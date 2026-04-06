@@ -314,6 +314,7 @@ const Inventory = () => {
   const [showCatDrop, setShowCatDrop] = useState(false);
   const [catComps, setCatComps] = useState<any[]>([]);
   const [missingComps, setMissingComps] = useState<Set<string>>(new Set());
+  const [matchResult, setMatchResult] = useState<any>(null);
 
   const fetchData = () => {
     supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).then(({ data }) => setItems(data || []));
@@ -323,40 +324,105 @@ const Inventory = () => {
 
   const fetchComps = async (id: string) => { const { data } = await supabase.from('item_components').select('*, components(name, component_code, is_critical)').eq('inventory_item_id', id); setComps(data || []); };
 
+  const generateUniqueId = () => {
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yy = String(d.getFullYear()).slice(-2);
+    const seq = String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0');
+    return `UNS-${dd}${mm}${yy}-${seq}`;
+  };
+
+  const updateComponentStatuses = async (inventoryItemId: string) => {
+    await new Promise(r => setTimeout(r, 500)); // wait for trigger to create item_components
+    const { data: itemComps } = await supabase.from('item_components').select('*').eq('inventory_item_id', inventoryItemId);
+    if (itemComps) {
+      for (const ic of itemComps) {
+        const isMissing = missingComps.has(ic.component_id);
+        await supabase.from('item_components').update({ status: isMissing ? 'missing' : 'present' }).eq('id', ic.id);
+      }
+    }
+  };
+
+  const checkForPairMatch = async (productId: string, currentItemId: string) => {
+    // Get all components for this category
+    const { data: allComps } = await supabase.from('components').select('id').eq('product_id', productId);
+    if (!allComps || allComps.length === 0) return;
+    const allCompIds = new Set(allComps.map(c => c.id));
+
+    // Get the current item's present components
+    const { data: currentItemComps } = await supabase.from('item_components').select('component_id, status').eq('inventory_item_id', currentItemId);
+    if (!currentItemComps) return;
+    const currentPresent = new Set(currentItemComps.filter(c => c.status === 'present').map(c => c.component_id));
+    const currentMissing = new Set(currentItemComps.filter(c => c.status === 'missing').map(c => c.component_id));
+    if (currentMissing.size === 0) return; // nothing missing, no need to pair
+
+    // Find other unsorted items of the same category
+    const { data: otherItems } = await supabase.from('inventory_items')
+      .select('id, batch_number, serial_number, created_at')
+      .eq('product_id', productId)
+      .eq('status', 'unsorted')
+      .neq('id', currentItemId);
+    if (!otherItems || otherItems.length === 0) return;
+
+    // Check each other item for complementary components
+    for (const other of otherItems) {
+      const { data: otherComps } = await supabase.from('item_components').select('component_id, status').eq('inventory_item_id', other.id);
+      if (!otherComps) continue;
+      const otherPresent = new Set(otherComps.filter(c => c.status === 'present').map(c => c.component_id));
+
+      // Check if the union of present components from both items covers ALL components
+      const union = new Set([...currentPresent, ...otherPresent]);
+      const coversAll = [...allCompIds].every(id => union.has(id));
+
+      if (coversAll) {
+        // Get component names for display
+        const { data: compNames } = await supabase.from('components').select('id, name').eq('product_id', productId);
+        const nameMap = Object.fromEntries((compNames || []).map(c => [c.id, c.name]));
+        const currentPresentNames = [...currentPresent].map(id => nameMap[id]).filter(Boolean);
+        const otherPresentNames = [...otherPresent].map(id => nameMap[id]).filter(Boolean);
+        const catName = products.find(p => p.id === productId)?.name || 'Unknown';
+
+        setMatchResult({
+          categoryName: catName,
+          currentId: currentItemId,
+          currentUniqueId: items.find(i => i.id === currentItemId)?.batch_number || 'Current item',
+          currentPresent: currentPresentNames,
+          otherId: other.id,
+          otherUniqueId: other.batch_number || other.serial_number || 'Unknown',
+          otherPresent: otherPresentNames,
+          otherDate: new Date(other.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        });
+        return; // found a match, stop searching
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    let savedItemId = '';
     if (selected) {
       const { error } = await supabase.from('inventory_items').update(form).eq('id', selected.id);
       if (error) { addToast(error.message, 'error'); return; }
-      // Update component statuses if unsorted
-      if (form.status === 'unsorted' && missingComps.size > 0) {
-        const { data: itemComps } = await supabase.from('item_components').select('*, components(id)').eq('inventory_item_id', selected.id);
-        if (itemComps) {
-          for (const ic of itemComps) {
-            const isMissing = missingComps.has(ic.component_id);
-            await supabase.from('item_components').update({ status: isMissing ? 'missing' : 'present' }).eq('id', ic.id);
-          }
-        }
-      }
+      if (form.status === 'unsorted') await updateComponentStatuses(selected.id);
+      savedItemId = selected.id;
       addToast('Updated!', 'success');
     } else {
-      const { data, error } = await supabase.from('inventory_items').insert({ ...form, reported_by: profile?.id }).select().single();
+      // Auto-generate unique ID and store in batch_number
+      const uniqueId = generateUniqueId();
+      const insertData = { ...form, batch_number: uniqueId, reported_by: profile?.id };
+      const { data, error } = await supabase.from('inventory_items').insert(insertData).select().single();
       if (error || !data) { addToast(error?.message || 'Error', 'error'); return; }
-      // Mark missing components after creation (trigger auto-creates item_components)
-      if (form.status === 'unsorted' && missingComps.size > 0) {
-        // Small delay to let the trigger create item_components
-        await new Promise(r => setTimeout(r, 500));
-        const { data: itemComps } = await supabase.from('item_components').select('*').eq('inventory_item_id', data.id);
-        if (itemComps) {
-          for (const ic of itemComps) {
-            const isMissing = missingComps.has(ic.component_id);
-            await supabase.from('item_components').update({ status: isMissing ? 'missing' : 'present' }).eq('id', ic.id);
-          }
-        }
-      }
-      addToast('Item added!', 'success');
+      if (form.status === 'unsorted') await updateComponentStatuses(data.id);
+      savedItemId = data.id;
+      addToast(`Item added! ID: ${uniqueId}`, 'success');
     }
     setShowModal(false); setSelected(null); setForm({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '' }); setCatComps([]); setMissingComps(new Set()); fetchData();
+
+    // Check for pair matches after save (only for unsorted items with missing components)
+    if (form.status === 'unsorted' && missingComps.size > 0) {
+      setTimeout(() => checkForPairMatch(form.product_id, savedItemId), 1000);
+    }
   };
 
   const updateComp = async (id: string, status: string) => { const { error } = await supabase.from('item_components').update({ status }).eq('id', id); if (error) addToast(error.message, 'error'); else { addToast('Updated!', 'success'); fetchComps(selected.id); fetchData(); } };
@@ -382,10 +448,11 @@ const Inventory = () => {
       const q = search.toLowerCase();
       const name = (i.products?.name || '').toLowerCase();
       const sku = (i.products?.sku || '').toLowerCase();
+      const uid = (i.batch_number || '').toLowerCase();
       const skuCode = (i.serial_number || '').toLowerCase();
       const notes = (i.notes || '').toLowerCase();
       const loc = (i.location || '').toLowerCase();
-      if (!name.includes(q) && !sku.includes(q) && !skuCode.includes(q) && !notes.includes(q) && !loc.includes(q)) return false;
+      if (!name.includes(q) && !sku.includes(q) && !uid.includes(q) && !skuCode.includes(q) && !notes.includes(q) && !loc.includes(q)) return false;
     }
     return true;
   });
@@ -408,8 +475,9 @@ const Inventory = () => {
       </div>
       <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>{['Category', 'SKU Code', 'Status', 'Location', 'Notes', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
+          <thead><tr>{['Unique ID', 'Category', 'SKU Code', 'Status', 'Location', 'Notes', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
           <tbody>{filtered.map((item) => (<tr key={item.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 11, color: T.gr }}>{item.batch_number || '—'}</td>
             <td style={S.tdStyle}><span style={{ fontWeight: 500 }}>{item.products?.name}</span><span style={{ display: 'block', fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{item.products?.sku}</span></td>
             <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 12 }}>{item.serial_number || '—'}</td>
             <td style={S.tdStyle}><span style={statusTag(item.status)}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></td>
@@ -429,6 +497,30 @@ const Inventory = () => {
       {showModal && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>Category *</label><input value={catSearch} onChange={(e) => { setCatSearch(e.target.value); setShowCatDrop(true); setForm({ ...form, product_id: '' }); }} onFocus={() => setShowCatDrop(true)} placeholder="Type to search categories by name or SKU..." style={S.fInput} autoComplete="off" /><input type="hidden" value={form.product_id} required />{form.product_id && <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: T.r, background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.25)', fontSize: 12, color: T.ac2 }}>{products.find(p => p.id === form.product_id)?.name} <span style={{ fontFamily: T.mono, opacity: 0.7 }}>{products.find(p => p.id === form.product_id)?.sku}</span><span onClick={() => { setForm({ ...form, product_id: '' }); setCatSearch(''); }} style={{ cursor: 'pointer', marginLeft: 4, opacity: 0.6 }}>✕</span></div>}{showCatDrop && !form.product_id && (() => { const q = catSearch.toLowerCase(); const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))); return filtered.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)' }}>{filtered.map(p => <div key={p.id} onClick={() => { setForm({ ...form, product_id: p.id }); setCatSearch(p.name); setShowCatDrop(false); supabase.from('components').select('*').eq('product_id', p.id).then(({ data }) => { setCatComps(data || []); setMissingComps(new Set()); }); }} style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}><span style={{ fontSize: 13, color: T.tx }}>{p.name}</span><span style={{ fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{p.sku}</span></div>)}</div> : catSearch ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '12px 14px', fontSize: 12, color: T.tx3, zIndex: 10 }}>No categories found</div> : null; })()}</div><div style={{ marginBottom: 14 }}><label style={S.fLabel}>SKU Code</label><input value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="e.g. LC-001-A" style={{ ...S.fInput, fontFamily: T.mono }} /></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select></div><div><label style={S.fLabel}>Location</label><input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Warehouse A" style={S.fInput} /></div></div>{form.status === 'unsorted' && catComps.length > 0 && <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Missing Components <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(select which are missing)</span></label><div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 10 }}>{catComps.map(c => { const isMissing = missingComps.has(c.id); return <div key={c.id} onClick={() => { const next = new Set(missingComps); if (isMissing) next.delete(c.id); else next.add(c.id); setMissingComps(next); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: T.r, cursor: 'pointer', marginBottom: 4, background: isMissing ? 'rgba(245,166,35,.08)' : 'transparent', border: `1px solid ${isMissing ? 'rgba(245,166,35,.3)' : 'transparent'}`, transition: 'all .12s' }}><div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isMissing ? T.yl : T.bd2}`, background: isMissing ? T.yl : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#000', fontWeight: 700, flexShrink: 0 }}>{isMissing && '✓'}</div><span style={{ fontSize: 13, color: isMissing ? T.yl : T.tx }}>{c.name}</span>{isMissing && <span style={{ fontSize: 10, color: T.yl, marginLeft: 'auto', fontWeight: 600 }}>MISSING</span>}</div>; })}</div>{missingComps.size > 0 && <p style={{ fontSize: 11, color: T.yl, marginTop: 6 }}>{missingComps.size} component{missingComps.size > 1 ? 's' : ''} marked as missing</p>}</div>}<div style={{ marginBottom: 14 }}><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional notes" style={S.fInput} /></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
 
       {showCompModal && selected && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>Components</span><p style={{ margin: '4px 0 0', fontSize: 12, color: T.tx3 }}>{selected.products?.name}</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}><div style={{ background: 'rgba(139,92,246,.06)', border: `1px solid rgba(139,92,246,.2)`, borderRadius: T.r, padding: '10px 14px', fontSize: 12, color: T.ac2, marginBottom: 16 }}>Mark all components as "Present" to auto-complete this item</div>{comps.map((c) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, marginBottom: 6 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: c.status === 'present' ? T.gr : c.status === 'damaged' ? T.re : T.yl }} /><div><p style={{ margin: 0, fontWeight: 500, fontSize: 13, color: T.tx }}>{c.components?.name}</p><p style={{ margin: 0, fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{c.components?.component_code}{c.components?.is_critical && <span style={{ marginLeft: 6, padding: '2px 6px', borderRadius: 3, fontSize: 9, background: 'rgba(245,87,92,.12)', color: T.re, fontWeight: 600 }}>Critical</span>}</p></div></div>{canEdit && <select value={c.status} onChange={(e) => updateComp(c.id, e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '6px 8px', cursor: 'pointer' }}><option value="missing">Missing</option><option value="present">Present</option><option value="damaged">Damaged</option></select>}</div>))}{comps.length === 0 && <p style={{ textAlign: 'center', color: T.tx3, fontSize: 13, padding: 20 }}>No components</p>}</div></div></div>)}
+      {matchResult && (<div style={S.modalOverlay}><div style={{ ...S.modalBox, width: 520 }}><div style={{ ...S.modalHead, background: 'rgba(45,212,160,.06)', borderBottom: `1px solid rgba(45,212,160,.2)` }}><span style={{ fontSize: 15, fontWeight: 600, color: T.gr }}>Pair Match Found!</span><span onClick={() => setMatchResult(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>
+        <div style={{ background: 'rgba(45,212,160,.08)', border: '1px solid rgba(45,212,160,.25)', borderRadius: T.r, padding: 14, marginBottom: 16, fontSize: 13, color: T.gr }}>
+          A complete <strong>{matchResult.categoryName}</strong> can be assembled by combining these two items!
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+          <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 14 }}>
+            <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 8 }}>Current Item</p>
+            <p style={{ fontSize: 12, fontFamily: T.mono, color: T.ac2, margin: '0 0 8px' }}>{matchResult.currentUniqueId}</p>
+            <p style={{ fontSize: 11, color: T.tx3, margin: '0 0 6px' }}>Has these components:</p>
+            {matchResult.currentPresent.map((n: string) => <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}><div style={{ width: 6, height: 6, borderRadius: '50%', background: T.gr }} /><span style={{ fontSize: 12, color: T.tx }}>{n}</span></div>)}
+          </div>
+          <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 14 }}>
+            <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 8 }}>Matching Item</p>
+            <p style={{ fontSize: 12, fontFamily: T.mono, color: T.ac2, margin: '0 0 4px' }}>{matchResult.otherUniqueId}</p>
+            <p style={{ fontSize: 11, color: T.tx3, margin: '0 0 8px' }}>Added on {matchResult.otherDate}</p>
+            <p style={{ fontSize: 11, color: T.tx3, margin: '0 0 6px' }}>Has these components:</p>
+            {matchResult.otherPresent.map((n: string) => <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}><div style={{ width: 6, height: 6, borderRadius: '50%', background: T.gr }} /><span style={{ fontSize: 12, color: T.tx }}>{n}</span></div>)}
+          </div>
+        </div>
+        <div style={{ background: 'rgba(139,92,246,.06)', border: '1px solid rgba(139,92,246,.2)', borderRadius: T.r, padding: 12, fontSize: 12, color: T.ac2, textAlign: 'center' }}>
+          Combine both items to complete the <strong>{matchResult.categoryName}</strong>
+        </div>
+        <div style={{ padding: '14px 0 0', display: 'flex', justifyContent: 'flex-end' }}><div onClick={() => setMatchResult(null)} style={S.btnPrimary}>Got it</div></div>
+      </div></div></div>)}
     </div>
   );
 };
