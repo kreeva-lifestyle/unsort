@@ -54,8 +54,10 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-    setProfile(data);
+    try {
+      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      setProfile(data);
+    } catch (_) {}
     setLoading(false);
   };
 
@@ -168,7 +170,7 @@ const AuthScreen = () => {
 
 const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (t: string) => void }) => {
   const { profile } = useAuth();
-  const tabs = [{ id: 'dashboard', icon: '📊', label: 'Dashboard' }, { id: 'inventory', icon: '📦', label: 'Inventory' }, { id: 'products', icon: '🏷️', label: 'Products' }, { id: 'reports', icon: '📋', label: 'Reports' }, { id: 'activity', icon: '📜', label: 'Activity' }];
+  const tabs = [{ id: 'dashboard', icon: '📊', label: 'Dashboard' }, { id: 'inventory', icon: '📦', label: 'Inventory' }, { id: 'categories', icon: '🏷️', label: 'Categories' }, { id: 'reports', icon: '📋', label: 'Reports' }, { id: 'activity', icon: '📜', label: 'Activity' }];
   if (profile?.role === 'admin') tabs.push({ id: 'users', icon: '👥', label: 'Users' });
 
   const handleSignOut = () => { supabase.auth.signOut(); };
@@ -247,19 +249,21 @@ const Dashboard = () => {
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
-    const [{ data: summary }, { data: items }] = await Promise.all([
-      supabase.from('dashboard_summary').select('*').single(),
-      supabase.from('inventory_items').select('*, products(name, sku)').order('created_at', { ascending: false }).limit(5)
-    ]);
-    if (summary) setStats(summary);
-    if (items) setRecent(items);
+    try {
+      const [summaryRes, itemsRes] = await Promise.all([
+        supabase.from('dashboard_summary').select('*').maybeSingle(),
+        supabase.from('inventory_items').select('*, products(name, sku)').order('created_at', { ascending: false }).limit(5)
+      ]);
+      if (summaryRes.data) setStats(summaryRes.data);
+      if (itemsRes.data) setRecent(itemsRes.data);
+    } catch (_) {}
     setLoading(false);
   };
 
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}><div className="spinner" /><span style={{ color: T.tx3, fontSize: 12 }}>Loading dashboard...</span></div>;
 
   const cards = [
-    { label: 'PRODUCTS', value: stats.total_products, color: T.ac, icon: '🏷️' },
+    { label: 'CATEGORIES', value: stats.total_products, color: T.ac, icon: '🏷️' },
     { label: 'INVENTORY', value: stats.total_inventory, color: T.bl, icon: '📦' },
     { label: 'DAMAGED', value: stats.damaged_count, color: T.re, icon: '⚠️' },
     { label: 'UNSORTED', value: stats.unsorted_count, color: T.yl, icon: '❓' },
@@ -286,7 +290,7 @@ const Dashboard = () => {
         </div>
         <div style={{ padding: 0 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr style={{ background: T.s2 }}>{['Product', 'SKU', 'Status'].map(h => <th key={h} style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, padding: '9px 13px', textAlign: 'left', fontWeight: 600, borderBottom: `1px solid ${T.bd}` }}>{h}</th>)}</tr></thead>
+            <thead><tr style={{ background: T.s2 }}>{['Category', 'Code', 'Status'].map(h => <th key={h} style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, padding: '9px 13px', textAlign: 'left', fontWeight: 600, borderBottom: `1px solid ${T.bd}` }}>{h}</th>)}</tr></thead>
             <tbody>{recent.map((item) => (
               <tr key={item.id}><td style={{ padding: '9px 13px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx }}>{item.products?.name}</td><td style={{ padding: '9px 13px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, color: T.tx2 }}>{item.products?.sku}</td><td style={{ padding: '9px 13px', fontSize: 12, borderBottom: `1px solid ${T.bd}` }}><span style={statusTag(item.status)}>{item.status}</span></td></tr>
             ))}</tbody>
@@ -313,7 +317,7 @@ const Inventory = () => {
 
   useEffect(() => { fetchData(); const ch = supabase.channel('inv').on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, fetchData).subscribe(); return () => { supabase.removeChannel(ch); }; }, []);
 
-  const fetchData = async () => { const [{ data: inv }, { data: prod }] = await Promise.all([supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }), supabase.from('products').select('*').eq('is_active', true)]); setItems(inv || []); setProducts(prod || []); setLoading(false); };
+  const fetchData = async () => { try { const [{ data: inv }, { data: prod }] = await Promise.all([supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }), supabase.from('products').select('*').eq('is_active', true)]); setItems(inv || []); setProducts(prod || []); } catch(_) {} setLoading(false); };
 
   const fetchComps = async (id: string) => { const { data } = await supabase.from('item_components').select('*, components(name, component_code, is_critical)').eq('inventory_item_id', id); setComps(data || []); };
 
@@ -338,21 +342,21 @@ const Inventory = () => {
       </div>
       <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>{['Product', 'SKU', 'Status', 'Components', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
+          <thead><tr>{['Category', 'Code', 'Status', 'Components', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
           <tbody>{filtered.map((item) => (<tr key={item.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}><td style={S.tdStyle}>{item.products?.name}</td><td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx2, fontSize: 12 }}>{item.products?.sku}</td><td style={S.tdStyle}><span style={statusTag(item.status)}>{item.status}</span></td><td style={S.tdStyle}><span onClick={() => openComps(item)} style={{ color: T.ac, cursor: 'pointer', fontSize: 13 }}>View ({item.products?.total_components || 0})</span></td><td style={S.tdStyle}>{canEdit && <span onClick={() => openEdit(item)} style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 12 }}>Edit</span>}</td></tr>))}</tbody>
         </table>
         {filtered.length === 0 && <div style={{ padding: 48, textAlign: 'center', color: T.tx3, fontSize: 13 }}>No items</div>}
       </div>
 
-      {showModal && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Product *</label><select value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })} required style={S.fInput}><option value="">Select</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Serial Number</label><input value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Batch Number</label><input value={form.batch_number} onChange={(e) => setForm({ ...form, batch_number: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="complete">Complete</option></select></div><div><label style={S.fLabel}>Location</label><input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Warehouse A" style={S.fInput} /></div></div><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional notes" style={S.fInput} /></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
+      {showModal && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Category *</label><select value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })} required style={S.fInput}><option value="">Select</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Serial Number</label><input value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Batch Number</label><input value={form.batch_number} onChange={(e) => setForm({ ...form, batch_number: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="complete">Complete</option></select></div><div><label style={S.fLabel}>Location</label><input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Warehouse A" style={S.fInput} /></div></div><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional notes" style={S.fInput} /></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
 
       {showCompModal && selected && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>Components</span><p style={{ margin: '4px 0 0', fontSize: 12, color: T.tx3 }}>{selected.products?.name}</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}><div style={{ background: 'rgba(139,92,246,.06)', border: `1px solid rgba(139,92,246,.2)`, borderRadius: T.r, padding: '10px 14px', fontSize: 12, color: T.ac2, marginBottom: 16 }}>Mark all components as "Present" to auto-complete this item</div>{comps.map((c) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, marginBottom: 6 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: c.status === 'present' ? T.gr : c.status === 'damaged' ? T.re : T.yl }} /><div><p style={{ margin: 0, fontWeight: 500, fontSize: 13, color: T.tx }}>{c.components?.name}</p><p style={{ margin: 0, fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{c.components?.component_code}{c.components?.is_critical && <span style={{ marginLeft: 6, padding: '2px 6px', borderRadius: 3, fontSize: 9, background: 'rgba(245,87,92,.12)', color: T.re, fontWeight: 600 }}>Critical</span>}</p></div></div>{canEdit && <select value={c.status} onChange={(e) => updateComp(c.id, e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '6px 8px', cursor: 'pointer' }}><option value="missing">Missing</option><option value="present">Present</option><option value="damaged">Damaged</option></select>}</div>))}{comps.length === 0 && <p style={{ textAlign: 'center', color: T.tx3, fontSize: 13, padding: 20 }}>No components</p>}</div></div></div>)}
     </div>
   );
 };
 
-const Products = () => {
-  const [products, setProducts] = useState<any[]>([]);
+const Categories = () => {
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showCompModal, setShowCompModal] = useState(false);
@@ -363,31 +367,49 @@ const Products = () => {
   const [form, setForm] = useState({ sku: '', name: '', description: '', category: '' });
   const [compForm, setCompForm] = useState({ component_code: '', name: '', is_critical: false });
 
-  useEffect(() => { fetchProducts(); }, []);
-  const fetchProducts = async () => { const { data } = await supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }); setProducts(data || []); setLoading(false); };
-  const fetchComps = async (id: string) => { const { data } = await supabase.from('components').select('*').eq('product_id', id); setComps(data || []); };
+  useEffect(() => { fetchCategories(); }, []);
+  const fetchCategories = async () => { try { const { data } = await supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }); setCategories(data || []); } catch(_) {} setLoading(false); };
+  const fetchComps = async (id: string) => { const { data } = await supabase.from('components').select('*').eq('product_id', id).order('created_at', { ascending: true }); setComps(data || []); };
 
-  const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); const { error } = selected ? await supabase.from('products').update(form).eq('id', selected.id) : await supabase.from('products').insert({ ...form, created_by: profile?.id }); if (error) addToast(error.message, 'error'); else { addToast(selected ? 'Updated!' : 'Added!', 'success'); setShowModal(false); setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); fetchProducts(); } };
+  const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); const { error } = selected ? await supabase.from('products').update(form).eq('id', selected.id) : await supabase.from('products').insert({ ...form, created_by: profile?.id }); if (error) addToast(error.message, 'error'); else { addToast(selected ? 'Updated!' : 'Added!', 'success'); setShowModal(false); setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); fetchCategories(); } };
 
-  const addComp = async (e: React.FormEvent) => { e.preventDefault(); const { error } = await supabase.from('components').insert({ ...compForm, product_id: selected.id }); if (error) addToast(error.message, 'error'); else { addToast('Added!', 'success'); setCompForm({ component_code: '', name: '', is_critical: false }); fetchComps(selected.id); fetchProducts(); } };
+  const addComp = async (e: React.FormEvent) => { e.preventDefault(); const { error } = await supabase.from('components').insert({ ...compForm, product_id: selected.id }); if (error) addToast(error.message, 'error'); else { addToast('Component added!', 'success'); setCompForm({ component_code: '', name: '', is_critical: false }); fetchComps(selected.id); fetchCategories(); } };
 
-  const deleteComp = async (id: string) => { await supabase.from('components').delete().eq('id', id); addToast('Deleted!', 'success'); fetchComps(selected.id); fetchProducts(); };
+  const deleteComp = async (id: string) => { await supabase.from('components').delete().eq('id', id); addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories(); };
 
   const openEdit = (p: any) => { setSelected(p); setForm({ sku: p.sku, name: p.name, description: p.description || '', category: p.category || '' }); setShowModal(true); };
   const openComps = async (p: any) => { setSelected(p); await fetchComps(p.id); setShowCompModal(true); };
   const canEdit = profile && ['admin', 'manager'].includes(profile.role);
 
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}><div className="spinner" /><span style={{ color: T.tx3, fontSize: 12 }}>Loading products...</span></div>;
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}><div className="spinner" /><span style={{ color: T.tx3, fontSize: 12 }}>Loading categories...</span></div>;
 
   return (
     <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Products</span>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setShowModal(true); }} style={S.btnPrimary}>+ Add Product</div>}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>{products.map((p) => (<div key={p.id} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '16px 18px', transition: 'border-color .15s, box-shadow .15s', cursor: 'default' }} onMouseEnter={e => { e.currentTarget.style.borderColor = T.bd2; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.2)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.boxShadow = 'none'; }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><div><h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: T.tx }}>{p.name}</h3><p style={{ margin: '4px 0 0', color: T.ac, fontSize: 12, fontFamily: T.mono }}>{p.sku}</p></div>{canEdit && <span onClick={() => openEdit(p)} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 12 }}>Edit</span>}</div><p style={{ color: T.tx3, fontSize: 13, margin: '0 0 12px' }}>{p.description || 'No description'}</p><span onClick={() => openComps(p)} style={{ color: T.ac, cursor: 'pointer', fontSize: 13 }}>Components ({p.total_components})</span></div>))}</div>
-      {products.length === 0 && <div style={{ textAlign: 'center', padding: 48, color: T.tx3, fontSize: 13 }}>No products yet</div>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Categories</span>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setShowModal(true); }} style={S.btnPrimary}>+ Add Category</div>}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>{categories.map((p) => (<div key={p.id} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '18px 20px', transition: 'border-color .15s, box-shadow .15s', cursor: 'default' }} onMouseEnter={e => { e.currentTarget.style.borderColor = T.bd2; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.2)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.boxShadow = 'none'; }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: T.tx }}>{p.name}</h3>
+            <p style={{ margin: '4px 0 0', color: T.ac, fontSize: 12, fontFamily: T.mono }}>{p.sku}</p>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {canEdit && <span onClick={() => openEdit(p)} style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 12 }}>Edit</span>}
+          </div>
+        </div>
+        {p.description && <p style={{ color: T.tx3, fontSize: 13, margin: '0 0 12px' }}>{p.description}</p>}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0 0', borderTop: `1px solid ${T.bd}` }}>
+          <span style={{ fontSize: 12, color: T.tx3 }}>{p.total_components} component{p.total_components !== 1 ? 's' : ''}</span>
+          <span onClick={() => openComps(p)} style={{ ...S.btnPrimary, padding: '5px 14px', fontSize: 12 }}>Manage Components</span>
+        </div>
+      </div>))}</div>
+      {categories.length === 0 && <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 48, textAlign: 'center' }}><p style={{ color: T.tx3, fontSize: 14, marginBottom: 12 }}>No categories yet</p><p style={{ color: T.tx3, fontSize: 12 }}>Add a category like "Lehenga Choli" and then add components like Lehenga, Blouse, Dupatta</p>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setShowModal(true); }} style={{ ...S.btnPrimary, marginTop: 16, display: 'inline-flex' }}>+ Add First Category</div>}</div>}
 
-      {showModal && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Product</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>SKU *</label><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required style={S.fInput} /></div><div><label style={S.fLabel}>Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required style={S.fInput} /></div></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Category</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="e.g. Lehenga, Saree" style={S.fInput} /></div><div><label style={S.fLabel}>Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
+      {showModal && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Category</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Category Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Lehenga Choli" style={S.fInput} /></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Code *</label><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required placeholder="e.g. LC-001" style={S.fInput} /></div><div><label style={S.fLabel}>Group</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="e.g. Ethnic Wear" style={S.fInput} /></div></div><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description of this category" style={S.fInput} /></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add Category'}</button></div></form></div></div>)}
 
-      {showCompModal && selected && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>Components</span><p style={{ margin: '4px 0 0', fontSize: 12, color: T.tx3 }}>{selected.name}</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>{canEdit && <form onSubmit={addComp} style={{ background: T.s2, border: `1px solid ${T.bd}`, padding: 14, borderRadius: T.r, marginBottom: 16 }}><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}><input value={compForm.component_code} onChange={(e) => setCompForm({ ...compForm, component_code: e.target.value })} placeholder="Code" required style={S.fInput} /><input value={compForm.name} onChange={(e) => setCompForm({ ...compForm, name: e.target.value })} placeholder="Name" required style={S.fInput} /></div><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: T.tx2, cursor: 'pointer' }}><input type="checkbox" checked={compForm.is_critical} onChange={(e) => setCompForm({ ...compForm, is_critical: e.target.checked })} /> Critical</label><button type="submit" style={{ ...S.btnPrimary, padding: '6px 14px' }}>Add</button></div></form>}{comps.map((c) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', border: `1px solid ${T.bd}`, borderRadius: T.r, marginBottom: 6, background: T.s2 }}><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 13, color: T.tx }}>{c.name}</span><span style={{ padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 500, background: 'rgba(139,92,246,.1)', color: T.ac2, fontFamily: T.mono }}>{c.component_code}</span>{c.is_critical && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(245,87,92,.1)', color: T.re }}>Critical</span>}</div>{canEdit && <span onClick={() => deleteComp(c.id)} style={S.btnDanger}>Delete</span>}</div>))}{comps.length === 0 && <p style={{ textAlign: 'center', color: T.tx3, fontSize: 13, padding: 20 }}>No components</p>}</div></div></div>)}
+      {showCompModal && selected && (<div style={S.modalOverlay}><div style={{ ...S.modalBox, width: 560 }}><div style={S.modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>Components of "{selected.name}"</span><p style={{ margin: '4px 0 0', fontSize: 12, color: T.tx3 }}>Add the individual parts that make up this category</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>{canEdit && <form onSubmit={addComp} style={{ background: T.s2, border: `1px solid ${T.bd}`, padding: 16, borderRadius: T.r, marginBottom: 16 }}><p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>Add New Component</p><div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 10, marginBottom: 10 }}><input value={compForm.component_code} onChange={(e) => setCompForm({ ...compForm, component_code: e.target.value })} placeholder="Code" required style={S.fInput} /><input value={compForm.name} onChange={(e) => setCompForm({ ...compForm, name: e.target.value })} placeholder="e.g. Lehenga, Blouse, Dupatta" required style={S.fInput} /></div><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: T.tx2, cursor: 'pointer' }}><input type="checkbox" checked={compForm.is_critical} onChange={(e) => setCompForm({ ...compForm, is_critical: e.target.checked })} /> Mark as critical</label><button type="submit" style={{ ...S.btnPrimary, padding: '7px 16px' }}>+ Add Component</button></div></form>}
+      {comps.length > 0 && <p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>{comps.length} Component{comps.length !== 1 ? 's' : ''}</p>}
+      {comps.map((c, i) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', border: `1px solid ${T.bd}`, borderRadius: T.r, marginBottom: 6, background: T.s2 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ width: 24, height: 24, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: T.tx2, fontFamily: T.mono }}>{i + 1}</span><div><span style={{ fontSize: 14, color: T.tx, fontWeight: 500 }}>{c.name}</span><div style={{ display: 'flex', gap: 6, marginTop: 2 }}><span style={{ padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 500, background: 'rgba(139,92,246,.1)', color: T.ac2, fontFamily: T.mono }}>{c.component_code}</span>{c.is_critical && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(245,87,92,.1)', color: T.re, fontWeight: 600 }}>Critical</span>}</div></div></div>{canEdit && <span onClick={() => deleteComp(c.id)} style={S.btnDanger}>Delete</span>}</div>))}
+      {comps.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: T.tx3 }}><p style={{ fontSize: 13, marginBottom: 4 }}>No components added yet</p><p style={{ fontSize: 12 }}>Add components like Lehenga, Blouse, Dupatta etc.</p></div>}</div></div></div>)}
     </div>
   );
 };
@@ -402,7 +424,7 @@ const Reports = () => {
   const [form, setForm] = useState({ inventory_item_id: '', damage_type: '', cause: '', estimated_loss: '' });
 
   useEffect(() => { fetchData(); }, []);
-  const fetchData = async () => { const [{ data: rep }, { data: inv }] = await Promise.all([supabase.from('damage_reports').select('*, inventory_items(*, products(name, sku)), profiles:reported_by(full_name)').order('created_at', { ascending: false }), supabase.from('inventory_items').select('*, products(name, sku)').in('status', ['damaged', 'unsorted'])]); setReports(rep || []); setItems(inv || []); setLoading(false); };
+  const fetchData = async () => { try { const [{ data: rep }, { data: inv }] = await Promise.all([supabase.from('damage_reports').select('*, inventory_items(*, products(name, sku)), profiles:reported_by(full_name)').order('created_at', { ascending: false }), supabase.from('inventory_items').select('*, products(name, sku)').in('status', ['damaged', 'unsorted'])]); setReports(rep || []); setItems(inv || []); } catch(_) {} setLoading(false); };
 
   const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); const { error } = await supabase.from('damage_reports').insert({ ...form, estimated_loss: form.estimated_loss ? parseFloat(form.estimated_loss) : null, reported_by: profile?.id }); if (error) addToast(error.message, 'error'); else { addToast('Created!', 'success'); setShowModal(false); setForm({ inventory_item_id: '', damage_type: '', cause: '', estimated_loss: '' }); fetchData(); } };
 
@@ -437,7 +459,7 @@ const Reports = () => {
 const Activity = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { (async () => { const { data } = await supabase.from('activity_logs').select('*, profiles:user_id(full_name)').order('created_at', { ascending: false }).limit(50); setLogs(data || []); setLoading(false); })(); }, []);
+  useEffect(() => { (async () => { try { const { data } = await supabase.from('activity_logs').select('*, profiles:user_id(full_name)').order('created_at', { ascending: false }).limit(50); setLogs(data || []); } catch(_) {} setLoading(false); })(); }, []);
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}><div className="spinner" /><span style={{ color: T.tx3, fontSize: 12 }}>Loading activity...</span></div>;
 
   const actionTag = (action: string) => {
@@ -453,7 +475,7 @@ const Users = () => {
   const [loading, setLoading] = useState(true);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
-  useEffect(() => { (async () => { const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); setLoading(false); })(); }, []);
+  useEffect(() => { (async () => { try { const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); } catch(_) {} setLoading(false); })(); }, []);
   const updateRole = async (id: string, role: string) => { await supabase.from('profiles').update({ role }).eq('id', id); addToast('Updated!', 'success'); const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); };
   const toggleActive = async (id: string, isActive: boolean) => { await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id); addToast(isActive ? 'Revoked' : 'Granted', 'success'); const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); };
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}><div className="spinner" /><span style={{ color: T.tx3, fontSize: 12 }}>Loading users...</span></div>;
@@ -462,8 +484,8 @@ const Users = () => {
 
 const MainApp = () => {
   const [tab, setTab] = useState('dashboard');
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', products: 'Products', reports: 'Damage Reports', activity: 'Activity Log', users: 'User Management' };
-  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%' }}><Sidebar activeTab={tab} setActiveTab={setTab} /><div style={{ marginLeft: 230, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}><Header title={titles[tab]} /><main style={{ flex: 1, overflowX: 'hidden' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory />}{tab === 'products' && <Products />}{tab === 'reports' && <Reports />}{tab === 'activity' && <Activity />}{tab === 'users' && <Users />}</main></div><ToastContainer /></div>);
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', categories: 'Categories', reports: 'Damage Reports', activity: 'Activity Log', users: 'User Management' };
+  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%' }}><Sidebar activeTab={tab} setActiveTab={setTab} /><div style={{ marginLeft: 230, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}><Header title={titles[tab]} /><main style={{ flex: 1, overflowX: 'hidden' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory />}{tab === 'categories' && <Categories />}{tab === 'reports' && <Reports />}{tab === 'activity' && <Activity />}{tab === 'users' && <Users />}</main></div><ToastContainer /></div>);
 };
 
 export default function App() { return <AuthProvider><AppContent /></AuthProvider>; }
