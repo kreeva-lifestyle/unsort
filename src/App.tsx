@@ -121,19 +121,17 @@ const ToastContainer = () => {
 };
 
 const AuthScreen = () => {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const { signIn } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const { error } = isLogin ? await signIn(email, password) : await signUp(email, password, fullName);
+    const { error } = await signIn(email, password);
     if (error) setError(error.message);
     setLoading(false);
   };
@@ -150,15 +148,10 @@ const AuthScreen = () => {
         <div style={{ fontSize: 11, color: T.tx3, letterSpacing: 3, textTransform: 'uppercase' as const, marginBottom: 32, opacity: 0, animation: 'loginFadeUp .5s .2s ease both' }}>Track Damaged & Unsorted Products</div>
         <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${T.bd2}, transparent)`, marginBottom: 28, opacity: 0, animation: 'loginFadeUp .5s .25s ease both' }} />
         {error && <div style={{ background: 'rgba(245,87,92,.12)', border: '1px solid rgba(245,87,92,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.re, marginBottom: 14, animation: 'loginShake .4s ease' }}>{error}</div>}
-        <div style={{ display: 'flex', marginBottom: 24, background: T.s2, borderRadius: 8, padding: 3 }}>
-          <button onClick={() => setIsLogin(true)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, fontFamily: T.sans, background: isLogin ? T.ac : 'transparent', color: isLogin ? '#fff' : T.tx3, transition: 'all .15s' }}>Sign In</button>
-          <button onClick={() => setIsLogin(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, fontFamily: T.sans, background: !isLogin ? T.ac : 'transparent', color: !isLogin ? '#fff' : T.tx3, transition: 'all .15s' }}>Sign Up</button>
-        </div>
         <form onSubmit={handleSubmit}>
-          {!isLogin && <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp .5s .3s ease both' }}><label style={{ fontSize: 11, color: T.tx3, marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1.5, display: 'block' }}>Full Name</label><input type="text" placeholder="Enter your name" value={fullName} onChange={(e) => setFullName(e.target.value)} required style={inputStyle} /></div>}
-          <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp .5s .35s ease both' }}><label style={{ fontSize: 11, color: T.tx3, marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1.5, display: 'block' }}>Email</label><input type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required style={inputStyle} /></div>
-          <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp .5s .4s ease both' }}><label style={{ fontSize: 11, color: T.tx3, marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1.5, display: 'block' }}>Password</label><input type="password" placeholder="Enter password" value={password} onChange={(e) => setPassword(e.target.value)} required style={inputStyle} /></div>
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '13px 20px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: T.sans, color: '#000', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: 0.3, opacity: 0, animation: 'loginFadeUp .5s .5s ease both', position: 'relative', overflow: 'hidden' }}>{loading ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}</button>
+          <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp .5s .3s ease both' }}><label style={{ fontSize: 11, color: T.tx3, marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1.5, display: 'block' }}>Email</label><input type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required style={inputStyle} /></div>
+          <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp .5s .35s ease both' }}><label style={{ fontSize: 11, color: T.tx3, marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1.5, display: 'block' }}>Password</label><input type="password" placeholder="Enter password" value={password} onChange={(e) => setPassword(e.target.value)} required style={inputStyle} /></div>
+          <button type="submit" disabled={loading} style={{ width: '100%', padding: '13px 20px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: T.sans, color: '#fff', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: 0.3, opacity: 0, animation: 'loginFadeUp .5s .4s ease both', position: 'relative', overflow: 'hidden' }}>{loading ? 'Please wait...' : 'Sign In'}</button>
         </form>
         <p style={{ fontSize: 11, color: T.tx3, marginTop: 24, letterSpacing: 1 }}>Powered by Arya Designs</p>
       </div>
@@ -245,19 +238,10 @@ const statusTag = (status: string) => {
 const Dashboard = () => {
   const [stats, setStats] = useState<any>({ total_products: 0, total_inventory: 0, damaged_count: 0, unsorted_count: 0, complete_count: 0, open_reports: 0 });
   const [recent, setRecent] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => { fetchData(); }, []);
-
-  const fetchData = async () => {
-    const { data: summaryRows } = await supabase.from('dashboard_summary').select('*').limit(1);
-    const { data: items } = await supabase.from('inventory_items').select('*, products(name, sku)').order('created_at', { ascending: false }).limit(5);
-    if (summaryRows && summaryRows.length > 0) setStats(summaryRows[0]);
-    setRecent(items || []);
-    setLoading(false);
-  };
-
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}><div className="spinner" /><span style={{ color: T.tx3, fontSize: 12 }}>Loading dashboard...</span></div>;
+  useEffect(() => {
+    supabase.from('dashboard_summary').select('*').limit(1).then(({ data }) => { if (data && data[0]) setStats(data[0]); });
+    supabase.from('inventory_items').select('*, products(name, sku)').order('created_at', { ascending: false }).limit(5).then(({ data }) => { setRecent(data || []); });
+  }, []);
 
   const cards = [
     { label: 'CATEGORIES', value: stats.total_products, color: T.ac, icon: '🏷️' },
@@ -302,7 +286,6 @@ const Dashboard = () => {
 const Inventory = () => {
   const [items, setItems] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showCompModal, setShowCompModal] = useState(false);
   const [selected, setSelected] = useState<any>(null);
@@ -312,9 +295,11 @@ const Inventory = () => {
   const { addToast } = useNotifications();
   const [form, setForm] = useState({ product_id: '', serial_number: '', batch_number: '', status: 'unsorted', location: '', notes: '' });
 
+  const fetchData = () => {
+    supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).then(({ data }) => setItems(data || []));
+    supabase.from('products').select('*').eq('is_active', true).then(({ data }) => setProducts(data || []));
+  };
   useEffect(() => { fetchData(); const ch = supabase.channel('inv').on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, fetchData).subscribe(); return () => { supabase.removeChannel(ch); }; }, []);
-
-  const fetchData = async () => { const { data: inv } = await supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }); const { data: prod } = await supabase.from('products').select('*').eq('is_active', true); setItems(inv || []); setProducts(prod || []); setLoading(false); };
 
   const fetchComps = async (id: string) => { const { data } = await supabase.from('item_components').select('*, components(name, component_code, is_critical)').eq('inventory_item_id', id); setComps(data || []); };
 
@@ -326,8 +311,6 @@ const Inventory = () => {
   const openComps = async (item: any) => { setSelected(item); await fetchComps(item.id); setShowCompModal(true); };
   const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
   const filtered = items.filter((i) => filter === 'all' || i.status === filter);
-
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}><div className="spinner" /><span style={{ color: T.tx3, fontSize: 12 }}>Loading inventory...</span></div>;
 
   return (
     <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
@@ -354,7 +337,6 @@ const Inventory = () => {
 
 const Categories = () => {
   const [categories, setCategories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showCompModal, setShowCompModal] = useState(false);
   const [selected, setSelected] = useState<any>(null);
@@ -364,8 +346,8 @@ const Categories = () => {
   const [form, setForm] = useState({ sku: '', name: '', description: '', category: '' });
   const [compForm, setCompForm] = useState({ component_code: '', name: '', is_critical: false });
 
+  const fetchCategories = () => { supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }).then(({ data }) => setCategories(data || [])); };
   useEffect(() => { fetchCategories(); }, []);
-  const fetchCategories = async () => { const { data } = await supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }); setCategories(data || []); setLoading(false); };
   const fetchComps = async (id: string) => { const { data } = await supabase.from('components').select('*').eq('product_id', id).order('created_at', { ascending: true }); setComps(data || []); };
 
   const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); const { error } = selected ? await supabase.from('products').update(form).eq('id', selected.id) : await supabase.from('products').insert({ ...form, created_by: profile?.id }); if (error) addToast(error.message, 'error'); else { addToast(selected ? 'Updated!' : 'Added!', 'success'); setShowModal(false); setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); fetchCategories(); } };
@@ -377,8 +359,6 @@ const Categories = () => {
   const openEdit = (p: any) => { setSelected(p); setForm({ sku: p.sku, name: p.name, description: p.description || '', category: p.category || '' }); setShowModal(true); };
   const openComps = async (p: any) => { setSelected(p); await fetchComps(p.id); setShowCompModal(true); };
   const canEdit = profile && ['admin', 'manager'].includes(profile.role);
-
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}><div className="spinner" /><span style={{ color: T.tx3, fontSize: 12 }}>Loading categories...</span></div>;
 
   return (
     <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
@@ -414,14 +394,16 @@ const Categories = () => {
 const Reports = () => {
   const [reports, setReports] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
   const [form, setForm] = useState({ inventory_item_id: '', damage_type: '', cause: '', estimated_loss: '' });
 
+  const fetchData = () => {
+    supabase.from('damage_reports').select('*, inventory_items(*, products(name, sku)), profiles:reported_by(full_name)').order('created_at', { ascending: false }).then(({ data }) => setReports(data || []));
+    supabase.from('inventory_items').select('*, products(name, sku)').in('status', ['damaged', 'unsorted']).then(({ data }) => setItems(data || []));
+  };
   useEffect(() => { fetchData(); }, []);
-  const fetchData = async () => { const { data: rep } = await supabase.from('damage_reports').select('*, inventory_items(*, products(name, sku)), profiles:reported_by(full_name)').order('created_at', { ascending: false }); const { data: inv } = await supabase.from('inventory_items').select('*, products(name, sku)').in('status', ['damaged', 'unsorted']); setReports(rep || []); setItems(inv || []); setLoading(false); };
 
   const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); const { error } = await supabase.from('damage_reports').insert({ ...form, estimated_loss: form.estimated_loss ? parseFloat(form.estimated_loss) : null, reported_by: profile?.id }); if (error) addToast(error.message, 'error'); else { addToast('Created!', 'success'); setShowModal(false); setForm({ inventory_item_id: '', damage_type: '', cause: '', estimated_loss: '' }); fetchData(); } };
 
@@ -440,8 +422,6 @@ const Reports = () => {
     return { display: 'inline-block' as const, padding: '2px 8px', borderRadius: T.r, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color };
   };
 
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}><div className="spinner" /><span style={{ color: T.tx3, fontSize: 12 }}>Loading reports...</span></div>;
-
   return (
     <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Damage Reports</span>{canEdit && <div onClick={() => setShowModal(true)} style={S.btnPrimary}>+ New Report</div>}</div>
@@ -455,9 +435,7 @@ const Reports = () => {
 
 const Activity = () => {
   const [logs, setLogs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => { (async () => { const { data } = await supabase.from('activity_logs').select('*, profiles:user_id(full_name)').order('created_at', { ascending: false }).limit(50); setLogs(data || []); setLoading(false); })(); }, []);
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}><div className="spinner" /><span style={{ color: T.tx3, fontSize: 12 }}>Loading activity...</span></div>;
+  useEffect(() => { supabase.from('activity_logs').select('*, profiles:user_id(full_name)').order('created_at', { ascending: false }).limit(50).then(({ data }) => setLogs(data || [])); }, []);
 
   const actionTag = (action: string) => {
     const isCreate = action === 'created';
@@ -469,14 +447,122 @@ const Activity = () => {
 
 const Users = () => {
   const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', password: '', role: 'viewer' });
+  const [inviteResult, setInviteResult] = useState<{ email: string; password: string } | null>(null);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
-  useEffect(() => { (async () => { const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); setLoading(false); })(); }, []);
-  const updateRole = async (id: string, role: string) => { await supabase.from('profiles').update({ role }).eq('id', id); addToast('Updated!', 'success'); const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); };
-  const toggleActive = async (id: string, isActive: boolean) => { await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id); addToast(isActive ? 'Revoked' : 'Granted', 'success'); const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); };
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}><div className="spinner" /><span style={{ color: T.tx3, fontSize: 12 }}>Loading users...</span></div>;
-  return (<div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}><div style={{ fontSize: 14, fontWeight: 600, color: T.tx, marginBottom: 16 }}>User Management</div><div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, overflow: 'hidden' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr>{['User', 'Role', 'Status', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead><tbody>{users.map((u) => (<tr key={u.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}><td style={S.tdStyle}><p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: T.tx }}>{u.full_name}</p><p style={{ margin: '2px 0 0', fontSize: 12, color: T.tx3 }}>{u.email}</p></td><td style={S.tdStyle}><select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} disabled={u.id === profile?.id} style={{ ...S.fInput, width: 'auto', minWidth: 110, padding: '6px 10px', cursor: u.id === profile?.id ? 'not-allowed' : 'pointer', opacity: u.id === profile?.id ? 0.5 : 1 }}><option value="admin">Admin</option><option value="manager">Manager</option><option value="operator">Operator</option><option value="viewer">Viewer</option></select></td><td style={S.tdStyle}><span style={{ padding: '3px 10px', borderRadius: T.r, fontSize: 11, fontWeight: 600, ...( u.is_active ? { background: 'rgba(45,212,160,.12)', color: T.gr } : { background: 'rgba(245,87,92,.12)', color: T.re }) }}>{u.is_active ? 'Active' : 'Inactive'}</span></td><td style={S.tdStyle}>{u.id !== profile?.id && <span onClick={() => toggleActive(u.id, u.is_active)} style={{ padding: '6px 14px', borderRadius: T.r, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: T.sans, display: 'inline-block', ...(u.is_active ? { background: 'rgba(245,87,92,.1)', color: T.re, border: '1px solid rgba(245,87,92,.25)' } : { background: 'rgba(45,212,160,.1)', color: T.gr, border: '1px solid rgba(45,212,160,.25)' }) }}>{u.is_active ? 'Revoke' : 'Grant'}</span>}</td></tr>))}</tbody></table></div></div>);
+
+  const fetchUsers = () => { supabase.from('profiles').select('*').order('created_at', { ascending: false }).then(({ data }) => setUsers(data || [])); };
+  useEffect(() => { fetchUsers(); }, []);
+
+  const updateRole = async (id: string, role: string) => { await supabase.from('profiles').update({ role }).eq('id', id); addToast('Role updated!', 'success'); fetchUsers(); };
+  const toggleActive = async (id: string, isActive: boolean) => { await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id); addToast(isActive ? 'Access revoked' : 'Access granted', 'success'); fetchUsers(); };
+
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
+    let pwd = '';
+    for (let i = 0; i < 12; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+    return pwd;
+  };
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setInviting(true);
+    const password = inviteForm.password || generatePassword();
+    const { data, error } = await supabase.auth.signUp({
+      email: inviteForm.email,
+      password,
+      options: { data: { full_name: inviteForm.full_name } }
+    });
+    if (error) {
+      addToast(error.message, 'error');
+      setInviting(false);
+      return;
+    }
+    // Update role if not default viewer
+    if (data.user && inviteForm.role !== 'viewer') {
+      await supabase.from('profiles').update({ role: inviteForm.role }).eq('id', data.user.id);
+    }
+    setInviteResult({ email: inviteForm.email, password });
+    addToast(`User ${inviteForm.full_name} invited!`, 'success');
+    setInviting(false);
+    fetchUsers();
+  };
+
+  const closeInvite = () => {
+    setShowInvite(false);
+    setInviteResult(null);
+    setInviteForm({ email: '', full_name: '', password: '', role: 'viewer' });
+  };
+
+  return (
+    <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>User Management</span>
+        <div onClick={() => setShowInvite(true)} style={S.btnPrimary}>+ Invite User</div>
+      </div>
+      <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr>{['User', 'Role', 'Status', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
+          <tbody>{users.map((u) => (
+            <tr key={u.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              <td style={S.tdStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{(u.full_name || u.email || '?')[0].toUpperCase()}</div>
+                  <div><p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: T.tx }}>{u.full_name || 'Unnamed'}</p><p style={{ margin: '2px 0 0', fontSize: 12, color: T.tx3 }}>{u.email}</p></div>
+                </div>
+              </td>
+              <td style={S.tdStyle}><select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} disabled={u.id === profile?.id} style={{ ...S.fInput, width: 'auto', minWidth: 110, padding: '6px 10px', cursor: u.id === profile?.id ? 'not-allowed' : 'pointer', opacity: u.id === profile?.id ? 0.5 : 1 }}><option value="admin">Admin</option><option value="manager">Manager</option><option value="operator">Operator</option><option value="viewer">Viewer</option></select></td>
+              <td style={S.tdStyle}><span style={{ padding: '3px 10px', borderRadius: T.r, fontSize: 11, fontWeight: 600, ...(u.is_active ? { background: 'rgba(45,212,160,.12)', color: T.gr } : { background: 'rgba(245,87,92,.12)', color: T.re }) }}>{u.is_active ? 'Active' : 'Inactive'}</span></td>
+              <td style={S.tdStyle}>{u.id !== profile?.id && <span onClick={() => toggleActive(u.id, u.is_active)} style={{ padding: '6px 14px', borderRadius: T.r, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: T.sans, display: 'inline-block', ...(u.is_active ? { background: 'rgba(245,87,92,.1)', color: T.re, border: '1px solid rgba(245,87,92,.25)' } : { background: 'rgba(45,212,160,.1)', color: T.gr, border: '1px solid rgba(45,212,160,.25)' }) }}>{u.is_active ? 'Revoke' : 'Grant'}</span>}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+
+      {showInvite && (<div style={S.modalOverlay}><div style={S.modalBox}>
+        <div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>Invite New User</span><span onClick={closeInvite} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div>
+        {inviteResult ? (
+          <div style={{ padding: 20 }}>
+            <div style={{ background: 'rgba(45,212,160,.08)', border: '1px solid rgba(45,212,160,.25)', borderRadius: T.r, padding: 16, marginBottom: 16 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: T.gr, margin: '0 0 8px' }}>User invited successfully!</p>
+              <p style={{ fontSize: 12, color: T.tx2, margin: 0 }}>Share these credentials with the user:</p>
+            </div>
+            <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 16 }}>
+              <div style={{ marginBottom: 12 }}>
+                <p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 4 }}>Email</p>
+                <p style={{ fontSize: 14, fontFamily: T.mono, color: T.tx, margin: 0, userSelect: 'all' as const }}>{inviteResult.email}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 4 }}>Password</p>
+                <p style={{ fontSize: 14, fontFamily: T.mono, color: T.ac, margin: 0, userSelect: 'all' as const }}>{inviteResult.password}</p>
+              </div>
+            </div>
+            <p style={{ fontSize: 11, color: T.tx3, marginTop: 12, textAlign: 'center' }}>The user should change their password after first login</p>
+            <div style={{ padding: '14px 0 0', display: 'flex', justifyContent: 'flex-end' }}>
+              <div onClick={closeInvite} style={S.btnPrimary}>Done</div>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleInvite} style={{ padding: 20 }}>
+            <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Full Name *</label><input value={inviteForm.full_name} onChange={(e) => setInviteForm({ ...inviteForm, full_name: e.target.value })} required placeholder="e.g. Mahesh Dhameliya" style={S.fInput} /></div>
+            <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Email *</label><input type="email" value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} required placeholder="user@aryadesigns.co.in" style={S.fInput} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div><label style={S.fLabel}>Password</label><input value={inviteForm.password} onChange={(e) => setInviteForm({ ...inviteForm, password: e.target.value })} placeholder="Auto-generate if empty" style={S.fInput} /></div>
+              <div><label style={S.fLabel}>Role</label><select value={inviteForm.role} onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })} style={S.fInput}><option value="viewer">Viewer</option><option value="operator">Operator</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>
+            </div>
+            <div style={{ background: 'rgba(139,92,246,.06)', border: `1px solid rgba(139,92,246,.2)`, borderRadius: T.r, padding: '10px 14px', fontSize: 12, color: T.ac2, marginBottom: 14 }}>The user will be created with the credentials above. Share the email and password with them so they can sign in.</div>
+            <div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
+              <span onClick={closeInvite} style={S.btnGhost}>Cancel</span>
+              <button type="submit" disabled={inviting} style={S.btnPrimary}>{inviting ? 'Creating...' : 'Create & Invite'}</button>
+            </div>
+          </form>
+        )}
+      </div></div>)}
+    </div>
+  );
 };
 
 const MainApp = () => {
