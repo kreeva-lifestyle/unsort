@@ -242,7 +242,8 @@ const statusTag = (status: string) => {
     complete: { bg: 'rgba(45,212,160,.15)', color: T.gr },
     damaged: { bg: 'rgba(245,87,92,.15)', color: T.re },
     unsorted: { bg: 'rgba(245,166,35,.15)', color: T.yl },
-    repaired: { bg: 'rgba(78,142,247,.15)', color: T.bl },
+    dry_clean: { bg: 'rgba(78,142,247,.15)', color: T.bl },
+    repaired: { bg: 'rgba(155,109,255,.15)', color: '#9b6dff' },
     disposed: { bg: 'rgba(139,154,191,.1)', color: T.tx3 },
   };
   const s = m[status] || m.unsorted;
@@ -260,10 +261,10 @@ const Dashboard = () => {
   const cards = [
     { label: 'CATEGORIES', value: stats.total_products, color: T.ac, icon: '🏷️' },
     { label: 'INVENTORY', value: stats.total_inventory, color: T.bl, icon: '📦' },
-    { label: 'DAMAGED', value: stats.damaged_count, color: T.re, icon: '⚠️' },
     { label: 'UNSORTED', value: stats.unsorted_count, color: T.yl, icon: '❓' },
+    { label: 'DAMAGED', value: stats.damaged_count, color: T.re, icon: '⚠️' },
+    { label: 'DRY CLEAN', value: stats.dry_clean_count || 0, color: T.bl, icon: '🧹' },
     { label: 'COMPLETE', value: stats.complete_count, color: T.gr, icon: '✅' },
-    { label: 'OPEN REPORTS', value: stats.open_reports, color: '#9b6dff', icon: '📋' },
   ];
 
   return (
@@ -308,6 +309,8 @@ const Inventory = () => {
   const { profile } = useAuth();
   const { addToast } = useNotifications();
   const [form, setForm] = useState({ product_id: '', serial_number: '', batch_number: '', status: 'unsorted', location: '', notes: '' });
+  const [catSearch, setCatSearch] = useState('');
+  const [showCatDrop, setShowCatDrop] = useState(false);
 
   const fetchData = () => {
     supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).then(({ data }) => setItems(data || []));
@@ -321,7 +324,7 @@ const Inventory = () => {
 
   const updateComp = async (id: string, status: string) => { const { error } = await supabase.from('item_components').update({ status }).eq('id', id); if (error) addToast(error.message, 'error'); else { addToast('Updated!', 'success'); fetchComps(selected.id); fetchData(); } };
 
-  const openEdit = (item: any) => { setSelected(item); setForm({ product_id: item.product_id, serial_number: item.serial_number || '', batch_number: item.batch_number || '', status: item.status, location: item.location || '', notes: item.notes || '' }); setShowModal(true); };
+  const openEdit = (item: any) => { setSelected(item); setForm({ product_id: item.product_id, serial_number: item.serial_number || '', batch_number: item.batch_number || '', status: item.status, location: item.location || '', notes: item.notes || '' }); setCatSearch(item.products?.name || ''); setShowModal(true); };
   const openComps = async (item: any) => { setSelected(item); await fetchComps(item.id); setShowCompModal(true); };
   const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
   const filtered = items.filter((i) => filter === 'all' || i.status === filter);
@@ -330,9 +333,9 @@ const Inventory = () => {
     <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <span style={{ fontSize: 11, color: T.tx3, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' as const }}>Status</span>
-        <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ ...S.fInput, width: 150, padding: '7px 10px', cursor: 'pointer' }}><option value="all">All</option><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="complete">Complete</option></select>
+        <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ ...S.fInput, width: 150, padding: '7px 10px', cursor: 'pointer' }}><option value="all">All</option><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option><option value="repaired">Repaired</option><option value="disposed">Disposed</option></select>
         <div style={{ flex: 1 }} />
-        {canEdit && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', batch_number: '', status: 'unsorted', location: '', notes: '' }); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
+        {canEdit && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', batch_number: '', status: 'unsorted', location: '', notes: '' }); setCatSearch(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
       </div>
       <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -342,7 +345,7 @@ const Inventory = () => {
         {filtered.length === 0 && <div style={{ padding: 48, textAlign: 'center', color: T.tx3, fontSize: 13 }}>No items</div>}
       </div>
 
-      {showModal && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Category *</label><select value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })} required style={S.fInput}><option value="">Select</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Serial Number</label><input value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Batch Number</label><input value={form.batch_number} onChange={(e) => setForm({ ...form, batch_number: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="complete">Complete</option></select></div><div><label style={S.fLabel}>Location</label><input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Warehouse A" style={S.fInput} /></div></div><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional notes" style={S.fInput} /></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
+      {showModal && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>Category *</label><input value={catSearch} onChange={(e) => { setCatSearch(e.target.value); setShowCatDrop(true); setForm({ ...form, product_id: '' }); }} onFocus={() => setShowCatDrop(true)} placeholder="Type to search categories by name or SKU..." style={S.fInput} autoComplete="off" /><input type="hidden" value={form.product_id} required />{form.product_id && <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: T.r, background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.25)', fontSize: 12, color: T.ac2 }}>{products.find(p => p.id === form.product_id)?.name} <span style={{ fontFamily: T.mono, opacity: 0.7 }}>{products.find(p => p.id === form.product_id)?.sku}</span><span onClick={() => { setForm({ ...form, product_id: '' }); setCatSearch(''); }} style={{ cursor: 'pointer', marginLeft: 4, opacity: 0.6 }}>✕</span></div>}{showCatDrop && !form.product_id && (() => { const q = catSearch.toLowerCase(); const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))); return filtered.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)' }}>{filtered.map(p => <div key={p.id} onClick={() => { setForm({ ...form, product_id: p.id }); setCatSearch(p.name); setShowCatDrop(false); }} style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}><span style={{ fontSize: 13, color: T.tx }}>{p.name}</span><span style={{ fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{p.sku}</span></div>)}</div> : catSearch ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '12px 14px', fontSize: 12, color: T.tx3, zIndex: 10 }}>No categories found</div> : null; })()}</div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Serial Number</label><input value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Batch Number</label><input value={form.batch_number} onChange={(e) => setForm({ ...form, batch_number: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option><option value="repaired">Repaired</option><option value="disposed">Disposed</option></select></div><div><label style={S.fLabel}>Location</label><input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Warehouse A" style={S.fInput} /></div></div><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional notes" style={S.fInput} /></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
 
       {showCompModal && selected && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>Components</span><p style={{ margin: '4px 0 0', fontSize: 12, color: T.tx3 }}>{selected.products?.name}</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}><div style={{ background: 'rgba(139,92,246,.06)', border: `1px solid rgba(139,92,246,.2)`, borderRadius: T.r, padding: '10px 14px', fontSize: 12, color: T.ac2, marginBottom: 16 }}>Mark all components as "Present" to auto-complete this item</div>{comps.map((c) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, marginBottom: 6 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: c.status === 'present' ? T.gr : c.status === 'damaged' ? T.re : T.yl }} /><div><p style={{ margin: 0, fontWeight: 500, fontSize: 13, color: T.tx }}>{c.components?.name}</p><p style={{ margin: 0, fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{c.components?.component_code}{c.components?.is_critical && <span style={{ marginLeft: 6, padding: '2px 6px', borderRadius: 3, fontSize: 9, background: 'rgba(245,87,92,.12)', color: T.re, fontWeight: 600 }}>Critical</span>}</p></div></div>{canEdit && <select value={c.status} onChange={(e) => updateComp(c.id, e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '6px 8px', cursor: 'pointer' }}><option value="missing">Missing</option><option value="present">Present</option><option value="damaged">Damaged</option></select>}</div>))}{comps.length === 0 && <p style={{ textAlign: 'center', color: T.tx3, fontSize: 13, padding: 20 }}>No components</p>}</div></div></div>)}
     </div>
@@ -357,7 +360,7 @@ const Categories = () => {
   const [comps, setComps] = useState<any[]>([]);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
-  const [form, setForm] = useState({ name: '', description: '', category: '' });
+  const [form, setForm] = useState({ sku: '', name: '', description: '', category: '' });
   const [newComps, setNewComps] = useState<string[]>(['']);
 
   const fetchCategories = () => { supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }).then(({ data }) => setCategories(data || [])); };
@@ -366,13 +369,12 @@ const Categories = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const sku = form.name.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) + '-' + Date.now().toString(36).slice(-4).toUpperCase();
     if (selected) {
-      const { error } = await supabase.from('products').update({ name: form.name, description: form.description, category: form.category }).eq('id', selected.id);
+      const { error } = await supabase.from('products').update({ sku: form.sku, name: form.name, description: form.description, category: form.category }).eq('id', selected.id);
       if (error) { addToast(error.message, 'error'); return; }
       addToast('Updated!', 'success');
     } else {
-      const { data, error } = await supabase.from('products').insert({ sku, name: form.name, description: form.description, category: form.category, created_by: profile?.id }).select().single();
+      const { data, error } = await supabase.from('products').insert({ sku: form.sku, name: form.name, description: form.description, category: form.category, created_by: profile?.id }).select().single();
       if (error || !data) { addToast(error?.message || 'Error', 'error'); return; }
       const validComps = newComps.filter(c => c.trim());
       if (validComps.length > 0) {
@@ -381,7 +383,7 @@ const Categories = () => {
       }
       addToast(`Category "${form.name}" added with ${validComps.length} components!`, 'success');
     }
-    setShowModal(false); setSelected(null); setForm({ name: '', description: '', category: '' }); setNewComps(['']); fetchCategories();
+    setShowModal(false); setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); fetchCategories();
   };
 
   const addCompRow = () => setNewComps([...newComps, '']);
@@ -401,24 +403,24 @@ const Categories = () => {
 
   const deleteComp = async (id: string) => { await supabase.from('components').delete().eq('id', id); addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories(); };
 
-  const openEdit = (p: any) => { setSelected(p); setForm({ name: p.name, description: p.description || '', category: p.category || '' }); setNewComps(['']); setShowModal(true); };
+  const openEdit = (p: any) => { setSelected(p); setForm({ sku: p.sku || '', name: p.name, description: p.description || '', category: p.category || '' }); setNewComps(['']); setShowModal(true); };
   const openComps = async (p: any) => { setSelected(p); setNewComps(['']); await fetchComps(p.id); setShowCompModal(true); };
   const canEdit = profile && ['admin', 'manager'].includes(profile.role);
 
   const compInputRow = (val: string, i: number, total: number) => (
     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
       <span style={{ width: 22, height: 22, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: T.tx3, fontFamily: T.mono, flexShrink: 0 }}>{i + 1}</span>
-      <input value={val} onChange={(e) => updateCompRow(i, e.target.value)} placeholder={i === 0 ? 'e.g. Lehenga' : i === 1 ? 'e.g. Blouse' : i === 2 ? 'e.g. Dupatta' : 'Component name'} style={{ ...S.fInput, flex: 1 }} />
+      <input value={val} onChange={(e) => updateCompRow(i, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (val.trim()) addCompRow(); } }} placeholder={i === 0 ? 'e.g. Lehenga' : i === 1 ? 'e.g. Blouse' : i === 2 ? 'e.g. Dupatta' : 'Component name'} style={{ ...S.fInput, flex: 1 }} />
       {total > 1 && <span onClick={() => removeCompRow(i)} style={{ cursor: 'pointer', color: T.re, fontSize: 16, lineHeight: 1, padding: '0 4px', flexShrink: 0 }}>✕</span>}
     </div>
   );
 
   return (
     <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Categories</span>{canEdit && <div onClick={() => { setSelected(null); setForm({ name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={S.btnPrimary}>+ Add Category</div>}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Categories</span>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={S.btnPrimary}>+ Add Category</div>}</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>{categories.map((p) => (<div key={p.id} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '18px 20px', transition: 'border-color .15s, box-shadow .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = T.bd2; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.2)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.boxShadow = 'none'; }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: T.tx }}>{p.name}</h3>
+          <div><h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: T.tx }}>{p.name}</h3><span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2 }}>{p.sku}</span></div>
           {canEdit && <span onClick={() => openEdit(p)} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 12 }}>Edit</span>}
         </div>
         {p.description && <p style={{ color: T.tx3, fontSize: 13, margin: '0 0 12px' }}>{p.description}</p>}
@@ -427,10 +429,10 @@ const Categories = () => {
           <span onClick={() => openComps(p)} style={{ ...S.btnPrimary, padding: '5px 14px', fontSize: 12 }}>Manage Components</span>
         </div>
       </div>))}</div>
-      {categories.length === 0 && <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 48, textAlign: 'center' }}><p style={{ color: T.tx3, fontSize: 14, marginBottom: 8 }}>No categories yet</p><p style={{ color: T.tx3, fontSize: 12 }}>Add a category like "Lehenga Choli" with components like Lehenga, Blouse, Dupatta</p>{canEdit && <div onClick={() => { setSelected(null); setForm({ name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={{ ...S.btnPrimary, marginTop: 16, display: 'inline-flex' }}>+ Add First Category</div>}</div>}
+      {categories.length === 0 && <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 48, textAlign: 'center' }}><p style={{ color: T.tx3, fontSize: 14, marginBottom: 8 }}>No categories yet</p><p style={{ color: T.tx3, fontSize: 12 }}>Add a category like "Lehenga Choli" with components like Lehenga, Blouse, Dupatta</p>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={{ ...S.btnPrimary, marginTop: 16, display: 'inline-flex' }}>+ Add First Category</div>}</div>}
 
       {showModal && (<div style={S.modalOverlay}><div style={{ ...S.modalBox, width: 520 }}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Category</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}>
-        <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Category Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Lehenga Choli" style={S.fInput} /></div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Category Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Lehenga Choli" style={S.fInput} /></div><div><label style={S.fLabel}>SKU *</label><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required placeholder="e.g. LC-01" style={{ ...S.fInput, fontFamily: T.mono }} /></div></div>
         <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description (optional)" style={S.fInput} /></div>
         {!selected && <>
           <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ ...S.fLabel, margin: 0 }}>Components</label><span onClick={addCompRow} style={{ ...S.btnPrimary, padding: '4px 10px', fontSize: 11 }}>+ Add More</span></div>
