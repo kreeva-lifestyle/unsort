@@ -14,12 +14,12 @@
   --re: #f5575c;
   --bl: #4e8ef7;
   --yl: #f5a623;
-  --r: 4px;
+  --r: 6px;
   --mono: 'IBM Plex Mono', monospace;
   --sans: 'IBM Plex Sans', sans-serif;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { overflow-y: scroll; }
 body {
   background: var(--bg);
@@ -30,6 +30,8 @@ body {
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
+  line-height: 1.5;
 }
 #root { min-height: 100vh; width: 100%; }
 
@@ -40,35 +42,16 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--tx3); }
 
 /* Focus */
-*:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; border-radius: var(--r); }
-input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; border-color: var(--ac) !important; box-shadow: 0 0 0 3px rgba(139,92,246,.15); }
-
-/* Links */
-a { color: var(--ac); text-decoration: none; }
-a:hover { text-decoration: underline; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ac) !important; box-shadow: 0 0 0 2px rgba(139,92,246,.15); }
 
 /* Tables */
 table { border-spacing: 0; }
-tr:hover td { background: rgba(255,255,255,.015); }
-
-/* Buttons global */
-button { font-family: var(--sans); transition: all .12s ease; }
-button:not(:disabled):hover { filter: brightness(1.1); }
-button:not(:disabled):active { transform: scale(.98); }
 
 /* Select styling */
-select { font-family: var(--sans); }
 select option { background: var(--s2); color: var(--tx); }
 
 /* Input placeholder */
-input::placeholder, textarea::placeholder { color: var(--tx3); opacity: .6; }
-
-/* Sidebar nav hover */
-nav button:hover { background: var(--s2) !important; color: var(--tx) !important; }
-
-/* Card hover */
-.card-hover { transition: border-color .15s ease, box-shadow .15s ease; }
-.card-hover:hover { border-color: var(--bd2); box-shadow: 0 2px 12px rgba(0,0,0,.2); }
+input::placeholder, textarea::placeholder { color: var(--tx3); opacity: .5; }
 
 /* Animations */
 @keyframes fi { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -79,7 +62,6 @@ nav button:hover { background: var(--s2) !important; color: var(--tx) !important
 @keyframes loginFadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes loginShake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
 @keyframes btnSpin { to { transform: rotate(360deg); } }
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .6; } }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 
 /* Notification dropdown animation */
@@ -87,9 +69,3 @@ nav button:hover { background: var(--s2) !important; color: var(--tx) !important
 
 /* Loading spinner */
 .spinner { width: 20px; height: 20px; border: 2px solid var(--bd2); border-top-color: var(--ac); border-radius: 50%; animation: btnSpin .6s linear infinite; }
-
-/* Mobile responsive */
-@media (max-width: 768px) {
-  .sidebar-desktop { display: none !important; }
-  .main-content { margin-left: 0 !important; }
-}
