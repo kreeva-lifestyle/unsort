@@ -473,7 +473,7 @@ const Users = () => {
 const MainApp = () => {
   const [tab, setTab] = useState('dashboard');
   const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', products: 'Products', reports: 'Damage Reports', activity: 'Activity Log', users: 'User Management' };
-  return (<div style={{ display: 'flex', minHeight: '100vh', background: T.bg }}><Sidebar activeTab={tab} setActiveTab={setTab} /><div style={{ marginLeft: 230, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}><Header title={titles[tab]} /><main style={{ flex: 1, overflowX: 'hidden' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory />}{tab === 'products' && <Products />}{tab === 'reports' && <Reports />}{tab === 'activity' && <Activity />}{tab === 'users' && <Users />}</main></div><ToastContainer /></div>);
+  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%' }}><Sidebar activeTab={tab} setActiveTab={setTab} /><div style={{ marginLeft: 230, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}><Header title={titles[tab]} /><main style={{ flex: 1, overflowX: 'hidden' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory />}{tab === 'products' && <Products />}{tab === 'reports' && <Reports />}{tab === 'activity' && <Activity />}{tab === 'users' && <Users />}</main></div><ToastContainer /></div>);
 };
 
 export default function App() { return <AuthProvider><AppContent /></AuthProvider>; }
