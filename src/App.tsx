@@ -40,24 +40,38 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Safety timeout: if auth check takes more than 4 seconds, stop loading
+    const timeout = setTimeout(() => setLoading(false), 4000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      else setLoading(false);
+      if (session?.user) {
+        supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle().then(({ data }) => {
+          setProfile(data);
+          setLoading(false);
+          clearTimeout(timeout);
+        });
+      } else {
+        setLoading(false);
+        clearTimeout(timeout);
+      }
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) await fetchProfile(session.user.id);
-      else { setProfile(null); setLoading(false); }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-    setProfile(data);
-    setLoading(false);
-  };
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle().then(({ data }) => {
+          setProfile(data);
+          setLoading(false);
+        });
+      } else {
+        setProfile(null);
+        setLoading(false);
+      }
+    });
+
+    return () => { subscription.unsubscribe(); clearTimeout(timeout); };
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -71,7 +85,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => { await supabase.auth.signOut(); };
 
-  return <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut, fetchProfile }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut }}>{children}</AuthContext.Provider>;
 };
 
 const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
@@ -343,35 +357,69 @@ const Categories = () => {
   const [comps, setComps] = useState<any[]>([]);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
-  const [form, setForm] = useState({ sku: '', name: '', description: '', category: '' });
-  const [compForm, setCompForm] = useState({ component_code: '', name: '', is_critical: false });
+  const [form, setForm] = useState({ name: '', description: '', category: '' });
+  const [newComps, setNewComps] = useState<string[]>(['']);
 
   const fetchCategories = () => { supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }).then(({ data }) => setCategories(data || [])); };
   useEffect(() => { fetchCategories(); }, []);
   const fetchComps = async (id: string) => { const { data } = await supabase.from('components').select('*').eq('product_id', id).order('created_at', { ascending: true }); setComps(data || []); };
 
-  const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); const { error } = selected ? await supabase.from('products').update(form).eq('id', selected.id) : await supabase.from('products').insert({ ...form, created_by: profile?.id }); if (error) addToast(error.message, 'error'); else { addToast(selected ? 'Updated!' : 'Added!', 'success'); setShowModal(false); setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); fetchCategories(); } };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const sku = form.name.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) + '-' + Date.now().toString(36).slice(-4).toUpperCase();
+    if (selected) {
+      const { error } = await supabase.from('products').update({ name: form.name, description: form.description, category: form.category }).eq('id', selected.id);
+      if (error) { addToast(error.message, 'error'); return; }
+      addToast('Updated!', 'success');
+    } else {
+      const { data, error } = await supabase.from('products').insert({ sku, name: form.name, description: form.description, category: form.category, created_by: profile?.id }).select().single();
+      if (error || !data) { addToast(error?.message || 'Error', 'error'); return; }
+      const validComps = newComps.filter(c => c.trim());
+      if (validComps.length > 0) {
+        const compsToInsert = validComps.map((name, i) => ({ product_id: data.id, name: name.trim(), component_code: `C${i + 1}` }));
+        await supabase.from('components').insert(compsToInsert);
+      }
+      addToast(`Category "${form.name}" added with ${validComps.length} components!`, 'success');
+    }
+    setShowModal(false); setSelected(null); setForm({ name: '', description: '', category: '' }); setNewComps(['']); fetchCategories();
+  };
 
-  const addComp = async (e: React.FormEvent) => { e.preventDefault(); const { error } = await supabase.from('components').insert({ ...compForm, product_id: selected.id }); if (error) addToast(error.message, 'error'); else { addToast('Component added!', 'success'); setCompForm({ component_code: '', name: '', is_critical: false }); fetchComps(selected.id); fetchCategories(); } };
+  const addCompRow = () => setNewComps([...newComps, '']);
+  const removeCompRow = (i: number) => setNewComps(newComps.filter((_, idx) => idx !== i));
+  const updateCompRow = (i: number, val: string) => { const c = [...newComps]; c[i] = val; setNewComps(c); };
+
+  const addCompToExisting = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const validComps = newComps.filter(c => c.trim());
+    if (validComps.length === 0) return;
+    const compsToInsert = validComps.map((name, i) => ({ product_id: selected.id, name: name.trim(), component_code: `C${(comps.length || 0) + i + 1}` }));
+    const { error } = await supabase.from('components').insert(compsToInsert);
+    if (error) { addToast(error.message, 'error'); return; }
+    addToast(`${validComps.length} component(s) added!`, 'success');
+    setNewComps(['']); fetchComps(selected.id); fetchCategories();
+  };
 
   const deleteComp = async (id: string) => { await supabase.from('components').delete().eq('id', id); addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories(); };
 
-  const openEdit = (p: any) => { setSelected(p); setForm({ sku: p.sku, name: p.name, description: p.description || '', category: p.category || '' }); setShowModal(true); };
-  const openComps = async (p: any) => { setSelected(p); await fetchComps(p.id); setShowCompModal(true); };
+  const openEdit = (p: any) => { setSelected(p); setForm({ name: p.name, description: p.description || '', category: p.category || '' }); setNewComps(['']); setShowModal(true); };
+  const openComps = async (p: any) => { setSelected(p); setNewComps(['']); await fetchComps(p.id); setShowCompModal(true); };
   const canEdit = profile && ['admin', 'manager'].includes(profile.role);
+
+  const compInputRow = (val: string, i: number, total: number) => (
+    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <span style={{ width: 22, height: 22, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: T.tx3, fontFamily: T.mono, flexShrink: 0 }}>{i + 1}</span>
+      <input value={val} onChange={(e) => updateCompRow(i, e.target.value)} placeholder={i === 0 ? 'e.g. Lehenga' : i === 1 ? 'e.g. Blouse' : i === 2 ? 'e.g. Dupatta' : 'Component name'} style={{ ...S.fInput, flex: 1 }} />
+      {total > 1 && <span onClick={() => removeCompRow(i)} style={{ cursor: 'pointer', color: T.re, fontSize: 16, lineHeight: 1, padding: '0 4px', flexShrink: 0 }}>✕</span>}
+    </div>
+  );
 
   return (
     <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Categories</span>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setShowModal(true); }} style={S.btnPrimary}>+ Add Category</div>}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>{categories.map((p) => (<div key={p.id} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '18px 20px', transition: 'border-color .15s, box-shadow .15s', cursor: 'default' }} onMouseEnter={e => { e.currentTarget.style.borderColor = T.bd2; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.2)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.boxShadow = 'none'; }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Categories</span>{canEdit && <div onClick={() => { setSelected(null); setForm({ name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={S.btnPrimary}>+ Add Category</div>}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>{categories.map((p) => (<div key={p.id} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '18px 20px', transition: 'border-color .15s, box-shadow .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = T.bd2; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.2)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.boxShadow = 'none'; }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: T.tx }}>{p.name}</h3>
-            <p style={{ margin: '4px 0 0', color: T.ac, fontSize: 12, fontFamily: T.mono }}>{p.sku}</p>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {canEdit && <span onClick={() => openEdit(p)} style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 12 }}>Edit</span>}
-          </div>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: T.tx }}>{p.name}</h3>
+          {canEdit && <span onClick={() => openEdit(p)} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 12 }}>Edit</span>}
         </div>
         {p.description && <p style={{ color: T.tx3, fontSize: 13, margin: '0 0 12px' }}>{p.description}</p>}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0 0', borderTop: `1px solid ${T.bd}` }}>
@@ -379,14 +427,30 @@ const Categories = () => {
           <span onClick={() => openComps(p)} style={{ ...S.btnPrimary, padding: '5px 14px', fontSize: 12 }}>Manage Components</span>
         </div>
       </div>))}</div>
-      {categories.length === 0 && <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 48, textAlign: 'center' }}><p style={{ color: T.tx3, fontSize: 14, marginBottom: 12 }}>No categories yet</p><p style={{ color: T.tx3, fontSize: 12 }}>Add a category like "Lehenga Choli" and then add components like Lehenga, Blouse, Dupatta</p>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setShowModal(true); }} style={{ ...S.btnPrimary, marginTop: 16, display: 'inline-flex' }}>+ Add First Category</div>}</div>}
+      {categories.length === 0 && <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 48, textAlign: 'center' }}><p style={{ color: T.tx3, fontSize: 14, marginBottom: 8 }}>No categories yet</p><p style={{ color: T.tx3, fontSize: 12 }}>Add a category like "Lehenga Choli" with components like Lehenga, Blouse, Dupatta</p>{canEdit && <div onClick={() => { setSelected(null); setForm({ name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={{ ...S.btnPrimary, marginTop: 16, display: 'inline-flex' }}>+ Add First Category</div>}</div>}
 
-      {showModal && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Category</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Category Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Lehenga Choli" style={S.fInput} /></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Code *</label><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required placeholder="e.g. LC-001" style={S.fInput} /></div><div><label style={S.fLabel}>Group</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="e.g. Ethnic Wear" style={S.fInput} /></div></div><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description of this category" style={S.fInput} /></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add Category'}</button></div></form></div></div>)}
+      {showModal && (<div style={S.modalOverlay}><div style={{ ...S.modalBox, width: 520 }}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Category</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}>
+        <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Category Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Lehenga Choli" style={S.fInput} /></div>
+        <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description (optional)" style={S.fInput} /></div>
+        {!selected && <>
+          <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ ...S.fLabel, margin: 0 }}>Components</label><span onClick={addCompRow} style={{ ...S.btnPrimary, padding: '4px 10px', fontSize: 11 }}>+ Add More</span></div>
+          <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 12, marginBottom: 14 }}>
+            {newComps.map((c, i) => compInputRow(c, i, newComps.length))}
+          </div>
+        </>}
+        <div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add Category'}</button></div>
+      </form></div></div>)}
 
-      {showCompModal && selected && (<div style={S.modalOverlay}><div style={{ ...S.modalBox, width: 560 }}><div style={S.modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>Components of "{selected.name}"</span><p style={{ margin: '4px 0 0', fontSize: 12, color: T.tx3 }}>Add the individual parts that make up this category</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>{canEdit && <form onSubmit={addComp} style={{ background: T.s2, border: `1px solid ${T.bd}`, padding: 16, borderRadius: T.r, marginBottom: 16 }}><p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>Add New Component</p><div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 10, marginBottom: 10 }}><input value={compForm.component_code} onChange={(e) => setCompForm({ ...compForm, component_code: e.target.value })} placeholder="Code" required style={S.fInput} /><input value={compForm.name} onChange={(e) => setCompForm({ ...compForm, name: e.target.value })} placeholder="e.g. Lehenga, Blouse, Dupatta" required style={S.fInput} /></div><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: T.tx2, cursor: 'pointer' }}><input type="checkbox" checked={compForm.is_critical} onChange={(e) => setCompForm({ ...compForm, is_critical: e.target.checked })} /> Mark as critical</label><button type="submit" style={{ ...S.btnPrimary, padding: '7px 16px' }}>+ Add Component</button></div></form>}
-      {comps.length > 0 && <p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>{comps.length} Component{comps.length !== 1 ? 's' : ''}</p>}
-      {comps.map((c, i) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', border: `1px solid ${T.bd}`, borderRadius: T.r, marginBottom: 6, background: T.s2 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ width: 24, height: 24, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: T.tx2, fontFamily: T.mono }}>{i + 1}</span><div><span style={{ fontSize: 14, color: T.tx, fontWeight: 500 }}>{c.name}</span><div style={{ display: 'flex', gap: 6, marginTop: 2 }}><span style={{ padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 500, background: 'rgba(139,92,246,.1)', color: T.ac2, fontFamily: T.mono }}>{c.component_code}</span>{c.is_critical && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(245,87,92,.1)', color: T.re, fontWeight: 600 }}>Critical</span>}</div></div></div>{canEdit && <span onClick={() => deleteComp(c.id)} style={S.btnDanger}>Delete</span>}</div>))}
-      {comps.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: T.tx3 }}><p style={{ fontSize: 13, marginBottom: 4 }}>No components added yet</p><p style={{ fontSize: 12 }}>Add components like Lehenga, Blouse, Dupatta etc.</p></div>}</div></div></div>)}
+      {showCompModal && selected && (<div style={S.modalOverlay}><div style={{ ...S.modalBox, width: 560 }}><div style={S.modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>Components of "{selected.name}"</span><p style={{ margin: '4px 0 0', fontSize: 12, color: T.tx3 }}>Manage the individual parts of this category</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>
+        {canEdit && <form onSubmit={addCompToExisting} style={{ background: T.s2, border: `1px solid ${T.bd}`, padding: 14, borderRadius: T.r, marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}><p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, margin: 0 }}>Add Components</p><span onClick={addCompRow} style={{ fontSize: 11, color: T.ac, cursor: 'pointer' }}>+ Add More</span></div>
+          {newComps.map((c, i) => compInputRow(c, i, newComps.length))}
+          <button type="submit" style={{ ...S.btnPrimary, padding: '6px 14px', marginTop: 6 }}>+ Add Component{newComps.filter(c => c.trim()).length > 1 ? 's' : ''}</button>
+        </form>}
+        {comps.length > 0 && <p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>{comps.length} Component{comps.length !== 1 ? 's' : ''}</p>}
+        {comps.map((c, i) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', border: `1px solid ${T.bd}`, borderRadius: T.r, marginBottom: 6, background: T.s2 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ width: 24, height: 24, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: T.tx2, fontFamily: T.mono }}>{i + 1}</span><span style={{ fontSize: 14, color: T.tx, fontWeight: 500 }}>{c.name}</span></div>{canEdit && <span onClick={() => deleteComp(c.id)} style={S.btnDanger}>Delete</span>}</div>))}
+        {comps.length === 0 && <div style={{ textAlign: 'center', padding: 20, color: T.tx3 }}><p style={{ fontSize: 13 }}>No components yet</p></div>}
+      </div></div></div>)}
     </div>
   );
 };
