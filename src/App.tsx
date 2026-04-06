@@ -54,10 +54,8 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    try {
-      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      setProfile(data);
-    } catch (_) {}
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+    setProfile(data);
     setLoading(false);
   };
 
@@ -173,7 +171,10 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
   const tabs = [{ id: 'dashboard', icon: '📊', label: 'Dashboard' }, { id: 'inventory', icon: '📦', label: 'Inventory' }, { id: 'categories', icon: '🏷️', label: 'Categories' }, { id: 'reports', icon: '📋', label: 'Reports' }, { id: 'activity', icon: '📜', label: 'Activity' }];
   if (profile?.role === 'admin') tabs.push({ id: 'users', icon: '👥', label: 'Users' });
 
-  const handleSignOut = () => { supabase.auth.signOut(); };
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
 
   return (
     <div style={{ width: 230, height: '100vh', background: T.s, borderRight: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, zIndex: 100, overflowY: 'auto' }}>
@@ -249,14 +250,10 @@ const Dashboard = () => {
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
-    try {
-      const [summaryRes, itemsRes] = await Promise.all([
-        supabase.from('dashboard_summary').select('*').maybeSingle(),
-        supabase.from('inventory_items').select('*, products(name, sku)').order('created_at', { ascending: false }).limit(5)
-      ]);
-      if (summaryRes.data) setStats(summaryRes.data);
-      if (itemsRes.data) setRecent(itemsRes.data);
-    } catch (_) {}
+    const { data: summaryRows } = await supabase.from('dashboard_summary').select('*').limit(1);
+    const { data: items } = await supabase.from('inventory_items').select('*, products(name, sku)').order('created_at', { ascending: false }).limit(5);
+    if (summaryRows && summaryRows.length > 0) setStats(summaryRows[0]);
+    setRecent(items || []);
     setLoading(false);
   };
 
@@ -317,7 +314,7 @@ const Inventory = () => {
 
   useEffect(() => { fetchData(); const ch = supabase.channel('inv').on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, fetchData).subscribe(); return () => { supabase.removeChannel(ch); }; }, []);
 
-  const fetchData = async () => { try { const [{ data: inv }, { data: prod }] = await Promise.all([supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }), supabase.from('products').select('*').eq('is_active', true)]); setItems(inv || []); setProducts(prod || []); } catch(_) {} setLoading(false); };
+  const fetchData = async () => { const { data: inv } = await supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }); const { data: prod } = await supabase.from('products').select('*').eq('is_active', true); setItems(inv || []); setProducts(prod || []); setLoading(false); };
 
   const fetchComps = async (id: string) => { const { data } = await supabase.from('item_components').select('*, components(name, component_code, is_critical)').eq('inventory_item_id', id); setComps(data || []); };
 
@@ -368,7 +365,7 @@ const Categories = () => {
   const [compForm, setCompForm] = useState({ component_code: '', name: '', is_critical: false });
 
   useEffect(() => { fetchCategories(); }, []);
-  const fetchCategories = async () => { try { const { data } = await supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }); setCategories(data || []); } catch(_) {} setLoading(false); };
+  const fetchCategories = async () => { const { data } = await supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }); setCategories(data || []); setLoading(false); };
   const fetchComps = async (id: string) => { const { data } = await supabase.from('components').select('*').eq('product_id', id).order('created_at', { ascending: true }); setComps(data || []); };
 
   const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); const { error } = selected ? await supabase.from('products').update(form).eq('id', selected.id) : await supabase.from('products').insert({ ...form, created_by: profile?.id }); if (error) addToast(error.message, 'error'); else { addToast(selected ? 'Updated!' : 'Added!', 'success'); setShowModal(false); setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); fetchCategories(); } };
@@ -424,7 +421,7 @@ const Reports = () => {
   const [form, setForm] = useState({ inventory_item_id: '', damage_type: '', cause: '', estimated_loss: '' });
 
   useEffect(() => { fetchData(); }, []);
-  const fetchData = async () => { try { const [{ data: rep }, { data: inv }] = await Promise.all([supabase.from('damage_reports').select('*, inventory_items(*, products(name, sku)), profiles:reported_by(full_name)').order('created_at', { ascending: false }), supabase.from('inventory_items').select('*, products(name, sku)').in('status', ['damaged', 'unsorted'])]); setReports(rep || []); setItems(inv || []); } catch(_) {} setLoading(false); };
+  const fetchData = async () => { const { data: rep } = await supabase.from('damage_reports').select('*, inventory_items(*, products(name, sku)), profiles:reported_by(full_name)').order('created_at', { ascending: false }); const { data: inv } = await supabase.from('inventory_items').select('*, products(name, sku)').in('status', ['damaged', 'unsorted']); setReports(rep || []); setItems(inv || []); setLoading(false); };
 
   const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); const { error } = await supabase.from('damage_reports').insert({ ...form, estimated_loss: form.estimated_loss ? parseFloat(form.estimated_loss) : null, reported_by: profile?.id }); if (error) addToast(error.message, 'error'); else { addToast('Created!', 'success'); setShowModal(false); setForm({ inventory_item_id: '', damage_type: '', cause: '', estimated_loss: '' }); fetchData(); } };
 
@@ -459,7 +456,7 @@ const Reports = () => {
 const Activity = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { (async () => { try { const { data } = await supabase.from('activity_logs').select('*, profiles:user_id(full_name)').order('created_at', { ascending: false }).limit(50); setLogs(data || []); } catch(_) {} setLoading(false); })(); }, []);
+  useEffect(() => { (async () => { const { data } = await supabase.from('activity_logs').select('*, profiles:user_id(full_name)').order('created_at', { ascending: false }).limit(50); setLogs(data || []); setLoading(false); })(); }, []);
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}><div className="spinner" /><span style={{ color: T.tx3, fontSize: 12 }}>Loading activity...</span></div>;
 
   const actionTag = (action: string) => {
@@ -475,7 +472,7 @@ const Users = () => {
   const [loading, setLoading] = useState(true);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
-  useEffect(() => { (async () => { try { const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); } catch(_) {} setLoading(false); })(); }, []);
+  useEffect(() => { (async () => { const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); setLoading(false); })(); }, []);
   const updateRole = async (id: string, role: string) => { await supabase.from('profiles').update({ role }).eq('id', id); addToast('Updated!', 'success'); const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); };
   const toggleActive = async (id: string, isActive: boolean) => { await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id); addToast(isActive ? 'Revoked' : 'Granted', 'success'); const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); };
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, flexDirection: 'column', gap: 12 }}><div className="spinner" /><span style={{ color: T.tx3, fontSize: 12 }}>Loading users...</span></div>;
