@@ -5,6 +5,16 @@ const SUPABASE_URL = 'https://ulphprdnswznfztawbvg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Design tokens matching Pricedesk dark theme
+const T = {
+  bg: '#0f1117', s: '#181c26', s2: '#1f2435', s3: '#262d42',
+  bd: '#2a3148', bd2: '#3a4560',
+  tx: '#e8ecf4', tx2: '#8b9abf', tx3: '#5a6a90',
+  ac: '#8b5cf6', ac2: '#a78bfa',
+  gr: '#2dd4a0', re: '#f5575c', bl: '#4e8ef7', yl: '#f5a623',
+  r: 4, mono: "'IBM Plex Mono', monospace", sans: "'IBM Plex Sans', sans-serif",
+};
+
 const AuthContext = createContext<any>(null);
 const NotificationContext = createContext<any>(null);
 const useAuth = () => useContext(AuthContext);
@@ -88,9 +98,9 @@ const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
 const ToastContainer = () => {
   const { toasts } = useNotifications();
   return (
-    <div style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 50 }}>
+    <div style={{ position: 'fixed', bottom: 22, right: 22, zIndex: 999 }}>
       {toasts.map((t: any) => (
-        <div key={t.id} style={{ background: t.type === 'pair_complete' ? '#8b5cf6' : '#3b82f6', color: 'white', padding: '12px 16px', borderRadius: 8, marginBottom: 8 }}>{t.message}</div>
+        <div key={t.id} style={{ background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '11px 17px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 9, boxShadow: '0 4px 20px rgba(0,0,0,.4)', animation: 'su .18s ease', marginBottom: 8, borderLeft: `3px solid ${t.type === 'error' ? T.re : T.gr}`, color: T.tx, maxWidth: 'calc(100vw - 32px)' }}>{t.message}</div>
       ))}
     </div>
   );
@@ -114,28 +124,29 @@ const AuthScreen = () => {
     setLoading(false);
   };
 
+  const inputStyle: React.CSSProperties = { width: '100%', background: `rgba(31,36,53,.8)`, border: `1px solid ${T.bd2}`, borderRadius: 10, color: T.tx, fontFamily: T.sans, fontSize: 16, padding: '12px 14px', transition: 'all .2s', outline: 'none', marginBottom: 16 };
+
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #1e1b4b 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ width: '100%', maxWidth: 400 }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ width: 80, height: 80, background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 36 }}>📦</div>
-          <h1 style={{ fontSize: 36, fontWeight: 'bold', color: 'white', margin: 0 }}>Unsort</h1>
-          <p style={{ color: '#c4b5fd', marginTop: 8 }}>Track Damaged and Unsorted Products</p>
+    <div style={{ position: 'fixed', inset: 0, background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', width: 400, height: 400, background: T.ac, borderRadius: '50%', filter: 'blur(80px)', opacity: 0.15, top: -100, left: -100, animation: 'loginGlowFloat 8s ease-in-out infinite alternate' }} />
+      <div style={{ position: 'absolute', width: 350, height: 350, background: T.bl, borderRadius: '50%', filter: 'blur(80px)', opacity: 0.15, bottom: -80, right: -80, animation: 'loginGlowFloat 10s ease-in-out infinite alternate', animationDelay: '-3s' }} />
+      <div style={{ position: 'absolute', width: 250, height: 250, background: T.yl, borderRadius: '50%', filter: 'blur(80px)', opacity: 0.1, top: '50%', left: '60%', animation: 'loginGlowFloat 12s ease-in-out infinite alternate', animationDelay: '-5s' }} />
+      <div style={{ position: 'relative', zIndex: 1, background: 'rgba(24,28,38,.85)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: `1px solid rgba(42,49,72,.6)`, borderRadius: 20, width: 400, maxWidth: 'calc(100vw - 32px)', padding: '40px 36px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.03) inset', animation: 'loginBoxEnter .6s cubic-bezier(.16,1,.3,1) both' }}>
+        <div style={{ fontSize: 28, fontWeight: 700, color: T.ac, fontFamily: T.mono, marginBottom: 4, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'loginLogoShine 3s ease-in-out infinite alternate' }}>Unsort</div>
+        <div style={{ fontSize: 11, color: T.tx3, letterSpacing: 3, textTransform: 'uppercase' as const, marginBottom: 32, opacity: 0, animation: 'loginFadeUp .5s .2s ease both' }}>Track Damaged & Unsorted Products</div>
+        <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${T.bd2}, transparent)`, marginBottom: 28, opacity: 0, animation: 'loginFadeUp .5s .25s ease both' }} />
+        {error && <div style={{ background: 'rgba(245,87,92,.12)', border: '1px solid rgba(245,87,92,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.re, marginBottom: 14, animation: 'loginShake .4s ease' }}>{error}</div>}
+        <div style={{ display: 'flex', marginBottom: 24, background: T.s2, borderRadius: 8, padding: 3 }}>
+          <button onClick={() => setIsLogin(true)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, fontFamily: T.sans, background: isLogin ? T.ac : 'transparent', color: isLogin ? '#fff' : T.tx3, transition: 'all .15s' }}>Sign In</button>
+          <button onClick={() => setIsLogin(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, fontFamily: T.sans, background: !isLogin ? T.ac : 'transparent', color: !isLogin ? '#fff' : T.tx3, transition: 'all .15s' }}>Sign Up</button>
         </div>
-        <div style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', borderRadius: 16, padding: 32, border: '1px solid rgba(255,255,255,0.2)' }}>
-          <div style={{ display: 'flex', marginBottom: 24, background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: 4 }}>
-            <button onClick={() => setIsLogin(true)} style={{ flex: 1, padding: '10px 0', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, background: isLogin ? '#8b5cf6' : 'transparent', color: isLogin ? 'white' : '#cbd5e1' }}>Sign In</button>
-            <button onClick={() => setIsLogin(false)} style={{ flex: 1, padding: '10px 0', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600, background: !isLogin ? '#8b5cf6' : 'transparent', color: !isLogin ? 'white' : '#cbd5e1' }}>Sign Up</button>
-          </div>
-          <form onSubmit={handleSubmit}>
-            {!isLogin && <input type="text" placeholder="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} required style={{ width: '100%', padding: 12, marginBottom: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: 16, boxSizing: 'border-box' }} />}
-            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: 12, marginBottom: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: 16, boxSizing: 'border-box' }} />
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '100%', padding: 12, marginBottom: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: 16, boxSizing: 'border-box' }} />
-            {error && <p style={{ color: '#fca5a5', fontSize: 14, margin: '0 0 12px' }}>{error}</p>}
-            <button type="submit" disabled={loading} style={{ width: '100%', padding: 14, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', color: 'white', fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>{loading ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}</button>
-          </form>
-        </div>
-        <p style={{ textAlign: 'center', color: 'rgba(196,181,253,0.6)', fontSize: 14, marginTop: 24 }}>Powered by Arya Designs</p>
+        <form onSubmit={handleSubmit}>
+          {!isLogin && <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp .5s .3s ease both' }}><label style={{ fontSize: 11, color: T.tx3, marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1.5, display: 'block' }}>Full Name</label><input type="text" placeholder="Enter your name" value={fullName} onChange={(e) => setFullName(e.target.value)} required style={inputStyle} /></div>}
+          <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp .5s .35s ease both' }}><label style={{ fontSize: 11, color: T.tx3, marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1.5, display: 'block' }}>Email</label><input type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required style={inputStyle} /></div>
+          <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp .5s .4s ease both' }}><label style={{ fontSize: 11, color: T.tx3, marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1.5, display: 'block' }}>Password</label><input type="password" placeholder="Enter password" value={password} onChange={(e) => setPassword(e.target.value)} required style={inputStyle} /></div>
+          <button type="submit" disabled={loading} style={{ width: '100%', padding: '13px 20px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: T.sans, color: '#000', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: 0.3, opacity: 0, animation: 'loginFadeUp .5s .5s ease both', position: 'relative', overflow: 'hidden' }}>{loading ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}</button>
+        </form>
+        <p style={{ fontSize: 11, color: T.tx3, marginTop: 24, letterSpacing: 1 }}>Powered by Arya Designs</p>
       </div>
     </div>
   );
@@ -147,21 +158,25 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
   if (profile?.role === 'admin') tabs.push({ id: 'users', icon: '👥', label: 'Users' });
 
   return (
-    <div style={{ width: 220, background: '#0f172a', color: 'white', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <div style={{ padding: 20, borderBottom: '1px solid #1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 36, height: 36, background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📦</div>
-        <span style={{ fontWeight: 'bold', fontSize: 18 }}>Unsort</span>
+    <div style={{ width: 230, height: '100vh', background: T.s, borderRight: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, zIndex: 100, overflowY: 'auto' }}>
+      <div style={{ padding: 18, borderBottom: `1px solid ${T.bd}` }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: T.ac, fontFamily: T.mono }}>Unsort</div>
+        <div style={{ fontSize: 10, color: T.tx3, letterSpacing: 2, textTransform: 'uppercase' as const, marginTop: 2 }}>Product Tracking</div>
       </div>
-      <nav style={{ flex: 1, padding: 8 }}>
+      <div style={{ fontSize: 10, color: T.tx3, letterSpacing: 2, textTransform: 'uppercase' as const, padding: '12px 16px 5px' }}>Navigation</div>
+      <nav style={{ flex: 1, padding: '0 0 10px' }}>
         {tabs.map((t) => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', marginBottom: 4, borderRadius: 8, border: 'none', cursor: 'pointer', background: activeTab === t.id ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)' : 'transparent', color: activeTab === t.id ? 'white' : '#94a3b8', fontSize: 14, textAlign: 'left' }}>
-            <span>{t.icon}</span> {t.label}
+          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 16px', border: 'none', cursor: 'pointer', background: activeTab === t.id ? T.s2 : 'transparent', color: activeTab === t.id ? T.ac : T.tx2, fontSize: 13, fontWeight: 500, fontFamily: T.sans, textAlign: 'left', borderLeft: `3px solid ${activeTab === t.id ? T.ac : 'transparent'}`, transition: 'all .12s' }}>
+            <span style={{ width: 16, textAlign: 'center', fontSize: 13 }}>{t.icon}</span> {t.label}
           </button>
         ))}
       </nav>
-      <div style={{ padding: 16, borderTop: '1px solid #1e293b' }}>
-        {profile && <div style={{ marginBottom: 12 }}><p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>{profile.full_name}</p><p style={{ margin: 0, fontSize: 12, color: '#64748b', textTransform: 'capitalize' }}>{profile.role}</p></div>}
-        <button onClick={signOut} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', background: '#1e293b', color: 'white', cursor: 'pointer', fontSize: 14 }}>🚪 Sign Out</button>
+      <div style={{ padding: '14px 16px', borderTop: `1px solid ${T.bd}`, marginTop: 'auto' }}>
+        {profile && <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: T.ac, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#000', flexShrink: 0 }}>{(profile.full_name || 'U')[0].toUpperCase()}</div>
+          <div><p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: T.tx }}>{profile.full_name}</p><p style={{ margin: 0, fontSize: 10, color: T.tx3, textTransform: 'capitalize' as const }}>{profile.role}</p></div>
+        </div>}
+        <button onClick={signOut} style={{ width: '100%', padding: '7px 15px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', color: T.tx2, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: T.sans, transition: 'all .12s', display: 'flex', alignItems: 'center', gap: 5 }}>🚪 Sign Out</button>
       </div>
     </div>
   );
@@ -173,19 +188,19 @@ const Header = ({ title }: { title: string }) => {
   const unread = notifications.filter((n: any) => !n.is_read).length;
 
   return (
-    <header style={{ background: 'white', borderBottom: '1px solid #e2e8f0', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: '#1e293b' }}>{title}</h1>
+    <header style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '12px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50 }}>
+      <h1 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: T.tx }}>{title}</h1>
       <div style={{ position: 'relative' }}>
-        <button onClick={() => setShow(!show)} style={{ padding: 10, borderRadius: 8, border: 'none', background: '#f1f5f9', cursor: 'pointer', position: 'relative' }}>
-          🔔 {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 18, height: 18, background: '#8b5cf6', color: 'white', borderRadius: '50%', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unread}</span>}
+        <button onClick={() => setShow(!show)} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', position: 'relative', color: T.tx2, fontSize: 14 }}>
+          🔔 {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono }}>{unread}</span>}
         </button>
         {show && (
-          <div style={{ position: 'absolute', right: 0, top: 48, width: 300, background: 'white', borderRadius: 12, boxShadow: '0 10px 40px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', zIndex: 50, maxHeight: 400, overflowY: 'auto' }}>
-            <div style={{ padding: 12, borderBottom: '1px solid #e2e8f0', fontWeight: 600 }}>Notifications</div>
-            {notifications.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>No notifications</div> : notifications.slice(0, 10).map((n: any) => (
-              <div key={n.id} onClick={() => markAsRead(n.id)} style={{ padding: 12, borderBottom: '1px solid #f1f5f9', cursor: 'pointer', background: n.is_read ? 'white' : '#f5f3ff' }}>
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>{n.title}</p>
-                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>{n.message}</p>
+          <div style={{ position: 'absolute', right: 0, top: 44, width: 300, background: T.s, borderRadius: T.r, boxShadow: '0 10px 40px rgba(0,0,0,.4)', border: `1px solid ${T.bd2}`, zIndex: 50, maxHeight: 400, overflowY: 'auto' }}>
+            <div style={{ padding: '13px 17px', borderBottom: `1px solid ${T.bd}`, fontWeight: 600, fontSize: 13, color: T.tx }}>Notifications</div>
+            {notifications.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 12 }}>No notifications</div> : notifications.slice(0, 10).map((n: any) => (
+              <div key={n.id} onClick={() => markAsRead(n.id)} style={{ padding: '10px 17px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: n.is_read ? 'transparent' : 'rgba(139,92,246,.06)' }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: T.tx }}>{n.title}</p>
+                <p style={{ margin: '4px 0 0', fontSize: 11, color: T.tx3 }}>{n.message}</p>
               </div>
             ))}
           </div>
@@ -193,6 +208,18 @@ const Header = ({ title }: { title: string }) => {
       </div>
     </header>
   );
+};
+
+const statusTag = (status: string) => {
+  const m: Record<string, { bg: string; color: string }> = {
+    complete: { bg: 'rgba(45,212,160,.15)', color: T.gr },
+    damaged: { bg: 'rgba(245,87,92,.15)', color: T.re },
+    unsorted: { bg: 'rgba(245,166,35,.15)', color: T.yl },
+    repaired: { bg: 'rgba(78,142,247,.15)', color: T.bl },
+    disposed: { bg: 'rgba(139,154,191,.1)', color: T.tx3 },
+  };
+  const s = m[status] || m.unsorted;
+  return { display: 'inline-block' as const, padding: '2px 8px', borderRadius: T.r, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color };
 };
 
 const Dashboard = () => {
@@ -212,37 +239,40 @@ const Dashboard = () => {
     setLoading(false);
   };
 
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>Loading...</div>;
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, color: T.tx3, fontSize: 13 }}>Loading...</div>;
 
   const cards = [
-    { label: 'Products', value: stats.total_products, icon: '🏷️', color: '#8b5cf6' },
-    { label: 'Inventory', value: stats.total_inventory, icon: '📦', color: '#3b82f6' },
-    { label: 'Damaged', value: stats.damaged_count, icon: '⚠️', color: '#ef4444' },
-    { label: 'Unsorted', value: stats.unsorted_count, icon: '❓', color: '#f59e0b' },
-    { label: 'Complete', value: stats.complete_count, icon: '✅', color: '#10b981' },
-    { label: 'Reports', value: stats.open_reports, icon: '📋', color: '#a855f7' },
+    { label: 'PRODUCTS', value: stats.total_products, color: T.ac },
+    { label: 'INVENTORY', value: stats.total_inventory, color: T.bl },
+    { label: 'DAMAGED', value: stats.damaged_count, color: T.re },
+    { label: 'UNSORTED', value: stats.unsorted_count, color: T.yl },
+    { label: 'COMPLETE', value: stats.complete_count, color: T.gr },
+    { label: 'OPEN REPORTS', value: stats.open_reports, color: '#9b6dff' },
   ];
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16, marginBottom: 24 }}>
+    <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 13, marginBottom: 20 }}>
         {cards.map((c, i) => (
-          <div key={i} style={{ background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <div style={{ width: 40, height: 40, background: c.color, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, fontSize: 20 }}>{c.icon}</div>
-            <p style={{ margin: 0, fontSize: 28, fontWeight: 'bold', color: '#1e293b' }}>{c.value}</p>
-            <p style={{ margin: '4px 0 0', fontSize: 14, color: '#64748b' }}>{c.label}</p>
+          <div key={i} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '15px 17px' }}>
+            <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 7 }}>{c.label}</p>
+            <p style={{ fontFamily: T.mono, fontSize: 22, fontWeight: 600, color: c.color, margin: 0 }}>{c.value}</p>
           </div>
         ))}
       </div>
-      <div style={{ background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600 }}>Recent Items</h3>
-        {recent.map((item) => (
-          <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
-            <div><p style={{ margin: 0, fontWeight: 500 }}>{item.products?.name}</p><p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>{item.products?.sku}</p></div>
-            <span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: item.status === 'complete' ? '#d1fae5' : item.status === 'damaged' ? '#fee2e2' : '#fef3c7', color: item.status === 'complete' ? '#065f46' : item.status === 'damaged' ? '#991b1b' : '#92400e' }}>{item.status}</span>
-          </div>
-        ))}
-        {recent.length === 0 && <p style={{ color: '#64748b', textAlign: 'center', padding: 20 }}>No items yet</p>}
+      <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r }}>
+        <div style={{ padding: '13px 17px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Recent Items</span>
+        </div>
+        <div style={{ padding: 0 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr style={{ background: T.s2 }}>{['Product', 'SKU', 'Status'].map(h => <th key={h} style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, padding: '9px 13px', textAlign: 'left', fontWeight: 600, borderBottom: `1px solid ${T.bd}` }}>{h}</th>)}</tr></thead>
+            <tbody>{recent.map((item) => (
+              <tr key={item.id}><td style={{ padding: '9px 13px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx }}>{item.products?.name}</td><td style={{ padding: '9px 13px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, color: T.tx2 }}>{item.products?.sku}</td><td style={{ padding: '9px 13px', fontSize: 12, borderBottom: `1px solid ${T.bd}` }}><span style={statusTag(item.status)}>{item.status}</span></td></tr>
+            ))}</tbody>
+          </table>
+          {recent.length === 0 && <p style={{ color: T.tx3, textAlign: 'center', padding: 20, fontSize: 12 }}>No items yet</p>}
+        </div>
       </div>
     </div>
   );
@@ -276,25 +306,35 @@ const Inventory = () => {
   const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
   const filtered = items.filter((i) => filter === 'all' || i.status === filter);
 
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>Loading...</div>;
+  const modalOverlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.74)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(4px)' };
+  const modalBox: React.CSSProperties = { background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 12, width: 540, maxWidth: 'calc(100vw - 32px)', maxHeight: '88vh', overflowY: 'auto' };
+  const modalHead: React.CSSProperties = { padding: '17px 21px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' };
+  const fLabel: React.CSSProperties = { fontSize: 11, color: T.tx3, marginBottom: 5, textTransform: 'uppercase' as const, letterSpacing: 1, display: 'block' };
+  const fInput: React.CSSProperties = { width: '100%', background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 13, padding: '8px 11px' };
+  const btnPrimary: React.CSSProperties = { padding: '7px 15px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: T.sans, background: T.ac, color: '#000', display: 'inline-flex', alignItems: 'center', gap: 5 };
+  const btnGhost: React.CSSProperties = { ...btnPrimary, background: 'transparent', color: T.tx2, border: `1px solid ${T.bd2}` };
+
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, color: T.tx3, fontSize: 13 }}>Loading...</div>;
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14 }}><option value="all">All</option><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="complete">Complete</option></select>
-        {canEdit && <button onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', batch_number: '', status: 'unsorted', location: '', notes: '' }); setShowModal(true); }} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#8b5cf6', color: 'white', cursor: 'pointer', fontWeight: 600 }}>+ Add Item</button>}
+    <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, padding: '10px 14px', background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r }}>
+        <span style={{ fontSize: 11, color: T.tx3, whiteSpace: 'nowrap' }}>Status</span>
+        <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ ...fInput, minWidth: 120, padding: '5px 9px', fontSize: 12, cursor: 'pointer' }}><option value="all">All</option><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="complete">Complete</option></select>
+        <div style={{ flex: 1 }} />
+        {canEdit && <button onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', batch_number: '', status: 'unsorted', location: '', notes: '' }); setShowModal(true); }} style={btnPrimary}>+ Add Item</button>}
       </div>
-      <div style={{ background: 'white', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead style={{ background: '#f8fafc' }}><tr>{['Product', 'SKU', 'Status', 'Components', 'Actions'].map((h) => <th key={h} style={{ padding: 14, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#64748b' }}>{h}</th>)}</tr></thead>
-          <tbody>{filtered.map((item) => (<tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: 14 }}>{item.products?.name}</td><td style={{ padding: 14, color: '#64748b' }}>{item.products?.sku}</td><td style={{ padding: 14 }}><span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 12, background: item.status === 'complete' ? '#d1fae5' : item.status === 'damaged' ? '#fee2e2' : '#fef3c7' }}>{item.status}</span></td><td style={{ padding: 14 }}><button onClick={() => openComps(item)} style={{ color: '#8b5cf6', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>View ({item.products?.total_components || 0})</button></td><td style={{ padding: 14 }}>{canEdit && <button onClick={() => openEdit(item)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}>Edit</button>}</td></tr>))}</tbody>
+          <thead><tr style={{ background: T.s2 }}>{['Product', 'SKU', 'Status', 'Components', 'Actions'].map((h) => <th key={h} style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, padding: '9px 13px', textAlign: 'left', fontWeight: 600, borderBottom: `1px solid ${T.bd}` }}>{h}</th>)}</tr></thead>
+          <tbody>{filtered.map((item) => (<tr key={item.id} style={{ borderBottom: `1px solid ${T.bd}` }}><td style={{ padding: '9px 13px', fontSize: 12, color: T.tx }}>{item.products?.name}</td><td style={{ padding: '9px 13px', fontSize: 12, fontFamily: T.mono, color: T.tx2 }}>{item.products?.sku}</td><td style={{ padding: '9px 13px' }}><span style={statusTag(item.status)}>{item.status}</span></td><td style={{ padding: '9px 13px' }}><button onClick={() => openComps(item)} style={{ color: T.ac, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, textDecoration: 'underline' }}>View ({item.products?.total_components || 0})</button></td><td style={{ padding: '9px 13px' }}>{canEdit && <button onClick={() => openEdit(item)} style={{ ...btnGhost, padding: '4px 8px', fontSize: 11 }}>Edit</button>}</td></tr>))}</tbody>
         </table>
-        {filtered.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>No items</div>}
+        {filtered.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>No items</div>}
       </div>
 
-      {showModal && (<div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}><div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 400, maxHeight: '90vh', overflow: 'auto' }}><div style={{ padding: 20, borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}><h2 style={{ margin: 0, fontSize: 18 }}>{selected ? 'Edit' : 'Add'} Item</h2><button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' }}>✕</button></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 16 }}><label style={{ display: 'block', marginBottom: 6, fontSize: 14, fontWeight: 500 }}>Product *</label><select value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })} required style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0' }}><option value="">Select</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div><div style={{ marginBottom: 16 }}><label style={{ display: 'block', marginBottom: 6, fontSize: 14, fontWeight: 500 }}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0' }}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="complete">Complete</option></select></div><div style={{ marginBottom: 16 }}><label style={{ display: 'block', marginBottom: 6, fontSize: 14, fontWeight: 500 }}>Location</label><input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0', boxSizing: 'border-box' }} /></div><div style={{ display: 'flex', gap: 12 }}><button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}>Cancel</button><button type="submit" style={{ flex: 1, padding: 12, borderRadius: 8, border: 'none', background: '#8b5cf6', color: 'white', cursor: 'pointer' }}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
+      {showModal && (<div style={modalOverlay}><div style={modalBox}><div style={modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 21 }}><div style={{ marginBottom: 14 }}><label style={fLabel}>Product *</label><select value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })} required style={fInput}><option value="">Select</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div><div style={{ marginBottom: 14 }}><label style={fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="complete">Complete</option></select></div><div style={{ marginBottom: 14 }}><label style={fLabel}>Location</label><input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={fInput} /></div><div style={{ padding: '15px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><button type="button" onClick={() => setShowModal(false)} style={btnGhost}>Cancel</button><button type="submit" style={btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
 
-      {showCompModal && selected && (<div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}><div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 400, maxHeight: '90vh', overflow: 'auto' }}><div style={{ padding: 20, borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}><div><h2 style={{ margin: 0, fontSize: 18 }}>Components</h2><p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>{selected.products?.name}</p></div><button onClick={() => setShowCompModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' }}>✕</button></div><div style={{ padding: 20 }}><div style={{ background: '#f5f3ff', padding: 12, borderRadius: 8, marginBottom: 16, fontSize: 13, color: '#5b21b6' }}>💡 Mark all as Present to complete!</div>{comps.map((c) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 12, background: '#f8fafc', borderRadius: 8, marginBottom: 8 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 10, height: 10, borderRadius: '50%', background: c.status === 'present' ? '#10b981' : c.status === 'damaged' ? '#ef4444' : '#f59e0b' }} /><div><p style={{ margin: 0, fontWeight: 500 }}>{c.components?.name}</p><p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>{c.components?.component_code}</p></div></div>{canEdit && <select value={c.status} onChange={(e) => updateComp(c.id, e.target.value)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 13 }}><option value="missing">Missing</option><option value="present">Present</option><option value="damaged">Damaged</option></select>}</div>))}{comps.length === 0 && <p style={{ textAlign: 'center', color: '#64748b' }}>No components</p>}</div></div></div>)}
+      {showCompModal && selected && (<div style={modalOverlay}><div style={modalBox}><div style={modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>Components</span><p style={{ margin: '4px 0 0', fontSize: 11, color: T.tx3 }}>{selected.products?.name}</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 21 }}><div style={{ background: 'rgba(78,142,247,.07)', border: '1px solid rgba(78,142,247,.2)', borderRadius: 6, padding: '9px 13px', fontSize: 12, color: T.tx2, marginBottom: 14 }}>Mark all as Present to auto-complete this item</div>{comps.map((c) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 11px', background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, marginBottom: 6 }}><div style={{ display: 'flex', alignItems: 'center', gap: 9 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: c.status === 'present' ? T.gr : c.status === 'damaged' ? T.re : T.yl }} /><div><p style={{ margin: 0, fontWeight: 500, fontSize: 12, color: T.tx }}>{c.components?.name}</p><p style={{ margin: 0, fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>{c.components?.component_code}{c.components?.is_critical && <span style={{ marginLeft: 6, padding: '1px 5px', borderRadius: 3, fontSize: 9, background: 'rgba(245,87,92,.15)', color: T.re }}>Critical</span>}</p></div></div>{canEdit && <select value={c.status} onChange={(e) => updateComp(c.id, e.target.value)} style={{ ...fInput, width: 'auto', minWidth: 90, padding: '5px 7px', fontSize: 12, cursor: 'pointer' }}><option value="missing">Missing</option><option value="present">Present</option><option value="damaged">Damaged</option></select>}</div>))}{comps.length === 0 && <p style={{ textAlign: 'center', color: T.tx3, fontSize: 12 }}>No components</p>}</div></div></div>)}
     </div>
   );
 };
@@ -325,17 +365,26 @@ const Products = () => {
   const openComps = async (p: any) => { setSelected(p); await fetchComps(p.id); setShowCompModal(true); };
   const canEdit = profile && ['admin', 'manager'].includes(profile.role);
 
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>Loading...</div>;
+  const modalOverlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.74)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(4px)' };
+  const modalBox: React.CSSProperties = { background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 12, width: 540, maxWidth: 'calc(100vw - 32px)', maxHeight: '88vh', overflowY: 'auto' };
+  const modalHead: React.CSSProperties = { padding: '17px 21px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' };
+  const fLabel: React.CSSProperties = { fontSize: 11, color: T.tx3, marginBottom: 5, textTransform: 'uppercase' as const, letterSpacing: 1, display: 'block' };
+  const fInput: React.CSSProperties = { width: '100%', background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 13, padding: '8px 11px' };
+  const btnPrimary: React.CSSProperties = { padding: '7px 15px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: T.sans, background: T.ac, color: '#000' };
+  const btnGhost: React.CSSProperties = { ...btnPrimary, background: 'transparent', color: T.tx2, border: `1px solid ${T.bd2}` };
+  const btnDanger: React.CSSProperties = { ...btnPrimary, background: 'rgba(245,87,92,.15)', color: T.re, border: '1px solid rgba(245,87,92,.3)' };
+
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, color: T.tx3, fontSize: 13 }}>Loading...</div>;
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}><h2 style={{ margin: 0, fontSize: 18 }}>Products</h2>{canEdit && <button onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setShowModal(true); }} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#8b5cf6', color: 'white', cursor: 'pointer' }}>+ Add Product</button>}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>{products.map((p) => (<div key={p.id} style={{ background: 'white', borderRadius: 12, padding: 20 }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}><div><h3 style={{ margin: 0, fontSize: 16 }}>{p.name}</h3><p style={{ margin: '4px 0 0', color: '#8b5cf6', fontSize: 14 }}>{p.sku}</p></div>{canEdit && <button onClick={() => openEdit(p)} style={{ padding: 6, borderRadius: 6, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}>✏️</button>}</div><p style={{ color: '#64748b', fontSize: 14, margin: '0 0 12px' }}>{p.description || 'No description'}</p><button onClick={() => openComps(p)} style={{ color: '#8b5cf6', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}>🔧 {p.total_components} components</button></div>))}</div>
-      {products.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>No products yet</div>}
+    <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Products</span>{canEdit && <button onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setShowModal(true); }} style={btnPrimary}>+ Add Product</button>}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 13 }}>{products.map((p) => (<div key={p.id} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 15, transition: 'border-color .12s' }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><div><h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: T.tx }}>{p.name}</h3><p style={{ margin: '3px 0 0', color: T.ac, fontSize: 12, fontFamily: T.mono }}>{p.sku}</p></div>{canEdit && <button onClick={() => openEdit(p)} style={{ ...btnGhost, padding: '4px 8px', fontSize: 11 }}>Edit</button>}</div><p style={{ color: T.tx3, fontSize: 12, margin: '0 0 10px' }}>{p.description || 'No description'}</p><button onClick={() => openComps(p)} style={{ color: T.ac, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>Components ({p.total_components})</button></div>))}</div>
+      {products.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: T.tx3, fontSize: 12 }}>No products yet</div>}
 
-      {showModal && (<div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}><div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 400 }}><div style={{ padding: 20, borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}><h2 style={{ margin: 0 }}>{selected ? 'Edit' : 'Add'} Product</h2><button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' }}>✕</button></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 16 }}><label style={{ display: 'block', marginBottom: 6, fontSize: 14 }}>SKU *</label><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0', boxSizing: 'border-box' }} /></div><div style={{ marginBottom: 16 }}><label style={{ display: 'block', marginBottom: 6, fontSize: 14 }}>Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0', boxSizing: 'border-box' }} /></div><div style={{ marginBottom: 16 }}><label style={{ display: 'block', marginBottom: 6, fontSize: 14 }}>Category</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0', boxSizing: 'border-box' }} /></div><div style={{ display: 'flex', gap: 12 }}><button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}>Cancel</button><button type="submit" style={{ flex: 1, padding: 12, borderRadius: 8, border: 'none', background: '#8b5cf6', color: 'white', cursor: 'pointer' }}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
+      {showModal && (<div style={modalOverlay}><div style={modalBox}><div style={modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Product</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 21 }}><div style={{ marginBottom: 14 }}><label style={fLabel}>SKU *</label><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required style={fInput} /></div><div style={{ marginBottom: 14 }}><label style={fLabel}>Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required style={fInput} /></div><div style={{ marginBottom: 14 }}><label style={fLabel}>Category</label><input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} style={fInput} /></div><div style={{ padding: '15px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><button type="button" onClick={() => setShowModal(false)} style={btnGhost}>Cancel</button><button type="submit" style={btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
 
-      {showCompModal && selected && (<div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}><div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 400, maxHeight: '90vh', overflow: 'auto' }}><div style={{ padding: 20, borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}><div><h2 style={{ margin: 0 }}>Components</h2><p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>{selected.name}</p></div><button onClick={() => setShowCompModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' }}>✕</button></div><div style={{ padding: 20 }}>{canEdit && <form onSubmit={addComp} style={{ background: '#f8fafc', padding: 16, borderRadius: 8, marginBottom: 20 }}><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}><input value={compForm.component_code} onChange={(e) => setCompForm({ ...compForm, component_code: e.target.value })} placeholder="Code" required style={{ padding: 8, borderRadius: 6, border: '1px solid #e2e8f0' }} /><input value={compForm.name} onChange={(e) => setCompForm({ ...compForm, name: e.target.value })} placeholder="Name" required style={{ padding: 8, borderRadius: 6, border: '1px solid #e2e8f0' }} /></div><div style={{ display: 'flex', justifyContent: 'space-between' }}><label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}><input type="checkbox" checked={compForm.is_critical} onChange={(e) => setCompForm({ ...compForm, is_critical: e.target.checked })} /> Critical</label><button type="submit" style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: '#8b5cf6', color: 'white', cursor: 'pointer' }}>Add</button></div></form>}{comps.map((c) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 12, border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 8 }}><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span>{c.name}</span><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, background: '#f1f5f9' }}>{c.component_code}</span>{c.is_critical && <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, background: '#fee2e2', color: '#991b1b' }}>Critical</span>}</div>{canEdit && <button onClick={() => deleteComp(c.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}</div>))}{comps.length === 0 && <p style={{ textAlign: 'center', color: '#64748b' }}>No components</p>}</div></div></div>)}
+      {showCompModal && selected && (<div style={modalOverlay}><div style={modalBox}><div style={modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>Components</span><p style={{ margin: '4px 0 0', fontSize: 11, color: T.tx3 }}>{selected.name}</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 21 }}>{canEdit && <form onSubmit={addComp} style={{ background: T.s2, border: `1px solid ${T.bd}`, padding: 14, borderRadius: T.r, marginBottom: 16 }}><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}><input value={compForm.component_code} onChange={(e) => setCompForm({ ...compForm, component_code: e.target.value })} placeholder="Code" required style={{ ...fInput, fontSize: 12 }} /><input value={compForm.name} onChange={(e) => setCompForm({ ...compForm, name: e.target.value })} placeholder="Name" required style={{ ...fInput, fontSize: 12 }} /></div><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: T.tx2 }}><input type="checkbox" checked={compForm.is_critical} onChange={(e) => setCompForm({ ...compForm, is_critical: e.target.checked })} /> Critical</label><button type="submit" style={{ ...btnPrimary, padding: '5px 10px', fontSize: 12 }}>Add</button></div></form>}{comps.map((c) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 11px', border: `1px solid ${T.bd}`, borderRadius: T.r, marginBottom: 6, background: T.s2 }}><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 12, color: T.tx }}>{c.name}</span><span style={{ padding: '1px 6px', borderRadius: 3, fontSize: 9, fontWeight: 500, background: 'rgba(155,109,255,.12)', color: '#9b6dff', border: '1px solid rgba(155,109,255,.25)', fontFamily: T.mono }}>{c.component_code}</span>{c.is_critical && <span style={{ padding: '1px 5px', borderRadius: 3, fontSize: 9, background: 'rgba(245,87,92,.15)', color: T.re }}>Critical</span>}</div>{canEdit && <button onClick={() => deleteComp(c.id)} style={btnDanger}>Del</button>}</div>))}{comps.length === 0 && <p style={{ textAlign: 'center', color: T.tx3, fontSize: 12 }}>No components</p>}</div></div></div>)}
     </div>
   );
 };
@@ -358,15 +407,34 @@ const Reports = () => {
 
   const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
 
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>Loading...</div>;
+  const reportStatusTag = (status: string) => {
+    const m: Record<string, { bg: string; color: string }> = {
+      open: { bg: 'rgba(245,87,92,.15)', color: T.re },
+      investigating: { bg: 'rgba(245,166,35,.15)', color: T.yl },
+      resolved: { bg: 'rgba(45,212,160,.15)', color: T.gr },
+      closed: { bg: 'rgba(139,154,191,.1)', color: T.tx3 },
+    };
+    const s = m[status] || m.open;
+    return { display: 'inline-block' as const, padding: '2px 8px', borderRadius: T.r, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color };
+  };
+
+  const modalOverlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.74)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(4px)' };
+  const modalBox: React.CSSProperties = { background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 12, width: 540, maxWidth: 'calc(100vw - 32px)', maxHeight: '88vh', overflowY: 'auto' };
+  const modalHead: React.CSSProperties = { padding: '17px 21px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' };
+  const fLabel: React.CSSProperties = { fontSize: 11, color: T.tx3, marginBottom: 5, textTransform: 'uppercase' as const, letterSpacing: 1, display: 'block' };
+  const fInput: React.CSSProperties = { width: '100%', background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 13, padding: '8px 11px' };
+  const btnPrimary: React.CSSProperties = { padding: '7px 15px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: T.sans, background: T.ac, color: '#000' };
+  const btnGhost: React.CSSProperties = { ...btnPrimary, background: 'transparent', color: T.tx2, border: `1px solid ${T.bd2}` };
+
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, color: T.tx3, fontSize: 13 }}>Loading...</div>;
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}><h2 style={{ margin: 0, fontSize: 18 }}>Damage Reports</h2>{canEdit && <button onClick={() => setShowModal(true)} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#8b5cf6', color: 'white', cursor: 'pointer' }}>+ New Report</button>}</div>
-      {reports.map((r) => (<div key={r.id} style={{ background: 'white', borderRadius: 12, padding: 20, marginBottom: 12 }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}><div><span style={{ fontFamily: 'monospace', color: '#8b5cf6', fontSize: 14 }}>{r.report_number}</span><span style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 12, fontSize: 11, background: r.status === 'open' ? '#fee2e2' : '#d1fae5', color: r.status === 'open' ? '#991b1b' : '#065f46' }}>{r.status}</span><h3 style={{ margin: '8px 0 0', fontSize: 15 }}>{r.inventory_items?.products?.name}</h3></div>{canEdit && <select value={r.status} onChange={(e) => updateStatus(r.id, e.target.value)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 13, height: 'fit-content' }}><option value="open">Open</option><option value="investigating">Investigating</option><option value="resolved">Resolved</option></select>}</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 12, fontSize: 14 }}><div><p style={{ margin: 0, color: '#64748b', fontSize: 12 }}>Type</p><p style={{ margin: '2px 0 0' }}>{r.damage_type}</p></div><div><p style={{ margin: 0, color: '#64748b', fontSize: 12 }}>Cause</p><p style={{ margin: '2px 0 0' }}>{r.cause || '-'}</p></div><div><p style={{ margin: 0, color: '#64748b', fontSize: 12 }}>Est. Loss</p><p style={{ margin: '2px 0 0' }}>{r.estimated_loss ? `₹${r.estimated_loss}` : '-'}</p></div></div></div>))}
-      {reports.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>No reports</div>}
+    <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Damage Reports</span>{canEdit && <button onClick={() => setShowModal(true)} style={btnPrimary}>+ New Report</button>}</div>
+      {reports.map((r) => (<div key={r.id} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 15, marginBottom: 10 }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><div><span style={{ fontFamily: T.mono, color: T.ac, fontSize: 12 }}>{r.report_number}</span><span style={{ marginLeft: 8, ...reportStatusTag(r.status) }}>{r.status}</span><h3 style={{ margin: '6px 0 0', fontSize: 13, fontWeight: 600, color: T.tx }}>{r.inventory_items?.products?.name}</h3></div>{canEdit && <select value={r.status} onChange={(e) => updateStatus(r.id, e.target.value)} style={{ ...fInput, width: 'auto', minWidth: 110, padding: '5px 9px', fontSize: 12, cursor: 'pointer', height: 'fit-content' }}><option value="open">Open</option><option value="investigating">Investigating</option><option value="resolved">Resolved</option></select>}</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}><div><p style={{ margin: 0, color: T.tx3, fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: 1 }}>Type</p><p style={{ margin: '2px 0 0', fontSize: 12, color: T.tx }}>{r.damage_type}</p></div><div><p style={{ margin: 0, color: T.tx3, fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: 1 }}>Cause</p><p style={{ margin: '2px 0 0', fontSize: 12, color: T.tx }}>{r.cause || '-'}</p></div><div><p style={{ margin: 0, color: T.tx3, fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: 1 }}>Est. Loss</p><p style={{ margin: '2px 0 0', fontSize: 12, fontFamily: T.mono, color: T.re }}>{r.estimated_loss ? `₹${r.estimated_loss}` : '-'}</p></div></div></div>))}
+      {reports.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: T.tx3, fontSize: 12 }}>No reports</div>}
 
-      {showModal && (<div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}><div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 400 }}><div style={{ padding: 20, borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}><h2 style={{ margin: 0 }}>New Report</h2><button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' }}>✕</button></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 16 }}><label style={{ display: 'block', marginBottom: 6, fontSize: 14 }}>Item *</label><select value={form.inventory_item_id} onChange={(e) => setForm({ ...form, inventory_item_id: e.target.value })} required style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0' }}><option value="">Select</option>{items.map((i) => <option key={i.id} value={i.id}>{i.products?.name}</option>)}</select></div><div style={{ marginBottom: 16 }}><label style={{ display: 'block', marginBottom: 6, fontSize: 14 }}>Damage Type *</label><input value={form.damage_type} onChange={(e) => setForm({ ...form, damage_type: e.target.value })} required style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0', boxSizing: 'border-box' }} /></div><div style={{ marginBottom: 16 }}><label style={{ display: 'block', marginBottom: 6, fontSize: 14 }}>Est. Loss (₹)</label><input type="number" value={form.estimated_loss} onChange={(e) => setForm({ ...form, estimated_loss: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0', boxSizing: 'border-box' }} /></div><div style={{ display: 'flex', gap: 12 }}><button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}>Cancel</button><button type="submit" style={{ flex: 1, padding: 12, borderRadius: 8, border: 'none', background: '#8b5cf6', color: 'white', cursor: 'pointer' }}>Submit</button></div></form></div></div>)}
+      {showModal && (<div style={modalOverlay}><div style={modalBox}><div style={modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>New Report</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 21 }}><div style={{ marginBottom: 14 }}><label style={fLabel}>Item *</label><select value={form.inventory_item_id} onChange={(e) => setForm({ ...form, inventory_item_id: e.target.value })} required style={fInput}><option value="">Select</option>{items.map((i) => <option key={i.id} value={i.id}>{i.products?.name}</option>)}</select></div><div style={{ marginBottom: 14 }}><label style={fLabel}>Damage Type *</label><input value={form.damage_type} onChange={(e) => setForm({ ...form, damage_type: e.target.value })} required style={fInput} /></div><div style={{ marginBottom: 14 }}><label style={fLabel}>Est. Loss (₹)</label><input type="number" value={form.estimated_loss} onChange={(e) => setForm({ ...form, estimated_loss: e.target.value })} style={fInput} /></div><div style={{ padding: '15px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><button type="button" onClick={() => setShowModal(false)} style={btnGhost}>Cancel</button><button type="submit" style={btnPrimary}>Submit</button></div></form></div></div>)}
     </div>
   );
 };
@@ -375,8 +443,14 @@ const Activity = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => { (async () => { const { data } = await supabase.from('activity_logs').select('*, profiles:user_id(full_name)').order('created_at', { ascending: false }).limit(50); setLogs(data || []); setLoading(false); })(); }, []);
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>Loading...</div>;
-  return (<div style={{ padding: 24 }}><h2 style={{ margin: '0 0 20px', fontSize: 18 }}>Activity Log</h2><div style={{ background: 'white', borderRadius: 12 }}>{logs.map((log) => (<div key={log.id} style={{ padding: 16, borderBottom: '1px solid #f1f5f9', display: 'flex', gap: 12 }}><div style={{ width: 32, height: 32, borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{log.action === 'created' ? '➕' : '✏️'}</div><div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontWeight: 500 }}>{log.profiles?.full_name || 'System'}</span><span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11, background: log.action === 'created' ? '#d1fae5' : '#dbeafe' }}>{log.action}</span></div><p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>{log.description}</p></div></div>))}{logs.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>No activity</div>}</div></div>);
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, color: T.tx3, fontSize: 13 }}>Loading...</div>;
+
+  const actionTag = (action: string) => {
+    const isCreate = action === 'created';
+    return { display: 'inline-block' as const, padding: '2px 7px', borderRadius: T.r, fontSize: 10, fontFamily: T.mono, background: isCreate ? 'rgba(45,212,160,.15)' : 'rgba(78,142,247,.15)', color: isCreate ? T.gr : T.bl };
+  };
+
+  return (<div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}><div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 16 }}>Activity Log</div><div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r }}>{logs.map((log) => (<div key={log.id} style={{ padding: '12px 17px', borderBottom: `1px solid ${T.bd}`, display: 'flex', gap: 11, alignItems: 'flex-start' }}><div style={{ width: 28, height: 28, borderRadius: '50%', background: T.s2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flexShrink: 0 }}>{log.action === 'created' ? '➕' : '✏️'}</div><div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontWeight: 500, fontSize: 12, color: T.tx }}>{log.profiles?.full_name || 'System'}</span><span style={actionTag(log.action)}>{log.action}</span></div><p style={{ margin: '4px 0 0', fontSize: 11, color: T.tx3 }}>{log.description}</p></div></div>))}{logs.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>No activity</div>}</div></div>);
 };
 
 const Users = () => {
@@ -387,21 +461,22 @@ const Users = () => {
   useEffect(() => { (async () => { const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); setLoading(false); })(); }, []);
   const updateRole = async (id: string, role: string) => { await supabase.from('profiles').update({ role }).eq('id', id); addToast('Updated!', 'success'); const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); };
   const toggleActive = async (id: string, isActive: boolean) => { await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id); addToast(isActive ? 'Revoked' : 'Granted', 'success'); const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); setUsers(data || []); };
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>Loading...</div>;
-  return (<div style={{ padding: 24 }}><h2 style={{ margin: '0 0 20px', fontSize: 18 }}>User Management</h2><div style={{ background: 'white', borderRadius: 12, overflow: 'hidden' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}><thead style={{ background: '#f8fafc' }}><tr>{['User', 'Role', 'Status', 'Actions'].map((h) => <th key={h} style={{ padding: 14, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#64748b' }}>{h}</th>)}</tr></thead><tbody>{users.map((u) => (<tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: 14 }}><p style={{ margin: 0, fontWeight: 500 }}>{u.full_name}</p><p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b' }}>{u.email}</p></td><td style={{ padding: 14 }}><select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} disabled={u.id === profile?.id} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0' }}><option value="admin">Admin</option><option value="manager">Manager</option><option value="operator">Operator</option><option value="viewer">Viewer</option></select></td><td style={{ padding: 14 }}><span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, background: u.is_active ? '#d1fae5' : '#fee2e2', color: u.is_active ? '#065f46' : '#991b1b' }}>{u.is_active ? 'Active' : 'Inactive'}</span></td><td style={{ padding: 14 }}>{u.id !== profile?.id && <button onClick={() => toggleActive(u.id, u.is_active)} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', background: u.is_active ? '#fee2e2' : '#d1fae5', color: u.is_active ? '#991b1b' : '#065f46' }}>{u.is_active ? 'Revoke' : 'Grant'}</button>}</td></tr>))}</tbody></table></div></div>);
+  const fInput: React.CSSProperties = { background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '5px 9px', cursor: 'pointer' };
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300, color: T.tx3, fontSize: 13 }}>Loading...</div>;
+  return (<div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}><div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 16 }}>User Management</div><div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, overflow: 'hidden' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr style={{ background: T.s2 }}>{['User', 'Role', 'Status', 'Actions'].map((h) => <th key={h} style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, padding: '9px 13px', textAlign: 'left', fontWeight: 600, borderBottom: `1px solid ${T.bd}` }}>{h}</th>)}</tr></thead><tbody>{users.map((u) => (<tr key={u.id} style={{ borderBottom: `1px solid ${T.bd}` }}><td style={{ padding: '9px 13px' }}><p style={{ margin: 0, fontWeight: 500, fontSize: 12, color: T.tx }}>{u.full_name}</p><p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3 }}>{u.email}</p></td><td style={{ padding: '9px 13px' }}><select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} disabled={u.id === profile?.id} style={fInput}><option value="admin">Admin</option><option value="manager">Manager</option><option value="operator">Operator</option><option value="viewer">Viewer</option></select></td><td style={{ padding: '9px 13px' }}><span style={{ padding: '2px 8px', borderRadius: T.r, fontSize: 11, fontWeight: 500, ...( u.is_active ? { background: 'rgba(45,212,160,.15)', color: T.gr } : { background: 'rgba(245,87,92,.15)', color: T.re }) }}>{u.is_active ? 'Active' : 'Inactive'}</span></td><td style={{ padding: '9px 13px' }}>{u.id !== profile?.id && <button onClick={() => toggleActive(u.id, u.is_active)} style={{ padding: '5px 10px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: T.sans, ...(u.is_active ? { background: 'rgba(245,87,92,.15)', color: T.re } : { background: 'rgba(45,212,160,.15)', color: T.gr }) }}>{u.is_active ? 'Revoke' : 'Grant'}</button>}</td></tr>))}</tbody></table></div></div>);
 };
 
 const MainApp = () => {
   const [tab, setTab] = useState('dashboard');
   const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', products: 'Products', reports: 'Damage Reports', activity: 'Activity Log', users: 'User Management' };
-  return (<div style={{ display: 'flex', minHeight: '100vh', background: '#f1f5f9' }}><Sidebar activeTab={tab} setActiveTab={setTab} /><div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}><Header title={titles[tab]} /><main style={{ flex: 1, overflow: 'auto' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory />}{tab === 'products' && <Products />}{tab === 'reports' && <Reports />}{tab === 'activity' && <Activity />}{tab === 'users' && <Users />}</main></div><ToastContainer /></div>);
+  return (<div style={{ display: 'flex', minHeight: '100vh', background: T.bg }}><Sidebar activeTab={tab} setActiveTab={setTab} /><div style={{ marginLeft: 230, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}><Header title={titles[tab]} /><main style={{ flex: 1, overflowX: 'hidden' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory />}{tab === 'products' && <Products />}{tab === 'reports' && <Reports />}{tab === 'activity' && <Activity />}{tab === 'users' && <Users />}</main></div><ToastContainer /></div>);
 };
 
 export default function App() { return <AuthProvider><AppContent /></AuthProvider>; }
 
 const AppContent = () => {
   const { user, loading } = useAuth();
-  if (loading) return <div style={{ minHeight: '100vh', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}><div style={{ width: 64, height: 64, background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>📦</div><p style={{ color: '#c4b5fd' }}>Loading Unsort...</p></div>;
+  if (loading) return <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}><div style={{ fontSize: 17, fontWeight: 700, color: T.ac, fontFamily: T.mono, letterSpacing: -0.5 }}>Unsort</div><p style={{ color: T.tx3, fontSize: 12 }}>Loading...</p></div>;
   if (!user) return <AuthScreen />;
   return <NotificationProvider><MainApp /></NotificationProvider>;
 };
