@@ -1,4 +1,18 @@
-import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext, useId, Component } from 'react';
+
+// Error boundary to prevent blank screen crashes
+class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: any }> {
+  state = { error: null as any };
+  static getDerivedStateFromError(error: any) { return { error }; }
+  render() {
+    if (this.state.error) return <div style={{ minHeight: '100vh', background: '#0a0d14', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' as const, gap: 12, padding: 20 }}>
+      <p style={{ color: '#eaf0f6', fontSize: 16, fontWeight: 600 }}>Something went wrong</p>
+      <p style={{ color: '#4f6080', fontSize: 12, textAlign: 'center' as const }}>{String(this.state.error?.message || this.state.error)}</p>
+      <button onClick={() => window.location.reload()} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#8b5cf6', color: '#fff', cursor: 'pointer', fontSize: 13 }}>Reload</button>
+    </div>;
+    return this.props.children;
+  }
+}
 import { createClient } from '@supabase/supabase-js';
 import JsBarcode from 'jsbarcode';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -393,6 +407,7 @@ const Dashboard = () => {
 const MARKETPLACES = ['Myntra-Fusionic', 'Ajio-Fusionic', 'Tanuka', 'Svaraa', 'Amazon'];
 
 const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus }: { globalSearch?: string; openItemId?: string | null; onItemOpened?: () => void; defaultStatus?: string }) => {
+  const instanceId = useId();
   const [items, setItems] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -486,7 +501,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   }, [items, itemMissing, itemPresent]);
   useEffect(() => {
     fetchData();
-    const ch = supabase.channel('inv-sync')
+    const ch = supabase.channel('inv-sync-' + instanceId.replace(/:/g, ''))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, fetchData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'item_components' }, fetchData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'item_tags' }, fetchData)
@@ -1258,7 +1273,11 @@ const MainApp = () => {
   const [globalSearch, setGlobalSearch] = useState('');
   const [notifItemId, setNotifItemId] = useState<string | null>(null);
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [mounted, setMounted] = useState<Set<string>>(new Set(['dashboard']));
   const { addToast } = useNotifications();
+
+  // Lazy mount: only mount a page once its tab is selected
+  useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
   const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', completed: 'Completed Items', categories: 'Categories', locations: 'Locations', reports: 'Damage Reports', users: 'User Management' };
   const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
   const handleNotifClick = (n: any) => {
@@ -1285,20 +1304,20 @@ const MainApp = () => {
       </div>
       <Header title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} onScan={handleScan} />
       <main style={{ flex: 1, overflow: 'auto' }}>
-        <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard /></div>
-        <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} /></div>
-        <div style={{ display: tab === 'completed' ? 'block' : 'none' }}><Inventory globalSearch="" defaultStatus="completed" /></div>
-        <div style={{ display: tab === 'categories' ? 'block' : 'none' }}><Categories /></div>
-        <div style={{ display: tab === 'locations' ? 'block' : 'none' }}><Locations /></div>
-        <div style={{ display: tab === 'reports' ? 'block' : 'none' }}><Reports /></div>
-        <div style={{ display: tab === 'users' ? 'block' : 'none' }}><Users /></div>
+        {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard /></div>}
+        {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} /></div>}
+        {mounted.has('completed') && <div style={{ display: tab === 'completed' ? 'block' : 'none' }}><Inventory globalSearch="" defaultStatus="completed" /></div>}
+        {mounted.has('categories') && <div style={{ display: tab === 'categories' ? 'block' : 'none' }}><Categories /></div>}
+        {mounted.has('locations') && <div style={{ display: tab === 'locations' ? 'block' : 'none' }}><Locations /></div>}
+        {mounted.has('reports') && <div style={{ display: tab === 'reports' ? 'block' : 'none' }}><Reports /></div>}
+        {mounted.has('users') && <div style={{ display: tab === 'users' ? 'block' : 'none' }}><Users /></div>}
       </main>
     </div>
     <ToastContainer />
   </div>);
 };
 
-export default function App() { return <AuthProvider><AppContent /></AuthProvider>; }
+export default function App() { return <ErrorBoundary><AuthProvider><AppContent /></AuthProvider></ErrorBoundary>; }
 
 const AppContent = () => {
   const auth = useAuth();
