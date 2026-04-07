@@ -1,20 +1,20 @@
 :root {
-  --bg: #0f1117;
-  --s: #181c26;
-  --s2: #1f2435;
-  --s3: #262d42;
-  --bd: #2a3148;
-  --bd2: #3a4560;
-  --tx: #e8ecf4;
-  --tx2: #8b9abf;
-  --tx3: #5a6a90;
+  --bg: #0a0d14;
+  --s: #12161f;
+  --s2: #1a1f2e;
+  --s3: #232a3b;
+  --bd: #1e2536;
+  --bd2: #2d3548;
+  --tx: #eaf0f6;
+  --tx2: #8899b4;
+  --tx3: #4f6080;
   --ac: #8b5cf6;
   --ac2: #a78bfa;
-  --gr: #2dd4a0;
-  --re: #f5575c;
-  --bl: #4e8ef7;
-  --yl: #f5a623;
-  --r: 6px;
+  --gr: #34d399;
+  --re: #f87171;
+  --bl: #60a5fa;
+  --yl: #fbbf24;
+  --r: 8px;
   --mono: 'IBM Plex Mono', monospace;
   --sans: 'IBM Plex Sans', sans-serif;
 }
@@ -35,26 +35,18 @@ body {
 }
 #root { min-height: 100vh; width: 100%; }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--bd2); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--bd2); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--tx3); }
 
-/* Focus */
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ac) !important; box-shadow: 0 0 0 2px rgba(139,92,246,.15); }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ac) !important; box-shadow: 0 0 0 3px rgba(139,92,246,.12); }
 
-/* Tables */
-table { border-spacing: 0; }
-
-/* Select styling */
 select option { background: var(--s2); color: var(--tx); }
-
-/* Input placeholder */
 input::placeholder, textarea::placeholder { color: var(--tx3); opacity: .5; }
 
 /* Animations */
-@keyframes fi { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fi { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes su { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes loginBoxEnter { from { opacity: 0; transform: translateY(30px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes loginGlowFloat { 0% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-20px) scale(1.1); } 100% { transform: translate(-20px,30px) scale(.95); } }
@@ -63,9 +55,16 @@ input::placeholder, textarea::placeholder { color: var(--tx3); opacity: .5; }
 @keyframes loginShake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
 @keyframes btnSpin { to { transform: rotate(360deg); } }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes pulseGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(139,92,246,.2); } 50% { box-shadow: 0 0 0 6px rgba(139,92,246,0); } }
 
-/* Notification dropdown animation */
 .notif-dropdown { animation: slideDown .15s ease; }
-
-/* Loading spinner */
 .spinner { width: 20px; height: 20px; border: 2px solid var(--bd2); border-top-color: var(--ac); border-radius: 50%; animation: btnSpin .6s linear infinite; }
+
+/* Table row hover */
+tr { transition: background .12s ease; }
+
+/* Smooth transitions for interactive elements */
+button, select, [style*="cursor: pointer"], [style*="cursor:pointer"] {
+  transition: all .15s ease;
+}
