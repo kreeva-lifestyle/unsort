@@ -606,7 +606,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
     });
   };
 
-  // Compute all completable pairs for each unsorted item
+  // Compute all completable pairs: must match category + SKU + size
   useEffect(() => {
     if (items.length === 0) return;
     const unsorted = items.filter(i => i.status === 'unsorted');
@@ -618,7 +618,11 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
       const totalComps = a.products?.total_components || 0;
       if (totalComps === 0) continue;
       for (const b of unsorted) {
-        if (a.id === b.id || a.product_id !== b.product_id) continue;
+        if (a.id === b.id) continue;
+        // Must match: same category, same SKU, same size
+        if (a.product_id !== b.product_id) continue;
+        if ((a.serial_number || '') !== (b.serial_number || '')) continue;
+        if ((a.size || '') !== (b.size || '')) continue;
         const bPresent = itemPresent[b.id];
         if (!bPresent) continue;
         const union = new Set([...aPresent, ...bPresent]);
@@ -676,6 +680,10 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   };
 
   const checkForPairMatch = async (productId: string, currentItemId: string) => {
+    // Get current item details for SKU + size matching
+    const { data: currentItem } = await supabase.from('inventory_items').select('serial_number, size').eq('id', currentItemId).maybeSingle();
+    if (!currentItem) return;
+
     // Get all components for this category
     const { data: allComps } = await supabase.from('components').select('id').eq('product_id', productId);
     if (!allComps || allComps.length === 0) return;
@@ -686,14 +694,17 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
     if (!currentItemComps) return;
     const currentPresent = new Set(currentItemComps.filter(c => c.status === 'present').map(c => c.component_id));
     const currentMissing = new Set(currentItemComps.filter(c => c.status === 'missing').map(c => c.component_id));
-    if (currentMissing.size === 0) return; // nothing missing, no need to pair
+    if (currentMissing.size === 0) return;
 
-    // Find other unsorted items of the same category
-    const { data: otherItems } = await supabase.from('inventory_items')
-      .select('id, batch_number, serial_number, created_at')
+    // Find other unsorted items of the same category + SKU + size
+    let query = supabase.from('inventory_items')
+      .select('id, batch_number, serial_number, size, created_at')
       .eq('product_id', productId)
       .eq('status', 'unsorted')
       .neq('id', currentItemId);
+    if (currentItem.serial_number) query = query.eq('serial_number', currentItem.serial_number);
+    if (currentItem.size) query = query.eq('size', currentItem.size);
+    const { data: otherItems } = await query;
     if (!otherItems || otherItems.length === 0) return;
 
     // Check each other item for complementary components
@@ -716,6 +727,8 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
 
         setMatchResult({
           categoryName: catName,
+          sku: currentItem.serial_number || '',
+          size: currentItem.size || '',
           currentId: currentItemId,
           currentUniqueId: items.find(i => i.id === currentItemId)?.batch_number || 'Current item',
           currentPresent: currentPresentNames,
@@ -980,7 +993,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
       </div></div></div>)}
       {matchResult && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 520 }}><div style={{ ...S.modalHead, background: 'rgba(45,212,160,.06)', borderBottom: `1px solid rgba(45,212,160,.2)` }}><span style={{ fontSize: 15, fontWeight: 600, color: T.gr }}>Pair Match Found!</span><span onClick={() => setMatchResult(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>
         <div style={{ background: 'rgba(45,212,160,.08)', border: '1px solid rgba(45,212,160,.25)', borderRadius: T.r, padding: 14, marginBottom: 16, fontSize: 13, color: T.gr }}>
-          A complete <strong>{matchResult.categoryName}</strong> can be assembled by combining these two items!
+          A complete <strong>{matchResult.categoryName}</strong>{matchResult.size && <> in size <strong>{matchResult.size}</strong></>}{matchResult.sku && <> (SKU: <span style={{ fontFamily: T.mono }}>{matchResult.sku}</span>)</>} can be assembled!
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
           <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 14 }}>
@@ -1023,7 +1036,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
                 <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>This Item</span>
                 <span style={{ fontSize: 11, fontFamily: T.mono, color: T.gr }}>{itemA.batch_number}</span>
               </div>
-              <p style={{ fontSize: 13, fontWeight: 600, color: T.tx, margin: '0 0 4px' }}>{itemA.products?.name} {itemA.serial_number && <span style={{ fontFamily: T.mono, color: T.ac2, fontWeight: 400 }}>({itemA.serial_number})</span>}</p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: T.tx, margin: '0 0 4px' }}>{itemA.products?.name} {itemA.serial_number && <span style={{ fontFamily: T.mono, color: T.ac2, fontWeight: 400 }}>({itemA.serial_number})</span>}{itemA.size && <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, fontSize: 10, background: T.s3, color: T.tx2 }}>{itemA.size}</span>}</p>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {missingA.map(name => <span key={name} style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(251,191,36,.12)', color: T.yl }}>{name} missing</span>)}
               </div>
@@ -1041,6 +1054,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
                       <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isSelected ? '#10b981' : T.bd2}`, background: isSelected ? '#10b981' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 700, flexShrink: 0 }}>{isSelected && '✓'}</div>
                       <span style={{ fontSize: 11, fontFamily: T.mono, color: T.gr }}>{b.batch_number}</span>
                       {b.serial_number && <span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2 }}>{b.serial_number}</span>}
+                      {b.size && <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: T.s3, color: T.tx2 }}>{b.size}</span>}
                     </div>
                     {b.location && <span style={{ fontSize: 10, color: T.tx3 }}>{b.location}</span>}
                   </div>
