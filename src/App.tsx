@@ -761,8 +761,8 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   };
 
   const handleComplete = async (itemId: string, pairId: string) => {
-    const { error: e1 } = await supabase.from('inventory_items').update({ status: 'completed' }).eq('id', itemId);
-    const { error: e2 } = await supabase.from('inventory_items').update({ status: 'completed' }).eq('id', pairId);
+    const { error: e1 } = await supabase.from('inventory_items').update({ status: 'completed', paired_with: pairId }).eq('id', itemId);
+    const { error: e2 } = await supabase.from('inventory_items').update({ status: 'completed', paired_with: itemId }).eq('id', pairId);
     if (e1 || e2) { addToast(`Error: ${e1?.message || e2?.message}`, 'error'); return; }
     setItems(prev => prev.map(i => (i.id === itemId || i.id === pairId) ? { ...i, status: 'completed' } : i));
     addToast('Both items moved to Completed!', 'success');
@@ -771,10 +771,17 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   };
 
   const handleCancelCompletion = async (itemId: string) => {
-    const { error } = await supabase.from('inventory_items').update({ status: 'unsorted' }).eq('id', itemId);
-    if (error) { addToast(error.message, 'error'); return; }
-    setItems(prev => prev.map(i => i.id === itemId ? { ...i, status: 'unsorted' } : i));
-    addToast('Item moved back to Inventory', 'success');
+    // Find the paired item and revert both
+    const item = items.find(i => i.id === itemId);
+    const pairedId = item?.paired_with;
+    const idsToRevert = [itemId];
+    if (pairedId) idsToRevert.push(pairedId);
+
+    for (const id of idsToRevert) {
+      await supabase.from('inventory_items').update({ status: 'unsorted', paired_with: null }).eq('id', id);
+    }
+    setItems(prev => prev.map(i => idsToRevert.includes(i.id) ? { ...i, status: 'unsorted', paired_with: null } : i));
+    addToast(pairedId ? 'Both paired items moved back to Inventory' : 'Item moved back to Inventory', 'success');
     fetchData();
   };
 
@@ -836,13 +843,13 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
             <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 500, background: 'rgba(139,92,246,.12)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 12 }}>—</span>}</div></td>
             <td style={{ ...S.tdStyle, fontSize: 12, maxWidth: 160 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 30 ? item.notes.slice(0, 30) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
             <td style={S.tdStyle}>{item.link ? <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ color: T.ac, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="link" size={14} /></a> : <span style={{ color: T.tx3 }}>—</span>}</td>
-            <td style={S.tdStyle}><span style={statusTag(item.status)}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></td>
+            <td style={S.tdStyle}><span style={statusTag(item.status)}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span>{isCompletedView && item.paired_with && (() => { const pair = items.find(p => p.id === item.paired_with); return pair ? <span style={{ display: 'block', fontSize: 10, fontFamily: T.mono, color: T.tx3, marginTop: 3 }}>Paired: {pair.batch_number}</span> : null; })()}</td>
             <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(251,191,36,.1)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(248,113,113,.1)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 12 }}>{item.status === 'completed' || item.status === 'complete' ? 'All good' : '—'}</span>}</td>
             <td style={S.tdStyle}>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 <span onClick={() => openComps(item)} style={{ ...S.btnPrimary, ...S.btnSm }}>View</span>
                 {!isCompletedView && completablePairs[item.id]?.length > 0 && <span onClick={() => setShowCompleteModal({ itemId: item.id })} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: 'rgba(16,185,129,.15)', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' as const }}>Complete ({completablePairs[item.id].length})</span>}
-                {isCompletedView && canEdit && <span onClick={() => handleCancelCompletion(item.id)} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: T.r, border: '1px solid rgba(251,191,36,.25)', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: 'rgba(251,191,36,.08)', color: T.yl, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' as const }}>Revert</span>}
+                {isCompletedView && canEdit && <span onClick={() => { if (confirm(item.paired_with ? 'This will revert BOTH paired items back to Inventory. Continue?' : 'Revert this item back to Inventory?')) handleCancelCompletion(item.id); }} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: T.r, border: '1px solid rgba(251,191,36,.25)', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: 'rgba(251,191,36,.08)', color: T.yl, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' as const }}>Revert{item.paired_with ? ' Both' : ''}</span>}
                 {item.batch_number && <span onClick={() => printBarcode(item.batch_number)} style={{ ...S.btnGhost, ...S.btnSm }}>Barcode</span>}
                 {canEdit && <span onClick={() => openEdit(item)} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>}
                 {canEdit && <span onClick={() => handleDelete(item.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Del</span>}
