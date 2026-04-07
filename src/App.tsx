@@ -812,6 +812,15 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   const hasActiveFilters = statusFilter !== 'all' || catFilter !== 'all' || locFilter !== 'all' || mpFilter !== 'all' || tagFilter !== 'all' || search !== '' || globalSearch !== '';
   const clearFilters = () => { setStatusFilter('all'); setCatFilter('all'); setLocFilter('all'); setMpFilter('all'); setTagFilter('all'); setSearch(''); };
 
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+
+  const scrollToPair = (pairId: string) => {
+    setHighlightId(pairId);
+    const el = document.getElementById('row-' + pairId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => setHighlightId(null), 2000);
+  };
+
   return (
     <div className="page-pad" style={{ padding: '16px 18px', animation: 'fi .15s ease' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -835,15 +844,15 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
           <tbody>{filtered.map((item) => {
             const missing = itemMissing[item.id] || [];
             const damaged = itemDamaged[item.id] || [];
-            return (<tr key={item.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-            <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 11, color: T.gr, whiteSpace: 'nowrap' }}>{item.batch_number || '—'}</td>
+            return (<tr key={item.id} id={'row-' + item.id} style={{ transition: 'background .3s', background: highlightId === item.id ? 'rgba(139,92,246,.12)' : 'transparent' }} onMouseEnter={e => { if (highlightId !== item.id) e.currentTarget.style.background = 'rgba(255,255,255,.02)'; }} onMouseLeave={e => { if (highlightId !== item.id) e.currentTarget.style.background = 'transparent'; }}>
+            <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 11, whiteSpace: 'nowrap' }}><span style={{ color: T.gr }}>{item.batch_number || '—'}</span>{isCompletedView && item.paired_with && (() => { const pair = items.find(p => p.id === item.paired_with); return pair ? <span onClick={() => scrollToPair(item.paired_with)} style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, cursor: 'pointer' }} title="Click to find paired item"><svg viewBox="0 0 24 24" style={{ width: 10, height: 10, fill: 'none', stroke: T.ac2, strokeWidth: 2, flexShrink: 0 }}><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg><span style={{ fontSize: 10, color: T.ac2 }}>{pair.batch_number}</span></span> : null; })()}</td>
             <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 12 }}>{item.serial_number || '—'}</td>
             <td style={S.tdStyle}><span style={{ fontWeight: 500 }}>{item.products?.name}</span></td>
             <td style={{ ...S.tdStyle, fontSize: 12, color: T.tx3 }}>{item.location || '—'}</td>
             <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 500, background: 'rgba(139,92,246,.12)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 12 }}>—</span>}</div></td>
             <td style={{ ...S.tdStyle, fontSize: 12, maxWidth: 160 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 30 ? item.notes.slice(0, 30) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
             <td style={S.tdStyle}>{item.link ? <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ color: T.ac, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="link" size={14} /></a> : <span style={{ color: T.tx3 }}>—</span>}</td>
-            <td style={S.tdStyle}><span style={statusTag(item.status)}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span>{isCompletedView && item.paired_with && (() => { const pair = items.find(p => p.id === item.paired_with); return pair ? <span style={{ display: 'block', fontSize: 10, fontFamily: T.mono, color: T.tx3, marginTop: 3 }}>Paired: {pair.batch_number}</span> : null; })()}</td>
+            <td style={S.tdStyle}><span style={statusTag(item.status)}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></td>
             <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(251,191,36,.1)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(248,113,113,.1)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 12 }}>{item.status === 'completed' || item.status === 'complete' ? 'All good' : '—'}</span>}</td>
             <td style={S.tdStyle}>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
