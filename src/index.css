@@ -16,8 +16,8 @@
   --yl: #fbbf24;
   --r: 8px;
   --sidebar: 220px;
-  --mono: 'IBM Plex Mono', monospace;
-  --sans: 'IBM Plex Sans', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Inter', sans-serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
