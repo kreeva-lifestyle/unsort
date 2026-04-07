@@ -15,7 +15,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: an
 }
 import { createClient } from '@supabase/supabase-js';
 import JsBarcode from 'jsbarcode';
-import { Html5Qrcode } from 'html5-qrcode';
+import Quagga from '@ericblade/quagga2';
 
 const SUPABASE_URL = 'https://ulphprdnswznfztawbvg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0';
@@ -208,6 +208,7 @@ const Icon = ({ name, size = 16 }: { name: string; size?: number }) => {
     search: 'M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35',
     scan: 'M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M8 12h8',
     check: 'M20 6L9 17l-5-5',
+    link: 'M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71',
   };
   return <svg viewBox="0 0 24 24" style={s}><path d={paths[name] || ''} /></svg>;
 };
@@ -256,32 +257,61 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
 };
 
 const BarcodeScanner = ({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) => {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState('');
   const [manualId, setManualId] = useState('');
+  const [lastCode, setLastCode] = useState('');
+  const scannedRef = useRef(false);
 
   useEffect(() => {
-    const scanner = new Html5Qrcode('scanner-region');
-    scannerRef.current = scanner;
-    scanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 280, height: 120 } },
-      (text) => { scanner.stop().catch(() => {}); onScan(text); },
-      () => {}
-    ).catch(() => setError('Camera access denied or not available. Use manual entry below.'));
-    return () => { scanner.stop().catch(() => {}); };
+    if (!videoRef.current) return;
+    Quagga.init({
+      inputStream: {
+        type: 'LiveStream',
+        target: videoRef.current,
+        constraints: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+      },
+      decoder: {
+        readers: ['code_128_reader', 'code_39_reader', 'ean_reader', 'ean_8_reader', 'upc_reader', 'i2of5_reader'],
+        multiple: false,
+      },
+      locate: true,
+      frequency: 10,
+    }, (err: any) => {
+      if (err) { setError('Camera not available. Use manual entry below.'); return; }
+      Quagga.start();
+    });
+
+    Quagga.onDetected((result: any) => {
+      const code = result?.codeResult?.code;
+      if (code && !scannedRef.current) {
+        scannedRef.current = true;
+        setLastCode(code);
+        // Brief vibration feedback on mobile
+        if (navigator.vibrate) navigator.vibrate(100);
+        Quagga.stop();
+        onScan(code);
+      }
+    });
+
+    return () => { Quagga.stop(); Quagga.offDetected(); };
   }, []);
 
   return (
     <div style={S.modalOverlay}>
-      <div className="modal-inner" style={{ ...S.modalBox, width: 380 }}>
+      <div className="modal-inner" style={{ ...S.modalBox, width: 400 }}>
         <div style={S.modalHead}>
           <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Scan Barcode</span>
           <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
         </div>
         <div style={{ padding: 16 }}>
-          <div id="scanner-region" style={{ width: '100%', borderRadius: 8, overflow: 'hidden', marginBottom: 12, background: '#000', minHeight: 200 }} />
-          {error && <p style={{ fontSize: 11, color: T.yl, marginBottom: 10, textAlign: 'center' }}>{error}</p>}
+          {!error && <div ref={videoRef} style={{ width: '100%', borderRadius: 8, overflow: 'hidden', marginBottom: 12, background: '#000', minHeight: 240, position: 'relative' }}>
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '70%', height: 2, background: T.re, opacity: 0.6, zIndex: 2, boxShadow: `0 0 8px ${T.re}` }} />
+          </div>}
+          {error && <div style={{ background: T.s2, borderRadius: 8, padding: 24, marginBottom: 12, textAlign: 'center' }}>
+            <p style={{ fontSize: 12, color: T.yl, marginBottom: 4 }}>{error}</p>
+          </div>}
+          {lastCode && <div style={{ background: 'rgba(52,211,153,.08)', border: '1px solid rgba(52,211,153,.2)', borderRadius: T.r, padding: '8px 12px', marginBottom: 12, fontSize: 12, color: T.gr, fontFamily: T.mono, textAlign: 'center' }}>Scanned: {lastCode}</div>}
           <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Or enter ID manually</p>
           <div style={{ display: 'flex', gap: 8 }}>
             <input value={manualId} onChange={(e) => setManualId(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && manualId.trim()) { onScan(manualId.trim()); } }} placeholder="e.g. UNS-070426-9720" style={{ ...S.fInput, flex: 1, fontFamily: T.mono }} autoFocus={!!error} />
@@ -307,16 +337,17 @@ const Header = ({ title, onSearch, onNotifClick, onScan }: { title: string; onSe
   };
 
   return (
-    <header className="header-bar" style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 12, position: 'sticky', top: 0, zIndex: 50 }}>
-      <h1 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: T.tx, whiteSpace: 'nowrap' }}>{title}</h1>
-      <div style={{ flex: 1, maxWidth: 360 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: T.s2, border: `1px solid ${T.bd}`, borderRadius: 6, padding: '5px 10px' }}>
-          <Icon name="search" size={13} />
-          <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search..." style={{ background: 'transparent', border: 'none', outline: 'none', color: T.tx, fontFamily: T.sans, fontSize: 12, flex: 1, minWidth: 0 }} />
-          {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>×</span>}
+    <header className="header-bar" style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '8px 16px', position: 'sticky', top: 0, zIndex: 50 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h1 className="header-title" style={{ margin: 0, fontSize: 14, fontWeight: 600, color: T.tx, whiteSpace: 'nowrap' }}>{title}</h1>
+        <div className="header-search" style={{ flex: 1, maxWidth: 320 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: T.s2, border: `1px solid ${T.bd}`, borderRadius: 6, padding: '5px 10px' }}>
+            <Icon name="search" size={13} />
+            <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search..." style={{ background: 'transparent', border: 'none', outline: 'none', color: T.tx, fontFamily: T.sans, fontSize: 12, flex: 1, minWidth: 0 }} />
+            {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>×</span>}
+          </div>
         </div>
-      </div>
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
         <button onClick={() => setShowScanner(true)} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', color: T.tx2, display: 'flex', alignItems: 'center' }} title="Scan barcode">
           <Icon name="scan" size={16} />
         </button>
@@ -340,6 +371,7 @@ const Header = ({ title, onSearch, onNotifClick, onScan }: { title: string; onSe
             ))}
           </div>
         )}
+      </div>
       </div>
       </div>
       {showScanner && <BarcodeScanner onScan={(code) => { setShowScanner(false); onScan?.(code); }} onClose={() => setShowScanner(false)} />}
@@ -703,14 +735,25 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
     const { error: e1 } = await supabase.from('inventory_items').update({ status: 'completed' }).eq('id', itemId);
     const { error: e2 } = await supabase.from('inventory_items').update({ status: 'completed' }).eq('id', pairId);
     if (e1 || e2) { addToast(`Error: ${e1?.message || e2?.message}`, 'error'); return; }
-    // Update local state immediately
     setItems(prev => prev.map(i => (i.id === itemId || i.id === pairId) ? { ...i, status: 'completed' } : i));
-    addToast('Both items marked as Completed!', 'success');
+    addToast('Both items moved to Completed!', 'success');
     setShowCompleteModal(null);
     fetchData();
   };
 
+  const handleCancelCompletion = async (itemId: string) => {
+    const { error } = await supabase.from('inventory_items').update({ status: 'unsorted' }).eq('id', itemId);
+    if (error) { addToast(error.message, 'error'); return; }
+    setItems(prev => prev.map(i => i.id === itemId ? { ...i, status: 'unsorted' } : i));
+    addToast('Item moved back to Inventory', 'success');
+    fetchData();
+  };
+
+  const isCompletedView = defaultStatus === 'completed';
+
   const filtered = items.filter((i) => {
+    // Main inventory hides completed items; completed view only shows them
+    if (!isCompletedView && i.status === 'completed') return false;
     if (statusFilter !== 'all' && i.status !== statusFilter) return false;
     if (catFilter !== 'all' && i.product_id !== catFilter) return false;
     if (locFilter !== 'all' && (i.location || '') !== locFilter) return false;
@@ -742,7 +785,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
       <div className="filter-bar" style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, SKU code, location, notes..." style={{ ...S.fInput, flex: 1, minWidth: 180, padding: '7px 10px' }} />
         <div style={{ width: 1, height: 24, background: T.bd2 }} />
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 120, padding: '7px 10px', cursor: 'pointer' }}><option value="all">All Status</option><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option><option value="completed">Completed</option></select>
+        {!isCompletedView && <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 120, padding: '7px 10px', cursor: 'pointer' }}><option value="all">All Status</option><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select>}
         <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 130, padding: '7px 10px', cursor: 'pointer' }}><option value="all">All Categories</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
         <select value={locFilter} onChange={(e) => setLocFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 120, padding: '7px 10px', cursor: 'pointer' }}><option value="all">All Locations</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select>
         <select value={mpFilter} onChange={(e) => setMpFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 130, padding: '7px 10px', cursor: 'pointer' }}><option value="all">All Marketplaces</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select>
@@ -751,8 +794,8 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
       </div>
       <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
         <div className="table-wrap">
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
-          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Location', 'Tags', 'Notes', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 950 }}>
+          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Location', 'Tags', 'Notes', 'Link', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
           <tbody>{filtered.map((item) => {
             const missing = itemMissing[item.id] || [];
             const damaged = itemDamaged[item.id] || [];
@@ -763,12 +806,14 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
             <td style={{ ...S.tdStyle, fontSize: 12, color: T.tx3 }}>{item.location || '—'}</td>
             <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 500, background: 'rgba(139,92,246,.12)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 12 }}>—</span>}</div></td>
             <td style={{ ...S.tdStyle, fontSize: 12, maxWidth: 160 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 30 ? item.notes.slice(0, 30) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
+            <td style={S.tdStyle}>{item.link ? <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ color: T.ac, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="link" size={14} /></a> : <span style={{ color: T.tx3 }}>—</span>}</td>
             <td style={S.tdStyle}><span style={statusTag(item.status)}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></td>
             <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(251,191,36,.1)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(248,113,113,.1)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 12 }}>{item.status === 'completed' || item.status === 'complete' ? 'All good' : '—'}</span>}</td>
             <td style={S.tdStyle}>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 <span onClick={() => openComps(item)} style={{ ...S.btnPrimary, ...S.btnSm }}>View</span>
-                {completablePairs[item.id]?.length > 0 && <span onClick={() => setShowCompleteModal({ itemId: item.id })} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: 'rgba(16,185,129,.15)', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' as const }}>Complete ({completablePairs[item.id].length})</span>}
+                {!isCompletedView && completablePairs[item.id]?.length > 0 && <span onClick={() => setShowCompleteModal({ itemId: item.id })} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: 'rgba(16,185,129,.15)', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' as const }}>Complete ({completablePairs[item.id].length})</span>}
+                {isCompletedView && canEdit && <span onClick={() => handleCancelCompletion(item.id)} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: T.r, border: '1px solid rgba(251,191,36,.25)', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: 'rgba(251,191,36,.08)', color: T.yl, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' as const }}>Revert</span>}
                 {item.batch_number && <span onClick={() => printBarcode(item.batch_number)} style={{ ...S.btnGhost, ...S.btnSm }}>Barcode</span>}
                 {canEdit && <span onClick={() => openEdit(item)} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>}
                 {canEdit && <span onClick={() => handleDelete(item.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Del</span>}
@@ -780,7 +825,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
         {filtered.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{hasActiveFilters ? 'No items match your filters' : 'No items yet'}</div>}
       </div>
 
-      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>Category *</label><input value={catSearch} onChange={(e) => { setCatSearch(e.target.value); setShowCatDrop(true); setForm({ ...form, product_id: '' }); }} onFocus={() => setShowCatDrop(true)} placeholder="Type to search categories by name or SKU..." style={S.fInput} autoComplete="off" /><input type="hidden" value={form.product_id} required />{form.product_id && <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: T.r, background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.25)', fontSize: 12, color: T.ac2 }}>{products.find(p => p.id === form.product_id)?.name} <span style={{ fontFamily: T.mono, opacity: 0.7 }}>{products.find(p => p.id === form.product_id)?.sku}</span><span onClick={() => { setForm({ ...form, product_id: '' }); setCatSearch(''); }} style={{ cursor: 'pointer', marginLeft: 4, opacity: 0.6 }}>✕</span></div>}{showCatDrop && !form.product_id && (() => { const q = catSearch.toLowerCase(); const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))); return filtered.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)' }}>{filtered.map(p => <div key={p.id} onClick={() => { setForm({ ...form, product_id: p.id }); setCatSearch(p.name); setShowCatDrop(false); supabase.from('components').select('*').eq('product_id', p.id).then(({ data }) => { setCatComps(data || []); setMissingComps(new Set()); setDamagedComps(new Set()); }); }} style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}><span style={{ fontSize: 13, color: T.tx }}>{p.name}</span><span style={{ fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{p.sku}</span></div>)}</div> : catSearch ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '12px 14px', fontSize: 12, color: T.tx3, zIndex: 10 }}>No categories found</div> : null; })()}</div><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>SKU Code</label><input value={form.serial_number} onChange={(e) => { setForm({ ...form, serial_number: e.target.value }); setShowSkuDrop(true); }} onFocus={() => setShowSkuDrop(true)} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. LC-001-A" style={{ ...S.fInput, fontFamily: T.mono }} autoComplete="off" />{showSkuDrop && form.serial_number && (() => { const q = form.serial_number.toLowerCase(); const existing = [...new Set(items.map(i => i.serial_number).filter(Boolean))]; const matches = existing.filter(s => s.toLowerCase().includes(q) && s !== form.serial_number); return matches.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 140, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 20px rgba(0,0,0,.3)' }}>{matches.slice(0, 8).map(s => <div key={s} onMouseDown={() => { setForm({ ...form, serial_number: s }); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{s}</div>)}</div> : null; })()}</div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option><option value="completed">Completed</option></select></div><div><label style={S.fLabel}>Location</label><select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={S.fInput}><option value="">Select location</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div></div>{(form.status === 'unsorted' || form.status === 'damaged') && catComps.length > 0 && <div style={{ marginBottom: 14 }}>
+      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>Category *</label><input value={catSearch} onChange={(e) => { setCatSearch(e.target.value); setShowCatDrop(true); setForm({ ...form, product_id: '' }); }} onFocus={() => setShowCatDrop(true)} placeholder="Type to search categories by name or SKU..." style={S.fInput} autoComplete="off" /><input type="hidden" value={form.product_id} required />{form.product_id && <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: T.r, background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.25)', fontSize: 12, color: T.ac2 }}>{products.find(p => p.id === form.product_id)?.name} <span style={{ fontFamily: T.mono, opacity: 0.7 }}>{products.find(p => p.id === form.product_id)?.sku}</span><span onClick={() => { setForm({ ...form, product_id: '' }); setCatSearch(''); }} style={{ cursor: 'pointer', marginLeft: 4, opacity: 0.6 }}>✕</span></div>}{showCatDrop && !form.product_id && (() => { const q = catSearch.toLowerCase(); const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))); return filtered.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)' }}>{filtered.map(p => <div key={p.id} onClick={() => { setForm({ ...form, product_id: p.id }); setCatSearch(p.name); setShowCatDrop(false); supabase.from('components').select('*').eq('product_id', p.id).then(({ data }) => { setCatComps(data || []); setMissingComps(new Set()); setDamagedComps(new Set()); }); }} style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}><span style={{ fontSize: 13, color: T.tx }}>{p.name}</span><span style={{ fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{p.sku}</span></div>)}</div> : catSearch ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '12px 14px', fontSize: 12, color: T.tx3, zIndex: 10 }}>No categories found</div> : null; })()}</div><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>SKU Code</label><input value={form.serial_number} onChange={(e) => { setForm({ ...form, serial_number: e.target.value }); setShowSkuDrop(true); }} onFocus={() => setShowSkuDrop(true)} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. LC-001-A" style={{ ...S.fInput, fontFamily: T.mono }} autoComplete="off" />{showSkuDrop && form.serial_number && (() => { const q = form.serial_number.toLowerCase(); const existing = [...new Set(items.map(i => i.serial_number).filter(Boolean))]; const matches = existing.filter(s => s.toLowerCase().includes(q) && s !== form.serial_number); return matches.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 140, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 20px rgba(0,0,0,.3)' }}>{matches.slice(0, 8).map(s => <div key={s} onMouseDown={() => { setForm({ ...form, serial_number: s }); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{s}</div>)}</div> : null; })()}</div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select></div><div><label style={S.fLabel}>Location</label><select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={S.fInput}><option value="">Select location</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div></div>{(form.status === 'unsorted' || form.status === 'damaged') && catComps.length > 0 && <div style={{ marginBottom: 14 }}>
   <label style={S.fLabel}>Component Status <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(click to toggle: Present → Missing → Damaged)</span></label>
   {form.status === 'damaged' && <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
     <span onClick={() => { setDamagedComps(new Set(catComps.map((c: any) => c.id))); setMissingComps(new Set()); }} style={{ ...S.btnDanger, fontSize: 10, padding: '3px 10px', cursor: 'pointer' }}>Mark All Damaged</span>
