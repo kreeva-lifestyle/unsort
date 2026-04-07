@@ -1,5 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import JsBarcode from 'jsbarcode';
 
 const SUPABASE_URL = 'https://ulphprdnswznfztawbvg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0';
@@ -173,18 +174,31 @@ const AuthScreen = () => {
   );
 };
 
+// SVG icons for modern look
+const Icon = ({ name, size = 16 }: { name: string; size?: number }) => {
+  const s = { width: size, height: size, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  const paths: Record<string, string> = {
+    grid: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
+    box: 'M21 8l-9-5-9 5v8l9 5 9-5V8zM3 8l9 5M12 22V13M21 8l-9 5',
+    tag: 'M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82zM7 7h.01',
+    pin: 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1118 0zM12 7a3 3 0 100 6 3 3 0 000-6z',
+    file: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8',
+    users: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
+    search: 'M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35',
+  };
+  return <svg viewBox="0 0 24 24" style={s}><path d={paths[name] || ''} /></svg>;
+};
+
 const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (t: string) => void }) => {
   const { profile } = useAuth();
   const tabs = [
-    { id: 'dashboard', icon: '📊', label: 'Dashboard' },
-    { id: 'inventory', icon: '📦', label: 'Inventory' },
-    { id: 'categories', icon: '🏷️', label: 'Categories' },
-    { id: 'locations', icon: '📍', label: 'Locations' },
-    { id: 'tags', icon: '🔖', label: 'Tags' },
-    { id: 'reports', icon: '📋', label: 'Reports' },
-    { id: 'activity', icon: '📜', label: 'Activity' },
+    { id: 'dashboard', icon: 'grid', label: 'Dashboard' },
+    { id: 'inventory', icon: 'box', label: 'Inventory' },
+    { id: 'categories', icon: 'tag', label: 'Categories' },
+    { id: 'locations', icon: 'pin', label: 'Locations' },
+    { id: 'reports', icon: 'file', label: 'Reports' },
   ];
-  if (profile?.role === 'admin') tabs.push({ id: 'users', icon: '👥', label: 'Users' });
+  if (profile?.role === 'admin') tabs.push({ id: 'users', icon: 'users', label: 'Users' });
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -201,7 +215,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
       <nav style={{ flex: 1, padding: '0 0 10px' }}>
         {tabs.map((t) => (
           <div key={t.id} onClick={() => setActiveTab(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', cursor: 'pointer', background: activeTab === t.id ? T.s2 : 'transparent', color: activeTab === t.id ? T.ac : T.tx2, fontSize: 13, fontWeight: activeTab === t.id ? 600 : 400, fontFamily: T.sans, borderLeft: `3px solid ${activeTab === t.id ? T.ac : 'transparent'}`, transition: 'all .12s' }}>
-            <span style={{ width: 18, textAlign: 'center', fontSize: 14 }}>{t.icon}</span> {t.label}
+            <span style={{ width: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={t.icon} size={16} /></span> {t.label}
           </div>
         ))}
       </nav>
@@ -217,17 +231,26 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
   );
 };
 
-const Header = ({ title }: { title: string }) => {
+const Header = ({ title, onSearch }: { title: string; onSearch?: (q: string) => void }) => {
   const { notifications, markAsRead } = useNotifications();
   const [show, setShow] = useState(false);
   const unread = notifications.filter((n: any) => !n.is_read).length;
+  const [globalSearch, setGlobalSearch] = useState('');
 
   return (
-    <header style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '12px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50 }}>
-      <h1 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: T.tx }}>{title}</h1>
-      <div style={{ position: 'relative' }}>
-        <button onClick={() => setShow(!show)} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', position: 'relative', color: T.tx2, fontSize: 14 }}>
-          🔔 {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono }}>{unread}</span>}
+    <header style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '10px 26px', display: 'flex', alignItems: 'center', gap: 16, position: 'sticky', top: 0, zIndex: 50 }}>
+      <h1 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: T.tx, whiteSpace: 'nowrap' }}>{title}</h1>
+      <div style={{ flex: 1, maxWidth: 400 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '6px 12px' }}>
+          <Icon name="search" size={14} />
+          <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search..." style={{ background: 'transparent', border: 'none', outline: 'none', color: T.tx, fontFamily: T.sans, fontSize: 13, flex: 1 }} />
+          {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>×</span>}
+        </div>
+      </div>
+      <div style={{ marginLeft: 'auto', position: 'relative' }}>
+        <button onClick={() => setShow(!show)} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', position: 'relative', color: T.tx2, fontSize: 14, display: 'flex', alignItems: 'center' }}>
+          <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
+          {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono }}>{unread}</span>}
         </button>
         {show && (
           <div className="notif-dropdown" style={{ position: 'absolute', right: 0, top: 44, width: 320, background: T.s, borderRadius: 8, boxShadow: '0 10px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.03) inset', border: `1px solid ${T.bd2}`, zIndex: 50, maxHeight: 400, overflowY: 'auto' }}>
@@ -258,53 +281,34 @@ const statusTag = (status: string) => {
 
 const Dashboard = () => {
   const [stats, setStats] = useState<any>({ total_products: 0, total_inventory: 0, damaged_count: 0, unsorted_count: 0, complete_count: 0, open_reports: 0 });
-  const [recent, setRecent] = useState<any[]>([]);
   useEffect(() => {
     supabase.from('dashboard_summary').select('*').limit(1).then(({ data }) => { if (data && data[0]) setStats(data[0]); });
-    supabase.from('inventory_items').select('*, products(name, sku)').order('created_at', { ascending: false }).limit(5).then(({ data }) => { setRecent(data || []); });
   }, []);
 
   const cards = [
-    { label: 'CATEGORIES', value: stats.total_products, color: T.ac, icon: '🏷️' },
-    { label: 'INVENTORY', value: stats.total_inventory, color: T.bl, icon: '📦' },
-    { label: 'UNSORTED', value: stats.unsorted_count, color: T.yl, icon: '❓' },
-    { label: 'DAMAGED', value: stats.damaged_count, color: T.re, icon: '⚠️' },
-    { label: 'DRY CLEAN', value: stats.dry_clean_count || 0, color: T.bl, icon: '🧹' },
-    { label: 'COMPLETE', value: stats.complete_count, color: T.gr, icon: '✅' },
+    { label: 'CATEGORIES', value: stats.total_products, color: T.ac },
+    { label: 'TOTAL ITEMS', value: stats.total_inventory, color: T.bl },
+    { label: 'UNSORTED', value: stats.unsorted_count, color: T.yl },
+    { label: 'DAMAGED', value: stats.damaged_count, color: T.re },
+    { label: 'DRY CLEAN', value: stats.dry_clean_count || 0, color: '#06b6d4' },
+    { label: 'COMPLETE', value: stats.complete_count, color: T.gr },
   ];
 
   return (
     <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: 13, marginBottom: 20 }}>
         {cards.map((c, i) => (
-          <div key={i} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '15px 17px', transition: 'border-color .15s, box-shadow .15s', cursor: 'default' }} onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = T.bd2; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 12px rgba(0,0,0,.2)'; }} onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = T.bd; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 7 }}>
-              <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1 }}>{c.label}</p>
-              <span style={{ fontSize: 14, opacity: 0.6 }}>{c.icon}</span>
-            </div>
-            <p style={{ fontFamily: T.mono, fontSize: 24, fontWeight: 600, color: c.color, margin: 0 }}>{c.value}</p>
+          <div key={i} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '15px 17px', transition: 'border-color .15s, box-shadow .15s', cursor: 'default', borderTop: `2px solid ${c.color}` }} onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = T.bd2; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 12px rgba(0,0,0,.2)'; }} onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = T.bd; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; (e.currentTarget as HTMLDivElement).style.borderTop = `2px solid ${c.color}`; }}>
+            <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 7 }}>{c.label}</p>
+            <p style={{ fontFamily: T.mono, fontSize: 26, fontWeight: 600, color: c.color, margin: 0 }}>{c.value}</p>
           </div>
         ))}
-      </div>
-      <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r }}>
-        <div style={{ padding: '13px 17px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Recent Items</span>
-        </div>
-        <div style={{ padding: 0 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr style={{ background: T.s2 }}>{['Category', 'Code', 'Status'].map(h => <th key={h} style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, padding: '9px 13px', textAlign: 'left', fontWeight: 600, borderBottom: `1px solid ${T.bd}` }}>{h}</th>)}</tr></thead>
-            <tbody>{recent.map((item) => (
-              <tr key={item.id}><td style={{ padding: '9px 13px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx }}>{item.products?.name}</td><td style={{ padding: '9px 13px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, color: T.tx2 }}>{item.products?.sku}</td><td style={{ padding: '9px 13px', fontSize: 12, borderBottom: `1px solid ${T.bd}` }}><span style={statusTag(item.status)}>{item.status}</span></td></tr>
-            ))}</tbody>
-          </table>
-          {recent.length === 0 && <p style={{ color: T.tx3, textAlign: 'center', padding: 20, fontSize: 12 }}>No items yet</p>}
-        </div>
       </div>
     </div>
   );
 };
 
-const Inventory = () => {
+const Inventory = ({ globalSearch = '' }: { globalSearch?: string }) => {
   const [items, setItems] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -322,13 +326,15 @@ const Inventory = () => {
   const [expandedNote, setExpandedNote] = useState<string | null>(null);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
-  const [form, setForm] = useState({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '' });
+  const [form, setForm] = useState({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' });
   const [catSearch, setCatSearch] = useState('');
   const [showCatDrop, setShowCatDrop] = useState(false);
   const [catComps, setCatComps] = useState<any[]>([]);
   const [missingComps, setMissingComps] = useState<Set<string>>(new Set());
-  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [tagInput, setTagInput] = useState('');
   const [matchResult, setMatchResult] = useState<any>(null);
+
+  const [itemMissing, setItemMissing] = useState<Record<string, string[]>>({});
 
   const fetchData = () => {
     supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).then(({ data }) => setItems(data || []));
@@ -339,6 +345,11 @@ const Inventory = () => {
       const map: Record<string, any[]> = {};
       (data || []).forEach((it: any) => { if (!map[it.inventory_item_id]) map[it.inventory_item_id] = []; map[it.inventory_item_id].push(it.tags); });
       setItemTags(map);
+    });
+    supabase.from('item_components').select('inventory_item_id, status, components(name)').eq('status', 'missing').then(({ data }) => {
+      const map: Record<string, string[]> = {};
+      (data || []).forEach((ic: any) => { if (!map[ic.inventory_item_id]) map[ic.inventory_item_id] = []; if (ic.components?.name) map[ic.inventory_item_id].push(ic.components.name); });
+      setItemMissing(map);
     });
   };
   useEffect(() => { fetchData(); const ch = supabase.channel('inv').on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, fetchData).subscribe(); return () => { supabase.removeChannel(ch); }; }, []);
@@ -421,6 +432,9 @@ const Inventory = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (form.status === 'unsorted' && catComps.length > 0 && missingComps.size === catComps.length) {
+      addToast('All components are missing — entire product is missing. Change status or deselect some.', 'error'); return;
+    }
     let savedItemId = '';
     if (selected) {
       const { error } = await supabase.from('inventory_items').update(form).eq('id', selected.id);
@@ -439,18 +453,22 @@ const Inventory = () => {
       addToast(`Item added! ID: ${uniqueId}`, 'success');
     }
     // Save tags
-    if (savedItemId) {
+    if (savedItemId && tagInput.trim()) {
       await supabase.from('item_tags').delete().eq('inventory_item_id', savedItemId);
-      if (selectedTags.size > 0) {
-        const tagInserts = [...selectedTags].map(tagId => ({ inventory_item_id: savedItemId, tag_id: tagId }));
-        await supabase.from('item_tags').insert(tagInserts);
+      const tagNames = tagInput.split(',').map(t => t.trim()).filter(Boolean);
+      for (const name of tagNames) {
+        let { data: existing } = await supabase.from('tags').select('id').eq('name', name).maybeSingle();
+        if (!existing) { const { data: created } = await supabase.from('tags').insert({ name }).select('id').single(); existing = created; }
+        if (existing) await supabase.from('item_tags').insert({ inventory_item_id: savedItemId, tag_id: existing.id });
       }
+    } else if (savedItemId && !tagInput.trim()) {
+      await supabase.from('item_tags').delete().eq('inventory_item_id', savedItemId);
     }
 
     const savedProductId = form.product_id;
     const savedStatus = form.status;
     const hadMissing = missingComps.size > 0;
-    setShowModal(false); setSelected(null); setForm({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '' }); setCatComps([]); setMissingComps(new Set()); setSelectedTags(new Set()); fetchData();
+    setShowModal(false); setSelected(null); setForm({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatComps([]); setMissingComps(new Set()); setTagInput(''); fetchData();
 
     // Check for pair matches after save (only for unsorted items with missing components)
     if (savedStatus === 'unsorted' && hadMissing) {
@@ -461,19 +479,31 @@ const Inventory = () => {
   const updateComp = async (id: string, status: string) => { const { error } = await supabase.from('item_components').update({ status }).eq('id', id); if (error) addToast(error.message, 'error'); else { addToast('Updated!', 'success'); fetchComps(selected.id); fetchData(); } };
 
   const openEdit = async (item: any) => {
-    setSelected(item); setForm({ product_id: item.product_id, serial_number: item.serial_number || '', status: item.status, location: item.location || '', notes: item.notes || '' }); setCatSearch(item.products?.name || '');
+    setSelected(item); setForm({ product_id: item.product_id, serial_number: item.serial_number || '', status: item.status, location: item.location || '', notes: item.notes || '', order_id: item.order_id || '', marketplace: item.marketplace || '', ticket_id: item.ticket_id || '', link: item.link || '' }); setCatSearch(item.products?.name || '');
     const { data: cc } = await supabase.from('components').select('*').eq('product_id', item.product_id);
     setCatComps(cc || []);
     const { data: ic } = await supabase.from('item_components').select('*').eq('inventory_item_id', item.id);
     const missing = new Set<string>();
     if (ic) ic.forEach((c: any) => { if (c.status === 'missing') missing.add(c.component_id); });
     setMissingComps(missing);
-    // Load existing tags
-    const existingTags = new Set<string>((itemTags[item.id] || []).map((t: any) => t?.id).filter(Boolean));
-    setSelectedTags(existingTags);
+    setTagInput((itemTags[item.id] || []).map((t: any) => t?.name).filter(Boolean).join(', '));
     setShowModal(true);
   };
-  const openComps = async (item: any) => { setSelected(item); await fetchComps(item.id); setShowCompModal(true); };
+  const [itemLogs, setItemLogs] = useState<any[]>([]);
+
+  const printBarcode = (uniqueId: string, categoryName: string, skuCode: string) => {
+    const canvas = document.createElement('canvas');
+    try { JsBarcode(canvas, uniqueId, { format: 'CODE128', width: 2, height: 60, displayValue: true, fontSize: 14, font: 'IBM Plex Mono', margin: 10 }); } catch { return; }
+    const win = window.open('', '_blank', 'width=400,height=300');
+    if (!win) return;
+    win.document.write(`<html><head><title>Barcode - ${uniqueId}</title><style>body{font-family:'IBM Plex Sans',sans-serif;text-align:center;padding:20px}@media print{.no-print{display:none}}</style></head><body><p style="font-size:14px;font-weight:600;margin:0 0 4px">${categoryName}</p>${skuCode ? `<p style="font-size:11px;color:#666;margin:0 0 12px">${skuCode}</p>` : ''}<img src="${canvas.toDataURL()}" /><br><button class="no-print" onclick="window.print()" style="margin-top:16px;padding:8px 24px;font-size:14px;cursor:pointer">Print</button></body></html>`);
+    win.document.close();
+  };
+  const openComps = async (item: any) => {
+    setSelected(item); await fetchComps(item.id);
+    supabase.from('activity_logs').select('*, profiles:user_id(full_name)').eq('entity_id', item.id).order('created_at', { ascending: false }).limit(20).then(({ data }) => setItemLogs(data || []));
+    setShowCompModal(true);
+  };
   const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
 
   const filtered = items.filter((i) => {
@@ -481,8 +511,9 @@ const Inventory = () => {
     if (catFilter !== 'all' && i.product_id !== catFilter) return false;
     if (locFilter !== 'all' && (i.location || '') !== locFilter) return false;
     if (tagFilter !== 'all') { const t = itemTags[i.id] || []; if (!t.some((tg: any) => tg?.id === tagFilter)) return false; }
-    if (search) {
-      const q = search.toLowerCase();
+    const searchTerm = globalSearch || search;
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
       const name = (i.products?.name || '').toLowerCase();
       const sku = (i.products?.sku || '').toLowerCase();
       const uid = (i.batch_number || '').toLowerCase();
@@ -494,14 +525,14 @@ const Inventory = () => {
     return true;
   });
 
-  const hasActiveFilters = statusFilter !== 'all' || catFilter !== 'all' || locFilter !== 'all' || tagFilter !== 'all' || search !== '';
+  const hasActiveFilters = statusFilter !== 'all' || catFilter !== 'all' || locFilter !== 'all' || tagFilter !== 'all' || search !== '' || globalSearch !== '';
   const clearFilters = () => { setStatusFilter('all'); setCatFilter('all'); setLocFilter('all'); setTagFilter('all'); setSearch(''); };
 
   return (
     <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Inventory <span style={{ fontSize: 12, fontWeight: 400, color: T.tx3 }}>({filtered.length}{items.length !== filtered.length ? ` of ${items.length}` : ''})</span></span>
-        {canEdit && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setSelectedTags(new Set()); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
+        <div><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Inventory</span><span style={{ fontSize: 12, fontWeight: 500, color: T.tx3, marginLeft: 10 }}>{filtered.length !== items.length ? `${filtered.length} of ` : ''}{items.length} item{items.length !== 1 ? 's' : ''}</span></div>
+        {canEdit && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
       </div>
       <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '10px 14px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, SKU code, location, notes..." style={{ ...S.fInput, flex: 1, minWidth: 180, padding: '7px 10px' }} />
@@ -514,29 +545,38 @@ const Inventory = () => {
       </div>
       <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>{['Unique ID', 'Category', 'SKU Code', 'Status', 'Location', 'Tags', 'Notes', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
-          <tbody>{filtered.map((item) => (<tr key={item.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-            <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 11, color: T.gr }}>{item.batch_number || '—'}</td>
-            <td style={S.tdStyle}><span style={{ fontWeight: 500 }}>{item.products?.name}</span><span style={{ display: 'block', fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{item.products?.sku}</span></td>
+          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Location', 'Tags', 'Notes', 'Status', 'Missing Parts', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
+          <tbody>{filtered.map((item) => {
+            const missing = itemMissing[item.id] || [];
+            return (<tr key={item.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 11, color: T.gr, whiteSpace: 'nowrap' }}>{item.batch_number || '—'}</td>
             <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 12 }}>{item.serial_number || '—'}</td>
-            <td style={S.tdStyle}><span style={statusTag(item.status)}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></td>
+            <td style={S.tdStyle}><span style={{ fontWeight: 500 }}>{item.products?.name}</span></td>
             <td style={{ ...S.tdStyle, fontSize: 12, color: T.tx3 }}>{item.location || '—'}</td>
-            <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 500, background: (t.color || T.ac) + '20', color: t.color || T.ac }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 12 }}>—</span>}</div></td>
-            <td style={{ ...S.tdStyle, fontSize: 12, maxWidth: 180 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 40 ? item.notes.slice(0, 40) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
+            <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 500, background: 'rgba(139,92,246,.12)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 12 }}>—</span>}</div></td>
+            <td style={{ ...S.tdStyle, fontSize: 12, maxWidth: 160 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 30 ? item.notes.slice(0, 30) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
+            <td style={S.tdStyle}><span style={statusTag(item.status)}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></td>
+            <td style={S.tdStyle}>{missing.length > 0 ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{missing.map((name, i) => <span key={i} style={{ padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 500, background: 'rgba(245,166,35,.12)', color: T.yl }}>{name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 12 }}>{item.status === 'complete' ? 'All present' : '—'}</span>}</td>
             <td style={S.tdStyle}>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <span onClick={() => openComps(item)} style={{ color: T.ac, cursor: 'pointer', fontSize: 12 }}>Parts</span>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                <span onClick={() => openComps(item)} style={{ ...S.btnPrimary, padding: '4px 10px', fontSize: 11 }}>View</span>
+                {item.batch_number && <span onClick={() => printBarcode(item.batch_number, item.products?.name || '', item.serial_number || '')} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 11 }}>Barcode</span>}
                 {canEdit && <span onClick={() => openEdit(item)} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 11 }}>Edit</span>}
               </div>
             </td>
-          </tr>))}</tbody>
+          </tr>);})}</tbody>
         </table>
         {filtered.length === 0 && <div style={{ padding: 48, textAlign: 'center', color: T.tx3, fontSize: 13 }}>{hasActiveFilters ? 'No items match your filters' : 'No items yet'}</div>}
       </div>
 
-      {showModal && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>Category *</label><input value={catSearch} onChange={(e) => { setCatSearch(e.target.value); setShowCatDrop(true); setForm({ ...form, product_id: '' }); }} onFocus={() => setShowCatDrop(true)} placeholder="Type to search categories by name or SKU..." style={S.fInput} autoComplete="off" /><input type="hidden" value={form.product_id} required />{form.product_id && <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: T.r, background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.25)', fontSize: 12, color: T.ac2 }}>{products.find(p => p.id === form.product_id)?.name} <span style={{ fontFamily: T.mono, opacity: 0.7 }}>{products.find(p => p.id === form.product_id)?.sku}</span><span onClick={() => { setForm({ ...form, product_id: '' }); setCatSearch(''); }} style={{ cursor: 'pointer', marginLeft: 4, opacity: 0.6 }}>✕</span></div>}{showCatDrop && !form.product_id && (() => { const q = catSearch.toLowerCase(); const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))); return filtered.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)' }}>{filtered.map(p => <div key={p.id} onClick={() => { setForm({ ...form, product_id: p.id }); setCatSearch(p.name); setShowCatDrop(false); supabase.from('components').select('*').eq('product_id', p.id).then(({ data }) => { setCatComps(data || []); setMissingComps(new Set()); }); }} style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}><span style={{ fontSize: 13, color: T.tx }}>{p.name}</span><span style={{ fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{p.sku}</span></div>)}</div> : catSearch ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '12px 14px', fontSize: 12, color: T.tx3, zIndex: 10 }}>No categories found</div> : null; })()}</div><div style={{ marginBottom: 14 }}><label style={S.fLabel}>SKU Code</label><input value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="e.g. LC-001-A" style={{ ...S.fInput, fontFamily: T.mono }} /></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select></div><div><label style={S.fLabel}>Location</label><select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={S.fInput}><option value="">Select location</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div></div>{form.status === 'unsorted' && catComps.length > 0 && <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Missing Components <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(select which are missing)</span></label><div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 10 }}>{catComps.map(c => { const isMissing = missingComps.has(c.id); return <div key={c.id} onClick={() => { const next = new Set(missingComps); if (isMissing) next.delete(c.id); else next.add(c.id); setMissingComps(next); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: T.r, cursor: 'pointer', marginBottom: 4, background: isMissing ? 'rgba(245,166,35,.08)' : 'transparent', border: `1px solid ${isMissing ? 'rgba(245,166,35,.3)' : 'transparent'}`, transition: 'all .12s' }}><div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isMissing ? T.yl : T.bd2}`, background: isMissing ? T.yl : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#000', fontWeight: 700, flexShrink: 0 }}>{isMissing && '✓'}</div><span style={{ fontSize: 13, color: isMissing ? T.yl : T.tx }}>{c.name}</span>{isMissing && <span style={{ fontSize: 10, color: T.yl, marginLeft: 'auto', fontWeight: 600 }}>MISSING</span>}</div>; })}</div>{missingComps.size > 0 && <p style={{ fontSize: 11, color: T.yl, marginTop: 6 }}>{missingComps.size} component{missingComps.size > 1 ? 's' : ''} marked as missing</p>}</div>}<div style={{ marginBottom: 14 }}><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional notes" style={S.fInput} /></div>{tags.length > 0 && <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Tags</label><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{tags.map(t => { const sel = selectedTags.has(t.id); return <span key={t.id} onClick={() => { const next = new Set(selectedTags); if (sel) next.delete(t.id); else next.add(t.id); setSelectedTags(next); }} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontWeight: 500, background: sel ? (t.color || T.ac) + '25' : T.s2, color: sel ? (t.color || T.ac) : T.tx3, border: `1px solid ${sel ? (t.color || T.ac) + '50' : T.bd}`, transition: 'all .12s' }}>{t.name}</span>; })}</div></div>}<div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
+      {showModal && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>Category *</label><input value={catSearch} onChange={(e) => { setCatSearch(e.target.value); setShowCatDrop(true); setForm({ ...form, product_id: '' }); }} onFocus={() => setShowCatDrop(true)} placeholder="Type to search categories by name or SKU..." style={S.fInput} autoComplete="off" /><input type="hidden" value={form.product_id} required />{form.product_id && <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: T.r, background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.25)', fontSize: 12, color: T.ac2 }}>{products.find(p => p.id === form.product_id)?.name} <span style={{ fontFamily: T.mono, opacity: 0.7 }}>{products.find(p => p.id === form.product_id)?.sku}</span><span onClick={() => { setForm({ ...form, product_id: '' }); setCatSearch(''); }} style={{ cursor: 'pointer', marginLeft: 4, opacity: 0.6 }}>✕</span></div>}{showCatDrop && !form.product_id && (() => { const q = catSearch.toLowerCase(); const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))); return filtered.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)' }}>{filtered.map(p => <div key={p.id} onClick={() => { setForm({ ...form, product_id: p.id }); setCatSearch(p.name); setShowCatDrop(false); supabase.from('components').select('*').eq('product_id', p.id).then(({ data }) => { setCatComps(data || []); setMissingComps(new Set()); }); }} style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}><span style={{ fontSize: 13, color: T.tx }}>{p.name}</span><span style={{ fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{p.sku}</span></div>)}</div> : catSearch ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '12px 14px', fontSize: 12, color: T.tx3, zIndex: 10 }}>No categories found</div> : null; })()}</div><div style={{ marginBottom: 14 }}><label style={S.fLabel}>SKU Code</label><input value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="e.g. LC-001-A" style={{ ...S.fInput, fontFamily: T.mono }} /></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select></div><div><label style={S.fLabel}>Location</label><select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={S.fInput}><option value="">Select location</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div></div>{form.status === 'unsorted' && catComps.length > 0 && <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Missing Components <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(select which are missing)</span></label><div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 10 }}>{catComps.map(c => { const isMissing = missingComps.has(c.id); return <div key={c.id} onClick={() => { const next = new Set(missingComps); if (isMissing) next.delete(c.id); else next.add(c.id); setMissingComps(next); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: T.r, cursor: 'pointer', marginBottom: 4, background: isMissing ? 'rgba(245,166,35,.08)' : 'transparent', border: `1px solid ${isMissing ? 'rgba(245,166,35,.3)' : 'transparent'}`, transition: 'all .12s' }}><div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isMissing ? T.yl : T.bd2}`, background: isMissing ? T.yl : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#000', fontWeight: 700, flexShrink: 0 }}>{isMissing && '✓'}</div><span style={{ fontSize: 13, color: isMissing ? T.yl : T.tx }}>{c.name}</span>{isMissing && <span style={{ fontSize: 10, color: T.yl, marginLeft: 'auto', fontWeight: 600 }}>MISSING</span>}</div>; })}</div>{missingComps.size > 0 && missingComps.size === catComps.length && <p style={{ fontSize: 12, color: T.re, marginTop: 6, background: 'rgba(245,87,92,.08)', border: '1px solid rgba(245,87,92,.2)', borderRadius: T.r, padding: '8px 12px' }}>All components are missing. This means the entire product is missing, not unsorted. Change status to "Damaged" or remove some selections.</p>}{missingComps.size > 0 && missingComps.size < catComps.length && <p style={{ fontSize: 11, color: T.yl, marginTop: 6 }}>{missingComps.size} of {catComps.length} component{missingComps.size > 1 ? 's' : ''} missing</p>}</div>}<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Order ID</label><input value={form.order_id} onChange={(e) => setForm({ ...form, order_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Marketplace</label><input value={form.marketplace} onChange={(e) => setForm({ ...form, marketplace: e.target.value })} placeholder="e.g. Myntra, Amazon" style={S.fInput} /></div></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Ticket ID</label><input value={form.ticket_id} onChange={(e) => setForm({ ...form, ticket_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Link</label><input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="Optional URL" style={S.fInput} /></div></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Tags <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(comma separated)</span></label><input value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="e.g. urgent, wedding" style={S.fInput} /></div><div><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
 
-      {showCompModal && selected && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>Components</span><p style={{ margin: '4px 0 0', fontSize: 12, color: T.tx3 }}>{selected.products?.name}</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}><div style={{ background: 'rgba(139,92,246,.06)', border: `1px solid rgba(139,92,246,.2)`, borderRadius: T.r, padding: '10px 14px', fontSize: 12, color: T.ac2, marginBottom: 16 }}>Mark all components as "Present" to auto-complete this item</div>{comps.map((c) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, marginBottom: 6 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: c.status === 'present' ? T.gr : c.status === 'damaged' ? T.re : T.yl }} /><div><p style={{ margin: 0, fontWeight: 500, fontSize: 13, color: T.tx }}>{c.components?.name}</p><p style={{ margin: 0, fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{c.components?.component_code}{c.components?.is_critical && <span style={{ marginLeft: 6, padding: '2px 6px', borderRadius: 3, fontSize: 9, background: 'rgba(245,87,92,.12)', color: T.re, fontWeight: 600 }}>Critical</span>}</p></div></div>{canEdit && <select value={c.status} onChange={(e) => updateComp(c.id, e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '6px 8px', cursor: 'pointer' }}><option value="missing">Missing</option><option value="present">Present</option><option value="damaged">Damaged</option></select>}</div>))}{comps.length === 0 && <p style={{ textAlign: 'center', color: T.tx3, fontSize: 13, padding: 20 }}>No components</p>}</div></div></div>)}
+      {showCompModal && selected && (<div style={S.modalOverlay}><div style={{ ...S.modalBox, width: 580 }}><div style={S.modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected.products?.name}</span><div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center', flexWrap: 'wrap' }}><span style={{ fontSize: 11, fontFamily: T.mono, color: T.gr }}>{selected.batch_number}</span>{selected.serial_number && <span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2 }}>{selected.serial_number}</span>}<span style={statusTag(selected.status)}>{selected.status}</span>{selected.batch_number && <span onClick={() => printBarcode(selected.batch_number, selected.products?.name || '', selected.serial_number || '')} style={{ ...S.btnGhost, padding: '2px 8px', fontSize: 10 }}>Print Barcode</span>}</div>{selected.order_id && <p style={{ margin: '4px 0 0', fontSize: 11, color: T.tx3 }}>Order: {selected.order_id}{selected.marketplace ? ` | ${selected.marketplace}` : ''}</p>}{selected.ticket_id && <p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3 }}>Ticket: {selected.ticket_id}</p>}{selected.link && <a href={selected.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: T.ac, marginTop: 2, display: 'block' }}>Open Link</a>}</div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>
+        <p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 8 }}>Components</p>
+        {comps.map((c) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: T.s2, border: `1px solid ${c.status === 'missing' ? 'rgba(245,166,35,.3)' : T.bd}`, borderRadius: T.r, marginBottom: 6 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 10, height: 10, borderRadius: '50%', background: c.status === 'present' ? T.gr : c.status === 'damaged' ? T.re : T.yl }} /><span style={{ fontWeight: 500, fontSize: 13, color: T.tx }}>{c.components?.name}</span>{c.status === 'missing' && <span style={{ fontSize: 10, color: T.yl, fontWeight: 600, padding: '1px 6px', borderRadius: 3, background: 'rgba(245,166,35,.1)' }}>MISSING</span>}</div>{canEdit && <select value={c.status} onChange={(e) => updateComp(c.id, e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '6px 8px', cursor: 'pointer' }}><option value="missing">Missing</option><option value="present">Present</option><option value="damaged">Damaged</option></select>}</div>))}
+        {comps.length === 0 && <p style={{ textAlign: 'center', color: T.tx3, fontSize: 13, padding: 16 }}>No components</p>}
+        {itemLogs.length > 0 && <><div style={{ borderTop: `1px solid ${T.bd}`, marginTop: 16, paddingTop: 16 }}><p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 8 }}>Activity History</p>{itemLogs.map(log => <div key={log.id} style={{ padding: '8px 0', borderBottom: `1px solid ${T.bd}`, display: 'flex', gap: 10, fontSize: 12 }}><span style={{ color: T.tx3, whiteSpace: 'nowrap', fontFamily: T.mono, fontSize: 10 }}>{new Date(log.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span><span style={{ color: T.tx2 }}>{log.description || log.action}</span></div>)}</div></>}
+      </div></div></div>)}
       {matchResult && (<div style={S.modalOverlay}><div style={{ ...S.modalBox, width: 520 }}><div style={{ ...S.modalHead, background: 'rgba(45,212,160,.06)', borderBottom: `1px solid rgba(45,212,160,.2)` }}><span style={{ fontSize: 15, fontWeight: 600, color: T.gr }}>Pair Match Found!</span><span onClick={() => setMatchResult(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>
         <div style={{ background: 'rgba(45,212,160,.08)', border: '1px solid rgba(45,212,160,.25)', borderRadius: T.r, padding: 14, marginBottom: 16, fontSize: 13, color: T.gr }}>
           A complete <strong>{matchResult.categoryName}</strong> can be assembled by combining these two items!
@@ -670,78 +710,6 @@ const Categories = () => {
   );
 };
 
-const TAG_COLORS = ['#8b5cf6', '#4e8ef7', '#2dd4a0', '#f5a623', '#f5575c', '#ff6b9d', '#06b6d4', '#84cc16'];
-
-const Tags = () => {
-  const [tags, setTags] = useState<any[]>([]);
-  const [newTag, setNewTag] = useState('');
-  const [newColor, setNewColor] = useState(TAG_COLORS[0]);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editColor, setEditColor] = useState('');
-  const { profile } = useAuth();
-  const { addToast } = useNotifications();
-  const canEdit = profile && ['admin', 'manager'].includes(profile.role);
-
-  const fetchTags = () => { supabase.from('tags').select('*').order('name').then(({ data }) => setTags(data || [])); };
-  useEffect(() => { fetchTags(); }, []);
-
-  const addTag = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTag.trim()) return;
-    const { error } = await supabase.from('tags').insert({ name: newTag.trim(), color: newColor });
-    if (error) addToast(error.message, 'error');
-    else { addToast('Tag added!', 'success'); setNewTag(''); setNewColor(TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]); fetchTags(); }
-  };
-
-  const updateTag = async (id: string) => {
-    if (!editName.trim()) return;
-    const { error } = await supabase.from('tags').update({ name: editName.trim(), color: editColor }).eq('id', id);
-    if (error) addToast(error.message, 'error');
-    else { addToast('Updated!', 'success'); setEditId(null); fetchTags(); }
-  };
-
-  const deleteTag = async (id: string) => {
-    await supabase.from('item_tags').delete().eq('tag_id', id);
-    const { error } = await supabase.from('tags').delete().eq('id', id);
-    if (error) addToast(error.message, 'error');
-    else { addToast('Deleted!', 'success'); fetchTags(); }
-  };
-
-  return (
-    <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: T.tx, marginBottom: 16 }}>Tags</div>
-      {canEdit && <form onSubmit={addTag} style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
-        <input value={newTag} onChange={(e) => setNewTag(e.target.value)} placeholder="Add new tag..." style={{ ...S.fInput, flex: 1 }} />
-        <div style={{ display: 'flex', gap: 4 }}>{TAG_COLORS.map(c => <div key={c} onClick={() => setNewColor(c)} style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', border: newColor === c ? '2px solid #fff' : '2px solid transparent', transition: 'border .1s' }} />)}</div>
-        <button type="submit" style={S.btnPrimary}>+ Add</button>
-      </form>}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {tags.map(t => (
-          <div key={t.id} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 160 }}>
-            {editId === t.id ? (
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1 }}>
-                <input value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') updateTag(t.id); if (e.key === 'Escape') setEditId(null); }} style={{ ...S.fInput, width: 100 }} autoFocus />
-                <div style={{ display: 'flex', gap: 3 }}>{TAG_COLORS.map(c => <div key={c} onClick={() => setEditColor(c)} style={{ width: 18, height: 18, borderRadius: '50%', background: c, cursor: 'pointer', border: editColor === c ? '2px solid #fff' : '2px solid transparent' }} />)}</div>
-                <span onClick={() => updateTag(t.id)} style={{ ...S.btnPrimary, padding: '4px 8px', fontSize: 11 }}>Save</span>
-              </div>
-            ) : (
-              <>
-                <div style={{ width: 12, height: 12, borderRadius: '50%', background: t.color || T.ac, flexShrink: 0 }} />
-                <span style={{ fontSize: 14, fontWeight: 500, color: T.tx, flex: 1 }}>{t.name}</span>
-                {canEdit && <div style={{ display: 'flex', gap: 4 }}>
-                  <span onClick={() => { setEditId(t.id); setEditName(t.name); setEditColor(t.color || T.ac); }} style={{ fontSize: 11, color: T.tx3, cursor: 'pointer' }}>Edit</span>
-                  <span onClick={() => deleteTag(t.id)} style={{ fontSize: 11, color: T.re, cursor: 'pointer' }}>Del</span>
-                </div>}
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-      {tags.length === 0 && <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 40, textAlign: 'center', color: T.tx3, fontSize: 13 }}>No tags yet. Add tags like "Urgent", "Priority", "Wedding Collection" etc.</div>}
-    </div>
-  );
-};
 
 const Locations = () => {
   const [locations, setLocations] = useState<any[]>([]);
@@ -854,18 +822,6 @@ const Reports = () => {
       {showModal && (<div style={S.modalOverlay}><div style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>New Report</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Item *</label><select value={form.inventory_item_id} onChange={(e) => setForm({ ...form, inventory_item_id: e.target.value })} required style={S.fInput}><option value="">Select</option>{items.map((i) => <option key={i.id} value={i.id}>{i.products?.name}</option>)}</select></div><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Damage Type *</label><input value={form.damage_type} onChange={(e) => setForm({ ...form, damage_type: e.target.value })} required placeholder="e.g. Tear, Stain, Broken" style={S.fInput} /></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Cause</label><input value={form.cause} onChange={(e) => setForm({ ...form, cause: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Est. Loss (₹)</label><input type="number" value={form.estimated_loss} onChange={(e) => setForm({ ...form, estimated_loss: e.target.value })} placeholder="0" style={S.fInput} /></div></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>Submit</button></div></form></div></div>)}
     </div>
   );
-};
-
-const Activity = () => {
-  const [logs, setLogs] = useState<any[]>([]);
-  useEffect(() => { supabase.from('activity_logs').select('*, profiles:user_id(full_name)').order('created_at', { ascending: false }).limit(50).then(({ data }) => setLogs(data || [])); }, []);
-
-  const actionTag = (action: string) => {
-    const isCreate = action === 'created';
-    return { display: 'inline-block' as const, padding: '2px 7px', borderRadius: T.r, fontSize: 10, fontFamily: T.mono, background: isCreate ? 'rgba(45,212,160,.15)' : 'rgba(78,142,247,.15)', color: isCreate ? T.gr : T.bl };
-  };
-
-  return (<div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}><div style={{ fontSize: 14, fontWeight: 600, color: T.tx, marginBottom: 16 }}>Activity Log</div><div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r }}>{logs.map((log) => (<div key={log.id} style={{ padding: '12px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', gap: 12, alignItems: 'flex-start' }}><div style={{ width: 32, height: 32, borderRadius: '50%', background: T.s2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{log.action === 'created' ? '➕' : '✏️'}</div><div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontWeight: 600, fontSize: 13, color: T.tx }}>{log.profiles?.full_name || 'System'}</span><span style={actionTag(log.action)}>{log.action}</span></div><p style={{ margin: '4px 0 0', fontSize: 12, color: T.tx3 }}>{log.description}</p></div></div>))}{logs.length === 0 && <div style={{ padding: 48, textAlign: 'center', color: T.tx3, fontSize: 13 }}>No activity</div>}</div></div>);
 };
 
 const Users = () => {
@@ -990,8 +946,10 @@ const Users = () => {
 
 const MainApp = () => {
   const [tab, setTab] = useState('dashboard');
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', categories: 'Categories', locations: 'Locations', tags: 'Tags', reports: 'Damage Reports', activity: 'Activity Log', users: 'User Management' };
-  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%' }}><Sidebar activeTab={tab} setActiveTab={setTab} /><div style={{ marginLeft: 230, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}><Header title={titles[tab]} /><main style={{ flex: 1, overflowX: 'hidden' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory />}{tab === 'categories' && <Categories />}{tab === 'locations' && <Locations />}{tab === 'tags' && <Tags />}{tab === 'reports' && <Reports />}{tab === 'activity' && <Activity />}{tab === 'users' && <Users />}</main></div><ToastContainer /></div>);
+  const [globalSearch, setGlobalSearch] = useState('');
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', categories: 'Categories', locations: 'Locations', reports: 'Damage Reports', users: 'User Management' };
+  const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
+  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%' }}><Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); }} /><div style={{ marginLeft: 230, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}><Header title={titles[tab]} onSearch={handleGlobalSearch} /><main style={{ flex: 1, overflowX: 'hidden' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory globalSearch={globalSearch} />}{tab === 'categories' && <Categories />}{tab === 'locations' && <Locations />}{tab === 'reports' && <Reports />}{tab === 'users' && <Users />}</main></div><ToastContainer /></div>);
 };
 
 export default function App() { return <AuthProvider><AppContent /></AuthProvider>; }
