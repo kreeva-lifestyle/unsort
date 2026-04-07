@@ -174,16 +174,31 @@ const AuthScreen = () => {
   );
 };
 
+// SVG icons for modern look
+const Icon = ({ name, size = 16 }: { name: string; size?: number }) => {
+  const s = { width: size, height: size, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  const paths: Record<string, string> = {
+    grid: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
+    box: 'M21 8l-9-5-9 5v8l9 5 9-5V8zM3 8l9 5M12 22V13M21 8l-9 5',
+    tag: 'M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82zM7 7h.01',
+    pin: 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1118 0zM12 7a3 3 0 100 6 3 3 0 000-6z',
+    file: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8',
+    users: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
+    search: 'M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35',
+  };
+  return <svg viewBox="0 0 24 24" style={s}><path d={paths[name] || ''} /></svg>;
+};
+
 const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (t: string) => void }) => {
   const { profile } = useAuth();
   const tabs = [
-    { id: 'dashboard', icon: '📊', label: 'Dashboard' },
-    { id: 'inventory', icon: '📦', label: 'Inventory' },
-    { id: 'categories', icon: '🏷️', label: 'Categories' },
-    { id: 'locations', icon: '📍', label: 'Locations' },
-    { id: 'reports', icon: '📋', label: 'Reports' },
+    { id: 'dashboard', icon: 'grid', label: 'Dashboard' },
+    { id: 'inventory', icon: 'box', label: 'Inventory' },
+    { id: 'categories', icon: 'tag', label: 'Categories' },
+    { id: 'locations', icon: 'pin', label: 'Locations' },
+    { id: 'reports', icon: 'file', label: 'Reports' },
   ];
-  if (profile?.role === 'admin') tabs.push({ id: 'users', icon: '👥', label: 'Users' });
+  if (profile?.role === 'admin') tabs.push({ id: 'users', icon: 'users', label: 'Users' });
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -200,7 +215,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
       <nav style={{ flex: 1, padding: '0 0 10px' }}>
         {tabs.map((t) => (
           <div key={t.id} onClick={() => setActiveTab(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', cursor: 'pointer', background: activeTab === t.id ? T.s2 : 'transparent', color: activeTab === t.id ? T.ac : T.tx2, fontSize: 13, fontWeight: activeTab === t.id ? 600 : 400, fontFamily: T.sans, borderLeft: `3px solid ${activeTab === t.id ? T.ac : 'transparent'}`, transition: 'all .12s' }}>
-            <span style={{ width: 18, textAlign: 'center', fontSize: 14 }}>{t.icon}</span> {t.label}
+            <span style={{ width: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={t.icon} size={16} /></span> {t.label}
           </div>
         ))}
       </nav>
@@ -216,17 +231,26 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
   );
 };
 
-const Header = ({ title }: { title: string }) => {
+const Header = ({ title, onSearch }: { title: string; onSearch?: (q: string) => void }) => {
   const { notifications, markAsRead } = useNotifications();
   const [show, setShow] = useState(false);
   const unread = notifications.filter((n: any) => !n.is_read).length;
+  const [globalSearch, setGlobalSearch] = useState('');
 
   return (
-    <header style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '12px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50 }}>
-      <h1 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: T.tx }}>{title}</h1>
-      <div style={{ position: 'relative' }}>
-        <button onClick={() => setShow(!show)} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', position: 'relative', color: T.tx2, fontSize: 14 }}>
-          🔔 {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono }}>{unread}</span>}
+    <header style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '10px 26px', display: 'flex', alignItems: 'center', gap: 16, position: 'sticky', top: 0, zIndex: 50 }}>
+      <h1 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: T.tx, whiteSpace: 'nowrap' }}>{title}</h1>
+      <div style={{ flex: 1, maxWidth: 400 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '6px 12px' }}>
+          <Icon name="search" size={14} />
+          <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search..." style={{ background: 'transparent', border: 'none', outline: 'none', color: T.tx, fontFamily: T.sans, fontSize: 13, flex: 1 }} />
+          {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>×</span>}
+        </div>
+      </div>
+      <div style={{ marginLeft: 'auto', position: 'relative' }}>
+        <button onClick={() => setShow(!show)} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', position: 'relative', color: T.tx2, fontSize: 14, display: 'flex', alignItems: 'center' }}>
+          <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
+          {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono }}>{unread}</span>}
         </button>
         {show && (
           <div className="notif-dropdown" style={{ position: 'absolute', right: 0, top: 44, width: 320, background: T.s, borderRadius: 8, boxShadow: '0 10px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.03) inset', border: `1px solid ${T.bd2}`, zIndex: 50, maxHeight: 400, overflowY: 'auto' }}>
@@ -262,24 +286,21 @@ const Dashboard = () => {
   }, []);
 
   const cards = [
-    { label: 'CATEGORIES', value: stats.total_products, color: T.ac, icon: '🏷️' },
-    { label: 'INVENTORY', value: stats.total_inventory, color: T.bl, icon: '📦' },
-    { label: 'UNSORTED', value: stats.unsorted_count, color: T.yl, icon: '❓' },
-    { label: 'DAMAGED', value: stats.damaged_count, color: T.re, icon: '⚠️' },
-    { label: 'DRY CLEAN', value: stats.dry_clean_count || 0, color: T.bl, icon: '🧹' },
-    { label: 'COMPLETE', value: stats.complete_count, color: T.gr, icon: '✅' },
+    { label: 'CATEGORIES', value: stats.total_products, color: T.ac },
+    { label: 'TOTAL ITEMS', value: stats.total_inventory, color: T.bl },
+    { label: 'UNSORTED', value: stats.unsorted_count, color: T.yl },
+    { label: 'DAMAGED', value: stats.damaged_count, color: T.re },
+    { label: 'DRY CLEAN', value: stats.dry_clean_count || 0, color: '#06b6d4' },
+    { label: 'COMPLETE', value: stats.complete_count, color: T.gr },
   ];
 
   return (
     <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: 13, marginBottom: 20 }}>
         {cards.map((c, i) => (
-          <div key={i} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '15px 17px', transition: 'border-color .15s, box-shadow .15s', cursor: 'default' }} onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = T.bd2; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 12px rgba(0,0,0,.2)'; }} onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = T.bd; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 7 }}>
-              <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1 }}>{c.label}</p>
-              <span style={{ fontSize: 14, opacity: 0.6 }}>{c.icon}</span>
-            </div>
-            <p style={{ fontFamily: T.mono, fontSize: 24, fontWeight: 600, color: c.color, margin: 0 }}>{c.value}</p>
+          <div key={i} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '15px 17px', transition: 'border-color .15s, box-shadow .15s', cursor: 'default', borderTop: `2px solid ${c.color}` }} onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = T.bd2; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 12px rgba(0,0,0,.2)'; }} onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = T.bd; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; (e.currentTarget as HTMLDivElement).style.borderTop = `2px solid ${c.color}`; }}>
+            <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 7 }}>{c.label}</p>
+            <p style={{ fontFamily: T.mono, fontSize: 26, fontWeight: 600, color: c.color, margin: 0 }}>{c.value}</p>
           </div>
         ))}
       </div>
@@ -287,7 +308,7 @@ const Dashboard = () => {
   );
 };
 
-const Inventory = () => {
+const Inventory = ({ globalSearch = '' }: { globalSearch?: string }) => {
   const [items, setItems] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -490,8 +511,9 @@ const Inventory = () => {
     if (catFilter !== 'all' && i.product_id !== catFilter) return false;
     if (locFilter !== 'all' && (i.location || '') !== locFilter) return false;
     if (tagFilter !== 'all') { const t = itemTags[i.id] || []; if (!t.some((tg: any) => tg?.id === tagFilter)) return false; }
-    if (search) {
-      const q = search.toLowerCase();
+    const searchTerm = globalSearch || search;
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
       const name = (i.products?.name || '').toLowerCase();
       const sku = (i.products?.sku || '').toLowerCase();
       const uid = (i.batch_number || '').toLowerCase();
@@ -503,13 +525,13 @@ const Inventory = () => {
     return true;
   });
 
-  const hasActiveFilters = statusFilter !== 'all' || catFilter !== 'all' || locFilter !== 'all' || tagFilter !== 'all' || search !== '';
+  const hasActiveFilters = statusFilter !== 'all' || catFilter !== 'all' || locFilter !== 'all' || tagFilter !== 'all' || search !== '' || globalSearch !== '';
   const clearFilters = () => { setStatusFilter('all'); setCatFilter('all'); setLocFilter('all'); setTagFilter('all'); setSearch(''); };
 
   return (
     <div style={{ padding: '22px 26px', animation: 'fi .18s ease' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Inventory <span style={{ fontSize: 12, fontWeight: 400, color: T.tx3 }}>({filtered.length}{items.length !== filtered.length ? ` of ${items.length}` : ''})</span></span>
+        <div><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Inventory</span><span style={{ fontSize: 12, fontWeight: 500, color: T.tx3, marginLeft: 10 }}>{filtered.length !== items.length ? `${filtered.length} of ` : ''}{items.length} item{items.length !== 1 ? 's' : ''}</span></div>
         {canEdit && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
       </div>
       <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '10px 14px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
@@ -924,8 +946,10 @@ const Users = () => {
 
 const MainApp = () => {
   const [tab, setTab] = useState('dashboard');
+  const [globalSearch, setGlobalSearch] = useState('');
   const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', categories: 'Categories', locations: 'Locations', reports: 'Damage Reports', users: 'User Management' };
-  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%' }}><Sidebar activeTab={tab} setActiveTab={setTab} /><div style={{ marginLeft: 230, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}><Header title={titles[tab]} /><main style={{ flex: 1, overflowX: 'hidden' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory />}{tab === 'categories' && <Categories />}{tab === 'locations' && <Locations />}{tab === 'reports' && <Reports />}{tab === 'users' && <Users />}</main></div><ToastContainer /></div>);
+  const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
+  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%' }}><Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); }} /><div style={{ marginLeft: 230, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}><Header title={titles[tab]} onSearch={handleGlobalSearch} /><main style={{ flex: 1, overflowX: 'hidden' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory globalSearch={globalSearch} />}{tab === 'categories' && <Categories />}{tab === 'locations' && <Locations />}{tab === 'reports' && <Reports />}{tab === 'users' && <Users />}</main></div><ToastContainer /></div>);
 };
 
 export default function App() { return <AuthProvider><AppContent /></AuthProvider>; }
