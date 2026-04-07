@@ -536,6 +536,15 @@ const Dashboard = () => {
 
 const MARKETPLACES = ['Myntra-Fusionic', 'Ajio-Fusionic', 'Tanuka', 'Svaraa', 'Amazon'];
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
+const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+const canAlterSize = (a: string, b: string): boolean => {
+  if (a === b) return true;
+  if (a === 'Semi-Stitched' || b === 'Semi-Stitched') return true;
+  const ai = SIZE_ORDER.indexOf(a), bi = SIZE_ORDER.indexOf(b);
+  if (ai === -1 || bi === -1) return false;
+  return Math.abs(ai - bi) === 1;
+};
+const isDupatta = (name: string) => /dupatt?a/i.test(name);
 
 const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus }: { globalSearch?: string; openItemId?: string | null; onItemOpened?: () => void; defaultStatus?: string }) => {
   const instanceId = useId();
@@ -572,6 +581,8 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   const [itemPresent, setItemPresent] = useState<Record<string, Set<string>>>({});
   const [completablePairs, setCompletablePairs] = useState<Record<string, string[]>>({});
   const [showCompleteModal, setShowCompleteModal] = useState<{ itemId: string; pairId?: string } | null>(null);
+  const [showIntel, setShowIntel] = useState(false);
+  const [intelResults, setIntelResults] = useState<any[]>([]);
 
   const fetchData = () => {
     supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).then(({ data }) => setItems(data || []));
@@ -868,6 +879,51 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
     fetchData();
   };
 
+  const computeIntel = async () => {
+    const unsorted = items.filter(i => i.status === 'unsorted');
+    const results: any[] = [];
+    const checked = new Set<string>();
+
+    for (const a of unsorted) {
+      const aMissing = itemMissing[a.id] || [];
+      const aPresent = itemPresent[a.id];
+      if (!aMissing.length || !aPresent) continue;
+
+      for (const b of unsorted) {
+        if (a.id === b.id) continue;
+        if (a.product_id !== b.product_id) continue;
+        if ((a.serial_number || '') !== (b.serial_number || '')) continue;
+        // Skip if same size (normal pairing handles that)
+        if ((a.size || '') === (b.size || '')) continue;
+        // Must be alterable adjacent sizes
+        if (!canAlterSize(a.size || '', b.size || '')) continue;
+        // Skip duplicate pairs
+        const pairKey = [a.id, b.id].sort().join('-');
+        if (checked.has(pairKey)) continue;
+
+        const bPresent = itemPresent[b.id];
+        if (!bPresent) continue;
+        const totalComps = a.products?.total_components || 0;
+        if (totalComps === 0) continue;
+
+        const union = new Set([...aPresent, ...bPresent]);
+        if (union.size >= totalComps) {
+          checked.add(pairKey);
+          results.push({
+            itemA: a, itemB: b,
+            missingA: aMissing,
+            missingB: itemMissing[b.id] || [],
+            sizeA: a.size, sizeB: b.size,
+            category: a.products?.name,
+            sku: a.serial_number,
+          });
+        }
+      }
+    }
+    setIntelResults(results);
+    setShowIntel(true);
+  };
+
   const isCompletedView = defaultStatus === 'completed';
 
   const filtered = items.filter((i) => {
@@ -908,7 +964,10 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
     <div className="page-pad" style={{ padding: '16px 18px', animation: 'fi .15s ease' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Inventory</span><span style={{ fontSize: 12, fontWeight: 500, color: T.tx3, marginLeft: 10 }}>{filtered.length !== items.length ? `${filtered.length} of ` : ''}{items.length} item{items.length !== 1 ? 's' : ''}</span></div>
-        {canEdit && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
+        <div style={{ display: 'flex', gap: 6 }}>
+          {!isCompletedView && <div onClick={computeIntel} style={{ ...S.btnGhost, background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.2)', color: T.yl, fontWeight: 600 }}>Unsort Intel</div>}
+          {canEdit && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
+        </div>
       </div>
       <div className="filter-bar" style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, SKU code, location, notes..." style={{ ...S.fInput, flex: 1, minWidth: 180, padding: '7px 10px' }} />
@@ -1081,6 +1140,62 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
         <span style={{ fontSize: 13, color: T.tx }}>Item deleted</span>
         <span onClick={undoDelete} style={{ ...S.btnPrimary, padding: '5px 14px', fontSize: 12, background: T.yl, color: '#000', boxShadow: 'none' }}>Undo</span>
       </div>}
+
+      {/* Unsort Intel Modal */}
+      {showIntel && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 580 }}>
+        <div style={{ ...S.modalHead, background: 'rgba(251,191,36,.06)', borderBottom: '1px solid rgba(251,191,36,.2)' }}>
+          <div>
+            <span style={{ fontSize: 14, fontWeight: 600, color: T.yl }}>Unsort Intel</span>
+            <p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3 }}>Cross-size completion possibilities (adjacent size alteration)</p>
+          </div>
+          <span onClick={() => setShowIntel(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
+        </div>
+        <div style={{ padding: 16, maxHeight: '70vh', overflowY: 'auto' }}>
+          {intelResults.length === 0 && <div style={{ textAlign: 'center', padding: 30, color: T.tx3 }}>
+            <p style={{ fontSize: 14, marginBottom: 6 }}>No cross-size matches found</p>
+            <p style={{ fontSize: 11 }}>Intel looks for unsorted items with the same SKU but adjacent sizes (e.g. M ↔ L) that can complete each other</p>
+          </div>}
+          {intelResults.map((r, idx) => (
+            <div key={idx} style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 14, marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{r.category}</span>
+                  {r.sku && <span style={{ marginLeft: 6, fontFamily: T.mono, fontSize: 11, color: T.ac2 }}>{r.sku}</span>}
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 600, color: T.yl, background: 'rgba(251,191,36,.1)', padding: '2px 8px', borderRadius: 4 }}>{r.sizeA} ↔ {r.sizeB}</span>
+              </div>
+              <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                <div style={{ background: T.s3, borderRadius: 6, padding: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, fontFamily: T.mono, color: T.gr }}>{r.itemA.batch_number}</span>
+                    <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'rgba(251,191,36,.1)', color: T.yl }}>{r.sizeA}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {r.missingA.map((n: string) => <span key={n} style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, background: isDupatta(n) ? 'rgba(96,165,250,.1)' : 'rgba(251,191,36,.1)', color: isDupatta(n) ? T.bl : T.yl }}>{isDupatta(n) ? `${n} (no size)` : `${n} missing`}</span>)}
+                  </div>
+                </div>
+                <div style={{ background: T.s3, borderRadius: 6, padding: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, fontFamily: T.mono, color: T.gr }}>{r.itemB.batch_number}</span>
+                    <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'rgba(251,191,36,.1)', color: T.yl }}>{r.sizeB}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {r.missingB.map((n: string) => <span key={n} style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, background: isDupatta(n) ? 'rgba(96,165,250,.1)' : 'rgba(251,191,36,.1)', color: isDupatta(n) ? T.bl : T.yl }}>{isDupatta(n) ? `${n} (no size)` : `${n} missing`}</span>)}
+                  </div>
+                </div>
+              </div>
+              <div style={{ background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: T.yl, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.yl, strokeWidth: 2, flexShrink: 0 }}><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
+                Can complete by altering size {r.sizeA} → {r.sizeB} or {r.sizeB} → {r.sizeA}
+                {r.missingA.some((n: string) => isDupatta(n)) || r.missingB.some((n: string) => isDupatta(n)) ? ' (Dupatta is universal - no alteration needed)' : ''}
+              </div>
+            </div>
+          ))}
+          {intelResults.length > 0 && <p style={{ fontSize: 10, color: T.tx3, textAlign: 'center', marginTop: 8 }}>
+            Size alteration: XS↔S, S↔M, M↔L, L↔XL, XL↔XXL | Semi-Stitched matches all | Dupatta has no size
+          </p>}
+        </div>
+      </div></div>)}
     </div>
   );
 };
