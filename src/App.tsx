@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, createContext, useContext, useId, Component, useCallback } from 'react';
-import Tesseract from 'tesseract.js';
 
 // Error boundary to prevent blank screen crashes
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: any }> {
@@ -299,37 +298,49 @@ const BarcodeScanner = ({ onScan, onClose, scanError }: { onScan: (code: string)
     } catch { setCameraError('Camera not available.'); }
   }, []);
 
+  const extractId = (text: string): string | null => {
+    // Try standard format: UNS-DDMMYY-XXXX
+    const m1 = text.match(/UNS[-–—.\s]*\d{6}[-–—.\s]*\d{4}/i);
+    if (m1) return m1[0].replace(/[^A-Z0-9]/gi, '').replace(/^(UNS)(\d{6})(\d{4})$/i, '$1-$2-$3').toUpperCase();
+    // Try looser: UNS followed by digits
+    const m2 = text.match(/UNS\D*(\d[\d\s-]{8,14}\d)/i);
+    if (m2) { const digits = m2[1].replace(/\D/g, ''); if (digits.length >= 10) return `UNS-${digits.slice(0,6)}-${digits.slice(6,10)}`; }
+    return null;
+  };
+
   const captureAndOcr = async () => {
     if (!ocrVideoRef.current || !canvasRef.current) return;
     setOcrProcessing(true); setOcrStatus('Capturing...');
     const video = ocrVideoRef.current;
     const canvas = canvasRef.current;
     canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) { setOcrProcessing(false); return; }
+    ctx.drawImage(video, 0, 0);
 
-    setOcrStatus('Reading text...');
+    setOcrStatus('Reading...');
     try {
-      const { data: { text } } = await Tesseract.recognize(canvas, 'eng', {});
-      // Extract UNS-DDMMYY-XXXX pattern from OCR text
-      const match = text.match(/UNS[-–—]?\s*\d{6}[-–—]?\s*\d{4}/i);
-      if (match) {
-        const cleaned = match[0].replace(/\s+/g, '').replace(/[–—]/g, '-').toUpperCase();
-        setLastCode(cleaned); setOcrStatus('');
+      const blob = await new Promise<Blob>((res) => canvas.toBlob(b => res(b!), 'image/png'));
+      const formData = new FormData();
+      formData.append('file', blob, 'scan.png');
+      formData.append('apikey', 'K85858938588957');
+      formData.append('language', 'eng');
+      formData.append('isOverlayRequired', 'false');
+      formData.append('OCREngine', '2');
+
+      const resp = await fetch('https://api.ocr.space/parse/image', { method: 'POST', body: formData });
+      const json = await resp.json();
+      const text = json?.ParsedResults?.[0]?.ParsedText || '';
+      const id = extractId(text);
+      if (id) {
+        setLastCode(id); setOcrStatus('');
         if (navigator.vibrate) navigator.vibrate(100);
-        onScan(cleaned);
+        onScan(id);
       } else {
-        // Try finding any ID-like pattern
-        const altMatch = text.match(/UNS\S{8,15}/i);
-        if (altMatch) {
-          const cleaned = altMatch[0].replace(/\s+/g, '').replace(/[–—]/g, '-').toUpperCase();
-          setLastCode(cleaned); setOcrStatus('');
-          onScan(cleaned);
-        } else {
-          setOcrStatus('No ID found. Try again - hold text steady and clear.');
-          setLastCode('');
-        }
+        setOcrStatus('No ID found. Write clearly: UNS-DDMMYY-XXXX');
+        setLastCode('');
       }
-    } catch { setOcrStatus('OCR failed. Try again.'); }
+    } catch { setOcrStatus('Network error. Try manual entry.'); }
     setOcrProcessing(false);
   };
 
