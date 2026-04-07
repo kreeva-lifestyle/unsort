@@ -187,6 +187,7 @@ const Icon = ({ name, size = 16 }: { name: string; size?: number }) => {
     users: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
     search: 'M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35',
     scan: 'M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M8 12h8',
+    check: 'M20 6L9 17l-5-5',
   };
   return <svg viewBox="0 0 24 24" style={s}><path d={paths[name] || ''} /></svg>;
 };
@@ -196,6 +197,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
   const tabs = [
     { id: 'dashboard', icon: 'grid', label: 'Dashboard' },
     { id: 'inventory', icon: 'box', label: 'Inventory' },
+    { id: 'completed', icon: 'check', label: 'Completed' },
     { id: 'categories', icon: 'tag', label: 'Categories' },
     { id: 'locations', icon: 'pin', label: 'Locations' },
     { id: 'reports', icon: 'file', label: 'Reports' },
@@ -384,7 +386,7 @@ const Dashboard = () => {
 
 const MARKETPLACES = ['Myntra-Fusionic', 'Ajio-Fusionic', 'Tanuka', 'Svaraa', 'Amazon'];
 
-const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSearch?: string; openItemId?: string | null; onItemOpened?: () => void }) => {
+const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus }: { globalSearch?: string; openItemId?: string | null; onItemOpened?: () => void; defaultStatus?: string }) => {
   const [items, setItems] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -394,7 +396,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
   const [locations, setLocations] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
   const [itemTags, setItemTags] = useState<Record<string, any[]>>({});
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(defaultStatus || 'all');
   const [catFilter, setCatFilter] = useState('all');
   const [locFilter, setLocFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('all');
@@ -677,7 +679,11 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
   };
 
   const handleComplete = async (itemId: string, pairId: string) => {
-    await supabase.from('inventory_items').update({ status: 'completed' }).in('id', [itemId, pairId]);
+    const { error: e1 } = await supabase.from('inventory_items').update({ status: 'completed' }).eq('id', itemId);
+    const { error: e2 } = await supabase.from('inventory_items').update({ status: 'completed' }).eq('id', pairId);
+    if (e1 || e2) { addToast(`Error: ${e1?.message || e2?.message}`, 'error'); return; }
+    // Update local state immediately
+    setItems(prev => prev.map(i => (i.id === itemId || i.id === pairId) ? { ...i, status: 'completed' } : i));
     addToast('Both items marked as Completed!', 'success');
     setShowCompleteModal(null);
     fetchData();
@@ -1247,7 +1253,7 @@ const MainApp = () => {
   const [notifItemId, setNotifItemId] = useState<string | null>(null);
   const [mobileMenu, setMobileMenu] = useState(false);
   const { addToast } = useNotifications();
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', categories: 'Categories', locations: 'Locations', reports: 'Damage Reports', users: 'User Management' };
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', completed: 'Completed Items', categories: 'Categories', locations: 'Locations', reports: 'Damage Reports', users: 'User Management' };
   const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
@@ -1275,6 +1281,7 @@ const MainApp = () => {
       <main style={{ flex: 1, overflow: 'auto' }}>
         <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard /></div>
         <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} /></div>
+        <div style={{ display: tab === 'completed' ? 'block' : 'none' }}><Inventory globalSearch="" defaultStatus="completed" /></div>
         <div style={{ display: tab === 'categories' ? 'block' : 'none' }}><Categories /></div>
         <div style={{ display: tab === 'locations' ? 'block' : 'none' }}><Locations /></div>
         <div style={{ display: tab === 'reports' ? 'block' : 'none' }}><Reports /></div>
