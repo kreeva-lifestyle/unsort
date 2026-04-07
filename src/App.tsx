@@ -535,6 +535,16 @@ const Dashboard = () => {
 };
 
 const MARKETPLACES = ['Myntra-Fusionic', 'Ajio-Fusionic', 'Tanuka', 'Svaraa', 'Amazon'];
+const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
+const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+const canAlterSize = (a: string, b: string): boolean => {
+  if (a === b) return true;
+  if (a === 'Semi-Stitched' || b === 'Semi-Stitched') return true;
+  const ai = SIZE_ORDER.indexOf(a), bi = SIZE_ORDER.indexOf(b);
+  if (ai === -1 || bi === -1) return false;
+  return Math.abs(ai - bi) === 1;
+};
+const isDupatta = (name: string) => /dupatt?a/i.test(name);
 
 const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus }: { globalSearch?: string; openItemId?: string | null; onItemOpened?: () => void; defaultStatus?: string }) => {
   const instanceId = useId();
@@ -556,7 +566,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   const [expandedNote, setExpandedNote] = useState<string | null>(null);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
-  const [form, setForm] = useState({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' });
+  const [form, setForm] = useState({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' });
   const [catSearch, setCatSearch] = useState('');
   const [showCatDrop, setShowCatDrop] = useState(false);
   const [showSkuDrop, setShowSkuDrop] = useState(false);
@@ -571,6 +581,8 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   const [itemPresent, setItemPresent] = useState<Record<string, Set<string>>>({});
   const [completablePairs, setCompletablePairs] = useState<Record<string, string[]>>({});
   const [showCompleteModal, setShowCompleteModal] = useState<{ itemId: string; pairId?: string } | null>(null);
+  const [showIntel, setShowIntel] = useState(false);
+  const [intelResults, setIntelResults] = useState<any[]>([]);
 
   const fetchData = () => {
     supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).then(({ data }) => setItems(data || []));
@@ -605,7 +617,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
     });
   };
 
-  // Compute all completable pairs for each unsorted item
+  // Compute all completable pairs: must match category + SKU + size
   useEffect(() => {
     if (items.length === 0) return;
     const unsorted = items.filter(i => i.status === 'unsorted');
@@ -617,7 +629,11 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
       const totalComps = a.products?.total_components || 0;
       if (totalComps === 0) continue;
       for (const b of unsorted) {
-        if (a.id === b.id || a.product_id !== b.product_id) continue;
+        if (a.id === b.id) continue;
+        // Must match: same category, same SKU, same size
+        if (a.product_id !== b.product_id) continue;
+        if ((a.serial_number || '') !== (b.serial_number || '')) continue;
+        if ((a.size || '') !== (b.size || '')) continue;
         const bPresent = itemPresent[b.id];
         if (!bPresent) continue;
         const union = new Set([...aPresent, ...bPresent]);
@@ -675,6 +691,10 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   };
 
   const checkForPairMatch = async (productId: string, currentItemId: string) => {
+    // Get current item details for SKU + size matching
+    const { data: currentItem } = await supabase.from('inventory_items').select('serial_number, size').eq('id', currentItemId).maybeSingle();
+    if (!currentItem) return;
+
     // Get all components for this category
     const { data: allComps } = await supabase.from('components').select('id').eq('product_id', productId);
     if (!allComps || allComps.length === 0) return;
@@ -685,14 +705,17 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
     if (!currentItemComps) return;
     const currentPresent = new Set(currentItemComps.filter(c => c.status === 'present').map(c => c.component_id));
     const currentMissing = new Set(currentItemComps.filter(c => c.status === 'missing').map(c => c.component_id));
-    if (currentMissing.size === 0) return; // nothing missing, no need to pair
+    if (currentMissing.size === 0) return;
 
-    // Find other unsorted items of the same category
-    const { data: otherItems } = await supabase.from('inventory_items')
-      .select('id, batch_number, serial_number, created_at')
+    // Find other unsorted items of the same category + SKU + size
+    let query = supabase.from('inventory_items')
+      .select('id, batch_number, serial_number, size, created_at')
       .eq('product_id', productId)
       .eq('status', 'unsorted')
       .neq('id', currentItemId);
+    if (currentItem.serial_number) query = query.eq('serial_number', currentItem.serial_number);
+    if (currentItem.size) query = query.eq('size', currentItem.size);
+    const { data: otherItems } = await query;
     if (!otherItems || otherItems.length === 0) return;
 
     // Check each other item for complementary components
@@ -715,6 +738,8 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
 
         setMatchResult({
           categoryName: catName,
+          sku: currentItem.serial_number || '',
+          size: currentItem.size || '',
           currentId: currentItemId,
           currentUniqueId: items.find(i => i.id === currentItemId)?.batch_number || 'Current item',
           currentPresent: currentPresentNames,
@@ -766,7 +791,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
     const savedProductId = form.product_id;
     const savedStatus = form.status;
     const hadMissing = missingComps.size > 0;
-    setShowModal(false); setSelected(null); setForm({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); fetchData();
+    setShowModal(false); setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); fetchData();
 
     // Check for pair matches after save (only for unsorted items with missing components)
     if (savedStatus === 'unsorted' && hadMissing) {
@@ -777,7 +802,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   const updateComp = async (id: string, status: string) => { const { error } = await supabase.from('item_components').update({ status }).eq('id', id); if (error) addToast(error.message, 'error'); else { addToast('Updated!', 'success'); fetchComps(selected.id); fetchData(); } };
 
   const openEdit = async (item: any) => {
-    setSelected(item); setForm({ product_id: item.product_id, serial_number: item.serial_number || '', status: item.status, location: item.location || '', notes: item.notes || '', order_id: item.order_id || '', marketplace: item.marketplace || '', ticket_id: item.ticket_id || '', link: item.link || '' }); setCatSearch(item.products?.name || '');
+    setSelected(item); setForm({ product_id: item.product_id, serial_number: item.serial_number || '', size: item.size || '', status: item.status, location: item.location || '', notes: item.notes || '', order_id: item.order_id || '', marketplace: item.marketplace || '', ticket_id: item.ticket_id || '', link: item.link || '' }); setCatSearch(item.products?.name || '');
     const { data: cc } = await supabase.from('components').select('*').eq('product_id', item.product_id);
     setCatComps(cc || []);
     const { data: ic } = await supabase.from('item_components').select('*').eq('inventory_item_id', item.id);
@@ -854,6 +879,51 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
     fetchData();
   };
 
+  const computeIntel = async () => {
+    const unsorted = items.filter(i => i.status === 'unsorted');
+    const results: any[] = [];
+    const checked = new Set<string>();
+
+    for (const a of unsorted) {
+      const aMissing = itemMissing[a.id] || [];
+      const aPresent = itemPresent[a.id];
+      if (!aMissing.length || !aPresent) continue;
+
+      for (const b of unsorted) {
+        if (a.id === b.id) continue;
+        if (a.product_id !== b.product_id) continue;
+        if ((a.serial_number || '') !== (b.serial_number || '')) continue;
+        // Skip if same size (normal pairing handles that)
+        if ((a.size || '') === (b.size || '')) continue;
+        // Must be alterable adjacent sizes
+        if (!canAlterSize(a.size || '', b.size || '')) continue;
+        // Skip duplicate pairs
+        const pairKey = [a.id, b.id].sort().join('-');
+        if (checked.has(pairKey)) continue;
+
+        const bPresent = itemPresent[b.id];
+        if (!bPresent) continue;
+        const totalComps = a.products?.total_components || 0;
+        if (totalComps === 0) continue;
+
+        const union = new Set([...aPresent, ...bPresent]);
+        if (union.size >= totalComps) {
+          checked.add(pairKey);
+          results.push({
+            itemA: a, itemB: b,
+            missingA: aMissing,
+            missingB: itemMissing[b.id] || [],
+            sizeA: a.size, sizeB: b.size,
+            category: a.products?.name,
+            sku: a.serial_number,
+          });
+        }
+      }
+    }
+    setIntelResults(results);
+    setShowIntel(true);
+  };
+
   const isCompletedView = defaultStatus === 'completed';
 
   const filtered = items.filter((i) => {
@@ -868,7 +938,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       const fields = [
-        i.products?.name, i.products?.sku, i.batch_number, i.serial_number,
+        i.products?.name, i.products?.sku, i.batch_number, i.serial_number, i.size,
         i.notes, i.location, i.order_id, i.marketplace, i.ticket_id, i.link, i.status,
         ...(itemTags[i.id] || []).map((t: any) => t?.name),
         ...(itemMissing[i.id] || []),
@@ -894,7 +964,10 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
     <div className="page-pad" style={{ padding: '16px 18px', animation: 'fi .15s ease' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Inventory</span><span style={{ fontSize: 12, fontWeight: 500, color: T.tx3, marginLeft: 10 }}>{filtered.length !== items.length ? `${filtered.length} of ` : ''}{items.length} item{items.length !== 1 ? 's' : ''}</span></div>
-        {canEdit && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
+        <div style={{ display: 'flex', gap: 6 }}>
+          {!isCompletedView && <div onClick={computeIntel} style={{ ...S.btnGhost, background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.2)', color: T.yl, fontWeight: 600 }}>Unsort Intel</div>}
+          {canEdit && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
+        </div>
       </div>
       <div className="filter-bar" style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, SKU code, location, notes..." style={{ ...S.fInput, flex: 1, minWidth: 180, padding: '7px 10px' }} />
@@ -908,8 +981,8 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
       </div>
       <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
         <div className="table-wrap">
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 950 }}>
-          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Location', 'Tags', 'Notes', 'Link', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000 }}>
+          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Size', 'Location', 'Tags', 'Notes', 'Link', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
           <tbody>{filtered.map((item) => {
             const missing = itemMissing[item.id] || [];
             const damaged = itemDamaged[item.id] || [];
@@ -917,6 +990,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
             <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 11, whiteSpace: 'nowrap' }}><span style={{ color: T.gr }}>{item.batch_number || '—'}</span>{isCompletedView && item.paired_with && (() => { const pair = items.find(p => p.id === item.paired_with); return pair ? <span onClick={() => scrollToPair(item.paired_with)} style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, cursor: 'pointer' }} title="Click to find paired item"><svg viewBox="0 0 24 24" style={{ width: 10, height: 10, fill: 'none', stroke: T.ac2, strokeWidth: 2, flexShrink: 0 }}><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg><span style={{ fontSize: 10, color: T.ac2 }}>{pair.batch_number}</span></span> : null; })()}</td>
             <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 12 }}>{item.serial_number || '—'}</td>
             <td style={S.tdStyle}><span style={{ fontWeight: 500 }}>{item.products?.name}</span></td>
+            <td style={{ ...S.tdStyle, fontSize: 11, fontWeight: 500 }}>{item.size || '—'}</td>
             <td style={{ ...S.tdStyle, fontSize: 12, color: T.tx3 }}>{item.location || '—'}</td>
             <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 500, background: 'rgba(139,92,246,.12)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 12 }}>—</span>}</div></td>
             <td style={{ ...S.tdStyle, fontSize: 12, maxWidth: 160 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 30 ? item.notes.slice(0, 30) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
@@ -939,7 +1013,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
         {filtered.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{hasActiveFilters ? 'No items match your filters' : 'No items yet'}</div>}
       </div>
 
-      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>Category *</label><input value={catSearch} onChange={(e) => { setCatSearch(e.target.value); setShowCatDrop(true); setForm({ ...form, product_id: '' }); }} onFocus={() => setShowCatDrop(true)} placeholder="Type to search categories by name or SKU..." style={S.fInput} autoComplete="off" /><input type="hidden" value={form.product_id} required />{form.product_id && <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: T.r, background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.25)', fontSize: 12, color: T.ac2 }}>{products.find(p => p.id === form.product_id)?.name} <span style={{ fontFamily: T.mono, opacity: 0.7 }}>{products.find(p => p.id === form.product_id)?.sku}</span><span onClick={() => { setForm({ ...form, product_id: '' }); setCatSearch(''); }} style={{ cursor: 'pointer', marginLeft: 4, opacity: 0.6 }}>✕</span></div>}{showCatDrop && !form.product_id && (() => { const q = catSearch.toLowerCase(); const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))); return filtered.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)' }}>{filtered.map(p => <div key={p.id} onClick={() => { setForm({ ...form, product_id: p.id }); setCatSearch(p.name); setShowCatDrop(false); supabase.from('components').select('*').eq('product_id', p.id).then(({ data }) => { setCatComps(data || []); setMissingComps(new Set()); setDamagedComps(new Set()); }); }} style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}><span style={{ fontSize: 13, color: T.tx }}>{p.name}</span><span style={{ fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{p.sku}</span></div>)}</div> : catSearch ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '12px 14px', fontSize: 12, color: T.tx3, zIndex: 10 }}>No categories found</div> : null; })()}</div><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>SKU Code</label><input value={form.serial_number} onChange={(e) => { setForm({ ...form, serial_number: e.target.value }); setShowSkuDrop(true); }} onFocus={() => setShowSkuDrop(true)} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. LC-001-A" style={{ ...S.fInput, fontFamily: T.mono }} autoComplete="off" />{showSkuDrop && form.serial_number && (() => { const q = form.serial_number.toLowerCase(); const existing = [...new Set(items.map(i => i.serial_number).filter(Boolean))]; const matches = existing.filter(s => s.toLowerCase().includes(q) && s !== form.serial_number); return matches.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 140, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 20px rgba(0,0,0,.3)' }}>{matches.slice(0, 8).map(s => <div key={s} onMouseDown={() => { setForm({ ...form, serial_number: s }); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{s}</div>)}</div> : null; })()}</div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select></div><div><label style={S.fLabel}>Location</label><select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={S.fInput}><option value="">Select location</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div></div>{(form.status === 'unsorted' || form.status === 'damaged') && catComps.length > 0 && <div style={{ marginBottom: 14 }}>
+      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>Category *</label><input value={catSearch} onChange={(e) => { setCatSearch(e.target.value); setShowCatDrop(true); setForm({ ...form, product_id: '' }); }} onFocus={() => setShowCatDrop(true)} placeholder="Type to search categories by name or SKU..." style={S.fInput} autoComplete="off" /><input type="hidden" value={form.product_id} required />{form.product_id && <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: T.r, background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.25)', fontSize: 12, color: T.ac2 }}>{products.find(p => p.id === form.product_id)?.name} <span style={{ fontFamily: T.mono, opacity: 0.7 }}>{products.find(p => p.id === form.product_id)?.sku}</span><span onClick={() => { setForm({ ...form, product_id: '' }); setCatSearch(''); }} style={{ cursor: 'pointer', marginLeft: 4, opacity: 0.6 }}>✕</span></div>}{showCatDrop && !form.product_id && (() => { const q = catSearch.toLowerCase(); const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))); return filtered.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)' }}>{filtered.map(p => <div key={p.id} onClick={() => { setForm({ ...form, product_id: p.id }); setCatSearch(p.name); setShowCatDrop(false); supabase.from('components').select('*').eq('product_id', p.id).then(({ data }) => { setCatComps(data || []); setMissingComps(new Set()); setDamagedComps(new Set()); }); }} style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}><span style={{ fontSize: 13, color: T.tx }}>{p.name}</span><span style={{ fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{p.sku}</span></div>)}</div> : catSearch ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '12px 14px', fontSize: 12, color: T.tx3, zIndex: 10 }}>No categories found</div> : null; })()}</div><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>SKU Code</label><input value={form.serial_number} onChange={(e) => { setForm({ ...form, serial_number: e.target.value }); setShowSkuDrop(true); }} onFocus={() => setShowSkuDrop(true)} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. LC-001-A" style={{ ...S.fInput, fontFamily: T.mono }} autoComplete="off" />{showSkuDrop && form.serial_number && (() => { const q = form.serial_number.toLowerCase(); const existing = [...new Set(items.map(i => i.serial_number).filter(Boolean))]; const matches = existing.filter(s => s.toLowerCase().includes(q) && s !== form.serial_number); return matches.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 140, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 20px rgba(0,0,0,.3)' }}>{matches.slice(0, 8).map(s => <div key={s} onMouseDown={() => { setForm({ ...form, serial_number: s }); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{s}</div>)}</div> : null; })()}</div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Size *</label><select value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} required style={S.fInput}><option value="">Select size</option>{SIZES.map(s => <option key={s} value={s}>{s}</option>)}</select></div><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select></div></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Location</label><select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={S.fInput}><option value="">Select location</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div><div><label style={S.fLabel}>Marketplace</label><select value={form.marketplace} onChange={(e) => setForm({ ...form, marketplace: e.target.value })} style={S.fInput}><option value="">Select</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select></div></div>{(form.status === 'unsorted' || form.status === 'damaged') && catComps.length > 0 && <div style={{ marginBottom: 14 }}>
   <label style={S.fLabel}>Component Status <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(click to toggle: Present → Missing → Damaged)</span></label>
   {form.status === 'damaged' && <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
     <span onClick={() => { setDamagedComps(new Set(catComps.map((c: any) => c.id))); setMissingComps(new Set()); }} style={{ ...S.btnDanger, fontSize: 10, padding: '3px 10px', cursor: 'pointer' }}>Mark All Damaged</span>
@@ -968,7 +1042,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   {missingComps.size > 0 && <p style={{ fontSize: 10, color: T.yl, marginTop: 5 }}>{missingComps.size} missing</p>}
   {damagedComps.size > 0 && <p style={{ fontSize: 10, color: T.re, marginTop: 3 }}>{damagedComps.size} damaged</p>}
   {form.status === 'unsorted' && missingComps.size === catComps.length && damagedComps.size === 0 && <p style={{ fontSize: 11, color: T.re, marginTop: 5, background: 'rgba(248,113,113,.06)', border: '1px solid rgba(248,113,113,.15)', borderRadius: 6, padding: '6px 10px' }}>All missing — change status to "Damaged" or deselect some.</p>}
-</div>}<div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Order ID</label><input value={form.order_id} onChange={(e) => setForm({ ...form, order_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Marketplace</label><select value={form.marketplace} onChange={(e) => setForm({ ...form, marketplace: e.target.value })} style={S.fInput}><option value="">Select</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select></div></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Ticket ID</label><input value={form.ticket_id} onChange={(e) => setForm({ ...form, ticket_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Link</label><input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="Optional URL" style={S.fInput} /></div></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Tags <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(comma separated)</span></label><input value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="e.g. urgent, wedding" style={S.fInput} /></div><div><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
+</div>}<div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Order ID</label><input value={form.order_id} onChange={(e) => setForm({ ...form, order_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Ticket ID</label><input value={form.ticket_id} onChange={(e) => setForm({ ...form, ticket_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ marginBottom: 12 }}><label style={S.fLabel}>Link</label><input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="Optional URL" style={S.fInput} /></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Tags <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(comma separated)</span></label><input value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="e.g. urgent, wedding" style={S.fInput} /></div><div><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
 
       {showCompModal && selected && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 580 }}><div style={S.modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected.products?.name}</span><div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center', flexWrap: 'wrap' }}><span style={{ fontSize: 11, fontFamily: T.mono, color: T.gr }}>{selected.batch_number}</span>{selected.serial_number && <span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2 }}>{selected.serial_number}</span>}<span style={statusTag(selected.status)}>{selected.status}</span>{selected.batch_number && <span onClick={() => printBarcode(selected.batch_number)} style={{ ...S.btnGhost, padding: '2px 8px', fontSize: 10 }}>Print Barcode</span>}</div>{selected.order_id && <p style={{ margin: '4px 0 0', fontSize: 11, color: T.tx3 }}>Order: {selected.order_id}{selected.marketplace ? ` | ${selected.marketplace}` : ''}</p>}{selected.ticket_id && <p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3 }}>Ticket: {selected.ticket_id}</p>}{selected.link && <a href={selected.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: T.ac, marginTop: 2, display: 'block' }}>Open Link</a>}</div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>
         <p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 8 }}>Components</p>
@@ -978,7 +1052,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
       </div></div></div>)}
       {matchResult && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 520 }}><div style={{ ...S.modalHead, background: 'rgba(45,212,160,.06)', borderBottom: `1px solid rgba(45,212,160,.2)` }}><span style={{ fontSize: 15, fontWeight: 600, color: T.gr }}>Pair Match Found!</span><span onClick={() => setMatchResult(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>
         <div style={{ background: 'rgba(45,212,160,.08)', border: '1px solid rgba(45,212,160,.25)', borderRadius: T.r, padding: 14, marginBottom: 16, fontSize: 13, color: T.gr }}>
-          A complete <strong>{matchResult.categoryName}</strong> can be assembled by combining these two items!
+          A complete <strong>{matchResult.categoryName}</strong>{matchResult.size && <> in size <strong>{matchResult.size}</strong></>}{matchResult.sku && <> (SKU: <span style={{ fontFamily: T.mono }}>{matchResult.sku}</span>)</>} can be assembled!
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
           <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 14 }}>
@@ -1021,7 +1095,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
                 <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>This Item</span>
                 <span style={{ fontSize: 11, fontFamily: T.mono, color: T.gr }}>{itemA.batch_number}</span>
               </div>
-              <p style={{ fontSize: 13, fontWeight: 600, color: T.tx, margin: '0 0 4px' }}>{itemA.products?.name} {itemA.serial_number && <span style={{ fontFamily: T.mono, color: T.ac2, fontWeight: 400 }}>({itemA.serial_number})</span>}</p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: T.tx, margin: '0 0 4px' }}>{itemA.products?.name} {itemA.serial_number && <span style={{ fontFamily: T.mono, color: T.ac2, fontWeight: 400 }}>({itemA.serial_number})</span>}{itemA.size && <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, fontSize: 10, background: T.s3, color: T.tx2 }}>{itemA.size}</span>}</p>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {missingA.map(name => <span key={name} style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(251,191,36,.12)', color: T.yl }}>{name} missing</span>)}
               </div>
@@ -1039,6 +1113,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
                       <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isSelected ? '#10b981' : T.bd2}`, background: isSelected ? '#10b981' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 700, flexShrink: 0 }}>{isSelected && '✓'}</div>
                       <span style={{ fontSize: 11, fontFamily: T.mono, color: T.gr }}>{b.batch_number}</span>
                       {b.serial_number && <span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2 }}>{b.serial_number}</span>}
+                      {b.size && <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: T.s3, color: T.tx2 }}>{b.size}</span>}
                     </div>
                     {b.location && <span style={{ fontSize: 10, color: T.tx3 }}>{b.location}</span>}
                   </div>
@@ -1065,6 +1140,62 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
         <span style={{ fontSize: 13, color: T.tx }}>Item deleted</span>
         <span onClick={undoDelete} style={{ ...S.btnPrimary, padding: '5px 14px', fontSize: 12, background: T.yl, color: '#000', boxShadow: 'none' }}>Undo</span>
       </div>}
+
+      {/* Unsort Intel Modal */}
+      {showIntel && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 580 }}>
+        <div style={{ ...S.modalHead, background: 'rgba(251,191,36,.06)', borderBottom: '1px solid rgba(251,191,36,.2)' }}>
+          <div>
+            <span style={{ fontSize: 14, fontWeight: 600, color: T.yl }}>Unsort Intel</span>
+            <p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3 }}>Cross-size completion possibilities (adjacent size alteration)</p>
+          </div>
+          <span onClick={() => setShowIntel(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
+        </div>
+        <div style={{ padding: 16, maxHeight: '70vh', overflowY: 'auto' }}>
+          {intelResults.length === 0 && <div style={{ textAlign: 'center', padding: 30, color: T.tx3 }}>
+            <p style={{ fontSize: 14, marginBottom: 6 }}>No cross-size matches found</p>
+            <p style={{ fontSize: 11 }}>Intel looks for unsorted items with the same SKU but adjacent sizes (e.g. M ↔ L) that can complete each other</p>
+          </div>}
+          {intelResults.map((r, idx) => (
+            <div key={idx} style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 14, marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{r.category}</span>
+                  {r.sku && <span style={{ marginLeft: 6, fontFamily: T.mono, fontSize: 11, color: T.ac2 }}>{r.sku}</span>}
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 600, color: T.yl, background: 'rgba(251,191,36,.1)', padding: '2px 8px', borderRadius: 4 }}>{r.sizeA} ↔ {r.sizeB}</span>
+              </div>
+              <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                <div style={{ background: T.s3, borderRadius: 6, padding: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, fontFamily: T.mono, color: T.gr }}>{r.itemA.batch_number}</span>
+                    <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'rgba(251,191,36,.1)', color: T.yl }}>{r.sizeA}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {r.missingA.map((n: string) => <span key={n} style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, background: isDupatta(n) ? 'rgba(96,165,250,.1)' : 'rgba(251,191,36,.1)', color: isDupatta(n) ? T.bl : T.yl }}>{isDupatta(n) ? `${n} (no size)` : `${n} missing`}</span>)}
+                  </div>
+                </div>
+                <div style={{ background: T.s3, borderRadius: 6, padding: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, fontFamily: T.mono, color: T.gr }}>{r.itemB.batch_number}</span>
+                    <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'rgba(251,191,36,.1)', color: T.yl }}>{r.sizeB}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {r.missingB.map((n: string) => <span key={n} style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, background: isDupatta(n) ? 'rgba(96,165,250,.1)' : 'rgba(251,191,36,.1)', color: isDupatta(n) ? T.bl : T.yl }}>{isDupatta(n) ? `${n} (no size)` : `${n} missing`}</span>)}
+                  </div>
+                </div>
+              </div>
+              <div style={{ background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: T.yl, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.yl, strokeWidth: 2, flexShrink: 0 }}><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
+                Can complete by altering size {r.sizeA} → {r.sizeB} or {r.sizeB} → {r.sizeA}
+                {r.missingA.some((n: string) => isDupatta(n)) || r.missingB.some((n: string) => isDupatta(n)) ? ' (Dupatta is universal - no alteration needed)' : ''}
+              </div>
+            </div>
+          ))}
+          {intelResults.length > 0 && <p style={{ fontSize: 10, color: T.tx3, textAlign: 'center', marginTop: 8 }}>
+            Size alteration: XS↔S, S↔M, M↔L, L↔XL, XL↔XXL | Semi-Stitched matches all | Dupatta has no size
+          </p>}
+        </div>
+      </div></div>)}
     </div>
   );
 };
@@ -1460,10 +1591,10 @@ const MainApp = () => {
     </div>
     <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
       {/* Mobile bottom nav */}
-      <div className="mobile-hamburger" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 102, background: T.s, borderTop: `1px solid ${T.bd}`, padding: '6px 0 env(safe-area-inset-bottom, 6px)', justifyContent: 'space-around' }}>
-        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Items' }, { id: 'completed', icon: 'check', label: 'Done' }, { id: 'more', icon: 'users', label: 'More' }].map(t => (
-          <div key={t.id} onClick={() => { if (t.id === 'more') setMobileMenu(!mobileMenu); else { setTab(t.id); setMobileMenu(false); } }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, cursor: 'pointer', padding: '4px 12px', color: (t.id !== 'more' && tab === t.id) ? T.ac : T.tx3, fontSize: 10 }}>
-            <Icon name={t.icon} size={18} />{t.label}
+      <div className="mobile-hamburger" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 102, background: T.s, borderTop: `1px solid ${T.bd}`, padding: '8px 0', paddingBottom: 'max(8px, env(safe-area-inset-bottom))', justifyContent: 'space-around' }}>
+        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Items' }, { id: 'completed', icon: 'check', label: 'Done' }, { id: 'more', icon: 'users', label: 'Menu' }].map(t => (
+          <div key={t.id} onClick={() => { if (t.id === 'more') setMobileMenu(!mobileMenu); else { setTab(t.id); setMobileMenu(false); } }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: (t.id !== 'more' && tab === t.id) ? T.ac : T.tx3, fontSize: 9, fontWeight: 500 }}>
+            <Icon name={t.icon} size={20} /><span>{t.label}</span>
           </div>
         ))}
       </div>
