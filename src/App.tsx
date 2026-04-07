@@ -208,6 +208,7 @@ const Icon = ({ name, size = 16 }: { name: string; size?: number }) => {
     search: 'M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35',
     scan: 'M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M8 12h8',
     check: 'M20 6L9 17l-5-5',
+    link: 'M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71',
   };
   return <svg viewBox="0 0 24 24" style={s}><path d={paths[name] || ''} /></svg>;
 };
@@ -307,16 +308,17 @@ const Header = ({ title, onSearch, onNotifClick, onScan }: { title: string; onSe
   };
 
   return (
-    <header className="header-bar" style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 12, position: 'sticky', top: 0, zIndex: 50 }}>
-      <h1 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: T.tx, whiteSpace: 'nowrap' }}>{title}</h1>
-      <div style={{ flex: 1, maxWidth: 360 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: T.s2, border: `1px solid ${T.bd}`, borderRadius: 6, padding: '5px 10px' }}>
-          <Icon name="search" size={13} />
-          <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search..." style={{ background: 'transparent', border: 'none', outline: 'none', color: T.tx, fontFamily: T.sans, fontSize: 12, flex: 1, minWidth: 0 }} />
-          {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>×</span>}
+    <header className="header-bar" style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '8px 16px', position: 'sticky', top: 0, zIndex: 50 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h1 className="header-title" style={{ margin: 0, fontSize: 14, fontWeight: 600, color: T.tx, whiteSpace: 'nowrap' }}>{title}</h1>
+        <div className="header-search" style={{ flex: 1, maxWidth: 320 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: T.s2, border: `1px solid ${T.bd}`, borderRadius: 6, padding: '5px 10px' }}>
+            <Icon name="search" size={13} />
+            <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search..." style={{ background: 'transparent', border: 'none', outline: 'none', color: T.tx, fontFamily: T.sans, fontSize: 12, flex: 1, minWidth: 0 }} />
+            {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>×</span>}
+          </div>
         </div>
-      </div>
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
         <button onClick={() => setShowScanner(true)} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', color: T.tx2, display: 'flex', alignItems: 'center' }} title="Scan barcode">
           <Icon name="scan" size={16} />
         </button>
@@ -340,6 +342,7 @@ const Header = ({ title, onSearch, onNotifClick, onScan }: { title: string; onSe
             ))}
           </div>
         )}
+      </div>
       </div>
       </div>
       {showScanner && <BarcodeScanner onScan={(code) => { setShowScanner(false); onScan?.(code); }} onClose={() => setShowScanner(false)} />}
@@ -762,8 +765,8 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
       </div>
       <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
         <div className="table-wrap">
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
-          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Location', 'Tags', 'Notes', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 950 }}>
+          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Location', 'Tags', 'Notes', 'Link', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
           <tbody>{filtered.map((item) => {
             const missing = itemMissing[item.id] || [];
             const damaged = itemDamaged[item.id] || [];
@@ -774,6 +777,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
             <td style={{ ...S.tdStyle, fontSize: 12, color: T.tx3 }}>{item.location || '—'}</td>
             <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 500, background: 'rgba(139,92,246,.12)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 12 }}>—</span>}</div></td>
             <td style={{ ...S.tdStyle, fontSize: 12, maxWidth: 160 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 30 ? item.notes.slice(0, 30) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
+            <td style={S.tdStyle}>{item.link ? <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ color: T.ac, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="link" size={14} /></a> : <span style={{ color: T.tx3 }}>—</span>}</td>
             <td style={S.tdStyle}><span style={statusTag(item.status)}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></td>
             <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(251,191,36,.1)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(248,113,113,.1)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 12 }}>{item.status === 'completed' || item.status === 'complete' ? 'All good' : '—'}</span>}</td>
             <td style={S.tdStyle}>

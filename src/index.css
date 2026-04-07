@@ -74,6 +74,9 @@ tr { transition: background .1s ease; }
   .sidebar { display: none !important; }
   .main-area { margin-left: 0 !important; }
   .mobile-hamburger { display: flex !important; align-items: center; }
+  .header-bar { padding: 8px 12px !important; }
+  .header-title { font-size: 13px !important; }
+  .header-search { max-width: none !important; }
   .mobile-overlay { display: block !important; }
   .mobile-drawer { display: block !important; }
   .mobile-drawer .sidebar { display: flex !important; width: 100% !important; }
