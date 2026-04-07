@@ -1459,10 +1459,13 @@ const MainApp = () => {
       <Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} />
     </div>
     <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
-      {/* Mobile hamburger - floating pill */}
-      <div className="mobile-hamburger" onClick={() => setMobileMenu(!mobileMenu)} style={{ display: 'none', position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 102, padding: '10px 20px', borderRadius: 50, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, boxShadow: '0 4px 20px rgba(139,92,246,.4)', cursor: 'pointer', color: '#fff', fontSize: 12, fontWeight: 600, fontFamily: T.sans, alignItems: 'center', gap: 8 }}>
-        <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: '#fff', strokeWidth: 2, verticalAlign: 'middle', marginRight: 6 }}>{mobileMenu ? <path d="M18 6L6 18M6 6l12 12" /> : <path d="M3 12h18M3 6h18M3 18h18" />}</svg>
-        Menu
+      {/* Mobile bottom nav */}
+      <div className="mobile-hamburger" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 102, background: T.s, borderTop: `1px solid ${T.bd}`, padding: '6px 0 env(safe-area-inset-bottom, 6px)', justifyContent: 'space-around' }}>
+        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Items' }, { id: 'completed', icon: 'check', label: 'Done' }, { id: 'more', icon: 'users', label: 'More' }].map(t => (
+          <div key={t.id} onClick={() => { if (t.id === 'more') setMobileMenu(!mobileMenu); else { setTab(t.id); setMobileMenu(false); } }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, cursor: 'pointer', padding: '4px 12px', color: (t.id !== 'more' && tab === t.id) ? T.ac : T.tx3, fontSize: 10 }}>
+            <Icon name={t.icon} size={18} />{t.label}
+          </div>
+        ))}
       </div>
       <Header title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} onOpenScanner={() => { setScanError(''); setScannerOpen(true); }} />
       <main style={{ flex: 1, overflow: 'auto' }}>

@@ -78,7 +78,8 @@ tr { transition: background .1s ease; }
   :root { --sidebar: 0px; }
   .sidebar { display: none !important; }
   .main-area { margin-left: 0 !important; }
-  .mobile-hamburger { display: flex !important; align-items: center; }
+  .mobile-hamburger { display: flex !important; }
+  .page-pad { padding-bottom: 70px !important; }
   .header-bar { padding: 8px 12px !important; }
   .header-title { font-size: 13px !important; }
   .header-search { max-width: none !important; }
