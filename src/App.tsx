@@ -40,39 +40,45 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Safety timeout: if auth check takes more than 4 seconds, stop loading
-    const timeout = setTimeout(() => setLoading(false), 4000);
+    let mounted = true;
+    const timeout = setTimeout(() => { if (mounted) { setLoading(false); setReady(true); } }, 3000);
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
       if (session?.user) {
-        supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle().then(({ data }) => {
-          setProfile(data);
-          setLoading(false);
-          clearTimeout(timeout);
-        });
+        // Verify the session is still valid by refreshing
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        if (!mounted) return;
+        if (refreshed?.session?.user) {
+          setUser(refreshed.session.user);
+          const { data: prof } = await supabase.from('profiles').select('*').eq('id', refreshed.session.user.id).maybeSingle();
+          if (mounted) setProfile(prof);
+        } else {
+          setUser(null); setProfile(null);
+        }
       } else {
-        setLoading(false);
-        clearTimeout(timeout);
+        setUser(null); setProfile(null);
       }
+      if (mounted) { setLoading(false); setReady(true); clearTimeout(timeout); }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      if (!mounted) return;
       if (session?.user) {
+        setUser(session.user);
         supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle().then(({ data }) => {
-          setProfile(data);
-          setLoading(false);
+          if (mounted) { setProfile(data); setLoading(false); setReady(true); }
         });
       } else {
-        setProfile(null);
-        setLoading(false);
+        setUser(null); setProfile(null);
+        setLoading(false); setReady(true);
       }
     });
 
-    return () => { subscription.unsubscribe(); clearTimeout(timeout); };
+    return () => { mounted = false; subscription.unsubscribe(); clearTimeout(timeout); };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -87,7 +93,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => { await supabase.auth.signOut(); };
 
-  return <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, profile, loading, ready, signIn, signUp, signOut }}>{children}</AuthContext.Provider>;
 };
 
 const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
@@ -1295,8 +1301,8 @@ const MainApp = () => {
 export default function App() { return <AuthProvider><AppContent /></AuthProvider>; }
 
 const AppContent = () => {
-  const { user, loading } = useAuth();
-  if (loading) return <div style={{ minHeight: '100vh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}><div style={{ fontSize: 24, fontWeight: 700, fontFamily: T.mono, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Unsort</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 11, letterSpacing: 1 }}>LOADING</p></div>;
-  if (!user) return <AuthScreen />;
+  const auth = useAuth();
+  if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100vh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}><div style={{ fontSize: 24, fontWeight: 700, fontFamily: T.mono, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Unsort</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 11, letterSpacing: 1 }}>LOADING</p></div>;
+  if (!auth?.user) return <AuthScreen />;
   return <NotificationProvider><MainApp /></NotificationProvider>;
 };
