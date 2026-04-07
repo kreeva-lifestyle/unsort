@@ -353,8 +353,8 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
 
   const [itemMissing, setItemMissing] = useState<Record<string, string[]>>({});
   const [itemPresent, setItemPresent] = useState<Record<string, Set<string>>>({});
-  const [completablePairs, setCompletablePairs] = useState<Record<string, string>>({});
-  const [showCompleteModal, setShowCompleteModal] = useState<{ itemId: string; pairId: string } | null>(null);
+  const [completablePairs, setCompletablePairs] = useState<Record<string, string[]>>({});
+  const [showCompleteModal, setShowCompleteModal] = useState<{ itemId: string; pairId?: string } | null>(null);
 
   const fetchData = () => {
     supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).then(({ data }) => setItems(data || []));
@@ -388,26 +388,25 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
     });
   };
 
-  // Compute completable pairs whenever items or component data changes
+  // Compute all completable pairs for each unsorted item
   useEffect(() => {
     if (items.length === 0) return;
     const unsorted = items.filter(i => i.status === 'unsorted');
-    const pairs: Record<string, string> = {};
+    const pairs: Record<string, string[]> = {};
     for (const a of unsorted) {
-      if (pairs[a.id]) continue;
-      const aMissing = itemMissing[a.id];
       const aPresent = itemPresent[a.id];
+      const aMissing = itemMissing[a.id];
       if (!aMissing || aMissing.length === 0 || !aPresent) continue;
+      const totalComps = a.products?.total_components || 0;
+      if (totalComps === 0) continue;
       for (const b of unsorted) {
-        if (a.id === b.id || a.product_id !== b.product_id || pairs[b.id]) continue;
+        if (a.id === b.id || a.product_id !== b.product_id) continue;
         const bPresent = itemPresent[b.id];
         if (!bPresent) continue;
-        // Check if b has all components that a is missing (by name matching via component_id)
-        const allPresent = new Set([...(aPresent || []), ...(bPresent || [])]);
-        const totalComps = a.products?.total_components || 0;
-        if (totalComps > 0 && allPresent.size >= totalComps) {
-          pairs[a.id] = b.id;
-          pairs[b.id] = a.id;
+        const union = new Set([...aPresent, ...bPresent]);
+        if (union.size >= totalComps) {
+          if (!pairs[a.id]) pairs[a.id] = [];
+          if (!pairs[a.id].includes(b.id)) pairs[a.id].push(b.id);
         }
       }
     }
@@ -587,8 +586,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
   };
 
   const handleComplete = async (itemId: string, pairId: string) => {
-    await supabase.from('inventory_items').update({ status: 'completed' }).eq('id', itemId);
-    await supabase.from('inventory_items').update({ status: 'completed' }).eq('id', pairId);
+    await supabase.from('inventory_items').update({ status: 'completed' }).in('id', [itemId, pairId]);
     addToast('Both items marked as Completed!', 'success');
     setShowCompleteModal(null);
     fetchData();
@@ -651,7 +649,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
             <td style={S.tdStyle}>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 <span onClick={() => openComps(item)} style={{ ...S.btnPrimary, ...S.btnSm }}>View</span>
-                {completablePairs[item.id] && <span onClick={() => setShowCompleteModal({ itemId: item.id, pairId: completablePairs[item.id] })} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: 'rgba(16,185,129,.15)', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' as const }}>Complete</span>}
+                {completablePairs[item.id]?.length > 0 && <span onClick={() => setShowCompleteModal({ itemId: item.id })} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: 'rgba(16,185,129,.15)', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' as const }}>Complete ({completablePairs[item.id].length})</span>}
                 {item.batch_number && <span onClick={() => printBarcode(item.batch_number)} style={{ ...S.btnGhost, ...S.btnSm }}>Barcode</span>}
                 {canEdit && <span onClick={() => openEdit(item)} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>}
                 {canEdit && <span onClick={() => handleDelete(item.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Del</span>}
@@ -698,39 +696,59 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
 
       {showCompleteModal && (() => {
         const itemA = items.find(i => i.id === showCompleteModal.itemId);
-        const itemB = items.find(i => i.id === showCompleteModal.pairId);
-        if (!itemA || !itemB) return null;
+        if (!itemA) return null;
         const missingA = itemMissing[itemA.id] || [];
-        const missingB = itemMissing[itemB.id] || [];
-        return (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 520 }}>
+        const pairIds = completablePairs[itemA.id] || [];
+        const pairItems = pairIds.map(pid => items.find(i => i.id === pid)).filter(Boolean);
+        const selectedPair = showCompleteModal.pairId ? items.find(i => i.id === showCompleteModal.pairId) : null;
+
+        return (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 540 }}>
           <div style={{ ...S.modalHead, background: 'rgba(16,185,129,.06)', borderBottom: '1px solid rgba(16,185,129,.2)' }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: '#10b981' }}>Complete Product</span>
             <span onClick={() => setShowCompleteModal(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
           </div>
           <div style={{ padding: 18 }}>
-            <p style={{ fontSize: 13, color: T.tx, marginBottom: 14 }}>These two items together have all components of <strong>{itemA.products?.name}</strong>. Mark both as <strong style={{ color: '#10b981' }}>Completed</strong>?</p>
-            <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-              <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 12 }}>
-                <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Item 1</p>
-                <p style={{ fontSize: 11, fontFamily: T.mono, color: T.gr, margin: '0 0 4px' }}>{itemA.batch_number || '—'}</p>
-                {itemA.serial_number && <p style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2, margin: '0 0 6px' }}>{itemA.serial_number}</p>}
-                <p style={{ fontSize: 10, color: T.tx3, margin: '0 0 3px' }}>Has: {missingA.length === 0 ? 'All' : `${(itemA.products?.total_components || 0) - missingA.length} parts`}</p>
-                {missingA.length > 0 && <p style={{ fontSize: 10, color: T.yl, margin: 0 }}>Missing: {missingA.join(', ')}</p>}
+            {/* Current item */}
+            <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 12, marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>This Item</span>
+                <span style={{ fontSize: 11, fontFamily: T.mono, color: T.gr }}>{itemA.batch_number}</span>
               </div>
-              <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 12 }}>
-                <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Item 2</p>
-                <p style={{ fontSize: 11, fontFamily: T.mono, color: T.gr, margin: '0 0 4px' }}>{itemB.batch_number || '—'}</p>
-                {itemB.serial_number && <p style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2, margin: '0 0 6px' }}>{itemB.serial_number}</p>}
-                <p style={{ fontSize: 10, color: T.tx3, margin: '0 0 3px' }}>Has: {missingB.length === 0 ? 'All' : `${(itemB.products?.total_components || 0) - missingB.length} parts`}</p>
-                {missingB.length > 0 && <p style={{ fontSize: 10, color: T.yl, margin: 0 }}>Missing: {missingB.join(', ')}</p>}
+              <p style={{ fontSize: 13, fontWeight: 600, color: T.tx, margin: '0 0 4px' }}>{itemA.products?.name} {itemA.serial_number && <span style={{ fontFamily: T.mono, color: T.ac2, fontWeight: 400 }}>({itemA.serial_number})</span>}</p>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {missingA.map(name => <span key={name} style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(251,191,36,.12)', color: T.yl }}>{name} missing</span>)}
               </div>
             </div>
-            <div style={{ background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.15)', borderRadius: T.r, padding: '10px 14px', fontSize: 12, color: '#10b981', textAlign: 'center', marginBottom: 14 }}>
-              Combined = <strong>Complete {itemA.products?.name}</strong>
+
+            {/* Pair selection */}
+            <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 8 }}>Select item to combine with ({pairItems.length} available)</p>
+            <div style={{ maxHeight: 220, overflowY: 'auto', marginBottom: 14 }}>
+              {pairItems.map((b: any) => {
+                const missingB = itemMissing[b.id] || [];
+                const isSelected = showCompleteModal.pairId === b.id;
+                return <div key={b.id} onClick={() => setShowCompleteModal({ ...showCompleteModal, pairId: b.id })} style={{ background: isSelected ? 'rgba(16,185,129,.08)' : T.s2, border: `1px solid ${isSelected ? 'rgba(16,185,129,.4)' : T.bd}`, borderRadius: T.r, padding: 12, marginBottom: 6, cursor: 'pointer', transition: 'all .15s' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isSelected ? '#10b981' : T.bd2}`, background: isSelected ? '#10b981' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 700, flexShrink: 0 }}>{isSelected && '✓'}</div>
+                      <span style={{ fontSize: 11, fontFamily: T.mono, color: T.gr }}>{b.batch_number}</span>
+                      {b.serial_number && <span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2 }}>{b.serial_number}</span>}
+                    </div>
+                    {b.location && <span style={{ fontSize: 10, color: T.tx3 }}>{b.location}</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginLeft: 26 }}>
+                    {missingB.length > 0
+                      ? missingB.map(name => <span key={name} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, background: 'rgba(251,191,36,.1)', color: T.yl }}>{name} missing</span>)
+                      : <span style={{ fontSize: 10, color: T.gr }}>All components present</span>
+                    }
+                  </div>
+                  {isSelected && <div style={{ marginLeft: 26, marginTop: 6, fontSize: 11, color: '#10b981' }}>Combined = <strong>Complete {itemA.products?.name}</strong></div>}
+                </div>;
+              })}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span onClick={() => setShowCompleteModal(null)} style={S.btnGhost}>Cancel</span>
-              <span onClick={() => handleComplete(showCompleteModal.itemId, showCompleteModal.pairId)} style={{ ...S.btnPrimary, background: 'linear-gradient(135deg, #10b981, #34d399)', boxShadow: '0 2px 8px rgba(16,185,129,.25)' }}>Mark as Completed</span>
+              <span onClick={() => { if (showCompleteModal.pairId) handleComplete(showCompleteModal.itemId, showCompleteModal.pairId); else addToast('Select an item to combine with', 'error'); }} style={{ ...S.btnPrimary, background: selectedPair ? 'linear-gradient(135deg, #10b981, #34d399)' : T.bd2, boxShadow: selectedPair ? '0 2px 8px rgba(16,185,129,.25)' : 'none', opacity: selectedPair ? 1 : 0.5 }}>Mark as Completed</span>
             </div>
           </div>
         </div></div>);
