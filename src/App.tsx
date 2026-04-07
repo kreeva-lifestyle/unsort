@@ -15,7 +15,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: an
 }
 import { createClient } from '@supabase/supabase-js';
 import JsBarcode from 'jsbarcode';
-import { Html5Qrcode } from 'html5-qrcode';
+import Quagga from '@ericblade/quagga2';
 
 const SUPABASE_URL = 'https://ulphprdnswznfztawbvg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0';
@@ -257,32 +257,61 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
 };
 
 const BarcodeScanner = ({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) => {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState('');
   const [manualId, setManualId] = useState('');
+  const [lastCode, setLastCode] = useState('');
+  const scannedRef = useRef(false);
 
   useEffect(() => {
-    const scanner = new Html5Qrcode('scanner-region');
-    scannerRef.current = scanner;
-    scanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 280, height: 120 } },
-      (text) => { scanner.stop().catch(() => {}); onScan(text); },
-      () => {}
-    ).catch(() => setError('Camera access denied or not available. Use manual entry below.'));
-    return () => { scanner.stop().catch(() => {}); };
+    if (!videoRef.current) return;
+    Quagga.init({
+      inputStream: {
+        type: 'LiveStream',
+        target: videoRef.current,
+        constraints: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+      },
+      decoder: {
+        readers: ['code_128_reader', 'code_39_reader', 'ean_reader', 'ean_8_reader', 'upc_reader', 'i2of5_reader'],
+        multiple: false,
+      },
+      locate: true,
+      frequency: 10,
+    }, (err: any) => {
+      if (err) { setError('Camera not available. Use manual entry below.'); return; }
+      Quagga.start();
+    });
+
+    Quagga.onDetected((result: any) => {
+      const code = result?.codeResult?.code;
+      if (code && !scannedRef.current) {
+        scannedRef.current = true;
+        setLastCode(code);
+        // Brief vibration feedback on mobile
+        if (navigator.vibrate) navigator.vibrate(100);
+        Quagga.stop();
+        onScan(code);
+      }
+    });
+
+    return () => { Quagga.stop(); Quagga.offDetected(); };
   }, []);
 
   return (
     <div style={S.modalOverlay}>
-      <div className="modal-inner" style={{ ...S.modalBox, width: 380 }}>
+      <div className="modal-inner" style={{ ...S.modalBox, width: 400 }}>
         <div style={S.modalHead}>
           <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Scan Barcode</span>
           <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
         </div>
         <div style={{ padding: 16 }}>
-          <div id="scanner-region" style={{ width: '100%', borderRadius: 8, overflow: 'hidden', marginBottom: 12, background: '#000', minHeight: 200 }} />
-          {error && <p style={{ fontSize: 11, color: T.yl, marginBottom: 10, textAlign: 'center' }}>{error}</p>}
+          {!error && <div ref={videoRef} style={{ width: '100%', borderRadius: 8, overflow: 'hidden', marginBottom: 12, background: '#000', minHeight: 240, position: 'relative' }}>
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '70%', height: 2, background: T.re, opacity: 0.6, zIndex: 2, boxShadow: `0 0 8px ${T.re}` }} />
+          </div>}
+          {error && <div style={{ background: T.s2, borderRadius: 8, padding: 24, marginBottom: 12, textAlign: 'center' }}>
+            <p style={{ fontSize: 12, color: T.yl, marginBottom: 4 }}>{error}</p>
+          </div>}
+          {lastCode && <div style={{ background: 'rgba(52,211,153,.08)', border: '1px solid rgba(52,211,153,.2)', borderRadius: T.r, padding: '8px 12px', marginBottom: 12, fontSize: 12, color: T.gr, fontFamily: T.mono, textAlign: 'center' }}>Scanned: {lastCode}</div>}
           <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Or enter ID manually</p>
           <div style={{ display: 'flex', gap: 8 }}>
             <input value={manualId} onChange={(e) => setManualId(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && manualId.trim()) { onScan(manualId.trim()); } }} placeholder="e.g. UNS-070426-9720" style={{ ...S.fInput, flex: 1, fontFamily: T.mono }} autoFocus={!!error} />

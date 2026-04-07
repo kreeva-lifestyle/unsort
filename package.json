@@ -9,8 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ericblade/quagga2": "^1.12.1",
     "@supabase/supabase-js": "^2.39.0",
-    "html5-qrcode": "^2.3.8",
     "jsbarcode": "^3.12.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
