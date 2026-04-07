@@ -73,10 +73,10 @@ tr { transition: background .1s ease; }
   :root { --sidebar: 0px; }
   .sidebar { display: none !important; }
   .main-area { margin-left: 0 !important; }
-  .mobile-hamburger { display: flex !important; }
-  .mobile-menu-overlay { display: block !important; }
-  .mobile-menu-sidebar { display: block !important; }
-  .mobile-menu-sidebar .sidebar { display: flex !important; }
+  .mobile-hamburger { display: flex !important; align-items: center; }
+  .mobile-overlay { display: block !important; }
+  .mobile-drawer { display: block !important; }
+  .mobile-drawer .sidebar { display: flex !important; width: 100% !important; }
   .page-pad { padding: 14px 12px !important; }
   .filter-bar { gap: 6px !important; padding: 8px 10px !important; }
   .filter-bar select, .filter-bar input { font-size: 12px !important; padding: 6px 8px !important; min-width: 0 !important; }

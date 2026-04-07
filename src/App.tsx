@@ -338,9 +338,19 @@ const statusTag = (status: string) => {
 };
 
 const Dashboard = () => {
+  const { profile } = useAuth();
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const [stats, setStats] = useState<any>({ total_products: 0, total_inventory: 0, damaged_count: 0, unsorted_count: 0, complete_count: 0, open_reports: 0 });
+  const refreshStats = () => { supabase.from('dashboard_summary').select('*').limit(1).then(({ data }) => { if (data && data[0]) setStats(data[0]); }); };
   useEffect(() => {
-    supabase.from('dashboard_summary').select('*').limit(1).then(({ data }) => { if (data && data[0]) setStats(data[0]); });
+    refreshStats();
+    const ch = supabase.channel('dash-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, refreshStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, refreshStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'damage_reports' }, refreshStats)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, []);
 
   const cards = [
@@ -355,6 +365,10 @@ const Dashboard = () => {
 
   return (
     <div className="page-pad" style={{ padding: '16px 18px', animation: 'fi .15s ease' }}>
+      <div style={{ marginBottom: 18 }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.tx }}>{greeting}, {profile?.full_name?.split(' ')[0] || 'there'}</h2>
+        <p style={{ margin: '2px 0 0', fontSize: 12, color: T.tx3 }}>Here's your overview for today</p>
+      </div>
       <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 18 }}>
         {cards.map((c, i) => (
           <div key={i} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 12, padding: '18px 20px', transition: 'transform .2s, box-shadow .2s', cursor: 'default', position: 'relative', overflow: 'hidden' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 24px ${c.color}15`; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
@@ -462,7 +476,18 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
     }
     setCompletablePairs(pairs);
   }, [items, itemMissing, itemPresent]);
-  useEffect(() => { fetchData(); const ch = supabase.channel('inv').on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, fetchData).subscribe(); return () => { supabase.removeChannel(ch); }; }, []);
+  useEffect(() => {
+    fetchData();
+    const ch = supabase.channel('inv-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'item_components' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'item_tags' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tags' }, fetchData)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
   // Open item detail from notification click
   useEffect(() => {
@@ -626,13 +651,29 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
   };
   const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
 
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; timer: number } | null>(null);
+
   const handleDelete = async (itemId: string) => {
-    if (!confirm('Delete this item? This cannot be undone.')) return;
-    await supabase.from('item_tags').delete().eq('inventory_item_id', itemId);
-    await supabase.from('item_components').delete().eq('inventory_item_id', itemId);
-    await supabase.from('inventory_items').delete().eq('id', itemId);
-    addToast('Item deleted', 'success');
-    fetchData();
+    // Soft-hide immediately, schedule permanent delete in 5s
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+    setItems(prev => prev.filter(i => i.id !== itemId));
+    const timer = window.setTimeout(async () => {
+      await supabase.from('item_tags').delete().eq('inventory_item_id', itemId);
+      await supabase.from('item_components').delete().eq('inventory_item_id', itemId);
+      await supabase.from('inventory_items').delete().eq('id', itemId);
+      setPendingDelete(null);
+      fetchData();
+    }, 5000);
+    setPendingDelete({ id: itemId, timer });
+  };
+
+  const undoDelete = () => {
+    if (pendingDelete) {
+      clearTimeout(pendingDelete.timer);
+      setPendingDelete(null);
+      fetchData();
+    }
   };
 
   const handleComplete = async (itemId: string, pairId: string) => {
@@ -833,6 +874,11 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
           </div>
         </div></div>);
       })()}
+
+      {pendingDelete && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, animation: 'su .2s ease' }}>
+        <span style={{ fontSize: 13, color: T.tx }}>Item deleted</span>
+        <span onClick={undoDelete} style={{ ...S.btnPrimary, padding: '5px 14px', fontSize: 12, background: T.yl, color: '#000', boxShadow: 'none' }}>Undo</span>
+      </div>}
     </div>
   );
 };
@@ -849,7 +895,14 @@ const Categories = () => {
   const [newComps, setNewComps] = useState<string[]>(['']);
 
   const fetchCategories = () => { supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }).then(({ data }) => setCategories(data || [])); };
-  useEffect(() => { fetchCategories(); }, []);
+  useEffect(() => {
+    fetchCategories();
+    const ch = supabase.channel('cat-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchCategories)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'components' }, fetchCategories)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
   const fetchComps = async (id: string) => { const { data } = await supabase.from('components').select('*').eq('product_id', id).order('created_at', { ascending: true }); setComps(data || []); };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -953,7 +1006,11 @@ const Locations = () => {
   const canEdit = profile && ['admin', 'manager'].includes(profile.role);
 
   const fetchLocations = () => { supabase.from('locations').select('*').order('name').then(({ data }) => setLocations(data || [])); };
-  useEffect(() => { fetchLocations(); }, []);
+  useEffect(() => {
+    fetchLocations();
+    const ch = supabase.channel('loc-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, fetchLocations).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
   const addLocation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1026,7 +1083,11 @@ const Reports = () => {
     supabase.from('damage_reports').select('*, inventory_items(*, products(name, sku)), profiles:reported_by(full_name)').order('created_at', { ascending: false }).then(({ data }) => setReports(data || []));
     supabase.from('inventory_items').select('*, products(name, sku)').in('status', ['damaged', 'unsorted']).then(({ data }) => setItems(data || []));
   };
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+    const ch = supabase.channel('rep-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'damage_reports' }, fetchData).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); const { error } = await supabase.from('damage_reports').insert({ ...form, estimated_loss: form.estimated_loss ? parseFloat(form.estimated_loss) : null, reported_by: profile?.id }); if (error) addToast(error.message, 'error'); else { addToast('Created!', 'success'); setShowModal(false); setForm({ inventory_item_id: '', damage_type: '', cause: '', estimated_loss: '' }); fetchData(); } };
 
@@ -1066,7 +1127,11 @@ const Users = () => {
   const { addToast } = useNotifications();
 
   const fetchUsers = () => { supabase.from('profiles').select('*').order('created_at', { ascending: false }).then(({ data }) => setUsers(data || [])); };
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    fetchUsers();
+    const ch = supabase.channel('usr-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fetchUsers).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
   const updateRole = async (id: string, role: string) => { await supabase.from('profiles').update({ role }).eq('id', id); addToast('Role updated!', 'success'); fetchUsers(); };
   const toggleActive = async (id: string, isActive: boolean) => { await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id); addToast(isActive ? 'Access revoked' : 'Access granted', 'success'); fetchUsers(); };
@@ -1194,18 +1259,27 @@ const MainApp = () => {
   };
   return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflow: 'hidden' }}>
     <Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} />
-    {/* Mobile menu overlay */}
-    {mobileMenu && <div className="mobile-menu-overlay" onClick={() => setMobileMenu(false)} style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 99 }} />}
-    {mobileMenu && <div className="mobile-menu-sidebar" style={{ display: 'none', position: 'fixed', top: 0, left: 0, width: 240, height: '100vh', zIndex: 101 }}>
+    {/* Mobile overlay */}
+    <div className="mobile-overlay" onClick={() => setMobileMenu(false)} style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 98, opacity: mobileMenu ? 1 : 0, pointerEvents: mobileMenu ? 'auto' : 'none', transition: 'opacity .25s ease', backdropFilter: 'blur(2px)' }} />
+    {/* Mobile sidebar drawer */}
+    <div className="mobile-drawer" style={{ display: 'none', position: 'fixed', top: 0, left: 0, width: 260, height: '100vh', zIndex: 101, transform: mobileMenu ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform .3s cubic-bezier(.4,0,.2,1)', boxShadow: mobileMenu ? '4px 0 24px rgba(0,0,0,.4)' : 'none' }}>
       <Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} />
-    </div>}
+    </div>
     <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
-      {/* Mobile hamburger */}
-      <div className="mobile-hamburger" onClick={() => setMobileMenu(!mobileMenu)} style={{ display: 'none', position: 'fixed', top: 10, left: 10, zIndex: 102, padding: '6px 8px', borderRadius: 6, background: T.s, border: `1px solid ${T.bd}`, cursor: 'pointer' }}>
-        <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: 'none', stroke: T.tx, strokeWidth: 2 }}><path d="M3 12h18M3 6h18M3 18h18" /></svg>
+      {/* Mobile hamburger - floating pill */}
+      <div className="mobile-hamburger" onClick={() => setMobileMenu(!mobileMenu)} style={{ display: 'none', position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 102, padding: '10px 20px', borderRadius: 50, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, boxShadow: '0 4px 20px rgba(139,92,246,.4)', cursor: 'pointer', color: '#fff', fontSize: 12, fontWeight: 600, fontFamily: T.sans, alignItems: 'center', gap: 8 }}>
+        <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: '#fff', strokeWidth: 2, verticalAlign: 'middle', marginRight: 6 }}>{mobileMenu ? <path d="M18 6L6 18M6 6l12 12" /> : <path d="M3 12h18M3 6h18M3 18h18" />}</svg>
+        Menu
       </div>
       <Header title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} onScan={handleScan} />
-      <main style={{ flex: 1, overflow: 'auto' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} />}{tab === 'categories' && <Categories />}{tab === 'locations' && <Locations />}{tab === 'reports' && <Reports />}{tab === 'users' && <Users />}</main>
+      <main style={{ flex: 1, overflow: 'auto' }}>
+        <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard /></div>
+        <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} /></div>
+        <div style={{ display: tab === 'categories' ? 'block' : 'none' }}><Categories /></div>
+        <div style={{ display: tab === 'locations' ? 'block' : 'none' }}><Locations /></div>
+        <div style={{ display: tab === 'reports' ? 'block' : 'none' }}><Reports /></div>
+        <div style={{ display: tab === 'users' ? 'block' : 'none' }}><Users /></div>
+      </main>
     </div>
     <ToastContainer />
   </div>);
