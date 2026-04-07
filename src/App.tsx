@@ -1,6 +1,7 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import JsBarcode from 'jsbarcode';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const SUPABASE_URL = 'https://ulphprdnswznfztawbvg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0';
@@ -185,6 +186,7 @@ const Icon = ({ name, size = 16 }: { name: string; size?: number }) => {
     file: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8',
     users: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
     search: 'M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35',
+    scan: 'M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M8 12h8',
   };
   return <svg viewBox="0 0 24 24" style={s}><path d={paths[name] || ''} /></svg>;
 };
@@ -231,9 +233,48 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
   );
 };
 
-const Header = ({ title, onSearch, onNotifClick }: { title: string; onSearch?: (q: string) => void; onNotifClick?: (n: any) => void }) => {
+const BarcodeScanner = ({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) => {
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const [error, setError] = useState('');
+  const [manualId, setManualId] = useState('');
+
+  useEffect(() => {
+    const scanner = new Html5Qrcode('scanner-region');
+    scannerRef.current = scanner;
+    scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 280, height: 120 } },
+      (text) => { scanner.stop().catch(() => {}); onScan(text); },
+      () => {}
+    ).catch(() => setError('Camera access denied or not available. Use manual entry below.'));
+    return () => { scanner.stop().catch(() => {}); };
+  }, []);
+
+  return (
+    <div style={S.modalOverlay}>
+      <div className="modal-inner" style={{ ...S.modalBox, width: 380 }}>
+        <div style={S.modalHead}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Scan Barcode</span>
+          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
+        </div>
+        <div style={{ padding: 16 }}>
+          <div id="scanner-region" style={{ width: '100%', borderRadius: 8, overflow: 'hidden', marginBottom: 12, background: '#000', minHeight: 200 }} />
+          {error && <p style={{ fontSize: 11, color: T.yl, marginBottom: 10, textAlign: 'center' }}>{error}</p>}
+          <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Or enter ID manually</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={manualId} onChange={(e) => setManualId(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && manualId.trim()) { onScan(manualId.trim()); } }} placeholder="e.g. UNS-070426-9720" style={{ ...S.fInput, flex: 1, fontFamily: T.mono }} autoFocus={!!error} />
+            <span onClick={() => { if (manualId.trim()) onScan(manualId.trim()); }} style={S.btnPrimary}>Go</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Header = ({ title, onSearch, onNotifClick, onScan }: { title: string; onSearch?: (q: string) => void; onNotifClick?: (n: any) => void; onScan?: (code: string) => void }) => {
   const { notifications, markAsRead } = useNotifications();
   const [show, setShow] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const unread = notifications.filter((n: any) => !n.is_read).length;
   const [globalSearch, setGlobalSearch] = useState('');
 
@@ -253,7 +294,11 @@ const Header = ({ title, onSearch, onNotifClick }: { title: string; onSearch?: (
           {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>×</span>}
         </div>
       </div>
-      <div style={{ marginLeft: 'auto', position: 'relative' }}>
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={() => setShowScanner(true)} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', color: T.tx2, display: 'flex', alignItems: 'center' }} title="Scan barcode">
+          <Icon name="scan" size={16} />
+        </button>
+        <div style={{ position: 'relative' }}>
         <button onClick={() => setShow(!show)} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', position: 'relative', color: T.tx2, fontSize: 14, display: 'flex', alignItems: 'center' }}>
           <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
           {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono }}>{unread}</span>}
@@ -274,6 +319,8 @@ const Header = ({ title, onSearch, onNotifClick }: { title: string; onSearch?: (
           </div>
         )}
       </div>
+      </div>
+      {showScanner && <BarcodeScanner onScan={(code) => { setShowScanner(false); onScan?.(code); }} onClose={() => setShowScanner(false)} />}
     </header>
   );
 };
@@ -1133,12 +1180,35 @@ const MainApp = () => {
   const [tab, setTab] = useState('dashboard');
   const [globalSearch, setGlobalSearch] = useState('');
   const [notifItemId, setNotifItemId] = useState<string | null>(null);
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const { addToast } = useNotifications();
   const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', categories: 'Categories', locations: 'Locations', reports: 'Damage Reports', users: 'User Management' };
   const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
-  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflow: 'hidden' }}><Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); }} /><div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}><Header title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} /><main style={{ flex: 1, overflow: 'auto' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} />}{tab === 'categories' && <Categories />}{tab === 'locations' && <Locations />}{tab === 'reports' && <Reports />}{tab === 'users' && <Users />}</main></div><ToastContainer /></div>);
+  const handleScan = async (code: string) => {
+    const { data } = await supabase.from('inventory_items').select('id').eq('batch_number', code).maybeSingle();
+    if (data) { setTab('inventory'); setNotifItemId(data.id); }
+    else addToast(`No item found for: ${code}`, 'error');
+  };
+  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflow: 'hidden' }}>
+    <Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} />
+    {/* Mobile menu overlay */}
+    {mobileMenu && <div className="mobile-menu-overlay" onClick={() => setMobileMenu(false)} style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 99 }} />}
+    {mobileMenu && <div className="mobile-menu-sidebar" style={{ display: 'none', position: 'fixed', top: 0, left: 0, width: 240, height: '100vh', zIndex: 101 }}>
+      <Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} />
+    </div>}
+    <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
+      {/* Mobile hamburger */}
+      <div className="mobile-hamburger" onClick={() => setMobileMenu(!mobileMenu)} style={{ display: 'none', position: 'fixed', top: 10, left: 10, zIndex: 102, padding: '6px 8px', borderRadius: 6, background: T.s, border: `1px solid ${T.bd}`, cursor: 'pointer' }}>
+        <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: 'none', stroke: T.tx, strokeWidth: 2 }}><path d="M3 12h18M3 6h18M3 18h18" /></svg>
+      </div>
+      <Header title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} onScan={handleScan} />
+      <main style={{ flex: 1, overflow: 'auto' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} />}{tab === 'categories' && <Categories />}{tab === 'locations' && <Locations />}{tab === 'reports' && <Reports />}{tab === 'users' && <Users />}</main>
+    </div>
+    <ToastContainer />
+  </div>);
 };
 
 export default function App() { return <AuthProvider><AppContent /></AuthProvider>; }
