@@ -256,29 +256,33 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
   );
 };
 
-const BarcodeScanner = ({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) => {
+const BarcodeScanner = ({ onScan, onClose, scanError }: { onScan: (code: string) => Promise<boolean>; onClose: () => void; scanError?: string }) => {
   const videoRef = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState('');
+  const [cameraError, setCameraError] = useState('');
   const [manualId, setManualId] = useState('');
   const [lastCode, setLastCode] = useState('');
+  const [scanning, setScanning] = useState(true);
   const scannedRef = useRef(false);
 
-  useEffect(() => {
+  const startScanner = () => {
     if (!videoRef.current) return;
+    scannedRef.current = false;
+    setScanning(true);
+    setLastCode('');
     Quagga.init({
       inputStream: {
         type: 'LiveStream',
         target: videoRef.current,
-        constraints: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+        constraints: { facingMode: 'environment', width: { ideal: 480 }, height: { ideal: 320 } },
       },
       decoder: {
-        readers: ['code_128_reader', 'code_39_reader', 'ean_reader', 'ean_8_reader', 'upc_reader', 'i2of5_reader'],
+        readers: ['code_128_reader', 'code_39_reader', 'ean_reader', 'ean_8_reader'],
         multiple: false,
       },
       locate: true,
       frequency: 10,
     }, (err: any) => {
-      if (err) { setError('Camera not available. Use manual entry below.'); return; }
+      if (err) { setCameraError('Camera not available. Use manual entry below.'); return; }
       Quagga.start();
     });
 
@@ -287,35 +291,62 @@ const BarcodeScanner = ({ onScan, onClose }: { onScan: (code: string) => void; o
       if (code && !scannedRef.current) {
         scannedRef.current = true;
         setLastCode(code);
-        // Brief vibration feedback on mobile
         if (navigator.vibrate) navigator.vibrate(100);
         Quagga.stop();
-        onScan(code);
+        setScanning(false);
+        onScan(code).then(found => {
+          if (!found) {
+            // Not found - allow re-scan after 2s
+            setTimeout(() => {
+              if (videoRef.current) startScanner();
+            }, 2000);
+          }
+        });
       }
     });
+  };
 
+  useEffect(() => {
+    startScanner();
     return () => { Quagga.stop(); Quagga.offDetected(); };
   }, []);
 
+  const handleManual = () => {
+    if (!manualId.trim()) return;
+    setLastCode(manualId.trim());
+    onScan(manualId.trim());
+  };
+
   return (
     <div style={S.modalOverlay}>
-      <div className="modal-inner" style={{ ...S.modalBox, width: 400 }}>
+      <div className="modal-inner" style={{ ...S.modalBox, width: 380 }}>
         <div style={S.modalHead}>
           <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Scan Barcode</span>
           <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
         </div>
-        <div style={{ padding: 16 }}>
-          {!error && <div ref={videoRef} style={{ width: '100%', borderRadius: 8, overflow: 'hidden', marginBottom: 12, background: '#000', minHeight: 240, position: 'relative' }}>
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '70%', height: 2, background: T.re, opacity: 0.6, zIndex: 2, boxShadow: `0 0 8px ${T.re}` }} />
+        <div style={{ padding: 14 }}>
+          {!cameraError && <div style={{ position: 'relative', width: '100%', borderRadius: 10, overflow: 'hidden', marginBottom: 10, background: '#000', aspectRatio: '4/3' }}>
+            <div ref={videoRef} style={{ position: 'absolute', inset: 0 }} />
+            {/* Scan guide overlay */}
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 2 }}>
+              <div style={{ width: '75%', height: 50, border: `2px solid ${scanning ? T.ac : T.gr}`, borderRadius: 8, position: 'relative' }}>
+                {scanning && <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', height: 2, background: T.re, boxShadow: `0 0 10px ${T.re}`, animation: 'scanLine 2s ease-in-out infinite' }} />}
+              </div>
+            </div>
           </div>}
-          {error && <div style={{ background: T.s2, borderRadius: 8, padding: 24, marginBottom: 12, textAlign: 'center' }}>
-            <p style={{ fontSize: 12, color: T.yl, marginBottom: 4 }}>{error}</p>
+          {cameraError && <div style={{ background: T.s2, borderRadius: 10, padding: 20, marginBottom: 10, textAlign: 'center' }}>
+            <p style={{ fontSize: 12, color: T.yl }}>{cameraError}</p>
           </div>}
-          {lastCode && <div style={{ background: 'rgba(52,211,153,.08)', border: '1px solid rgba(52,211,153,.2)', borderRadius: T.r, padding: '8px 12px', marginBottom: 12, fontSize: 12, color: T.gr, fontFamily: T.mono, textAlign: 'center' }}>Scanned: {lastCode}</div>}
-          <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Or enter ID manually</p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input value={manualId} onChange={(e) => setManualId(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && manualId.trim()) { onScan(manualId.trim()); } }} placeholder="e.g. UNS-070426-9720" style={{ ...S.fInput, flex: 1, fontFamily: T.mono }} autoFocus={!!error} />
-            <span onClick={() => { if (manualId.trim()) onScan(manualId.trim()); }} style={S.btnPrimary}>Go</span>
+          {lastCode && <div style={{ borderRadius: T.r, padding: '8px 12px', marginBottom: 10, fontSize: 12, textAlign: 'center', fontFamily: T.mono, ...(scanError ? { background: 'rgba(248,113,113,.08)', border: '1px solid rgba(248,113,113,.2)', color: T.re } : { background: 'rgba(52,211,153,.08)', border: '1px solid rgba(52,211,153,.2)', color: T.gr }) }}>
+            {scanError ? scanError : `Found: ${lastCode}`}
+            {scanError && <p style={{ fontSize: 10, color: T.tx3, margin: '4px 0 0' }}>Re-scanning...</p>}
+          </div>}
+          <div style={{ borderTop: `1px solid ${T.bd}`, paddingTop: 10 }}>
+            <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Or enter ID manually</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={manualId} onChange={(e) => setManualId(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleManual(); }} placeholder="UNS-DDMMYY-XXXX" style={{ ...S.fInput, flex: 1, fontFamily: T.mono, fontSize: 12 }} />
+              <span onClick={handleManual} style={S.btnPrimary}>Go</span>
+            </div>
           </div>
         </div>
       </div>
@@ -323,10 +354,9 @@ const BarcodeScanner = ({ onScan, onClose }: { onScan: (code: string) => void; o
   );
 };
 
-const Header = ({ title, onSearch, onNotifClick, onScan }: { title: string; onSearch?: (q: string) => void; onNotifClick?: (n: any) => void; onScan?: (code: string) => void }) => {
+const Header = ({ title, onSearch, onNotifClick, onOpenScanner }: { title: string; onSearch?: (q: string) => void; onNotifClick?: (n: any) => void; onOpenScanner?: () => void }) => {
   const { notifications, markAsRead } = useNotifications();
   const [show, setShow] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
   const unread = notifications.filter((n: any) => !n.is_read).length;
   const [globalSearch, setGlobalSearch] = useState('');
 
@@ -348,7 +378,7 @@ const Header = ({ title, onSearch, onNotifClick, onScan }: { title: string; onSe
           </div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-        <button onClick={() => setShowScanner(true)} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', color: T.tx2, display: 'flex', alignItems: 'center' }} title="Scan barcode">
+        <button onClick={() => onOpenScanner?.()} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', color: T.tx2, display: 'flex', alignItems: 'center' }} title="Scan barcode">
           <Icon name="scan" size={16} />
         </button>
         <div style={{ position: 'relative' }}>
@@ -374,7 +404,6 @@ const Header = ({ title, onSearch, onNotifClick, onScan }: { title: string; onSe
       </div>
       </div>
       </div>
-      {showScanner && <BarcodeScanner onScan={(code) => { setShowScanner(false); onScan?.(code); }} onClose={() => setShowScanner(false)} />}
     </header>
   );
 };
@@ -1319,7 +1348,6 @@ const MainApp = () => {
   const [notifItemId, setNotifItemId] = useState<string | null>(null);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [mounted, setMounted] = useState<Set<string>>(new Set(['dashboard']));
-  const { addToast } = useNotifications();
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
@@ -1328,10 +1356,14 @@ const MainApp = () => {
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
-  const handleScan = async (code: string) => {
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanError, setScanError] = useState('');
+  const handleScan = async (code: string): Promise<boolean> => {
+    setScanError('');
     const { data } = await supabase.from('inventory_items').select('id').eq('batch_number', code).maybeSingle();
-    if (data) { setTab('inventory'); setNotifItemId(data.id); }
-    else addToast(`No item found for: ${code}`, 'error');
+    if (data) { setScannerOpen(false); setTab('inventory'); setNotifItemId(data.id); return true; }
+    setScanError(`No item found for: ${code}`);
+    return false;
   };
   return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflow: 'hidden' }}>
     <Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} />
@@ -1347,7 +1379,7 @@ const MainApp = () => {
         <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: '#fff', strokeWidth: 2, verticalAlign: 'middle', marginRight: 6 }}>{mobileMenu ? <path d="M18 6L6 18M6 6l12 12" /> : <path d="M3 12h18M3 6h18M3 18h18" />}</svg>
         Menu
       </div>
-      <Header title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} onScan={handleScan} />
+      <Header title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} onOpenScanner={() => { setScanError(''); setScannerOpen(true); }} />
       <main style={{ flex: 1, overflow: 'auto' }}>
         {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard /></div>}
         {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} /></div>}
@@ -1359,6 +1391,7 @@ const MainApp = () => {
       </main>
     </div>
     <ToastContainer />
+    {scannerOpen && <BarcodeScanner onScan={handleScan} onClose={() => setScannerOpen(false)} scanError={scanError} />}
   </div>);
 };
 

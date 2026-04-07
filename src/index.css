@@ -60,6 +60,11 @@ input::placeholder, textarea::placeholder { color: var(--tx3); opacity: .45; }
 @keyframes loginShake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-5px); } 40%,80% { transform: translateX(5px); } }
 @keyframes btnSpin { to { transform: rotate(360deg); } }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes scanLine { 0%,100% { transform: translateY(-12px); opacity: .4; } 50% { transform: translateY(12px); opacity: 1; } }
+
+/* Quagga video fix */
+.drawingBuffer { display: none !important; }
+div[ref] > video, .modal-inner video { width: 100% !important; height: 100% !important; object-fit: cover !important; }
 
 .notif-dropdown { animation: slideDown .12s ease; }
 .spinner { width: 18px; height: 18px; border: 2px solid var(--bd2); border-top-color: var(--ac); border-radius: 50%; animation: btnSpin .6s linear infinite; }
