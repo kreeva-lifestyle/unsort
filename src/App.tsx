@@ -1,6 +1,7 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import JsBarcode from 'jsbarcode';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const SUPABASE_URL = 'https://ulphprdnswznfztawbvg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0';
@@ -185,6 +186,7 @@ const Icon = ({ name, size = 16 }: { name: string; size?: number }) => {
     file: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8',
     users: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
     search: 'M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35',
+    scan: 'M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M8 12h8',
   };
   return <svg viewBox="0 0 24 24" style={s}><path d={paths[name] || ''} /></svg>;
 };
@@ -231,9 +233,48 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
   );
 };
 
-const Header = ({ title, onSearch, onNotifClick }: { title: string; onSearch?: (q: string) => void; onNotifClick?: (n: any) => void }) => {
+const BarcodeScanner = ({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) => {
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const [error, setError] = useState('');
+  const [manualId, setManualId] = useState('');
+
+  useEffect(() => {
+    const scanner = new Html5Qrcode('scanner-region');
+    scannerRef.current = scanner;
+    scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 280, height: 120 } },
+      (text) => { scanner.stop().catch(() => {}); onScan(text); },
+      () => {}
+    ).catch(() => setError('Camera access denied or not available. Use manual entry below.'));
+    return () => { scanner.stop().catch(() => {}); };
+  }, []);
+
+  return (
+    <div style={S.modalOverlay}>
+      <div className="modal-inner" style={{ ...S.modalBox, width: 380 }}>
+        <div style={S.modalHead}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Scan Barcode</span>
+          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
+        </div>
+        <div style={{ padding: 16 }}>
+          <div id="scanner-region" style={{ width: '100%', borderRadius: 8, overflow: 'hidden', marginBottom: 12, background: '#000', minHeight: 200 }} />
+          {error && <p style={{ fontSize: 11, color: T.yl, marginBottom: 10, textAlign: 'center' }}>{error}</p>}
+          <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Or enter ID manually</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={manualId} onChange={(e) => setManualId(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && manualId.trim()) { onScan(manualId.trim()); } }} placeholder="e.g. UNS-070426-9720" style={{ ...S.fInput, flex: 1, fontFamily: T.mono }} autoFocus={!!error} />
+            <span onClick={() => { if (manualId.trim()) onScan(manualId.trim()); }} style={S.btnPrimary}>Go</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Header = ({ title, onSearch, onNotifClick, onScan }: { title: string; onSearch?: (q: string) => void; onNotifClick?: (n: any) => void; onScan?: (code: string) => void }) => {
   const { notifications, markAsRead } = useNotifications();
   const [show, setShow] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const unread = notifications.filter((n: any) => !n.is_read).length;
   const [globalSearch, setGlobalSearch] = useState('');
 
@@ -253,7 +294,11 @@ const Header = ({ title, onSearch, onNotifClick }: { title: string; onSearch?: (
           {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>×</span>}
         </div>
       </div>
-      <div style={{ marginLeft: 'auto', position: 'relative' }}>
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={() => setShowScanner(true)} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', color: T.tx2, display: 'flex', alignItems: 'center' }} title="Scan barcode">
+          <Icon name="scan" size={16} />
+        </button>
+        <div style={{ position: 'relative' }}>
         <button onClick={() => setShow(!show)} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', position: 'relative', color: T.tx2, fontSize: 14, display: 'flex', alignItems: 'center' }}>
           <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
           {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono }}>{unread}</span>}
@@ -274,6 +319,8 @@ const Header = ({ title, onSearch, onNotifClick }: { title: string; onSearch?: (
           </div>
         )}
       </div>
+      </div>
+      {showScanner && <BarcodeScanner onScan={(code) => { setShowScanner(false); onScan?.(code); }} onClose={() => setShowScanner(false)} />}
     </header>
   );
 };
@@ -348,13 +395,15 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
   const [showSkuDrop, setShowSkuDrop] = useState(false);
   const [catComps, setCatComps] = useState<any[]>([]);
   const [missingComps, setMissingComps] = useState<Set<string>>(new Set());
+  const [damagedComps, setDamagedComps] = useState<Set<string>>(new Set());
   const [tagInput, setTagInput] = useState('');
   const [matchResult, setMatchResult] = useState<any>(null);
 
   const [itemMissing, setItemMissing] = useState<Record<string, string[]>>({});
+  const [itemDamaged, setItemDamaged] = useState<Record<string, string[]>>({});
   const [itemPresent, setItemPresent] = useState<Record<string, Set<string>>>({});
-  const [completablePairs, setCompletablePairs] = useState<Record<string, string>>({});
-  const [showCompleteModal, setShowCompleteModal] = useState<{ itemId: string; pairId: string } | null>(null);
+  const [completablePairs, setCompletablePairs] = useState<Record<string, string[]>>({});
+  const [showCompleteModal, setShowCompleteModal] = useState<{ itemId: string; pairId?: string } | null>(null);
 
   const fetchData = () => {
     supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).then(({ data }) => setItems(data || []));
@@ -366,48 +415,48 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
       (data || []).forEach((it: any) => { if (!map[it.inventory_item_id]) map[it.inventory_item_id] = []; map[it.inventory_item_id].push(it.tags); });
       setItemTags(map);
     });
-    // Fetch all item_components for missing display + pair computation
     supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').then(({ data }) => {
       const missingMap: Record<string, string[]> = {};
+      const damagedMap: Record<string, string[]> = {};
       const presentMap: Record<string, Set<string>> = {};
-      const missingIdMap: Record<string, Set<string>> = {};
       (data || []).forEach((ic: any) => {
         if (ic.status === 'missing') {
           if (!missingMap[ic.inventory_item_id]) missingMap[ic.inventory_item_id] = [];
           if (ic.components?.name) missingMap[ic.inventory_item_id].push(ic.components.name);
-          if (!missingIdMap[ic.inventory_item_id]) missingIdMap[ic.inventory_item_id] = new Set();
-          missingIdMap[ic.inventory_item_id].add(ic.component_id);
+        }
+        if (ic.status === 'damaged') {
+          if (!damagedMap[ic.inventory_item_id]) damagedMap[ic.inventory_item_id] = [];
+          if (ic.components?.name) damagedMap[ic.inventory_item_id].push(ic.components.name);
         }
         if (ic.status === 'present') {
           if (!presentMap[ic.inventory_item_id]) presentMap[ic.inventory_item_id] = new Set();
           presentMap[ic.inventory_item_id].add(ic.component_id);
         }
       });
-      setItemMissing(missingMap);
+      setItemMissing(missingMap); setItemDamaged(damagedMap);
       setItemPresent(presentMap);
     });
   };
 
-  // Compute completable pairs whenever items or component data changes
+  // Compute all completable pairs for each unsorted item
   useEffect(() => {
     if (items.length === 0) return;
     const unsorted = items.filter(i => i.status === 'unsorted');
-    const pairs: Record<string, string> = {};
+    const pairs: Record<string, string[]> = {};
     for (const a of unsorted) {
-      if (pairs[a.id]) continue;
-      const aMissing = itemMissing[a.id];
       const aPresent = itemPresent[a.id];
+      const aMissing = itemMissing[a.id];
       if (!aMissing || aMissing.length === 0 || !aPresent) continue;
+      const totalComps = a.products?.total_components || 0;
+      if (totalComps === 0) continue;
       for (const b of unsorted) {
-        if (a.id === b.id || a.product_id !== b.product_id || pairs[b.id]) continue;
+        if (a.id === b.id || a.product_id !== b.product_id) continue;
         const bPresent = itemPresent[b.id];
         if (!bPresent) continue;
-        // Check if b has all components that a is missing (by name matching via component_id)
-        const allPresent = new Set([...(aPresent || []), ...(bPresent || [])]);
-        const totalComps = a.products?.total_components || 0;
-        if (totalComps > 0 && allPresent.size >= totalComps) {
-          pairs[a.id] = b.id;
-          pairs[b.id] = a.id;
+        const union = new Set([...aPresent, ...bPresent]);
+        if (union.size >= totalComps) {
+          if (!pairs[a.id]) pairs[a.id] = [];
+          if (!pairs[a.id].includes(b.id)) pairs[a.id].push(b.id);
         }
       }
     }
@@ -437,12 +486,12 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
   };
 
   const updateComponentStatuses = async (inventoryItemId: string) => {
-    await new Promise(r => setTimeout(r, 500)); // wait for trigger to create item_components
+    await new Promise(r => setTimeout(r, 500));
     const { data: itemComps } = await supabase.from('item_components').select('*').eq('inventory_item_id', inventoryItemId);
     if (itemComps) {
       for (const ic of itemComps) {
-        const isMissing = missingComps.has(ic.component_id);
-        await supabase.from('item_components').update({ status: isMissing ? 'missing' : 'present' }).eq('id', ic.id);
+        const status = damagedComps.has(ic.component_id) ? 'damaged' : missingComps.has(ic.component_id) ? 'missing' : 'present';
+        await supabase.from('item_components').update({ status }).eq('id', ic.id);
       }
     }
   };
@@ -510,7 +559,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
     if (selected) {
       const { error } = await supabase.from('inventory_items').update(form).eq('id', selected.id);
       if (error) { addToast(error.message, 'error'); return; }
-      if (form.status === 'unsorted') await updateComponentStatuses(selected.id);
+      if (form.status === 'unsorted' || form.status === 'damaged') await updateComponentStatuses(selected.id);
       savedItemId = selected.id;
       addToast('Updated!', 'success');
     } else {
@@ -519,7 +568,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
       const insertData = { ...form, batch_number: uniqueId, reported_by: profile?.id };
       const { data, error } = await supabase.from('inventory_items').insert(insertData).select().single();
       if (error || !data) { addToast(error?.message || 'Error', 'error'); return; }
-      if (form.status === 'unsorted') await updateComponentStatuses(data.id);
+      if (form.status === 'unsorted' || form.status === 'damaged') await updateComponentStatuses(data.id);
       savedItemId = data.id;
       addToast(`Item added! ID: ${uniqueId}`, 'success');
     }
@@ -539,7 +588,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
     const savedProductId = form.product_id;
     const savedStatus = form.status;
     const hadMissing = missingComps.size > 0;
-    setShowModal(false); setSelected(null); setForm({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatComps([]); setMissingComps(new Set()); setTagInput(''); fetchData();
+    setShowModal(false); setSelected(null); setForm({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); fetchData();
 
     // Check for pair matches after save (only for unsorted items with missing components)
     if (savedStatus === 'unsorted' && hadMissing) {
@@ -554,9 +603,9 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
     const { data: cc } = await supabase.from('components').select('*').eq('product_id', item.product_id);
     setCatComps(cc || []);
     const { data: ic } = await supabase.from('item_components').select('*').eq('inventory_item_id', item.id);
-    const missing = new Set<string>();
-    if (ic) ic.forEach((c: any) => { if (c.status === 'missing') missing.add(c.component_id); });
-    setMissingComps(missing);
+    const missing = new Set<string>(); const damaged = new Set<string>();
+    if (ic) ic.forEach((c: any) => { if (c.status === 'missing') missing.add(c.component_id); if (c.status === 'damaged') damaged.add(c.component_id); });
+    setMissingComps(missing); setDamagedComps(damaged);
     setTagInput((itemTags[item.id] || []).map((t: any) => t?.name).filter(Boolean).join(', '));
     setShowModal(true);
   };
@@ -587,8 +636,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
   };
 
   const handleComplete = async (itemId: string, pairId: string) => {
-    await supabase.from('inventory_items').update({ status: 'completed' }).eq('id', itemId);
-    await supabase.from('inventory_items').update({ status: 'completed' }).eq('id', pairId);
+    await supabase.from('inventory_items').update({ status: 'completed' }).in('id', [itemId, pairId]);
     addToast('Both items marked as Completed!', 'success');
     setShowCompleteModal(null);
     fetchData();
@@ -621,7 +669,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
     <div className="page-pad" style={{ padding: '16px 18px', animation: 'fi .15s ease' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Inventory</span><span style={{ fontSize: 12, fontWeight: 500, color: T.tx3, marginLeft: 10 }}>{filtered.length !== items.length ? `${filtered.length} of ` : ''}{items.length} item{items.length !== 1 ? 's' : ''}</span></div>
-        {canEdit && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
+        {canEdit && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
       </div>
       <div className="filter-bar" style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, SKU code, location, notes..." style={{ ...S.fInput, flex: 1, minWidth: 180, padding: '7px 10px' }} />
@@ -636,9 +684,10 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
       <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
         <div className="table-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
-          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Location', 'Tags', 'Notes', 'Status', 'Missing Parts', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
+          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Location', 'Tags', 'Notes', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
           <tbody>{filtered.map((item) => {
             const missing = itemMissing[item.id] || [];
+            const damaged = itemDamaged[item.id] || [];
             return (<tr key={item.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
             <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 11, color: T.gr, whiteSpace: 'nowrap' }}>{item.batch_number || '—'}</td>
             <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 12 }}>{item.serial_number || '—'}</td>
@@ -647,11 +696,11 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
             <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 500, background: 'rgba(139,92,246,.12)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 12 }}>—</span>}</div></td>
             <td style={{ ...S.tdStyle, fontSize: 12, maxWidth: 160 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 30 ? item.notes.slice(0, 30) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
             <td style={S.tdStyle}><span style={statusTag(item.status)}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></td>
-            <td style={S.tdStyle}>{missing.length > 0 ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{missing.map((name, i) => <span key={i} style={{ padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 500, background: 'rgba(245,166,35,.12)', color: T.yl }}>{name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 12 }}>{item.status === 'complete' ? 'All present' : '—'}</span>}</td>
+            <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(251,191,36,.1)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(248,113,113,.1)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 12 }}>{item.status === 'completed' || item.status === 'complete' ? 'All good' : '—'}</span>}</td>
             <td style={S.tdStyle}>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 <span onClick={() => openComps(item)} style={{ ...S.btnPrimary, ...S.btnSm }}>View</span>
-                {completablePairs[item.id] && <span onClick={() => setShowCompleteModal({ itemId: item.id, pairId: completablePairs[item.id] })} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: 'rgba(16,185,129,.15)', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' as const }}>Complete</span>}
+                {completablePairs[item.id]?.length > 0 && <span onClick={() => setShowCompleteModal({ itemId: item.id })} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: 'rgba(16,185,129,.15)', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' as const }}>Complete ({completablePairs[item.id].length})</span>}
                 {item.batch_number && <span onClick={() => printBarcode(item.batch_number)} style={{ ...S.btnGhost, ...S.btnSm }}>Barcode</span>}
                 {canEdit && <span onClick={() => openEdit(item)} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>}
                 {canEdit && <span onClick={() => handleDelete(item.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Del</span>}
@@ -663,7 +712,36 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
         {filtered.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{hasActiveFilters ? 'No items match your filters' : 'No items yet'}</div>}
       </div>
 
-      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>Category *</label><input value={catSearch} onChange={(e) => { setCatSearch(e.target.value); setShowCatDrop(true); setForm({ ...form, product_id: '' }); }} onFocus={() => setShowCatDrop(true)} placeholder="Type to search categories by name or SKU..." style={S.fInput} autoComplete="off" /><input type="hidden" value={form.product_id} required />{form.product_id && <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: T.r, background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.25)', fontSize: 12, color: T.ac2 }}>{products.find(p => p.id === form.product_id)?.name} <span style={{ fontFamily: T.mono, opacity: 0.7 }}>{products.find(p => p.id === form.product_id)?.sku}</span><span onClick={() => { setForm({ ...form, product_id: '' }); setCatSearch(''); }} style={{ cursor: 'pointer', marginLeft: 4, opacity: 0.6 }}>✕</span></div>}{showCatDrop && !form.product_id && (() => { const q = catSearch.toLowerCase(); const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))); return filtered.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)' }}>{filtered.map(p => <div key={p.id} onClick={() => { setForm({ ...form, product_id: p.id }); setCatSearch(p.name); setShowCatDrop(false); supabase.from('components').select('*').eq('product_id', p.id).then(({ data }) => { setCatComps(data || []); setMissingComps(new Set()); }); }} style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}><span style={{ fontSize: 13, color: T.tx }}>{p.name}</span><span style={{ fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{p.sku}</span></div>)}</div> : catSearch ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '12px 14px', fontSize: 12, color: T.tx3, zIndex: 10 }}>No categories found</div> : null; })()}</div><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>SKU Code</label><input value={form.serial_number} onChange={(e) => { setForm({ ...form, serial_number: e.target.value }); setShowSkuDrop(true); }} onFocus={() => setShowSkuDrop(true)} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. LC-001-A" style={{ ...S.fInput, fontFamily: T.mono }} autoComplete="off" />{showSkuDrop && form.serial_number && (() => { const q = form.serial_number.toLowerCase(); const existing = [...new Set(items.map(i => i.serial_number).filter(Boolean))]; const matches = existing.filter(s => s.toLowerCase().includes(q) && s !== form.serial_number); return matches.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 140, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 20px rgba(0,0,0,.3)' }}>{matches.slice(0, 8).map(s => <div key={s} onMouseDown={() => { setForm({ ...form, serial_number: s }); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{s}</div>)}</div> : null; })()}</div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option><option value="completed">Completed</option></select></div><div><label style={S.fLabel}>Location</label><select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={S.fInput}><option value="">Select location</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div></div>{form.status === 'unsorted' && catComps.length > 0 && <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Missing Components <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(select which are missing)</span></label><div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 10 }}>{catComps.map(c => { const isMissing = missingComps.has(c.id); return <div key={c.id} onClick={() => { const next = new Set(missingComps); if (isMissing) next.delete(c.id); else next.add(c.id); setMissingComps(next); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: T.r, cursor: 'pointer', marginBottom: 4, background: isMissing ? 'rgba(245,166,35,.08)' : 'transparent', border: `1px solid ${isMissing ? 'rgba(245,166,35,.3)' : 'transparent'}`, transition: 'all .12s' }}><div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isMissing ? T.yl : T.bd2}`, background: isMissing ? T.yl : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#000', fontWeight: 700, flexShrink: 0 }}>{isMissing && '✓'}</div><span style={{ fontSize: 13, color: isMissing ? T.yl : T.tx }}>{c.name}</span>{isMissing && <span style={{ fontSize: 10, color: T.yl, marginLeft: 'auto', fontWeight: 600 }}>MISSING</span>}</div>; })}</div>{missingComps.size > 0 && missingComps.size === catComps.length && <p style={{ fontSize: 12, color: T.re, marginTop: 6, background: 'rgba(245,87,92,.08)', border: '1px solid rgba(245,87,92,.2)', borderRadius: T.r, padding: '8px 12px' }}>All components are missing. This means the entire product is missing, not unsorted. Change status to "Damaged" or remove some selections.</p>}{missingComps.size > 0 && missingComps.size < catComps.length && <p style={{ fontSize: 11, color: T.yl, marginTop: 6 }}>{missingComps.size} of {catComps.length} component{missingComps.size > 1 ? 's' : ''} missing</p>}</div>}<div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Order ID</label><input value={form.order_id} onChange={(e) => setForm({ ...form, order_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Marketplace</label><select value={form.marketplace} onChange={(e) => setForm({ ...form, marketplace: e.target.value })} style={S.fInput}><option value="">Select</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select></div></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Ticket ID</label><input value={form.ticket_id} onChange={(e) => setForm({ ...form, ticket_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Link</label><input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="Optional URL" style={S.fInput} /></div></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Tags <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(comma separated)</span></label><input value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="e.g. urgent, wedding" style={S.fInput} /></div><div><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
+      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>Category *</label><input value={catSearch} onChange={(e) => { setCatSearch(e.target.value); setShowCatDrop(true); setForm({ ...form, product_id: '' }); }} onFocus={() => setShowCatDrop(true)} placeholder="Type to search categories by name or SKU..." style={S.fInput} autoComplete="off" /><input type="hidden" value={form.product_id} required />{form.product_id && <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: T.r, background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.25)', fontSize: 12, color: T.ac2 }}>{products.find(p => p.id === form.product_id)?.name} <span style={{ fontFamily: T.mono, opacity: 0.7 }}>{products.find(p => p.id === form.product_id)?.sku}</span><span onClick={() => { setForm({ ...form, product_id: '' }); setCatSearch(''); }} style={{ cursor: 'pointer', marginLeft: 4, opacity: 0.6 }}>✕</span></div>}{showCatDrop && !form.product_id && (() => { const q = catSearch.toLowerCase(); const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))); return filtered.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)' }}>{filtered.map(p => <div key={p.id} onClick={() => { setForm({ ...form, product_id: p.id }); setCatSearch(p.name); setShowCatDrop(false); supabase.from('components').select('*').eq('product_id', p.id).then(({ data }) => { setCatComps(data || []); setMissingComps(new Set()); setDamagedComps(new Set()); }); }} style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}><span style={{ fontSize: 13, color: T.tx }}>{p.name}</span><span style={{ fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{p.sku}</span></div>)}</div> : catSearch ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '12px 14px', fontSize: 12, color: T.tx3, zIndex: 10 }}>No categories found</div> : null; })()}</div><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>SKU Code</label><input value={form.serial_number} onChange={(e) => { setForm({ ...form, serial_number: e.target.value }); setShowSkuDrop(true); }} onFocus={() => setShowSkuDrop(true)} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. LC-001-A" style={{ ...S.fInput, fontFamily: T.mono }} autoComplete="off" />{showSkuDrop && form.serial_number && (() => { const q = form.serial_number.toLowerCase(); const existing = [...new Set(items.map(i => i.serial_number).filter(Boolean))]; const matches = existing.filter(s => s.toLowerCase().includes(q) && s !== form.serial_number); return matches.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 140, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 20px rgba(0,0,0,.3)' }}>{matches.slice(0, 8).map(s => <div key={s} onMouseDown={() => { setForm({ ...form, serial_number: s }); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{s}</div>)}</div> : null; })()}</div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option><option value="completed">Completed</option></select></div><div><label style={S.fLabel}>Location</label><select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={S.fInput}><option value="">Select location</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div></div>{(form.status === 'unsorted' || form.status === 'damaged') && catComps.length > 0 && <div style={{ marginBottom: 14 }}>
+  <label style={S.fLabel}>Component Status <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(click to toggle: Present → Missing → Damaged)</span></label>
+  {form.status === 'damaged' && <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+    <span onClick={() => { setDamagedComps(new Set(catComps.map((c: any) => c.id))); setMissingComps(new Set()); }} style={{ ...S.btnDanger, fontSize: 10, padding: '3px 10px', cursor: 'pointer' }}>Mark All Damaged</span>
+    <span onClick={() => { setDamagedComps(new Set()); setMissingComps(new Set()); }} style={{ ...S.btnGhost, fontSize: 10, padding: '3px 10px' }}>Reset All</span>
+  </div>}
+  <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 8 }}>{catComps.map(c => {
+    const isMissing = missingComps.has(c.id);
+    const isDamaged = damagedComps.has(c.id);
+    const state = isDamaged ? 'damaged' : isMissing ? 'missing' : 'present';
+    const cycle = () => {
+      const m = new Set(missingComps); const d = new Set(damagedComps);
+      if (state === 'present') { m.add(c.id); d.delete(c.id); }
+      else if (state === 'missing') { m.delete(c.id); d.add(c.id); }
+      else { m.delete(c.id); d.delete(c.id); }
+      setMissingComps(m); setDamagedComps(d);
+    };
+    const bg = isDamaged ? 'rgba(248,113,113,.08)' : isMissing ? 'rgba(251,191,36,.08)' : 'transparent';
+    const bdr = isDamaged ? 'rgba(248,113,113,.3)' : isMissing ? 'rgba(251,191,36,.3)' : 'transparent';
+    const clr = isDamaged ? T.re : isMissing ? T.yl : T.gr;
+    return <div key={c.id} onClick={cycle} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 3, background: bg, border: `1px solid ${bdr}`, transition: 'all .12s' }}>
+      <div style={{ width: 8, height: 8, borderRadius: '50%', background: clr, flexShrink: 0 }} />
+      <span style={{ fontSize: 12, color: state === 'present' ? T.tx : clr, flex: 1 }}>{c.name}</span>
+      <span style={{ fontSize: 10, fontWeight: 600, color: clr, textTransform: 'uppercase' as const }}>{state}</span>
+    </div>;
+  })}</div>
+  {missingComps.size > 0 && <p style={{ fontSize: 10, color: T.yl, marginTop: 5 }}>{missingComps.size} missing</p>}
+  {damagedComps.size > 0 && <p style={{ fontSize: 10, color: T.re, marginTop: 3 }}>{damagedComps.size} damaged</p>}
+  {form.status === 'unsorted' && missingComps.size === catComps.length && damagedComps.size === 0 && <p style={{ fontSize: 11, color: T.re, marginTop: 5, background: 'rgba(248,113,113,.06)', border: '1px solid rgba(248,113,113,.15)', borderRadius: 6, padding: '6px 10px' }}>All missing — change status to "Damaged" or deselect some.</p>}
+</div>}<div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Order ID</label><input value={form.order_id} onChange={(e) => setForm({ ...form, order_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Marketplace</label><select value={form.marketplace} onChange={(e) => setForm({ ...form, marketplace: e.target.value })} style={S.fInput}><option value="">Select</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select></div></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Ticket ID</label><input value={form.ticket_id} onChange={(e) => setForm({ ...form, ticket_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Link</label><input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="Optional URL" style={S.fInput} /></div></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Tags <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(comma separated)</span></label><input value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="e.g. urgent, wedding" style={S.fInput} /></div><div><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
 
       {showCompModal && selected && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 580 }}><div style={S.modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected.products?.name}</span><div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center', flexWrap: 'wrap' }}><span style={{ fontSize: 11, fontFamily: T.mono, color: T.gr }}>{selected.batch_number}</span>{selected.serial_number && <span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2 }}>{selected.serial_number}</span>}<span style={statusTag(selected.status)}>{selected.status}</span>{selected.batch_number && <span onClick={() => printBarcode(selected.batch_number)} style={{ ...S.btnGhost, padding: '2px 8px', fontSize: 10 }}>Print Barcode</span>}</div>{selected.order_id && <p style={{ margin: '4px 0 0', fontSize: 11, color: T.tx3 }}>Order: {selected.order_id}{selected.marketplace ? ` | ${selected.marketplace}` : ''}</p>}{selected.ticket_id && <p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3 }}>Ticket: {selected.ticket_id}</p>}{selected.link && <a href={selected.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: T.ac, marginTop: 2, display: 'block' }}>Open Link</a>}</div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>
         <p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 8 }}>Components</p>
@@ -698,39 +776,59 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
 
       {showCompleteModal && (() => {
         const itemA = items.find(i => i.id === showCompleteModal.itemId);
-        const itemB = items.find(i => i.id === showCompleteModal.pairId);
-        if (!itemA || !itemB) return null;
+        if (!itemA) return null;
         const missingA = itemMissing[itemA.id] || [];
-        const missingB = itemMissing[itemB.id] || [];
-        return (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 520 }}>
+        const pairIds = completablePairs[itemA.id] || [];
+        const pairItems = pairIds.map(pid => items.find(i => i.id === pid)).filter(Boolean);
+        const selectedPair = showCompleteModal.pairId ? items.find(i => i.id === showCompleteModal.pairId) : null;
+
+        return (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 540 }}>
           <div style={{ ...S.modalHead, background: 'rgba(16,185,129,.06)', borderBottom: '1px solid rgba(16,185,129,.2)' }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: '#10b981' }}>Complete Product</span>
             <span onClick={() => setShowCompleteModal(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
           </div>
           <div style={{ padding: 18 }}>
-            <p style={{ fontSize: 13, color: T.tx, marginBottom: 14 }}>These two items together have all components of <strong>{itemA.products?.name}</strong>. Mark both as <strong style={{ color: '#10b981' }}>Completed</strong>?</p>
-            <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-              <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 12 }}>
-                <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Item 1</p>
-                <p style={{ fontSize: 11, fontFamily: T.mono, color: T.gr, margin: '0 0 4px' }}>{itemA.batch_number || '—'}</p>
-                {itemA.serial_number && <p style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2, margin: '0 0 6px' }}>{itemA.serial_number}</p>}
-                <p style={{ fontSize: 10, color: T.tx3, margin: '0 0 3px' }}>Has: {missingA.length === 0 ? 'All' : `${(itemA.products?.total_components || 0) - missingA.length} parts`}</p>
-                {missingA.length > 0 && <p style={{ fontSize: 10, color: T.yl, margin: 0 }}>Missing: {missingA.join(', ')}</p>}
+            {/* Current item */}
+            <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 12, marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>This Item</span>
+                <span style={{ fontSize: 11, fontFamily: T.mono, color: T.gr }}>{itemA.batch_number}</span>
               </div>
-              <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 12 }}>
-                <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Item 2</p>
-                <p style={{ fontSize: 11, fontFamily: T.mono, color: T.gr, margin: '0 0 4px' }}>{itemB.batch_number || '—'}</p>
-                {itemB.serial_number && <p style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2, margin: '0 0 6px' }}>{itemB.serial_number}</p>}
-                <p style={{ fontSize: 10, color: T.tx3, margin: '0 0 3px' }}>Has: {missingB.length === 0 ? 'All' : `${(itemB.products?.total_components || 0) - missingB.length} parts`}</p>
-                {missingB.length > 0 && <p style={{ fontSize: 10, color: T.yl, margin: 0 }}>Missing: {missingB.join(', ')}</p>}
+              <p style={{ fontSize: 13, fontWeight: 600, color: T.tx, margin: '0 0 4px' }}>{itemA.products?.name} {itemA.serial_number && <span style={{ fontFamily: T.mono, color: T.ac2, fontWeight: 400 }}>({itemA.serial_number})</span>}</p>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {missingA.map(name => <span key={name} style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(251,191,36,.12)', color: T.yl }}>{name} missing</span>)}
               </div>
             </div>
-            <div style={{ background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.15)', borderRadius: T.r, padding: '10px 14px', fontSize: 12, color: '#10b981', textAlign: 'center', marginBottom: 14 }}>
-              Combined = <strong>Complete {itemA.products?.name}</strong>
+
+            {/* Pair selection */}
+            <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 8 }}>Select item to combine with ({pairItems.length} available)</p>
+            <div style={{ maxHeight: 220, overflowY: 'auto', marginBottom: 14 }}>
+              {pairItems.map((b: any) => {
+                const missingB = itemMissing[b.id] || [];
+                const isSelected = showCompleteModal.pairId === b.id;
+                return <div key={b.id} onClick={() => setShowCompleteModal({ ...showCompleteModal, pairId: b.id })} style={{ background: isSelected ? 'rgba(16,185,129,.08)' : T.s2, border: `1px solid ${isSelected ? 'rgba(16,185,129,.4)' : T.bd}`, borderRadius: T.r, padding: 12, marginBottom: 6, cursor: 'pointer', transition: 'all .15s' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isSelected ? '#10b981' : T.bd2}`, background: isSelected ? '#10b981' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 700, flexShrink: 0 }}>{isSelected && '✓'}</div>
+                      <span style={{ fontSize: 11, fontFamily: T.mono, color: T.gr }}>{b.batch_number}</span>
+                      {b.serial_number && <span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2 }}>{b.serial_number}</span>}
+                    </div>
+                    {b.location && <span style={{ fontSize: 10, color: T.tx3 }}>{b.location}</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginLeft: 26 }}>
+                    {missingB.length > 0
+                      ? missingB.map(name => <span key={name} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, background: 'rgba(251,191,36,.1)', color: T.yl }}>{name} missing</span>)
+                      : <span style={{ fontSize: 10, color: T.gr }}>All components present</span>
+                    }
+                  </div>
+                  {isSelected && <div style={{ marginLeft: 26, marginTop: 6, fontSize: 11, color: '#10b981' }}>Combined = <strong>Complete {itemA.products?.name}</strong></div>}
+                </div>;
+              })}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span onClick={() => setShowCompleteModal(null)} style={S.btnGhost}>Cancel</span>
-              <span onClick={() => handleComplete(showCompleteModal.itemId, showCompleteModal.pairId)} style={{ ...S.btnPrimary, background: 'linear-gradient(135deg, #10b981, #34d399)', boxShadow: '0 2px 8px rgba(16,185,129,.25)' }}>Mark as Completed</span>
+              <span onClick={() => { if (showCompleteModal.pairId) handleComplete(showCompleteModal.itemId, showCompleteModal.pairId); else addToast('Select an item to combine with', 'error'); }} style={{ ...S.btnPrimary, background: selectedPair ? 'linear-gradient(135deg, #10b981, #34d399)' : T.bd2, boxShadow: selectedPair ? '0 2px 8px rgba(16,185,129,.25)' : 'none', opacity: selectedPair ? 1 : 0.5 }}>Mark as Completed</span>
             </div>
           </div>
         </div></div>);
@@ -1082,12 +1180,35 @@ const MainApp = () => {
   const [tab, setTab] = useState('dashboard');
   const [globalSearch, setGlobalSearch] = useState('');
   const [notifItemId, setNotifItemId] = useState<string | null>(null);
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const { addToast } = useNotifications();
   const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', categories: 'Categories', locations: 'Locations', reports: 'Damage Reports', users: 'User Management' };
   const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
-  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflow: 'hidden' }}><Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); }} /><div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}><Header title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} /><main style={{ flex: 1, overflow: 'auto' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} />}{tab === 'categories' && <Categories />}{tab === 'locations' && <Locations />}{tab === 'reports' && <Reports />}{tab === 'users' && <Users />}</main></div><ToastContainer /></div>);
+  const handleScan = async (code: string) => {
+    const { data } = await supabase.from('inventory_items').select('id').eq('batch_number', code).maybeSingle();
+    if (data) { setTab('inventory'); setNotifItemId(data.id); }
+    else addToast(`No item found for: ${code}`, 'error');
+  };
+  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflow: 'hidden' }}>
+    <Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} />
+    {/* Mobile menu overlay */}
+    {mobileMenu && <div className="mobile-menu-overlay" onClick={() => setMobileMenu(false)} style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 99 }} />}
+    {mobileMenu && <div className="mobile-menu-sidebar" style={{ display: 'none', position: 'fixed', top: 0, left: 0, width: 240, height: '100vh', zIndex: 101 }}>
+      <Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} />
+    </div>}
+    <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
+      {/* Mobile hamburger */}
+      <div className="mobile-hamburger" onClick={() => setMobileMenu(!mobileMenu)} style={{ display: 'none', position: 'fixed', top: 10, left: 10, zIndex: 102, padding: '6px 8px', borderRadius: 6, background: T.s, border: `1px solid ${T.bd}`, cursor: 'pointer' }}>
+        <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: 'none', stroke: T.tx, strokeWidth: 2 }}><path d="M3 12h18M3 6h18M3 18h18" /></svg>
+      </div>
+      <Header title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} onScan={handleScan} />
+      <main style={{ flex: 1, overflow: 'auto' }}>{tab === 'dashboard' && <Dashboard />}{tab === 'inventory' && <Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} />}{tab === 'categories' && <Categories />}{tab === 'locations' && <Locations />}{tab === 'reports' && <Reports />}{tab === 'users' && <Users />}</main>
+    </div>
+    <ToastContainer />
+  </div>);
 };
 
 export default function App() { return <AuthProvider><AppContent /></AuthProvider>; }
