@@ -27,22 +27,22 @@ const T = {
   tx: '#eaf0f6', tx2: '#8899b4', tx3: '#4f6080',
   ac: '#8b5cf6', ac2: '#a78bfa',
   gr: '#34d399', re: '#f87171', bl: '#60a5fa', yl: '#fbbf24',
-  r: 8, mono: "'IBM Plex Mono', monospace", sans: "'IBM Plex Sans', sans-serif",
+  r: 8, mono: "'JetBrains Mono', monospace", sans: "'Inter', sans-serif",
 };
 
 // Shared styles
 const S = {
-  fLabel: { fontSize: 10, color: T.tx3, marginBottom: 5, textTransform: 'uppercase' as const, letterSpacing: 1.2, display: 'block', fontWeight: 600 } as React.CSSProperties,
-  fInput: { width: '100%', background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: T.r, color: T.tx, fontFamily: T.sans, fontSize: 13, padding: '8px 12px', outline: 'none', transition: 'border-color .2s, box-shadow .2s' } as React.CSSProperties,
-  btnPrimary: { padding: '7px 16px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: T.sans, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 5, letterSpacing: 0.2, boxShadow: '0 2px 8px rgba(139,92,246,.2)', whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  btnGhost: { padding: '7px 14px', borderRadius: T.r, border: `1px solid ${T.bd2}`, cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: T.sans, background: 'transparent', color: T.tx2, display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  btnDanger: { padding: '5px 12px', borderRadius: T.r, border: '1px solid rgba(248,113,113,.2)', cursor: 'pointer', fontSize: 11, fontWeight: 500, fontFamily: T.sans, background: 'rgba(248,113,113,.06)', color: T.re, whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  btnSm: { padding: '4px 10px', fontSize: 11 } as React.CSSProperties,
-  modalOverlay: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(6px)', padding: 8 } as React.CSSProperties,
-  modalBox: { background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 14, width: 500, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' as const, boxShadow: '0 20px 50px rgba(0,0,0,.5)' } as React.CSSProperties,
-  modalHead: { padding: '14px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
-  thStyle: { fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, padding: '9px 12px', textAlign: 'left' as const, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: T.s2, whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  tdStyle: { padding: '9px 12px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx } as React.CSSProperties,
+  fLabel: { fontSize: 11, color: T.tx3, marginBottom: 4, display: 'block', fontWeight: 500 } as React.CSSProperties,
+  fInput: { width: '100%', background: 'rgba(26,31,46,.8)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '7px 10px', outline: 'none', transition: 'border-color .2s, box-shadow .2s' } as React.CSSProperties,
+  btnPrimary: { padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 4, letterSpacing: 0.2, backdropFilter: 'blur(4px)', whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  btnGhost: { padding: '5px 12px', borderRadius: 6, border: `1px solid ${T.bd2}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, fontFamily: T.sans, background: 'rgba(26,31,46,.5)', backdropFilter: 'blur(4px)', color: T.tx2, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  btnDanger: { padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(248,113,113,.15)', cursor: 'pointer', fontSize: 10, fontWeight: 500, fontFamily: T.sans, background: 'rgba(248,113,113,.06)', backdropFilter: 'blur(4px)', color: T.re, whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  btnSm: { padding: '3px 8px', fontSize: 10 } as React.CSSProperties,
+  modalOverlay: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(8px)', padding: 8 } as React.CSSProperties,
+  modalBox: { background: 'rgba(18,22,31,.95)', border: `1px solid ${T.bd2}`, borderRadius: 12, width: 480, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' as const, boxShadow: '0 16px 48px rgba(0,0,0,.5)', backdropFilter: 'blur(12px)' } as React.CSSProperties,
+  modalHead: { padding: '12px 16px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
+  thStyle: { fontSize: 10, color: T.tx3, padding: '8px 10px', textAlign: 'left' as const, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: T.s2, whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  tdStyle: { padding: '8px 10px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx } as React.CSSProperties,
 };
 
 const AuthContext = createContext<any>(null);
@@ -494,25 +494,34 @@ const Dashboard = () => {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const [stats, setStats] = useState<any>({ total_products: 0, total_inventory: 0, damaged_count: 0, unsorted_count: 0, complete_count: 0, open_reports: 0 });
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [newTask, setNewTask] = useState('');
   const refreshStats = () => { supabase.from('dashboard_summary').select('*').limit(1).then(({ data }) => { if (data && data[0]) setStats(data[0]); }); };
+  const fetchTasks = () => { supabase.from('tasks').select('*').order('created_at', { ascending: false }).then(({ data }) => setTasks(data || [])); };
+
   useEffect(() => {
-    refreshStats();
+    refreshStats(); fetchTasks();
     const ch = supabase.channel('dash-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, refreshStats)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, refreshStats)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'damage_reports' }, refreshStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, fetchTasks)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, []);
 
+  const addTask = async (e: React.FormEvent) => { e.preventDefault(); if (!newTask.trim()) return; await supabase.from('tasks').insert({ title: newTask.trim(), created_by: profile?.id }); setNewTask(''); fetchTasks(); };
+  const toggleTask = async (id: string, done: boolean) => { await supabase.from('tasks').update({ is_done: !done }).eq('id', id); fetchTasks(); };
+  const deleteTask = async (id: string) => { await supabase.from('tasks').delete().eq('id', id); fetchTasks(); };
+
   const cards = [
-    { label: 'CATEGORIES', value: stats.total_products, color: T.ac },
-    { label: 'TOTAL ITEMS', value: stats.total_inventory, color: T.bl },
-    { label: 'UNSORTED', value: stats.unsorted_count, color: T.yl },
-    { label: 'DAMAGED', value: stats.damaged_count, color: T.re },
-    { label: 'DRY CLEAN', value: stats.dry_clean_count || 0, color: '#06b6d4' },
-    { label: 'COMPLETE', value: stats.complete_count, color: T.gr },
-    { label: 'COMPLETED', value: stats.completed_count || 0, color: '#10b981' },
+    { label: 'Categories', value: stats.total_products, color: T.ac },
+    { label: 'Total items', value: stats.total_inventory, color: T.bl },
+    { label: 'Unsorted', value: stats.unsorted_count, color: T.yl },
+    { label: 'Damaged', value: stats.damaged_count, color: T.re },
+    { label: 'Dry clean', value: stats.dry_clean_count || 0, color: '#06b6d4' },
+    { label: 'Complete', value: stats.complete_count, color: T.gr },
+    { label: 'Completed', value: stats.completed_count || 0, color: '#10b981' },
   ];
 
   return (
@@ -525,10 +534,31 @@ const Dashboard = () => {
         {cards.map((c, i) => (
           <div key={i} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 12, padding: '18px 20px', transition: 'transform .2s, box-shadow .2s', cursor: 'default', position: 'relative', overflow: 'hidden' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 24px ${c.color}15`; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${c.color}, ${c.color}66)` }} />
-            <p style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1.2, marginBottom: 8, fontWeight: 500 }}>{c.label}</p>
-            <p style={{ fontFamily: T.mono, fontSize: 28, fontWeight: 700, color: c.color, margin: 0, letterSpacing: -1 }}>{c.value}</p>
+            <p style={{ fontSize: 10, color: T.tx3, letterSpacing: 0.5, marginBottom: 6, fontWeight: 500 }}>{c.label}</p>
+            <p style={{ fontFamily: T.mono, fontSize: 26, fontWeight: 700, color: c.color, margin: 0, letterSpacing: -1 }}>{c.value}</p>
           </div>
         ))}
+      </div>
+      {/* Tasker */}
+      <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Tasks</span>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{tasks.filter(t => !t.is_done).length} pending</span>
+        </div>
+        <form onSubmit={addTask} style={{ display: 'flex', gap: 8, padding: '10px 14px', borderBottom: `1px solid ${T.bd}` }}>
+          <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Add a task..." style={{ ...S.fInput, flex: 1 }} />
+          <button type="submit" style={S.btnPrimary}>Add</button>
+        </form>
+        <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+          {tasks.map(t => (
+            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: `1px solid ${T.bd}`, opacity: t.is_done ? 0.5 : 1 }}>
+              <div onClick={() => toggleTask(t.id, t.is_done)} style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${t.is_done ? T.gr : T.bd2}`, background: t.is_done ? T.gr : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#000', fontWeight: 700, flexShrink: 0 }}>{t.is_done && '✓'}</div>
+              <span style={{ flex: 1, fontSize: 12, color: T.tx, textDecoration: t.is_done ? 'line-through' : 'none' }}>{t.title}</span>
+              <span onClick={() => deleteTask(t.id)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 12, opacity: 0.5 }}>×</span>
+            </div>
+          ))}
+          {tasks.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No tasks yet</div>}
+        </div>
       </div>
     </div>
   );
