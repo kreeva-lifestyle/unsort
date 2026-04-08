@@ -394,139 +394,63 @@ export default function BrandTagPrinter() {
   const totalLabels = useMemo(() => rows.reduce((s, r) => s + r.copies, 0), [rows]);
 
   return (
-    <div style={{ fontFamily: T.sans, color: T.tx, minHeight: '100vh' }}>
+    <div style={{ fontFamily: T.sans, color: T.tx }}>
       {/* ── Toolbar ── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <span style={{ fontSize: 16, fontWeight: 700, color: T.tx, marginRight: 8 }}>Brand Tag Printer</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 10 }}>
         <button style={btnPrimary} onClick={openAdd}>+ Add SKU</button>
         <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.2)' }} onClick={printTestLabel}>Test Print</button>
-        <button
-          style={{ ...btnPrimary, background: `linear-gradient(135deg, ${T.gr}cc, ${T.gr}99)` }}
-          onClick={printSelected}
-        >
-          Print Selected
-        </button>
-        <button style={btnGhost} onClick={() => fileRef.current?.click()}>Import Excel</button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".xlsx,.xls,.csv"
-          style={{ display: 'none' }}
-          onChange={handleImport}
-        />
-        <button style={btnGhost} onClick={handleExport}>Export Excel</button>
+        <button style={{ ...btnPrimary, background: `linear-gradient(135deg, ${T.gr}cc, ${T.gr}99)` }} onClick={printSelected}>Print Selected</button>
+        <button style={btnGhost} onClick={() => fileRef.current?.click()}>Import</button>
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
+        <button style={btnGhost} onClick={handleExport}>Export</button>
       </div>
 
-      {/* ── Search + Filters + Select All ── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <input
-          type="text"
-          placeholder="Search brand, SKU, EAN, product..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ ...inp, width: 240, flex: 'none' }}
-        />
-        <select
-          value={brandFilter}
-          onChange={e => setBrandFilter(e.target.value)}
-          style={{ ...inp, width: 130, flex: 'none', cursor: 'pointer' }}
-        >
-          <option value="">All Brands</option>
-          {uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}
-        </select>
-        <select
-          value={sizeFilter}
-          onChange={e => setSizeFilter(e.target.value)}
-          style={{ ...inp, width: 100, flex: 'none', cursor: 'pointer' }}
-        >
-          <option value="">All Sizes</option>
-          {uniqueSizes.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select
-          value={colorFilter}
-          onChange={e => setColorFilter(e.target.value)}
-          style={{ ...inp, width: 120, flex: 'none', cursor: 'pointer' }}
-        >
-          <option value="">All Colors</option>
-          {uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-
-        {/* Select All + Set All Copies */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, color: T.tx2, cursor: 'pointer', userSelect: 'none',
-          }}>
-            <input
-              type="checkbox"
-              checked={selectAll}
-              onChange={e => handleSelectAll(e.target.checked)}
-              style={{ accentColor: T.ac }}
-            />
-            Select All
+      {/* ── Filters ── */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 10, background: T.s, border: `1px solid ${T.bd}`, borderRadius: 8, padding: '8px 10px' }}>
+        <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inp, flex: 1, minWidth: 120 }} />
+        <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} style={{ ...inp, width: 'auto', cursor: 'pointer' }}><option value="">All brands</option>{uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}</select>
+        <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ ...inp, width: 'auto', cursor: 'pointer' }}><option value="">All sizes</option>{uniqueSizes.map(s => <option key={s} value={s}>{s}</option>)}</select>
+        <select value={colorFilter} onChange={e => setColorFilter(e.target.value)} style={{ ...inp, width: 'auto', cursor: 'pointer' }}><option value="">All colors</option>{uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}</select>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: T.tx2, cursor: 'pointer' }}>
+            <input type="checkbox" checked={selectAll} onChange={e => handleSelectAll(e.target.checked)} style={{ accentColor: T.ac }} /> All
           </label>
-          <input
-            type="number"
-            min={0}
-            value={globalCopies}
-            onChange={e => setGlobalCopies(Math.max(0, Number(e.target.value)))}
-            style={{ ...inp, width: 54, flex: 'none', textAlign: 'center', fontFamily: T.mono }}
-          />
-          <button style={{ ...btnGhost, ...btnSm }} onClick={handleSetAllCopies}>Set All Copies</button>
+          <input type="number" min={0} value={globalCopies} onChange={e => setGlobalCopies(Math.max(0, Number(e.target.value)))} style={{ ...inp, width: 40, textAlign: 'center', fontFamily: T.mono, padding: '4px' }} />
+          <button style={btnSm} onClick={handleSetAllCopies}>Set copies</button>
         </div>
       </div>
 
       {/* ── Data Table ── */}
-      <div style={{ overflowX: 'auto', border: `1px solid ${T.bd}`, borderRadius: T.r, background: T.s }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+      <div style={{ overflowX: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8, background: T.s }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, minWidth: 900 }}>
           <thead>
             <tr>
-              {['Brand', 'EAN', 'SKU', 'QTY', 'MRP', 'Size', 'Product', 'Color', 'Jio Code', 'Copies', 'Actions'].map(h => (
+              {['Brand', 'EAN', 'SKU', 'Includes', 'MRP', 'Size', 'Product', 'Color', 'Jio Code', 'Copies', 'Actions'].map(h => (
                 <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr>
-                <td colSpan={11} style={{ ...tdS, textAlign: 'center', color: T.tx3, padding: 24 }}>
-                  No rows found. Add SKUs or import an Excel file.
-                </td>
-              </tr>
+              <tr><td colSpan={11} style={{ ...tdS, textAlign: 'center', color: T.tx3, padding: 24, fontSize: 12 }}>No rows. Import an Excel or add SKUs.</td></tr>
             )}
-            {filtered.map(row => (
-              <tr
-                key={row.id}
-                style={{ transition: 'background .15s' }}
-                onMouseEnter={e => { e.currentTarget.style.background = T.s2; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                <td style={{ ...tdS, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.brand}>
-                  {row.brand}
-                </td>
+            {filtered.map(row => {
+              const brandShort = row.brand.replace(/^BRAND NAME:\s*/i, '').trim();
+              const qtyShort = row.qty.replace(/^INCLUDES:\s*/i, '').trim();
+              const prodShort = row.product.replace(/^PRODUCT DESC:\s*/i, '').trim();
+              return (
+              <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = T.s2; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                <td style={{ ...tdS, fontWeight: 600 }}>{brandShort}</td>
                 <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10 }}>{row.ean}</td>
-                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10, fontWeight: 600 }}>{row.sku}</td>
-                <td style={{ ...tdS, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.qty}>
-                  {row.qty}
-                </td>
-                <td style={{ ...tdS, fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtMrp(row.mrp)}</td>
-                <td style={{ ...tdS, textAlign: 'center' }}>{row.size}</td>
-                <td style={{ ...tdS, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.product}>
-                  {row.product}
-                </td>
+                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10, fontWeight: 600, color: T.ac2 }}>{row.sku}</td>
+                <td style={{ ...tdS, fontSize: 10, maxWidth: 180 }} title={row.qty}>{qtyShort}</td>
+                <td style={{ ...tdS, fontWeight: 600, fontFamily: T.mono, whiteSpace: 'nowrap' }}>{fmtMrp(row.mrp)}</td>
+                <td style={tdS}>{row.size}</td>
+                <td style={{ ...tdS, fontSize: 10 }} title={row.product}>{prodShort}</td>
                 <td style={tdS}>{row.color}</td>
                 <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10 }}>{row.jioCode}</td>
                 <td style={tdS}>
-                  <input
-                    type="number"
-                    min={0}
-                    value={row.copies}
-                    onChange={e => updateCopies(row.id, Number(e.target.value))}
-                    style={{
-                      ...inp, width: 50, textAlign: 'center',
-                      padding: '3px 4px', fontSize: 11, fontFamily: T.mono,
-                    }}
-                  />
+                  <input type="number" min={0} value={row.copies} onChange={e => updateCopies(row.id, Number(e.target.value))} style={{ ...inp, width: 44, textAlign: 'center', padding: '3px', fontSize: 11, fontFamily: T.mono }} />
                 </td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -541,7 +465,8 @@ export default function BrandTagPrinter() {
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
