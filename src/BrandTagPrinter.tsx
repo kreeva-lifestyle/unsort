@@ -271,6 +271,7 @@ const BrandTagModal = ({
 export default function BrandTagPrinter() {
   const [rows, setRows] = useState<BrandTagRow[]>([sampleRow()]);
   const [search, setSearch] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
   const [sizeFilter, setSizeFilter] = useState('');
   const [colorFilter, setColorFilter] = useState('');
   const [modalRow, setModalRow] = useState<BrandTagRow | null>(null);
@@ -294,6 +295,7 @@ export default function BrandTagPrinter() {
   }, [printLabels]);
 
   // Auto-populated filter options
+  const uniqueBrands = useMemo(() => [...new Set(rows.map(r => r.brand.replace(/^BRAND NAME:\s*/i, '').trim()).filter(Boolean))].sort(), [rows]);
   const uniqueSizes = useMemo(() => [...new Set(rows.map(r => r.size).filter(Boolean))].sort(), [rows]);
   const uniqueColors = useMemo(() => [...new Set(rows.map(r => r.color).filter(Boolean))].sort(), [rows]);
 
@@ -303,11 +305,12 @@ export default function BrandTagPrinter() {
     return rows.filter(r => {
       if (q && ![r.brand, r.ean, r.sku, r.product, r.color, r.size, r.jioCode, r.qty]
         .some(v => v.toLowerCase().includes(q))) return false;
+      if (brandFilter && !r.brand.toLowerCase().includes(brandFilter.toLowerCase())) return false;
       if (sizeFilter && r.size !== sizeFilter) return false;
       if (colorFilter && r.color !== colorFilter) return false;
       return true;
     });
-  }, [rows, search, sizeFilter, colorFilter]);
+  }, [rows, search, brandFilter, sizeFilter, colorFilter]);
 
   // ── Import Excel ──
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -498,6 +501,14 @@ export default function BrandTagPrinter() {
           onChange={e => setSearch(e.target.value)}
           style={{ ...inp, width: 240, flex: 'none' }}
         />
+        <select
+          value={brandFilter}
+          onChange={e => setBrandFilter(e.target.value)}
+          style={{ ...inp, width: 130, flex: 'none', cursor: 'pointer' }}
+        >
+          <option value="">All Brands</option>
+          {uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}
+        </select>
         <select
           value={sizeFilter}
           onChange={e => setSizeFilter(e.target.value)}
