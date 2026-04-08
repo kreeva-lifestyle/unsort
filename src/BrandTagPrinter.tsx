@@ -1,216 +1,634 @@
-import { useState, useEffect, useRef } from 'react';
-import * as XLSX from 'xlsx';
+/* eslint-disable */
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import JsBarcode from 'jsbarcode';
+import * as XLSX from 'xlsx';
 
+// ── Design Tokens ──────────────────────────────────────────────────────────────
 const T = {
   bg: '#0a0d14', s: '#12161f', s2: '#1a1f2e', s3: '#232a3b',
   bd: '#1e2536', bd2: '#2d3548',
   tx: '#eaf0f6', tx2: '#8899b4', tx3: '#4f6080',
-  ac: '#8b5cf6', ac2: '#a78bfa', gr: '#34d399', re: '#f87171', bl: '#60a5fa', yl: '#fbbf24',
+  ac: '#8b5cf6', ac2: '#a78bfa',
+  gr: '#34d399', re: '#f87171', bl: '#60a5fa', yl: '#fbbf24',
+  r: 8,
+  mono: "'JetBrains Mono', monospace",
+  sans: "'Inter', sans-serif",
 };
-const btn = (bg: string, color: string, extra?: any) => ({ padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600 as const, fontFamily: "'Inter',sans-serif", background: bg, color, display: 'inline-flex' as const, alignItems: 'center' as const, gap: 4, whiteSpace: 'nowrap' as const, backdropFilter: 'blur(4px)', ...extra });
-const inp = { background: 'rgba(26,31,46,.8)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: "'Inter',sans-serif", fontSize: 12, padding: '6px 10px', outline: 'none' };
 
-interface Row { brand: string; ean: string; sku: string; qty: string; mrp: number; size: string; product: string; color: string; mktd: string; jioCode: string; copies: number; selected: boolean; }
+// ── Reusable style helpers ─────────────────────────────────────────────────────
+const btnBase: React.CSSProperties = {
+  padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+  fontSize: 11, fontWeight: 600, fontFamily: T.sans,
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  whiteSpace: 'nowrap', backdropFilter: 'blur(4px)', letterSpacing: 0.2,
+};
+const btnPrimary: React.CSSProperties = { ...btnBase, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff' };
+const btnGhost: React.CSSProperties = { ...btnBase, fontWeight: 500, background: 'rgba(26,31,46,.5)', border: `1px solid ${T.bd2}`, color: T.tx2 };
+const btnDanger: React.CSSProperties = { ...btnBase, padding: '4px 10px', fontSize: 10, fontWeight: 500, background: 'rgba(248,113,113,.06)', border: '1px solid rgba(248,113,113,.15)', color: T.re };
+const btnSm: React.CSSProperties = { padding: '3px 8px', fontSize: 10 };
+const inp: React.CSSProperties = {
+  background: 'rgba(26,31,46,.8)', border: `1px solid ${T.bd2}`, borderRadius: 6,
+  color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '7px 10px',
+  outline: 'none', boxSizing: 'border-box', transition: 'border-color .2s',
+};
+const thS: React.CSSProperties = {
+  fontSize: 10, color: T.tx3, padding: '8px 10px', textAlign: 'left',
+  fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: T.s2,
+  whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 1,
+};
+const tdS: React.CSSProperties = { padding: '8px 10px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx };
+const fLabel: React.CSSProperties = { fontSize: 11, color: T.tx3, marginBottom: 4, display: 'block', fontWeight: 500 };
 
-const defaultRow: Row = { brand: 'BRAND NAME: TANUKA', ean: '8905738880431', sku: 'TNDRS177-S', qty: 'INCLUDES: 1 U Top, 1 U Bottom, 1 U Dupatta', mrp: 6800, size: 'S', product: 'PRODUCT DESC: Co-ord Set', color: 'Pink', mktd: 'Arya Designs, 16, Amba Bhuvan, Nr. Kasanagar Circle, Opp. Kumar Gurukul Vidhyalaya Katargam, Surat-395004', jioCode: '702342013006', copies: 0, selected: false };
+// ── Types ──────────────────────────────────────────────────────────────────────
+interface BrandTagRow {
+  id: string;
+  brand: string;
+  ean: string;
+  sku: string;
+  qty: string;
+  mrp: number;
+  size: string;
+  product: string;
+  color: string;
+  mktd: string;
+  jioCode: string;
+  copies: number;
+}
 
-const fmtMrp = (v: number) => '₹' + v.toLocaleString('en-IN');
+const uid = (): string => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
-// Label component
-const Label = ({ r }: { r: Row }) => {
+const sampleRow = (): BrandTagRow => ({
+  id: uid(),
+  brand: 'BRAND NAME: TANUKA',
+  ean: '8905738880431',
+  sku: 'TNDRS177-S',
+  qty: 'INCLUDES: 1 U Top, 1 U Bottom, 1 U Dupatta',
+  mrp: 6800,
+  size: 'S',
+  product: 'PRODUCT DESC: Co-ord Set',
+  color: 'Pink',
+  mktd: 'Arya Designs, 16, Amba Bhuvan, Nr. Kasanagar Circle, Opp. Kumar Gurukul Vidhyalaya Katargam, Surat-395004',
+  jioCode: '702342013006',
+  copies: 0,
+});
+
+const blankRow = (): BrandTagRow => ({
+  id: uid(), brand: '', ean: '', sku: '', qty: '', mrp: 0,
+  size: '', product: '', color: '', mktd: '', jioCode: '', copies: 0,
+});
+
+const REQUIRED_FIELDS: (keyof BrandTagRow)[] = ['brand', 'ean', 'sku', 'qty', 'size', 'product', 'color', 'mktd', 'jioCode'];
+const validateRow = (r: BrandTagRow): string | null => {
+  for (const f of REQUIRED_FIELDS) { if (!r[f] || String(r[f]).trim() === '') return f; }
+  if (!r.mrp || r.mrp <= 0) return 'mrp';
+  return null;
+};
+
+const fmtMrp = (v: number): string => '\u20B9' + v.toLocaleString('en-IN');
+
+// ── Print CSS (injected once) ──────────────────────────────────────────────────
+const PRINT_CSS_ID = 'bt-print-css';
+const ensurePrintCSS = () => {
+  if (document.getElementById(PRINT_CSS_ID)) return;
+  const el = document.createElement('style');
+  el.id = PRINT_CSS_ID;
+  el.textContent = `
+@media print {
+  body > *:not(.bt-print-area) { display: none !important; }
+  .bt-print-area { display: block !important; position: static !important; background: #fff !important; }
+  .bt-print-area .bt-label {
+    width: 1.97in; height: 2.95in;
+    page-break-inside: avoid; break-inside: avoid;
+    margin: 0; padding: 0; box-sizing: border-box;
+    transform: none !important;
+  }
+  @page { margin: 0; size: 1.97in 2.95in; }
+}`;
+  document.head.appendChild(el);
+};
+
+// ── Label Component (white bg, for printing) ──────────────────────────────────
+const BrandTagLabel = ({ row }: { row: BrandTagRow }) => {
   const bcRef = useRef<SVGSVGElement>(null);
-  useEffect(() => { if (bcRef.current) try { JsBarcode(bcRef.current, r.jioCode || '0', { format: 'CODE128', width: 1.2, height: 35, displayValue: true, text: r.sku, fontSize: 8, margin: 2, textMargin: 1 }); } catch {} }, [r.jioCode, r.sku]);
+
+  useEffect(() => {
+    if (!bcRef.current || !row.jioCode) return;
+    try {
+      JsBarcode(bcRef.current, row.jioCode, {
+        format: 'CODE128',
+        width: 1,
+        height: 28,
+        displayValue: true,
+        text: row.sku,
+        fontSize: 7,
+        font: 'JetBrains Mono, monospace',
+        margin: 0,
+        textMargin: 1,
+      });
+    } catch (_) { /* invalid barcode value */ }
+  }, [row.jioCode, row.sku]);
+
+  const brandText = row.brand.replace(/^BRAND NAME:\s*/i, '').trim() || row.brand;
+  const productText = row.product.replace(/^PRODUCT DESC:\s*/i, '').trim() || row.product;
+
   return (
-    <div className="bt-label" style={{ width: '2.95in', height: '1.97in', display: 'flex', fontFamily: "'Inter',sans-serif", background: '#fff', color: '#000', overflow: 'hidden', border: '1px solid #ddd', borderRadius: 2, pageBreakInside: 'avoid' as const }}>
-      <div style={{ flex: 1, padding: '6px 8px 4px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
-        <div>
-          <p style={{ margin: 0, fontSize: '9.5pt', fontWeight: 700, lineHeight: 1.2 }}>{r.brand}</p>
-          <p style={{ margin: '2px 0', fontSize: '9pt', fontWeight: 700, lineHeight: 1.2 }}>SKU: {r.sku}</p>
-          <p style={{ margin: '1px 0', fontSize: '8.5pt', lineHeight: 1.2 }}>{r.product}</p>
-          <p style={{ margin: '1px 0', fontSize: '8pt', lineHeight: 1.2, wordBreak: 'break-word' as const }}>{r.qty}</p>
-          <p style={{ margin: '1px 0', fontSize: '8.5pt', lineHeight: 1.2 }}>SIZE: {r.size}</p>
-          <p style={{ margin: '1px 0', fontSize: '8.5pt', lineHeight: 1.2 }}>COLOR: {r.color}</p>
-          <p style={{ margin: '1px 0', fontSize: '9pt', fontWeight: 700, lineHeight: 1.2 }}>MRP: {fmtMrp(r.mrp)}</p>
-          <p style={{ margin: '1px 0', fontSize: '7pt', lineHeight: 1.15, wordBreak: 'break-word' as const, color: '#333' }}>MKTD & DIST. BY: {r.mktd}</p>
-          <p style={{ margin: '1px 0', fontSize: '8pt', lineHeight: 1.2 }}>JIO CODE: {r.jioCode}</p>
+    <div
+      className="bt-label"
+      style={{
+        width: 189, height: 283, display: 'flex', flexDirection: 'row',
+        fontFamily: "'Inter', sans-serif", border: '1px solid #ccc',
+        boxSizing: 'border-box', overflow: 'hidden',
+        background: '#fff', color: '#000',
+      }}
+    >
+      {/* Main content area */}
+      <div style={{
+        flex: 1, padding: '5px 5px 3px 5px',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      }}>
+        <div style={{ fontWeight: 700, fontSize: '7.5pt', lineHeight: 1.25, marginBottom: 1 }}>BRAND NAME: {brandText}</div>
+        <div style={{ fontWeight: 700, fontSize: '7pt', lineHeight: 1.25, fontFamily: T.mono, marginBottom: 1 }}>SKU: {row.sku}</div>
+        <div style={{ fontSize: '6.5pt', lineHeight: 1.2, marginBottom: 1 }}>PRODUCT DESC: {productText}</div>
+        <div style={{ fontSize: '6pt', lineHeight: 1.2, wordWrap: 'break-word', overflowWrap: 'break-word', marginBottom: 1 }}>{row.qty}</div>
+        <div style={{ fontSize: '6.5pt', lineHeight: 1.25, marginBottom: 1 }}>SIZE: {row.size}</div>
+        <div style={{ fontSize: '6.5pt', lineHeight: 1.25, marginBottom: 1 }}>COLOR: {row.color}</div>
+        <div style={{ fontWeight: 700, fontSize: '7pt', lineHeight: 1.25, marginBottom: 1 }}>MRP: {fmtMrp(row.mrp)}</div>
+        <div style={{ fontSize: '5.5pt', lineHeight: 1.15, wordWrap: 'break-word', overflowWrap: 'break-word', marginBottom: 1, color: '#333' }}>
+          MKTD & DIST. BY: {row.mktd}
         </div>
-        <div style={{ textAlign: 'center', marginTop: 2 }}>
-          <svg ref={bcRef} style={{ width: '90%', height: 38 }} />
+        <div style={{ fontSize: '6pt', lineHeight: 1.2, fontFamily: T.mono, marginBottom: 2 }}>JIO CODE: {row.jioCode}</div>
+        <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'center' }}>
+          <svg ref={bcRef} style={{ maxWidth: '95%', height: 32 }} />
         </div>
       </div>
-      <div style={{ width: 38, background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <span style={{ writingMode: 'vertical-rl' as const, transform: 'rotate(180deg)', fontSize: '10pt', fontWeight: 700, letterSpacing: 1, whiteSpace: 'nowrap' as const, color: '#000' }}>EAN: {r.sku}</span>
+      {/* Right EAN strip */}
+      <div style={{
+        width: 28, minWidth: 28, background: '#f0f0f0',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        borderLeft: '1px solid #ddd',
+      }}>
+        <span style={{
+          writingMode: 'vertical-rl' as const,
+          transform: 'rotate(180deg)',
+          whiteSpace: 'nowrap',
+          fontWeight: 700, fontSize: '8pt', fontFamily: T.mono, color: '#333',
+          letterSpacing: 0.5,
+        }}>
+          EAN: {row.sku}
+        </span>
       </div>
     </div>
   );
 };
 
+// ── Add / Edit Modal ───────────────────────────────────────────────────────────
+const MODAL_FIELDS: { key: keyof BrandTagRow; label: string; type?: string; multiline?: boolean }[] = [
+  { key: 'brand', label: 'Brand Name' },
+  { key: 'ean', label: 'EAN' },
+  { key: 'sku', label: 'SKU' },
+  { key: 'product', label: 'Product Description' },
+  { key: 'qty', label: 'Includes / QTY', multiline: true },
+  { key: 'size', label: 'Size' },
+  { key: 'color', label: 'Color' },
+  { key: 'mrp', label: 'MRP', type: 'number' },
+  { key: 'mktd', label: 'MKTD & DIST. BY', multiline: true },
+  { key: 'jioCode', label: 'Jio Code' },
+];
+
+const BrandTagModal = ({
+  title,
+  initial,
+  onSave,
+  onClose,
+}: {
+  title: string;
+  initial: BrandTagRow;
+  onSave: (row: BrandTagRow) => void;
+  onClose: () => void;
+}) => {
+  const [form, setForm] = useState<BrandTagRow>({ ...initial });
+  const set = (k: keyof BrandTagRow, v: string | number) => setForm(p => ({ ...p, [k]: v }));
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 200, backdropFilter: 'blur(8px)', padding: 8,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'rgba(18,22,31,.95)', border: `1px solid ${T.bd2}`,
+          borderRadius: 12, width: 520, maxWidth: '100%', maxHeight: '90vh',
+          overflowY: 'auto', boxShadow: '0 16px 48px rgba(0,0,0,.5)',
+          backdropFilter: 'blur(12px)',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{
+          padding: '12px 16px', borderBottom: `1px solid ${T.bd}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span style={{ color: T.tx, fontSize: 14, fontWeight: 600 }}>{title}</span>
+          <button onClick={onClose} style={{ ...btnGhost, ...btnSm }}>Close</button>
+        </div>
+        {/* Fields */}
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {MODAL_FIELDS.map(f => (
+            <div key={f.key}>
+              <label style={fLabel}>{f.label}</label>
+              {f.multiline ? (
+                <textarea
+                  rows={2}
+                  style={{ ...inp, width: '100%', resize: 'vertical' }}
+                  value={String(form[f.key])}
+                  onChange={e => set(f.key, f.type === 'number' ? Number(e.target.value) : e.target.value)}
+                />
+              ) : (
+                <input
+                  type={f.type || 'text'}
+                  style={{ ...inp, width: '100%' }}
+                  value={String(form[f.key])}
+                  onChange={e => set(f.key, f.type === 'number' ? Number(e.target.value) : e.target.value)}
+                />
+              )}
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+            <button style={btnGhost} onClick={onClose}>Cancel</button>
+            <button style={btnPrimary} onClick={() => { const bad = validateRow(form); if (bad) { alert(`"${bad}" is required. Please fill all fields.`); return; } onSave(form); }}>Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 export default function BrandTagPrinter() {
-  const [rows, setRows] = useState<Row[]>([{ ...defaultRow }]);
+  const [rows, setRows] = useState<BrandTagRow[]>([sampleRow()]);
   const [search, setSearch] = useState('');
-  const [sizeF, setSizeF] = useState('all');
-  const [colorF, setColorF] = useState('all');
-  const [modal, setModal] = useState<{ idx: number; row: Row } | null>(null);
-  const [printRows, setPrintRows] = useState<Row[]>([]);
-  const [globalCopies, setGlobalCopies] = useState('1');
+  const [sizeFilter, setSizeFilter] = useState('');
+  const [colorFilter, setColorFilter] = useState('');
+  const [modalRow, setModalRow] = useState<BrandTagRow | null>(null);
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [selectAll, setSelectAll] = useState(false);
+  const [globalCopies, setGlobalCopies] = useState(1);
+  const [printLabels, setPrintLabels] = useState<BrandTagRow[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const sizes = [...new Set(rows.map(r => r.size).filter(Boolean))];
-  const colors = [...new Set(rows.map(r => r.color).filter(Boolean))];
+  // Inject print CSS once
+  useEffect(() => { ensurePrintCSS(); }, []);
 
-  const filtered = rows.filter(r => {
-    if (sizeF !== 'all' && r.size !== sizeF) return false;
-    if (colorF !== 'all' && r.color !== colorF) return false;
-    if (search) { const q = search.toLowerCase(); return [r.brand, r.ean, r.sku, r.qty, r.product, r.color, r.size, r.jioCode].some(f => (f || '').toLowerCase().includes(q)); }
-    return true;
-  });
+  // Trigger browser print after labels mount
+  useEffect(() => {
+    if (printLabels.length === 0) return;
+    const t = setTimeout(() => {
+      window.print();
+      setPrintLabels([]);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [printLabels]);
 
-  const importExcel = (e: any) => {
-    const file = e.target.files?.[0]; if (!file) return;
+  // Auto-populated filter options
+  const uniqueSizes = useMemo(() => [...new Set(rows.map(r => r.size).filter(Boolean))].sort(), [rows]);
+  const uniqueColors = useMemo(() => [...new Set(rows.map(r => r.color).filter(Boolean))].sort(), [rows]);
+
+  // Filter rows (AND logic: search + size + color)
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return rows.filter(r => {
+      if (q && ![r.brand, r.ean, r.sku, r.product, r.color, r.size, r.jioCode, r.qty]
+        .some(v => v.toLowerCase().includes(q))) return false;
+      if (sizeFilter && r.size !== sizeFilter) return false;
+      if (colorFilter && r.color !== colorFilter) return false;
+      return true;
+    });
+  }, [rows, search, sizeFilter, colorFilter]);
+
+  // ── Import Excel ──
+  const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const wb = XLSX.read(ev.target?.result, { type: 'binary' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_json<any>(ws);
-      const parsed: Row[] = data.map((d: any) => ({
-        brand: d['BRAND NAME'] || '', ean: String(d['EAN'] || ''), sku: String(d['SKU'] || ''),
-        qty: d['QTY'] || '', mrp: Number(d['MRP']) || 0, size: d['SIZE'] || '',
-        product: d['PRODUCT'] || '', color: d['Color'] || '', mktd: d['MKTD & DIST. BY'] || '',
-        jioCode: String(d['Jio Code'] || ''), copies: Number(d['COPIES']) || 0, selected: false,
-      }));
-      setRows(parsed);
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const json: any[] = XLSX.utils.sheet_to_json(ws);
+        const imported: BrandTagRow[] = json.map(d => ({
+          id: uid(),
+          brand: String(d['BRAND NAME'] ?? ''),
+          ean: String(d['EAN'] ?? ''),
+          sku: String(d['SKU'] ?? ''),
+          qty: String(d['QTY'] ?? ''),
+          mrp: Number(d['MRP']) || 0,
+          size: String(d['SIZE'] ?? ''),
+          product: String(d['PRODUCT'] ?? ''),
+          color: String(d['Color'] ?? ''),
+          mktd: String(d['MKTD & DIST. BY'] ?? ''),
+          jioCode: String(d['Jio Code'] ?? ''),
+          copies: Number(d['COPIES']) || 0,
+        }));
+        if (imported.length === 0) {
+          alert('No rows found. Check that column headers match the expected format.');
+          return;
+        }
+        // Validate all rows - reject file if any row has missing data
+        const errors: string[] = [];
+        imported.forEach((r, i) => {
+          const bad = validateRow(r);
+          if (bad) errors.push(`Row ${i + 1} (SKU: ${r.sku || 'empty'}): missing "${bad}"`);
+        });
+        if (errors.length > 0) {
+          alert(`Import rejected — ${errors.length} row(s) have missing data:\n\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? `\n...and ${errors.length - 10} more` : ''}\n\nFix the Excel file and re-import.`);
+          return;
+        }
+        setRows(prev => [...prev, ...imported]);
+      } catch (_) {
+        alert('Failed to parse Excel file. Ensure it is a valid .xlsx / .xls / .csv file.');
+      }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
     e.target.value = '';
-  };
+  }, []);
 
-  const exportExcel = () => {
-    const data = rows.map(r => ({ 'BRAND NAME': r.brand, 'EAN': r.ean, 'SKU': r.sku, 'QTY': r.qty, 'MRP': r.mrp, 'SIZE': r.size, 'PRODUCT': r.product, 'Color': r.color, 'MKTD & DIST. BY': r.mktd, 'Jio Code': r.jioCode, 'COPIES': r.copies }));
+  // ── Export Excel ──
+  const handleExport = useCallback(() => {
+    const data = rows.map(r => ({
+      'BRAND NAME': r.brand,
+      'EAN': r.ean,
+      'SKU': r.sku,
+      'QTY': r.qty,
+      'MRP': r.mrp,
+      'SIZE': r.size,
+      'PRODUCT': r.product,
+      'Color': r.color,
+      'MKTD & DIST. BY': r.mktd,
+      'Jio Code': r.jioCode,
+      'COPIES': r.copies,
+    }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Brand Tags');
-    XLSX.writeFile(wb, 'brand-tags.xlsx');
-  };
+    XLSX.writeFile(wb, 'brand_tags_export.xlsx');
+  }, [rows]);
 
-  const updateRow = (idx: number, field: string, val: any) => setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: val } : r));
-  const deleteRow = (idx: number) => { if (confirm(`Delete SKU: ${rows[idx].sku}?`)) setRows(prev => prev.filter((_, i) => i !== idx)); };
+  // ── Row Mutations ──
+  const updateCopies = useCallback((id: string, copies: number) => {
+    setRows(prev => prev.map(r => r.id === id ? { ...r, copies: Math.max(0, copies) } : r));
+  }, []);
 
-  const doPrint = (labels: Row[]) => { setPrintRows(labels); setTimeout(() => { window.print(); setTimeout(() => setPrintRows([]), 500); }, 100); };
-  const printOne = (r: Row) => doPrint([r]);
-  const printBulk = () => { const labels: Row[] = []; rows.forEach(r => { if (r.copies > 0) for (let i = 0; i < r.copies; i++) labels.push(r); }); if (labels.length === 0) { alert('Set copies > 0 for at least one row'); return; } doPrint(labels); };
-  const testPrint = () => doPrint([rows[0] || defaultRow]);
+  const deleteRow = useCallback((id: string, sku: string) => {
+    if (!window.confirm(`Delete SKU: ${sku || 'this row'}?`)) return;
+    setRows(prev => prev.filter(r => r.id !== id));
+  }, []);
 
-  const toggleAll = () => { const allSel = filtered.every(r => r.selected); setRows(prev => prev.map(r => ({ ...r, selected: allSel ? false : filtered.includes(r) ? true : r.selected }))); };
-  const applyGlobalCopies = () => { const n = parseInt(globalCopies) || 0; setRows(prev => prev.map(r => r.selected ? { ...r, copies: n } : r)); };
+  // ── Modal Open/Save ──
+  const openAdd = useCallback(() => {
+    setModalMode('add');
+    setModalRow(blankRow());
+  }, []);
 
-  const saveModal = () => { if (!modal) return; setRows(prev => { if (modal.idx === -1) return [...prev, { ...modal.row, selected: false }]; return prev.map((r, i) => i === modal.idx ? { ...modal.row, selected: r.selected } : r); }); setModal(null); };
+  const openEdit = useCallback((row: BrandTagRow) => {
+    setModalMode('edit');
+    setModalRow({ ...row });
+  }, []);
 
-  const thS = { fontSize: 9, color: T.tx3, padding: '6px 8px', textAlign: 'left' as const, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: T.s2, whiteSpace: 'nowrap' as const };
-  const tdS = { padding: '5px 8px', fontSize: 11, borderBottom: `1px solid ${T.bd}`, color: T.tx };
+  const handleModalSave = useCallback((updated: BrandTagRow) => {
+    if (modalMode === 'add') {
+      setRows(prev => [...prev, { ...updated, id: uid() }]);
+    } else {
+      setRows(prev => prev.map(r => r.id === updated.id ? updated : r));
+    }
+    setModalRow(null);
+  }, [modalMode]);
+
+  // ── Print Handlers ──
+  const doPrint = useCallback((labels: BrandTagRow[]) => {
+    if (labels.length === 0) {
+      alert('No labels to print. Set COPIES > 0 for the rows you want to print.');
+      return;
+    }
+    setPrintLabels(labels);
+  }, []);
+
+  const printSingle = useCallback((row: BrandTagRow) => {
+    const bad = validateRow(row);
+    if (bad) { alert(`Cannot print — "${bad}" is missing for SKU: ${row.sku || 'empty'}`); return; }
+    setPrintLabels([row]);
+  }, []);
+
+  const printTestLabel = useCallback(() => {
+    const s = rows[0] || sampleRow();
+    setPrintLabels([s]);
+  }, [rows]);
+
+  const printSelected = useCallback(() => {
+    const labels: BrandTagRow[] = [];
+    const badRows: string[] = [];
+    rows.forEach(r => {
+      if (r.copies <= 0) return;
+      const bad = validateRow(r);
+      if (bad) { badRows.push(`${r.sku || 'empty'}: missing "${bad}"`); return; }
+      for (let i = 0; i < r.copies; i++) labels.push(r);
+    });
+    if (badRows.length > 0) { alert(`Cannot print — incomplete data:\n${badRows.join('\n')}`); return; }
+    doPrint(labels);
+  }, [rows, doPrint]);
+
+  // ── Select All / Set All Copies ──
+  const handleSelectAll = useCallback((checked: boolean) => {
+    setSelectAll(checked);
+    setRows(prev => prev.map(r => ({ ...r, copies: checked ? globalCopies : 0 })));
+  }, [globalCopies]);
+
+  const handleSetAllCopies = useCallback(() => {
+    setRows(prev => prev.map(r => ({ ...r, copies: globalCopies })));
+    setSelectAll(globalCopies > 0);
+  }, [globalCopies]);
+
+  // Total label count
+  const totalLabels = useMemo(() => rows.reduce((s, r) => s + r.copies, 0), [rows]);
 
   return (
-    <div className="page-pad" style={{ padding: '16px 18px', fontFamily: "'Inter',sans-serif" }}>
-      {/* Print area */}
-      <div className="bt-print-area" style={{ display: 'none' }}>
-        {printRows.map((r, i) => <Label key={i} r={r} />)}
+    <div style={{ fontFamily: T.sans, color: T.tx, minHeight: '100vh' }}>
+      {/* ── Hidden Print Area ── */}
+      {printLabels.length > 0 && (
+        <div
+          className="bt-print-area"
+          style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, background: '#fff' }}
+        >
+          {printLabels.map((r, i) => <BrandTagLabel key={`pl-${i}`} row={r} />)}
+        </div>
+      )}
+
+      {/* ── Toolbar ── */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 16, fontWeight: 700, color: T.tx, marginRight: 8 }}>Brand Tag Printer</span>
+        <button style={btnPrimary} onClick={openAdd}>+ Add SKU</button>
+        <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.2)' }} onClick={printTestLabel}>Test Print</button>
+        <button
+          style={{ ...btnPrimary, background: `linear-gradient(135deg, ${T.gr}cc, ${T.gr}99)` }}
+          onClick={printSelected}
+        >
+          Print Selected
+        </button>
+        <button style={btnGhost} onClick={() => fileRef.current?.click()}>Import Excel</button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          style={{ display: 'none' }}
+          onChange={handleImport}
+        />
+        <button style={btnGhost} onClick={handleExport}>Export Excel</button>
       </div>
 
-      {/* Toolbar */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12, alignItems: 'center' }}>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={importExcel} style={{ display: 'none' }} />
-        <span onClick={() => fileRef.current?.click()} style={btn('rgba(96,165,250,.12)', T.bl)}>Import Excel</span>
-        <span onClick={exportExcel} style={btn('rgba(52,211,153,.12)', T.gr)}>Export Excel</span>
-        <span onClick={testPrint} style={btn('rgba(251,191,36,.12)', T.yl)}>Test Print</span>
-        <span onClick={printBulk} style={btn(`linear-gradient(135deg,${T.ac}dd,${T.ac2}cc)`, '#fff')}>Print Selected</span>
-        <span onClick={() => setModal({ idx: -1, row: { ...defaultRow, brand: '', ean: '', sku: '', qty: '', mrp: 0, size: '', product: '', color: '', mktd: defaultRow.mktd, jioCode: '', copies: 0, selected: false } })} style={btn(`linear-gradient(135deg,${T.ac}dd,${T.ac2}cc)`, '#fff')}>+ Add SKU</span>
-      </div>
+      {/* ── Search + Filters + Select All ── */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <input
+          type="text"
+          placeholder="Search brand, SKU, EAN, product..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ ...inp, width: 240, flex: 'none' }}
+        />
+        <select
+          value={sizeFilter}
+          onChange={e => setSizeFilter(e.target.value)}
+          style={{ ...inp, width: 100, flex: 'none', cursor: 'pointer' }}
+        >
+          <option value="">All Sizes</option>
+          {uniqueSizes.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select
+          value={colorFilter}
+          onChange={e => setColorFilter(e.target.value)}
+          style={{ ...inp, width: 120, flex: 'none', cursor: 'pointer' }}
+        >
+          <option value="">All Colors</option>
+          {uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10, alignItems: 'center' }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SKU, EAN, brand..." style={{ ...inp, flex: 1, minWidth: 140 }} />
-        <select value={sizeF} onChange={e => setSizeF(e.target.value)} style={{ ...inp, width: 100, cursor: 'pointer' }}><option value="all">All sizes</option>{sizes.map(s => <option key={s} value={s}>{s}</option>)}</select>
-        <select value={colorF} onChange={e => setColorF(e.target.value)} style={{ ...inp, width: 110, cursor: 'pointer' }}><option value="all">All colors</option>{colors.map(c => <option key={c} value={c}>{c}</option>)}</select>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <input value={globalCopies} onChange={e => setGlobalCopies(e.target.value)} style={{ ...inp, width: 40, textAlign: 'center' }} />
-          <span onClick={applyGlobalCopies} style={btn('rgba(139,92,246,.15)', T.ac2)}>Apply to selected</span>
+        {/* Select All + Set All Copies */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 11, color: T.tx2, cursor: 'pointer', userSelect: 'none',
+          }}>
+            <input
+              type="checkbox"
+              checked={selectAll}
+              onChange={e => handleSelectAll(e.target.checked)}
+              style={{ accentColor: T.ac }}
+            />
+            Select All
+          </label>
+          <input
+            type="number"
+            min={0}
+            value={globalCopies}
+            onChange={e => setGlobalCopies(Math.max(0, Number(e.target.value)))}
+            style={{ ...inp, width: 54, flex: 'none', textAlign: 'center', fontFamily: T.mono }}
+          />
+          <button style={{ ...btnGhost, ...btnSm }} onClick={handleSetAllCopies}>Set All Copies</button>
         </div>
       </div>
 
-      {/* Table */}
-      <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
-          <thead><tr>
-            <th style={thS}><input type="checkbox" checked={filtered.length > 0 && filtered.every(r => r.selected)} onChange={toggleAll} /></th>
-            <th style={thS}>Brand</th><th style={thS}>EAN</th><th style={thS}>SKU</th><th style={thS}>Includes</th>
-            <th style={thS}>MRP</th><th style={thS}>Size</th><th style={thS}>Product</th><th style={thS}>Color</th>
-            <th style={thS}>Jio Code</th><th style={thS}>Copies</th><th style={thS}>Actions</th>
-          </tr></thead>
-          <tbody>{filtered.map((r) => {
-            const ri = rows.indexOf(r);
-            return <tr key={ri}>
-              <td style={tdS}><input type="checkbox" checked={r.selected} onChange={() => updateRow(ri, 'selected', !r.selected)} /></td>
-              <td style={{ ...tdS, fontSize: 10, maxWidth: 100 }}>{r.brand.replace('BRAND NAME: ', '')}</td>
-              <td style={{ ...tdS, fontFamily: "'JetBrains Mono',monospace", fontSize: 10 }}>{r.ean}</td>
-              <td style={{ ...tdS, fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 600 }}>{r.sku}</td>
-              <td style={{ ...tdS, fontSize: 10, maxWidth: 120 }}>{r.qty.replace('INCLUDES: ', '')}</td>
-              <td style={{ ...tdS, fontFamily: "'JetBrains Mono',monospace", fontSize: 10 }}>{fmtMrp(r.mrp)}</td>
-              <td style={tdS}>{r.size}</td>
-              <td style={tdS}>{r.product.replace('PRODUCT DESC: ', '')}</td>
-              <td style={tdS}>{r.color}</td>
-              <td style={{ ...tdS, fontFamily: "'JetBrains Mono',monospace", fontSize: 10 }}>{r.jioCode}</td>
-              <td style={tdS}><input type="number" min={0} value={r.copies} onChange={e => updateRow(ri, 'copies', parseInt(e.target.value) || 0)} style={{ ...inp, width: 48, textAlign: 'center', padding: '3px 4px' }} /></td>
-              <td style={tdS}>
-                <div style={{ display: 'flex', gap: 3 }}>
-                  <span onClick={() => setModal({ idx: ri, row: { ...r } })} style={btn('rgba(96,165,250,.1)', T.bl)}>Edit</span>
-                  <span onClick={() => printOne(r)} style={btn('rgba(139,92,246,.12)', T.ac2)}>Print</span>
-                  <span onClick={() => deleteRow(ri)} style={btn('rgba(248,113,113,.08)', T.re)}>Del</span>
-                </div>
-              </td>
-            </tr>;
-          })}</tbody>
+      {/* ── Data Table ── */}
+      <div style={{ overflowX: 'auto', border: `1px solid ${T.bd}`, borderRadius: T.r, background: T.s }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr>
+              {['Brand', 'EAN', 'SKU', 'QTY', 'MRP', 'Size', 'Product', 'Color', 'Jio Code', 'Copies', 'Actions'].map(h => (
+                <th key={h} style={thS}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={11} style={{ ...tdS, textAlign: 'center', color: T.tx3, padding: 24 }}>
+                  No rows found. Add SKUs or import an Excel file.
+                </td>
+              </tr>
+            )}
+            {filtered.map(row => (
+              <tr
+                key={row.id}
+                style={{ transition: 'background .15s' }}
+                onMouseEnter={e => { e.currentTarget.style.background = T.s2; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <td style={{ ...tdS, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.brand}>
+                  {row.brand}
+                </td>
+                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10 }}>{row.ean}</td>
+                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10, fontWeight: 600 }}>{row.sku}</td>
+                <td style={{ ...tdS, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.qty}>
+                  {row.qty}
+                </td>
+                <td style={{ ...tdS, fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtMrp(row.mrp)}</td>
+                <td style={{ ...tdS, textAlign: 'center' }}>{row.size}</td>
+                <td style={{ ...tdS, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.product}>
+                  {row.product}
+                </td>
+                <td style={tdS}>{row.color}</td>
+                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10 }}>{row.jioCode}</td>
+                <td style={tdS}>
+                  <input
+                    type="number"
+                    min={0}
+                    value={row.copies}
+                    onChange={e => updateCopies(row.id, Number(e.target.value))}
+                    style={{
+                      ...inp, width: 50, textAlign: 'center',
+                      padding: '3px 4px', fontSize: 11, fontFamily: T.mono,
+                    }}
+                  />
+                </td>
+                <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <button style={{ ...btnGhost, ...btnSm }} onClick={() => openEdit(row)}>Edit</button>
+                    <button
+                      style={{ ...btnGhost, ...btnSm, color: T.bl, borderColor: 'rgba(96,165,250,.2)' }}
+                      onClick={() => printSingle(row)}
+                    >
+                      Print BT
+                    </button>
+                    <button style={{ ...btnDanger, ...btnSm }} onClick={() => deleteRow(row.id, row.sku)}>Del</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
         </table>
-        {filtered.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>No data. Import an Excel file or add SKUs manually.</div>}
       </div>
 
-      {/* Add/Edit Modal */}
-      {modal && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(8px)', padding: 8 }}>
-        <div className="modal-inner" style={{ background: 'rgba(18,22,31,.95)', border: `1px solid ${T.bd2}`, borderRadius: 12, width: 460, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 16px 48px rgba(0,0,0,.5)' }}>
-          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{modal.idx === -1 ? 'Add' : 'Edit'} SKU</span>
-            <span onClick={() => setModal(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16 }}>✕</span>
-          </div>
-          <div style={{ padding: 14, display: 'grid', gap: 10 }}>
-            {[
-              { k: 'brand', l: 'Brand name', p: 'BRAND NAME: FUSIONIC' },
-              { k: 'ean', l: 'EAN', p: '8905738898139' },
-              { k: 'sku', l: 'SKU', p: 'TF-167' },
-              { k: 'qty', l: 'Includes (QTY)', p: 'INCLUDES: 1 U Lehenga, 1 U Blouse' },
-              { k: 'mrp', l: 'MRP', p: '6800', type: 'number' },
-              { k: 'size', l: 'Size', p: 'Free Size' },
-              { k: 'product', l: 'Product desc', p: 'PRODUCT DESC: Lehenga Choli' },
-              { k: 'color', l: 'Color', p: 'Yellow' },
-              { k: 'mktd', l: 'MKTD & Dist. by', p: 'Address...' },
-              { k: 'jioCode', l: 'Jio Code', p: '464991219001' },
-            ].map(f => <div key={f.k}><label style={{ fontSize: 11, color: T.tx3, marginBottom: 3, display: 'block' }}>{f.l}</label><input value={(modal.row as any)[f.k]} onChange={e => setModal({ ...modal, row: { ...modal.row, [f.k]: f.type === 'number' ? Number(e.target.value) : e.target.value } })} placeholder={f.p} type={f.type || 'text'} style={{ ...inp, width: '100%' }} /></div>)}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, paddingTop: 6, borderTop: `1px solid ${T.bd}` }}>
-              <span onClick={() => setModal(null)} style={btn('transparent', T.tx2, { border: `1px solid ${T.bd2}` })}>Cancel</span>
-              <span onClick={saveModal} style={btn(`linear-gradient(135deg,${T.ac}dd,${T.ac2}cc)`, '#fff')}>Save</span>
-            </div>
-          </div>
-        </div>
-      </div>}
+      {/* ── Summary Footer ── */}
+      <div style={{ marginTop: 8, fontSize: 11, color: T.tx3 }}>
+        {filtered.length} of {rows.length} row{rows.length !== 1 ? 's' : ''} shown
+        {totalLabels > 0 && (
+          <span style={{ marginLeft: 12, color: T.tx2 }}>
+            Labels to print: <strong style={{ color: T.gr }}>{totalLabels}</strong>
+          </span>
+        )}
+      </div>
 
-      {/* Print CSS */}
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          .bt-print-area, .bt-print-area * { visibility: visible; }
-          .bt-print-area { display: flex !important; flex-wrap: wrap; position: fixed; top: 0; left: 0; z-index: 9999; background: #fff; }
-          .bt-label { margin: 0; border: none !important; page-break-inside: avoid; }
-          @page { size: 2.95in 1.97in; margin: 0; }
-        }
-      `}</style>
+      {/* ── Add / Edit Modal ── */}
+      {modalRow && (
+        <BrandTagModal
+          title={modalMode === 'add' ? 'Add New SKU' : `Edit: ${modalRow.sku || 'SKU'}`}
+          initial={modalRow}
+          onSave={handleModalSave}
+          onClose={() => setModalRow(null)}
+        />
+      )}
     </div>
   );
 }
