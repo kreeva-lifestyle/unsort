@@ -237,6 +237,8 @@ const BrandTagModal = ({
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function BrandTagPrinter() {
   const [rows, setRows] = useState<BrandTagRow[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState('');
   const [search, setSearch] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [sizeFilter, setSizeFilter] = useState('');
@@ -248,14 +250,56 @@ export default function BrandTagPrinter() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Fetch from Supabase + realtime
-  const fetchRows = useCallback(() => {
-    supabase.from('brand_tags').select('*').order('created_at', { ascending: false }).then(({ data }) => {
-      if (data) setRows(data.map(d => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies })));
-    });
+  const fetchRows = useCallback(async () => {
+    // Supabase default limit is 1000 - fetch ALL rows by paginating
+    const allRows: any[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const { data } = await supabase.from('brand_tags').select('*').order('created_at', { ascending: false }).range(from, from + pageSize - 1);
+      if (data && data.length > 0) { allRows.push(...data); from += pageSize; }
+      if (!data || data.length < pageSize) hasMore = false;
+    }
+    setRows(allRows.map(d => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies })));
   }, []);
   useEffect(() => {
     fetchRows();
     const ch = supabase.channel('bt-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'brand_tags' }, fetchRows).subscribe();
+
+    // Resume interrupted import from localStorage queue
+    const queueKey = 'bt_import_queue';
+    const saved = localStorage.getItem(queueKey);
+    if (saved) {
+      try {
+        const q = JSON.parse(saved);
+        if (q.data && q.startIdx < q.total) {
+          const remaining = q.data.slice(q.startIdx);
+          if (remaining.length > 0 && confirm(`Found interrupted import: ${q.startIdx} of ${q.total} done. Resume remaining ${remaining.length} rows?`)) {
+            (async () => {
+              setImporting(true);
+              const batchSize = 500;
+              for (let i = 0; i < remaining.length; i += batchSize) {
+                const batch = remaining.slice(i, i + batchSize);
+                await supabase.from('brand_tags').upsert(batch, { onConflict: 'ean,sku,size', ignoreDuplicates: false });
+                const done = q.startIdx + Math.min(i + batchSize, remaining.length);
+                setImportProgress(`${done} / ${q.total}`);
+                localStorage.setItem(queueKey, JSON.stringify({ ...q, startIdx: done }));
+              }
+              localStorage.removeItem(queueKey);
+              setImporting(false); setImportProgress('');
+              alert('Resumed import complete!');
+              fetchRows();
+            })();
+          } else {
+            localStorage.removeItem(queueKey);
+          }
+        } else {
+          localStorage.removeItem(queueKey);
+        }
+      } catch { localStorage.removeItem(queueKey); }
+    }
+
     return () => { supabase.removeChannel(ch); };
   }, [fetchRows]);
 
@@ -316,34 +360,41 @@ export default function BrandTagPrinter() {
           alert(`Import rejected — ${errors.length} row(s) have missing data:\n\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? `\n...and ${errors.length - 10} more` : ''}\n\nFix the Excel file and re-import.`);
           return;
         }
-        // Smart import: upsert in batches of 500
-        // - New SKU+EAN: insert
-        // - Existing SKU+EAN with changed values: update
-        // - Existing SKU+EAN with same values: skip
+        // Smart import with queue persistence
         const toUpsert = imported.map(r => ({
           brand: r.brand, ean: r.ean, sku: r.sku, qty: r.qty, mrp: r.mrp,
           size: r.size, product: r.product, color: r.color, mktd: r.mktd,
           jio_code: r.jioCode, copies: r.copies,
           updated_at: new Date().toISOString(),
         }));
-        const batchSize = 500;
-        let processed = 0, failed = 0;
-        const statusEl = document.createElement('div');
-        statusEl.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1a1f2e;color:#eaf0f6;padding:12px 24px;border-radius:8px;font-size:13px;z-index:9999;border:1px solid #2d3548;font-family:Inter,sans-serif';
-        statusEl.textContent = `Importing 0 / ${toUpsert.length}...`;
-        document.body.appendChild(statusEl);
 
+        // Save queue to localStorage so refresh can resume
+        const queueKey = 'bt_import_queue';
+        localStorage.setItem(queueKey, JSON.stringify({ data: toUpsert, startIdx: 0, total: toUpsert.length }));
+
+        // Warn on refresh during import
+        const beforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); return ''; };
+        window.addEventListener('beforeunload', beforeUnload);
+        setImporting(true);
+
+        const batchSize = 500;
+        let failed = 0;
         for (let i = 0; i < toUpsert.length; i += batchSize) {
           const batch = toUpsert.slice(i, i + batchSize);
-          const { error, data } = await supabase.from('brand_tags')
-            .upsert(batch, { onConflict: 'ean,sku,size', ignoreDuplicates: false })
-            .select('id');
-          if (error) { failed += batch.length; }
-          else { processed += (data?.length || 0); }
-          statusEl.textContent = `Importing ${Math.min(i + batchSize, toUpsert.length)} / ${toUpsert.length}...`;
+          const { error } = await supabase.from('brand_tags')
+            .upsert(batch, { onConflict: 'ean,sku,size', ignoreDuplicates: false });
+          if (error) failed += batch.length;
+          const done = Math.min(i + batchSize, toUpsert.length);
+          setImportProgress(`${done} / ${toUpsert.length}`);
+          // Update queue progress so resume knows where to start
+          localStorage.setItem(queueKey, JSON.stringify({ data: toUpsert, startIdx: done, total: toUpsert.length }));
         }
-        document.body.removeChild(statusEl);
-        alert(`Import complete!\n${toUpsert.length} rows processed.\nNew/updated rows saved to database.`);
+
+        localStorage.removeItem(queueKey);
+        window.removeEventListener('beforeunload', beforeUnload);
+        setImporting(false);
+        setImportProgress('');
+        alert(`Import complete! ${toUpsert.length} rows processed.${failed > 0 ? ` ${failed} failed.` : ''}`);
         fetchRows();
       } catch (_) {
         alert('Failed to parse Excel file. Ensure it is a valid .xlsx / .xls / .csv file.');
@@ -460,7 +511,12 @@ export default function BrandTagPrinter() {
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '16px 18px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Brand Tags</span><span style={{ fontSize: 12, fontWeight: 500, color: T.tx3, marginLeft: 10 }}>{filtered.length} of {rows.length} rows</span>{totalLabels > 0 && <span style={{ fontSize: 11, color: T.gr, marginLeft: 10 }}>{totalLabels} labels</span>}</div>
+        <div>
+          <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Brand Tags</span>
+          <span style={{ fontSize: 12, fontWeight: 500, color: T.tx3, marginLeft: 10 }}>{filtered.length} of {rows.length} rows</span>
+          {totalLabels > 0 && <span style={{ fontSize: 11, color: T.gr, marginLeft: 10 }}>{totalLabels} labels</span>}
+          {importing && <span style={{ fontSize: 11, color: T.yl, marginLeft: 10, fontWeight: 600 }}>Importing {importProgress}...</span>}
+        </div>
         <div style={{ display: 'flex', gap: 5 }}>
           <button style={btnGhost} onClick={() => fileRef.current?.click()}>Import</button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
