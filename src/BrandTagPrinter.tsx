@@ -1,6 +1,9 @@
 /* eslint-disable */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient('https://ulphprdnswznfztawbvg.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0');
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
 const T = {
@@ -233,7 +236,7 @@ const BrandTagModal = ({
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function BrandTagPrinter() {
-  const [rows, setRows] = useState<BrandTagRow[]>([sampleRow()]);
+  const [rows, setRows] = useState<BrandTagRow[]>([]);
   const [search, setSearch] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [sizeFilter, setSizeFilter] = useState('');
@@ -243,6 +246,18 @@ export default function BrandTagPrinter() {
   const [selectAll, setSelectAll] = useState(false);
   const [globalCopies, setGlobalCopies] = useState(1);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Fetch from Supabase + realtime
+  const fetchRows = useCallback(() => {
+    supabase.from('brand_tags').select('*').order('created_at', { ascending: false }).then(({ data }) => {
+      if (data) setRows(data.map(d => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies })));
+    });
+  }, []);
+  useEffect(() => {
+    fetchRows();
+    const ch = supabase.channel('bt-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'brand_tags' }, fetchRows).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [fetchRows]);
 
   // Auto-populated filter options
   const uniqueBrands = useMemo(() => [...new Set(rows.map(r => r.brand.replace(/^BRAND NAME:\s*/i, '').trim()).filter(Boolean))].sort(), [rows]);
@@ -301,7 +316,9 @@ export default function BrandTagPrinter() {
           alert(`Import rejected — ${errors.length} row(s) have missing data:\n\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? `\n...and ${errors.length - 10} more` : ''}\n\nFix the Excel file and re-import.`);
           return;
         }
-        setRows(prev => [...prev, ...imported]);
+        // Insert into Supabase
+        const toInsert = imported.map(r => ({ brand: r.brand, ean: r.ean, sku: r.sku, qty: r.qty, mrp: r.mrp, size: r.size, product: r.product, color: r.color, mktd: r.mktd, jio_code: r.jioCode, copies: r.copies }));
+        supabase.from('brand_tags').insert(toInsert).then(({ error }) => { if (error) alert('Import error: ' + error.message); else fetchRows(); });
       } catch (_) {
         alert('Failed to parse Excel file. Ensure it is a valid .xlsx / .xls / .csv file.');
       }
@@ -333,13 +350,15 @@ export default function BrandTagPrinter() {
 
   // ── Row Mutations ──
   const updateCopies = useCallback((id: string, copies: number) => {
-    setRows(prev => prev.map(r => r.id === id ? { ...r, copies: Math.max(0, copies) } : r));
+    const c = Math.max(0, copies);
+    setRows(prev => prev.map(r => r.id === id ? { ...r, copies: c } : r));
+    supabase.from('brand_tags').update({ copies: c }).eq('id', id);
   }, []);
 
   const deleteRow = useCallback((id: string, sku: string) => {
     if (!window.confirm(`Delete SKU: ${sku || 'this row'}?`)) return;
-    setRows(prev => prev.filter(r => r.id !== id));
-  }, []);
+    supabase.from('brand_tags').delete().eq('id', id).then(() => fetchRows());
+  }, [fetchRows]);
 
   // ── Modal Open/Save ──
   const openAdd = useCallback(() => {
@@ -353,13 +372,14 @@ export default function BrandTagPrinter() {
   }, []);
 
   const handleModalSave = useCallback((updated: BrandTagRow) => {
+    const dbRow = { brand: updated.brand, ean: updated.ean, sku: updated.sku, qty: updated.qty, mrp: updated.mrp, size: updated.size, product: updated.product, color: updated.color, mktd: updated.mktd, jio_code: updated.jioCode, copies: updated.copies };
     if (modalMode === 'add') {
-      setRows(prev => [...prev, { ...updated, id: uid() }]);
+      supabase.from('brand_tags').insert(dbRow).then(() => fetchRows());
     } else {
-      setRows(prev => prev.map(r => r.id === updated.id ? updated : r));
+      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(() => fetchRows());
     }
     setModalRow(null);
-  }, [modalMode]);
+  }, [modalMode, fetchRows]);
 
   // ── Print Handlers ──
   const printSingle = useCallback((row: BrandTagRow) => {
@@ -388,20 +408,25 @@ export default function BrandTagPrinter() {
   }, [rows]);
 
   // ── Select All / Set All Copies ──
-  const handleSelectAll = useCallback((checked: boolean) => {
+  const handleSelectAll = useCallback(async (checked: boolean) => {
     setSelectAll(checked);
-    setRows(prev => prev.map(r => ({ ...r, copies: checked ? globalCopies : 0 })));
-  }, [globalCopies]);
+    const c = checked ? globalCopies : 0;
+    setRows(prev => prev.map(r => ({ ...r, copies: c })));
+    const ids = rows.map(r => r.id);
+    for (const id of ids) await supabase.from('brand_tags').update({ copies: c }).eq('id', id);
+  }, [globalCopies, rows]);
 
-  const handleSetAllCopies = useCallback(() => {
+  const handleSetAllCopies = useCallback(async () => {
     setRows(prev => prev.map(r => ({ ...r, copies: globalCopies })));
     setSelectAll(globalCopies > 0);
-  }, [globalCopies]);
+    const ids = rows.map(r => r.id);
+    for (const id of ids) await supabase.from('brand_tags').update({ copies: globalCopies }).eq('id', id);
+  }, [globalCopies, rows]);
 
   // Total label count
   const totalLabels = useMemo(() => rows.reduce((s, r) => s + r.copies, 0), [rows]);
   const [btPage, setBtPage] = useState(0);
-  const btPerPage = 25;
+  const [btPerPage, setBtPerPage] = useState(25);
   const btTotalPages = Math.ceil(filtered.length / btPerPage);
   const btPaged = filtered.slice(btPage * btPerPage, (btPage + 1) * btPerPage);
   useEffect(() => { setBtPage(0); }, [search, brandFilter, sizeFilter, colorFilter]);
@@ -467,11 +492,15 @@ export default function BrandTagPrinter() {
           </tbody>
         </table>
       </div>
-      {btTotalPages > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
-        <span onClick={() => setBtPage(Math.max(0, btPage - 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage === 0 ? 0.3 : 1, pointerEvents: btPage === 0 ? 'none' : 'auto' }}>Prev</span>
-        <span style={{ color: T.tx3 }}>Page {btPage + 1} of {btTotalPages}</span>
-        <span onClick={() => setBtPage(Math.min(btTotalPages - 1, btPage + 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage >= btTotalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= btTotalPages - 1 ? 'none' : 'auto' }}>Next</span>
-      </div>}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
+        <select value={btPerPage} onChange={e => { setBtPerPage(Number(e.target.value)); setBtPage(0); }} style={{ ...inp, width: 'auto', padding: '3px 6px', fontSize: 10, cursor: 'pointer' }}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
+        <span style={{ color: T.tx3 }}>rows</span>
+        {btTotalPages > 1 && <>
+          <span onClick={() => setBtPage(Math.max(0, btPage - 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage === 0 ? 0.3 : 1, pointerEvents: btPage === 0 ? 'none' : 'auto' }}>Prev</span>
+          <span style={{ color: T.tx3 }}>{btPage + 1} / {btTotalPages}</span>
+          <span onClick={() => setBtPage(Math.min(btTotalPages - 1, btPage + 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage >= btTotalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= btTotalPages - 1 ? 'none' : 'auto' }}>Next</span>
+        </>}
+      </div>
 
       {/* ── Add / Edit Modal ── */}
       {modalRow && (
