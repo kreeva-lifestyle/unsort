@@ -104,12 +104,13 @@ const parseOrderSheet = (data: any[], masterRows: BrandTagRow[]): OrderRow[] => 
     const [skuPart, copiesStr] = rawSku.split('*');
     const sku = skuPart.trim();
     const copies = Math.max(1, parseInt(copiesStr) || 1);
-    const key = sku.toUpperCase();
     const brand = MARKETPLACE_BRAND[mp.toLowerCase()] || 'UNKNOWN';
+    // Aggregate by SKU + Brand (same SKU different brand = separate rows)
+    const key = sku.toUpperCase() + '::' + brand;
 
     if (map.has(key)) { map.get(key)!.copies += copies; }
     else {
-      const master = masterMap.get(key);
+      const master = masterMap.get(sku.toUpperCase());
       map.set(key, { sku, marketplace: mp, brand, copies, found: !!master, masterData: master });
     }
   }
@@ -512,8 +513,8 @@ export default function BrandTagPrinter() {
     e.target.value = '';
   }, [rows]);
 
-  const updateOrderCopies = (sku: string, copies: number) => {
-    setOrderRows(prev => prev ? prev.map(r => r.sku === sku ? { ...r, copies: Math.max(0, copies) } : r) : null);
+  const updateOrderCopies = (sku: string, brand: string, copies: number) => {
+    setOrderRows(prev => prev ? prev.map(r => (r.sku === sku && r.brand === brand) ? { ...r, copies: Math.max(0, copies) } : r) : null);
   };
 
   const printOrderLabels = (items: OrderRow[]) => {
@@ -643,10 +644,17 @@ export default function BrandTagPrinter() {
                 {missing.length > 0 && <span style={{ fontSize: 11, color: T.re, marginLeft: 6 }}>{missing.length} missing</span>}
               </div>
               <div style={{ display: 'flex', gap: 5 }}>
-                <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={() => printOrderLabels(ready)}>Print All Ready ({totalCopies})</button>
+                {missing.length === 0
+                  ? <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={() => printOrderLabels(ready)}>Print All ({totalCopies})</button>
+                  : <button style={{ ...btnGhost, opacity: 0.4, cursor: 'not-allowed' }} title="Resolve missing SKUs first">Print blocked</button>
+                }
                 <button style={btnGhost} onClick={() => setOrderRows(null)}>Close</button>
               </div>
             </div>
+            {missing.length > 0 && <div style={{ padding: '10px 16px', background: 'rgba(248,113,113,.06)', borderBottom: `1px solid rgba(248,113,113,.15)`, display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11, color: T.re, lineHeight: 1.5 }}>
+              <span style={{ fontSize: 14, flexShrink: 0 }}>⚠</span>
+              <div><strong>{missing.length} SKU{missing.length > 1 ? 's' : ''} not found in master data.</strong> Printing is blocked until all SKUs are resolved. Go to the Brand Tags table, add the missing SKU{missing.length > 1 ? 's' : ''} ({missing.map(m => m.sku).join(', ')}), then re-import this order sheet.</div>
+            </div>}
             <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead><tr>
@@ -662,7 +670,7 @@ export default function BrandTagPrinter() {
                     <td style={tdS}>{r.found ? r.masterData?.color : '—'}</td>
                     <td style={tdS}>{r.found ? r.masterData?.size : '—'}</td>
                     <td style={{ ...tdS, whiteSpace: 'nowrap' }}>{r.found ? fmtMrp(r.masterData?.mrp || 0) : '—'}</td>
-                    <td style={tdS}><input type="number" min={0} value={r.copies} onChange={e => updateOrderCopies(r.sku, Number(e.target.value))} style={{ ...inp, width: 40, textAlign: 'center', padding: '2px', fontSize: 12 }} /></td>
+                    <td style={tdS}><input type="number" min={0} value={r.copies} onChange={e => updateOrderCopies(r.sku, r.brand, Number(e.target.value))} style={{ ...inp, width: 40, textAlign: 'center', padding: '2px', fontSize: 12 }} /></td>
                     <td style={tdS}>{r.found ? <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(52,211,153,.12)', color: T.gr }}>Ready</span> : <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(248,113,113,.12)', color: T.re }}>Missing</span>}</td>
                   </tr>
                 ))}</tbody>
