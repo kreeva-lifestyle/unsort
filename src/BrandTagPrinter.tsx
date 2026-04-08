@@ -87,56 +87,58 @@ const fmtMrp = (v: number): string => '\u20B9' + v.toLocaleString('en-IN');
 
 // ── Print function: renders labels into a new window for clean printing ───────
 const printLabelsInWindow = (labels: BrandTagRow[]) => {
-  const win = window.open('', '_blank', 'width=400,height=600');
+  const win = window.open('', '_blank', 'width=300,height=500');
   if (!win) { alert('Popup blocked. Allow popups for this site.'); return; }
 
   const html = labels.map(r => {
-    const brand = r.brand.replace(/^BRAND NAME:\s*/i, '').trim() || r.brand;
-    const product = r.product.replace(/^PRODUCT DESC:\s*/i, '').trim() || r.product;
+    const brand = r.brand.replace(/^BRAND NAME:\s*/i, '').trim().toUpperCase();
+    const product = r.product.replace(/^PRODUCT DESC:\s*/i, '').trim();
+    const qty = r.qty.replace(/^INCLUDES:\s*/i, '').trim();
     const mrp = '\u20B9' + r.mrp.toLocaleString('en-IN');
-    return `<div class="bt-label">
-      <div class="left">
-        <div style="font-weight:700;font-size:8pt;margin-bottom:3px">BRAND NAME: ${brand}</div>
-        <div style="font-weight:700;font-size:7.5pt;font-family:monospace;margin-bottom:2px">SKU: ${r.sku}</div>
-        <div style="font-size:7pt;margin-bottom:2px">PRODUCT DESC: ${product}</div>
-        <div style="font-size:6.5pt;margin-bottom:2px;word-break:break-word">${r.qty}</div>
-        <div style="font-size:7pt;margin-bottom:1px">SIZE: ${r.size}</div>
-        <div style="font-size:7pt;margin-bottom:1px">COLOR: ${r.color}</div>
-        <div style="font-weight:700;font-size:7.5pt;margin-bottom:3px">MRP: ${mrp}</div>
-        <div style="font-size:5.5pt;margin-bottom:2px;word-break:break-word;color:#333">MKTD &amp; DIST. BY: ${r.mktd}</div>
-        <div style="font-size:6pt;font-family:monospace;margin-bottom:2px">JIO CODE: ${r.jioCode}</div>
-        <div class="bc"><svg id="bc-${r.id}"></svg></div>
-      </div>
-      <div class="right"><span>EAN: ${r.sku}</span></div>
-    </div>`;
+    return `<div class="label">
+  <div class="main">
+    <div class="row b" style="font-size:9pt">BRAND NAME: ${brand}</div>
+    <div class="row b" style="font-size:8.5pt">SKU: ${r.sku}</div>
+    <div class="row" style="font-size:7.5pt">PRODUCT DESC: ${product}</div>
+    <div class="row" style="font-size:7pt">INCLUDES: ${qty}</div>
+    <div class="row" style="font-size:7.5pt">SIZE: ${r.size}</div>
+    <div class="row" style="font-size:7.5pt">COLOR: ${r.color}</div>
+    <div class="row b" style="font-size:8.5pt">MRP: ${mrp}</div>
+    <div class="row sm">MKTD &amp; DIST. BY: ${r.mktd}</div>
+    <div class="row" style="font-size:7pt;font-family:monospace">JIO CODE: ${r.jioCode}</div>
+    <div class="barcode"><svg id="bc-${r.id}"></svg></div>
+  </div>
+  <div class="ean"><span>EAN: ${r.sku}</span></div>
+</div>`;
   }).join('');
 
   win.document.write(`<!DOCTYPE html><html><head>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Arial,Helvetica,sans-serif;background:#fff}
-.bt-label{width:1.97in;height:2.97in;display:flex;overflow:hidden;page-break-after:always;page-break-inside:avoid}
-.left{flex:1;padding:4px 5px 2px;display:flex;flex-direction:column;line-height:1.3}
-.bc{margin-top:auto;text-align:center}
-.bc svg{width:85%;height:30px}
-.right{width:24px;min-width:24px;background:#eee;display:flex;align-items:center;justify-content:center}
-.right span{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;font-weight:700;font-size:8pt;font-family:monospace;color:#222;letter-spacing:.5px}
+body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000}
+.label{width:1.97in;height:2.97in;display:flex;overflow:hidden;page-break-after:always}
+.main{flex:1;padding:6px 7px 4px;display:flex;flex-direction:column}
+.row{line-height:1.35;margin-bottom:2px}
+.b{font-weight:700}
+.sm{font-size:6pt;line-height:1.25;color:#222}
+.barcode{margin-top:auto;text-align:center;padding:4px 0 2px}
+.barcode svg{width:100%;height:36px}
+.ean{width:26px;min-width:26px;background:#e8e8e8;display:flex;align-items:center;justify-content:center}
+.ean span{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;font-weight:900;font-size:9pt;font-family:Arial,sans-serif;color:#000;letter-spacing:1px}
 @media print{
   @page{margin:0;size:1.97in 2.97in}
   body{margin:0}
-  .bt-label{border:none;width:100%;height:100%}
+  .label{width:100%;height:100%;border:none}
 }
-@media screen{
-  .bt-label{border:1px solid #ccc;margin:8px}
-}
+@media screen{.label{border:1px solid #ccc;margin:8px auto}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
 </head><body>${html}
 <script>
-document.querySelectorAll('.bc svg').forEach(function(svg){
+document.querySelectorAll('.barcode svg').forEach(function(svg){
   var id=svg.id.replace('bc-','');
   var row=${JSON.stringify(labels.map(r=>({id:r.id,jio:r.jioCode,sku:r.sku})))}.find(function(r){return r.id===id});
-  if(row&&row.jio)try{JsBarcode(svg,row.jio,{format:'CODE128',width:1,height:25,displayValue:true,text:row.sku,fontSize:7,font:'monospace',margin:0,textMargin:0})}catch(e){}
+  if(row&&row.jio)try{JsBarcode(svg,row.jio,{format:'CODE128',width:1.5,height:34,displayValue:true,text:row.sku,fontSize:8,font:'Arial',margin:0,textMargin:1})}catch(e){}
 });
 setTimeout(function(){window.print()},600);
 <\/script></body></html>`);
