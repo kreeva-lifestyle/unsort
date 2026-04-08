@@ -209,6 +209,7 @@ const Icon = ({ name, size = 16 }: { name: string; size?: number }) => {
     scan: 'M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M8 12h8',
     check: 'M20 6L9 17l-5-5',
     link: 'M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71',
+    settings: 'M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2zM12 15a3 3 0 100-6 3 3 0 000 6z',
   };
   return <svg viewBox="0 0 24 24" style={s}><path d={paths[name] || ''} /></svg>;
 };
@@ -219,11 +220,9 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
     { id: 'dashboard', icon: 'grid', label: 'Dashboard' },
     { id: 'inventory', icon: 'box', label: 'Inventory' },
     { id: 'completed', icon: 'check', label: 'Completed' },
-    { id: 'categories', icon: 'tag', label: 'Categories' },
-    { id: 'locations', icon: 'pin', label: 'Locations' },
     { id: 'reports', icon: 'file', label: 'Reports' },
+    { id: 'settings', icon: 'users', label: 'Settings' },
   ];
-  if (profile?.role === 'admin') tabs.push({ id: 'users', icon: 'users', label: 'Users' });
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -1016,8 +1015,8 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
       </div>
       <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
         <div className="table-wrap">
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000 }}>
-          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Size', 'Location', 'Tags', 'Notes', 'Link', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 850 }}>
+          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Size', 'Tags', 'Notes', 'Link', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
           <tbody>{filtered.map((item) => {
             const missing = itemMissing[item.id] || [];
             const damaged = itemDamaged[item.id] || [];
@@ -1026,7 +1025,6 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
             <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 12 }}>{item.serial_number || '—'}</td>
             <td style={S.tdStyle}><span style={{ fontWeight: 500 }}>{item.products?.name}</span></td>
             <td style={{ ...S.tdStyle, fontSize: 11, fontWeight: 500 }}>{item.size || '—'}</td>
-            <td style={{ ...S.tdStyle, fontSize: 12, color: T.tx3 }}>{item.location || '—'}</td>
             <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 500, background: 'rgba(139,92,246,.12)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 12 }}>—</span>}</div></td>
             <td style={{ ...S.tdStyle, fontSize: 12, maxWidth: 160 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 30 ? item.notes.slice(0, 30) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
             <td style={S.tdStyle}>{item.link ? <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ color: T.ac, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="link" size={14} /></a> : <span style={{ color: T.tx3 }}>—</span>}</td>
@@ -1036,8 +1034,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 <span onClick={() => openComps(item)} style={{ ...S.btnPrimary, ...S.btnSm }}>View</span>
                 {!isCompletedView && completablePairs[item.id]?.length > 0 && <span onClick={() => setShowCompleteModal({ itemId: item.id })} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: 'rgba(16,185,129,.15)', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' as const }}>Complete ({completablePairs[item.id].length})</span>}
-                {isCompletedView && canEdit && <span onClick={() => { if (confirm(item.paired_with ? 'This will revert BOTH paired items back to Inventory. Continue?' : 'Revert this item back to Inventory?')) handleCancelCompletion(item.id); }} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: T.r, border: '1px solid rgba(251,191,36,.25)', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: 'rgba(251,191,36,.08)', color: T.yl, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' as const }}>Revert{item.paired_with ? ' Both' : ''}</span>}
-                {item.batch_number && <span onClick={() => printBarcode(item.batch_number)} style={{ ...S.btnGhost, ...S.btnSm }}>Barcode</span>}
+                {isCompletedView && canEdit && <span onClick={() => { if (confirm(item.paired_with ? 'This will revert BOTH paired items back to Inventory. Continue?' : 'Revert this item back to Inventory?')) handleCancelCompletion(item.id); }} style={{ ...S.btnSm, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(251,191,36,.2)', cursor: 'pointer', fontSize: 10, fontWeight: 600, fontFamily: T.sans, background: 'rgba(251,191,36,.06)', color: T.yl, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' as const }}>Revert{item.paired_with ? ' Both' : ''}</span>}
                 {canEdit && <span onClick={() => openEdit(item)} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>}
                 {canEdit && <span onClick={() => handleDelete(item.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Del</span>}
               </div>
@@ -1306,8 +1303,8 @@ const Categories = () => {
   );
 
   return (
-    <div className="page-pad" style={{ padding: '16px 18px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Categories</span>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={S.btnPrimary}>+ Add Category</div>}</div>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Categories</span>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={S.btnPrimary}>+ Add</div>}</div>
       <div className="cat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>{categories.map((p) => (<div key={p.id} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '18px 20px', transition: 'border-color .15s, box-shadow .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = T.bd2; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.2)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.boxShadow = 'none'; }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
           <div><h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: T.tx }}>{p.name}</h3><span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2 }}>{p.sku}</span></div>
@@ -1322,7 +1319,7 @@ const Categories = () => {
       {categories.length === 0 && <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 48, textAlign: 'center' }}><p style={{ color: T.tx3, fontSize: 14, marginBottom: 8 }}>No categories yet</p><p style={{ color: T.tx3, fontSize: 12 }}>Add a category like "Lehenga Choli" with components like Lehenga, Blouse, Dupatta</p>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={{ ...S.btnPrimary, marginTop: 16, display: 'inline-flex' }}>+ Add First Category</div>}</div>}
 
       {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 520 }}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Category</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 12, marginBottom: 14 }}><div><label style={S.fLabel}>Category Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Lehenga Choli" style={S.fInput} /></div><div><label style={S.fLabel}>SKU *</label><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required placeholder="e.g. LC-01" style={{ ...S.fInput, fontFamily: T.mono }} /></div></div>
+        <div style={{ marginBottom: 12 }}><label style={S.fLabel}>Category name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Lehenga Choli" style={S.fInput} /></div>
         <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description (optional)" style={S.fInput} /></div>
         {!selected && <>
           <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ ...S.fLabel, margin: 0 }}>Components</label><span onClick={addCompRow} style={{ ...S.btnPrimary, padding: '4px 10px', fontSize: 11 }}>+ Add More</span></div>
@@ -1386,9 +1383,9 @@ const Locations = () => {
   };
 
   return (
-    <div className="page-pad" style={{ padding: '16px 18px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Locations</span>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Locations</span>
       </div>
       {canEdit && <form onSubmit={addLocation} style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
         <input value={newLoc} onChange={(e) => setNewLoc(e.target.value)} placeholder="Add new location..." style={{ ...S.fInput, flex: 1 }} />
@@ -1526,9 +1523,9 @@ const Users = () => {
   };
 
   return (
-    <div className="page-pad" style={{ padding: '16px 18px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>User Management</span>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Users</span>
         <div onClick={() => setShowInvite(true)} style={S.btnPrimary}>+ Invite User</div>
       </div>
       <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 12, overflow: 'hidden' }}>
@@ -1593,6 +1590,24 @@ const Users = () => {
   );
 };
 
+const SettingsPage = () => {
+  const [tab, setTab] = useState('categories');
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+  const tabs = [{ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }];
+  if (isAdmin) tabs.push({ id: 'users', label: 'Users' });
+  return (
+    <div className="page-pad" style={{ padding: '16px 18px', animation: 'fi .15s ease' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 14, background: T.s2, borderRadius: 6, padding: 3, width: 'fit-content' }}>
+        {tabs.map(t => <div key={t.id} onClick={() => setTab(t.id)} style={{ padding: '6px 16px', borderRadius: 4, fontSize: 12, fontWeight: tab === t.id ? 600 : 400, cursor: 'pointer', background: tab === t.id ? T.ac : 'transparent', color: tab === t.id ? '#fff' : T.tx3, transition: 'all .15s' }}>{t.label}</div>)}
+      </div>
+      {tab === 'categories' && <Categories />}
+      {tab === 'locations' && <Locations />}
+      {tab === 'users' && <Users />}
+    </div>
+  );
+};
+
 const MainApp = () => {
   const [tab, setTab] = useState('dashboard');
   const [globalSearch, setGlobalSearch] = useState('');
@@ -1602,7 +1617,7 @@ const MainApp = () => {
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', completed: 'Completed Items', categories: 'Categories', locations: 'Locations', reports: 'Damage Reports', users: 'User Management' };
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', completed: 'Completed', reports: 'Reports', settings: 'Settings' };
   const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
@@ -1627,8 +1642,8 @@ const MainApp = () => {
     <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
       {/* Mobile bottom nav */}
       <div className="mobile-hamburger" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 102, background: T.s, borderTop: `1px solid ${T.bd}`, padding: '8px 0', paddingBottom: 'max(8px, env(safe-area-inset-bottom))', justifyContent: 'space-around' }}>
-        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Items' }, { id: 'completed', icon: 'check', label: 'Done' }, { id: 'more', icon: 'users', label: 'Menu' }].map(t => (
-          <div key={t.id} onClick={() => { if (t.id === 'more') setMobileMenu(!mobileMenu); else { setTab(t.id); setMobileMenu(false); } }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: (t.id !== 'more' && tab === t.id) ? T.ac : T.tx3, fontSize: 9, fontWeight: 500 }}>
+        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Items' }, { id: 'completed', icon: 'check', label: 'Done' }, { id: 'settings', icon: 'settings', label: 'Settings' }].map(t => (
+          <div key={t.id} onClick={() => { setTab(t.id); setMobileMenu(false); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: tab === t.id ? T.ac : T.tx3, fontSize: 9, fontWeight: 500 }}>
             <Icon name={t.icon} size={20} /><span>{t.label}</span>
           </div>
         ))}
@@ -1638,10 +1653,8 @@ const MainApp = () => {
         {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard /></div>}
         {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} /></div>}
         {mounted.has('completed') && <div style={{ display: tab === 'completed' ? 'block' : 'none' }}><Inventory globalSearch="" defaultStatus="completed" /></div>}
-        {mounted.has('categories') && <div style={{ display: tab === 'categories' ? 'block' : 'none' }}><Categories /></div>}
-        {mounted.has('locations') && <div style={{ display: tab === 'locations' ? 'block' : 'none' }}><Locations /></div>}
         {mounted.has('reports') && <div style={{ display: tab === 'reports' ? 'block' : 'none' }}><Reports /></div>}
-        {mounted.has('users') && <div style={{ display: tab === 'users' ? 'block' : 'none' }}><Users /></div>}
+        {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage /></div>}
       </main>
     </div>
     <ToastContainer />
