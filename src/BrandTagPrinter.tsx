@@ -104,12 +104,13 @@ const parseOrderSheet = (data: any[], masterRows: BrandTagRow[]): OrderRow[] => 
     const [skuPart, copiesStr] = rawSku.split('*');
     const sku = skuPart.trim();
     const copies = Math.max(1, parseInt(copiesStr) || 1);
-    const key = sku.toUpperCase();
     const brand = MARKETPLACE_BRAND[mp.toLowerCase()] || 'UNKNOWN';
+    // Aggregate by SKU + Brand (same SKU different brand = separate rows)
+    const key = sku.toUpperCase() + '::' + brand;
 
     if (map.has(key)) { map.get(key)!.copies += copies; }
     else {
-      const master = masterMap.get(key);
+      const master = masterMap.get(sku.toUpperCase());
       map.set(key, { sku, marketplace: mp, brand, copies, found: !!master, masterData: master });
     }
   }
@@ -512,8 +513,8 @@ export default function BrandTagPrinter() {
     e.target.value = '';
   }, [rows]);
 
-  const updateOrderCopies = (sku: string, copies: number) => {
-    setOrderRows(prev => prev ? prev.map(r => r.sku === sku ? { ...r, copies: Math.max(0, copies) } : r) : null);
+  const updateOrderCopies = (sku: string, brand: string, copies: number) => {
+    setOrderRows(prev => prev ? prev.map(r => (r.sku === sku && r.brand === brand) ? { ...r, copies: Math.max(0, copies) } : r) : null);
   };
 
   const printOrderLabels = (items: OrderRow[]) => {
@@ -662,7 +663,7 @@ export default function BrandTagPrinter() {
                     <td style={tdS}>{r.found ? r.masterData?.color : '—'}</td>
                     <td style={tdS}>{r.found ? r.masterData?.size : '—'}</td>
                     <td style={{ ...tdS, whiteSpace: 'nowrap' }}>{r.found ? fmtMrp(r.masterData?.mrp || 0) : '—'}</td>
-                    <td style={tdS}><input type="number" min={0} value={r.copies} onChange={e => updateOrderCopies(r.sku, Number(e.target.value))} style={{ ...inp, width: 40, textAlign: 'center', padding: '2px', fontSize: 12 }} /></td>
+                    <td style={tdS}><input type="number" min={0} value={r.copies} onChange={e => updateOrderCopies(r.sku, r.brand, Number(e.target.value))} style={{ ...inp, width: 40, textAlign: 'center', padding: '2px', fontSize: 12 }} /></td>
                     <td style={tdS}>{r.found ? <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(52,211,153,.12)', color: T.gr }}>Ready</span> : <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(248,113,113,.12)', color: T.re }}>Missing</span>}</td>
                   </tr>
                 ))}</tbody>
