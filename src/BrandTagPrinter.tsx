@@ -496,16 +496,16 @@ export default function BrandTagPrinter() {
             {btPaged.map(row => (
               <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = T.s2; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
                 <td style={tdS}><input type="checkbox" checked={row.copies > 0} onChange={e => updateCopies(row.id, e.target.checked ? (globalCopies || 1) : 0)} style={{ accentColor: T.ac }} /></td>
-                <td style={tdS}><strong>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</strong></td>
-                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10, color: T.tx2 }}>{row.ean}</td>
-                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10, fontWeight: 600, color: T.ac2 }}>{row.sku}</td>
-                <td style={{ ...tdS, fontSize: 10 }}>{row.qty.replace(/^INCLUDES:\s*/i, '')}</td>
-                <td style={{ ...tdS, fontWeight: 600, fontFamily: T.mono, whiteSpace: 'nowrap' }}>{fmtMrp(row.mrp)}</td>
+                <td style={tdS}>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</td>
+                <td style={tdS}>{row.ean}</td>
+                <td style={{ ...tdS, fontWeight: 500 }}>{row.sku}</td>
+                <td style={tdS}>{row.qty.replace(/^INCLUDES:\s*/i, '')}</td>
+                <td style={{ ...tdS, whiteSpace: 'nowrap' }}>{fmtMrp(row.mrp)}</td>
                 <td style={tdS}>{row.size}</td>
-                <td style={{ ...tdS, fontSize: 10 }}>{row.product.replace(/^PRODUCT DESC:\s*/i, '')}</td>
+                <td style={tdS}>{row.product.replace(/^PRODUCT DESC:\s*/i, '')}</td>
                 <td style={tdS}>{row.color}</td>
-                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10, color: T.tx2 }}>{row.jioCode}</td>
-                <td style={tdS}><input type="number" min={0} value={row.copies} onChange={e => updateCopies(row.id, Number(e.target.value))} style={{ ...inp, width: 40, textAlign: 'center', padding: '2px', fontSize: 10, fontFamily: T.mono }} /></td>
+                <td style={tdS}>{row.jioCode}</td>
+                <td style={tdS}><input type="number" min={0} value={row.copies} onChange={e => updateCopies(row.id, Number(e.target.value))} style={{ ...inp, width: 40, textAlign: 'center', padding: '2px', fontSize: 12 }} /></td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', gap: 3 }}>
                     <button style={btnSm} onClick={() => openEdit(row)}>Edit</button>
