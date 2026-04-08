@@ -87,7 +87,7 @@ const fmtMrp = (v: number): string => '\u20B9' + v.toLocaleString('en-IN');
 
 // ── Print function: renders labels into a new window for clean printing ───────
 const printLabelsInWindow = (labels: BrandTagRow[]) => {
-  const win = window.open('', '_blank', 'width=600,height=800');
+  const win = window.open('', '_blank', 'width=400,height=600');
   if (!win) { alert('Popup blocked. Allow popups for this site.'); return; }
 
   const html = labels.map(r => {
@@ -96,15 +96,15 @@ const printLabelsInWindow = (labels: BrandTagRow[]) => {
     const mrp = '\u20B9' + r.mrp.toLocaleString('en-IN');
     return `<div class="bt-label">
       <div class="left">
-        <div style="font-weight:700;font-size:7.5pt">BRAND NAME: ${brand}</div>
-        <div style="font-weight:700;font-size:7pt;font-family:'JetBrains Mono',monospace">SKU: ${r.sku}</div>
-        <div style="font-size:6.5pt">PRODUCT DESC: ${product}</div>
-        <div style="font-size:6pt;word-break:break-word">${r.qty}</div>
-        <div style="font-size:6.5pt">SIZE: ${r.size}</div>
-        <div style="font-size:6.5pt">COLOR: ${r.color}</div>
-        <div style="font-weight:700;font-size:7pt">MRP: ${mrp}</div>
-        <div style="font-size:5.5pt;word-break:break-word;color:#333">MKTD & DIST. BY: ${r.mktd}</div>
-        <div style="font-size:6pt;font-family:'JetBrains Mono',monospace">JIO CODE: ${r.jioCode}</div>
+        <div style="font-weight:700;font-size:8pt;margin-bottom:3px">BRAND NAME: ${brand}</div>
+        <div style="font-weight:700;font-size:7.5pt;font-family:monospace;margin-bottom:2px">SKU: ${r.sku}</div>
+        <div style="font-size:7pt;margin-bottom:2px">PRODUCT DESC: ${product}</div>
+        <div style="font-size:6.5pt;margin-bottom:2px;word-break:break-word">${r.qty}</div>
+        <div style="font-size:7pt;margin-bottom:1px">SIZE: ${r.size}</div>
+        <div style="font-size:7pt;margin-bottom:1px">COLOR: ${r.color}</div>
+        <div style="font-weight:700;font-size:7.5pt;margin-bottom:3px">MRP: ${mrp}</div>
+        <div style="font-size:5.5pt;margin-bottom:2px;word-break:break-word;color:#333">MKTD &amp; DIST. BY: ${r.mktd}</div>
+        <div style="font-size:6pt;font-family:monospace;margin-bottom:2px">JIO CODE: ${r.jioCode}</div>
         <div class="bc"><svg id="bc-${r.id}"></svg></div>
       </div>
       <div class="right"><span>EAN: ${r.sku}</span></div>
@@ -112,27 +112,33 @@ const printLabelsInWindow = (labels: BrandTagRow[]) => {
   }).join('');
 
   win.document.write(`<!DOCTYPE html><html><head>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',sans-serif;background:#fff}
-.bt-label{width:1.97in;height:2.95in;display:flex;overflow:hidden;border:1px solid #ccc;page-break-inside:avoid;break-inside:avoid}
-.left{flex:1;padding:5px 5px 3px;display:flex;flex-direction:column;line-height:1.25}
-.left>div{margin-bottom:1px}
-.bc{margin-top:auto;text-align:center;padding-top:2px}
-.bc svg{max-width:95%;height:28px}
-.right{width:28px;min-width:28px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;border-left:1px solid #ddd}
-.right span{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;font-weight:700;font-size:8pt;font-family:'JetBrains Mono',monospace;color:#333;letter-spacing:.5px}
-@media print{@page{margin:0;size:1.97in 2.95in}.bt-label{border:none}}
-</style></head><body>${html}
+body{font-family:Arial,Helvetica,sans-serif;background:#fff}
+.bt-label{width:1.97in;height:2.97in;display:flex;overflow:hidden;page-break-after:always;page-break-inside:avoid}
+.left{flex:1;padding:4px 5px 2px;display:flex;flex-direction:column;line-height:1.3}
+.bc{margin-top:auto;text-align:center}
+.bc svg{width:85%;height:30px}
+.right{width:24px;min-width:24px;background:#eee;display:flex;align-items:center;justify-content:center}
+.right span{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;font-weight:700;font-size:8pt;font-family:monospace;color:#222;letter-spacing:.5px}
+@media print{
+  @page{margin:0;size:1.97in 2.97in}
+  body{margin:0}
+  .bt-label{border:none;width:100%;height:100%}
+}
+@media screen{
+  .bt-label{border:1px solid #ccc;margin:8px}
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+</head><body>${html}
 <script>
 document.querySelectorAll('.bc svg').forEach(function(svg){
   var id=svg.id.replace('bc-','');
   var row=${JSON.stringify(labels.map(r=>({id:r.id,jio:r.jioCode,sku:r.sku})))}.find(function(r){return r.id===id});
-  if(row&&row.jio)try{JsBarcode(svg,row.jio,{format:'CODE128',width:1,height:28,displayValue:true,text:row.sku,fontSize:7,margin:0,textMargin:1})}catch(e){}
+  if(row&&row.jio)try{JsBarcode(svg,row.jio,{format:'CODE128',width:1,height:25,displayValue:true,text:row.sku,fontSize:7,font:'monospace',margin:0,textMargin:0})}catch(e){}
 });
-setTimeout(function(){window.print()},500);
+setTimeout(function(){window.print()},600);
 <\/script></body></html>`);
   win.document.close();
 };
@@ -422,14 +428,16 @@ export default function BrandTagPrinter() {
       <div style={{ overflowX: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8, background: T.s, marginBottom: 8 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead><tr>
+            <th style={thS}><input type="checkbox" checked={selectAll} onChange={e => handleSelectAll(e.target.checked)} style={{ accentColor: T.ac }} /></th>
             {['Brand', 'EAN', 'SKU', 'Includes', 'MRP', 'Size', 'Product', 'Color', 'Jio Code', 'Copies', ''].map(h => (
               <th key={h} style={thS}>{h}</th>
             ))}
           </tr></thead>
           <tbody>
-            {filtered.length === 0 && <tr><td colSpan={11} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={12} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
             {filtered.map(row => (
               <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = T.s2; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                <td style={tdS}><input type="checkbox" checked={row.copies > 0} onChange={e => updateCopies(row.id, e.target.checked ? (globalCopies || 1) : 0)} style={{ accentColor: T.ac }} /></td>
                 <td style={tdS}><strong>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</strong></td>
                 <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10, color: T.tx2 }}>{row.ean}</td>
                 <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10, fontWeight: 600, color: T.ac2 }}>{row.sku}</td>
