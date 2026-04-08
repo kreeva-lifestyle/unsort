@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
@@ -33,10 +33,10 @@ const inp: React.CSSProperties = {
 const thS: React.CSSProperties = {
   fontSize: 10, color: T.tx3, padding: '8px 10px', textAlign: 'left',
   fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: T.s2,
-  whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 1,
+  whiteSpace: 'nowrap', fontFamily: T.sans,
 };
-const tdS: React.CSSProperties = { padding: '8px 10px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx };
-const fLabel: React.CSSProperties = { fontSize: 11, color: T.tx3, marginBottom: 4, display: 'block', fontWeight: 500 };
+const tdS: React.CSSProperties = { padding: '8px 10px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx, fontFamily: T.sans };
+const fLabel: React.CSSProperties = { fontSize: 11, color: T.tx3, marginBottom: 4, display: 'block', fontWeight: 500, fontFamily: T.sans };
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface BrandTagRow {
@@ -87,56 +87,58 @@ const fmtMrp = (v: number): string => '\u20B9' + v.toLocaleString('en-IN');
 
 // ── Print function: renders labels into a new window for clean printing ───────
 const printLabelsInWindow = (labels: BrandTagRow[]) => {
-  const win = window.open('', '_blank', 'width=400,height=600');
+  const win = window.open('', '_blank', 'width=300,height=500');
   if (!win) { alert('Popup blocked. Allow popups for this site.'); return; }
 
   const html = labels.map(r => {
-    const brand = r.brand.replace(/^BRAND NAME:\s*/i, '').trim() || r.brand;
-    const product = r.product.replace(/^PRODUCT DESC:\s*/i, '').trim() || r.product;
+    const brand = r.brand.replace(/^BRAND NAME:\s*/i, '').trim().toUpperCase();
+    const product = r.product.replace(/^PRODUCT DESC:\s*/i, '').trim();
+    const qty = r.qty.replace(/^INCLUDES:\s*/i, '').trim();
     const mrp = '\u20B9' + r.mrp.toLocaleString('en-IN');
-    return `<div class="bt-label">
-      <div class="left">
-        <div style="font-weight:700;font-size:8pt;margin-bottom:3px">BRAND NAME: ${brand}</div>
-        <div style="font-weight:700;font-size:7.5pt;font-family:monospace;margin-bottom:2px">SKU: ${r.sku}</div>
-        <div style="font-size:7pt;margin-bottom:2px">PRODUCT DESC: ${product}</div>
-        <div style="font-size:6.5pt;margin-bottom:2px;word-break:break-word">${r.qty}</div>
-        <div style="font-size:7pt;margin-bottom:1px">SIZE: ${r.size}</div>
-        <div style="font-size:7pt;margin-bottom:1px">COLOR: ${r.color}</div>
-        <div style="font-weight:700;font-size:7.5pt;margin-bottom:3px">MRP: ${mrp}</div>
-        <div style="font-size:5.5pt;margin-bottom:2px;word-break:break-word;color:#333">MKTD &amp; DIST. BY: ${r.mktd}</div>
-        <div style="font-size:6pt;font-family:monospace;margin-bottom:2px">JIO CODE: ${r.jioCode}</div>
-        <div class="bc"><svg id="bc-${r.id}"></svg></div>
-      </div>
-      <div class="right"><span>EAN: ${r.sku}</span></div>
-    </div>`;
+    return `<div class="label">
+  <div class="main">
+    <div class="row b" style="font-size:9pt">BRAND NAME: ${brand}</div>
+    <div class="row b" style="font-size:8.5pt">SKU: ${r.sku}</div>
+    <div class="row" style="font-size:7.5pt">PRODUCT DESC: ${product}</div>
+    <div class="row" style="font-size:7pt">INCLUDES: ${qty}</div>
+    <div class="row" style="font-size:7.5pt">SIZE: ${r.size}</div>
+    <div class="row" style="font-size:7.5pt">COLOR: ${r.color}</div>
+    <div class="row b" style="font-size:8.5pt">MRP: ${mrp}</div>
+    <div class="row sm">MKTD &amp; DIST. BY: ${r.mktd}</div>
+    <div class="row" style="font-size:7pt;font-family:monospace">JIO CODE: ${r.jioCode}</div>
+    <div class="barcode"><svg id="bc-${r.id}"></svg></div>
+  </div>
+  <div class="ean"><span>EAN: ${r.sku}</span></div>
+</div>`;
   }).join('');
 
   win.document.write(`<!DOCTYPE html><html><head>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Arial,Helvetica,sans-serif;background:#fff}
-.bt-label{width:1.97in;height:2.97in;display:flex;overflow:hidden;page-break-after:always;page-break-inside:avoid}
-.left{flex:1;padding:4px 5px 2px;display:flex;flex-direction:column;line-height:1.3}
-.bc{margin-top:auto;text-align:center}
-.bc svg{width:85%;height:30px}
-.right{width:24px;min-width:24px;background:#eee;display:flex;align-items:center;justify-content:center}
-.right span{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;font-weight:700;font-size:8pt;font-family:monospace;color:#222;letter-spacing:.5px}
+body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000}
+.label{width:1.97in;height:2.97in;display:flex;overflow:hidden;page-break-after:always}
+.main{flex:1;padding:6px 7px 4px;display:flex;flex-direction:column}
+.row{line-height:1.35;margin-bottom:2px}
+.b{font-weight:700}
+.sm{font-size:6pt;line-height:1.25;color:#222}
+.barcode{margin-top:auto;text-align:center;padding:4px 0 2px}
+.barcode svg{width:100%;height:36px}
+.ean{width:26px;min-width:26px;background:#e8e8e8;display:flex;align-items:center;justify-content:center}
+.ean span{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;font-weight:900;font-size:9pt;font-family:Arial,sans-serif;color:#000;letter-spacing:1px}
 @media print{
   @page{margin:0;size:1.97in 2.97in}
   body{margin:0}
-  .bt-label{border:none;width:100%;height:100%}
+  .label{width:100%;height:100%;border:none}
 }
-@media screen{
-  .bt-label{border:1px solid #ccc;margin:8px}
-}
+@media screen{.label{border:1px solid #ccc;margin:8px auto}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
 </head><body>${html}
 <script>
-document.querySelectorAll('.bc svg').forEach(function(svg){
+document.querySelectorAll('.barcode svg').forEach(function(svg){
   var id=svg.id.replace('bc-','');
   var row=${JSON.stringify(labels.map(r=>({id:r.id,jio:r.jioCode,sku:r.sku})))}.find(function(r){return r.id===id});
-  if(row&&row.jio)try{JsBarcode(svg,row.jio,{format:'CODE128',width:1,height:25,displayValue:true,text:row.sku,fontSize:7,font:'monospace',margin:0,textMargin:0})}catch(e){}
+  if(row&&row.jio)try{JsBarcode(svg,row.jio,{format:'CODE128',width:1.5,height:34,displayValue:true,text:row.sku,fontSize:8,font:'Arial',margin:0,textMargin:1})}catch(e){}
 });
 setTimeout(function(){window.print()},600);
 <\/script></body></html>`);
@@ -398,6 +400,11 @@ export default function BrandTagPrinter() {
 
   // Total label count
   const totalLabels = useMemo(() => rows.reduce((s, r) => s + r.copies, 0), [rows]);
+  const [btPage, setBtPage] = useState(0);
+  const btPerPage = 25;
+  const btTotalPages = Math.ceil(filtered.length / btPerPage);
+  const btPaged = filtered.slice(btPage * btPerPage, (btPage + 1) * btPerPage);
+  useEffect(() => { setBtPage(0); }, [search, brandFilter, sizeFilter, colorFilter]);
 
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '16px 18px' }}>
@@ -435,7 +442,7 @@ export default function BrandTagPrinter() {
           </tr></thead>
           <tbody>
             {filtered.length === 0 && <tr><td colSpan={12} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
-            {filtered.map(row => (
+            {btPaged.map(row => (
               <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = T.s2; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
                 <td style={tdS}><input type="checkbox" checked={row.copies > 0} onChange={e => updateCopies(row.id, e.target.checked ? (globalCopies || 1) : 0)} style={{ accentColor: T.ac }} /></td>
                 <td style={tdS}><strong>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</strong></td>
@@ -460,7 +467,11 @@ export default function BrandTagPrinter() {
           </tbody>
         </table>
       </div>
-
+      {btTotalPages > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
+        <span onClick={() => setBtPage(Math.max(0, btPage - 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage === 0 ? 0.3 : 1, pointerEvents: btPage === 0 ? 'none' : 'auto' }}>Prev</span>
+        <span style={{ color: T.tx3 }}>Page {btPage + 1} of {btTotalPages}</span>
+        <span onClick={() => setBtPage(Math.min(btTotalPages - 1, btPage + 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage >= btTotalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= btTotalPages - 1 ? 'none' : 'auto' }}>Next</span>
+      </div>}
 
       {/* ── Add / Edit Modal ── */}
       {modalRow && (
