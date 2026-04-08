@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
@@ -33,10 +33,10 @@ const inp: React.CSSProperties = {
 const thS: React.CSSProperties = {
   fontSize: 10, color: T.tx3, padding: '8px 10px', textAlign: 'left',
   fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: T.s2,
-  whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 1,
+  whiteSpace: 'nowrap', fontFamily: T.sans,
 };
-const tdS: React.CSSProperties = { padding: '8px 10px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx };
-const fLabel: React.CSSProperties = { fontSize: 11, color: T.tx3, marginBottom: 4, display: 'block', fontWeight: 500 };
+const tdS: React.CSSProperties = { padding: '8px 10px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx, fontFamily: T.sans };
+const fLabel: React.CSSProperties = { fontSize: 11, color: T.tx3, marginBottom: 4, display: 'block', fontWeight: 500, fontFamily: T.sans };
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface BrandTagRow {
@@ -400,6 +400,11 @@ export default function BrandTagPrinter() {
 
   // Total label count
   const totalLabels = useMemo(() => rows.reduce((s, r) => s + r.copies, 0), [rows]);
+  const [btPage, setBtPage] = useState(0);
+  const btPerPage = 25;
+  const btTotalPages = Math.ceil(filtered.length / btPerPage);
+  const btPaged = filtered.slice(btPage * btPerPage, (btPage + 1) * btPerPage);
+  useEffect(() => { setBtPage(0); }, [search, brandFilter, sizeFilter, colorFilter]);
 
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '16px 18px' }}>
@@ -437,7 +442,7 @@ export default function BrandTagPrinter() {
           </tr></thead>
           <tbody>
             {filtered.length === 0 && <tr><td colSpan={12} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
-            {filtered.map(row => (
+            {btPaged.map(row => (
               <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = T.s2; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
                 <td style={tdS}><input type="checkbox" checked={row.copies > 0} onChange={e => updateCopies(row.id, e.target.checked ? (globalCopies || 1) : 0)} style={{ accentColor: T.ac }} /></td>
                 <td style={tdS}><strong>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</strong></td>
@@ -462,7 +467,11 @@ export default function BrandTagPrinter() {
           </tbody>
         </table>
       </div>
-
+      {btTotalPages > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
+        <span onClick={() => setBtPage(Math.max(0, btPage - 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage === 0 ? 0.3 : 1, pointerEvents: btPage === 0 ? 'none' : 'auto' }}>Prev</span>
+        <span style={{ color: T.tx3 }}>Page {btPage + 1} of {btTotalPages}</span>
+        <span onClick={() => setBtPage(Math.min(btTotalPages - 1, btPage + 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage >= btTotalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= btTotalPages - 1 ? 'none' : 'auto' }}>Next</span>
+      </div>}
 
       {/* ── Add / Edit Modal ── */}
       {modalRow && (
