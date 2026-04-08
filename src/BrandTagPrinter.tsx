@@ -77,6 +77,13 @@ const blankRow = (): BrandTagRow => ({
   size: '', product: '', color: '', mktd: '', jioCode: '', copies: 0,
 });
 
+const REQUIRED_FIELDS: (keyof BrandTagRow)[] = ['brand', 'ean', 'sku', 'qty', 'size', 'product', 'color', 'mktd', 'jioCode'];
+const validateRow = (r: BrandTagRow): string | null => {
+  for (const f of REQUIRED_FIELDS) { if (!r[f] || String(r[f]).trim() === '') return f; }
+  if (!r.mrp || r.mrp <= 0) return 'mrp';
+  return null;
+};
+
 const fmtMrp = (v: number): string => '\u20B9' + v.toLocaleString('en-IN');
 
 // ── Print CSS (injected once) ──────────────────────────────────────────────────
@@ -252,7 +259,7 @@ const BrandTagModal = ({
           ))}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
             <button style={btnGhost} onClick={onClose}>Cancel</button>
-            <button style={btnPrimary} onClick={() => onSave(form)}>Save</button>
+            <button style={btnPrimary} onClick={() => { const bad = validateRow(form); if (bad) { alert(`"${bad}" is required. Please fill all fields.`); return; } onSave(form); }}>Save</button>
           </div>
         </div>
       </div>
@@ -331,6 +338,16 @@ export default function BrandTagPrinter() {
           alert('No rows found. Check that column headers match the expected format.');
           return;
         }
+        // Validate all rows - reject file if any row has missing data
+        const errors: string[] = [];
+        imported.forEach((r, i) => {
+          const bad = validateRow(r);
+          if (bad) errors.push(`Row ${i + 1} (SKU: ${r.sku || 'empty'}): missing "${bad}"`);
+        });
+        if (errors.length > 0) {
+          alert(`Import rejected — ${errors.length} row(s) have missing data:\n\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? `\n...and ${errors.length - 10} more` : ''}\n\nFix the Excel file and re-import.`);
+          return;
+        }
         setRows(prev => [...prev, ...imported]);
       } catch (_) {
         alert('Failed to parse Excel file. Ensure it is a valid .xlsx / .xls / .csv file.');
@@ -401,6 +418,8 @@ export default function BrandTagPrinter() {
   }, []);
 
   const printSingle = useCallback((row: BrandTagRow) => {
+    const bad = validateRow(row);
+    if (bad) { alert(`Cannot print — "${bad}" is missing for SKU: ${row.sku || 'empty'}`); return; }
     setPrintLabels([row]);
   }, []);
 
@@ -411,9 +430,14 @@ export default function BrandTagPrinter() {
 
   const printSelected = useCallback(() => {
     const labels: BrandTagRow[] = [];
+    const badRows: string[] = [];
     rows.forEach(r => {
+      if (r.copies <= 0) return;
+      const bad = validateRow(r);
+      if (bad) { badRows.push(`${r.sku || 'empty'}: missing "${bad}"`); return; }
       for (let i = 0; i < r.copies; i++) labels.push(r);
     });
+    if (badRows.length > 0) { alert(`Cannot print — incomplete data:\n${badRows.join('\n')}`); return; }
     doPrint(labels);
   }, [rows, doPrint]);
 
