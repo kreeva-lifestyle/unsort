@@ -1,6 +1,5 @@
 /* eslint-disable */
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import JsBarcode from 'jsbarcode';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
@@ -86,99 +85,56 @@ const validateRow = (r: BrandTagRow): string | null => {
 
 const fmtMrp = (v: number): string => '\u20B9' + v.toLocaleString('en-IN');
 
-// ── Print CSS (injected once) ──────────────────────────────────────────────────
-const PRINT_CSS_ID = 'bt-print-css';
-const ensurePrintCSS = () => {
-  if (document.getElementById(PRINT_CSS_ID)) return;
-  const el = document.createElement('style');
-  el.id = PRINT_CSS_ID;
-  el.textContent = `
-@media print {
-  body > *:not(.bt-print-area) { display: none !important; }
-  .bt-print-area { display: block !important; position: static !important; background: #fff !important; }
-  .bt-print-area .bt-label {
-    width: 1.97in; height: 2.95in;
-    page-break-inside: avoid; break-inside: avoid;
-    margin: 0; padding: 0; box-sizing: border-box;
-    transform: none !important;
-  }
-  @page { margin: 0; size: 1.97in 2.95in; }
-}`;
-  document.head.appendChild(el);
-};
+// ── Print function: renders labels into a new window for clean printing ───────
+const printLabelsInWindow = (labels: BrandTagRow[]) => {
+  const win = window.open('', '_blank', 'width=600,height=800');
+  if (!win) { alert('Popup blocked. Allow popups for this site.'); return; }
 
-// ── Label Component (white bg, for printing) ──────────────────────────────────
-const BrandTagLabel = ({ row }: { row: BrandTagRow }) => {
-  const bcRef = useRef<SVGSVGElement>(null);
-
-  useEffect(() => {
-    if (!bcRef.current || !row.jioCode) return;
-    try {
-      JsBarcode(bcRef.current, row.jioCode, {
-        format: 'CODE128',
-        width: 1,
-        height: 28,
-        displayValue: true,
-        text: row.sku,
-        fontSize: 7,
-        font: 'JetBrains Mono, monospace',
-        margin: 0,
-        textMargin: 1,
-      });
-    } catch (_) { /* invalid barcode value */ }
-  }, [row.jioCode, row.sku]);
-
-  const brandText = row.brand.replace(/^BRAND NAME:\s*/i, '').trim() || row.brand;
-  const productText = row.product.replace(/^PRODUCT DESC:\s*/i, '').trim() || row.product;
-
-  return (
-    <div
-      className="bt-label"
-      style={{
-        width: 189, height: 283, display: 'flex', flexDirection: 'row',
-        fontFamily: "'Inter', sans-serif", border: '1px solid #ccc',
-        boxSizing: 'border-box', overflow: 'hidden',
-        background: '#fff', color: '#000',
-      }}
-    >
-      {/* Main content area */}
-      <div style={{
-        flex: 1, padding: '5px 5px 3px 5px',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      }}>
-        <div style={{ fontWeight: 700, fontSize: '7.5pt', lineHeight: 1.25, marginBottom: 1 }}>BRAND NAME: {brandText}</div>
-        <div style={{ fontWeight: 700, fontSize: '7pt', lineHeight: 1.25, fontFamily: T.mono, marginBottom: 1 }}>SKU: {row.sku}</div>
-        <div style={{ fontSize: '6.5pt', lineHeight: 1.2, marginBottom: 1 }}>PRODUCT DESC: {productText}</div>
-        <div style={{ fontSize: '6pt', lineHeight: 1.2, wordWrap: 'break-word', overflowWrap: 'break-word', marginBottom: 1 }}>{row.qty}</div>
-        <div style={{ fontSize: '6.5pt', lineHeight: 1.25, marginBottom: 1 }}>SIZE: {row.size}</div>
-        <div style={{ fontSize: '6.5pt', lineHeight: 1.25, marginBottom: 1 }}>COLOR: {row.color}</div>
-        <div style={{ fontWeight: 700, fontSize: '7pt', lineHeight: 1.25, marginBottom: 1 }}>MRP: {fmtMrp(row.mrp)}</div>
-        <div style={{ fontSize: '5.5pt', lineHeight: 1.15, wordWrap: 'break-word', overflowWrap: 'break-word', marginBottom: 1, color: '#333' }}>
-          MKTD & DIST. BY: {row.mktd}
-        </div>
-        <div style={{ fontSize: '6pt', lineHeight: 1.2, fontFamily: T.mono, marginBottom: 2 }}>JIO CODE: {row.jioCode}</div>
-        <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'center' }}>
-          <svg ref={bcRef} style={{ maxWidth: '95%', height: 32 }} />
-        </div>
+  const html = labels.map(r => {
+    const brand = r.brand.replace(/^BRAND NAME:\s*/i, '').trim() || r.brand;
+    const product = r.product.replace(/^PRODUCT DESC:\s*/i, '').trim() || r.product;
+    const mrp = '\u20B9' + r.mrp.toLocaleString('en-IN');
+    return `<div class="bt-label">
+      <div class="left">
+        <div style="font-weight:700;font-size:7.5pt">BRAND NAME: ${brand}</div>
+        <div style="font-weight:700;font-size:7pt;font-family:'JetBrains Mono',monospace">SKU: ${r.sku}</div>
+        <div style="font-size:6.5pt">PRODUCT DESC: ${product}</div>
+        <div style="font-size:6pt;word-break:break-word">${r.qty}</div>
+        <div style="font-size:6.5pt">SIZE: ${r.size}</div>
+        <div style="font-size:6.5pt">COLOR: ${r.color}</div>
+        <div style="font-weight:700;font-size:7pt">MRP: ${mrp}</div>
+        <div style="font-size:5.5pt;word-break:break-word;color:#333">MKTD & DIST. BY: ${r.mktd}</div>
+        <div style="font-size:6pt;font-family:'JetBrains Mono',monospace">JIO CODE: ${r.jioCode}</div>
+        <div class="bc"><svg id="bc-${r.id}"></svg></div>
       </div>
-      {/* Right EAN strip */}
-      <div style={{
-        width: 28, minWidth: 28, background: '#f0f0f0',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        borderLeft: '1px solid #ddd',
-      }}>
-        <span style={{
-          writingMode: 'vertical-rl' as const,
-          transform: 'rotate(180deg)',
-          whiteSpace: 'nowrap',
-          fontWeight: 700, fontSize: '8pt', fontFamily: T.mono, color: '#333',
-          letterSpacing: 0.5,
-        }}>
-          EAN: {row.sku}
-        </span>
-      </div>
-    </div>
-  );
+      <div class="right"><span>EAN: ${r.sku}</span></div>
+    </div>`;
+  }).join('');
+
+  win.document.write(`<!DOCTYPE html><html><head>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#fff}
+.bt-label{width:1.97in;height:2.95in;display:flex;overflow:hidden;border:1px solid #ccc;page-break-inside:avoid;break-inside:avoid}
+.left{flex:1;padding:5px 5px 3px;display:flex;flex-direction:column;line-height:1.25}
+.left>div{margin-bottom:1px}
+.bc{margin-top:auto;text-align:center;padding-top:2px}
+.bc svg{max-width:95%;height:28px}
+.right{width:28px;min-width:28px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;border-left:1px solid #ddd}
+.right span{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;font-weight:700;font-size:8pt;font-family:'JetBrains Mono',monospace;color:#333;letter-spacing:.5px}
+@media print{@page{margin:0;size:1.97in 2.95in}.bt-label{border:none}}
+</style></head><body>${html}
+<script>
+document.querySelectorAll('.bc svg').forEach(function(svg){
+  var id=svg.id.replace('bc-','');
+  var row=${JSON.stringify(labels.map(r=>({id:r.id,jio:r.jioCode,sku:r.sku})))}.find(function(r){return r.id===id});
+  if(row&&row.jio)try{JsBarcode(svg,row.jio,{format:'CODE128',width:1,height:28,displayValue:true,text:row.sku,fontSize:7,margin:0,textMargin:1})}catch(e){}
+});
+setTimeout(function(){window.print()},500);
+<\/script></body></html>`);
+  win.document.close();
 };
 
 // ── Add / Edit Modal ───────────────────────────────────────────────────────────
@@ -278,21 +234,7 @@ export default function BrandTagPrinter() {
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [selectAll, setSelectAll] = useState(false);
   const [globalCopies, setGlobalCopies] = useState(1);
-  const [printLabels, setPrintLabels] = useState<BrandTagRow[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  // Inject print CSS once
-  useEffect(() => { ensurePrintCSS(); }, []);
-
-  // Trigger browser print after labels mount
-  useEffect(() => {
-    if (printLabels.length === 0) return;
-    const t = setTimeout(() => {
-      window.print();
-      setPrintLabels([]);
-    }, 400);
-    return () => clearTimeout(t);
-  }, [printLabels]);
 
   // Auto-populated filter options
   const uniqueBrands = useMemo(() => [...new Set(rows.map(r => r.brand.replace(/^BRAND NAME:\s*/i, '').trim()).filter(Boolean))].sort(), [rows]);
@@ -412,23 +354,15 @@ export default function BrandTagPrinter() {
   }, [modalMode]);
 
   // ── Print Handlers ──
-  const doPrint = useCallback((labels: BrandTagRow[]) => {
-    if (labels.length === 0) {
-      alert('No labels to print. Set COPIES > 0 for the rows you want to print.');
-      return;
-    }
-    setPrintLabels(labels);
-  }, []);
-
   const printSingle = useCallback((row: BrandTagRow) => {
     const bad = validateRow(row);
     if (bad) { alert(`Cannot print — "${bad}" is missing for SKU: ${row.sku || 'empty'}`); return; }
-    setPrintLabels([row]);
+    printLabelsInWindow([row]);
   }, []);
 
   const printTestLabel = useCallback(() => {
     const s = rows[0] || sampleRow();
-    setPrintLabels([s]);
+    printLabelsInWindow([s]);
   }, [rows]);
 
   const printSelected = useCallback(() => {
@@ -441,8 +375,9 @@ export default function BrandTagPrinter() {
       for (let i = 0; i < r.copies; i++) labels.push(r);
     });
     if (badRows.length > 0) { alert(`Cannot print — incomplete data:\n${badRows.join('\n')}`); return; }
-    doPrint(labels);
-  }, [rows, doPrint]);
+    if (labels.length === 0) { alert('Set COPIES > 0 for rows you want to print.'); return; }
+    printLabelsInWindow(labels);
+  }, [rows]);
 
   // ── Select All / Set All Copies ──
   const handleSelectAll = useCallback((checked: boolean) => {
@@ -460,16 +395,6 @@ export default function BrandTagPrinter() {
 
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, minHeight: '100vh' }}>
-      {/* ── Hidden Print Area ── */}
-      {printLabels.length > 0 && (
-        <div
-          className="bt-print-area"
-          style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, background: '#fff' }}
-        >
-          {printLabels.map((r, i) => <BrandTagLabel key={`pl-${i}`} row={r} />)}
-        </div>
-      )}
-
       {/* ── Toolbar ── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <span style={{ fontSize: 16, fontWeight: 700, color: T.tx, marginRight: 8 }}>Brand Tag Printer</span>
