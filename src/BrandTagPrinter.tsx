@@ -278,6 +278,7 @@ export default function BrandTagPrinter() {
   const orderFileRef = useRef<HTMLInputElement>(null);
   const [orderRows, setOrderRows] = useState<OrderRow[] | null>(null);
   const [orderPage, setOrderPage] = useState(0);
+  const [orderPerPage, setOrderPerPage] = useState(25);
 
   // Fetch from Supabase + realtime
   const fetchRows = useCallback(async () => {
@@ -631,7 +632,7 @@ export default function BrandTagPrinter() {
         const ready = orderRows.filter(r => r.found);
         const missing = orderRows.filter(r => !r.found);
         const totalCopies = ready.reduce((s, r) => s + r.copies, 0);
-        const opp = 25;
+        const opp = orderPerPage;
         const otp = Math.ceil(orderRows.length / opp);
         const opaged = orderRows.slice(orderPage * opp, (orderPage + 1) * opp);
         return <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 200, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
@@ -648,6 +649,18 @@ export default function BrandTagPrinter() {
                   ? <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={() => printOrderLabels(ready)}>Print All ({totalCopies})</button>
                   : <button style={{ ...btnGhost, opacity: 0.4, cursor: 'not-allowed' }} title="Resolve missing SKUs first">Print blocked</button>
                 }
+                <button style={btnGhost} onClick={() => {
+                  const exportData = (orderRows || []).map(r => ({
+                    'Marketplace': r.marketplace, 'SKU': r.sku, 'Brand': r.brand,
+                    'Product': r.found ? r.masterData?.product.replace(/^PRODUCT DESC:\s*/i, '') : '', 'Color': r.found ? r.masterData?.color : '',
+                    'Size': r.found ? r.masterData?.size : '', 'MRP': r.found ? r.masterData?.mrp : '',
+                    'Copies': r.copies, 'Status': r.found ? 'Ready' : 'Missing',
+                  }));
+                  const ws = XLSX.utils.json_to_sheet(exportData);
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, 'Order Preview');
+                  XLSX.writeFile(wb, 'order-preview.xlsx');
+                }}>Export</button>
                 <button style={btnGhost} onClick={() => setOrderRows(null)}>Close</button>
               </div>
             </div>
@@ -676,11 +689,15 @@ export default function BrandTagPrinter() {
                 ))}</tbody>
               </table>
             </div>
-            {otp > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '8px 0', borderTop: `1px solid ${T.bd}`, fontSize: 11 }}>
-              <span onClick={() => setOrderPage(Math.max(0, orderPage - 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: orderPage === 0 ? 0.3 : 1 }}>Prev</span>
-              <span style={{ color: T.tx3 }}>{orderPage + 1} / {otp}</span>
-              <span onClick={() => setOrderPage(Math.min(otp - 1, orderPage + 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: orderPage >= otp - 1 ? 0.3 : 1 }}>Next</span>
-            </div>}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '8px 0', borderTop: `1px solid ${T.bd}`, fontSize: 11 }}>
+              <select value={orderPerPage} onChange={e => { setOrderPerPage(Number(e.target.value)); setOrderPage(0); }} style={{ ...inp, width: 'auto', padding: '3px 6px', fontSize: 10, cursor: 'pointer' }}><option value={25}>25</option><option value={50}>50</option><option value={75}>75</option><option value={100}>100</option></select>
+              <span style={{ color: T.tx3 }}>rows</span>
+              {otp > 1 && <>
+                <span onClick={() => setOrderPage(Math.max(0, orderPage - 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: orderPage === 0 ? 0.3 : 1 }}>Prev</span>
+                <span style={{ color: T.tx3 }}>{orderPage + 1} / {otp}</span>
+                <span onClick={() => setOrderPage(Math.min(otp - 1, orderPage + 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: orderPage >= otp - 1 ? 0.3 : 1 }}>Next</span>
+              </>}
+            </div>
           </div>
         </div>;
       })()}
