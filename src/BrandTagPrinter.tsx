@@ -245,7 +245,6 @@ export default function BrandTagPrinter() {
   const [colorFilter, setColorFilter] = useState('');
   const [modalRow, setModalRow] = useState<BrandTagRow | null>(null);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [globalCopies, setGlobalCopies] = useState(1);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Fetch from Supabase + realtime
@@ -484,11 +483,6 @@ export default function BrandTagPrinter() {
   }, [rows]);
 
   // ── Select All / Set All Copies ──
-  const handleSetAllCopies = useCallback(async () => {
-    setRows(prev => prev.map(r => ({ ...r, copies: globalCopies })));
-    const ids = rows.map(r => r.id);
-    for (const id of ids) await supabase.from('brand_tags').update({ copies: globalCopies }).eq('id', id);
-  }, [globalCopies, rows]);
 
   // Total label count
   const [btPage, setBtPage] = useState(0);
@@ -520,9 +514,6 @@ export default function BrandTagPrinter() {
         <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 110, padding: '7px 10px', cursor: 'pointer' }}><option value="">All brands</option>{uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}</select>
         <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 90, padding: '7px 10px', cursor: 'pointer' }}><option value="">All sizes</option>{uniqueSizes.map(s => <option key={s} value={s}>{s}</option>)}</select>
         <select value={colorFilter} onChange={e => setColorFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 100, padding: '7px 10px', cursor: 'pointer' }}><option value="">All colors</option>{uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}</select>
-        <div style={{ width: 1, height: 24, background: T.bd2 }} />
-        <input type="number" min={0} value={globalCopies} onChange={e => setGlobalCopies(Math.max(0, Number(e.target.value)))} style={{ ...inp, width: 44, textAlign: 'center', fontFamily: T.mono, padding: '5px' }} />
-        <button style={btnGhost} onClick={handleSetAllCopies}>Set copies</button>
       </div>
 
       {/* Table */}
