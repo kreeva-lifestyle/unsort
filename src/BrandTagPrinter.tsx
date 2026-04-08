@@ -406,23 +406,23 @@ export default function BrandTagPrinter() {
       </div>
 
       {/* ── Filters ── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 10, background: T.s, border: `1px solid ${T.bd}`, borderRadius: 8, padding: '8px 10px' }}>
-        <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inp, flex: 1, minWidth: 120 }} />
-        <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} style={{ ...inp, width: 'auto', cursor: 'pointer' }}><option value="">All brands</option>{uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}</select>
-        <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ ...inp, width: 'auto', cursor: 'pointer' }}><option value="">All sizes</option>{uniqueSizes.map(s => <option key={s} value={s}>{s}</option>)}</select>
-        <select value={colorFilter} onChange={e => setColorFilter(e.target.value)} style={{ ...inp, width: 'auto', cursor: 'pointer' }}><option value="">All colors</option>{uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}</select>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: T.tx2, cursor: 'pointer' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+        <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inp, width: 180 }} />
+        <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} style={{ ...inp, cursor: 'pointer' }}><option value="">All brands</option>{uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}</select>
+        <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ ...inp, cursor: 'pointer' }}><option value="">All sizes</option>{uniqueSizes.map(s => <option key={s} value={s}>{s}</option>)}</select>
+        <select value={colorFilter} onChange={e => setColorFilter(e.target.value)} style={{ ...inp, cursor: 'pointer' }}><option value="">All colors</option>{uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}</select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: T.tx2, cursor: 'pointer' }}>
             <input type="checkbox" checked={selectAll} onChange={e => handleSelectAll(e.target.checked)} style={{ accentColor: T.ac }} /> All
           </label>
-          <input type="number" min={0} value={globalCopies} onChange={e => setGlobalCopies(Math.max(0, Number(e.target.value)))} style={{ ...inp, width: 40, textAlign: 'center', fontFamily: T.mono, padding: '4px' }} />
-          <button style={btnSm} onClick={handleSetAllCopies}>Set copies</button>
+          <input type="number" min={0} value={globalCopies} onChange={e => setGlobalCopies(Math.max(0, Number(e.target.value)))} style={{ ...inp, width: 36, textAlign: 'center', fontFamily: T.mono, padding: '3px' }} />
+          <button style={btnSm} onClick={handleSetAllCopies}>Set</button>
         </div>
       </div>
 
       {/* ── Data Table ── */}
       <div style={{ overflowX: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8, background: T.s }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, minWidth: 900 }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: 11, width: '100%' }}>
           <thead>
             <tr>
               {['Brand', 'EAN', 'SKU', 'Includes', 'MRP', 'Size', 'Product', 'Color', 'Jio Code', 'Copies', 'Actions'].map(h => (
