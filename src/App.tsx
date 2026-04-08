@@ -16,6 +16,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: an
 import { createClient } from '@supabase/supabase-js';
 import JsBarcode from 'jsbarcode';
 import Quagga from '@ericblade/quagga2';
+import BrandTagPrinter from './BrandTagPrinter';
 
 const SUPABASE_URL = 'https://ulphprdnswznfztawbvg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0';
@@ -221,7 +222,8 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
     { id: 'inventory', icon: 'box', label: 'Inventory' },
     { id: 'completed', icon: 'check', label: 'Completed' },
     { id: 'reports', icon: 'file', label: 'Reports' },
-    { id: 'settings', icon: 'users', label: 'Settings' },
+    { id: 'brandtag', icon: 'tag', label: 'Brand Tags' },
+    { id: 'settings', icon: 'settings', label: 'Settings' },
   ];
 
   const handleSignOut = async () => {
@@ -1617,7 +1619,7 @@ const MainApp = () => {
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', completed: 'Completed', reports: 'Reports', settings: 'Settings' };
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', completed: 'Completed', reports: 'Reports', brandtag: 'Brand Tags', settings: 'Settings' };
   const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
@@ -1654,6 +1656,7 @@ const MainApp = () => {
         {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} /></div>}
         {mounted.has('completed') && <div style={{ display: tab === 'completed' ? 'block' : 'none' }}><Inventory globalSearch="" defaultStatus="completed" /></div>}
         {mounted.has('reports') && <div style={{ display: tab === 'reports' ? 'block' : 'none' }}><Reports /></div>}
+        {mounted.has('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
         {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage /></div>}
       </main>
     </div>
