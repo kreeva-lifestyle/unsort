@@ -422,45 +422,35 @@ export default function BrandTagPrinter() {
 
       {/* Table */}
       <div style={{ overflowX: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8, background: T.s, marginBottom: 8 }}>
-        <table style={{ borderCollapse: 'collapse', fontSize: 11 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead><tr>
-            <th style={{ ...thS, padding: '6px 8px' }}>Brand</th>
-            <th style={{ ...thS, padding: '6px 8px' }}>EAN</th>
-            <th style={{ ...thS, padding: '6px 8px' }}>SKU</th>
-            <th style={{ ...thS, padding: '6px 8px' }}>Includes</th>
-            <th style={{ ...thS, padding: '6px 8px' }}>MRP</th>
-            <th style={{ ...thS, padding: '6px 8px' }}>Size</th>
-            <th style={{ ...thS, padding: '6px 8px' }}>Product</th>
-            <th style={{ ...thS, padding: '6px 8px' }}>Color</th>
-            <th style={{ ...thS, padding: '6px 8px' }}>Jio Code</th>
-            <th style={{ ...thS, padding: '6px 8px' }}>Copies</th>
-            <th style={{ ...thS, padding: '6px 8px' }}></th>
+            {['Brand', 'EAN', 'SKU', 'Includes', 'MRP', 'Size', 'Product', 'Color', 'Jio Code', 'Copies', ''].map(h => (
+              <th key={h} style={thS}>{h}</th>
+            ))}
           </tr></thead>
           <tbody>
             {filtered.length === 0 && <tr><td colSpan={11} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
-            {filtered.map(row => {
-              const c = { ...tdS, padding: '6px 8px', whiteSpace: 'nowrap' as const };
-              return (
+            {filtered.map(row => (
               <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = T.s2; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                <td style={{ ...c, fontWeight: 600, fontSize: 11 }}>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</td>
-                <td style={{ ...c, fontFamily: T.mono, fontSize: 10, color: T.tx2 }}>{row.ean}</td>
-                <td style={{ ...c, fontFamily: T.mono, fontSize: 10, fontWeight: 600, color: T.ac2 }}>{row.sku}</td>
-                <td style={{ ...c, fontSize: 10, whiteSpace: 'normal' as const, maxWidth: 160 }}>{row.qty.replace(/^INCLUDES:\s*/i, '')}</td>
-                <td style={{ ...c, fontWeight: 600, fontFamily: T.mono }}>{fmtMrp(row.mrp)}</td>
-                <td style={c}>{row.size}</td>
-                <td style={{ ...c, fontSize: 10 }}>{row.product.replace(/^PRODUCT DESC:\s*/i, '')}</td>
-                <td style={c}>{row.color}</td>
-                <td style={{ ...c, fontFamily: T.mono, fontSize: 10, color: T.tx2 }}>{row.jioCode}</td>
-                <td style={c}><input type="number" min={0} value={row.copies} onChange={e => updateCopies(row.id, Number(e.target.value))} style={{ ...inp, width: 40, textAlign: 'center', padding: '2px', fontSize: 10, fontFamily: T.mono }} /></td>
-                <td style={c}>
+                <td style={tdS}><strong>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</strong></td>
+                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10, color: T.tx2 }}>{row.ean}</td>
+                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10, fontWeight: 600, color: T.ac2 }}>{row.sku}</td>
+                <td style={{ ...tdS, fontSize: 10 }}>{row.qty.replace(/^INCLUDES:\s*/i, '')}</td>
+                <td style={{ ...tdS, fontWeight: 600, fontFamily: T.mono, whiteSpace: 'nowrap' }}>{fmtMrp(row.mrp)}</td>
+                <td style={tdS}>{row.size}</td>
+                <td style={{ ...tdS, fontSize: 10 }}>{row.product.replace(/^PRODUCT DESC:\s*/i, '')}</td>
+                <td style={tdS}>{row.color}</td>
+                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 10, color: T.tx2 }}>{row.jioCode}</td>
+                <td style={tdS}><input type="number" min={0} value={row.copies} onChange={e => updateCopies(row.id, Number(e.target.value))} style={{ ...inp, width: 40, textAlign: 'center', padding: '2px', fontSize: 10, fontFamily: T.mono }} /></td>
+                <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', gap: 3 }}>
                     <button style={btnSm} onClick={() => openEdit(row)}>Edit</button>
                     <button style={{ ...btnSm, color: T.bl }} onClick={() => printSingle(row)}>Print</button>
                     <button style={{ ...btnSm, color: T.re }} onClick={() => deleteRow(row.id, row.sku)}>×</button>
                   </div>
                 </td>
-              </tr>);
-            })}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
