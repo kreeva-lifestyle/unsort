@@ -1522,9 +1522,12 @@ const Users = () => {
       setInviting(false);
       return;
     }
-    // Update role if not default viewer
-    if (data.user && inviteForm.role !== 'viewer') {
-      await supabase.from('profiles').update({ role: inviteForm.role }).eq('id', data.user.id);
+    // Auto-confirm email + update role
+    if (data.user) {
+      await supabase.rpc('confirm_user_email', { target_user_id: data.user.id });
+      if (inviteForm.role !== 'viewer') {
+        await supabase.from('profiles').update({ role: inviteForm.role }).eq('id', data.user.id);
+      }
     }
     setInviteResult({ email: inviteForm.email, password });
     addToast(`User ${inviteForm.full_name} invited!`, 'success');
