@@ -644,10 +644,17 @@ export default function BrandTagPrinter() {
                 {missing.length > 0 && <span style={{ fontSize: 11, color: T.re, marginLeft: 6 }}>{missing.length} missing</span>}
               </div>
               <div style={{ display: 'flex', gap: 5 }}>
-                <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={() => printOrderLabels(ready)}>Print All Ready ({totalCopies})</button>
+                {missing.length === 0
+                  ? <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={() => printOrderLabels(ready)}>Print All ({totalCopies})</button>
+                  : <button style={{ ...btnGhost, opacity: 0.4, cursor: 'not-allowed' }} title="Resolve missing SKUs first">Print blocked</button>
+                }
                 <button style={btnGhost} onClick={() => setOrderRows(null)}>Close</button>
               </div>
             </div>
+            {missing.length > 0 && <div style={{ padding: '10px 16px', background: 'rgba(248,113,113,.06)', borderBottom: `1px solid rgba(248,113,113,.15)`, display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11, color: T.re, lineHeight: 1.5 }}>
+              <span style={{ fontSize: 14, flexShrink: 0 }}>⚠</span>
+              <div><strong>{missing.length} SKU{missing.length > 1 ? 's' : ''} not found in master data.</strong> Printing is blocked until all SKUs are resolved. Go to the Brand Tags table, add the missing SKU{missing.length > 1 ? 's' : ''} ({missing.map(m => m.sku).join(', ')}), then re-import this order sheet.</div>
+            </div>}
             <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead><tr>
