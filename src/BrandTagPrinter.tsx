@@ -245,8 +245,6 @@ export default function BrandTagPrinter() {
   const [colorFilter, setColorFilter] = useState('');
   const [modalRow, setModalRow] = useState<BrandTagRow | null>(null);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [selectAll, setSelectAll] = useState(false);
-  const [globalCopies, setGlobalCopies] = useState(1);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Fetch from Supabase + realtime
@@ -485,23 +483,8 @@ export default function BrandTagPrinter() {
   }, [rows]);
 
   // ── Select All / Set All Copies ──
-  const handleSelectAll = useCallback(async (checked: boolean) => {
-    setSelectAll(checked);
-    const c = checked ? globalCopies : 0;
-    setRows(prev => prev.map(r => ({ ...r, copies: c })));
-    const ids = rows.map(r => r.id);
-    for (const id of ids) await supabase.from('brand_tags').update({ copies: c }).eq('id', id);
-  }, [globalCopies, rows]);
-
-  const handleSetAllCopies = useCallback(async () => {
-    setRows(prev => prev.map(r => ({ ...r, copies: globalCopies })));
-    setSelectAll(globalCopies > 0);
-    const ids = rows.map(r => r.id);
-    for (const id of ids) await supabase.from('brand_tags').update({ copies: globalCopies }).eq('id', id);
-  }, [globalCopies, rows]);
 
   // Total label count
-  const totalLabels = useMemo(() => rows.reduce((s, r) => s + r.copies, 0), [rows]);
   const [btPage, setBtPage] = useState(0);
   const [btPerPage, setBtPerPage] = useState(25);
   const btTotalPages = Math.ceil(filtered.length / btPerPage);
@@ -514,7 +497,6 @@ export default function BrandTagPrinter() {
         <div>
           <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Brand Tags</span>
           <span style={{ fontSize: 12, fontWeight: 500, color: T.tx3, marginLeft: 10 }}>{filtered.length} of {rows.length} rows</span>
-          {totalLabels > 0 && <span style={{ fontSize: 11, color: T.gr, marginLeft: 10 }}>{totalLabels} labels</span>}
           {importing && <span style={{ fontSize: 11, color: T.yl, marginLeft: 10, fontWeight: 600 }}>Importing {importProgress}...</span>}
         </div>
         <div style={{ display: 'flex', gap: 5 }}>
@@ -532,26 +514,20 @@ export default function BrandTagPrinter() {
         <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 110, padding: '7px 10px', cursor: 'pointer' }}><option value="">All brands</option>{uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}</select>
         <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 90, padding: '7px 10px', cursor: 'pointer' }}><option value="">All sizes</option>{uniqueSizes.map(s => <option key={s} value={s}>{s}</option>)}</select>
         <select value={colorFilter} onChange={e => setColorFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 100, padding: '7px 10px', cursor: 'pointer' }}><option value="">All colors</option>{uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}</select>
-        <div style={{ width: 1, height: 24, background: T.bd2 }} />
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: T.tx2, cursor: 'pointer' }}><input type="checkbox" checked={selectAll} onChange={e => handleSelectAll(e.target.checked)} style={{ accentColor: T.ac }} /> Select all</label>
-        <input type="number" min={0} value={globalCopies} onChange={e => setGlobalCopies(Math.max(0, Number(e.target.value)))} style={{ ...inp, width: 44, textAlign: 'center', fontFamily: T.mono, padding: '5px' }} />
-        <button style={btnGhost} onClick={handleSetAllCopies}>Set copies</button>
       </div>
 
       {/* Table */}
       <div style={{ overflowX: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8, background: T.s, marginBottom: 8 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead><tr>
-            <th style={thS}><input type="checkbox" checked={selectAll} onChange={e => handleSelectAll(e.target.checked)} style={{ accentColor: T.ac }} /></th>
             {['Brand', 'EAN', 'SKU', 'Includes', 'MRP', 'Size', 'Product', 'Color', 'Jio Code', 'Copies', ''].map(h => (
               <th key={h} style={thS}>{h}</th>
             ))}
           </tr></thead>
           <tbody>
-            {filtered.length === 0 && <tr><td colSpan={12} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={11} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
             {btPaged.map(row => (
               <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = T.s2; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                <td style={tdS}><input type="checkbox" checked={row.copies > 0} onChange={e => updateCopies(row.id, e.target.checked ? (globalCopies || 1) : 0)} style={{ accentColor: T.ac }} /></td>
                 <td style={tdS}>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</td>
                 <td style={tdS}>{row.ean}</td>
                 <td style={{ ...tdS, fontWeight: 500 }}>{row.sku}</td>
