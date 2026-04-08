@@ -393,31 +393,29 @@ export default function BrandTagPrinter() {
   // Total label count
   const totalLabels = useMemo(() => rows.reduce((s, r) => s + r.copies, 0), [rows]);
 
-  const p = '14px 16px'; // page padding
-
   return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: p }}>
-      {/* Toolbar */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 12 }}>
-        <button style={btnPrimary} onClick={openAdd}>+ Add SKU</button>
-        <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.15)' }} onClick={printTestLabel}>Test Print</button>
-        <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={printSelected}>Print Selected</button>
-        <button style={btnGhost} onClick={() => fileRef.current?.click()}>Import</button>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
-        <button style={btnGhost} onClick={handleExport}>Export</button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: T.tx2, cursor: 'pointer' }}><input type="checkbox" checked={selectAll} onChange={e => handleSelectAll(e.target.checked)} style={{ accentColor: T.ac }} /> All</label>
-          <input type="number" min={0} value={globalCopies} onChange={e => setGlobalCopies(Math.max(0, Number(e.target.value)))} style={{ ...inp, width: 34, textAlign: 'center', fontFamily: T.mono, padding: '2px', fontSize: 10 }} />
-          <button style={btnSm} onClick={handleSetAllCopies}>Set</button>
+    <div style={{ fontFamily: T.sans, color: T.tx, padding: '16px 18px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Brand Tags</span><span style={{ fontSize: 12, fontWeight: 500, color: T.tx3, marginLeft: 10 }}>{filtered.length} of {rows.length} rows</span>{totalLabels > 0 && <span style={{ fontSize: 11, color: T.gr, marginLeft: 10 }}>{totalLabels} labels</span>}</div>
+        <div style={{ display: 'flex', gap: 5 }}>
+          <button style={btnGhost} onClick={() => fileRef.current?.click()}>Import</button>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
+          <button style={btnGhost} onClick={handleExport}>Export</button>
+          <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.15)' }} onClick={printTestLabel}>Test Print</button>
+          <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={printSelected}>Print Selected</button>
+          <button style={btnPrimary} onClick={openAdd}>+ Add SKU</button>
         </div>
       </div>
-
-      {/* Filters */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
-        <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inp, width: 160 }} />
-        <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} style={{ ...inp, cursor: 'pointer', fontSize: 11 }}><option value="">All brands</option>{uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}</select>
-        <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ ...inp, cursor: 'pointer', fontSize: 11 }}><option value="">All sizes</option>{uniqueSizes.map(s => <option key={s} value={s}>{s}</option>)}</select>
-        <select value={colorFilter} onChange={e => setColorFilter(e.target.value)} style={{ ...inp, cursor: 'pointer', fontSize: 11 }}><option value="">All colors</option>{uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}</select>
+      <div style={{ background: T.s, border: '1px solid ' + T.bd, borderRadius: 10, padding: '10px 12px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+        <input type="text" placeholder="Search brand, SKU, EAN..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inp, flex: 1, minWidth: 140, padding: '7px 10px' }} />
+        <div style={{ width: 1, height: 24, background: T.bd2 }} />
+        <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 110, padding: '7px 10px', cursor: 'pointer' }}><option value="">All brands</option>{uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}</select>
+        <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 90, padding: '7px 10px', cursor: 'pointer' }}><option value="">All sizes</option>{uniqueSizes.map(s => <option key={s} value={s}>{s}</option>)}</select>
+        <select value={colorFilter} onChange={e => setColorFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 100, padding: '7px 10px', cursor: 'pointer' }}><option value="">All colors</option>{uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}</select>
+        <div style={{ width: 1, height: 24, background: T.bd2 }} />
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: T.tx2, cursor: 'pointer' }}><input type="checkbox" checked={selectAll} onChange={e => handleSelectAll(e.target.checked)} style={{ accentColor: T.ac }} /> Select all</label>
+        <input type="number" min={0} value={globalCopies} onChange={e => setGlobalCopies(Math.max(0, Number(e.target.value)))} style={{ ...inp, width: 44, textAlign: 'center', fontFamily: T.mono, padding: '5px' }} />
+        <button style={btnGhost} onClick={handleSetAllCopies}>Set copies</button>
       </div>
 
       {/* Table */}
@@ -455,11 +453,6 @@ export default function BrandTagPrinter() {
         </table>
       </div>
 
-      {/* Footer */}
-      <div style={{ fontSize: 10, color: T.tx3 }}>
-        {filtered.length} of {rows.length} row{rows.length !== 1 ? 's' : ''}
-        {totalLabels > 0 && <span style={{ marginLeft: 10, color: T.tx2 }}>Labels: <strong style={{ color: T.gr }}>{totalLabels}</strong></span>}
-      </div>
 
       {/* ── Add / Edit Modal ── */}
       {modalRow && (
