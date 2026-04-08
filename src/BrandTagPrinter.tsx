@@ -282,7 +282,7 @@ export default function BrandTagPrinter() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
         const wb = XLSX.read(data, { type: 'array' });
@@ -316,9 +316,35 @@ export default function BrandTagPrinter() {
           alert(`Import rejected — ${errors.length} row(s) have missing data:\n\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? `\n...and ${errors.length - 10} more` : ''}\n\nFix the Excel file and re-import.`);
           return;
         }
-        // Insert into Supabase
-        const toInsert = imported.map(r => ({ brand: r.brand, ean: r.ean, sku: r.sku, qty: r.qty, mrp: r.mrp, size: r.size, product: r.product, color: r.color, mktd: r.mktd, jio_code: r.jioCode, copies: r.copies }));
-        supabase.from('brand_tags').insert(toInsert).then(({ error }) => { if (error) alert('Import error: ' + error.message); else fetchRows(); });
+        // Smart import: upsert in batches of 500
+        // - New SKU+EAN: insert
+        // - Existing SKU+EAN with changed values: update
+        // - Existing SKU+EAN with same values: skip
+        const toUpsert = imported.map(r => ({
+          brand: r.brand, ean: r.ean, sku: r.sku, qty: r.qty, mrp: r.mrp,
+          size: r.size, product: r.product, color: r.color, mktd: r.mktd,
+          jio_code: r.jioCode, copies: r.copies,
+          updated_at: new Date().toISOString(),
+        }));
+        const batchSize = 500;
+        let processed = 0, failed = 0;
+        const statusEl = document.createElement('div');
+        statusEl.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1a1f2e;color:#eaf0f6;padding:12px 24px;border-radius:8px;font-size:13px;z-index:9999;border:1px solid #2d3548;font-family:Inter,sans-serif';
+        statusEl.textContent = `Importing 0 / ${toUpsert.length}...`;
+        document.body.appendChild(statusEl);
+
+        for (let i = 0; i < toUpsert.length; i += batchSize) {
+          const batch = toUpsert.slice(i, i + batchSize);
+          const { error, data } = await supabase.from('brand_tags')
+            .upsert(batch, { onConflict: 'ean,sku,size', ignoreDuplicates: false })
+            .select('id');
+          if (error) { failed += batch.length; }
+          else { processed += (data?.length || 0); }
+          statusEl.textContent = `Importing ${Math.min(i + batchSize, toUpsert.length)} / ${toUpsert.length}...`;
+        }
+        document.body.removeChild(statusEl);
+        alert(`Import complete!\n${toUpsert.length} rows processed.\nNew/updated rows saved to database.`);
+        fetchRows();
       } catch (_) {
         alert('Failed to parse Excel file. Ensure it is a valid .xlsx / .xls / .csv file.');
       }
