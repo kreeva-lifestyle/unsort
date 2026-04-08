@@ -88,6 +88,34 @@ const validateRow = (r: BrandTagRow): string | null => {
 
 const fmtMrp = (v: number): string => '\u20B9' + v.toLocaleString('en-IN');
 
+// ── Order Sheet Types & Mapping ──
+const MARKETPLACE_BRAND: Record<string, string> = { 'ajio b2c': 'FUSIONIC', 'ajio tanuka': 'TANUKA', 'ajio svaraa': 'SVARAA' };
+interface OrderRow { sku: string; marketplace: string; brand: string; copies: number; found: boolean; masterData?: BrandTagRow; }
+
+const parseOrderSheet = (data: any[], masterRows: BrandTagRow[]): OrderRow[] => {
+  const map = new Map<string, OrderRow>();
+  const masterMap = new Map<string, BrandTagRow>();
+  masterRows.forEach(r => masterMap.set(r.sku.toUpperCase(), r));
+
+  for (const row of data) {
+    const mp = String(row['Marketplace'] || row['marketplace'] || '').trim();
+    const rawSku = String(row['SKU'] || row['sku'] || '').trim();
+    if (!mp || !rawSku) continue;
+    const [skuPart, copiesStr] = rawSku.split('*');
+    const sku = skuPart.trim();
+    const copies = Math.max(1, parseInt(copiesStr) || 1);
+    const key = sku.toUpperCase();
+    const brand = MARKETPLACE_BRAND[mp.toLowerCase()] || 'UNKNOWN';
+
+    if (map.has(key)) { map.get(key)!.copies += copies; }
+    else {
+      const master = masterMap.get(key);
+      map.set(key, { sku, marketplace: mp, brand, copies, found: !!master, masterData: master });
+    }
+  }
+  return Array.from(map.values());
+};
+
 // ── Print function: renders labels into a new window for clean printing ───────
 const printLabelsInWindow = (labels: BrandTagRow[]) => {
   const win = window.open('', '_blank', 'width=300,height=500');
@@ -246,6 +274,9 @@ export default function BrandTagPrinter() {
   const [modalRow, setModalRow] = useState<BrandTagRow | null>(null);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const fileRef = useRef<HTMLInputElement>(null);
+  const orderFileRef = useRef<HTMLInputElement>(null);
+  const [orderRows, setOrderRows] = useState<OrderRow[] | null>(null);
+  const [orderPage, setOrderPage] = useState(0);
 
   // Fetch from Supabase + realtime
   const fetchRows = useCallback(async () => {
@@ -463,6 +494,38 @@ export default function BrandTagPrinter() {
     printLabelsInWindow([row]);
   }, []);
 
+  // ── Order Sheet Import ──
+  const handleOrderImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const d = new Uint8Array(evt.target?.result as ArrayBuffer);
+        const wb = XLSX.read(d, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const json: any[] = XLSX.utils.sheet_to_json(ws);
+        const parsed = parseOrderSheet(json, rows);
+        setOrderRows(parsed); setOrderPage(0);
+      } catch { alert('Failed to parse order sheet.'); }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  }, [rows]);
+
+  const updateOrderCopies = (sku: string, copies: number) => {
+    setOrderRows(prev => prev ? prev.map(r => r.sku === sku ? { ...r, copies: Math.max(0, copies) } : r) : null);
+  };
+
+  const printOrderLabels = (items: OrderRow[]) => {
+    const labels: BrandTagRow[] = [];
+    items.forEach(r => {
+      if (!r.found || !r.masterData || r.copies <= 0) return;
+      for (let i = 0; i < r.copies; i++) labels.push({ ...r.masterData, brand: `BRAND NAME: ${r.brand}`, copies: 1 });
+    });
+    if (labels.length === 0) { alert('No printable labels. Ensure SKUs exist in master data and copies > 0.'); return; }
+    printLabelsInWindow(labels);
+  };
+
   const printTestLabel = useCallback(() => {
     const s = rows[0] || sampleRow();
     printLabelsInWindow([s]);
@@ -503,6 +566,8 @@ export default function BrandTagPrinter() {
           <button style={btnGhost} onClick={() => fileRef.current?.click()}>Import</button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
           <button style={btnGhost} onClick={handleExport}>Export</button>
+          <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.15)' }} onClick={() => orderFileRef.current?.click()}>Order Sheet</button>
+          <input ref={orderFileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleOrderImport} />
           <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.15)' }} onClick={printTestLabel}>Test Print</button>
           <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={printSelected}>Print Selected</button>
           <button style={btnPrimary} onClick={openAdd}>+ Add SKU</button>
@@ -559,6 +624,58 @@ export default function BrandTagPrinter() {
           <span onClick={() => setBtPage(Math.min(btTotalPages - 1, btPage + 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage >= btTotalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= btTotalPages - 1 ? 'none' : 'auto' }}>Next</span>
         </>}
       </div>
+
+      {/* ── Order Sheet Preview ── */}
+      {orderRows && (() => {
+        const ready = orderRows.filter(r => r.found);
+        const missing = orderRows.filter(r => !r.found);
+        const totalCopies = ready.reduce((s, r) => s + r.copies, 0);
+        const opp = 25;
+        const otp = Math.ceil(orderRows.length / opp);
+        const opaged = orderRows.slice(orderPage * opp, (orderPage + 1) * opp);
+        return <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 200, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
+          <div style={{ background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 12, width: '95vw', maxWidth: 1100, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <div>
+                <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Order Sheet Preview</span>
+                <span style={{ fontSize: 11, color: T.tx3, marginLeft: 10 }}>{ready.length} ready</span>
+                <span style={{ fontSize: 11, color: T.gr, marginLeft: 6 }}>{totalCopies} labels</span>
+                {missing.length > 0 && <span style={{ fontSize: 11, color: T.re, marginLeft: 6 }}>{missing.length} missing</span>}
+              </div>
+              <div style={{ display: 'flex', gap: 5 }}>
+                <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={() => printOrderLabels(ready)}>Print All Ready ({totalCopies})</button>
+                <button style={btnGhost} onClick={() => setOrderRows(null)}>Close</button>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead><tr>
+                  {['#', 'Marketplace', 'SKU', 'Brand', 'Product', 'Color', 'Size', 'MRP', 'Copies', 'Status'].map(h => <th key={h} style={thS}>{h}</th>)}
+                </tr></thead>
+                <tbody>{opaged.map((r, i) => (
+                  <tr key={r.sku} style={{ transition: 'background .1s', background: !r.found ? 'rgba(248,113,113,.04)' : 'transparent' }} onMouseEnter={e => { e.currentTarget.style.background = T.s2; }} onMouseLeave={e => { e.currentTarget.style.background = !r.found ? 'rgba(248,113,113,.04)' : 'transparent'; }}>
+                    <td style={{ ...tdS, color: T.tx3 }}>{orderPage * opp + i + 1}</td>
+                    <td style={tdS}>{r.marketplace}</td>
+                    <td style={{ ...tdS, fontWeight: 500 }}>{r.sku}</td>
+                    <td style={tdS}>{r.brand}</td>
+                    <td style={tdS}>{r.found ? r.masterData?.product.replace(/^PRODUCT DESC:\s*/i, '') : '—'}</td>
+                    <td style={tdS}>{r.found ? r.masterData?.color : '—'}</td>
+                    <td style={tdS}>{r.found ? r.masterData?.size : '—'}</td>
+                    <td style={{ ...tdS, whiteSpace: 'nowrap' }}>{r.found ? fmtMrp(r.masterData?.mrp || 0) : '—'}</td>
+                    <td style={tdS}><input type="number" min={0} value={r.copies} onChange={e => updateOrderCopies(r.sku, Number(e.target.value))} style={{ ...inp, width: 40, textAlign: 'center', padding: '2px', fontSize: 12 }} /></td>
+                    <td style={tdS}>{r.found ? <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(52,211,153,.12)', color: T.gr }}>Ready</span> : <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(248,113,113,.12)', color: T.re }}>Missing</span>}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+            {otp > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '8px 0', borderTop: `1px solid ${T.bd}`, fontSize: 11 }}>
+              <span onClick={() => setOrderPage(Math.max(0, orderPage - 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: orderPage === 0 ? 0.3 : 1 }}>Prev</span>
+              <span style={{ color: T.tx3 }}>{orderPage + 1} / {otp}</span>
+              <span onClick={() => setOrderPage(Math.min(otp - 1, orderPage + 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: orderPage >= otp - 1 ? 0.3 : 1 }}>Next</span>
+            </div>}
+          </div>
+        </div>;
+      })()}
 
       {/* ── Add / Edit Modal ── */}
       {modalRow && (
