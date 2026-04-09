@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient('https://ulphprdnswznfztawbvg.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0');
+const btAudit = (action: string, details: string) => { supabase.auth.getUser().then(({ data }) => { supabase.from('audit_log').insert({ action, module: 'brand_tags', details, user_id: data.user?.id }); }); };
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
 const T = {
@@ -460,6 +461,7 @@ export default function BrandTagPrinter() {
         window.removeEventListener('beforeunload', beforeUnload);
         setImporting(false);
         setImportProgress('');
+        btAudit('import', `Imported ${toUpsert.length} rows${failed > 0 ? `, ${failed} failed` : ''}`);
         alert(`Import complete! ${toUpsert.length} rows processed.${failed > 0 ? ` ${failed} failed.` : ''}`);
         fetchPage();
       } catch (_) {
@@ -495,7 +497,7 @@ export default function BrandTagPrinter() {
 
   const deleteRow = useCallback((id: string, sku: string) => {
     if (!window.confirm(`Delete SKU: ${sku || 'this row'}?`)) return;
-    supabase.from('brand_tags').delete().eq('id', id).then(() => fetchPage());
+    supabase.from('brand_tags').delete().eq('id', id).then(() => { btAudit('delete', `Deleted SKU: ${sku}`); fetchPage(); });
   }, [fetchPage]);
 
   // ── Modal Open/Save ──
@@ -512,9 +514,9 @@ export default function BrandTagPrinter() {
   const handleModalSave = useCallback((updated: BrandTagRow) => {
     const dbRow = { brand: updated.brand, ean: updated.ean, sku: updated.sku, qty: updated.qty, mrp: updated.mrp, size: updated.size, product: updated.product, color: updated.color, mktd: updated.mktd, jio_code: updated.jioCode, copies: updated.copies };
     if (modalMode === 'add') {
-      supabase.from('brand_tags').insert(dbRow).then(({ error }) => { if (error) alert('Save failed: ' + error.message); else fetchPage(); });
+      supabase.from('brand_tags').insert(dbRow).then(({ error }) => { if (error) alert('Save failed: ' + error.message); else { btAudit('add', `Added SKU: ${updated.sku}`); fetchPage(); } });
     } else {
-      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(({ error }) => { if (error) alert('Update failed: ' + error.message); else fetchPage(); });
+      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(({ error }) => { if (error) alert('Update failed: ' + error.message); else { btAudit('edit', `Edited SKU: ${updated.sku}`); fetchPage(); } });
     }
     setModalRow(null);
   }, [modalMode, fetchPage]);
