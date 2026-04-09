@@ -451,11 +451,6 @@ export default function BrandTagPrinter() {
   }, [rows]);
 
   // ── Row Mutations ──
-  const updateCopies = useCallback((id: string, copies: number) => {
-    const c = Math.max(0, copies);
-    setRows(prev => prev.map(r => r.id === id ? { ...r, copies: c } : r));
-    supabase.from('brand_tags').update({ copies: c }).eq('id', id);
-  }, []);
 
   const deleteRow = useCallback((id: string, sku: string) => {
     if (!window.confirm(`Delete SKU: ${sku || 'this row'}?`)) return;
@@ -536,22 +531,6 @@ export default function BrandTagPrinter() {
     printLabelsInWindow([s]);
   }, [rows]);
 
-  const printSelected = useCallback(async () => {
-    // Fetch all rows with copies > 0 from DB (not just current page)
-    const { data } = await supabase.from('brand_tags').select('*').gt('copies', 0);
-    if (!data || data.length === 0) { alert('No rows with copies > 0.'); return; }
-    const printRows: BrandTagRow[] = data.map(d => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies }));
-    const labels: BrandTagRow[] = [];
-    const badRows: string[] = [];
-    printRows.forEach(r => {
-      const bad = validateRow(r);
-      if (bad) { badRows.push(`${r.sku || 'empty'}: missing "${bad}"`); return; }
-      for (let i = 0; i < r.copies; i++) labels.push(r);
-    });
-    if (badRows.length > 0) { alert(`Cannot print — incomplete data:\n${badRows.join('\n')}`); return; }
-    if (labels.length === 0) { alert('Set COPIES > 0 for rows you want to print.'); return; }
-    printLabelsInWindow(labels);
-  }, [rows]);
 
   // ── Select All / Set All Copies ──
 
@@ -578,7 +557,6 @@ export default function BrandTagPrinter() {
           <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.15)' }} onClick={() => orderFileRef.current?.click()}>Order Sheet</button>
           <input ref={orderFileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleOrderImport} />
           <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.15)' }} onClick={printTestLabel}>Test Print</button>
-          <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={printSelected}>Print Selected</button>
           <button style={btnPrimary} onClick={openAdd}>+ Add SKU</button>
         </div>
       </div>
@@ -594,12 +572,12 @@ export default function BrandTagPrinter() {
       <div style={{ overflowX: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8, background: T.s, marginBottom: 8 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead><tr>
-            {['Brand', 'EAN', 'SKU', 'Includes', 'MRP', 'Size', 'Product', 'Color', 'Jio Code', 'Copies', ''].map(h => (
+            {['Brand', 'EAN', 'SKU', 'Includes', 'MRP', 'Size', 'Product', 'Color', 'Jio Code', ''].map(h => (
               <th key={h} style={thS}>{h}</th>
             ))}
           </tr></thead>
           <tbody>
-            {rows.length === 0 && !loading && <tr><td colSpan={11} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
+            {rows.length === 0 && !loading && <tr><td colSpan={10} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
             {rows.map(row => (
               <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = T.s2; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
                 <td style={tdS}>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</td>
@@ -611,7 +589,6 @@ export default function BrandTagPrinter() {
                 <td style={tdS}>{row.product.replace(/^PRODUCT DESC:\s*/i, '')}</td>
                 <td style={tdS}>{row.color}</td>
                 <td style={tdS}>{row.jioCode}</td>
-                <td style={tdS}><input type="number" min={0} value={row.copies} onChange={e => updateCopies(row.id, Number(e.target.value))} style={{ ...inp, width: 40, textAlign: 'center', padding: '2px', fontSize: 12 }} /></td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', gap: 3 }}>
                     <button style={btnSm} onClick={() => openEdit(row)}>Edit</button>
