@@ -8,14 +8,16 @@ const btAudit = (action: string, details: string) => { supabase.auth.getUser().t
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
 const T = {
-  bg: '#0a0d14', s: '#12161f', s2: '#1a1f2e', s3: '#232a3b',
-  bd: '#1e2536', bd2: '#2d3548',
-  tx: '#eaf0f6', tx2: '#8899b4', tx3: '#4f6080',
-  ac: '#8b5cf6', ac2: '#a78bfa',
-  gr: '#34d399', re: '#f87171', bl: '#60a5fa', yl: '#fbbf24',
-  r: 8,
+  bg: '#080C14', s: '#0D1117', s2: '#111827', s3: '#161D2E',
+  bd: 'rgba(255,255,255,0.06)', bd2: 'rgba(255,255,255,0.10)',
+  tx: '#F1F5F9', tx2: '#94A3B8', tx3: '#475569',
+  ac: '#6366F1', ac2: '#818CF8',
+  gr: '#22C55E', re: '#EF4444', bl: '#38BDF8', yl: '#F59E0B',
+  r: 10,
   mono: "'JetBrains Mono', monospace",
-  sans: "'Inter', sans-serif",
+  sans: "'Inter', -apple-system, sans-serif",
+  glass1: 'rgba(255,255,255,0.03)', glass2: 'rgba(255,255,255,0.06)',
+  transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
 };
 
 // ── Reusable style helpers ─────────────────────────────────────────────────────
@@ -30,17 +32,17 @@ const btnGhost: React.CSSProperties = { ...btnBase, fontWeight: 500, background:
 
 const btnSm: React.CSSProperties = { padding: '3px 7px', fontSize: 10, borderRadius: 4, border: `1px solid ${T.bd2}`, cursor: 'pointer', fontFamily: "'Inter',sans-serif", fontWeight: 500, color: T.tx2, background: 'rgba(26,31,46,.5)', whiteSpace: 'nowrap' };
 const inp: React.CSSProperties = {
-  background: 'rgba(26,31,46,.8)', border: `1px solid ${T.bd2}`, borderRadius: 6,
-  color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '7px 10px',
-  outline: 'none', boxSizing: 'border-box', transition: 'border-color .2s',
+  background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: T.r,
+  color: T.tx, fontFamily: T.sans, fontSize: 14, padding: '10px 14px',
+  outline: 'none', boxSizing: 'border-box', transition: T.transition,
 };
 const thS: React.CSSProperties = {
-  fontSize: 10, color: T.tx3, padding: '8px 10px', textAlign: 'left',
-  fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: T.s2,
-  whiteSpace: 'nowrap', fontFamily: T.sans,
+  fontSize: 11, color: T.tx3, padding: '12px 16px', textAlign: 'left',
+  fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: T.glass1,
+  whiteSpace: 'nowrap', fontFamily: T.sans, textTransform: 'uppercase', letterSpacing: '0.08em',
 };
-const tdS: React.CSSProperties = { padding: '8px 10px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: '#b0bdd0', fontFamily: T.sans };
-const fLabel: React.CSSProperties = { fontSize: 11, color: T.tx3, marginBottom: 4, display: 'block', fontWeight: 500, fontFamily: T.sans };
+const tdS: React.CSSProperties = { padding: '14px 16px', fontSize: 14, borderBottom: `1px solid ${T.bd}`, color: T.tx2, fontFamily: T.sans };
+const fLabel: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 500, color: T.tx2, marginBottom: 6, letterSpacing: '0.01em', fontFamily: T.sans };
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface BrandTagRow {
