@@ -318,11 +318,25 @@ export default function BrandTagPrinter() {
 
   useEffect(() => { fetchPage(); }, [fetchPage]);
 
-  // Realtime: just refresh current page
+  // Smart realtime: apply individual row changes without re-fetching entire page
   useEffect(() => {
-    const ch = supabase.channel('bt-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'brand_tags' }, () => fetchPage()).subscribe();
+    const mapRow = (d: any): BrandTagRow => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies });
+    const ch = supabase.channel('bt-smart')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'brand_tags' }, (payload) => {
+        const updated = mapRow(payload.new);
+        setRows(prev => prev.map(r => r.id === updated.id ? updated : r));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'brand_tags' }, (payload) => {
+        const id = (payload.old as any)?.id;
+        if (id) { setRows(prev => prev.filter(r => r.id !== id)); setTotalCount(c => c - 1); }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'brand_tags' }, () => {
+        // For inserts, just bump the count - user sees it when they paginate/refresh
+        setTotalCount(c => c + 1);
+      })
+      .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [fetchPage]);
+  }, []);
 
   // Debounce search to avoid hammering DB on every keystroke
   const searchTimeout = useRef<any>(null);
@@ -335,9 +349,6 @@ export default function BrandTagPrinter() {
   // Reset page on filter change
   useEffect(() => { setBtPage(0); }, [brandFilter, sizeFilter, colorFilter]);
   useEffect(() => {
-    fetchPage();
-    const ch = supabase.channel('bt-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'brand_tags' }, fetchPage).subscribe();
-
     // Resume interrupted import from localStorage queue
     const queueKey = 'bt_import_queue';
     const saved = localStorage.getItem(queueKey);
@@ -370,9 +381,7 @@ export default function BrandTagPrinter() {
         }
       } catch { localStorage.removeItem(queueKey); }
     }
-
-    return () => { supabase.removeChannel(ch); };
-  }, [fetchPage]);
+  }, []);
 
   // Filter options are now preset constants (BRAND_OPTIONS, SIZE_OPTIONS, COLOR_OPTIONS)
   // Filtering happens server-side in fetchPage()
@@ -603,6 +612,7 @@ export default function BrandTagPrinter() {
           {importing && <span style={{ fontSize: 11, color: T.yl, marginLeft: 10, fontWeight: 600 }}>Importing {importProgress}...</span>}
         </div>
         <div style={{ display: 'flex', gap: 5 }}>
+          <button style={btnGhost} onClick={() => fetchPage()}>Refresh</button>
           <button style={btnGhost} onClick={() => fileRef.current?.click()}>Import</button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
           <button style={btnGhost} onClick={handleExport}>Export</button>
