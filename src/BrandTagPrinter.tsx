@@ -378,20 +378,27 @@ export default function BrandTagPrinter() {
         const wb = XLSX.read(data, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const json: any[] = XLSX.utils.sheet_to_json(ws);
-        const imported: BrandTagRow[] = json.map(d => ({
+        const imported: BrandTagRow[] = json.map(d => {
+          // Auto-map brand from Marketplace column if BRAND NAME is missing
+          let brand = String(d['BRAND NAME'] ?? '');
+          if (!brand) {
+            const mp = String(d['Marketplace'] || d['marketplace'] || '').trim().toLowerCase();
+            if (mp) brand = 'BRAND NAME: ' + (MARKETPLACE_BRAND[mp] || mp.toUpperCase());
+          }
+          return {
           id: uid(),
-          brand: String(d['BRAND NAME'] ?? ''),
+          brand,
           ean: String(d['EAN'] ?? ''),
-          sku: String(d['SKU'] ?? ''),
+          sku: String(d['SKU'] ?? '').split('*')[0].trim(), // strip *copies if present
           qty: String(d['QTY'] ?? ''),
           mrp: Number(d['MRP']) || 0,
           size: String(d['SIZE'] ?? ''),
           product: String(d['PRODUCT'] ?? ''),
           color: String(d['Color'] ?? ''),
-          mktd: String(d['MKTD & DIST. BY'] ?? ''),
+          mktd: String(d['MKTD & DIST. BY'] ?? '') || _DEFAULT_MKTD,
           jioCode: String(d['Jio Code'] ?? ''),
           copies: Number(d['COPIES']) || 0,
-        }));
+        }});
         if (imported.length === 0) {
           alert('No rows found. Check that column headers match the expected format.');
           return;
