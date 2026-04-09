@@ -74,9 +74,10 @@ const sampleRow = (): BrandTagRow => ({
   copies: 0,
 });
 
+const _DEFAULT_MKTD = 'Arya Designs, 16, Amba Bhuvan, Near Kasanagar Circle, Opp- Kumar Gurukul Vidhyalay Katargam, Surat-395004, Gujarat, India';
 const blankRow = (): BrandTagRow => ({
   id: uid(), brand: '', ean: '', sku: '', qty: '', mrp: 0,
-  size: '', product: '', color: '', mktd: '', jioCode: '', copies: 0,
+  size: '', product: '', color: '', mktd: _DEFAULT_MKTD, jioCode: '', copies: 0,
 });
 
 const REQUIRED_FIELDS: (keyof BrandTagRow)[] = ['brand', 'ean', 'sku', 'qty', 'size', 'product', 'color', 'mktd', 'jioCode'];
@@ -177,17 +178,22 @@ setTimeout(function(){window.print()},600);
   win.document.close();
 };
 
+const DEFAULT_MKTD = 'Arya Designs, 16, Amba Bhuvan, Near Kasanagar Circle, Opp- Kumar Gurukul Vidhyalay Katargam, Surat-395004, Gujarat, India';
+const BRAND_OPTIONS = ['BRAND NAME: TANUKA', 'BRAND NAME: FUSIONIC', 'BRAND NAME: SVARAA'];
+const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
+const PRODUCT_OPTIONS = ['PRODUCT DESC: Co-ord Set', 'PRODUCT DESC: Dresses', 'PRODUCT DESC: Dress', 'PRODUCT DESC: Fusion Wear', 'PRODUCT DESC: Gown', 'PRODUCT DESC: Jumpsuit', 'PRODUCT DESC: Kurta', 'PRODUCT DESC: Kurta Set', 'PRODUCT DESC: Kurti', 'PRODUCT DESC: Lehenga Choli', 'PRODUCT DESC: Saree', 'PRODUCT DESC: Top'];
+
 // ── Add / Edit Modal ───────────────────────────────────────────────────────────
-const MODAL_FIELDS: { key: keyof BrandTagRow; label: string; type?: string; multiline?: boolean }[] = [
-  { key: 'brand', label: 'Brand Name' },
+const MODAL_FIELDS: { key: keyof BrandTagRow; label: string; type?: string; multiline?: boolean; options?: string[]; defaultVal?: string }[] = [
+  { key: 'brand', label: 'Brand Name', options: BRAND_OPTIONS },
   { key: 'ean', label: 'EAN' },
   { key: 'sku', label: 'SKU' },
-  { key: 'product', label: 'Product Description' },
+  { key: 'product', label: 'Product Description', options: PRODUCT_OPTIONS },
   { key: 'qty', label: 'Includes / QTY', multiline: true },
-  { key: 'size', label: 'Size' },
+  { key: 'size', label: 'Size', options: SIZE_OPTIONS },
   { key: 'color', label: 'Color' },
   { key: 'mrp', label: 'MRP', type: 'number' },
-  { key: 'mktd', label: 'MKTD & DIST. BY', multiline: true },
+  { key: 'mktd', label: 'MKTD & DIST. BY', multiline: true, defaultVal: DEFAULT_MKTD },
   { key: 'jioCode', label: 'Jio Code' },
 ];
 
@@ -236,7 +242,16 @@ const BrandTagModal = ({
           {MODAL_FIELDS.map(f => (
             <div key={f.key}>
               <label style={fLabel}>{f.label}</label>
-              {f.multiline ? (
+              {f.options ? (
+                <select
+                  style={{ ...inp, width: '100%', cursor: 'pointer' }}
+                  value={String(form[f.key])}
+                  onChange={e => set(f.key, e.target.value)}
+                >
+                  <option value="">Select {f.label.toLowerCase()}</option>
+                  {f.options.map(o => <option key={o} value={o}>{o.replace(/^BRAND NAME:\s*/i, '').replace(/^PRODUCT DESC:\s*/i, '')}</option>)}
+                </select>
+              ) : f.multiline ? (
                 <textarea
                   rows={2}
                   style={{ ...inp, width: '100%', resize: 'vertical' }}
