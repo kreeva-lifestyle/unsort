@@ -482,9 +482,9 @@ export default function BrandTagPrinter() {
   const handleModalSave = useCallback((updated: BrandTagRow) => {
     const dbRow = { brand: updated.brand, ean: updated.ean, sku: updated.sku, qty: updated.qty, mrp: updated.mrp, size: updated.size, product: updated.product, color: updated.color, mktd: updated.mktd, jio_code: updated.jioCode, copies: updated.copies };
     if (modalMode === 'add') {
-      supabase.from('brand_tags').insert(dbRow).then(() => fetchRows());
+      supabase.from('brand_tags').insert(dbRow).then(({ error }) => { if (error) alert('Save failed: ' + error.message); else fetchRows(); });
     } else {
-      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(() => fetchRows());
+      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(({ error }) => { if (error) alert('Update failed: ' + error.message); else fetchRows(); });
     }
     setModalRow(null);
   }, [modalMode, fetchRows]);
