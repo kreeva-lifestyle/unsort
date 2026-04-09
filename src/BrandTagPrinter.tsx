@@ -181,7 +181,7 @@ setTimeout(function(){window.print()},600);
 const DEFAULT_MKTD = 'Arya Designs, 16, Amba Bhuvan, Near Kasanagar Circle, Opp- Kumar Gurukul Vidhyalay Katargam, Surat-395004, Gujarat, India';
 const BRAND_OPTIONS = ['BRAND NAME: TANUKA', 'BRAND NAME: FUSIONIC', 'BRAND NAME: SVARAA'];
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
-const PRODUCT_OPTIONS = ['PRODUCT DESC: Co-ord Set', 'PRODUCT DESC: Dresses', 'PRODUCT DESC: Dress', 'PRODUCT DESC: Fusion Wear', 'PRODUCT DESC: Gown', 'PRODUCT DESC: Jumpsuit', 'PRODUCT DESC: Kurta', 'PRODUCT DESC: Kurta Set', 'PRODUCT DESC: Kurti', 'PRODUCT DESC: Lehenga Choli', 'PRODUCT DESC: Saree', 'PRODUCT DESC: Top'];
+const PRODUCT_OPTIONS = ['PRODUCT DESC: Co-ord Set', 'PRODUCT DESC: Dress', 'PRODUCT DESC: Fusion Wear', 'PRODUCT DESC: Gown', 'PRODUCT DESC: Gown Set', 'PRODUCT DESC: Jumpsuit', 'PRODUCT DESC: Kurta', 'PRODUCT DESC: Kurta Set', 'PRODUCT DESC: Kurti', 'PRODUCT DESC: Lehenga Choli', 'PRODUCT DESC: Saree', 'PRODUCT DESC: Top'];
 
 const COLOR_OPTIONS = ['Aqua', 'Beige', 'Black', 'Blue', 'Bronze', 'Brown', 'Burgundy', 'Coral', 'Cream', 'Fuchsia', 'Gold', 'Green', 'Grey', 'Lavender', 'Lime', 'Magenta', 'Maroon', 'Mauve', 'Multi', 'Mustard', 'Navy Blue', 'Nude', 'Off White', 'Olive', 'Orange', 'Peach', 'Pink', 'Pistachio', 'Purple', 'Rama', 'Red', 'Rose Gold', 'Rust', 'Sea Green', 'Silver', 'Tan', 'Taupe', 'Teal', 'Turquoise', 'Violet', 'White', 'Wine', 'Yellow'];
 
