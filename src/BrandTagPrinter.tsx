@@ -687,14 +687,14 @@ export default function BrandTagPrinter() {
             {rows.map(row => (
               <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.015)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
                 <td style={tdS}>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</td>
-                <td style={tdS}>{row.ean}</td>
-                <td style={{ ...tdS, fontWeight: 500 }}>{row.sku}</td>
+                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11 }}>{row.ean}</td>
+                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11, fontWeight: 500 }}>{row.sku}</td>
                 <td style={tdS}>{row.qty.replace(/^INCLUDES:\s*/i, '')}</td>
-                <td style={{ ...tdS, whiteSpace: 'nowrap' }}>{fmtMrp(row.mrp)}</td>
+                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11, whiteSpace: 'nowrap' }}>{fmtMrp(row.mrp)}</td>
                 <td style={tdS}>{row.size}</td>
                 <td style={tdS}>{row.product.replace(/^PRODUCT DESC:\s*/i, '')}</td>
                 <td style={tdS}>{row.color}</td>
-                <td style={tdS}>{row.jioCode}</td>
+                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11 }}>{row.jioCode}</td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', gap: 3 }}>
                     <button style={btnSm} onClick={() => openEdit(row)}>Edit</button>
