@@ -38,7 +38,7 @@ const thS: React.CSSProperties = {
   fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: T.s2,
   whiteSpace: 'nowrap', fontFamily: T.sans,
 };
-const tdS: React.CSSProperties = { padding: '8px 10px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx, fontFamily: T.sans };
+const tdS: React.CSSProperties = { padding: '8px 10px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: '#b0bdd0', fontFamily: T.sans };
 const fLabel: React.CSSProperties = { fontSize: 11, color: T.tx3, marginBottom: 4, display: 'block', fontWeight: 500, fontFamily: T.sans };
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -281,6 +281,7 @@ const BrandTagModal = ({
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function BrandTagPrinter() {
   const [rows, setRows] = useState<BrandTagRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState('');
   const [search, setSearch] = useState('');
@@ -308,6 +309,7 @@ export default function BrandTagPrinter() {
       if (!data || data.length < pageSize) hasMore = false;
     }
     setRows(allRows.map(d => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies })));
+    setLoading(false);
   }, []);
   useEffect(() => {
     fetchRows();
@@ -573,6 +575,11 @@ export default function BrandTagPrinter() {
 
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '16px 18px' }}>
+      {loading && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 16 }}>
+        <div style={{ width: 40, height: 40, border: `3px solid ${T.bd2}`, borderTopColor: T.ac, borderRadius: '50%', animation: 'btnSpin .7s linear infinite' }} />
+        <span style={{ fontSize: 13, color: T.tx3 }}>Loading brand tags...</span>
+      </div>}
+      {!loading && <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div>
           <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Brand Tags</span>
@@ -726,6 +733,7 @@ export default function BrandTagPrinter() {
           onClose={() => setModalRow(null)}
         />
       )}
+      </>}
     </div>
   );
 }
