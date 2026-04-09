@@ -311,7 +311,7 @@ const BrandTagModal = ({
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <span style={{ color: T.tx, fontSize: 13, fontWeight: 600 }}>{title}</span>
-          <button onClick={onClose} style={{ ...btnGhost, ...btnSm }}>Close</button>
+          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
         </div>
         {/* Fields */}
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -751,7 +751,7 @@ export default function BrandTagPrinter() {
                   XLSX.utils.book_append_sheet(wb, ws, 'Order Preview');
                   XLSX.writeFile(wb, 'order-preview.xlsx');
                 }}>Export</button>
-                <button style={btnGhost} onClick={() => setOrderRows(null)}>Close</button>
+                <span onClick={() => setOrderRows(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
               </div>
             </div>
             {missing.length > 0 && <div style={{ padding: '8px 14px', background: 'rgba(248,113,113,.05)', borderBottom: `1px solid rgba(248,113,113,.12)`, display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 10, color: T.re, lineHeight: 1.5 }}>
