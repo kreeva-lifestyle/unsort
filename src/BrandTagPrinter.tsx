@@ -183,6 +183,8 @@ const BRAND_OPTIONS = ['BRAND NAME: TANUKA', 'BRAND NAME: FUSIONIC', 'BRAND NAME
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
 const PRODUCT_OPTIONS = ['PRODUCT DESC: Co-ord Set', 'PRODUCT DESC: Dresses', 'PRODUCT DESC: Dress', 'PRODUCT DESC: Fusion Wear', 'PRODUCT DESC: Gown', 'PRODUCT DESC: Jumpsuit', 'PRODUCT DESC: Kurta', 'PRODUCT DESC: Kurta Set', 'PRODUCT DESC: Kurti', 'PRODUCT DESC: Lehenga Choli', 'PRODUCT DESC: Saree', 'PRODUCT DESC: Top'];
 
+const COLOR_OPTIONS = ['Aqua', 'Beige', 'Black', 'Blue', 'Bronze', 'Brown', 'Burgundy', 'Coral', 'Cream', 'Fuchsia', 'Gold', 'Green', 'Grey', 'Lavender', 'Lime', 'Magenta', 'Maroon', 'Mauve', 'Multi', 'Mustard', 'Navy Blue', 'Nude', 'Off White', 'Olive', 'Orange', 'Peach', 'Pink', 'Pistachio', 'Purple', 'Rama', 'Red', 'Rose Gold', 'Rust', 'Sea Green', 'Silver', 'Tan', 'Taupe', 'Teal', 'Turquoise', 'Violet', 'White', 'Wine', 'Yellow'];
+
 // ── Add / Edit Modal ───────────────────────────────────────────────────────────
 const MODAL_FIELDS: { key: keyof BrandTagRow; label: string; type?: string; multiline?: boolean; options?: string[]; defaultVal?: string }[] = [
   { key: 'brand', label: 'Brand Name', options: BRAND_OPTIONS },
@@ -191,7 +193,7 @@ const MODAL_FIELDS: { key: keyof BrandTagRow; label: string; type?: string; mult
   { key: 'product', label: 'Product Description', options: PRODUCT_OPTIONS },
   { key: 'qty', label: 'Includes / QTY', multiline: true },
   { key: 'size', label: 'Size', options: SIZE_OPTIONS },
-  { key: 'color', label: 'Color' },
+  { key: 'color', label: 'Color', options: COLOR_OPTIONS },
   { key: 'mrp', label: 'MRP', type: 'number' },
   { key: 'mktd', label: 'MKTD & DIST. BY', multiline: true, defaultVal: DEFAULT_MKTD },
   { key: 'jioCode', label: 'Jio Code' },
