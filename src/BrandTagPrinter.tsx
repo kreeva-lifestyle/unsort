@@ -93,10 +93,30 @@ const fmtMrp = (v: number): string => '\u20B9' + v.toLocaleString('en-IN');
 const MARKETPLACE_BRAND: Record<string, string> = { 'ajio b2c': 'FUSIONIC', 'ajio tanuka': 'TANUKA', 'ajio svaraa': 'SVARAA' };
 interface OrderRow { sku: string; marketplace: string; brand: string; copies: number; found: boolean; masterData?: BrandTagRow; }
 
+const BRAND_PREFIX: Record<string, string> = { 'SVARAA': 'SW', 'TANUKA': 'TN' };
+
 const parseOrderSheet = (data: any[], masterRows: BrandTagRow[]): OrderRow[] => {
   const map = new Map<string, OrderRow>();
   const masterMap = new Map<string, BrandTagRow>();
   masterRows.forEach(r => masterMap.set(r.sku.toUpperCase(), r));
+
+  const findMaster = (sku: string, brand: string): BrandTagRow | undefined => {
+    const upper = sku.toUpperCase();
+    // 1. Exact match
+    let m = masterMap.get(upper);
+    if (m) return m;
+    // 2. Try with brand prefix (SW for Svaraa, TN for Tanuka)
+    const prefix = BRAND_PREFIX[brand];
+    if (prefix) {
+      m = masterMap.get(prefix + upper);
+      if (m) return m;
+    }
+    // 3. Try stripping prefix if SKU already has it
+    for (const [, px] of Object.entries(BRAND_PREFIX)) {
+      if (upper.startsWith(px)) { m = masterMap.get(upper.slice(px.length)); if (m) return m; }
+    }
+    return undefined;
+  };
 
   for (const row of data) {
     const mp = String(row['Marketplace'] || row['marketplace'] || '').trim();
@@ -104,7 +124,6 @@ const parseOrderSheet = (data: any[], masterRows: BrandTagRow[]): OrderRow[] => 
     if (!mp || !rawSku) continue;
     const brand = MARKETPLACE_BRAND[mp.toLowerCase()] || 'UNKNOWN';
 
-    // Handle comma-separated SKUs: "TF-301-S*1, DRS143-M*1"
     const skuEntries = rawSku.split(',').map(s => s.trim()).filter(Boolean);
     for (const entry of skuEntries) {
       const [skuPart, copiesStr] = entry.split('*');
@@ -115,8 +134,8 @@ const parseOrderSheet = (data: any[], masterRows: BrandTagRow[]): OrderRow[] => 
 
       if (map.has(key)) { map.get(key)!.copies += copies; }
       else {
-        const master = masterMap.get(sku.toUpperCase());
-      map.set(key, { sku, marketplace: mp, brand, copies, found: !!master, masterData: master });
+        const master = findMaster(sku, brand);
+      map.set(key, { sku: master?.sku || sku, marketplace: mp, brand, copies, found: !!master, masterData: master });
       }
     }
   }
@@ -291,6 +310,7 @@ export default function BrandTagPrinter() {
   const [rows, setRows] = useState<BrandTagRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshMsg, setRefreshMsg] = useState('');
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState('');
   const [search, setSearch] = useState('');
@@ -576,7 +596,7 @@ export default function BrandTagPrinter() {
           {importing && <span style={{ fontSize: 11, color: T.yl, marginLeft: 10, fontWeight: 600 }}>Importing {importProgress}...</span>}
         </div>
         <div style={{ display: 'flex', gap: 5 }}>
-          <button style={btnGhost} onClick={() => fetchPage()}>Refresh</button>
+          <button style={btnGhost} onClick={async () => { setRefreshMsg('Refreshing...'); await fetchPage(); setRefreshMsg('Updated!'); setTimeout(() => setRefreshMsg(''), 2000); }}>{refreshMsg || 'Refresh'}</button>
           <button style={btnGhost} onClick={() => fileRef.current?.click()}>Import</button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
           <button style={btnGhost} onClick={handleExport}>Export</button>
