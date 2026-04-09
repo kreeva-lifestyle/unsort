@@ -226,7 +226,6 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
   const tabs = [
     { id: 'dashboard', icon: 'grid', label: 'Dashboard' },
     { id: 'inventory', icon: 'box', label: 'Inventory' },
-    { id: 'completed', icon: 'check', label: 'Completed' },
     { id: 'reports', icon: 'file', label: 'Reports' },
     { id: 'brandtag', icon: 'tag', label: 'Brand Tags' },
     { id: 'settings', icon: 'settings', label: 'Settings' },
@@ -603,7 +602,8 @@ const canAlterSize = (a: string, b: string): boolean => {
 };
 const isDupatta = (name: string) => /dupatt?a/i.test(name);
 
-const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus }: { globalSearch?: string; openItemId?: string | null; onItemOpened?: () => void; defaultStatus?: string }) => {
+const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSearch?: string; openItemId?: string | null; onItemOpened?: () => void }) => {
+  const [stage, setStage] = useState<'pending' | 'completed'>('pending');
   const instanceId = useId();
   const [items, setItems] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -614,7 +614,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   const [locations, setLocations] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
   const [itemTags, setItemTags] = useState<Record<string, any[]>>({});
-  const [statusFilter, setStatusFilter] = useState(defaultStatus || 'all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [catFilter, setCatFilter] = useState('all');
   const [locFilter, setLocFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('all');
@@ -986,11 +986,12 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
     setShowIntel(true);
   };
 
-  const isCompletedView = defaultStatus === 'completed';
+  const isCompletedView = stage === 'completed';
 
   const filtered = items.filter((i) => {
-    // Main inventory hides completed items; completed view only shows them
+    // Pending stage hides completed items; completed stage only shows them
     if (!isCompletedView && i.status === 'completed') return false;
+    if (isCompletedView && i.status !== 'completed') return false;
     if (statusFilter !== 'all' && i.status !== statusFilter) return false;
     if (catFilter !== 'all' && i.product_id !== catFilter) return false;
     if (locFilter !== 'all' && (i.location || '') !== locFilter) return false;
@@ -1011,14 +1012,14 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   });
 
   const hasActiveFilters = statusFilter !== 'all' || catFilter !== 'all' || locFilter !== 'all' || mpFilter !== 'all' || tagFilter !== 'all' || search !== '' || globalSearch !== '';
-  const clearFilters = () => { setStatusFilter('all'); setCatFilter('all'); setLocFilter('all'); setMpFilter('all'); setTagFilter('all'); setSearch(''); };
+  const clearFilters = () => { setStatusFilter('all'); setCatFilter('all'); setLocFilter('all'); setMpFilter('all'); setTagFilter('all'); setSearch(''); setPage(0); };
 
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [perPage, setPerPage] = useState(25);
   const totalPages = Math.ceil(filtered.length / perPage);
   const paged = filtered.slice(page * perPage, (page + 1) * perPage);
-  useEffect(() => { setPage(0); }, [statusFilter, catFilter, locFilter, mpFilter, tagFilter, search, globalSearch]);
+  useEffect(() => { setPage(0); }, [statusFilter, catFilter, locFilter, mpFilter, tagFilter, search, globalSearch, stage]);
 
   const scrollToPair = (pairId: string) => {
     setHighlightId(pairId);
@@ -1029,17 +1030,25 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
 
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      {/* Stage toggle */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div><span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Inventory</span><span style={{ fontSize: 10, fontWeight: 500, color: T.tx3, marginLeft: 8 }}>{filtered.length !== items.length ? `${filtered.length} of ` : ''}{items.length} item{items.length !== 1 ? 's' : ''}</span></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, border: `1px solid ${T.bd}` }}>
+            {(['pending', 'completed'] as const).map(s => (
+              <div key={s} onClick={() => { setStage(s); setPage(0); }} style={{ padding: '4px 14px', borderRadius: 4, fontSize: 10, fontWeight: stage === s ? 600 : 400, cursor: 'pointer', background: stage === s ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'transparent', color: stage === s ? '#fff' : T.tx3, transition: 'all .15s', textTransform: 'capitalize' }}>{s}</div>
+            ))}
+          </div>
+          <span style={{ fontSize: 10, fontWeight: 500, color: T.tx3 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length !== 1 ? 's' : ''}</span>
+        </div>
         <div style={{ display: 'flex', gap: 5 }}>
           {!isCompletedView && <div onClick={computeIntel} style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600, fontSize: 10 }}>Unsort Intel</div>}
-          {canEdit && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
+          {canEdit && !isCompletedView && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
         </div>
       </div>
       <div className="filter-bar" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, SKU code, location, notes..." style={{ ...S.fInput, flex: 1, minWidth: 160, padding: '6px 9px' }} />
         <div style={{ width: 1, height: 24, background: T.bd2 }} />
-        {!isCompletedView && <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 120, padding: '7px 10px', cursor: 'pointer' }}><option value="all">All Status</option><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select>}
+        {!isCompletedView && <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Status</option><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select>}
         <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 110, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Categories</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
         <select value={locFilter} onChange={(e) => setLocFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Locations</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select>
         <select value={mpFilter} onChange={(e) => setMpFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 110, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Marketplaces</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select>
@@ -1662,7 +1671,7 @@ const MainApp = () => {
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', completed: 'Completed', reports: 'Reports', brandtag: 'Brand Tags', settings: 'Settings' };
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', reports: 'Reports', brandtag: 'Brand Tags', settings: 'Settings' };
   const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
@@ -1692,7 +1701,7 @@ const MainApp = () => {
     <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
       {/* Mobile bottom nav */}
       <div className="mobile-hamburger" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 102, background: T.s, borderTop: `1px solid ${T.bd}`, padding: '8px 0', paddingBottom: 'max(8px, env(safe-area-inset-bottom))', justifyContent: 'space-around' }}>
-        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Items' }, { id: 'completed', icon: 'check', label: 'Done' }, { id: 'settings', icon: 'settings', label: 'Settings' }].map(t => (
+        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Items' }, { id: 'brandtag', icon: 'tag', label: 'Tags' }, { id: 'settings', icon: 'settings', label: 'Settings' }].map(t => (
           <div key={t.id} onClick={() => { setTab(t.id); setMobileMenu(false); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: tab === t.id ? T.ac : T.tx3, fontSize: 9, fontWeight: 500 }}>
             <Icon name={t.icon} size={20} /><span>{t.label}</span>
           </div>
@@ -1702,7 +1711,6 @@ const MainApp = () => {
       <main style={{ flex: 1, overflow: 'auto' }}>
         {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard /></div>}
         {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} /></div>}
-        {mounted.has('completed') && <div style={{ display: tab === 'completed' ? 'block' : 'none' }}><Inventory globalSearch="" defaultStatus="completed" /></div>}
         {mounted.has('reports') && <div style={{ display: tab === 'reports' ? 'block' : 'none' }}><Reports /></div>}
         {mounted.has('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
         {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage /></div>}
