@@ -23,27 +23,29 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const T = {
-  bg: '#0a0d14', s: '#12161f', s2: '#1a1f2e', s3: '#232a3b',
-  bd: '#1e2536', bd2: '#2d3548',
-  tx: '#eaf0f6', tx2: '#8899b4', tx3: '#4f6080',
-  ac: '#8b5cf6', ac2: '#a78bfa',
-  gr: '#34d399', re: '#f87171', bl: '#60a5fa', yl: '#fbbf24',
-  r: 8, mono: "'JetBrains Mono', monospace", sans: "'Inter', sans-serif",
+  bg: '#080C14', s: '#0D1117', s2: '#111827', s3: '#161D2E',
+  bd: 'rgba(255,255,255,0.06)', bd2: 'rgba(255,255,255,0.10)',
+  tx: '#F1F5F9', tx2: '#94A3B8', tx3: '#475569',
+  ac: '#6366F1', ac2: '#818CF8',
+  gr: '#22C55E', re: '#EF4444', bl: '#38BDF8', yl: '#F59E0B',
+  r: 10, mono: "'JetBrains Mono', monospace", sans: "'Inter', -apple-system, sans-serif",
+  glass1: 'rgba(255,255,255,0.03)', glass2: 'rgba(255,255,255,0.06)',
+  transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
 };
 
 // Shared styles
 const S = {
-  fLabel: { fontSize: 11, color: T.tx3, marginBottom: 4, display: 'block', fontWeight: 500 } as React.CSSProperties,
-  fInput: { width: '100%', background: 'rgba(26,31,46,.8)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '7px 10px', outline: 'none', transition: 'border-color .2s, box-shadow .2s' } as React.CSSProperties,
-  btnPrimary: { padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 4, letterSpacing: 0.2, backdropFilter: 'blur(4px)', whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  btnGhost: { padding: '5px 12px', borderRadius: 6, border: `1px solid ${T.bd2}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, fontFamily: T.sans, background: 'rgba(26,31,46,.5)', backdropFilter: 'blur(4px)', color: T.tx2, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  btnDanger: { padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(248,113,113,.15)', cursor: 'pointer', fontSize: 10, fontWeight: 500, fontFamily: T.sans, background: 'rgba(248,113,113,.06)', backdropFilter: 'blur(4px)', color: T.re, whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  btnSm: { padding: '3px 8px', fontSize: 10 } as React.CSSProperties,
-  modalOverlay: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(8px)', padding: 8 } as React.CSSProperties,
-  modalBox: { background: 'rgba(18,22,31,.95)', border: `1px solid ${T.bd2}`, borderRadius: 12, width: 480, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' as const, boxShadow: '0 16px 48px rgba(0,0,0,.5)', backdropFilter: 'blur(12px)' } as React.CSSProperties,
-  modalHead: { padding: '12px 16px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
-  thStyle: { fontSize: 10, color: T.tx3, padding: '8px 10px', textAlign: 'left' as const, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: T.s2, whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  tdStyle: { padding: '8px 10px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx } as React.CSSProperties,
+  fLabel: { display: 'block', fontSize: 13, fontWeight: 500, color: T.tx2, marginBottom: 6, letterSpacing: '0.01em' } as React.CSSProperties,
+  fInput: { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: T.r, color: T.tx, fontFamily: T.sans, fontSize: 14, padding: '10px 14px', outline: 'none', transition: T.transition } as React.CSSProperties,
+  btnPrimary: { padding: '7px 16px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: T.sans, background: T.ac, color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 16px rgba(99,102,241,0.35)', transition: T.transition, whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  btnGhost: { padding: '7px 16px', borderRadius: T.r, border: `1px solid ${T.bd2}`, cursor: 'pointer', fontSize: 13, fontWeight: 500, fontFamily: T.sans, background: T.glass2, color: T.tx2, display: 'inline-flex', alignItems: 'center', gap: 6, transition: T.transition, whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  btnDanger: { padding: '5px 12px', borderRadius: T.r, border: '1px solid rgba(239,68,68,0.25)', cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: T.sans, background: 'rgba(239,68,68,0.10)', color: '#FCA5A5', transition: T.transition, whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  btnSm: { padding: '4px 10px', fontSize: 11 } as React.CSSProperties,
+  modalOverlay: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', padding: 8 } as React.CSSProperties,
+  modalBox: { background: T.s3, backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: `1px solid ${T.bd2}`, borderRadius: 20, width: 520, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' as const, boxShadow: '0 24px 80px rgba(0,0,0,.60)', padding: 0 } as React.CSSProperties,
+  modalHead: { padding: '16px 24px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
+  thStyle: { fontSize: 11, color: T.tx3, padding: '12px 16px', textAlign: 'left' as const, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: T.glass1, textTransform: 'uppercase' as const, letterSpacing: '0.08em', whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  tdStyle: { padding: '14px 16px', fontSize: 14, borderBottom: `1px solid ${T.bd}`, color: T.tx2 } as React.CSSProperties,
 };
 
 const AuthContext = createContext<any>(null);
@@ -479,15 +481,15 @@ const Header = ({ title, onSearch, onNotifClick, onOpenScanner }: { title: strin
 };
 
 const statusTag = (status: string) => {
-  const m: Record<string, { bg: string; color: string }> = {
-    complete: { bg: 'rgba(45,212,160,.12)', color: T.gr },
-    completed: { bg: 'rgba(16,185,129,.2)', color: '#10b981' },
-    damaged: { bg: 'rgba(245,87,92,.15)', color: T.re },
-    unsorted: { bg: 'rgba(245,166,35,.15)', color: T.yl },
-    dry_clean: { bg: 'rgba(78,142,247,.15)', color: T.bl },
+  const m: Record<string, { bg: string; color: string; bd: string }> = {
+    complete: { bg: 'rgba(34,197,94,0.10)', color: '#4ADE80', bd: 'rgba(34,197,94,0.25)' },
+    completed: { bg: 'rgba(34,197,94,0.15)', color: '#4ADE80', bd: 'rgba(34,197,94,0.30)' },
+    damaged: { bg: 'rgba(239,68,68,0.10)', color: '#FCA5A5', bd: 'rgba(239,68,68,0.25)' },
+    unsorted: { bg: 'rgba(245,158,11,0.10)', color: '#FCD34D', bd: 'rgba(245,158,11,0.25)' },
+    dry_clean: { bg: 'rgba(56,189,248,0.10)', color: '#7DD3FC', bd: 'rgba(56,189,248,0.25)' },
   };
   const s = m[status] || m.unsorted;
-  return { display: 'inline-block' as const, padding: '2px 8px', borderRadius: T.r, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color };
+  return { display: 'inline-block' as const, padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.bd}`, textTransform: 'uppercase' as const, letterSpacing: '0.04em' };
 };
 
 const Dashboard = () => {
@@ -1461,14 +1463,14 @@ const Reports = () => {
   const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
 
   const reportStatusTag = (status: string) => {
-    const m: Record<string, { bg: string; color: string }> = {
-      open: { bg: 'rgba(245,87,92,.15)', color: T.re },
-      investigating: { bg: 'rgba(245,166,35,.15)', color: T.yl },
-      resolved: { bg: 'rgba(45,212,160,.15)', color: T.gr },
-      closed: { bg: 'rgba(139,154,191,.1)', color: T.tx3 },
+    const m: Record<string, { bg: string; color: string; bd: string }> = {
+      open: { bg: 'rgba(239,68,68,0.10)', color: '#FCA5A5', bd: 'rgba(239,68,68,0.25)' },
+      investigating: { bg: 'rgba(245,158,11,0.10)', color: '#FCD34D', bd: 'rgba(245,158,11,0.25)' },
+      resolved: { bg: 'rgba(34,197,94,0.10)', color: '#4ADE80', bd: 'rgba(34,197,94,0.25)' },
+      closed: { bg: T.glass2, color: T.tx3, bd: T.bd },
     };
     const s = m[status] || m.open;
-    return { display: 'inline-block' as const, padding: '2px 8px', borderRadius: T.r, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color };
+    return { display: 'inline-block' as const, padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.bd}`, textTransform: 'uppercase' as const, letterSpacing: '0.04em' };
   };
 
   return (
