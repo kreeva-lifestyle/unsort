@@ -451,24 +451,32 @@ const Header = ({ title, onSearch, onNotifClick, onOpenScanner }: { title: strin
   };
 
   return (
-    <header className="header-bar" style={{ background: 'rgba(8,11,20,0.75)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: `1px solid ${T.bd}`, padding: '7px 14px', position: 'sticky', top: 0, zIndex: 50 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <h1 className="header-title" style={{ margin: 0, fontSize: 13, fontWeight: 600, color: T.tx, whiteSpace: 'nowrap', fontFamily: T.sora }}>{title}</h1>
-        <div className="header-search" style={{ flex: 1, maxWidth: 280 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, padding: '4px 9px' }}>
-            <Icon name="search" size={12} />
-            <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search..." style={{ background: 'transparent', border: 'none', outline: 'none', color: T.tx, fontFamily: T.sans, fontSize: 11, flex: 1, minWidth: 0 }} />
-            {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 13 }}>×</span>}
+    <header className="header-bar" style={{ background: 'rgba(8,11,20,0.60)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', borderBottom: `1px solid ${T.bd}`, padding: '0 16px', position: 'sticky', top: 0, zIndex: 50, height: 44, display: 'flex', alignItems: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
+        {/* Title with accent dot */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, boxShadow: `0 0 8px ${T.ac}55` }} />
+          <h1 className="header-title" style={{ margin: 0, fontSize: 13, fontWeight: 700, color: T.tx, whiteSpace: 'nowrap', fontFamily: T.sora, letterSpacing: -0.2 }}>{title}</h1>
+        </div>
+        {/* Separator */}
+        <div style={{ width: 1, height: 18, background: `linear-gradient(180deg, transparent, ${T.bd2}, transparent)`, flexShrink: 0 }} />
+        {/* Search */}
+        <div className="header-search" style={{ flex: 1, maxWidth: 320 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '5px 10px', transition: 'all .18s' }}>
+            <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, flexShrink: 0, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
+            <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search items, IDs, SKUs..." style={{ background: 'transparent', border: 'none', outline: 'none', color: T.tx, fontFamily: T.sans, fontSize: 11, flex: 1, minWidth: 0 }} />
+            {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 12, lineHeight: 1 }}>×</span>}
           </div>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
-        <button onClick={() => onOpenScanner?.()} style={{ padding: '5px 8px', borderRadius: 6, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center' }} title="Scan barcode">
+        {/* Right actions */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <button onClick={() => onOpenScanner?.()} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} title="Scan barcode" onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = T.bd2; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = T.bd; }}>
           <Icon name="scan" size={14} />
         </button>
         <div style={{ position: 'relative' }}>
-        <button onClick={() => setShow(!show)} style={{ padding: '5px 8px', borderRadius: 6, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', position: 'relative', color: T.tx3, fontSize: 13, display: 'flex', alignItems: 'center' }}>
+        <button onClick={() => setShow(!show)} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', position: 'relative', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = T.bd2; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = T.bd; }}>
           <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
-          {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono }}>{unread}</span>}
+          {unread > 0 && <span style={{ position: 'absolute', top: -3, right: -3, width: 14, height: 14, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 8, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono, boxShadow: `0 0 6px ${T.ac}66` }}>{unread}</span>}
         </button>
         {show && (
           <div className="notif-dropdown" style={{ position: 'absolute', right: 0, top: 38, width: 290, background: 'rgba(12,16,28,0.96)', backdropFilter: 'blur(24px)', borderRadius: 8, boxShadow: '0 10px 40px rgba(0,0,0,.55)', border: `1px solid ${T.bd2}`, zIndex: 50, maxHeight: 360, overflowY: 'auto' }}>
