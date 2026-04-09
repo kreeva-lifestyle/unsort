@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { createClient } from '@supabase/supabase-js';
 
@@ -282,7 +282,9 @@ const BrandTagModal = ({
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function BrandTagPrinter() {
+  // Server-side pagination + filtering
   const [rows, setRows] = useState<BrandTagRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState('');
@@ -297,25 +299,44 @@ export default function BrandTagPrinter() {
   const [orderRows, setOrderRows] = useState<OrderRow[] | null>(null);
   const [orderPage, setOrderPage] = useState(0);
   const [orderPerPage, setOrderPerPage] = useState(25);
+  const [btPage, setBtPage] = useState(0);
+  const [btPerPage, setBtPerPage] = useState(25);
 
-  // Fetch from Supabase + realtime
-  const fetchRows = useCallback(async () => {
-    // Supabase default limit is 1000 - fetch ALL rows by paginating
-    const allRows: any[] = [];
-    const pageSize = 1000;
-    let from = 0;
-    let hasMore = true;
-    while (hasMore) {
-      const { data } = await supabase.from('brand_tags').select('*').order('created_at', { ascending: false }).range(from, from + pageSize - 1);
-      if (data && data.length > 0) { allRows.push(...data); from += pageSize; }
-      if (!data || data.length < pageSize) hasMore = false;
-    }
-    setRows(allRows.map(d => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies })));
+  // Fetch current page from Supabase (server-side pagination)
+  const fetchPage = useCallback(async () => {
+    let query = supabase.from('brand_tags').select('*', { count: 'exact' });
+    if (search) query = query.or(`sku.ilike.%${search}%,ean.ilike.%${search}%,brand.ilike.%${search}%,color.ilike.%${search}%,product.ilike.%${search}%`);
+    if (brandFilter) query = query.ilike('brand', `%${brandFilter}%`);
+    if (sizeFilter) query = query.eq('size', sizeFilter);
+    if (colorFilter) query = query.eq('color', colorFilter);
+    const from = btPage * btPerPage;
+    const { data, count } = await query.order('created_at', { ascending: false }).range(from, from + btPerPage - 1);
+    if (data) setRows(data.map(d => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies })));
+    if (count !== null) setTotalCount(count);
     setLoading(false);
-  }, []);
+  }, [btPage, btPerPage, search, brandFilter, sizeFilter, colorFilter]);
+
+  useEffect(() => { fetchPage(); }, [fetchPage]);
+
+  // Realtime: just refresh current page
   useEffect(() => {
-    fetchRows();
-    const ch = supabase.channel('bt-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'brand_tags' }, fetchRows).subscribe();
+    const ch = supabase.channel('bt-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'brand_tags' }, () => fetchPage()).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [fetchPage]);
+
+  // Debounce search to avoid hammering DB on every keystroke
+  const searchTimeout = useRef<any>(null);
+  const handleSearch = (val: string) => {
+    setSearch(val);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => setBtPage(0), 300);
+  };
+
+  // Reset page on filter change
+  useEffect(() => { setBtPage(0); }, [brandFilter, sizeFilter, colorFilter]);
+  useEffect(() => {
+    fetchPage();
+    const ch = supabase.channel('bt-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'brand_tags' }, fetchPage).subscribe();
 
     // Resume interrupted import from localStorage queue
     const queueKey = 'bt_import_queue';
@@ -339,7 +360,7 @@ export default function BrandTagPrinter() {
               localStorage.removeItem(queueKey);
               setImporting(false); setImportProgress('');
               alert('Resumed import complete!');
-              fetchRows();
+              fetchPage();
             })();
           } else {
             localStorage.removeItem(queueKey);
@@ -351,25 +372,11 @@ export default function BrandTagPrinter() {
     }
 
     return () => { supabase.removeChannel(ch); };
-  }, [fetchRows]);
+  }, [fetchPage]);
 
-  // Auto-populated filter options
-  const uniqueBrands = useMemo(() => [...new Set(rows.map(r => r.brand.replace(/^BRAND NAME:\s*/i, '').trim()).filter(Boolean))].sort(), [rows]);
-  const uniqueSizes = useMemo(() => [...new Set(rows.map(r => r.size).filter(Boolean))].sort(), [rows]);
-  const uniqueColors = useMemo(() => [...new Set(rows.map(r => r.color).filter(Boolean))].sort(), [rows]);
-
-  // Filter rows (AND logic: search + size + color)
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    return rows.filter(r => {
-      if (q && ![r.brand, r.ean, r.sku, r.product, r.color, r.size, r.jioCode, r.qty]
-        .some(v => v.toLowerCase().includes(q))) return false;
-      if (brandFilter && !r.brand.toLowerCase().includes(brandFilter.toLowerCase())) return false;
-      if (sizeFilter && r.size !== sizeFilter) return false;
-      if (colorFilter && r.color !== colorFilter) return false;
-      return true;
-    });
-  }, [rows, search, brandFilter, sizeFilter, colorFilter]);
+  // Filter options are now preset constants (BRAND_OPTIONS, SIZE_OPTIONS, COLOR_OPTIONS)
+  // Filtering happens server-side in fetchPage()
+  const totalPages = Math.ceil(totalCount / btPerPage);
 
   // ── Import Excel ──
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -445,7 +452,7 @@ export default function BrandTagPrinter() {
         setImporting(false);
         setImportProgress('');
         alert(`Import complete! ${toUpsert.length} rows processed.${failed > 0 ? ` ${failed} failed.` : ''}`);
-        fetchRows();
+        fetchPage();
       } catch (_) {
         alert('Failed to parse Excel file. Ensure it is a valid .xlsx / .xls / .csv file.');
       }
@@ -484,8 +491,8 @@ export default function BrandTagPrinter() {
 
   const deleteRow = useCallback((id: string, sku: string) => {
     if (!window.confirm(`Delete SKU: ${sku || 'this row'}?`)) return;
-    supabase.from('brand_tags').delete().eq('id', id).then(() => fetchRows());
-  }, [fetchRows]);
+    supabase.from('brand_tags').delete().eq('id', id).then(() => fetchPage());
+  }, [fetchPage]);
 
   // ── Modal Open/Save ──
   const openAdd = useCallback(() => {
@@ -501,12 +508,12 @@ export default function BrandTagPrinter() {
   const handleModalSave = useCallback((updated: BrandTagRow) => {
     const dbRow = { brand: updated.brand, ean: updated.ean, sku: updated.sku, qty: updated.qty, mrp: updated.mrp, size: updated.size, product: updated.product, color: updated.color, mktd: updated.mktd, jio_code: updated.jioCode, copies: updated.copies };
     if (modalMode === 'add') {
-      supabase.from('brand_tags').insert(dbRow).then(({ error }) => { if (error) alert('Save failed: ' + error.message); else fetchRows(); });
+      supabase.from('brand_tags').insert(dbRow).then(({ error }) => { if (error) alert('Save failed: ' + error.message); else fetchPage(); });
     } else {
-      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(({ error }) => { if (error) alert('Update failed: ' + error.message); else fetchRows(); });
+      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(({ error }) => { if (error) alert('Update failed: ' + error.message); else fetchPage(); });
     }
     setModalRow(null);
-  }, [modalMode, fetchRows]);
+  }, [modalMode, fetchPage]);
 
   // ── Print Handlers ──
   const printSingle = useCallback((row: BrandTagRow) => {
@@ -519,19 +526,28 @@ export default function BrandTagPrinter() {
   const handleOrderImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const d = new Uint8Array(evt.target?.result as ArrayBuffer);
         const wb = XLSX.read(d, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const json: any[] = XLSX.utils.sheet_to_json(ws);
-        const parsed = parseOrderSheet(json, rows);
+        // Fetch ALL master data for SKU matching (one-time, not paginated)
+        const allMaster: any[] = [];
+        let from = 0; let more = true;
+        while (more) {
+          const { data } = await supabase.from('brand_tags').select('*').range(from, from + 999);
+          if (data && data.length > 0) { allMaster.push(...data); from += 1000; }
+          if (!data || data.length < 1000) more = false;
+        }
+        const masterRows: BrandTagRow[] = allMaster.map(d => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies }));
+        const parsed = parseOrderSheet(json, masterRows);
         setOrderRows(parsed); setOrderPage(0);
       } catch { alert('Failed to parse order sheet.'); }
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
-  }, [rows]);
+  }, []);
 
   const updateOrderCopies = (sku: string, brand: string, copies: number) => {
     setOrderRows(prev => prev ? prev.map(r => (r.sku === sku && r.brand === brand) ? { ...r, copies: Math.max(0, copies) } : r) : null);
@@ -552,11 +568,14 @@ export default function BrandTagPrinter() {
     printLabelsInWindow([s]);
   }, [rows]);
 
-  const printSelected = useCallback(() => {
+  const printSelected = useCallback(async () => {
+    // Fetch all rows with copies > 0 from DB (not just current page)
+    const { data } = await supabase.from('brand_tags').select('*').gt('copies', 0);
+    if (!data || data.length === 0) { alert('No rows with copies > 0.'); return; }
+    const printRows: BrandTagRow[] = data.map(d => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies }));
     const labels: BrandTagRow[] = [];
     const badRows: string[] = [];
-    rows.forEach(r => {
-      if (r.copies <= 0) return;
+    printRows.forEach(r => {
       const bad = validateRow(r);
       if (bad) { badRows.push(`${r.sku || 'empty'}: missing "${bad}"`); return; }
       for (let i = 0; i < r.copies; i++) labels.push(r);
@@ -568,12 +587,7 @@ export default function BrandTagPrinter() {
 
   // ── Select All / Set All Copies ──
 
-  // Total label count
-  const [btPage, setBtPage] = useState(0);
-  const [btPerPage, setBtPerPage] = useState(25);
-  const btTotalPages = Math.ceil(filtered.length / btPerPage);
-  const btPaged = filtered.slice(btPage * btPerPage, (btPage + 1) * btPerPage);
-  useEffect(() => { setBtPage(0); }, [search, brandFilter, sizeFilter, colorFilter]);
+  // Server-side pagination handles btPage/btPerPage - defined above
 
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '16px 18px' }}>
@@ -585,7 +599,7 @@ export default function BrandTagPrinter() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div>
           <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Brand Tags</span>
-          <span style={{ fontSize: 12, fontWeight: 500, color: T.tx3, marginLeft: 10 }}>{filtered.length} of {rows.length} rows</span>
+          <span style={{ fontSize: 12, fontWeight: 500, color: T.tx3, marginLeft: 10 }}>{totalCount} rows</span>
           {importing && <span style={{ fontSize: 11, color: T.yl, marginLeft: 10, fontWeight: 600 }}>Importing {importProgress}...</span>}
         </div>
         <div style={{ display: 'flex', gap: 5 }}>
@@ -600,11 +614,11 @@ export default function BrandTagPrinter() {
         </div>
       </div>
       <div style={{ background: T.s, border: '1px solid ' + T.bd, borderRadius: 10, padding: '10px 12px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-        <input type="text" placeholder="Search brand, SKU, EAN..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inp, flex: 1, minWidth: 140, padding: '7px 10px' }} />
+        <input type="text" placeholder="Search brand, SKU, EAN..." value={search} onChange={e => handleSearch(e.target.value)} style={{ ...inp, flex: 1, minWidth: 140, padding: '7px 10px' }} />
         <div style={{ width: 1, height: 24, background: T.bd2 }} />
-        <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 110, padding: '7px 10px', cursor: 'pointer' }}><option value="">All brands</option>{uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}</select>
-        <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 90, padding: '7px 10px', cursor: 'pointer' }}><option value="">All sizes</option>{uniqueSizes.map(s => <option key={s} value={s}>{s}</option>)}</select>
-        <select value={colorFilter} onChange={e => setColorFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 100, padding: '7px 10px', cursor: 'pointer' }}><option value="">All colors</option>{uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}</select>
+        <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 110, padding: '7px 10px', cursor: 'pointer' }}><option value="">All brands</option>{BRAND_OPTIONS.map(b => { const n = b.replace(/^BRAND NAME:\s*/i, ''); return <option key={b} value={n}>{n}</option>; })}</select>
+        <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 90, padding: '7px 10px', cursor: 'pointer' }}><option value="">All sizes</option>{SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+        <select value={colorFilter} onChange={e => setColorFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 100, padding: '7px 10px', cursor: 'pointer' }}><option value="">All colors</option>{COLOR_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}</select>
       </div>
 
       {/* Table */}
@@ -616,8 +630,8 @@ export default function BrandTagPrinter() {
             ))}
           </tr></thead>
           <tbody>
-            {filtered.length === 0 && <tr><td colSpan={11} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
-            {btPaged.map(row => (
+            {rows.length === 0 && !loading && <tr><td colSpan={11} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
+            {rows.map(row => (
               <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = T.s2; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
                 <td style={tdS}>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</td>
                 <td style={tdS}>{row.ean}</td>
@@ -644,10 +658,10 @@ export default function BrandTagPrinter() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
         <select value={btPerPage} onChange={e => { setBtPerPage(Number(e.target.value)); setBtPage(0); }} style={{ ...inp, width: 'auto', padding: '3px 6px', fontSize: 10, cursor: 'pointer' }}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
         <span style={{ color: T.tx3 }}>rows</span>
-        {btTotalPages > 1 && <>
+        {totalPages > 1 && <>
           <span onClick={() => setBtPage(Math.max(0, btPage - 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage === 0 ? 0.3 : 1, pointerEvents: btPage === 0 ? 'none' : 'auto' }}>Prev</span>
-          <span style={{ color: T.tx3 }}>{btPage + 1} / {btTotalPages}</span>
-          <span onClick={() => setBtPage(Math.min(btTotalPages - 1, btPage + 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage >= btTotalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= btTotalPages - 1 ? 'none' : 'auto' }}>Next</span>
+          <span style={{ color: T.tx3 }}>{btPage + 1} / {totalPages}</span>
+          <span onClick={() => setBtPage(Math.min(totalPages - 1, btPage + 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= totalPages - 1 ? 'none' : 'auto' }}>Next</span>
         </>}
       </div>
 
