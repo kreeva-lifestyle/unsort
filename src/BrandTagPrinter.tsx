@@ -181,7 +181,7 @@ setTimeout(function(){window.print()},600);
 const DEFAULT_MKTD = 'Arya Designs, 16, Amba Bhuvan, Near Kasanagar Circle, Opp- Kumar Gurukul Vidhyalay Katargam, Surat-395004, Gujarat, India';
 const BRAND_OPTIONS = ['BRAND NAME: TANUKA', 'BRAND NAME: FUSIONIC', 'BRAND NAME: SVARAA'];
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
-const PRODUCT_OPTIONS = ['PRODUCT DESC: Co-ord Set', 'PRODUCT DESC: Dresses', 'PRODUCT DESC: Dress', 'PRODUCT DESC: Fusion Wear', 'PRODUCT DESC: Gown', 'PRODUCT DESC: Jumpsuit', 'PRODUCT DESC: Kurta', 'PRODUCT DESC: Kurta Set', 'PRODUCT DESC: Kurti', 'PRODUCT DESC: Lehenga Choli', 'PRODUCT DESC: Saree', 'PRODUCT DESC: Top'];
+const PRODUCT_OPTIONS = ['PRODUCT DESC: Co-ord Set', 'PRODUCT DESC: Dress', 'PRODUCT DESC: Fusion Wear', 'PRODUCT DESC: Gown', 'PRODUCT DESC: Gown Set', 'PRODUCT DESC: Jumpsuit', 'PRODUCT DESC: Kurta', 'PRODUCT DESC: Kurta Set', 'PRODUCT DESC: Kurti', 'PRODUCT DESC: Lehenga Choli', 'PRODUCT DESC: Saree', 'PRODUCT DESC: Top'];
 
 const COLOR_OPTIONS = ['Aqua', 'Beige', 'Black', 'Blue', 'Bronze', 'Brown', 'Burgundy', 'Coral', 'Cream', 'Fuchsia', 'Gold', 'Green', 'Grey', 'Lavender', 'Lime', 'Magenta', 'Maroon', 'Mauve', 'Multi', 'Mustard', 'Navy Blue', 'Nude', 'Off White', 'Olive', 'Orange', 'Peach', 'Pink', 'Pistachio', 'Purple', 'Rama', 'Red', 'Rose Gold', 'Rust', 'Sea Green', 'Silver', 'Tan', 'Taupe', 'Teal', 'Turquoise', 'Violet', 'White', 'Wine', 'Yellow'];
 
@@ -297,6 +297,8 @@ export default function BrandTagPrinter() {
   const fileRef = useRef<HTMLInputElement>(null);
   const orderFileRef = useRef<HTMLInputElement>(null);
   const [orderRows, setOrderRows] = useState<OrderRow[] | null>(null);
+  const [orderLoading, setOrderLoading] = useState(false);
+  const [orderLoadMsg, setOrderLoadMsg] = useState('');
   const [orderPage, setOrderPage] = useState(0);
   const [orderPerPage, setOrderPerPage] = useState(25);
   const [btPage, setBtPage] = useState(0);
@@ -491,22 +493,27 @@ export default function BrandTagPrinter() {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
+        setOrderLoading(true);
+        setOrderLoadMsg('Parsing file...');
         const d = new Uint8Array(evt.target?.result as ArrayBuffer);
         const wb = XLSX.read(d, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const json: any[] = XLSX.utils.sheet_to_json(ws);
-        // Fetch ALL master data for SKU matching (one-time, not paginated)
+        setOrderLoadMsg(`${json.length} rows parsed. Loading master data...`);
         const allMaster: any[] = [];
         let from = 0; let more = true;
         while (more) {
           const { data } = await supabase.from('brand_tags').select('*').range(from, from + 999);
           if (data && data.length > 0) { allMaster.push(...data); from += 1000; }
           if (!data || data.length < 1000) more = false;
+          setOrderLoadMsg(`${json.length} rows parsed. Master data: ${allMaster.length} loaded...`);
         }
+        setOrderLoadMsg(`Matching ${json.length} orders against ${allMaster.length} SKUs...`);
         const masterRows: BrandTagRow[] = allMaster.map(d => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies }));
         const parsed = parseOrderSheet(json, masterRows);
         setOrderRows(parsed); setOrderPage(0);
-      } catch { alert('Failed to parse order sheet.'); }
+        setOrderLoading(false); setOrderLoadMsg('');
+      } catch { alert('Failed to parse order sheet.'); setOrderLoading(false); setOrderLoadMsg(''); }
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
@@ -554,8 +561,9 @@ export default function BrandTagPrinter() {
           <button style={btnGhost} onClick={() => fileRef.current?.click()}>Import</button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
           <button style={btnGhost} onClick={handleExport}>Export</button>
-          <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.15)' }} onClick={() => orderFileRef.current?.click()}>Order Sheet</button>
+          <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.15)', opacity: orderLoading ? 0.5 : 1, pointerEvents: orderLoading ? 'none' : 'auto' }} onClick={() => orderFileRef.current?.click()}>Order Sheet</button>
           <input ref={orderFileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleOrderImport} />
+          {orderLoading && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: T.yl }}><span style={{ width: 12, height: 12, border: '2px solid rgba(251,191,36,.2)', borderTopColor: T.yl, borderRadius: '50%', animation: 'btnSpin .6s linear infinite', flexShrink: 0 }} />{orderLoadMsg}</span>}
           <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.15)' }} onClick={printTestLabel}>Test Print</button>
           <button style={btnPrimary} onClick={openAdd}>+ Add SKU</button>
         </div>
