@@ -102,17 +102,22 @@ const parseOrderSheet = (data: any[], masterRows: BrandTagRow[]): OrderRow[] => 
     const mp = String(row['Marketplace'] || row['marketplace'] || '').trim();
     const rawSku = String(row['SKU'] || row['sku'] || '').trim();
     if (!mp || !rawSku) continue;
-    const [skuPart, copiesStr] = rawSku.split('*');
-    const sku = skuPart.trim();
-    const copies = Math.max(1, parseInt(copiesStr) || 1);
     const brand = MARKETPLACE_BRAND[mp.toLowerCase()] || 'UNKNOWN';
-    // Aggregate by SKU + Brand (same SKU different brand = separate rows)
-    const key = sku.toUpperCase() + '::' + brand;
 
-    if (map.has(key)) { map.get(key)!.copies += copies; }
-    else {
-      const master = masterMap.get(sku.toUpperCase());
+    // Handle comma-separated SKUs: "TF-301-S*1, DRS143-M*1"
+    const skuEntries = rawSku.split(',').map(s => s.trim()).filter(Boolean);
+    for (const entry of skuEntries) {
+      const [skuPart, copiesStr] = entry.split('*');
+      const sku = skuPart.trim();
+      if (!sku) continue;
+      const copies = Math.max(1, parseInt(copiesStr) || 1);
+      const key = sku.toUpperCase() + '::' + brand;
+
+      if (map.has(key)) { map.get(key)!.copies += copies; }
+      else {
+        const master = masterMap.get(sku.toUpperCase());
       map.set(key, { sku, marketplace: mp, brand, copies, found: !!master, masterData: master });
+      }
     }
   }
   return Array.from(map.values());
@@ -319,6 +324,13 @@ export default function BrandTagPrinter() {
   }, [btPage, btPerPage, search, brandFilter, sizeFilter, colorFilter]);
 
   useEffect(() => { fetchPage(); }, [fetchPage]);
+
+  // Lock body scroll when any modal/popup is open
+  useEffect(() => {
+    const hasModal = !!modalRow || !!orderRows;
+    document.body.classList.toggle('modal-open', hasModal);
+    return () => { document.body.classList.remove('modal-open'); };
+  }, [modalRow, orderRows]);
 
   // Smart realtime: apply individual row changes without re-fetching entire page
   useEffect(() => {

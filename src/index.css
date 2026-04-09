@@ -62,7 +62,8 @@ input::placeholder, textarea::placeholder { color: var(--tx3); opacity: .45; }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes scanLine { 0%,100% { transform: translateY(-12px); opacity: .4; } 50% { transform: translateY(12px); opacity: 1; } }
 
-/* Quagga video fix */
+/* Disable body scroll when modal is open */
+body.modal-open { overflow: hidden !important; }
 .drawingBuffer { display: none !important; }
 div[ref] > video, .modal-inner video { width: 100% !important; height: 100% !important; object-fit: cover !important; }
 
