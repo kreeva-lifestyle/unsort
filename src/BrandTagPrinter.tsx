@@ -348,40 +348,6 @@ export default function BrandTagPrinter() {
 
   // Reset page on filter change
   useEffect(() => { setBtPage(0); }, [brandFilter, sizeFilter, colorFilter]);
-  useEffect(() => {
-    // Resume interrupted import from localStorage queue
-    const queueKey = 'bt_import_queue';
-    const saved = localStorage.getItem(queueKey);
-    if (saved) {
-      try {
-        const q = JSON.parse(saved);
-        if (q.data && q.startIdx < q.total) {
-          const remaining = q.data.slice(q.startIdx);
-          if (remaining.length > 0 && confirm(`Found interrupted import: ${q.startIdx} of ${q.total} done. Resume remaining ${remaining.length} rows?`)) {
-            (async () => {
-              setImporting(true);
-              const batchSize = 500;
-              for (let i = 0; i < remaining.length; i += batchSize) {
-                const batch = remaining.slice(i, i + batchSize);
-                await supabase.from('brand_tags').upsert(batch, { onConflict: 'ean,sku,size', ignoreDuplicates: false });
-                const done = q.startIdx + Math.min(i + batchSize, remaining.length);
-                setImportProgress(`${done} / ${q.total}`);
-                localStorage.setItem(queueKey, JSON.stringify({ ...q, startIdx: done }));
-              }
-              localStorage.removeItem(queueKey);
-              setImporting(false); setImportProgress('');
-              alert('Resumed import complete!');
-              fetchPage();
-            })();
-          } else {
-            localStorage.removeItem(queueKey);
-          }
-        } else {
-          localStorage.removeItem(queueKey);
-        }
-      } catch { localStorage.removeItem(queueKey); }
-    }
-  }, []);
 
   // Filter options are now preset constants (BRAND_OPTIONS, SIZE_OPTIONS, COLOR_OPTIONS)
   // Filtering happens server-side in fetchPage()
@@ -434,10 +400,6 @@ export default function BrandTagPrinter() {
           updated_at: new Date().toISOString(),
         }));
 
-        // Save queue to localStorage so refresh can resume
-        const queueKey = 'bt_import_queue';
-        localStorage.setItem(queueKey, JSON.stringify({ data: toUpsert, startIdx: 0, total: toUpsert.length }));
-
         // Warn on refresh during import
         const beforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); return ''; };
         window.addEventListener('beforeunload', beforeUnload);
@@ -452,11 +414,8 @@ export default function BrandTagPrinter() {
           if (error) failed += batch.length;
           const done = Math.min(i + batchSize, toUpsert.length);
           setImportProgress(`${done} / ${toUpsert.length}`);
-          // Update queue progress so resume knows where to start
-          localStorage.setItem(queueKey, JSON.stringify({ data: toUpsert, startIdx: done, total: toUpsert.length }));
         }
 
-        localStorage.removeItem(queueKey);
         window.removeEventListener('beforeunload', beforeUnload);
         setImporting(false);
         setImportProgress('');
