@@ -23,29 +23,30 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const T = {
-  bg: '#080C14', s: '#0D1117', s2: '#111827', s3: '#161D2E',
-  bd: 'rgba(255,255,255,0.06)', bd2: 'rgba(255,255,255,0.10)',
-  tx: '#F1F5F9', tx2: '#94A3B8', tx3: '#475569',
+  bg: '#060810', s: '#0B0F19', s2: '#0F1420', s3: '#141B2B',
+  bd: 'rgba(255,255,255,0.05)', bd2: 'rgba(255,255,255,0.08)',
+  tx: '#E2E8F0', tx2: '#8896B0', tx3: '#4A5568',
   ac: '#6366F1', ac2: '#818CF8',
   gr: '#22C55E', re: '#EF4444', bl: '#38BDF8', yl: '#F59E0B',
-  r: 10, mono: "'JetBrains Mono', monospace", sans: "'Inter', -apple-system, sans-serif",
-  glass1: 'rgba(255,255,255,0.03)', glass2: 'rgba(255,255,255,0.06)',
-  transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+  r: 8, mono: "'JetBrains Mono', monospace", sans: "'Inter', -apple-system, sans-serif",
+  sora: "'Sora', 'Inter', sans-serif",
+  glass1: 'rgba(255,255,255,0.02)', glass2: 'rgba(255,255,255,0.04)',
+  transition: 'all 180ms cubic-bezier(0.4, 0, 0.2, 1)',
 };
 
 // Shared styles
 const S = {
-  fLabel: { display: 'block', fontSize: 13, fontWeight: 500, color: T.tx2, marginBottom: 6, letterSpacing: '0.01em' } as React.CSSProperties,
-  fInput: { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: T.r, color: T.tx, fontFamily: T.sans, fontSize: 14, padding: '10px 14px', outline: 'none', transition: T.transition } as React.CSSProperties,
-  btnPrimary: { padding: '7px 16px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: T.sans, background: T.ac, color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 16px rgba(99,102,241,0.35)', transition: T.transition, whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  btnGhost: { padding: '7px 16px', borderRadius: T.r, border: `1px solid ${T.bd2}`, cursor: 'pointer', fontSize: 13, fontWeight: 500, fontFamily: T.sans, background: T.glass2, color: T.tx2, display: 'inline-flex', alignItems: 'center', gap: 6, transition: T.transition, whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  btnDanger: { padding: '5px 12px', borderRadius: T.r, border: '1px solid rgba(239,68,68,0.25)', cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: T.sans, background: 'rgba(239,68,68,0.10)', color: '#FCA5A5', transition: T.transition, whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  btnSm: { padding: '4px 10px', fontSize: 11 } as React.CSSProperties,
-  modalOverlay: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', padding: 8 } as React.CSSProperties,
-  modalBox: { background: T.s3, backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: `1px solid ${T.bd2}`, borderRadius: 20, width: 520, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' as const, boxShadow: '0 24px 80px rgba(0,0,0,.60)', padding: 0 } as React.CSSProperties,
-  modalHead: { padding: '16px 24px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
-  thStyle: { fontSize: 11, color: T.tx3, padding: '12px 16px', textAlign: 'left' as const, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: T.glass1, textTransform: 'uppercase' as const, letterSpacing: '0.08em', whiteSpace: 'nowrap' as const } as React.CSSProperties,
-  tdStyle: { padding: '14px 16px', fontSize: 14, borderBottom: `1px solid ${T.bd}`, color: T.tx2 } as React.CSSProperties,
+  fLabel: { display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, marginBottom: 5, letterSpacing: '0.06em', textTransform: 'uppercase' as const } as React.CSSProperties,
+  fInput: { width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '7px 10px', outline: 'none', transition: T.transition } as React.CSSProperties,
+  btnPrimary: { padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 10px rgba(99,102,241,0.25)', transition: T.transition, whiteSpace: 'nowrap' as const, letterSpacing: '0.02em' } as React.CSSProperties,
+  btnGhost: { padding: '5px 12px', borderRadius: 6, border: `1px solid ${T.bd2}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, fontFamily: T.sans, background: 'rgba(255,255,255,0.03)', color: T.tx2, display: 'inline-flex', alignItems: 'center', gap: 5, transition: T.transition, whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  btnDanger: { padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.18)', cursor: 'pointer', fontSize: 10, fontWeight: 500, fontFamily: T.sans, background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', transition: T.transition, whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  btnSm: { padding: '3px 8px', fontSize: 10 } as React.CSSProperties,
+  modalOverlay: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,.80)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', padding: 8 } as React.CSSProperties,
+  modalBox: { background: 'rgba(14,18,30,0.96)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', border: `1px solid ${T.bd2}`, borderRadius: 14, width: 480, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' as const, boxShadow: '0 24px 80px rgba(0,0,0,.65)', padding: 0 } as React.CSSProperties,
+  modalHead: { padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
+  thStyle: { fontSize: 9, color: T.tx3, padding: '9px 12px', textAlign: 'left' as const, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)', textTransform: 'uppercase' as const, letterSpacing: '0.1em', whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  tdStyle: { padding: '9px 12px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx2 } as React.CSSProperties,
 };
 
 const AuthContext = createContext<any>(null);
@@ -151,9 +152,9 @@ const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
 const ToastContainer = () => {
   const { toasts } = useNotifications();
   return (
-    <div style={{ position: 'fixed', bottom: 22, right: 22, zIndex: 999 }}>
+    <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 999 }}>
       {toasts.map((t: any) => (
-        <div key={t.id} style={{ background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '11px 17px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 9, boxShadow: '0 4px 20px rgba(0,0,0,.4)', animation: 'su .18s ease', marginBottom: 8, borderLeft: `3px solid ${t.type === 'error' ? T.re : T.gr}`, color: T.tx, maxWidth: 'calc(100vw - 32px)' }}>{t.message}</div>
+        <div key={t.id} style={{ background: 'rgba(12,16,28,0.95)', backdropFilter: 'blur(16px)', border: `1px solid ${T.bd2}`, borderRadius: 6, padding: '8px 14px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 20px rgba(0,0,0,.5)', animation: 'su .18s ease', marginBottom: 6, borderLeft: `2px solid ${t.type === 'error' ? T.re : T.gr}`, color: T.tx, maxWidth: 'calc(100vw - 32px)' }}>{t.message}</div>
       ))}
     </div>
   );
@@ -175,22 +176,22 @@ const AuthScreen = () => {
     setLoading(false);
   };
 
-  const inputStyle: React.CSSProperties = { width: '100%', background: `rgba(31,36,53,.8)`, border: `1px solid ${T.bd2}`, borderRadius: 10, color: T.tx, fontFamily: T.sans, fontSize: 16, padding: '12px 14px', transition: 'all .2s', outline: 'none', marginBottom: 16 };
+  const inputStyle: React.CSSProperties = { width: '100%', background: `rgba(20,25,40,.8)`, border: `1px solid ${T.bd2}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 13, padding: '10px 12px', transition: 'all .2s', outline: 'none', marginBottom: 14 };
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', width: 400, height: 400, background: T.ac, borderRadius: '50%', filter: 'blur(80px)', opacity: 0.15, top: -100, left: -100, animation: 'loginGlowFloat 8s ease-in-out infinite alternate' }} />
       <div style={{ position: 'absolute', width: 350, height: 350, background: T.bl, borderRadius: '50%', filter: 'blur(80px)', opacity: 0.15, bottom: -80, right: -80, animation: 'loginGlowFloat 10s ease-in-out infinite alternate', animationDelay: '-3s' }} />
       <div style={{ position: 'absolute', width: 250, height: 250, background: T.yl, borderRadius: '50%', filter: 'blur(80px)', opacity: 0.1, top: '50%', left: '60%', animation: 'loginGlowFloat 12s ease-in-out infinite alternate', animationDelay: '-5s' }} />
-      <div style={{ position: 'relative', zIndex: 1, background: 'rgba(24,28,38,.85)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: `1px solid rgba(42,49,72,.6)`, borderRadius: 20, width: 400, maxWidth: 'calc(100vw - 32px)', padding: '40px 36px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.03) inset', animation: 'loginBoxEnter .6s cubic-bezier(.16,1,.3,1) both' }}>
-        <div style={{ fontSize: 28, fontWeight: 700, color: T.ac, fontFamily: T.mono, marginBottom: 4, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'loginLogoShine 3s ease-in-out infinite alternate' }}>Unsort</div>
-        <div style={{ fontSize: 11, color: T.tx3, letterSpacing: 3, textTransform: 'uppercase' as const, marginBottom: 32, opacity: 0, animation: 'loginFadeUp .5s .2s ease both' }}>Track Damaged & Unsorted Products</div>
-        <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${T.bd2}, transparent)`, marginBottom: 28, opacity: 0, animation: 'loginFadeUp .5s .25s ease both' }} />
+      <div style={{ position: 'relative', zIndex: 1, background: 'rgba(14,18,30,.90)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', border: `1px solid rgba(255,255,255,.06)`, borderRadius: 16, width: 360, maxWidth: 'calc(100vw - 32px)', padding: '32px 28px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,.5)', animation: 'loginBoxEnter .6s cubic-bezier(.16,1,.3,1) both' }}>
+        <div style={{ fontSize: 24, fontWeight: 700, color: T.ac, fontFamily: T.sora, marginBottom: 3, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'loginLogoShine 3s ease-in-out infinite alternate' }}>Unsort</div>
+        <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 3, textTransform: 'uppercase' as const, marginBottom: 26, opacity: 0, animation: 'loginFadeUp .5s .2s ease both' }}>Track Damaged & Unsorted Products</div>
+        <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${T.bd2}, transparent)`, marginBottom: 22, opacity: 0, animation: 'loginFadeUp .5s .25s ease both' }} />
         {error && <div style={{ background: 'rgba(245,87,92,.12)', border: '1px solid rgba(245,87,92,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.re, marginBottom: 14, animation: 'loginShake .4s ease' }}>{error}</div>}
         <form onSubmit={handleSubmit}>
           <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp .5s .3s ease both' }}><label style={{ fontSize: 11, color: T.tx3, marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1.5, display: 'block' }}>Email</label><input type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required style={inputStyle} /></div>
           <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp .5s .35s ease both' }}><label style={{ fontSize: 11, color: T.tx3, marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1.5, display: 'block' }}>Password</label><input type="password" placeholder="Enter password" value={password} onChange={(e) => setPassword(e.target.value)} required style={inputStyle} /></div>
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '13px 20px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: T.sans, color: '#fff', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: 0.3, opacity: 0, animation: 'loginFadeUp .5s .4s ease both', position: 'relative', overflow: 'hidden' }}>{loading ? 'Please wait...' : 'Sign In'}</button>
+          <button type="submit" disabled={loading} style={{ width: '100%', padding: '10px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: T.sans, color: '#fff', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, letterSpacing: 0.3, opacity: 0, animation: 'loginFadeUp .5s .4s ease both', position: 'relative', overflow: 'hidden', boxShadow: '0 4px 16px rgba(99,102,241,0.3)' }}>{loading ? 'Please wait...' : 'Sign In'}</button>
         </form>
         <p style={{ fontSize: 11, color: T.tx3, marginTop: 24, letterSpacing: 1 }}>Powered by Arya Designs</p>
       </div>
@@ -234,26 +235,28 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
   };
 
   return (
-    <div className="sidebar" style={{ width: 220, height: '100vh', background: `linear-gradient(180deg, ${T.s} 0%, ${T.bg} 100%)`, borderRight: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, zIndex: 100, overflowY: 'auto' }}>
-      <div style={{ padding: '16px 14px 12px', borderBottom: `1px solid ${T.bd}` }}>
-        <div style={{ fontSize: 18, fontWeight: 700, fontFamily: T.mono, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Unsort</div>
-        <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 2, textTransform: 'uppercase' as const, marginTop: 3 }}>Product Tracking</div>
+    <div className="sidebar" style={{ width: 220, height: '100vh', background: 'rgba(8,11,20,0.85)', backdropFilter: 'blur(36px)', WebkitBackdropFilter: 'blur(36px)', borderRight: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, zIndex: 100, overflowY: 'auto' }}>
+      <div style={{ padding: '14px 14px 11px', borderBottom: `1px solid ${T.bd}` }}>
+        <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Unsort</div>
+        <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2.5, textTransform: 'uppercase' as const, marginTop: 2 }}>Product Tracking</div>
       </div>
-      <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 2, textTransform: 'uppercase' as const, padding: '14px 14px 6px', fontWeight: 600 }}>Menu</div>
+      <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2, textTransform: 'uppercase' as const, padding: '12px 14px 5px', fontWeight: 600 }}>Menu</div>
       <nav style={{ flex: 1, padding: '2px 8px 8px' }}>
         {tabs.map((t) => (
-          <div key={t.id} onClick={() => setActiveTab(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', margin: '1px 0', cursor: 'pointer', background: activeTab === t.id ? 'rgba(139,92,246,.1)' : 'transparent', color: activeTab === t.id ? T.ac : T.tx2, fontSize: 12, fontWeight: activeTab === t.id ? 600 : 400, fontFamily: T.sans, borderRadius: 6, transition: 'all .15s' }}>
-            <span style={{ width: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: activeTab === t.id ? 1 : 0.5 }}><Icon name={t.icon} size={15} /></span> {t.label}
+          <div key={t.id} onClick={() => setActiveTab(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 10px', margin: '2px 0', cursor: 'pointer', background: activeTab === t.id ? 'rgba(99,102,241,.08)' : 'transparent', color: activeTab === t.id ? T.ac2 : T.tx3, fontSize: 11, fontWeight: activeTab === t.id ? 600 : 400, fontFamily: T.sans, borderRadius: 6, transition: 'all .15s', position: 'relative' }}>
+            <span style={{ width: 28, height: 28, borderRadius: 7, background: activeTab === t.id ? 'rgba(99,102,241,.12)' : 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}><Icon name={t.icon} size={14} /></span>
+            {t.label}
+            {activeTab === t.id && <span style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 3, height: 18, borderRadius: '0 3px 3px 0', background: T.ac, boxShadow: `0 0 8px ${T.ac}88` }} />}
           </div>
         ))}
       </nav>
-      <div style={{ padding: '12px 10px', borderTop: `1px solid ${T.bd}`, marginTop: 'auto' }}>
-        {profile && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '8px 10px', background: T.s2, borderRadius: 6 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 8, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{(profile.full_name || 'U')[0].toUpperCase()}</div>
-          <div style={{ flex: 1, minWidth: 0 }}><p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.full_name}</p><p style={{ margin: 0, fontSize: 9, color: T.tx3, textTransform: 'capitalize' as const }}>{profile.role}</p></div>
+      <div style={{ padding: '10px 10px', borderTop: `1px solid ${T.bd}`, marginTop: 'auto' }}>
+        {profile && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '7px 9px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, border: `1px solid ${T.bd}` }}>
+          <div style={{ width: 28, height: 28, borderRadius: 7, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{(profile.full_name || 'U')[0].toUpperCase()}</div>
+          <div style={{ flex: 1, minWidth: 0 }}><p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.full_name}</p><p style={{ margin: 0, fontSize: 8, color: T.tx3, textTransform: 'capitalize' as const }}>{profile.role}</p></div>
         </div>}
-        <div onClick={handleSignOut} style={{ width: '100%', padding: '7px 12px', borderRadius: 6, background: 'rgba(248,113,113,.05)', border: '1px solid rgba(248,113,113,.12)', color: T.re, cursor: 'pointer', fontSize: 11, fontWeight: 500, fontFamily: T.sans, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>Sign Out</div>
-        <p style={{ margin: '10px 0 0', fontSize: 8, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' as const, textAlign: 'center', opacity: 0.35 }}>Powered by Arya Designs</p>
+        <div onClick={handleSignOut} style={{ width: '100%', padding: '6px 10px', borderRadius: 6, background: 'rgba(248,113,113,.04)', border: '1px solid rgba(248,113,113,.10)', color: '#f87171', cursor: 'pointer', fontSize: 10, fontWeight: 500, fontFamily: T.sans, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>Sign Out</div>
+        <p style={{ margin: '8px 0 0', fontSize: 7, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' as const, textAlign: 'center', opacity: 0.3 }}>Powered by Arya Designs</p>
       </div>
     </div>
   );
@@ -439,36 +442,36 @@ const Header = ({ title, onSearch, onNotifClick, onOpenScanner }: { title: strin
   };
 
   return (
-    <header className="header-bar" style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '8px 16px', position: 'sticky', top: 0, zIndex: 50 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <h1 className="header-title" style={{ margin: 0, fontSize: 14, fontWeight: 600, color: T.tx, whiteSpace: 'nowrap' }}>{title}</h1>
-        <div className="header-search" style={{ flex: 1, maxWidth: 320 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: T.s2, border: `1px solid ${T.bd}`, borderRadius: 6, padding: '5px 10px' }}>
-            <Icon name="search" size={13} />
-            <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search..." style={{ background: 'transparent', border: 'none', outline: 'none', color: T.tx, fontFamily: T.sans, fontSize: 12, flex: 1, minWidth: 0 }} />
-            {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>×</span>}
+    <header className="header-bar" style={{ background: 'rgba(8,11,20,0.75)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: `1px solid ${T.bd}`, padding: '7px 14px', position: 'sticky', top: 0, zIndex: 50 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <h1 className="header-title" style={{ margin: 0, fontSize: 13, fontWeight: 600, color: T.tx, whiteSpace: 'nowrap', fontFamily: T.sora }}>{title}</h1>
+        <div className="header-search" style={{ flex: 1, maxWidth: 280 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, padding: '4px 9px' }}>
+            <Icon name="search" size={12} />
+            <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search..." style={{ background: 'transparent', border: 'none', outline: 'none', color: T.tx, fontFamily: T.sans, fontSize: 11, flex: 1, minWidth: 0 }} />
+            {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 13 }}>×</span>}
           </div>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-        <button onClick={() => onOpenScanner?.()} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', color: T.tx2, display: 'flex', alignItems: 'center' }} title="Scan barcode">
-          <Icon name="scan" size={16} />
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+        <button onClick={() => onOpenScanner?.()} style={{ padding: '5px 8px', borderRadius: 6, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center' }} title="Scan barcode">
+          <Icon name="scan" size={14} />
         </button>
         <div style={{ position: 'relative' }}>
-        <button onClick={() => setShow(!show)} style={{ padding: '7px 10px', borderRadius: T.r, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', position: 'relative', color: T.tx2, fontSize: 14, display: 'flex', alignItems: 'center' }}>
-          <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
-          {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono }}>{unread}</span>}
+        <button onClick={() => setShow(!show)} style={{ padding: '5px 8px', borderRadius: 6, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', position: 'relative', color: T.tx3, fontSize: 13, display: 'flex', alignItems: 'center' }}>
+          <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
+          {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono }}>{unread}</span>}
         </button>
         {show && (
-          <div className="notif-dropdown" style={{ position: 'absolute', right: 0, top: 44, width: 320, background: T.s, borderRadius: 8, boxShadow: '0 10px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.03) inset', border: `1px solid ${T.bd2}`, zIndex: 50, maxHeight: 400, overflowY: 'auto' }}>
-            <div style={{ padding: '13px 17px', borderBottom: `1px solid ${T.bd}`, fontWeight: 600, fontSize: 13, color: T.tx, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>Notifications {unread > 0 && <span style={{ fontSize: 10, fontFamily: T.mono, color: T.ac, background: 'rgba(139,92,246,.12)', padding: '2px 7px', borderRadius: T.r }}>{unread} new</span>}</div>
-            {notifications.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 12 }}>No notifications</div> : notifications.slice(0, 10).map((n: any) => (
-              <div key={n.id} onClick={() => handleNotifClick(n)} style={{ padding: '10px 14px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: n.is_read ? 'transparent' : 'rgba(139,92,246,.06)', transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = n.is_read ? 'transparent' : 'rgba(139,92,246,.06)'}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                  <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: T.tx }}>{n.title}</p>
-                  {!n.is_read && <span style={{ width: 6, height: 6, borderRadius: '50%', background: T.ac, flexShrink: 0, marginTop: 4 }} />}
+          <div className="notif-dropdown" style={{ position: 'absolute', right: 0, top: 38, width: 290, background: 'rgba(12,16,28,0.96)', backdropFilter: 'blur(24px)', borderRadius: 8, boxShadow: '0 10px 40px rgba(0,0,0,.55)', border: `1px solid ${T.bd2}`, zIndex: 50, maxHeight: 360, overflowY: 'auto' }}>
+            <div style={{ padding: '10px 14px', borderBottom: `1px solid ${T.bd}`, fontWeight: 600, fontSize: 11, color: T.tx, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>Notifications {unread > 0 && <span style={{ fontSize: 9, fontFamily: T.mono, color: T.ac, background: 'rgba(99,102,241,.10)', padding: '2px 6px', borderRadius: 4 }}>{unread} new</span>}</div>
+            {notifications.length === 0 ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No notifications</div> : notifications.slice(0, 10).map((n: any) => (
+              <div key={n.id} onClick={() => handleNotifClick(n)} style={{ padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: n.is_read ? 'transparent' : 'rgba(99,102,241,.04)', transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseLeave={e => e.currentTarget.style.background = n.is_read ? 'transparent' : 'rgba(99,102,241,.04)'}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                  <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: T.tx }}>{n.title}</p>
+                  {!n.is_read && <span style={{ width: 5, height: 5, borderRadius: '50%', background: T.ac, flexShrink: 0, marginTop: 4 }} />}
                 </div>
-                <p style={{ margin: '3px 0 0', fontSize: 11, color: T.tx3, lineHeight: 1.4 }}>{n.message}</p>
-                <p style={{ margin: '4px 0 0', fontSize: 10, color: T.tx3, opacity: 0.6 }}>{new Date(n.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 10, color: T.tx3, lineHeight: 1.4 }}>{n.message}</p>
+                <p style={{ margin: '3px 0 0', fontSize: 9, color: T.tx3, opacity: 0.5 }}>{new Date(n.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
               </div>
             ))}
           </div>
@@ -489,7 +492,7 @@ const statusTag = (status: string) => {
     dry_clean: { bg: 'rgba(56,189,248,0.10)', color: '#7DD3FC', bd: 'rgba(56,189,248,0.25)' },
   };
   const s = m[status] || m.unsorted;
-  return { display: 'inline-block' as const, padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.bd}`, textTransform: 'uppercase' as const, letterSpacing: '0.04em' };
+  return { display: 'inline-flex' as const, alignItems: 'center' as const, gap: 4, padding: '2px 7px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: s.bg, color: s.color, border: `1px solid ${s.bd}`, textTransform: 'uppercase' as const, letterSpacing: '0.05em' };
 };
 
 const Dashboard = () => {
@@ -528,40 +531,44 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="page-pad" style={{ padding: '16px 18px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 18 }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.tx }}>{greeting}, {profile?.full_name?.split(' ')[0] || 'there'}</h2>
-        <p style={{ margin: '2px 0 0', fontSize: 12, color: T.tx3 }}>Here's your overview for today</p>
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease', position: 'relative' }}>
+      {/* Ambient glow */}
+      <div style={{ position: 'absolute', top: -60, right: -40, width: 250, height: 250, background: `radial-gradient(circle, ${T.ac}12 0%, transparent 70%)`, pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+      <div style={{ marginBottom: 14 }}>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>{greeting}, {profile?.full_name?.split(' ')[0] || 'there'}</h2>
+        <p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3 }}>Here's your overview for today</p>
       </div>
-      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 18 }}>
+      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 14 }}>
         {cards.map((c, i) => (
-          <div key={i} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 12, padding: '18px 20px', transition: 'transform .2s, box-shadow .2s', cursor: 'default', position: 'relative', overflow: 'hidden' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 24px ${c.color}15`; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${c.color}, ${c.color}66)` }} />
-            <p style={{ fontSize: 10, color: T.tx3, letterSpacing: 0.5, marginBottom: 6, fontWeight: 500 }}>{c.label}</p>
-            <p style={{ fontFamily: T.mono, fontSize: 26, fontWeight: 700, color: c.color, margin: 0, letterSpacing: -1 }}>{c.value}</p>
+          <div key={i} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', transition: 'transform .2s, box-shadow .2s', cursor: 'default', position: 'relative', overflow: 'hidden', backdropFilter: 'blur(8px)' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 8px 24px ${c.color}18`; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${c.color}cc, ${c.color}33)` }} />
+            <p style={{ fontSize: 9, color: T.tx3, letterSpacing: 0.8, marginBottom: 5, fontWeight: 600, textTransform: 'uppercase' }}>{c.label}</p>
+            <p style={{ fontFamily: T.sora, fontSize: 24, fontWeight: 700, color: c.color, margin: 0, letterSpacing: -0.5 }}>{c.value}</p>
           </div>
         ))}
       </div>
       {/* Tasker */}
-      <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
-        <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Tasks</span>
-          <span style={{ fontSize: 10, color: T.tx3 }}>{tasks.filter(t => !t.is_done).length} pending</span>
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ padding: '10px 14px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Tasks</span>
+          <span style={{ fontSize: 9, color: T.tx3 }}>{tasks.filter(t => !t.is_done).length} pending</span>
         </div>
-        <form onSubmit={addTask} style={{ display: 'flex', gap: 8, padding: '10px 14px', borderBottom: `1px solid ${T.bd}` }}>
+        <form onSubmit={addTask} style={{ display: 'flex', gap: 6, padding: '8px 12px', borderBottom: `1px solid ${T.bd}` }}>
           <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Add a task..." style={{ ...S.fInput, flex: 1 }} />
           <button type="submit" style={S.btnPrimary}>Add</button>
         </form>
-        <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+        <div style={{ maxHeight: 240, overflowY: 'auto' }}>
           {tasks.map(t => (
-            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: `1px solid ${T.bd}`, opacity: t.is_done ? 0.5 : 1 }}>
-              <div onClick={() => toggleTask(t.id, t.is_done)} style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${t.is_done ? T.gr : T.bd2}`, background: t.is_done ? T.gr : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#000', fontWeight: 700, flexShrink: 0 }}>{t.is_done && '✓'}</div>
-              <span style={{ flex: 1, fontSize: 12, color: T.tx, textDecoration: t.is_done ? 'line-through' : 'none' }}>{t.title}</span>
-              <span onClick={() => deleteTask(t.id)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 12, opacity: 0.5 }}>×</span>
+            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: `1px solid ${T.bd}`, opacity: t.is_done ? 0.45 : 1 }}>
+              <div onClick={() => toggleTask(t.id, t.is_done)} style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${t.is_done ? T.gr : T.bd2}`, background: t.is_done ? T.gr : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#000', fontWeight: 700, flexShrink: 0 }}>{t.is_done && '✓'}</div>
+              <span style={{ flex: 1, fontSize: 11, color: T.tx, textDecoration: t.is_done ? 'line-through' : 'none' }}>{t.title}</span>
+              <span onClick={() => deleteTask(t.id)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 11, opacity: 0.4 }}>×</span>
             </div>
           ))}
-          {tasks.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No tasks yet</div>}
+          {tasks.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: T.tx3, fontSize: 10 }}>No tasks yet</div>}
         </div>
+      </div>
       </div>
     </div>
   );
@@ -1004,46 +1011,46 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   };
 
   return (
-    <div className="page-pad" style={{ padding: '16px 18px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Inventory</span><span style={{ fontSize: 12, fontWeight: 500, color: T.tx3, marginLeft: 10 }}>{filtered.length !== items.length ? `${filtered.length} of ` : ''}{items.length} item{items.length !== 1 ? 's' : ''}</span></div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {!isCompletedView && <div onClick={computeIntel} style={{ ...S.btnGhost, background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.2)', color: T.yl, fontWeight: 600 }}>Unsort Intel</div>}
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <div><span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Inventory</span><span style={{ fontSize: 10, fontWeight: 500, color: T.tx3, marginLeft: 8 }}>{filtered.length !== items.length ? `${filtered.length} of ` : ''}{items.length} item{items.length !== 1 ? 's' : ''}</span></div>
+        <div style={{ display: 'flex', gap: 5 }}>
+          {!isCompletedView && <div onClick={computeIntel} style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600, fontSize: 10 }}>Unsort Intel</div>}
           {canEdit && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
         </div>
       </div>
-      <div className="filter-bar" style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, SKU code, location, notes..." style={{ ...S.fInput, flex: 1, minWidth: 180, padding: '7px 10px' }} />
+      <div className="filter-bar" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, SKU code, location, notes..." style={{ ...S.fInput, flex: 1, minWidth: 160, padding: '6px 9px' }} />
         <div style={{ width: 1, height: 24, background: T.bd2 }} />
         {!isCompletedView && <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 120, padding: '7px 10px', cursor: 'pointer' }}><option value="all">All Status</option><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select>}
-        <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 130, padding: '7px 10px', cursor: 'pointer' }}><option value="all">All Categories</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-        <select value={locFilter} onChange={(e) => setLocFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 120, padding: '7px 10px', cursor: 'pointer' }}><option value="all">All Locations</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select>
-        <select value={mpFilter} onChange={(e) => setMpFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 130, padding: '7px 10px', cursor: 'pointer' }}><option value="all">All Marketplaces</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select>
-        {tags.length > 0 && <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 110, padding: '7px 10px', cursor: 'pointer' }}><option value="all">All Tags</option>{tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>}
-        {hasActiveFilters && <span onClick={clearFilters} style={{ fontSize: 11, color: T.ac, cursor: 'pointer', padding: '4px 10px', border: '1px solid rgba(139,92,246,.3)', borderRadius: T.r, background: 'rgba(139,92,246,.06)' }}>Clear filters</span>}
+        <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 110, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Categories</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+        <select value={locFilter} onChange={(e) => setLocFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Locations</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select>
+        <select value={mpFilter} onChange={(e) => setMpFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 110, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Marketplaces</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select>
+        {tags.length > 0 && <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 90, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Tags</option>{tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>}
+        {hasActiveFilters && <span onClick={clearFilters} style={{ fontSize: 10, color: T.ac, cursor: 'pointer', padding: '3px 8px', border: '1px solid rgba(99,102,241,.2)', borderRadius: 4, background: 'rgba(99,102,241,.06)' }}>Clear filters</span>}
       </div>
-      <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
+      <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         <div className="table-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 850 }}>
           <thead><tr>{['Unique ID', 'SKU', 'Category', 'Size', 'Tags', 'Notes', 'Link', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
           <tbody>{paged.map((item) => {
             const missing = itemMissing[item.id] || [];
             const damaged = itemDamaged[item.id] || [];
-            return (<tr key={item.id} id={'row-' + item.id} style={{ transition: 'background .3s', background: highlightId === item.id ? 'rgba(139,92,246,.12)' : 'transparent' }} onMouseEnter={e => { if (highlightId !== item.id) e.currentTarget.style.background = 'rgba(255,255,255,.02)'; }} onMouseLeave={e => { if (highlightId !== item.id) e.currentTarget.style.background = 'transparent'; }}>
-            <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 11, whiteSpace: 'nowrap' }}><span style={{ color: T.gr }}>{item.batch_number || '—'}</span>{isCompletedView && item.paired_with && (() => { const pair = items.find(p => p.id === item.paired_with); return pair ? <span onClick={() => scrollToPair(item.paired_with)} style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, cursor: 'pointer' }} title="Click to find paired item"><svg viewBox="0 0 24 24" style={{ width: 10, height: 10, fill: 'none', stroke: T.ac2, strokeWidth: 2, flexShrink: 0 }}><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg><span style={{ fontSize: 10, color: T.ac2 }}>{pair.batch_number}</span></span> : null; })()}</td>
-            <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 12 }}>{item.serial_number || '—'}</td>
-            <td style={S.tdStyle}><span style={{ fontWeight: 500 }}>{item.products?.name}</span></td>
-            <td style={{ ...S.tdStyle, fontSize: 11, fontWeight: 500 }}>{item.size || '—'}</td>
-            <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 500, background: 'rgba(139,92,246,.12)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 12 }}>—</span>}</div></td>
-            <td style={{ ...S.tdStyle, fontSize: 12, maxWidth: 160 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 30 ? item.notes.slice(0, 30) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
-            <td style={S.tdStyle}>{item.link ? <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ color: T.ac, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="link" size={14} /></a> : <span style={{ color: T.tx3 }}>—</span>}</td>
-            <td style={S.tdStyle}><span style={statusTag(item.status)}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></td>
-            <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(251,191,36,.1)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(248,113,113,.1)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 12 }}>{item.status === 'completed' || item.status === 'complete' ? 'All good' : '—'}</span>}</td>
+            return (<tr key={item.id} id={'row-' + item.id} style={{ transition: 'background .2s', background: highlightId === item.id ? 'rgba(99,102,241,.08)' : 'transparent' }} onMouseEnter={e => { if (highlightId !== item.id) e.currentTarget.style.background = 'rgba(255,255,255,.015)'; }} onMouseLeave={e => { if (highlightId !== item.id) e.currentTarget.style.background = 'transparent'; }}>
+            <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 10, whiteSpace: 'nowrap' }}><span style={{ color: T.gr }}>{item.batch_number || '—'}</span>{isCompletedView && item.paired_with && (() => { const pair = items.find(p => p.id === item.paired_with); return pair ? <span onClick={() => scrollToPair(item.paired_with)} style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2, cursor: 'pointer' }} title="Click to find paired item"><svg viewBox="0 0 24 24" style={{ width: 9, height: 9, fill: 'none', stroke: T.ac2, strokeWidth: 2, flexShrink: 0 }}><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg><span style={{ fontSize: 9, color: T.ac2 }}>{pair.batch_number}</span></span> : null; })()}</td>
+            <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 10 }}>{item.serial_number || '—'}</td>
+            <td style={{ ...S.tdStyle, fontSize: 11 }}><span style={{ fontWeight: 500 }}>{item.products?.name}</span></td>
+            <td style={{ ...S.tdStyle, fontSize: 10, fontWeight: 500 }}>{item.size || '—'}</td>
+            <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(99,102,241,.10)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 10 }}>—</span>}</div></td>
+            <td style={{ ...S.tdStyle, fontSize: 11, maxWidth: 140 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 25 ? item.notes.slice(0, 25) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
+            <td style={S.tdStyle}>{item.link ? <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ color: T.ac, display: 'inline-flex', alignItems: 'center', gap: 3 }}><Icon name="link" size={12} /></a> : <span style={{ color: T.tx3 }}>—</span>}</td>
+            <td style={S.tdStyle}><span style={statusTag(item.status)}><span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor', opacity: 0.6 }} />{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></td>
+            <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(251,191,36,.08)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(248,113,113,.08)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 10 }}>{item.status === 'completed' || item.status === 'complete' ? 'All good' : '—'}</span>}</td>
             <td style={S.tdStyle}>
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                 <span onClick={() => openComps(item)} style={{ ...S.btnPrimary, ...S.btnSm }}>View</span>
-                {!isCompletedView && completablePairs[item.id]?.length > 0 && <span onClick={() => setShowCompleteModal({ itemId: item.id })} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: T.r, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: T.sans, background: 'rgba(16,185,129,.15)', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' as const }}>Complete ({completablePairs[item.id].length})</span>}
-                {isCompletedView && canEdit && <span onClick={() => { if (confirm(item.paired_with ? 'This will revert BOTH paired items back to Inventory. Continue?' : 'Revert this item back to Inventory?')) handleCancelCompletion(item.id); }} style={{ ...S.btnSm, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(251,191,36,.2)', cursor: 'pointer', fontSize: 10, fontWeight: 600, fontFamily: T.sans, background: 'rgba(251,191,36,.06)', color: T.yl, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' as const }}>Revert{item.paired_with ? ' Both' : ''}</span>}
+                {!isCompletedView && completablePairs[item.id]?.length > 0 && <span onClick={() => setShowCompleteModal({ itemId: item.id })} style={{ ...S.btnSm, padding: '3px 8px', borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 600, fontFamily: T.sans, background: 'rgba(16,185,129,.12)', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' as const }}>Complete ({completablePairs[item.id].length})</span>}
+                {isCompletedView && canEdit && <span onClick={() => { if (confirm(item.paired_with ? 'This will revert BOTH paired items back to Inventory. Continue?' : 'Revert this item back to Inventory?')) handleCancelCompletion(item.id); }} style={{ ...S.btnSm, padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(251,191,36,.15)', cursor: 'pointer', fontSize: 9, fontWeight: 600, fontFamily: T.sans, background: 'rgba(251,191,36,.05)', color: T.yl, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' as const }}>Revert{item.paired_with ? ' Both' : ''}</span>}
                 {canEdit && <span onClick={() => openEdit(item)} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>}
                 {canEdit && <span onClick={() => handleDelete(item.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Del</span>}
               </div>
@@ -1063,7 +1070,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
         </>}
       </div>
 
-      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>Category *</label><input value={catSearch} onChange={(e) => { setCatSearch(e.target.value); setShowCatDrop(true); setForm({ ...form, product_id: '' }); }} onFocus={() => setShowCatDrop(true)} placeholder="Type to search categories by name or SKU..." style={S.fInput} autoComplete="off" /><input type="hidden" value={form.product_id} required />{form.product_id && <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: T.r, background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.25)', fontSize: 12, color: T.ac2 }}>{products.find(p => p.id === form.product_id)?.name} <span style={{ fontFamily: T.mono, opacity: 0.7 }}>{products.find(p => p.id === form.product_id)?.sku}</span><span onClick={() => { setForm({ ...form, product_id: '' }); setCatSearch(''); }} style={{ cursor: 'pointer', marginLeft: 4, opacity: 0.6 }}>✕</span></div>}{showCatDrop && !form.product_id && (() => { const q = catSearch.toLowerCase(); const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))); return filtered.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)' }}>{filtered.map(p => <div key={p.id} onClick={() => { setForm({ ...form, product_id: p.id }); setCatSearch(p.name); setShowCatDrop(false); supabase.from('components').select('*').eq('product_id', p.id).then(({ data }) => { setCatComps(data || []); setMissingComps(new Set()); setDamagedComps(new Set()); }); }} style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}><span style={{ fontSize: 13, color: T.tx }}>{p.name}</span><span style={{ fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{p.sku}</span></div>)}</div> : catSearch ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '12px 14px', fontSize: 12, color: T.tx3, zIndex: 10 }}>No categories found</div> : null; })()}</div><div style={{ marginBottom: 14, position: 'relative' }}><label style={S.fLabel}>SKU Code</label><input value={form.serial_number} onChange={(e) => { setForm({ ...form, serial_number: e.target.value }); setShowSkuDrop(true); }} onFocus={() => setShowSkuDrop(true)} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. LC-001-A" style={{ ...S.fInput, fontFamily: T.mono }} autoComplete="off" />{showSkuDrop && form.serial_number && (() => { const q = form.serial_number.toLowerCase(); const existing = [...new Set(items.map(i => i.serial_number).filter(Boolean))]; const matches = existing.filter(s => s.toLowerCase().includes(q) && s !== form.serial_number); return matches.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 140, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 20px rgba(0,0,0,.3)' }}>{matches.slice(0, 8).map(s => <div key={s} onMouseDown={() => { setForm({ ...form, serial_number: s }); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{s}</div>)}</div> : null; })()}</div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Size</label><select value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} style={S.fInput}><option value="">Not applicable</option>{SIZES.map(s => <option key={s} value={s}>{s}</option>)}</select></div><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select></div></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Location</label><select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={S.fInput}><option value="">Select location</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div><div><label style={S.fLabel}>Marketplace</label><select value={form.marketplace} onChange={(e) => setForm({ ...form, marketplace: e.target.value })} style={S.fInput}><option value="">Select</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select></div></div>{(form.status === 'unsorted' || form.status === 'damaged') && catComps.length > 0 && <div style={{ marginBottom: 14 }}>
+      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 16 }}><div style={{ marginBottom: 10, position: 'relative' }}><label style={S.fLabel}>Category *</label><input value={catSearch} onChange={(e) => { setCatSearch(e.target.value); setShowCatDrop(true); setForm({ ...form, product_id: '' }); }} onFocus={() => setShowCatDrop(true)} placeholder="Type to search categories by name or SKU..." style={S.fInput} autoComplete="off" /><input type="hidden" value={form.product_id} required />{form.product_id && <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: T.r, background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.25)', fontSize: 12, color: T.ac2 }}>{products.find(p => p.id === form.product_id)?.name} <span style={{ fontFamily: T.mono, opacity: 0.7 }}>{products.find(p => p.id === form.product_id)?.sku}</span><span onClick={() => { setForm({ ...form, product_id: '' }); setCatSearch(''); }} style={{ cursor: 'pointer', marginLeft: 4, opacity: 0.6 }}>✕</span></div>}{showCatDrop && !form.product_id && (() => { const q = catSearch.toLowerCase(); const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))); return filtered.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)' }}>{filtered.map(p => <div key={p.id} onClick={() => { setForm({ ...form, product_id: p.id }); setCatSearch(p.name); setShowCatDrop(false); supabase.from('components').select('*').eq('product_id', p.id).then(({ data }) => { setCatComps(data || []); setMissingComps(new Set()); setDamagedComps(new Set()); }); }} style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}><span style={{ fontSize: 13, color: T.tx }}>{p.name}</span><span style={{ fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{p.sku}</span></div>)}</div> : catSearch ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '12px 14px', fontSize: 12, color: T.tx3, zIndex: 10 }}>No categories found</div> : null; })()}</div><div style={{ marginBottom: 10, position: 'relative' }}><label style={S.fLabel}>SKU Code</label><input value={form.serial_number} onChange={(e) => { setForm({ ...form, serial_number: e.target.value }); setShowSkuDrop(true); }} onFocus={() => setShowSkuDrop(true)} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. LC-001-A" style={{ ...S.fInput, fontFamily: T.mono }} autoComplete="off" />{showSkuDrop && form.serial_number && (() => { const q = form.serial_number.toLowerCase(); const existing = [...new Set(items.map(i => i.serial_number).filter(Boolean))]; const matches = existing.filter(s => s.toLowerCase().includes(q) && s !== form.serial_number); return matches.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 140, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 20px rgba(0,0,0,.3)' }}>{matches.slice(0, 8).map(s => <div key={s} onMouseDown={() => { setForm({ ...form, serial_number: s }); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{s}</div>)}</div> : null; })()}</div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Size</label><select value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} style={S.fInput}><option value="">Not applicable</option>{SIZES.map(s => <option key={s} value={s}>{s}</option>)}</select></div><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select></div></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Location</label><select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={S.fInput}><option value="">Select location</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div><div><label style={S.fLabel}>Marketplace</label><select value={form.marketplace} onChange={(e) => setForm({ ...form, marketplace: e.target.value })} style={S.fInput}><option value="">Select</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select></div></div>{(form.status === 'unsorted' || form.status === 'damaged') && catComps.length > 0 && <div style={{ marginBottom: 14 }}>
   <label style={S.fLabel}>Component Status <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(click to toggle: Present → Missing → Damaged)</span></label>
   {form.status === 'damaged' && <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
     <span onClick={() => { setDamagedComps(new Set(catComps.map((c: any) => c.id))); setMissingComps(new Set()); }} style={{ ...S.btnDanger, fontSize: 10, padding: '3px 10px', cursor: 'pointer' }}>Mark All Damaged</span>
@@ -1094,14 +1101,14 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, defaultStatus 
   {form.status === 'unsorted' && missingComps.size === catComps.length && damagedComps.size === 0 && <p style={{ fontSize: 11, color: T.re, marginTop: 5, background: 'rgba(248,113,113,.06)', border: '1px solid rgba(248,113,113,.15)', borderRadius: 6, padding: '6px 10px' }}>All missing — change status to "Damaged" or deselect some.</p>}
 </div>}<div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Order ID</label><input value={form.order_id} onChange={(e) => setForm({ ...form, order_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Ticket ID</label><input value={form.ticket_id} onChange={(e) => setForm({ ...form, ticket_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ marginBottom: 12 }}><label style={S.fLabel}>Link</label><input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="Optional URL" style={S.fInput} /></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Tags <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(comma separated)</span></label><input value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="e.g. urgent, wedding" style={S.fInput} /></div><div><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
 
-      {showCompModal && selected && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 580 }}><div style={S.modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected.products?.name}</span><div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center', flexWrap: 'wrap' }}><span style={{ fontSize: 11, fontFamily: T.mono, color: T.gr }}>{selected.batch_number}</span>{selected.serial_number && <span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2 }}>{selected.serial_number}</span>}<span style={statusTag(selected.status)}>{selected.status}</span>{selected.batch_number && <span onClick={() => printBarcode(selected.batch_number)} style={{ ...S.btnGhost, padding: '2px 8px', fontSize: 10 }}>Print Barcode</span>}</div>{selected.order_id && <p style={{ margin: '4px 0 0', fontSize: 11, color: T.tx3 }}>Order: {selected.order_id}{selected.marketplace ? ` | ${selected.marketplace}` : ''}</p>}{selected.ticket_id && <p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3 }}>Ticket: {selected.ticket_id}</p>}{selected.link && <a href={selected.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: T.ac, marginTop: 2, display: 'block' }}>Open Link</a>}</div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>
-        <p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 8 }}>Components</p>
-        {comps.map((c) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: T.s2, border: `1px solid ${c.status === 'missing' ? 'rgba(245,166,35,.3)' : T.bd}`, borderRadius: T.r, marginBottom: 6 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 10, height: 10, borderRadius: '50%', background: c.status === 'present' ? T.gr : c.status === 'damaged' ? T.re : T.yl }} /><span style={{ fontWeight: 500, fontSize: 13, color: T.tx }}>{c.components?.name}</span>{c.status === 'missing' && <span style={{ fontSize: 10, color: T.yl, fontWeight: 600, padding: '1px 6px', borderRadius: 3, background: 'rgba(245,166,35,.1)' }}>MISSING</span>}</div>{canEdit && <select value={c.status} onChange={(e) => updateComp(c.id, e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '6px 8px', cursor: 'pointer' }}><option value="missing">Missing</option><option value="present">Present</option><option value="damaged">Damaged</option></select>}</div>))}
-        {comps.length === 0 && <p style={{ textAlign: 'center', color: T.tx3, fontSize: 13, padding: 16 }}>No components</p>}
-        {itemLogs.length > 0 && <><div style={{ borderTop: `1px solid ${T.bd}`, marginTop: 16, paddingTop: 16 }}><p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 8 }}>Activity History</p>{itemLogs.map(log => <div key={log.id} style={{ padding: '8px 0', borderBottom: `1px solid ${T.bd}`, display: 'flex', gap: 10, fontSize: 12 }}><span style={{ color: T.tx3, whiteSpace: 'nowrap', fontFamily: T.mono, fontSize: 10 }}>{new Date(log.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span><span style={{ color: T.tx2 }}>{log.description || log.action}</span></div>)}</div></>}
+      {showCompModal && selected && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 520 }}><div style={S.modalHead}><div><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{selected.products?.name}</span><div style={{ display: 'flex', gap: 6, marginTop: 3, alignItems: 'center', flexWrap: 'wrap' }}><span style={{ fontSize: 10, fontFamily: T.mono, color: T.gr }}>{selected.batch_number}</span>{selected.serial_number && <span style={{ fontSize: 10, fontFamily: T.mono, color: T.ac2 }}>{selected.serial_number}</span>}<span style={statusTag(selected.status)}>{selected.status}</span>{selected.batch_number && <span onClick={() => printBarcode(selected.batch_number)} style={{ ...S.btnGhost, ...S.btnSm }}>Print Barcode</span>}</div>{selected.order_id && <p style={{ margin: '3px 0 0', fontSize: 10, color: T.tx3 }}>Order: {selected.order_id}{selected.marketplace ? ` | ${selected.marketplace}` : ''}</p>}{selected.ticket_id && <p style={{ margin: '2px 0 0', fontSize: 10, color: T.tx3 }}>Ticket: {selected.ticket_id}</p>}{selected.link && <a href={selected.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: T.ac, marginTop: 2, display: 'block' }}>Open Link</a>}</div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span></div><div style={{ padding: 16 }}>
+        <p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Components</p>
+        {comps.map((c) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${c.status === 'missing' ? 'rgba(245,166,35,.2)' : T.bd}`, borderRadius: 6, marginBottom: 5 }}><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: c.status === 'present' ? T.gr : c.status === 'damaged' ? T.re : T.yl }} /><span style={{ fontWeight: 500, fontSize: 11, color: T.tx }}>{c.components?.name}</span>{c.status === 'missing' && <span style={{ fontSize: 9, color: T.yl, fontWeight: 600, padding: '1px 5px', borderRadius: 3, background: 'rgba(245,166,35,.08)' }}>MISSING</span>}</div>{canEdit && <select value={c.status} onChange={(e) => updateComp(c.id, e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 85, padding: '4px 6px', cursor: 'pointer', fontSize: 10 }}><option value="missing">Missing</option><option value="present">Present</option><option value="damaged">Damaged</option></select>}</div>))}
+        {comps.length === 0 && <p style={{ textAlign: 'center', color: T.tx3, fontSize: 11, padding: 14 }}>No components</p>}
+        {itemLogs.length > 0 && <><div style={{ borderTop: `1px solid ${T.bd}`, marginTop: 12, paddingTop: 12 }}><p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Activity History</p>{itemLogs.map(log => <div key={log.id} style={{ padding: '6px 0', borderBottom: `1px solid ${T.bd}`, display: 'flex', gap: 8, fontSize: 10 }}><span style={{ color: T.tx3, whiteSpace: 'nowrap', fontFamily: T.mono, fontSize: 9 }}>{new Date(log.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span><span style={{ color: T.tx2 }}>{log.description || log.action}</span></div>)}</div></>}
       </div></div></div>)}
-      {matchResult && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 520 }}><div style={{ ...S.modalHead, background: 'rgba(45,212,160,.06)', borderBottom: `1px solid rgba(45,212,160,.2)` }}><span style={{ fontSize: 15, fontWeight: 600, color: T.gr }}>Pair Match Found!</span><span onClick={() => setMatchResult(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>
-        <div style={{ background: 'rgba(45,212,160,.08)', border: '1px solid rgba(45,212,160,.25)', borderRadius: T.r, padding: 14, marginBottom: 16, fontSize: 13, color: T.gr }}>
+      {matchResult && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 480 }}><div style={{ ...S.modalHead, background: 'rgba(45,212,160,.05)', borderBottom: `1px solid rgba(45,212,160,.15)` }}><span style={{ fontSize: 13, fontWeight: 600, color: T.gr }}>Pair Match Found!</span><span onClick={() => setMatchResult(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span></div><div style={{ padding: 16 }}>
+        <div style={{ background: 'rgba(45,212,160,.06)', border: '1px solid rgba(45,212,160,.18)', borderRadius: T.r, padding: 12, marginBottom: 12, fontSize: 11, color: T.gr }}>
           A complete <strong>{matchResult.categoryName}</strong>{matchResult.size && <> in size <strong>{matchResult.size}</strong></>}{matchResult.sku && <> (SKU: <span style={{ fontFamily: T.mono }}>{matchResult.sku}</span>)</>} can be assembled!
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
@@ -1322,41 +1329,41 @@ const Categories = () => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Categories</span>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={S.btnPrimary}>+ Add</div>}</div>
-      <div className="cat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>{categories.map((p) => (<div key={p.id} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '18px 20px', transition: 'border-color .15s, box-shadow .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = T.bd2; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.2)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.boxShadow = 'none'; }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-          <div><h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: T.tx }}>{p.name}</h3><span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2 }}>{p.sku}</span></div>
-          {canEdit && <span onClick={() => openEdit(p)} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 12 }}>Edit</span>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}><span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Categories</span>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={S.btnPrimary}>+ Add</div>}</div>
+      <div className="cat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>{categories.map((p) => (<div key={p.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '14px 16px', transition: 'border-color .15s, box-shadow .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = T.bd2; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,.2)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.boxShadow = 'none'; }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+          <div><h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: T.tx }}>{p.name}</h3><span style={{ fontSize: 10, fontFamily: T.mono, color: T.ac2 }}>{p.sku}</span></div>
+          {canEdit && <span onClick={() => openEdit(p)} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>}
         </div>
-        {p.description && <p style={{ color: T.tx3, fontSize: 13, margin: '0 0 12px' }}>{p.description}</p>}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0 0', borderTop: `1px solid ${T.bd}` }}>
-          <span style={{ fontSize: 12, color: T.tx3 }}>{p.total_components} component{p.total_components !== 1 ? 's' : ''}</span>
-          <span onClick={() => openComps(p)} style={{ ...S.btnPrimary, padding: '5px 14px', fontSize: 12 }}>Manage Components</span>
+        {p.description && <p style={{ color: T.tx3, fontSize: 11, margin: '0 0 10px' }}>{p.description}</p>}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 0', borderTop: `1px solid ${T.bd}` }}>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{p.total_components} component{p.total_components !== 1 ? 's' : ''}</span>
+          <span onClick={() => openComps(p)} style={{ ...S.btnPrimary, ...S.btnSm }}>Manage Components</span>
         </div>
       </div>))}</div>
-      {categories.length === 0 && <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 48, textAlign: 'center' }}><p style={{ color: T.tx3, fontSize: 14, marginBottom: 8 }}>No categories yet</p><p style={{ color: T.tx3, fontSize: 12 }}>Add a category like "Lehenga Choli" with components like Lehenga, Blouse, Dupatta</p>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={{ ...S.btnPrimary, marginTop: 16, display: 'inline-flex' }}>+ Add First Category</div>}</div>}
+      {categories.length === 0 && <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 36, textAlign: 'center' }}><p style={{ color: T.tx3, fontSize: 12, marginBottom: 6 }}>No categories yet</p><p style={{ color: T.tx3, fontSize: 10 }}>Add a category like "Lehenga Choli" with components like Lehenga, Blouse, Dupatta</p>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={{ ...S.btnPrimary, marginTop: 12, display: 'inline-flex' }}>+ Add First Category</div>}</div>}
 
-      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 520 }}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Category</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}>
-        <div style={{ marginBottom: 12 }}><label style={S.fLabel}>Category name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Lehenga Choli" style={S.fInput} /></div>
-        <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description (optional)" style={S.fInput} /></div>
+      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 480 }}><div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Category</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 16 }}>
+        <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Category name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Lehenga Choli" style={S.fInput} /></div>
+        <div style={{ marginBottom: 12 }}><label style={S.fLabel}>Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description (optional)" style={S.fInput} /></div>
         {!selected && <>
-          <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ ...S.fLabel, margin: 0 }}>Components</label><span onClick={addCompRow} style={{ ...S.btnPrimary, padding: '4px 10px', fontSize: 11 }}>+ Add More</span></div>
-          <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 12, marginBottom: 14 }}>
+          <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ ...S.fLabel, margin: 0 }}>Components</label><span onClick={addCompRow} style={{ ...S.btnPrimary, ...S.btnSm }}>+ Add More</span></div>
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 10, marginBottom: 12 }}>
             {newComps.map((c, i) => compInputRow(c, i, newComps.length))}
           </div>
         </>}
-        <div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add Category'}</button></div>
+        <div style={{ padding: '12px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 7 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add Category'}</button></div>
       </form></div></div>)}
 
-      {showCompModal && selected && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 560 }}><div style={S.modalHead}><div><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>Components of "{selected.name}"</span><p style={{ margin: '4px 0 0', fontSize: 12, color: T.tx3 }}>Manage the individual parts of this category</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><div style={{ padding: 20 }}>
-        {canEdit && <form onSubmit={addCompToExisting} style={{ background: T.s2, border: `1px solid ${T.bd}`, padding: 14, borderRadius: T.r, marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}><p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, margin: 0 }}>Add Components</p><span onClick={addCompRow} style={{ fontSize: 11, color: T.ac, cursor: 'pointer' }}>+ Add More</span></div>
+      {showCompModal && selected && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 500 }}><div style={S.modalHead}><div><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Components of "{selected.name}"</span><p style={{ margin: '3px 0 0', fontSize: 10, color: T.tx3 }}>Manage the individual parts of this category</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span></div><div style={{ padding: 16 }}>
+        {canEdit && <form onSubmit={addCompToExisting} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, padding: 12, borderRadius: T.r, marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}><p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, margin: 0 }}>Add Components</p><span onClick={addCompRow} style={{ fontSize: 10, color: T.ac, cursor: 'pointer' }}>+ Add More</span></div>
           {newComps.map((c, i) => compInputRow(c, i, newComps.length))}
-          <button type="submit" style={{ ...S.btnPrimary, padding: '6px 14px', marginTop: 6 }}>+ Add Component{newComps.filter(c => c.trim()).length > 1 ? 's' : ''}</button>
+          <button type="submit" style={{ ...S.btnPrimary, marginTop: 4 }}>+ Add Component{newComps.filter(c => c.trim()).length > 1 ? 's' : ''}</button>
         </form>}
-        {comps.length > 0 && <p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>{comps.length} Component{comps.length !== 1 ? 's' : ''}</p>}
-        {comps.map((c, i) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', border: `1px solid ${T.bd}`, borderRadius: T.r, marginBottom: 6, background: T.s2 }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ width: 24, height: 24, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: T.tx2, fontFamily: T.mono }}>{i + 1}</span><span style={{ fontSize: 14, color: T.tx, fontWeight: 500 }}>{c.name}</span></div>{canEdit && <span onClick={() => deleteComp(c.id)} style={S.btnDanger}>Delete</span>}</div>))}
-        {comps.length === 0 && <div style={{ textAlign: 'center', padding: 20, color: T.tx3 }}><p style={{ fontSize: 13 }}>No components yet</p></div>}
+        {comps.length > 0 && <p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 8 }}>{comps.length} Component{comps.length !== 1 ? 's' : ''}</p>}
+        {comps.map((c, i) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', border: `1px solid ${T.bd}`, borderRadius: 6, marginBottom: 5, background: 'rgba(255,255,255,0.02)' }}><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 20, height: 20, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 600, color: T.tx3, fontFamily: T.mono }}>{i + 1}</span><span style={{ fontSize: 12, color: T.tx, fontWeight: 500 }}>{c.name}</span></div>{canEdit && <span onClick={() => deleteComp(c.id)} style={S.btnDanger}>Delete</span>}</div>))}
+        {comps.length === 0 && <div style={{ textAlign: 'center', padding: 16, color: T.tx3 }}><p style={{ fontSize: 11 }}>No components yet</p></div>}
       </div></div></div>)}
     </div>
   );
@@ -1402,37 +1409,37 @@ const Locations = () => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Locations</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Locations</span>
       </div>
-      {canEdit && <form onSubmit={addLocation} style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+      {canEdit && <form onSubmit={addLocation} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <input value={newLoc} onChange={(e) => setNewLoc(e.target.value)} placeholder="Add new location..." style={{ ...S.fInput, flex: 1 }} />
         <button type="submit" style={S.btnPrimary}>+ Add</button>
       </form>}
-      <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r }}>
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r }}>
         {locations.map((loc, i) => (
-          <div key={loc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: i < locations.length - 1 ? `1px solid ${T.bd}` : 'none' }}>
+          <div key={loc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderBottom: i < locations.length - 1 ? `1px solid ${T.bd}` : 'none' }}>
             {editId === loc.id ? (
-              <div style={{ display: 'flex', gap: 8, flex: 1 }}>
+              <div style={{ display: 'flex', gap: 6, flex: 1 }}>
                 <input value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') updateLocation(loc.id); if (e.key === 'Escape') setEditId(null); }} style={{ ...S.fInput, flex: 1 }} autoFocus />
-                <span onClick={() => updateLocation(loc.id)} style={{ ...S.btnPrimary, padding: '6px 12px', fontSize: 12 }}>Save</span>
-                <span onClick={() => setEditId(null)} style={{ ...S.btnGhost, padding: '6px 12px', fontSize: 12 }}>Cancel</span>
+                <span onClick={() => updateLocation(loc.id)} style={S.btnPrimary}>Save</span>
+                <span onClick={() => setEditId(null)} style={S.btnGhost}>Cancel</span>
               </div>
             ) : (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 16 }}>📍</span>
-                  <span style={{ fontSize: 14, color: T.tx, fontWeight: 500 }}>{loc.name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13 }}>📍</span>
+                  <span style={{ fontSize: 12, color: T.tx, fontWeight: 500 }}>{loc.name}</span>
                 </div>
-                {canEdit && <div style={{ display: 'flex', gap: 6 }}>
-                  <span onClick={() => { setEditId(loc.id); setEditName(loc.name); }} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 12 }}>Edit</span>
-                  <span onClick={() => deleteLocation(loc.id)} style={{ ...S.btnDanger, padding: '4px 10px', fontSize: 12 }}>Delete</span>
+                {canEdit && <div style={{ display: 'flex', gap: 4 }}>
+                  <span onClick={() => { setEditId(loc.id); setEditName(loc.name); }} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>
+                  <span onClick={() => deleteLocation(loc.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
                 </div>}
               </>
             )}
           </div>
         ))}
-        {locations.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 13 }}>No locations yet. Add your first location above.</div>}
+        {locations.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No locations yet. Add your first location above.</div>}
       </div>
     </div>
   );
@@ -1470,16 +1477,16 @@ const Reports = () => {
       closed: { bg: T.glass2, color: T.tx3, bd: T.bd },
     };
     const s = m[status] || m.open;
-    return { display: 'inline-block' as const, padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.bd}`, textTransform: 'uppercase' as const, letterSpacing: '0.04em' };
+    return { display: 'inline-block' as const, padding: '2px 7px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: s.bg, color: s.color, border: `1px solid ${s.bd}`, textTransform: 'uppercase' as const, letterSpacing: '0.05em' };
   };
 
   return (
-    <div className="page-pad" style={{ padding: '16px 18px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}><span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Damage Reports</span>{canEdit && <div onClick={() => setShowModal(true)} style={S.btnPrimary}>+ New Report</div>}</div>
-      {reports.map((r) => (<div key={r.id} style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '16px 18px', marginBottom: 10, transition: 'border-color .15s' }} onMouseEnter={e => e.currentTarget.style.borderColor = T.bd2} onMouseLeave={e => e.currentTarget.style.borderColor = T.bd}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}><div><span style={{ fontFamily: T.mono, color: T.ac, fontSize: 12, fontWeight: 500 }}>{r.report_number}</span><span style={{ marginLeft: 8, ...reportStatusTag(r.status) }}>{r.status}</span><h3 style={{ margin: '6px 0 0', fontSize: 14, fontWeight: 600, color: T.tx }}>{r.inventory_items?.products?.name}</h3></div>{canEdit && <select value={r.status} onChange={(e) => updateStatus(r.id, e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 120, padding: '6px 10px', cursor: 'pointer', height: 'fit-content' }}><option value="open">Open</option><option value="investigating">Investigating</option><option value="resolved">Resolved</option></select>}</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}><div><p style={{ margin: 0, color: T.tx3, fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>Type</p><p style={{ margin: '4px 0 0', fontSize: 13, color: T.tx }}>{r.damage_type}</p></div><div><p style={{ margin: 0, color: T.tx3, fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>Cause</p><p style={{ margin: '4px 0 0', fontSize: 13, color: T.tx }}>{r.cause || '-'}</p></div><div><p style={{ margin: 0, color: T.tx3, fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>Est. Loss</p><p style={{ margin: '4px 0 0', fontSize: 13, fontFamily: T.mono, color: r.estimated_loss ? T.re : T.tx3 }}>{r.estimated_loss ? `₹${r.estimated_loss.toLocaleString()}` : '-'}</p></div></div></div>))}
-      {reports.length === 0 && <div style={{ textAlign: 'center', padding: 48, color: T.tx3, fontSize: 13 }}>No reports</div>}
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Damage Reports</span>{canEdit && <div onClick={() => setShowModal(true)} style={S.btnPrimary}>+ New Report</div>}</div>
+      {reports.map((r) => (<div key={r.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '12px 14px', marginBottom: 8, transition: 'border-color .15s' }} onMouseEnter={e => e.currentTarget.style.borderColor = T.bd2} onMouseLeave={e => e.currentTarget.style.borderColor = T.bd}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><div><span style={{ fontFamily: T.mono, color: T.ac, fontSize: 10, fontWeight: 500 }}>{r.report_number}</span><span style={{ marginLeft: 6, ...reportStatusTag(r.status) }}>{r.status}</span><h3 style={{ margin: '4px 0 0', fontSize: 12, fontWeight: 600, color: T.tx }}>{r.inventory_items?.products?.name}</h3></div>{canEdit && <select value={r.status} onChange={(e) => updateStatus(r.id, e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '4px 8px', cursor: 'pointer', height: 'fit-content', fontSize: 10 }}><option value="open">Open</option><option value="investigating">Investigating</option><option value="resolved">Resolved</option></select>}</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}><div><p style={{ margin: 0, color: T.tx3, fontSize: 9, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>Type</p><p style={{ margin: '3px 0 0', fontSize: 11, color: T.tx }}>{r.damage_type}</p></div><div><p style={{ margin: 0, color: T.tx3, fontSize: 9, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>Cause</p><p style={{ margin: '3px 0 0', fontSize: 11, color: T.tx }}>{r.cause || '-'}</p></div><div><p style={{ margin: 0, color: T.tx3, fontSize: 9, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>Est. Loss</p><p style={{ margin: '3px 0 0', fontSize: 11, fontFamily: T.mono, color: r.estimated_loss ? T.re : T.tx3 }}>{r.estimated_loss ? `₹${r.estimated_loss.toLocaleString()}` : '-'}</p></div></div></div>))}
+      {reports.length === 0 && <div style={{ textAlign: 'center', padding: 36, color: T.tx3, fontSize: 11 }}>No reports</div>}
 
-      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>New Report</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 20 }}><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Item *</label><select value={form.inventory_item_id} onChange={(e) => setForm({ ...form, inventory_item_id: e.target.value })} required style={S.fInput}><option value="">Select</option>{items.map((i) => <option key={i.id} value={i.id}>{i.products?.name}</option>)}</select></div><div style={{ marginBottom: 14 }}><label style={S.fLabel}>Damage Type *</label><input value={form.damage_type} onChange={(e) => setForm({ ...form, damage_type: e.target.value })} required placeholder="e.g. Tear, Stain, Broken" style={S.fInput} /></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Cause</label><input value={form.cause} onChange={(e) => setForm({ ...form, cause: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Est. Loss (₹)</label><input type="number" value={form.estimated_loss} onChange={(e) => setForm({ ...form, estimated_loss: e.target.value })} placeholder="0" style={S.fInput} /></div></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>Submit</button></div></form></div></div>)}
+      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>New Report</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 16 }}><div style={{ marginBottom: 10 }}><label style={S.fLabel}>Item *</label><select value={form.inventory_item_id} onChange={(e) => setForm({ ...form, inventory_item_id: e.target.value })} required style={S.fInput}><option value="">Select</option>{items.map((i) => <option key={i.id} value={i.id}>{i.products?.name}</option>)}</select></div><div style={{ marginBottom: 10 }}><label style={S.fLabel}>Damage Type *</label><input value={form.damage_type} onChange={(e) => setForm({ ...form, damage_type: e.target.value })} required placeholder="e.g. Tear, Stain, Broken" style={S.fInput} /></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}><div><label style={S.fLabel}>Cause</label><input value={form.cause} onChange={(e) => setForm({ ...form, cause: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Est. Loss (₹)</label><input type="number" value={form.estimated_loss} onChange={(e) => setForm({ ...form, estimated_loss: e.target.value })} placeholder="0" style={S.fInput} /></div></div><div style={{ padding: '12px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 7 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>Submit</button></div></form></div></div>)}
     </div>
   );
 };
@@ -1545,62 +1552,62 @@ const Users = () => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Users</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Users</span>
         <div onClick={() => setShowInvite(true)} style={S.btnPrimary}>+ Invite User</div>
       </div>
-      <div style={{ background: T.s, border: `1px solid ${T.bd}`, borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>{['User', 'Role', 'Status', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
           <tbody>{users.map((u) => (
-            <tr key={u.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            <tr key={u.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.015)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <td style={S.tdStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{(u.full_name || u.email || '?')[0].toUpperCase()}</div>
-                  <div><p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: T.tx }}>{u.full_name || 'Unnamed'}</p><p style={{ margin: '2px 0 0', fontSize: 12, color: T.tx3 }}>{u.email}</p></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 26, height: 26, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{(u.full_name || u.email || '?')[0].toUpperCase()}</div>
+                  <div><p style={{ margin: 0, fontWeight: 600, fontSize: 11, color: T.tx }}>{u.full_name || 'Unnamed'}</p><p style={{ margin: '1px 0 0', fontSize: 10, color: T.tx3 }}>{u.email}</p></div>
                 </div>
               </td>
-              <td style={S.tdStyle}><select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} disabled={u.id === profile?.id} style={{ ...S.fInput, width: 'auto', minWidth: 110, padding: '6px 10px', cursor: u.id === profile?.id ? 'not-allowed' : 'pointer', opacity: u.id === profile?.id ? 0.5 : 1 }}><option value="admin">Admin</option><option value="manager">Manager</option><option value="operator">Operator</option><option value="viewer">Viewer</option></select></td>
-              <td style={S.tdStyle}><span style={{ padding: '3px 10px', borderRadius: T.r, fontSize: 11, fontWeight: 600, ...(u.is_active ? { background: 'rgba(45,212,160,.12)', color: T.gr } : { background: 'rgba(245,87,92,.12)', color: T.re }) }}>{u.is_active ? 'Active' : 'Inactive'}</span></td>
-              <td style={S.tdStyle}>{u.id !== profile?.id && <span onClick={() => toggleActive(u.id, u.is_active)} style={{ padding: '6px 14px', borderRadius: T.r, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: T.sans, display: 'inline-block', ...(u.is_active ? { background: 'rgba(245,87,92,.1)', color: T.re, border: '1px solid rgba(245,87,92,.25)' } : { background: 'rgba(45,212,160,.1)', color: T.gr, border: '1px solid rgba(45,212,160,.25)' }) }}>{u.is_active ? 'Revoke' : 'Grant'}</span>}</td>
+              <td style={S.tdStyle}><select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} disabled={u.id === profile?.id} style={{ ...S.fInput, width: 'auto', minWidth: 90, padding: '4px 8px', cursor: u.id === profile?.id ? 'not-allowed' : 'pointer', opacity: u.id === profile?.id ? 0.5 : 1, fontSize: 10 }}><option value="admin">Admin</option><option value="manager">Manager</option><option value="operator">Operator</option><option value="viewer">Viewer</option></select></td>
+              <td style={S.tdStyle}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, ...(u.is_active ? { background: 'rgba(45,212,160,.10)', color: T.gr } : { background: 'rgba(245,87,92,.10)', color: T.re }) }}>{u.is_active ? 'Active' : 'Inactive'}</span></td>
+              <td style={S.tdStyle}>{u.id !== profile?.id && <span onClick={() => toggleActive(u.id, u.is_active)} style={{ padding: '4px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 600, fontFamily: T.sans, display: 'inline-block', ...(u.is_active ? { background: 'rgba(245,87,92,.08)', color: T.re, border: '1px solid rgba(245,87,92,.18)' } : { background: 'rgba(45,212,160,.08)', color: T.gr, border: '1px solid rgba(45,212,160,.18)' }) }}>{u.is_active ? 'Revoke' : 'Grant'}</span>}</td>
             </tr>
           ))}</tbody>
         </table>
       </div>
 
       {showInvite && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}>
-        <div style={S.modalHead}><span style={{ fontSize: 15, fontWeight: 600, color: T.tx }}>Invite New User</span><span onClick={closeInvite} style={{ cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1 }}>✕</span></div>
+        <div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Invite New User</span><span onClick={closeInvite} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span></div>
         {inviteResult ? (
-          <div style={{ padding: 20 }}>
-            <div style={{ background: 'rgba(45,212,160,.08)', border: '1px solid rgba(45,212,160,.25)', borderRadius: T.r, padding: 16, marginBottom: 16 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: T.gr, margin: '0 0 8px' }}>User invited successfully!</p>
-              <p style={{ fontSize: 12, color: T.tx2, margin: 0 }}>Share these credentials with the user:</p>
+          <div style={{ padding: 16 }}>
+            <div style={{ background: 'rgba(45,212,160,.06)', border: '1px solid rgba(45,212,160,.18)', borderRadius: T.r, padding: 12, marginBottom: 12 }}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: T.gr, margin: '0 0 4px' }}>User invited successfully!</p>
+              <p style={{ fontSize: 10, color: T.tx2, margin: 0 }}>Share these credentials with the user:</p>
             </div>
-            <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 16 }}>
-              <div style={{ marginBottom: 12 }}>
-                <p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 4 }}>Email</p>
-                <p style={{ fontSize: 14, fontFamily: T.mono, color: T.tx, margin: 0, userSelect: 'all' as const }}>{inviteResult.email}</p>
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 12 }}>
+              <div style={{ marginBottom: 10 }}>
+                <p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 3 }}>Email</p>
+                <p style={{ fontSize: 12, fontFamily: T.mono, color: T.tx, margin: 0, userSelect: 'all' as const }}>{inviteResult.email}</p>
               </div>
               <div>
-                <p style={{ fontSize: 11, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 4 }}>Password</p>
-                <p style={{ fontSize: 14, fontFamily: T.mono, color: T.ac, margin: 0, userSelect: 'all' as const }}>{inviteResult.password}</p>
+                <p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 3 }}>Password</p>
+                <p style={{ fontSize: 12, fontFamily: T.mono, color: T.ac, margin: 0, userSelect: 'all' as const }}>{inviteResult.password}</p>
               </div>
             </div>
-            <p style={{ fontSize: 11, color: T.tx3, marginTop: 12, textAlign: 'center' }}>The user should change their password after first login</p>
-            <div style={{ padding: '14px 0 0', display: 'flex', justifyContent: 'flex-end' }}>
+            <p style={{ fontSize: 10, color: T.tx3, marginTop: 10, textAlign: 'center' }}>The user should change their password after first login</p>
+            <div style={{ padding: '12px 0 0', display: 'flex', justifyContent: 'flex-end' }}>
               <div onClick={closeInvite} style={S.btnPrimary}>Done</div>
             </div>
           </div>
         ) : (
-          <form onSubmit={handleInvite} style={{ padding: 20 }}>
-            <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Full Name *</label><input value={inviteForm.full_name} onChange={(e) => setInviteForm({ ...inviteForm, full_name: e.target.value })} required placeholder="e.g. Mahesh Dhameliya" style={S.fInput} /></div>
-            <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Email *</label><input type="email" value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} required placeholder="user@aryadesigns.co.in" style={S.fInput} /></div>
-            <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+          <form onSubmit={handleInvite} style={{ padding: 16 }}>
+            <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Full Name *</label><input value={inviteForm.full_name} onChange={(e) => setInviteForm({ ...inviteForm, full_name: e.target.value })} required placeholder="e.g. Mahesh Dhameliya" style={S.fInput} /></div>
+            <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Email *</label><input type="email" value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} required placeholder="user@aryadesigns.co.in" style={S.fInput} /></div>
+            <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
               <div><label style={S.fLabel}>Password</label><input value={inviteForm.password} onChange={(e) => setInviteForm({ ...inviteForm, password: e.target.value })} placeholder="Auto-generate if empty" style={S.fInput} /></div>
               <div><label style={S.fLabel}>Role</label><select value={inviteForm.role} onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })} style={S.fInput}><option value="viewer">Viewer</option><option value="operator">Operator</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>
             </div>
-            <div style={{ background: 'rgba(139,92,246,.06)', border: `1px solid rgba(139,92,246,.2)`, borderRadius: T.r, padding: '10px 14px', fontSize: 12, color: T.ac2, marginBottom: 14 }}>The user will be created with the credentials above. Share the email and password with them so they can sign in.</div>
-            <div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
+            <div style={{ background: 'rgba(99,102,241,.05)', border: `1px solid rgba(99,102,241,.15)`, borderRadius: T.r, padding: '8px 12px', fontSize: 10, color: T.ac2, marginBottom: 12 }}>The user will be created with the credentials above. Share the email and password with them so they can sign in.</div>
+            <div style={{ padding: '12px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 7 }}>
               <span onClick={closeInvite} style={S.btnGhost}>Cancel</span>
               <button type="submit" disabled={inviting} style={S.btnPrimary}>{inviting ? 'Creating...' : 'Create & Invite'}</button>
             </div>
@@ -1618,9 +1625,9 @@ const SettingsPage = () => {
   const tabs = [{ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }];
   if (isAdmin) tabs.push({ id: 'users', label: 'Users' });
   return (
-    <div className="page-pad" style={{ padding: '16px 18px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 14, background: T.s2, borderRadius: 6, padding: 3, width: 'fit-content' }}>
-        {tabs.map(t => <div key={t.id} onClick={() => setTab(t.id)} style={{ padding: '6px 16px', borderRadius: 4, fontSize: 12, fontWeight: tab === t.id ? 600 : 400, cursor: 'pointer', background: tab === t.id ? T.ac : 'transparent', color: tab === t.id ? '#fff' : T.tx3, transition: 'all .15s' }}>{t.label}</div>)}
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      <div style={{ display: 'flex', gap: 3, marginBottom: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, width: 'fit-content', border: `1px solid ${T.bd}` }}>
+        {tabs.map(t => <div key={t.id} onClick={() => setTab(t.id)} style={{ padding: '5px 14px', borderRadius: 4, fontSize: 10, fontWeight: tab === t.id ? 600 : 400, cursor: 'pointer', background: tab === t.id ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'transparent', color: tab === t.id ? '#fff' : T.tx3, transition: 'all .15s' }}>{t.label}</div>)}
       </div>
       {tab === 'categories' && <Categories />}
       {tab === 'locations' && <Locations />}
@@ -1652,7 +1659,12 @@ const MainApp = () => {
     setScanError(`No item found for: ${code}`);
     return false;
   };
-  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflow: 'hidden' }}>
+  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflow: 'hidden', position: 'relative' }}>
+    {/* Ambient background glows */}
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 0 }}>
+      <div style={{ position: 'absolute', top: -100, right: -50, width: 400, height: 400, background: `radial-gradient(circle, ${T.ac}08 0%, transparent 70%)` }} />
+      <div style={{ position: 'absolute', bottom: -100, left: -50, width: 350, height: 350, background: `radial-gradient(circle, ${T.bl}06 0%, transparent 70%)` }} />
+    </div>
     <Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} />
     {/* Mobile overlay */}
     <div className="mobile-overlay" onClick={() => setMobileMenu(false)} style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 98, opacity: mobileMenu ? 1 : 0, pointerEvents: mobileMenu ? 'auto' : 'none', transition: 'opacity .25s ease', backdropFilter: 'blur(2px)' }} />
@@ -1688,7 +1700,7 @@ export default function App() { return <ErrorBoundary><AuthProvider><AppContent 
 
 const AppContent = () => {
   const auth = useAuth();
-  if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100vh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}><div style={{ fontSize: 24, fontWeight: 700, fontFamily: T.mono, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Unsort</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 11, letterSpacing: 1 }}>LOADING</p></div>;
+  if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100vh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}><div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Unsort</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase' }}>LOADING</p></div>;
   if (!auth?.user) return <AuthScreen />;
   return <NotificationProvider><MainApp /></NotificationProvider>;
 };

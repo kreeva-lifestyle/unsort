@@ -8,41 +8,42 @@ const btAudit = (action: string, details: string) => { supabase.auth.getUser().t
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
 const T = {
-  bg: '#080C14', s: '#0D1117', s2: '#111827', s3: '#161D2E',
-  bd: 'rgba(255,255,255,0.06)', bd2: 'rgba(255,255,255,0.10)',
-  tx: '#F1F5F9', tx2: '#94A3B8', tx3: '#475569',
+  bg: '#060810', s: '#0B0F19', s2: '#0F1420', s3: '#141B2B',
+  bd: 'rgba(255,255,255,0.05)', bd2: 'rgba(255,255,255,0.08)',
+  tx: '#E2E8F0', tx2: '#8896B0', tx3: '#4A5568',
   ac: '#6366F1', ac2: '#818CF8',
   gr: '#22C55E', re: '#EF4444', bl: '#38BDF8', yl: '#F59E0B',
-  r: 10,
+  r: 8,
   mono: "'JetBrains Mono', monospace",
   sans: "'Inter', -apple-system, sans-serif",
-  glass1: 'rgba(255,255,255,0.03)', glass2: 'rgba(255,255,255,0.06)',
-  transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+  sora: "'Sora', 'Inter', sans-serif",
+  glass1: 'rgba(255,255,255,0.02)', glass2: 'rgba(255,255,255,0.04)',
+  transition: 'all 180ms cubic-bezier(0.4, 0, 0.2, 1)',
 };
 
 // ── Reusable style helpers ─────────────────────────────────────────────────────
 const btnBase: React.CSSProperties = {
   padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
   fontSize: 11, fontWeight: 600, fontFamily: T.sans,
-  display: 'inline-flex', alignItems: 'center', gap: 4,
-  whiteSpace: 'nowrap', backdropFilter: 'blur(4px)', letterSpacing: 0.2,
+  display: 'inline-flex', alignItems: 'center', gap: 5,
+  whiteSpace: 'nowrap', letterSpacing: '0.02em',
 };
-const btnPrimary: React.CSSProperties = { ...btnBase, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff' };
-const btnGhost: React.CSSProperties = { ...btnBase, fontWeight: 500, background: 'rgba(26,31,46,.5)', border: `1px solid ${T.bd2}`, color: T.tx2 };
+const btnPrimary: React.CSSProperties = { ...btnBase, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', boxShadow: '0 2px 10px rgba(99,102,241,0.25)' };
+const btnGhost: React.CSSProperties = { ...btnBase, fontWeight: 500, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd2}`, color: T.tx2 };
 
-const btnSm: React.CSSProperties = { padding: '3px 7px', fontSize: 10, borderRadius: 4, border: `1px solid ${T.bd2}`, cursor: 'pointer', fontFamily: "'Inter',sans-serif", fontWeight: 500, color: T.tx2, background: 'rgba(26,31,46,.5)', whiteSpace: 'nowrap' };
+const btnSm: React.CSSProperties = { padding: '3px 8px', fontSize: 10, borderRadius: 4, border: `1px solid ${T.bd2}`, cursor: 'pointer', fontFamily: T.sans, fontWeight: 500, color: T.tx2, background: 'rgba(255,255,255,0.03)', whiteSpace: 'nowrap' };
 const inp: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: T.r,
-  color: T.tx, fontFamily: T.sans, fontSize: 14, padding: '10px 14px',
+  background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6,
+  color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '7px 10px',
   outline: 'none', boxSizing: 'border-box', transition: T.transition,
 };
 const thS: React.CSSProperties = {
-  fontSize: 11, color: T.tx3, padding: '12px 16px', textAlign: 'left',
-  fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: T.glass1,
-  whiteSpace: 'nowrap', fontFamily: T.sans, textTransform: 'uppercase', letterSpacing: '0.08em',
+  fontSize: 9, color: T.tx3, padding: '9px 12px', textAlign: 'left',
+  fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)',
+  whiteSpace: 'nowrap', fontFamily: T.sans, textTransform: 'uppercase', letterSpacing: '0.1em',
 };
-const tdS: React.CSSProperties = { padding: '14px 16px', fontSize: 14, borderBottom: `1px solid ${T.bd}`, color: T.tx2, fontFamily: T.sans };
-const fLabel: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 500, color: T.tx2, marginBottom: 6, letterSpacing: '0.01em', fontFamily: T.sans };
+const tdS: React.CSSProperties = { padding: '9px 12px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx2, fontFamily: T.sans };
+const fLabel: React.CSSProperties = { display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, marginBottom: 5, letterSpacing: '0.06em', textTransform: 'uppercase' as const, fontFamily: T.sans };
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface BrandTagRow {
@@ -297,19 +298,19 @@ const BrandTagModal = ({
     >
       <div
         style={{
-          background: 'rgba(18,22,31,.95)', border: `1px solid ${T.bd2}`,
-          borderRadius: 12, width: 520, maxWidth: '100%', maxHeight: '90vh',
-          overflowY: 'auto', boxShadow: '0 16px 48px rgba(0,0,0,.5)',
-          backdropFilter: 'blur(12px)',
+          background: 'rgba(14,18,30,0.96)', border: `1px solid ${T.bd2}`,
+          borderRadius: 14, width: 480, maxWidth: '100%', maxHeight: '90vh',
+          overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,.65)',
+          backdropFilter: 'blur(32px)',
         }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{
-          padding: '12px 16px', borderBottom: `1px solid ${T.bd}`,
+          padding: '11px 14px', borderBottom: `1px solid ${T.bd}`,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ color: T.tx, fontSize: 14, fontWeight: 600 }}>{title}</span>
+          <span style={{ color: T.tx, fontSize: 13, fontWeight: 600 }}>{title}</span>
           <button onClick={onClose} style={{ ...btnGhost, ...btnSm }}>Close</button>
         </div>
         {/* Fields */}
@@ -641,40 +642,40 @@ export default function BrandTagPrinter() {
   // Server-side pagination handles btPage/btPerPage - defined above
 
   return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '16px 18px' }}>
-      {loading && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 16 }}>
-        <div style={{ width: 40, height: 40, border: `3px solid ${T.bd2}`, borderTopColor: T.ac, borderRadius: '50%', animation: 'btnSpin .7s linear infinite' }} />
-        <span style={{ fontSize: 13, color: T.tx3 }}>Loading brand tags...</span>
+    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+      {loading && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 12 }}>
+        <div style={{ width: 32, height: 32, border: `2px solid ${T.bd2}`, borderTopColor: T.ac, borderRadius: '50%', animation: 'btnSpin .7s linear infinite' }} />
+        <span style={{ fontSize: 11, color: T.tx3 }}>Loading brand tags...</span>
       </div>}
       {!loading && <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <div>
-          <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Brand Tags</span>
-          <span style={{ fontSize: 12, fontWeight: 500, color: T.tx3, marginLeft: 10 }}>{totalCount} rows</span>
-          {importing && <span style={{ fontSize: 11, color: T.yl, marginLeft: 10, fontWeight: 600 }}>Importing {importProgress}...</span>}
+          <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Brand Tags</span>
+          <span style={{ fontSize: 10, fontWeight: 500, color: T.tx3, marginLeft: 8 }}>{totalCount} rows</span>
+          {importing && <span style={{ fontSize: 10, color: T.yl, marginLeft: 8, fontWeight: 600 }}>Importing {importProgress}...</span>}
         </div>
-        <div style={{ display: 'flex', gap: 5 }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <button style={btnGhost} onClick={async () => { setRefreshMsg('Refreshing...'); await fetchPage(); setRefreshMsg('Updated!'); setTimeout(() => setRefreshMsg(''), 2000); }}>{refreshMsg || 'Refresh'}</button>
           <button style={btnGhost} onClick={() => fileRef.current?.click()}>Import</button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
           <button style={btnGhost} onClick={handleExport}>Export</button>
-          <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.15)', opacity: orderLoading ? 0.5 : 1, pointerEvents: orderLoading ? 'none' : 'auto' }} onClick={() => orderFileRef.current?.click()}>Order Sheet</button>
+          <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.12)', opacity: orderLoading ? 0.5 : 1, pointerEvents: orderLoading ? 'none' : 'auto' }} onClick={() => orderFileRef.current?.click()}>Order Sheet</button>
           <input ref={orderFileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleOrderImport} />
-          {orderLoading && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: T.yl }}><span style={{ width: 12, height: 12, border: '2px solid rgba(251,191,36,.2)', borderTopColor: T.yl, borderRadius: '50%', animation: 'btnSpin .6s linear infinite', flexShrink: 0 }} />{orderLoadMsg}</span>}
-          <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.15)' }} onClick={printTestLabel}>Test Print</button>
+          {orderLoading && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: T.yl }}><span style={{ width: 10, height: 10, border: '1.5px solid rgba(251,191,36,.2)', borderTopColor: T.yl, borderRadius: '50%', animation: 'btnSpin .6s linear infinite', flexShrink: 0 }} />{orderLoadMsg}</span>}
+          <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.12)' }} onClick={printTestLabel}>Test Print</button>
           <button style={btnPrimary} onClick={openAdd}>+ Add SKU</button>
         </div>
       </div>
-      <div style={{ background: T.s, border: '1px solid ' + T.bd, borderRadius: 10, padding: '10px 12px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-        <input type="text" placeholder="Search brand, SKU, EAN..." value={search} onChange={e => handleSearch(e.target.value)} style={{ ...inp, flex: 1, minWidth: 140, padding: '7px 10px' }} />
-        <div style={{ width: 1, height: 24, background: T.bd2 }} />
-        <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 110, padding: '7px 10px', cursor: 'pointer' }}><option value="">All brands</option>{BRAND_OPTIONS.map(b => { const n = b.replace(/^BRAND NAME:\s*/i, ''); return <option key={b} value={n}>{n}</option>; })}</select>
-        <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 90, padding: '7px 10px', cursor: 'pointer' }}><option value="">All sizes</option>{SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
-        <select value={colorFilter} onChange={e => setColorFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 100, padding: '7px 10px', cursor: 'pointer' }}><option value="">All colors</option>{COLOR_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}</select>
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid ' + T.bd, borderRadius: 8, padding: '8px 10px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+        <input type="text" placeholder="Search brand, SKU, EAN..." value={search} onChange={e => handleSearch(e.target.value)} style={{ ...inp, flex: 1, minWidth: 130, padding: '6px 9px' }} />
+        <div style={{ width: 1, height: 20, background: T.bd2 }} />
+        <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 100, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="">All brands</option>{BRAND_OPTIONS.map(b => { const n = b.replace(/^BRAND NAME:\s*/i, ''); return <option key={b} value={n}>{n}</option>; })}</select>
+        <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 80, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="">All sizes</option>{SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+        <select value={colorFilter} onChange={e => setColorFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 90, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="">All colors</option>{COLOR_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}</select>
       </div>
 
       {/* Table */}
-      <div style={{ overflowX: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8, background: T.s, marginBottom: 8 }}>
+      <div style={{ overflowX: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8, background: 'rgba(255,255,255,0.015)', marginBottom: 8 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead><tr>
             {['Brand', 'EAN', 'SKU', 'Includes', 'MRP', 'Size', 'Product', 'Color', 'Jio Code', ''].map(h => (
@@ -682,9 +683,9 @@ export default function BrandTagPrinter() {
             ))}
           </tr></thead>
           <tbody>
-            {rows.length === 0 && !loading && <tr><td colSpan={10} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
+            {rows.length === 0 && !loading && <tr><td colSpan={10} style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 10 }}>No rows. Import Excel or add SKUs.</td></tr>}
             {rows.map(row => (
-              <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = T.s2; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+              <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.015)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
                 <td style={tdS}>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</td>
                 <td style={tdS}>{row.ean}</td>
                 <td style={{ ...tdS, fontWeight: 500 }}>{row.sku}</td>
@@ -724,14 +725,14 @@ export default function BrandTagPrinter() {
         const opp = orderPerPage;
         const otp = Math.ceil(orderRows.length / opp);
         const opaged = orderRows.slice(orderPage * opp, (orderPage + 1) * opp);
-        return <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 200, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
-          <div style={{ background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 12, width: '95vw', maxWidth: 1100, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        return <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.80)', zIndex: 200, backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
+          <div style={{ background: 'rgba(14,18,30,0.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, width: '95vw', maxWidth: 1100, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', backdropFilter: 'blur(32px)' }}>
+            <div style={{ padding: '10px 14px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
               <div>
-                <span style={{ fontSize: 14, fontWeight: 600, color: T.tx }}>Order Sheet Preview</span>
-                <span style={{ fontSize: 11, color: T.tx3, marginLeft: 10 }}>{ready.length} ready</span>
-                <span style={{ fontSize: 11, color: T.gr, marginLeft: 6 }}>{totalCopies} labels</span>
-                {missing.length > 0 && <span style={{ fontSize: 11, color: T.re, marginLeft: 6 }}>{missing.length} missing</span>}
+                <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Order Sheet Preview</span>
+                <span style={{ fontSize: 10, color: T.tx3, marginLeft: 8 }}>{ready.length} ready</span>
+                <span style={{ fontSize: 10, color: T.gr, marginLeft: 5 }}>{totalCopies} labels</span>
+                {missing.length > 0 && <span style={{ fontSize: 10, color: T.re, marginLeft: 5 }}>{missing.length} missing</span>}
               </div>
               <div style={{ display: 'flex', gap: 5 }}>
                 {missing.length === 0
@@ -753,12 +754,12 @@ export default function BrandTagPrinter() {
                 <button style={btnGhost} onClick={() => setOrderRows(null)}>Close</button>
               </div>
             </div>
-            {missing.length > 0 && <div style={{ padding: '10px 16px', background: 'rgba(248,113,113,.06)', borderBottom: `1px solid rgba(248,113,113,.15)`, display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11, color: T.re, lineHeight: 1.5 }}>
-              <span style={{ fontSize: 14, flexShrink: 0 }}>⚠</span>
+            {missing.length > 0 && <div style={{ padding: '8px 14px', background: 'rgba(248,113,113,.05)', borderBottom: `1px solid rgba(248,113,113,.12)`, display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 10, color: T.re, lineHeight: 1.5 }}>
+              <span style={{ fontSize: 12, flexShrink: 0 }}>⚠</span>
               <div><strong>{missing.length} SKU{missing.length > 1 ? 's' : ''} not found in master data.</strong> Printing is blocked until all SKUs are resolved. Go to the Brand Tags table, add the missing SKU{missing.length > 1 ? 's' : ''} ({missing.map(m => m.sku).join(', ')}), then re-import this order sheet.</div>
             </div>}
             <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                 <thead><tr>
                   {['#', 'Marketplace', 'SKU', 'Brand', 'Product', 'Color', 'Size', 'MRP', 'Copies', 'Status'].map(h => <th key={h} style={thS}>{h}</th>)}
                 </tr></thead>
