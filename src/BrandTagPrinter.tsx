@@ -155,15 +155,15 @@ const printLabelsInWindow = (labels: BrandTagRow[]) => {
     const mrp = '\u20B9' + r.mrp.toLocaleString('en-IN');
     return `<div class="label">
   <div class="main">
-    <div class="row b" style="font-size:9pt">BRAND NAME: ${brand}</div>
-    <div class="row b" style="font-size:8.5pt">SKU: ${r.sku}</div>
-    <div class="row" style="font-size:7.5pt">PRODUCT DESC: ${product}</div>
-    <div class="row" style="font-size:7pt">INCLUDES: ${qty}</div>
-    <div class="row" style="font-size:7.5pt">SIZE: ${r.size}</div>
-    <div class="row" style="font-size:7.5pt">COLOR: ${r.color}</div>
-    <div class="row b" style="font-size:8.5pt">MRP: ${mrp}</div>
+    <div class="row b">BRAND NAME: ${brand}</div>
+    <div class="row b">SKU: ${r.sku}</div>
+    <div class="row">PRODUCT DESC: ${product}</div>
+    <div class="row">${qty}</div>
+    <div class="row">SIZE: ${r.size}</div>
+    <div class="row">COLOR: ${r.color}</div>
+    <div class="row b">MRP: ${mrp}</div>
     <div class="row sm">MKTD &amp; DIST. BY: ${r.mktd}</div>
-    <div class="row" style="font-size:7pt;font-family:monospace">JIO CODE: ${r.jioCode}</div>
+    <div class="row">JIO CODE: ${r.jioCode}</div>
     <div class="barcode"><svg id="bc-${r.id}"></svg></div>
   </div>
   <div class="ean"><span>EAN: ${r.sku}</span></div>
@@ -176,9 +176,9 @@ const printLabelsInWindow = (labels: BrandTagRow[]) => {
 body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000}
 .label{width:1.97in;height:2.97in;display:flex;overflow:hidden;page-break-after:always}
 .main{flex:1;padding:6px 7px 4px;display:flex;flex-direction:column}
-.row{line-height:1.35;margin-bottom:2px}
-.b{font-weight:700}
-.sm{font-size:6pt;line-height:1.25;color:#222}
+.row{font-size:7.5pt;line-height:1.35;margin-bottom:2px}
+.b{font-weight:700;font-size:8pt}
+.sm{font-size:6pt;line-height:1.2;color:#222}
 .barcode{margin-top:auto;text-align:center;padding:4px 0 2px}
 .barcode svg{width:100%;height:36px}
 .ean{width:26px;min-width:26px;background:#e8e8e8;display:flex;align-items:center;justify-content:center}
@@ -208,6 +208,28 @@ const BRAND_OPTIONS = ['BRAND NAME: TANUKA', 'BRAND NAME: FUSIONIC', 'BRAND NAME
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
 const PRODUCT_OPTIONS = ['PRODUCT DESC: Co-ord Set', 'PRODUCT DESC: Dress', 'PRODUCT DESC: Fusion Wear', 'PRODUCT DESC: Gown', 'PRODUCT DESC: Gown Set', 'PRODUCT DESC: Jumpsuit', 'PRODUCT DESC: Kurta', 'PRODUCT DESC: Kurta Set', 'PRODUCT DESC: Kurti', 'PRODUCT DESC: Lehenga Choli', 'PRODUCT DESC: Saree', 'PRODUCT DESC: Top'];
 
+// Searchable auto-suggest input
+const SearchableSelect = ({ value, options, placeholder, stripPrefix, onChange }: { value: string; options: string[]; placeholder: string; stripPrefix?: RegExp; onChange: (v: string) => void }) => {
+  const [text, setText] = useState(value ? (stripPrefix ? value.replace(stripPrefix, '') : value) : '');
+  const [open, setOpen] = useState(false);
+  const display = (o: string) => stripPrefix ? o.replace(stripPrefix, '') : o;
+  const q = text.toLowerCase();
+  const filtered = options.filter(o => display(o).toLowerCase().includes(q));
+  useEffect(() => { setText(value ? (stripPrefix ? value.replace(stripPrefix, '') : value) : ''); }, [value]);
+  return (
+    <div style={{ position: 'relative' }}>
+      <input value={text} placeholder={placeholder} style={{ ...inp, width: '100%' }}
+        onChange={e => { setText(e.target.value); setOpen(true); onChange(''); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+      />
+      {open && filtered.length > 0 && <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 2, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 6, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 6px 20px rgba(0,0,0,.4)' }}>
+        {filtered.slice(0, 15).map(o => <div key={o} onMouseDown={() => { onChange(o); setText(display(o)); setOpen(false); }} style={{ padding: '6px 10px', fontSize: 12, color: T.tx, cursor: 'pointer', borderBottom: `1px solid ${T.bd}` }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{display(o)}</div>)}
+      </div>}
+    </div>
+  );
+};
+
 const COLOR_OPTIONS = ['Aqua', 'Beige', 'Black', 'Blue', 'Bronze', 'Brown', 'Burgundy', 'Coral', 'Cream', 'Fuchsia', 'Gold', 'Green', 'Grey', 'Lavender', 'Lime', 'Magenta', 'Maroon', 'Mauve', 'Multi', 'Mustard', 'Navy Blue', 'Nude', 'Off White', 'Olive', 'Orange', 'Peach', 'Pink', 'Pistachio', 'Purple', 'Rama', 'Red', 'Rose Gold', 'Rust', 'Sea Green', 'Silver', 'Tan', 'Taupe', 'Teal', 'Turquoise', 'Violet', 'White', 'Wine', 'Yellow'];
 
 const QTY_OPTIONS = [
@@ -235,14 +257,14 @@ const QTY_OPTIONS = [
 ];
 
 // ── Add / Edit Modal ───────────────────────────────────────────────────────────
-const MODAL_FIELDS: { key: keyof BrandTagRow; label: string; type?: string; multiline?: boolean; options?: string[]; defaultVal?: string }[] = [
+const MODAL_FIELDS: { key: keyof BrandTagRow; label: string; type?: string; multiline?: boolean; options?: string[]; searchable?: boolean; defaultVal?: string }[] = [
   { key: 'brand', label: 'Brand Name', options: BRAND_OPTIONS },
   { key: 'ean', label: 'EAN' },
   { key: 'sku', label: 'SKU' },
-  { key: 'product', label: 'Product Description', options: PRODUCT_OPTIONS },
-  { key: 'qty', label: 'Includes / QTY', options: QTY_OPTIONS },
+  { key: 'product', label: 'Product', options: PRODUCT_OPTIONS },
+  { key: 'qty', label: 'Includes', options: QTY_OPTIONS, searchable: true },
   { key: 'size', label: 'Size', options: SIZE_OPTIONS },
-  { key: 'color', label: 'Color', options: COLOR_OPTIONS },
+  { key: 'color', label: 'Color', options: COLOR_OPTIONS, searchable: true },
   { key: 'mrp', label: 'MRP', type: 'number' },
   { key: 'mktd', label: 'MKTD & DIST. BY', multiline: true, defaultVal: DEFAULT_MKTD },
   { key: 'jioCode', label: 'Jio Code' },
@@ -291,16 +313,24 @@ const BrandTagModal = ({
         {/* Fields */}
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {MODAL_FIELDS.map(f => (
-            <div key={f.key}>
+            <div key={f.key} style={{ position: 'relative' }}>
               <label style={fLabel}>{f.label}</label>
-              {f.options ? (
+              {f.searchable && f.options ? (
+                <SearchableSelect
+                  value={String(form[f.key])}
+                  options={f.options}
+                  placeholder={`Type to search ${f.label.toLowerCase()}...`}
+                  stripPrefix={f.key === 'qty' ? /^INCLUDES:\s*/i : undefined}
+                  onChange={v => set(f.key, v)}
+                />
+              ) : f.options ? (
                 <select
                   style={{ ...inp, width: '100%', cursor: 'pointer' }}
                   value={String(form[f.key])}
                   onChange={e => set(f.key, e.target.value)}
                 >
                   <option value="">Select {f.label.toLowerCase()}</option>
-                  {f.options.map(o => <option key={o} value={o}>{o.replace(/^BRAND NAME:\s*/i, '').replace(/^PRODUCT DESC:\s*/i, '')}</option>)}
+                  {f.options.map(o => <option key={o} value={o}>{o.replace(/^BRAND NAME:\s*/i, '').replace(/^PRODUCT DESC:\s*/i, '').replace(/^INCLUDES:\s*/i, '')}</option>)}
                 </select>
               ) : f.multiline ? (
                 <textarea
