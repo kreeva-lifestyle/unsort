@@ -1,5 +1,6 @@
 /* eslint-disable */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Quagga from '@ericblade/quagga2';
 
 // ── Theme (synced with App.tsx) ─────────────────────────────────────────────────
 const T = {
@@ -59,6 +60,10 @@ export default function PackTime() {
   const [duplicateAwb, setDuplicateAwb] = useState('');
   const [scanning, setScanning] = useState(false);
   const [serverError, setServerError] = useState('');
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+  const cameraRef = useRef<HTMLDivElement>(null);
+  const scanLockRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Keep input focused
@@ -67,8 +72,52 @@ export default function PackTime() {
   }, []);
 
   useEffect(() => {
-    if (started) focusInput();
-  }, [started, focusInput]);
+    if (started && !cameraOpen) focusInput();
+  }, [started, cameraOpen, focusInput]);
+
+  // Camera scanner
+  const startCamera = useCallback(() => {
+    if (!cameraRef.current) return;
+    setCameraError('');
+    scanLockRef.current = false;
+    Quagga.init({
+      inputStream: { type: 'LiveStream', target: cameraRef.current, constraints: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } },
+      decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader', 'ean_8_reader', 'i2of5_reader'], multiple: false },
+      locate: true, frequency: 10,
+    }, (err: any) => {
+      if (err) { setCameraError('Camera not available'); return; }
+      Quagga.start();
+    });
+    Quagga.onDetected((result: any) => {
+      const code = result?.codeResult?.code;
+      if (code && !scanLockRef.current) {
+        scanLockRef.current = true;
+        if (navigator.vibrate) navigator.vibrate(100);
+        setAwbInput(code);
+        // Auto-submit the scan
+        Quagga.stop();
+        setCameraOpen(false);
+        // Trigger scan via a small delay to let state update
+        setTimeout(() => {
+          const fakeInput = code.trim();
+          if (fakeInput) {
+            submitAwb(fakeInput);
+          }
+        }, 100);
+      }
+    });
+  }, []);
+
+  const stopCamera = useCallback(() => {
+    try { Quagga.stop(); Quagga.offDetected(); } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (cameraOpen) {
+      setTimeout(() => startCamera(), 100);
+    }
+    return () => { stopCamera(); };
+  }, [cameraOpen, startCamera, stopCamera]);
 
   // Flash animation clear
   useEffect(() => {
@@ -93,8 +142,7 @@ export default function PackTime() {
     setRecentScans([]);
   };
 
-  const handleScan = async () => {
-    const awb = awbInput.trim();
+  const submitAwb = async (awb: string) => {
     if (!awb || scanning) return;
 
     setAwbInput('');
@@ -132,6 +180,11 @@ export default function PackTime() {
 
     setScanning(false);
     focusInput();
+  };
+
+  const handleScan = () => {
+    const awb = awbInput.trim();
+    if (awb) submitAwb(awb);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -225,9 +278,31 @@ export default function PackTime() {
         </div>
       </div>
 
+      {/* Camera Scanner */}
+      {cameraOpen && (
+        <div style={{ marginBottom: 14, borderRadius: 12, overflow: 'hidden', border: `1px solid ${T.ac}44`, position: 'relative', background: '#000' }}>
+          <div ref={cameraRef} style={{ width: '100%', aspectRatio: '4/3', position: 'relative' }}>
+            {/* Scan line overlay */}
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 2 }}>
+              <div style={{ width: '75%', height: 50, border: `2px solid ${T.ac}`, borderRadius: 8, position: 'relative' }}>
+                <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', height: 2, background: T.re, boxShadow: `0 0 10px ${T.re}`, animation: 'scanLine 2s ease-in-out infinite' }} />
+              </div>
+            </div>
+          </div>
+          {cameraError && <div style={{ padding: 12, textAlign: 'center', fontSize: 12, color: T.yl }}>{cameraError}</div>}
+          <div onClick={() => { stopCamera(); setCameraOpen(false); }} style={{ position: 'absolute', top: 8, right: 8, zIndex: 3, width: 28, height: 28, borderRadius: 7, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', fontSize: 14 }}>✕</div>
+        </div>
+      )}
+
       {/* AWB Input */}
       <div style={{ marginBottom: 14, position: 'relative' }}>
-        <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Scan AWB Barcode</label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <label style={{ fontSize: 10, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Scan AWB Barcode</label>
+          <div onClick={() => { if (cameraOpen) { stopCamera(); setCameraOpen(false); } else { setCameraOpen(true); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 5, background: cameraOpen ? 'rgba(239,68,68,.10)' : 'rgba(99,102,241,.08)', border: `1px solid ${cameraOpen ? 'rgba(239,68,68,.2)' : 'rgba(99,102,241,.15)'}`, color: cameraOpen ? T.re : T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer', transition: 'all .15s' }}>
+            <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" /></svg>
+            {cameraOpen ? 'Close Camera' : 'Open Camera'}
+          </div>
+        </div>
         <div style={{ position: 'relative' }}>
           <input
             ref={inputRef}
