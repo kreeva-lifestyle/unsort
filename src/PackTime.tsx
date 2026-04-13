@@ -146,9 +146,12 @@ export default function PackTime() {
   // ── Submit scan ─────────────────────────────────────────────────────────────
   const submitAwb = async (awb: string) => {
     if (!awb || scanning) return;
+    // Get sheet name directly from couriers array (don't rely on state timing)
+    const sheet = couriers.find(x => x.name === courier)?.sheet_name || courierSheet;
+    if (!sheet) { setServerError('No sheet configured for ' + courier); return; }
     setAwbInput(''); setScanning(true); setServerError('');
     try {
-      const data = await callEdge({ action: 'scan', awb, sheetName: courierSheet, cameraNumber: camera });
+      const data = await callEdge({ action: 'scan', awb, sheetName: sheet, cameraNumber: camera });
       if (data.error) {
         setServerError(data.error); beepErr(); setFlash('error');
       } else if (data.duplicate) {
