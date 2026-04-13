@@ -9,6 +9,7 @@ const supabase = createClient(
 );
 
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
+const UC_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/unicommerce';
 
 const T = {
   bg: '#060810',
@@ -107,6 +108,9 @@ export default function PackTime() {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loadingConfig, setLoadingConfig] = useState(true);
 
+  // Unicommerce order stats
+  const [ucStats, setUcStats] = useState<{ total: number; pending: number; processing: number; dispatched: number } | null>(null);
+
   // Setup
   const [courier, setCourier] = useState('');
   const [courierSheet, setCourierSheet] = useState('');
@@ -153,6 +157,9 @@ export default function PackTime() {
       setCouriers(c || []);
       setCameras(cam || []);
       setLoadingConfig(false);
+      // Fetch Unicommerce stats (non-blocking)
+      fetch(UC_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+        .then(r => r.json()).then(d => { if (d.ok) setUcStats(d.today); }).catch(() => {});
     })();
   }, []);
 
@@ -388,6 +395,23 @@ export default function PackTime() {
         <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Pack Time</span>
         <span style={{ fontSize: 10, color: T.tx3 }}>Forward Scan Station</span>
       </div>
+
+      {/* Unicommerce Order Stats */}
+      {ucStats && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
+          {[
+            { label: 'Total', value: ucStats.total, color: T.ac2 },
+            { label: 'Pending', value: ucStats.pending, color: T.yl },
+            { label: 'Processing', value: ucStats.processing, color: '#38BDF8' },
+            { label: 'Dispatched', value: ucStats.dispatched, color: T.gr },
+          ].map(s => (
+            <div key={s.label} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '8px 6px', textAlign: 'center' }}>
+              <div style={{ fontSize: 7, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>{s.label}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: s.color, lineHeight: 1 }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{ maxWidth: 420 }}>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16 }}>
