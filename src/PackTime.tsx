@@ -420,7 +420,7 @@ export default function PackTime() {
             </div>
           </div>
           {cameraError && <div style={{ padding: 10, textAlign: 'center', fontSize: 11, color: T.yl }}>{cameraError}</div>}
-          <div onClick={() => { stopCam(); setCameraOpen(false); }} style={{ position: 'absolute', top: 6, right: 6, zIndex: 3, width: 26, height: 26, borderRadius: 6, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', fontSize: 13 }}>✕</div>
+          <div onClick={() => { stopCam(); setCameraOpen(false); }} style={{ position: 'absolute', top: 8, right: 8, zIndex: 100, width: 32, height: 32, borderRadius: 8, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', fontSize: 16, fontWeight: 700 }}>✕</div>
         </div>
       )}
 
