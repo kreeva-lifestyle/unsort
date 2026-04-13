@@ -1703,7 +1703,7 @@ const MainApp = () => {
     <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
       {/* Mobile bottom nav */}
       <div className="mobile-hamburger" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 102, background: T.s, borderTop: `1px solid ${T.bd}`, padding: '8px 0', paddingBottom: 'max(8px, env(safe-area-inset-bottom))', justifyContent: 'space-around' }}>
-        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Items' }, { id: 'brandtag', icon: 'tag', label: 'Tags' }, { id: 'settings', icon: 'settings', label: 'Settings' }].map(t => (
+        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Items' }, { id: 'brandtag', icon: 'tag', label: 'Tags' }, { id: 'packtime', icon: 'scan', label: 'Pack Time' }].map(t => (
           <div key={t.id} onClick={() => { setTab(t.id); setMobileMenu(false); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: tab === t.id ? T.ac : T.tx3, fontSize: 9, fontWeight: 500 }}>
             <Icon name={t.icon} size={20} /><span>{t.label}</span>
           </div>
