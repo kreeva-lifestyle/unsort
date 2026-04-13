@@ -29,6 +29,8 @@ let audioCtx: AudioContext | null = null;
 function beep(freq: number, dur: number, type: OscillatorType = 'square') {
   try {
     if (!audioCtx) audioCtx = new AudioContext();
+    // iOS Safari suspends AudioContext after inactivity — must resume
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.connect(g); g.connect(audioCtx.destination);
     o.type = type; o.frequency.value = freq; g.gain.value = 0.3;
