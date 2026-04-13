@@ -142,11 +142,18 @@ export default function PackTime() {
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 800); return () => clearTimeout(t); } }, [flash]);
   useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 2500); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
 
-  // ── Camera scanner (html5-qrcode / ZXing — works on iOS + Android) ──────────
+  // ── Camera scanner ──────────────────────────────────────────────────────────
   const submitRef = useRef<(awb: string) => void>(() => {});
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanTimerRef = useRef<number>(0);
   const html5QrRef = useRef<Html5Qrcode | null>(null);
 
   const stopCam = useCallback(() => {
+    cancelAnimationFrame(scanTimerRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
     if (html5QrRef.current) {
       html5QrRef.current.stop().catch(() => {});
       html5QrRef.current.clear();
@@ -157,23 +164,66 @@ export default function PackTime() {
   const startCam = useCallback(() => {
     if (!cameraRef.current) return;
     setCameraError(''); scanLockRef.current = false;
-    const containerId = cameraRef.current.id || 'packtime-scanner';
-    cameraRef.current.id = containerId;
-    cameraRef.current.innerHTML = '';
+    const container = cameraRef.current;
 
+    const onDetect = (code: string) => {
+      if (scanLockRef.current) return;
+      const val = code?.trim();
+      if (!val || val.length < 4) return;
+      scanLockRef.current = true;
+      if (navigator.vibrate) navigator.vibrate(100);
+      stopCam(); setCameraOpen(false);
+      setTimeout(() => submitRef.current(val), 50);
+    };
+
+    // Path 1: Native BarcodeDetector (iOS 17.2+, Chrome 83+)
+    if ('BarcodeDetector' in window) {
+      container.innerHTML = '';
+      const video = document.createElement('video');
+      video.autoplay = true;
+      video.muted = true;
+      video.playsInline = true;
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('webkit-playsinline', 'true');
+      video.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+      container.appendChild(video);
+
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+          streamRef.current = stream;
+          video.srcObject = stream;
+          video.onloadedmetadata = () => {
+            video.play().then(() => {
+              const detector = new (window as any).BarcodeDetector({ formats: ['code_128', 'code_39'] });
+              const loop = async () => {
+                if (scanLockRef.current || !streamRef.current) return;
+                try {
+                  const results = await detector.detect(video);
+                  if (results.length > 0 && results[0].rawValue) {
+                    onDetect(results[0].rawValue);
+                    return;
+                  }
+                } catch {}
+                scanTimerRef.current = requestAnimationFrame(loop);
+              };
+              scanTimerRef.current = requestAnimationFrame(loop);
+            }).catch(() => setCameraError('Cannot play video'));
+          };
+        })
+        .catch(() => setCameraError('Camera not available'));
+      return;
+    }
+
+    // Path 2: html5-qrcode / ZXing fallback (older browsers)
+    const containerId = 'packtime-scanner';
+    container.id = containerId;
+    container.innerHTML = '';
     const scanner = new Html5Qrcode(containerId);
     html5QrRef.current = scanner;
-
     scanner.start(
       { facingMode: 'environment' },
-      { fps: 15, qrbox: { width: 280, height: 100 }, aspectRatio: 1.333, disableFlip: false },
-      (code: string) => {
-        if (scanLockRef.current || !code || code.trim().length < 4) return;
-        scanLockRef.current = true;
-        if (navigator.vibrate) navigator.vibrate(100);
-        stopCam(); setCameraOpen(false);
-        setTimeout(() => submitRef.current(code.trim()), 50);
-      },
+      { fps: 10, qrbox: { width: 280, height: 100 }, aspectRatio: 1.333 },
+      (code: string) => onDetect(code),
       () => {},
     ).catch(() => setCameraError('Camera not available'));
   }, [stopCam]);
