@@ -26,11 +26,23 @@ interface ScanEntry { awb: string; time: string; success: boolean; pending?: boo
 
 // ── Beep ────────────────────────────────────────────────────────────────────────
 let audioCtx: AudioContext | null = null;
+
+// iOS Safari: AudioContext must be created/resumed from a user gesture.
+// resume() is async — by the time beep() plays, context may still be suspended.
+// Fix: warm it up on every touch so it's always "running" when beep() fires.
+if (typeof window !== 'undefined') {
+  const warmAudio = () => {
+    if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  };
+  document.addEventListener('touchstart', warmAudio, { passive: true });
+  document.addEventListener('click', warmAudio);
+}
+
 function beep(freq: number, dur: number, type: OscillatorType = 'square') {
   try {
-    if (!audioCtx) audioCtx = new AudioContext();
-    // iOS Safari suspends AudioContext after inactivity — must resume
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (audioCtx.state !== 'running') audioCtx.resume();
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.connect(g); g.connect(audioCtx.destination);
     o.type = type; o.frequency.value = freq; g.gain.value = 0.3;
