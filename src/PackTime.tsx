@@ -147,22 +147,31 @@ export default function PackTime() {
 
   // ── Camera scanner ──────────────────────────────────────────────────────────
   const submitRef = useRef<(awb: string) => void>(() => {});
+  const consecutiveRef = useRef<{ code: string; count: number }>({ code: '', count: 0 });
   const startCam = useCallback(() => {
     if (!cameraRef.current) return;
     setCameraError(''); scanLockRef.current = false;
+    consecutiveRef.current = { code: '', count: 0 };
     Quagga.init({
       inputStream: { type: 'LiveStream', target: cameraRef.current, constraints: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } },
-      decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader', 'ean_8_reader', 'i2of5_reader'], multiple: false },
+      decoder: { readers: ['code_128_reader', 'code_39_reader'], multiple: false },
       locate: true, frequency: 10,
     }, (err: any) => { if (err) setCameraError('Camera not available'); else Quagga.start(); });
     Quagga.onDetected((result: any) => {
       const code = result?.codeResult?.code;
-      if (code && !scanLockRef.current) {
-        scanLockRef.current = true;
-        if (navigator.vibrate) navigator.vibrate(100);
-        Quagga.stop(); setCameraOpen(false);
-        setTimeout(() => submitRef.current(code.trim()), 50);
+      const errors = result?.codeResult?.decodedCodes?.filter((d: any) => d.error != null).map((d: any) => d.error) || [];
+      const avgError = errors.length > 0 ? errors.reduce((a: number, b: number) => a + b, 0) / errors.length : 1;
+      if (!code || scanLockRef.current || avgError > 0.2) return;
+      if (consecutiveRef.current.code === code) {
+        consecutiveRef.current.count++;
+      } else {
+        consecutiveRef.current = { code, count: 1 };
       }
+      if (consecutiveRef.current.count < 3) return;
+      scanLockRef.current = true;
+      if (navigator.vibrate) navigator.vibrate(100);
+      Quagga.stop(); setCameraOpen(false);
+      setTimeout(() => submitRef.current(code.trim()), 50);
     });
   }, []);
   const stopCam = useCallback(() => { try { Quagga.stop(); Quagga.offDetected(); } catch {} }, []);
