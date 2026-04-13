@@ -159,7 +159,7 @@ export default function PackTime() {
       setLoadingConfig(false);
       // Fetch Unicommerce stats (non-blocking)
       fetch(UC_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-        .then(r => r.json()).then(d => { if (d.ok) setUcStats(d.today); }).catch(() => {});
+        .then(r => r.json()).then(d => { if (d.ok) setUcStats(d.today); else console.log('UC error:', d.error); }).catch(() => {});
     })();
   }, []);
 
