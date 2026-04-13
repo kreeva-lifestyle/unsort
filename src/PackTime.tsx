@@ -117,6 +117,8 @@ export default function PackTime() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [sheetTotal, setSheetTotal] = useState(0);
+  const [todaySummaryOpen, setTodaySummaryOpen] = useState(false);
+  const [todaySummary, setTodaySummary] = useState<{ courier: string; count: number }[]>([]);
 
   // Local duplicate tracking (loaded from server on init, updated on each scan)
   const awbSetRef = useRef<Set<string>>(new Set());
@@ -318,6 +320,40 @@ export default function PackTime() {
     focusInput();
   }, [lastScanned, focusInput]);
 
+  // ── Delete a specific scan from recent list ─────────────────────────────────
+  const deleteScan = useCallback((awb: string) => {
+    awbSetRef.current.delete(awb.toUpperCase());
+    setRecentScans(p => p.filter(s => s.awb !== awb));
+    const wasSuccess = recentScans.find(s => s.awb === awb)?.success;
+    if (wasSuccess) {
+      setSessionCount(p => Math.max(0, p - 1));
+      setSheetTotal(p => Math.max(0, p - 1));
+      rowCountRef.current = Math.max(0, rowCountRef.current - 1);
+    }
+    if (lastScanned === awb) setLastScanned('');
+    beep(500, 0.1);
+  }, [recentScans, lastScanned]);
+
+  // ── Fetch today's summary across all couriers ──────────────────────────────
+  const fetchTodaySummary = useCallback(async () => {
+    const results: { courier: string; count: number }[] = [];
+    for (const c of couriers) {
+      try {
+        const resp = await fetch(EDGE_FN, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'init', sheetName: c.sheet_name }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          // Count AWBs from today only (awbs are already filtered to 7 days by server)
+          results.push({ courier: c.name, count: data.totalRows || 0 });
+        }
+      } catch {}
+    }
+    setTodaySummary(results);
+  }, [couriers]);
+
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
 
   // ── Loading ─────────────────────────────────────────────────────────────────
@@ -442,7 +478,7 @@ export default function PackTime() {
         </div>
       )}
 
-      {/* Counter + Sheet Total */}
+      {/* Counter + Today Total */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         <div style={{ flex: 1, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
           <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Session</div>
@@ -452,7 +488,36 @@ export default function PackTime() {
           <div style={{ fontSize: 8, color: T.ac2, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Sheet Total</div>
           <div style={{ fontSize: 28, fontWeight: 800, fontFamily: T.sora, color: T.ac2, lineHeight: 1 }}>{sheetTotal}</div>
         </div>
+        <div onClick={() => { setTodaySummaryOpen(true); fetchTodaySummary(); }} style={{ flex: 1, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.12)', borderRadius: 10, padding: '10px 12px', textAlign: 'center', cursor: 'pointer' }}>
+          <div style={{ fontSize: 8, color: T.yl, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Today</div>
+          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.yl, lineHeight: 1 }}>
+            <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.yl, strokeWidth: 2, verticalAlign: 'middle' }}><path d="M3 12h18M3 6h18M3 18h18" /></svg>
+          </div>
+        </div>
       </div>
+
+      {/* Today Summary Modal */}
+      {todaySummaryOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={() => setTodaySummaryOpen(false)}>
+          <div className="modal-inner" onClick={e => e.stopPropagation()} style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '18px 16px', maxWidth: 340, width: '100%' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 12, textAlign: 'center' }}>Today's Summary</div>
+            {todaySummary.length === 0 && <div style={{ textAlign: 'center', color: T.tx3, fontSize: 11, padding: 16 }}>Loading...</div>}
+            {todaySummary.map((s, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: `1px solid ${T.bd}` }}>
+                <span style={{ fontSize: 12, color: T.tx, fontWeight: 500 }}>{s.courier}</span>
+                <span style={{ fontSize: 14, fontFamily: T.mono, color: T.ac2, fontWeight: 700 }}>{s.count}</span>
+              </div>
+            ))}
+            {todaySummary.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '0 0 8px 8px' }}>
+                <span style={{ fontSize: 12, color: T.tx, fontWeight: 700, fontFamily: T.sora }}>Total</span>
+                <span style={{ fontSize: 18, fontFamily: T.mono, color: T.gr, fontWeight: 800 }}>{todaySummary.reduce((a, s) => a + s.count, 0)}</span>
+              </div>
+            )}
+            <button onClick={() => setTodaySummaryOpen(false)} style={{ width: '100%', marginTop: 12, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Close</button>
+          </div>
+        </div>
+      )}
 
       {/* Last Scanned + Undo */}
       {lastScanned && (
@@ -476,7 +541,9 @@ export default function PackTime() {
             </div>
           </div>
           {cameraError && <div style={{ padding: 10, textAlign: 'center', fontSize: 11, color: T.yl }}>{cameraError}</div>}
-          <button type="button" onTouchEnd={(e) => { e.preventDefault(); try { const track = streamRef.current?.getVideoTracks()[0]; if (track) { const caps = track.getCapabilities?.() as any; if (caps?.torch) track.applyConstraints({ advanced: [{ torch: !(track.getSettings?.() as any)?.torch } as any] }); } } catch {} }} onClick={() => {}} style={{ position: 'absolute', top: 8, left: 8, zIndex: 100, width: 36, height: 36, borderRadius: 8, background: 'rgba(0,0,0,.8)', border: '1px solid rgba(255,255,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#FFD700', fontSize: 16, WebkitTapHighlightColor: 'transparent' }}>🔦</button>
+          <button type="button" onTouchEnd={(e) => { e.preventDefault(); try { const track = streamRef.current?.getVideoTracks()[0]; if (track) { const caps = track.getCapabilities?.() as any; if (caps?.torch) track.applyConstraints({ advanced: [{ torch: !(track.getSettings?.() as any)?.torch } as any] }); } } catch {} }} onClick={() => {}} style={{ position: 'absolute', top: 8, left: 8, zIndex: 100, width: 36, height: 36, borderRadius: 8, background: 'rgba(0,0,0,.8)', border: '1px solid rgba(255,255,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+            <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: T.yl, strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M9 18h6M10 22h4M12 2v1M4.22 4.22l.71.71M1 12h1M21 12h1M18.36 4.22l-.71.71" /><path d="M16 8a4 4 0 10-8 0c0 2 1.5 3.5 2 5h4c.5-1.5 2-3 2-5z" /></svg>
+          </button>
           <button type="button" onTouchEnd={(e) => { e.preventDefault(); stopCam(); setCameraOpen(false); }} onClick={() => { stopCam(); setCameraOpen(false); }} style={{ position: 'absolute', top: 8, right: 8, zIndex: 100, width: 36, height: 36, borderRadius: 8, background: 'rgba(0,0,0,.8)', border: '1px solid rgba(255,255,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', fontSize: 18, fontWeight: 700, WebkitTapHighlightColor: 'transparent' }}>✕</button>
         </div>
       )}
@@ -502,6 +569,7 @@ export default function PackTime() {
             <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M5 12h14M12 5l7 7-7 7" /></svg>
           </button>
         </div>
+        <div style={{ marginTop: 4, fontSize: 9, color: T.tx3, letterSpacing: 0.3 }}>Scan barcode with camera or type AWB and press Enter</div>
       </div>
 
       {/* Recent Scans */}
@@ -513,14 +581,17 @@ export default function PackTime() {
         <div style={{ maxHeight: 280, overflowY: 'auto' }}>
           {recentScans.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans yet. Start scanning AWB barcodes.</div>}
           {recentScans.map((s, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .15s ease' : undefined }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: s.success ? T.gr : T.re, flexShrink: 0, boxShadow: `0 0 5px ${s.success ? T.gr : T.re}55`, opacity: s.pending ? 0.5 : 1 }} />
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .15s ease' : undefined }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: s.success ? T.gr : T.re, flexShrink: 0, boxShadow: `0 0 5px ${s.success ? T.gr : T.re}55`, opacity: s.pending ? 0.5 : 1 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontFamily: T.mono, color: T.tx, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.awb}</div>
+                <div style={{ fontSize: 11, fontFamily: T.mono, color: T.tx, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.awb}</div>
               </div>
-              <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, flexShrink: 0 }}>{s.time}</div>
-              {!s.success && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 600 }}>DUP</span>}
-              {s.success && s.pending && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(245,158,11,.10)', color: T.yl, fontWeight: 600 }}>SYNC</span>}
+              <div style={{ fontSize: 8, color: T.tx3, fontFamily: T.mono, flexShrink: 0 }}>{s.time}</div>
+              {!s.success && <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 600 }}>DUP</span>}
+              {s.success && s.pending && <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: 'rgba(245,158,11,.10)', color: T.yl, fontWeight: 600 }}>SYNC</span>}
+              {s.success && !s.pending && <button type="button" onClick={(e) => { e.stopPropagation(); deleteScan(s.awb); }} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', opacity: 0.4 }}>
+                <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.tx3, strokeWidth: 2 }}><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>}
             </div>
           ))}
         </div>
