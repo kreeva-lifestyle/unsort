@@ -18,7 +18,9 @@ const T = {
 const COURIERS = ['XpressBees', 'Shadow Fax', 'Delhivery', 'Ecom Express', 'Amazon', 'Mirraw'];
 const CAMERAS = ['1', '2', '3', '4'];
 
-const API_BASE = (import.meta as any).env.DEV ? 'http://localhost:3001' : '';
+// In dev: Vite proxy forwards /api -> localhost:3001
+// In prod: Express server serves both frontend + API on same origin
+const API_BASE = '';
 
 interface ScanEntry {
   awb: string;
