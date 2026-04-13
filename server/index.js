@@ -2,7 +2,12 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { google } from 'googleapis';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 app.use(cors());
@@ -73,7 +78,22 @@ app.post('/api/verify-sheet', async (req, res) => {
         });
       }
     } catch (err) {
-      return res.json({ ok: false, error: 'Cannot connect to Google Sheets. Check credentials and spreadsheet ID.' });
+      const msg = err.message || '';
+      if (err.status === 403 || msg.includes('403') || msg.includes('permission')) {
+        return res.json({
+          ok: false,
+          error: 'Permission denied (403). The spreadsheet has not been shared with the service account.',
+          details: `Share the spreadsheet with: packtime-bot@packtime-493208.iam.gserviceaccount.com (Editor access). Open the spreadsheet → Share → paste this email → give Editor role.`,
+        });
+      }
+      if (err.status === 404 || msg.includes('404') || msg.includes('not found')) {
+        return res.json({
+          ok: false,
+          error: 'Spreadsheet not found (404). Check the SPREADSHEET_ID in .env file.',
+          details: `Current ID: ${SPREADSHEET_ID}`,
+        });
+      }
+      return res.json({ ok: false, error: 'Cannot connect to Google Sheets: ' + (msg || 'Unknown error') });
     }
 
     // Check columns structure — read first few rows
@@ -245,6 +265,14 @@ app.get('/api/session-stats', async (req, res) => {
 // ── Health ───────────────────────────────────────────────────────────────────────
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 
-app.listen(PORT, () => {
-  console.log(`Pack Time server running on port ${PORT}`);
+// ── Serve frontend (production) ─────────────────────────────────────────────────
+const distPath = join(__dirname, '..', 'dist');
+if (existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (_, res) => res.sendFile(join(distPath, 'index.html')));
+  console.log('✓ Serving frontend from dist/');
+}
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Pack Time server running on http://localhost:${PORT}`);
 });
