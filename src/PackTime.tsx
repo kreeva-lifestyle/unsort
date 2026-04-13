@@ -259,6 +259,7 @@ export default function PackTime() {
     // Instant local duplicate check
     if (awbSetRef.current.has(key)) {
       setDuplicateAwb(trimmed); beepErr(); setFlash('error');
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
       setRecentScans(p => [{ awb: trimmed, time: new Date().toLocaleTimeString('en-IN'), success: false }, ...p].slice(0, 30));
       focusInput();
       return;
@@ -266,6 +267,7 @@ export default function PackTime() {
 
     // SUCCESS — instant feedback
     beepOk(); setFlash('success');
+    if (navigator.vibrate) navigator.vibrate(100);
     awbSetRef.current.add(key);
     rowCountRef.current++;
     const count = rowCountRef.current;
