@@ -145,33 +145,36 @@ export default function PackTime() {
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 800); return () => clearTimeout(t); } }, [flash]);
   useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 2500); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
 
-  // ── Camera scanner ──────────────────────────────────────────────────────────
+  // ── Camera scanner (with 2-read consistency check) ─────────────────────────
   const submitRef = useRef<(awb: string) => void>(() => {});
-  const consecutiveRef = useRef<{ code: string; count: number }>({ code: '', count: 0 });
+  const lastReadRef = useRef<{ code: string; count: number }>({ code: '', count: 0 });
+
   const startCam = useCallback(() => {
     if (!cameraRef.current) return;
     setCameraError(''); scanLockRef.current = false;
-    consecutiveRef.current = { code: '', count: 0 };
+    lastReadRef.current = { code: '', count: 0 };
     Quagga.init({
       inputStream: { type: 'LiveStream', target: cameraRef.current, constraints: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } },
       decoder: { readers: ['code_128_reader', 'code_39_reader'], multiple: false },
       locate: true, frequency: 10,
     }, (err: any) => { if (err) setCameraError('Camera not available'); else Quagga.start(); });
     Quagga.onDetected((result: any) => {
-      const code = result?.codeResult?.code;
-      const errors = result?.codeResult?.decodedCodes?.filter((d: any) => d.error != null).map((d: any) => d.error) || [];
-      const avgError = errors.length > 0 ? errors.reduce((a: number, b: number) => a + b, 0) / errors.length : 1;
-      if (!code || scanLockRef.current || avgError > 0.2) return;
-      if (consecutiveRef.current.code === code) {
-        consecutiveRef.current.count++;
+      if (scanLockRef.current) return;
+      const code = result?.codeResult?.code?.trim();
+      if (!code || code.length < 4) return;
+
+      // Require 2 consistent reads of the same value to avoid misreads
+      if (lastReadRef.current.code === code) {
+        lastReadRef.current.count++;
       } else {
-        consecutiveRef.current = { code, count: 1 };
+        lastReadRef.current = { code, count: 1 };
       }
-      if (consecutiveRef.current.count < 3) return;
+      if (lastReadRef.current.count < 2) return;
+
       scanLockRef.current = true;
       if (navigator.vibrate) navigator.vibrate(100);
       Quagga.stop(); setCameraOpen(false);
-      setTimeout(() => submitRef.current(code.trim()), 50);
+      setTimeout(() => submitRef.current(code), 50);
     });
   }, []);
   const stopCam = useCallback(() => { try { Quagga.stop(); Quagga.offDetected(); } catch {} }, []);
