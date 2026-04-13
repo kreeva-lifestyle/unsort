@@ -9,7 +9,6 @@ const supabase = createClient(
 );
 
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
-const UC_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/unicommerce';
 
 const T = {
   bg: '#060810',
@@ -108,22 +107,6 @@ export default function PackTime() {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loadingConfig, setLoadingConfig] = useState(true);
 
-  // Unicommerce order stats
-  const [ucStats, setUcStats] = useState<{ total: number; pending: number; processing: number; dispatched: number } | null>(null);
-  const [ucUpdated, setUcUpdated] = useState('');
-  const [ucLoading, setUcLoading] = useState(false);
-
-  const fetchUcStats = useCallback(() => {
-    setUcLoading(true);
-    fetch(UC_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-      .then(r => r.json()).then(d => {
-        if (d.ok) {
-          setUcStats(d.today);
-          setUcUpdated(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
-        } else console.log('UC error:', d.error);
-      }).catch(() => {}).finally(() => setUcLoading(false));
-  }, []);
-
   // Setup
   const [courier, setCourier] = useState('');
   const [courierSheet, setCourierSheet] = useState('');
@@ -170,7 +153,6 @@ export default function PackTime() {
       setCouriers(c || []);
       setCameras(cam || []);
       setLoadingConfig(false);
-      fetchUcStats();
     })();
   }, []);
 
@@ -408,29 +390,6 @@ export default function PackTime() {
       </div>
 
       {/* Unicommerce Order Stats */}
-      {ucStats && <>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-          {[
-            { label: 'Total', value: ucStats.total, color: T.ac2 },
-            { label: 'Pending', value: ucStats.pending, color: T.yl },
-            { label: 'Processing', value: ucStats.processing, color: '#38BDF8' },
-            { label: 'Dispatched', value: ucStats.dispatched, color: T.gr },
-          ].map(s => (
-            <div key={s.label} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '8px 6px', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>{s.label}</div>
-              <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: s.color, lineHeight: 1 }}>{s.value}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, marginBottom: 14 }}>
-          <span style={{ fontSize: 9, color: T.tx3 }}>{ucUpdated ? `Updated ${ucUpdated}` : ''}</span>
-          <button type="button" onClick={fetchUcStats} disabled={ucLoading} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>
-            <svg viewBox="0 0 24 24" style={{ width: 10, height: 10, fill: 'none', stroke: 'currentColor', strokeWidth: 2, animation: ucLoading ? 'btnSpin .6s linear infinite' : 'none' }}><path d="M23 4v6h-6M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" /></svg>
-            Refresh
-          </button>
-        </div>
-      </>}
-
       <div style={{ maxWidth: 420 }}>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16 }}>
           {/* Courier */}
