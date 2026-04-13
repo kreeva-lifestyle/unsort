@@ -426,10 +426,10 @@ export default function PackTime() {
           <label style={{ fontSize: 10, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Scan AWB Barcode</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {pendingWrites > 0 && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.18)', color: T.yl, fontWeight: 600 }}>Syncing {pendingWrites}</span>}
-            <div onClick={() => { if (cameraOpen) { stopCam(); setCameraOpen(false); } else setCameraOpen(true); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 4, background: cameraOpen ? 'rgba(239,68,68,.08)' : 'rgba(99,102,241,.08)', border: `1px solid ${cameraOpen ? 'rgba(239,68,68,.15)' : 'rgba(99,102,241,.12)'}`, color: cameraOpen ? T.re : T.ac2, fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>
+            {!cameraOpen && <div onClick={() => setCameraOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 4, background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.12)', color: T.ac2, fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>
               <svg viewBox="0 0 24 24" style={{ width: 11, height: 11, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" /></svg>
-              {cameraOpen ? 'Close' : 'Camera'}
-            </div>
+              Camera
+            </div>}
           </div>
         </div>
         <div style={{ position: 'relative' }}>
