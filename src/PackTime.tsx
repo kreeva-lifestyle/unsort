@@ -17,7 +17,7 @@ const T = {
 const COURIERS = ['XpressBees', 'Shadow Fax', 'Delhivery', 'Ecom Express', 'Amazon', 'Mirraw'];
 const CAMERAS = ['1', '2', '3', '4'];
 
-const API_BASE = import.meta.env.DEV ? 'http://localhost:3001' : '';
+const API_BASE = (import.meta as any).env.DEV ? 'http://localhost:3001' : '';
 
 interface ScanEntry {
   awb: string;
@@ -143,7 +143,6 @@ export default function PackTime() {
 
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
-  const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
   // ── Setup Screen ──────────────────────────────────────────────────────────────
   if (!started) {
