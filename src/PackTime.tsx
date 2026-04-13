@@ -221,10 +221,13 @@ export default function PackTime() {
             </div>
           )}
           {verifyResult && verifyResult.ok && verifyResult.columnsOk === false && (
-            <div style={{ marginTop: 12, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.18)', borderRadius: 8, padding: 12, animation: 'fi .2s ease' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: T.yl, marginBottom: 4 }}>Column Mismatch</div>
-              <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5 }}>{verifyResult.columnsInfo}</div>
-              <button onClick={() => { setStarted(true); setSessionCount(0); setRecentScans([]); setVerifyResult(null); }} style={{ marginTop: 8, padding: '8px 0', width: '100%', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}cc, ${T.yl}88)`, color: '#000', cursor: 'pointer' }}>Proceed Anyway</button>
+            <div style={{ marginTop: 12, background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.18)', borderRadius: 8, padding: 12, animation: 'fi .2s ease' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: T.re, marginBottom: 4 }}>Column Mismatch</div>
+              <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.6, marginBottom: 6 }}>{verifyResult.columnsInfo}</div>
+              <div style={{ fontSize: 10, color: T.tx3, lineHeight: 1.6, background: 'rgba(0,0,0,.2)', borderRadius: 6, padding: '8px 10px' }}>
+                Please fix the sheet columns before scanning. Expected order:<br/>
+                <strong style={{ color: T.tx }}>A:</strong> Count &nbsp; <strong style={{ color: T.tx }}>B:</strong> AWB &nbsp; <strong style={{ color: T.tx }}>C:</strong> Timestamp &nbsp; <strong style={{ color: T.tx }}>D:</strong> Camera Number
+              </div>
             </div>
           )}
         </div>
