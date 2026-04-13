@@ -1,6 +1,7 @@
 /* eslint-disable */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const supabase = createClient(
   'https://ulphprdnswznfztawbvg.supabase.co',
@@ -141,63 +142,40 @@ export default function PackTime() {
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 800); return () => clearTimeout(t); } }, [flash]);
   useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 2500); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
 
-  // ── Camera scanner (native BarcodeDetector API) ─────────────────────────────
+  // ── Camera scanner (html5-qrcode / ZXing — works on iOS + Android) ──────────
   const submitRef = useRef<(awb: string) => void>(() => {});
-  const streamRef = useRef<MediaStream | null>(null);
-  const scanTimerRef = useRef<number>(0);
+  const html5QrRef = useRef<Html5Qrcode | null>(null);
 
   const stopCam = useCallback(() => {
-    cancelAnimationFrame(scanTimerRef.current);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
+    if (html5QrRef.current) {
+      html5QrRef.current.stop().catch(() => {});
+      html5QrRef.current.clear();
+      html5QrRef.current = null;
     }
   }, []);
 
   const startCam = useCallback(() => {
     if (!cameraRef.current) return;
     setCameraError(''); scanLockRef.current = false;
-
-    // Use native BarcodeDetector API (Chrome/Android) — only reliable way to read Code 128
-    if (typeof (window as any).BarcodeDetector === 'undefined') {
-      setCameraError('Camera scanning not supported on this browser. Use a barcode scanner gun or type the AWB manually.');
-      return;
-    }
-
-    const detector = new (window as any).BarcodeDetector({ formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'itf'] });
-    const video = document.createElement('video');
-    video.setAttribute('playsinline', 'true');
-    video.style.width = '100%';
-    video.style.height = '100%';
-    video.style.objectFit = 'cover';
+    const containerId = cameraRef.current.id || 'packtime-scanner';
+    cameraRef.current.id = containerId;
     cameraRef.current.innerHTML = '';
-    cameraRef.current.appendChild(video);
 
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } })
-      .then(stream => {
-        streamRef.current = stream;
-        video.srcObject = stream;
-        video.play();
-        const scan = async () => {
-          if (scanLockRef.current || !streamRef.current) return;
-          try {
-            const barcodes = await detector.detect(video);
-            if (barcodes.length > 0) {
-              const code = barcodes[0].rawValue?.trim();
-              if (code && code.length >= 4 && !scanLockRef.current) {
-                scanLockRef.current = true;
-                if (navigator.vibrate) navigator.vibrate(100);
-                stopCam(); setCameraOpen(false);
-                setTimeout(() => submitRef.current(code), 50);
-                return;
-              }
-            }
-          } catch {}
-          scanTimerRef.current = requestAnimationFrame(scan);
-        };
-        video.onloadedmetadata = () => { scanTimerRef.current = requestAnimationFrame(scan); };
-      })
-      .catch(() => setCameraError('Camera not available'));
+    const scanner = new Html5Qrcode(containerId);
+    html5QrRef.current = scanner;
+
+    scanner.start(
+      { facingMode: 'environment' },
+      { fps: 15, qrbox: { width: 280, height: 100 }, aspectRatio: 1.333, disableFlip: false },
+      (code: string) => {
+        if (scanLockRef.current || !code || code.trim().length < 4) return;
+        scanLockRef.current = true;
+        if (navigator.vibrate) navigator.vibrate(100);
+        stopCam(); setCameraOpen(false);
+        setTimeout(() => submitRef.current(code.trim()), 50);
+      },
+      () => {},
+    ).catch(() => setCameraError('Camera not available'));
   }, [stopCam]);
 
   useEffect(() => { if (cameraOpen) setTimeout(() => startCam(), 100); return () => stopCam(); }, [cameraOpen, startCam, stopCam]);
