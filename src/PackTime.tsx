@@ -178,14 +178,14 @@ export default function PackTime() {
 
   // ── Setup Screen ────────────────────────────────────────────────────────────
   if (!started) return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '20px 16px', minHeight: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 400 }}>
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontSize: 26, fontWeight: 800, fontFamily: T.sora, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: 3 }}>Pack Time</div>
-          <div style={{ fontSize: 10, color: T.tx3, letterSpacing: 2, textTransform: 'uppercase' }}>Forward Scan Station</div>
-        </div>
+    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Pack Time</span>
+        <span style={{ fontSize: 10, color: T.tx3 }}>Forward Scan Station</span>
+      </div>
 
-        <div style={{ background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(24px)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 20, boxShadow: '0 8px 32px rgba(0,0,0,.3)' }}>
+      <div style={{ maxWidth: 420 }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16 }}>
           {/* Courier */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5 }}>Courier Company</label>
