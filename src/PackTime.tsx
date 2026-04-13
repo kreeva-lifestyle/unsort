@@ -201,8 +201,12 @@ export default function PackTime() {
                 if (code && code.length >= 4 && !scanLockRef.current) {
                   scanLockRef.current = true;
                   if (navigator.vibrate) navigator.vibrate(100);
-                  stopCam(); setCameraOpen(false);
                   setTimeout(() => submitRef.current(code), 50);
+                  // Resume scanning after 1.5s (camera stays open)
+                  setTimeout(() => {
+                    scanLockRef.current = false;
+                    if (streamRef.current) scanTimerRef.current = requestAnimationFrame(loop);
+                  }, 1500);
                   return;
                 }
               }
@@ -408,7 +412,7 @@ export default function PackTime() {
             </div>
           </div>
           {cameraError && <div style={{ padding: 10, textAlign: 'center', fontSize: 11, color: T.yl }}>{cameraError}</div>}
-          <div onClick={() => { stopCam(); setCameraOpen(false); }} style={{ position: 'absolute', top: 8, right: 8, zIndex: 100, width: 32, height: 32, borderRadius: 8, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', fontSize: 16, fontWeight: 700 }}>✕</div>
+          <button type="button" onTouchEnd={(e) => { e.preventDefault(); stopCam(); setCameraOpen(false); }} onClick={() => { stopCam(); setCameraOpen(false); }} style={{ position: 'absolute', top: 8, right: 8, zIndex: 100, width: 36, height: 36, borderRadius: 8, background: 'rgba(0,0,0,.8)', border: '1px solid rgba(255,255,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', fontSize: 18, fontWeight: 700, WebkitTapHighlightColor: 'transparent' }}>✕</button>
         </div>
       )}
 
