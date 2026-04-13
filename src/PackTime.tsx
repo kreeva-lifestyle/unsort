@@ -1,7 +1,6 @@
 /* eslint-disable */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import Quagga from '@ericblade/quagga2';
 
 const supabase = createClient(
   'https://ulphprdnswznfztawbvg.supabase.co',
@@ -142,7 +141,7 @@ export default function PackTime() {
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 800); return () => clearTimeout(t); } }, [flash]);
   useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 2500); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
 
-  // ── Camera scanner (BarcodeDetector API with Quagga fallback) ───────────────
+  // ── Camera scanner (native BarcodeDetector API) ─────────────────────────────
   const submitRef = useRef<(awb: string) => void>(() => {});
   const streamRef = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<number>(0);
@@ -153,68 +152,52 @@ export default function PackTime() {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
-    try { Quagga.stop(); Quagga.offDetected(); } catch {}
   }, []);
 
   const startCam = useCallback(() => {
     if (!cameraRef.current) return;
     setCameraError(''); scanLockRef.current = false;
 
-    // Try native BarcodeDetector (Chrome/Android — fast + accurate)
-    const hasBarcodeAPI = typeof (window as any).BarcodeDetector !== 'undefined';
-    if (hasBarcodeAPI) {
-      const detector = new (window as any).BarcodeDetector({ formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'itf'] });
-      const video = document.createElement('video');
-      video.setAttribute('playsinline', 'true');
-      video.style.width = '100%';
-      video.style.height = '100%';
-      video.style.objectFit = 'cover';
-      cameraRef.current.innerHTML = '';
-      cameraRef.current.appendChild(video);
-
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } })
-        .then(stream => {
-          streamRef.current = stream;
-          video.srcObject = stream;
-          video.play();
-          const scan = async () => {
-            if (scanLockRef.current || !streamRef.current) return;
-            try {
-              const barcodes = await detector.detect(video);
-              if (barcodes.length > 0) {
-                const code = barcodes[0].rawValue?.trim();
-                if (code && code.length >= 4 && !scanLockRef.current) {
-                  scanLockRef.current = true;
-                  if (navigator.vibrate) navigator.vibrate(100);
-                  stopCam(); setCameraOpen(false);
-                  setTimeout(() => submitRef.current(code), 50);
-                  return;
-                }
-              }
-            } catch {}
-            scanTimerRef.current = requestAnimationFrame(scan);
-          };
-          video.onloadedmetadata = () => { scanTimerRef.current = requestAnimationFrame(scan); };
-        })
-        .catch(() => setCameraError('Camera not available'));
+    // Use native BarcodeDetector API (Chrome/Android) — only reliable way to read Code 128
+    if (typeof (window as any).BarcodeDetector === 'undefined') {
+      setCameraError('Camera scanning not supported on this browser. Use a barcode scanner gun or type the AWB manually.');
       return;
     }
 
-    // Fallback: Quagga2
-    Quagga.init({
-      inputStream: { type: 'LiveStream', target: cameraRef.current, constraints: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } },
-      decoder: { readers: ['code_128_reader', 'code_39_reader'], multiple: false },
-      locate: true, frequency: 10,
-    }, (err: any) => { if (err) setCameraError('Camera not available'); else Quagga.start(); });
-    Quagga.onDetected((result: any) => {
-      if (scanLockRef.current) return;
-      const code = result?.codeResult?.code?.trim();
-      if (!code || code.length < 4) return;
-      scanLockRef.current = true;
-      if (navigator.vibrate) navigator.vibrate(100);
-      Quagga.stop(); setCameraOpen(false);
-      setTimeout(() => submitRef.current(code), 50);
-    });
+    const detector = new (window as any).BarcodeDetector({ formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'itf'] });
+    const video = document.createElement('video');
+    video.setAttribute('playsinline', 'true');
+    video.style.width = '100%';
+    video.style.height = '100%';
+    video.style.objectFit = 'cover';
+    cameraRef.current.innerHTML = '';
+    cameraRef.current.appendChild(video);
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } })
+      .then(stream => {
+        streamRef.current = stream;
+        video.srcObject = stream;
+        video.play();
+        const scan = async () => {
+          if (scanLockRef.current || !streamRef.current) return;
+          try {
+            const barcodes = await detector.detect(video);
+            if (barcodes.length > 0) {
+              const code = barcodes[0].rawValue?.trim();
+              if (code && code.length >= 4 && !scanLockRef.current) {
+                scanLockRef.current = true;
+                if (navigator.vibrate) navigator.vibrate(100);
+                stopCam(); setCameraOpen(false);
+                setTimeout(() => submitRef.current(code), 50);
+                return;
+              }
+            }
+          } catch {}
+          scanTimerRef.current = requestAnimationFrame(scan);
+        };
+        video.onloadedmetadata = () => { scanTimerRef.current = requestAnimationFrame(scan); };
+      })
+      .catch(() => setCameraError('Camera not available'));
   }, [stopCam]);
 
   useEffect(() => { if (cameraOpen) setTimeout(() => startCam(), 100); return () => stopCam(); }, [cameraOpen, startCam, stopCam]);
