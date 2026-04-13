@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "cd server && node index.js",
+    "server:dev": "cd server && node --watch index.js"
   },
   "dependencies": {
     "@ericblade/quagga2": "^1.12.1",
