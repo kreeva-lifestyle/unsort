@@ -50,6 +50,83 @@ function todayStr() {
   return `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
 }
 
+// ── POST /api/verify-sheet ───────────────────────────────────────────────────────
+app.post('/api/verify-sheet', async (req, res) => {
+  try {
+    const { courier } = req.body;
+    if (!courier) return res.status(400).json({ ok: false, error: 'Missing courier' });
+
+    const sheetName = COURIER_SHEETS[courier];
+    if (!sheetName) return res.json({ ok: false, error: `No sheet mapping for "${courier}"` });
+
+    // Check if the sheet/tab exists
+    let sheetExists = false;
+    try {
+      const meta = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+      const tabNames = (meta.data.sheets || []).map(s => s.properties?.title);
+      sheetExists = tabNames.includes(sheetName);
+      if (!sheetExists) {
+        return res.json({
+          ok: false,
+          error: `Sheet tab "${sheetName}" not found in spreadsheet`,
+          details: `Expected tab "${sheetName}" for courier "${courier}". Available tabs: ${tabNames.join(', ')}`,
+        });
+      }
+    } catch (err) {
+      return res.json({ ok: false, error: 'Cannot connect to Google Sheets. Check credentials and spreadsheet ID.' });
+    }
+
+    // Check columns structure — read first few rows
+    try {
+      const result = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A1:D2`,
+      });
+      const rows = result.data.values || [];
+      // Sheet is accessible and readable. Check if it has header or data
+      const expectedCols = ['Count', 'AWB', 'Timestamp', 'Camera'];
+      let columnsOk = true;
+      let columnsInfo = '';
+
+      if (rows.length > 0) {
+        const firstRow = rows[0];
+        // Check if first row looks like headers or data
+        const isHeader = firstRow[0] && isNaN(Number(firstRow[0]));
+        if (isHeader) {
+          // Validate header names loosely
+          const headers = firstRow.map(h => (h || '').toString().trim().toLowerCase());
+          const missing = [];
+          if (!headers.some(h => h.includes('count') || h === '#' || h === 'sr' || h === 'no')) missing.push('Count (Col A)');
+          if (!headers.some(h => h.includes('awb') || h.includes('barcode') || h.includes('tracking'))) missing.push('AWB (Col B)');
+          if (!headers.some(h => h.includes('time') || h.includes('date') || h.includes('stamp'))) missing.push('Timestamp (Col C)');
+          if (!headers.some(h => h.includes('cam') || h.includes('camera'))) missing.push('Camera (Col D)');
+          if (missing.length > 0) {
+            columnsOk = false;
+            columnsInfo = `Missing columns: ${missing.join(', ')}. Expected: ${expectedCols.join(', ')}`;
+          }
+        }
+        // If first row is data (starts with a number), columns structure can't be validated from headers but sheet is usable
+      }
+      // Empty sheet is fine — will auto-populate
+
+      const dataRows = rows.length > 0 && isNaN(Number(rows[0][0])) ? rows.length - 1 : rows.length;
+
+      return res.json({
+        ok: true,
+        sheetName,
+        columnsOk,
+        columnsInfo,
+        totalRows: dataRows,
+        expectedColumns: expectedCols,
+      });
+    } catch (err) {
+      return res.json({ ok: false, error: `Cannot read sheet "${sheetName}": ${err.message}` });
+    }
+  } catch (err) {
+    return res.json({ ok: false, error: 'Verification failed: ' + err.message });
+  }
+});
+
 // ── POST /api/scan ──────────────────────────────────────────────────────────────
 app.post('/api/scan', async (req, res) => {
   try {

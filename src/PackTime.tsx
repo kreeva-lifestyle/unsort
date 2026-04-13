@@ -60,6 +60,9 @@ export default function PackTime() {
   const [duplicateAwb, setDuplicateAwb] = useState('');
   const [scanning, setScanning] = useState(false);
   const [serverError, setServerError] = useState('');
+  const [showComplete, setShowComplete] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<{ ok: boolean; error?: string; details?: string; sheetName?: string; columnsOk?: boolean; columnsInfo?: string; totalRows?: number } | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const cameraRef = useRef<HTMLDivElement>(null);
@@ -135,11 +138,39 @@ export default function PackTime() {
     }
   }, [duplicateAwb, focusInput]);
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!courier || !camera) return;
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      const resp = await fetch(`${API_BASE}/api/verify-sheet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ courier }),
+      });
+      const data = await resp.json();
+      setVerifyResult(data);
+      if (data.ok) {
+        // If columns have issues, show warning but still allow start
+        if (!data.columnsOk && data.columnsInfo) {
+          // Don't auto-start, let user decide
+        } else {
+          setStarted(true);
+          setSessionCount(0);
+          setRecentScans([]);
+        }
+      }
+    } catch {
+      setVerifyResult({ ok: false, error: 'Cannot reach Pack Time server. Make sure the server is running (npm run server).' });
+    }
+    setVerifying(false);
+  };
+
+  const proceedAnyway = () => {
     setStarted(true);
     setSessionCount(0);
     setRecentScans([]);
+    setVerifyResult(null);
   };
 
   const submitAwb = async (awb: string) => {
@@ -227,9 +258,47 @@ export default function PackTime() {
               </div>
             </div>
 
-            <button onClick={handleStart} disabled={!courier || !camera} style={{ width: '100%', padding: '14px 0', borderRadius: 10, border: 'none', fontSize: 15, fontWeight: 700, fontFamily: T.sans, cursor: courier && camera ? 'pointer' : 'not-allowed', background: courier && camera ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.05)', color: courier && camera ? '#fff' : T.tx3, boxShadow: courier && camera ? `0 4px 20px ${T.ac}40` : 'none', transition: 'all .2s', letterSpacing: 0.5 }}>
-              Start Scanning
+            <button onClick={handleStart} disabled={!courier || !camera || verifying} style={{ width: '100%', padding: '14px 0', borderRadius: 10, border: 'none', fontSize: 15, fontWeight: 700, fontFamily: T.sans, cursor: courier && camera && !verifying ? 'pointer' : 'not-allowed', background: courier && camera && !verifying ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.05)', color: courier && camera ? '#fff' : T.tx3, boxShadow: courier && camera && !verifying ? `0 4px 20px ${T.ac}40` : 'none', transition: 'all .2s', letterSpacing: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              {verifying && <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'btnSpin .6s linear infinite' }} />}
+              {verifying ? 'Verifying Sheet...' : 'Start Scanning'}
             </button>
+
+            {/* Verification Results */}
+            {verifyResult && !verifyResult.ok && (
+              <div style={{ marginTop: 14, background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.20)', borderRadius: 10, padding: 16, animation: 'fi .2s ease' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(239,68,68,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>✕</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: T.re, fontFamily: T.sora }}>Connection Failed</div>
+                </div>
+                <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: verifyResult.details ? 8 : 0 }}>{verifyResult.error}</div>
+                {verifyResult.details && <div style={{ fontSize: 10, color: T.tx3, background: 'rgba(0,0,0,.2)', borderRadius: 6, padding: '8px 10px', fontFamily: T.mono, lineHeight: 1.6 }}>{verifyResult.details}</div>}
+              </div>
+            )}
+
+            {verifyResult && verifyResult.ok && !verifyResult.columnsOk && (
+              <div style={{ marginTop: 14, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.18)', borderRadius: 10, padding: 16, animation: 'fi .2s ease' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(245,158,11,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>⚠</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: T.yl, fontFamily: T.sora }}>Column Mismatch</div>
+                </div>
+                <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 8 }}>Sheet "{verifyResult.sheetName}" exists but columns may not be configured correctly.</div>
+                <div style={{ fontSize: 10, color: T.tx3, background: 'rgba(0,0,0,.2)', borderRadius: 6, padding: '8px 10px', fontFamily: T.mono, lineHeight: 1.6, marginBottom: 12 }}>{verifyResult.columnsInfo}</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={proceedAnyway} style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, fontFamily: T.sans, background: `linear-gradient(135deg, ${T.yl}cc, ${T.yl}88)`, color: '#000', cursor: 'pointer' }}>Proceed Anyway</button>
+                  <button onClick={() => setVerifyResult(null)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `1px solid ${T.bd2}`, fontSize: 12, fontWeight: 500, fontFamily: T.sans, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {verifyResult && verifyResult.ok && verifyResult.columnsOk && (
+              <div style={{ marginTop: 14, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 10, padding: 12, animation: 'fi .2s ease', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(34,197,94,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flexShrink: 0, color: T.gr }}>✓</div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: T.gr }}>Connected to "{verifyResult.sheetName}"</div>
+                  <div style={{ fontSize: 10, color: T.tx3 }}>{verifyResult.totalRows} existing rows</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -351,6 +420,56 @@ export default function PackTime() {
           ))}
         </div>
       </div>
+
+      {/* Complete Session Button */}
+      {sessionCount > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <button onClick={() => setShowComplete(true)} style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: `1px solid rgba(34,197,94,.20)`, fontSize: 13, fontWeight: 600, fontFamily: T.sans, background: 'rgba(34,197,94,.06)', color: T.gr, cursor: 'pointer', transition: 'all .15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M20 6L9 17l-5-5" /></svg>
+            Complete Session
+          </button>
+        </div>
+      )}
+
+      {/* Complete Session Modal */}
+      {showComplete && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
+          <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '24px 20px', textAlign: 'center', maxWidth: 380, width: '100%', boxShadow: '0 24px 80px rgba(0,0,0,.5)' }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(34,197,94,.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+              <svg viewBox="0 0 24 24" style={{ width: 24, height: 24, fill: 'none', stroke: T.gr, strokeWidth: 2.5 }}><path d="M20 6L9 17l-5-5" /></svg>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 6 }}>Session Complete</div>
+            <div style={{ fontSize: 12, color: T.tx3, marginBottom: 16 }}>End scanning session for {courier}?</div>
+
+            {/* Summary */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 14, marginBottom: 16, textAlign: 'left' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 3 }}>Courier</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{courier}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 3 }}>Camera</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{camera}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 3 }}>Total Scanned</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: T.gr, fontFamily: T.sora }}>{sessionCount}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 3 }}>Duplicates</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: recentScans.filter(s => !s.success).length > 0 ? T.re : T.tx3, fontFamily: T.sora }}>{recentScans.filter(s => !s.success).length}</div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowComplete(false)} style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `1px solid ${T.bd2}`, fontSize: 12, fontWeight: 500, fontFamily: T.sans, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Continue Scanning</button>
+              <button onClick={() => { setStarted(false); setSessionCount(0); setRecentScans([]); setShowComplete(false); setVerifyResult(null); }} style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, fontFamily: T.sans, background: `linear-gradient(135deg, ${T.gr}cc, ${T.gr}88)`, color: '#fff', cursor: 'pointer' }}>End Session</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
