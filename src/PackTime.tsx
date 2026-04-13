@@ -11,18 +11,18 @@ const supabase = createClient(
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
 
 const T = {
-  bg: '#060810', s: '#0B0F19', s2: '#0F1420', s3: '#141B2B',
+  bg: '#060810',
   bd: 'rgba(255,255,255,0.05)', bd2: 'rgba(255,255,255,0.08)',
   tx: '#E2E8F0', tx2: '#8896B0', tx3: '#4A5568',
   ac: '#6366F1', ac2: '#818CF8',
-  gr: '#22C55E', re: '#EF4444', bl: '#38BDF8', yl: '#F59E0B',
-  r: 8, mono: "'JetBrains Mono', monospace", sans: "'Inter', -apple-system, sans-serif",
+  gr: '#22C55E', re: '#EF4444', yl: '#F59E0B',
+  mono: "'JetBrains Mono', monospace", sans: "'Inter', -apple-system, sans-serif",
   sora: "'Sora', 'Inter', sans-serif",
 };
 
 interface Courier { id: string; name: string; sheet_name: string; }
 interface Camera { id: string; number: string; }
-interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; failed?: boolean; }
+interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; }
 
 // ── Beep ────────────────────────────────────────────────────────────────────────
 let audioCtx: AudioContext | null = null;
@@ -69,16 +69,13 @@ async function flushQueue() {
       });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
     } catch {
-      // Re-queue failed batch with retry limit
-      writeQueue.unshift({ rows: batch, sheetName, retries: 0 });
-      // Wait and retry
-      await new Promise(r => setTimeout(r, 2000));
-      const item = writeQueue[0];
-      if (item && item.retries < 3) {
-        item.retries++;
-      } else if (item) {
-        writeQueue.shift(); // Drop after 3 retries
+      // Re-queue failed batch, preserve retry count
+      const retries = (writeQueue[0]?.retries || 0) + 1;
+      if (retries <= 3) {
+        writeQueue.unshift({ rows: batch, sheetName, retries });
+        await new Promise(r => setTimeout(r, 2000));
       }
+      // Silently drop after 3 retries
     }
   }
   flushing = false;
