@@ -22,7 +22,7 @@ const T = {
 
 interface Courier { id: string; name: string; sheet_name: string; }
 interface Camera { id: string; number: string; }
-interface ScanEntry { awb: string; time: string; success: boolean; }
+interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; failed?: boolean; }
 
 // ── Beep ────────────────────────────────────────────────────────────────────────
 let audioCtx: AudioContext | null = null;
@@ -39,14 +39,54 @@ function beep(freq: number, dur: number, type: OscillatorType = 'square') {
 function beepOk() { beep(880, 0.12); setTimeout(() => beep(1100, 0.12), 100); }
 function beepErr() { beep(300, 0.3, 'sawtooth'); setTimeout(() => beep(200, 0.4, 'sawtooth'), 200); }
 
-// ── API call to Edge Function ───────────────────────────────────────────────────
-async function callEdge(body: Record<string, string>): Promise<any> {
-  const resp = await fetch(EDGE_FN, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  return resp.json();
+// ── Timestamp helper ────────────────────────────────────────────────────────────
+function pad(n: number) { return n < 10 ? '0' + n : String(n); }
+function formatTimestamp(d: Date) {
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+// ── Background write queue ──────────────────────────────────────────────────────
+type QueueItem = { rows: unknown[][]; sheetName: string; retries: number; };
+const writeQueue: QueueItem[] = [];
+let flushing = false;
+
+async function flushQueue() {
+  if (flushing || writeQueue.length === 0) return;
+  flushing = true;
+  while (writeQueue.length > 0) {
+    // Batch up to 20 rows per request
+    const batch: unknown[][] = [];
+    const sheetName = writeQueue[0].sheetName;
+    while (writeQueue.length > 0 && writeQueue[0].sheetName === sheetName && batch.length < 20) {
+      const item = writeQueue.shift()!;
+      batch.push(...item.rows);
+    }
+    try {
+      const resp = await fetch(EDGE_FN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'batch', rows: batch, sheetName }),
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    } catch {
+      // Re-queue failed batch with retry limit
+      writeQueue.unshift({ rows: batch, sheetName, retries: 0 });
+      // Wait and retry
+      await new Promise(r => setTimeout(r, 2000));
+      const item = writeQueue[0];
+      if (item && item.retries < 3) {
+        item.retries++;
+      } else if (item) {
+        writeQueue.shift(); // Drop after 3 retries
+      }
+    }
+  }
+  flushing = false;
+}
+
+function enqueueWrite(rows: unknown[][], sheetName: string) {
+  writeQueue.push({ rows, sheetName, retries: 0 });
+  flushQueue();
 }
 
 // ── Component ───────────────────────────────────────────────────────────────────
@@ -66,15 +106,18 @@ export default function PackTime() {
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<any>(null);
 
-  // Scanning
+  // Scanning — optimistic
   const [awbInput, setAwbInput] = useState('');
   const [sessionCount, setSessionCount] = useState(0);
   const [recentScans, setRecentScans] = useState<ScanEntry[]>([]);
   const [flash, setFlash] = useState<'success' | 'error' | null>(null);
   const [duplicateAwb, setDuplicateAwb] = useState('');
-  const [scanning, setScanning] = useState(false);
-  const [serverError, setServerError] = useState('');
   const [showComplete, setShowComplete] = useState(false);
+  const [pendingWrites, setPendingWrites] = useState(0);
+
+  // Local duplicate tracking (loaded from server on init, updated on each scan)
+  const awbSetRef = useRef<Set<string>>(new Set());
+  const rowCountRef = useRef(0);
 
   // Camera scanner
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -99,10 +142,11 @@ export default function PackTime() {
   // ── Focus ───────────────────────────────────────────────────────────────────
   const focusInput = useCallback(() => { setTimeout(() => inputRef.current?.focus(), 50); }, []);
   useEffect(() => { if (started && !cameraOpen) focusInput(); }, [started, cameraOpen, focusInput]);
-  useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 1500); return () => clearTimeout(t); } }, [flash]);
-  useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 3000); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
+  useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 800); return () => clearTimeout(t); } }, [flash]);
+  useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 2500); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
 
   // ── Camera scanner ──────────────────────────────────────────────────────────
+  const submitRef = useRef<(awb: string) => void>(() => {});
   const consecutiveRef = useRef<{ code: string; count: number }>({ code: '', count: 0 });
   const startCam = useCallback(() => {
     if (!cameraRef.current) return;
@@ -117,9 +161,7 @@ export default function PackTime() {
       const code = result?.codeResult?.code;
       const errors = result?.codeResult?.decodedCodes?.filter((d: any) => d.error != null).map((d: any) => d.error) || [];
       const avgError = errors.length > 0 ? errors.reduce((a: number, b: number) => a + b, 0) / errors.length : 1;
-      // Reject low confidence reads (lower error = better)
       if (!code || scanLockRef.current || avgError > 0.2) return;
-      // Require 3 consecutive identical reads
       if (consecutiveRef.current.code === code) {
         consecutiveRef.current.count++;
       } else {
@@ -129,13 +171,13 @@ export default function PackTime() {
       scanLockRef.current = true;
       if (navigator.vibrate) navigator.vibrate(100);
       Quagga.stop(); setCameraOpen(false);
-      setTimeout(() => submitAwb(code.trim()), 100);
+      setTimeout(() => submitRef.current(code.trim()), 50);
     });
   }, []);
   const stopCam = useCallback(() => { try { Quagga.stop(); Quagga.offDetected(); } catch {} }, []);
   useEffect(() => { if (cameraOpen) setTimeout(() => startCam(), 100); return () => stopCam(); }, [cameraOpen, startCam, stopCam]);
 
-  // ── Verify sheet on start ───────────────────────────────────────────────────
+  // ── Init sheet on start (loads existing AWBs for local duplicate detection) ─
   const handleStart = async () => {
     if (!courier || !camera) return;
     const c = couriers.find(x => x.name === courier);
@@ -143,9 +185,17 @@ export default function PackTime() {
     setCourierSheet(c.sheet_name);
     setVerifying(true); setVerifyResult(null);
     try {
-      const data = await callEdge({ action: 'verify', sheetName: c.sheet_name, courier });
+      const resp = await fetch(EDGE_FN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'init', sheetName: c.sheet_name }),
+      });
+      const data = await resp.json();
       setVerifyResult(data);
       if (data.ok && data.columnsOk !== false) {
+        // Load existing AWBs into local Set for instant duplicate detection
+        awbSetRef.current = new Set((data.awbs || []).map((a: string) => a.trim().toUpperCase()));
+        rowCountRef.current = data.totalRows || 0;
         setStarted(true); setSessionCount(0); setRecentScans([]);
       }
     } catch {
@@ -154,29 +204,48 @@ export default function PackTime() {
     setVerifying(false);
   };
 
-  // ── Submit scan ─────────────────────────────────────────────────────────────
-  const submitAwb = async (awb: string) => {
-    if (!awb || scanning) return;
-    // Get sheet name directly from couriers array (don't rely on state timing)
-    const sheet = couriers.find(x => x.name === courier)?.sheet_name || courierSheet;
-    if (!sheet) { setServerError('No sheet configured for ' + courier); return; }
-    setAwbInput(''); setScanning(true); setServerError('');
-    try {
-      const data = await callEdge({ action: 'scan', awb, sheetName: sheet, cameraNumber: camera });
-      if (data.error) {
-        setServerError(data.error); beepErr(); setFlash('error');
-      } else if (data.duplicate) {
-        setDuplicateAwb(awb); beepErr(); setFlash('error');
-        setRecentScans(p => [{ awb, time: new Date().toLocaleTimeString('en-IN'), success: false }, ...p].slice(0, 10));
-      } else {
-        beepOk(); setFlash('success'); setSessionCount(p => p + 1);
-        setRecentScans(p => [{ awb, time: new Date().toLocaleTimeString('en-IN'), success: true }, ...p].slice(0, 10));
-      }
-    } catch {
-      setServerError('Connection failed. Try again.'); beepErr(); setFlash('error');
+  // ── Submit scan — OPTIMISTIC (instant feedback, background write) ───────────
+  const submitAwb = useCallback((awb: string) => {
+    if (!awb) return;
+    const trimmed = awb.trim();
+    const key = trimmed.toUpperCase();
+    setAwbInput('');
+
+    // Instant local duplicate check
+    if (awbSetRef.current.has(key)) {
+      setDuplicateAwb(trimmed); beepErr(); setFlash('error');
+      setRecentScans(p => [{ awb: trimmed, time: new Date().toLocaleTimeString('en-IN'), success: false }, ...p].slice(0, 30));
+      focusInput();
+      return;
     }
-    setScanning(false); focusInput();
-  };
+
+    // SUCCESS — instant feedback
+    beepOk(); setFlash('success');
+    awbSetRef.current.add(key);
+    rowCountRef.current++;
+    const count = rowCountRef.current;
+    const now = new Date();
+    const timestamp = formatTimestamp(now);
+
+    setSessionCount(p => p + 1);
+    setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true }, ...p].slice(0, 30));
+
+    // Background write — fire and forget
+    const row = [count, trimmed, timestamp, camera];
+    enqueueWrite([row], courierSheet);
+    setPendingWrites(p => p + 1);
+
+    // Mark as synced after a short delay (optimistic)
+    setTimeout(() => {
+      setRecentScans(p => p.map(s => s.awb === trimmed && s.pending ? { ...s, pending: false } : s));
+      setPendingWrites(p => Math.max(0, p - 1));
+    }, 1500);
+
+    focusInput();
+  }, [camera, courierSheet, focusInput]);
+
+  // Keep submitRef in sync for camera callback
+  useEffect(() => { submitRef.current = submitAwb; }, [submitAwb]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); const v = awbInput.trim(); if (v) submitAwb(v); } };
 
@@ -306,22 +375,23 @@ export default function PackTime() {
       <div style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
           <label style={{ fontSize: 10, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Scan AWB Barcode</label>
-          <div onClick={() => { if (cameraOpen) { stopCam(); setCameraOpen(false); } else setCameraOpen(true); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 4, background: cameraOpen ? 'rgba(239,68,68,.08)' : 'rgba(99,102,241,.08)', border: `1px solid ${cameraOpen ? 'rgba(239,68,68,.15)' : 'rgba(99,102,241,.12)'}`, color: cameraOpen ? T.re : T.ac2, fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>
-            <svg viewBox="0 0 24 24" style={{ width: 11, height: 11, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" /></svg>
-            {cameraOpen ? 'Close' : 'Camera'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {pendingWrites > 0 && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.18)', color: T.yl, fontWeight: 600 }}>Syncing {pendingWrites}</span>}
+            <div onClick={() => { if (cameraOpen) { stopCam(); setCameraOpen(false); } else setCameraOpen(true); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 4, background: cameraOpen ? 'rgba(239,68,68,.08)' : 'rgba(99,102,241,.08)', border: `1px solid ${cameraOpen ? 'rgba(239,68,68,.15)' : 'rgba(99,102,241,.12)'}`, color: cameraOpen ? T.re : T.ac2, fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>
+              <svg viewBox="0 0 24 24" style={{ width: 11, height: 11, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" /></svg>
+              {cameraOpen ? 'Close' : 'Camera'}
+            </div>
           </div>
         </div>
         <div style={{ position: 'relative' }}>
           <input ref={inputRef} type="text" inputMode="text" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
             value={awbInput} onChange={e => setAwbInput(e.target.value)} onKeyDown={handleKeyDown}
             placeholder="Scan or type AWB number..."
-            style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${flash === 'success' ? T.gr : flash === 'error' ? T.re : T.ac + '55'}`, borderRadius: 10, color: T.tx, fontFamily: T.mono, fontSize: 17, padding: '14px 50px 14px 14px', outline: 'none', transition: 'border-color .2s', boxSizing: 'border-box', boxShadow: `0 0 16px ${flash === 'success' ? 'rgba(34,197,94,.12)' : flash === 'error' ? 'rgba(239,68,68,.12)' : 'rgba(99,102,241,.06)'}` }} />
-          <button onClick={() => { const v = awbInput.trim(); if (v) submitAwb(v); }} disabled={scanning || !awbInput.trim()} style={{ position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)', width: 38, height: 38, borderRadius: 7, border: 'none', background: awbInput.trim() ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.05)', color: '#fff', cursor: awbInput.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${flash === 'success' ? T.gr : flash === 'error' ? T.re : T.ac + '55'}`, borderRadius: 10, color: T.tx, fontFamily: T.mono, fontSize: 17, padding: '14px 50px 14px 14px', outline: 'none', transition: 'border-color .15s', boxSizing: 'border-box', boxShadow: `0 0 16px ${flash === 'success' ? 'rgba(34,197,94,.15)' : flash === 'error' ? 'rgba(239,68,68,.15)' : 'rgba(99,102,241,.06)'}` }} />
+          <button onClick={() => { const v = awbInput.trim(); if (v) submitAwb(v); }} disabled={!awbInput.trim()} style={{ position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)', width: 38, height: 38, borderRadius: 7, border: 'none', background: awbInput.trim() ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.05)', color: '#fff', cursor: awbInput.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M5 12h14M12 5l7 7-7 7" /></svg>
           </button>
         </div>
-        {scanning && <div style={{ marginTop: 4, fontSize: 10, color: T.ac2 }}>Processing...</div>}
-        {serverError && <div style={{ marginTop: 4, fontSize: 10, color: T.re }}>{serverError}</div>}
       </div>
 
       {/* Recent Scans */}
@@ -333,13 +403,14 @@ export default function PackTime() {
         <div style={{ maxHeight: 280, overflowY: 'auto' }}>
           {recentScans.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans yet. Start scanning AWB barcodes.</div>}
           {recentScans.map((s, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .2s ease' : undefined }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: s.success ? T.gr : T.re, flexShrink: 0, boxShadow: `0 0 5px ${s.success ? T.gr : T.re}55` }} />
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .15s ease' : undefined }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: s.success ? T.gr : T.re, flexShrink: 0, boxShadow: `0 0 5px ${s.success ? T.gr : T.re}55`, opacity: s.pending ? 0.5 : 1 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontFamily: T.mono, color: T.tx, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.awb}</div>
               </div>
               <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, flexShrink: 0 }}>{s.time}</div>
               {!s.success && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 600 }}>DUP</span>}
+              {s.success && s.pending && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(245,158,11,.10)', color: T.yl, fontWeight: 600 }}>SYNC</span>}
             </div>
           ))}
         </div>
