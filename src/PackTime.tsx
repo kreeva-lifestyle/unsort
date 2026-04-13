@@ -113,6 +113,10 @@ export default function PackTime() {
   const [duplicateAwb, setDuplicateAwb] = useState('');
   const [showComplete, setShowComplete] = useState(false);
   const [pendingWrites, setPendingWrites] = useState(0);
+  const [lastScanned, setLastScanned] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [sheetTotal, setSheetTotal] = useState(0);
 
   // Local duplicate tracking (loaded from server on init, updated on each scan)
   const awbSetRef = useRef<Set<string>>(new Set());
@@ -142,7 +146,7 @@ export default function PackTime() {
   const focusInput = useCallback(() => { setTimeout(() => inputRef.current?.focus(), 50); }, []);
   useEffect(() => { if (started && !cameraOpen) focusInput(); }, [started, cameraOpen, focusInput]);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 800); return () => clearTimeout(t); } }, [flash]);
-  useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 2500); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
+  useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 1500); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
 
   // ── Camera scanner (barcode-detector ZXing-WASM polyfill — works on all browsers) ──
   const submitRef = useRef<(awb: string) => void>(() => {});
@@ -240,10 +244,10 @@ export default function PackTime() {
       const data = await resp.json();
       setVerifyResult(data);
       if (data.ok && data.columnsOk !== false) {
-        // Load existing AWBs into local Set for instant duplicate detection
         awbSetRef.current = new Set((data.awbs || []).map((a: string) => a.trim().toUpperCase()));
         rowCountRef.current = data.totalRows || 0;
-        setStarted(true); setSessionCount(0); setRecentScans([]);
+        setSheetTotal(data.totalRows || 0);
+        setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned('');
       }
     } catch {
       setVerifyResult({ ok: false, error: 'Cannot connect to server. Try again.' });
@@ -276,7 +280,9 @@ export default function PackTime() {
     const now = new Date();
     const timestamp = formatTimestamp(now);
 
+    setLastScanned(trimmed);
     setSessionCount(p => p + 1);
+    setSheetTotal(p => p + 1);
     setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true }, ...p].slice(0, 30));
 
     // Background write — fire and forget
@@ -296,7 +302,21 @@ export default function PackTime() {
   // Keep submitRef in sync for camera callback
   useEffect(() => { submitRef.current = submitAwb; }, [submitAwb]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); const v = awbInput.trim(); if (v) submitAwb(v); } };
+  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); const v = awbInput.trim(); if (v) submitAwb(v); } };
+
+  // ── Undo last scan ──────────────────────────────────────────────────────────
+  const undoLast = useCallback(() => {
+    if (!lastScanned) return;
+    const key = lastScanned.toUpperCase();
+    awbSetRef.current.delete(key);
+    setRecentScans(p => p.filter(s => s.awb !== lastScanned));
+    setSessionCount(p => Math.max(0, p - 1));
+    setSheetTotal(p => Math.max(0, p - 1));
+    rowCountRef.current = Math.max(0, rowCountRef.current - 1);
+    setLastScanned('');
+    beep(500, 0.15);
+    focusInput();
+  }, [lastScanned, focusInput]);
 
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -388,7 +408,7 @@ export default function PackTime() {
       )}
 
       {/* Top bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <div>
           <div style={{ fontSize: 10, color: T.tx3, marginBottom: 2 }}>{dateStr}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -396,14 +416,54 @@ export default function PackTime() {
             <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(99,102,241,.10)', color: T.ac2, fontWeight: 600, fontFamily: T.mono }}>CAM {camera}</span>
           </div>
         </div>
-        <div onClick={() => { stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setVerifyResult(null); }} style={{ padding: '5px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd2}`, color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Change</div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div onClick={() => setSearchOpen(p => !p)} style={{ padding: '5px 8px', borderRadius: 6, background: searchOpen ? 'rgba(99,102,241,.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${searchOpen ? T.ac + '33' : T.bd2}`, color: searchOpen ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>
+            <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+          </div>
+          {sessionCount === 0
+            ? <div onClick={() => { stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setVerifyResult(null); }} style={{ padding: '5px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd2}`, color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Change</div>
+            : <div style={{ padding: '5px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, color: T.tx3, fontSize: 10, fontWeight: 500, opacity: 0.4, cursor: 'not-allowed' }} title="Complete session first">Change</div>
+          }
+        </div>
       </div>
 
-      {/* Counter */}
-      <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 10, padding: '12px 16px', textAlign: 'center', marginBottom: 12 }}>
-        <div style={{ fontSize: 9, color: T.gr, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Session Scans</div>
-        <div style={{ fontSize: 34, fontWeight: 800, fontFamily: T.sora, color: T.gr, lineHeight: 1 }}>{sessionCount}</div>
+      {/* AWB Search */}
+      {searchOpen && (
+        <div style={{ marginBottom: 10, animation: 'fi .15s ease' }}>
+          <div style={{ position: 'relative' }}>
+            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search AWB..." autoFocus
+              style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 8, color: T.tx, fontFamily: T.mono, fontSize: 13, padding: '8px 12px', outline: 'none', boxSizing: 'border-box' }} />
+            {searchQuery.trim() && (
+              <div style={{ marginTop: 4, fontSize: 11, fontFamily: T.mono, color: awbSetRef.current.has(searchQuery.trim().toUpperCase()) ? T.re : T.gr }}>
+                {awbSetRef.current.has(searchQuery.trim().toUpperCase()) ? '⚠ Already scanned (last 7 days)' : '✓ Not found — safe to scan'}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Counter + Sheet Total */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <div style={{ flex: 1, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Session</div>
+          <div style={{ fontSize: 28, fontWeight: 800, fontFamily: T.sora, color: T.gr, lineHeight: 1 }}>{sessionCount}</div>
+        </div>
+        <div style={{ flex: 1, background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.12)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 8, color: T.ac2, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Sheet Total</div>
+          <div style={{ fontSize: 28, fontWeight: 800, fontFamily: T.sora, color: T.ac2, lineHeight: 1 }}>{sheetTotal}</div>
+        </div>
       </div>
+
+      {/* Last Scanned + Undo */}
+      {lastScanned && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, background: 'rgba(34,197,94,.05)', border: '1px solid rgba(34,197,94,.12)', borderRadius: 8, padding: '8px 12px', animation: 'fi .15s ease' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Last Scanned</div>
+            <div style={{ fontSize: 14, fontFamily: T.mono, color: T.tx, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lastScanned}</div>
+          </div>
+          <button type="button" onClick={(e) => { e.stopPropagation(); undoLast(); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.08)', color: '#FCA5A5', fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: T.sans }}>Undo</button>
+        </div>
+      )}
 
       {/* Camera */}
       {cameraOpen && (
@@ -416,6 +476,7 @@ export default function PackTime() {
             </div>
           </div>
           {cameraError && <div style={{ padding: 10, textAlign: 'center', fontSize: 11, color: T.yl }}>{cameraError}</div>}
+          <button type="button" onTouchEnd={(e) => { e.preventDefault(); try { const track = streamRef.current?.getVideoTracks()[0]; if (track) { const caps = track.getCapabilities?.() as any; if (caps?.torch) track.applyConstraints({ advanced: [{ torch: !(track.getSettings?.() as any)?.torch } as any] }); } } catch {} }} onClick={() => {}} style={{ position: 'absolute', top: 8, left: 8, zIndex: 100, width: 36, height: 36, borderRadius: 8, background: 'rgba(0,0,0,.8)', border: '1px solid rgba(255,255,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#FFD700', fontSize: 16, WebkitTapHighlightColor: 'transparent' }}>🔦</button>
           <button type="button" onTouchEnd={(e) => { e.preventDefault(); stopCam(); setCameraOpen(false); }} onClick={() => { stopCam(); setCameraOpen(false); }} style={{ position: 'absolute', top: 8, right: 8, zIndex: 100, width: 36, height: 36, borderRadius: 8, background: 'rgba(0,0,0,.8)', border: '1px solid rgba(255,255,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', fontSize: 18, fontWeight: 700, WebkitTapHighlightColor: 'transparent' }}>✕</button>
         </div>
       )}
@@ -487,9 +548,19 @@ export default function PackTime() {
                 <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 2 }}>Duplicates</div><div style={{ fontSize: 20, fontWeight: 800, color: recentScans.filter(s => !s.success).length > 0 ? T.re : T.tx3, fontFamily: T.sora }}>{recentScans.filter(s => !s.success).length}</div></div>
               </div>
             </div>
+            <button onClick={() => {
+              const successScans = recentScans.filter(s => s.success);
+              if (successScans.length === 0) return;
+              const csv = 'AWB,Time,Courier,Camera\n' + successScans.map(s => `${s.awb},${s.time},${courier},${camera}`).join('\n');
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = `PackTime_${courier}_CAM${camera}_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click(); URL.revokeObjectURL(url);
+            }} style={{ width: '100%', padding: '7px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 10, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx2, cursor: 'pointer', marginBottom: 10, fontFamily: T.sans }}>Export Session CSV</button>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setShowComplete(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Continue</button>
-              <button onClick={() => { stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setShowComplete(false); setVerifyResult(null); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}cc, ${T.gr}88)`, color: '#fff', cursor: 'pointer' }}>End Session</button>
+              <button onClick={() => { stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setShowComplete(false); setVerifyResult(null); setLastScanned(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}cc, ${T.gr}88)`, color: '#fff', cursor: 'pointer' }}>End Session</button>
             </div>
           </div>
         </div>
