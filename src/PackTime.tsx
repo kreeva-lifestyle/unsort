@@ -29,6 +29,8 @@ let audioCtx: AudioContext | null = null;
 function beep(freq: number, dur: number, type: OscillatorType = 'square') {
   try {
     if (!audioCtx) audioCtx = new AudioContext();
+    // iOS Safari suspends AudioContext after inactivity — must resume
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.connect(g); g.connect(audioCtx.destination);
     o.type = type; o.frequency.value = freq; g.gain.value = 0.3;
@@ -259,6 +261,7 @@ export default function PackTime() {
     // Instant local duplicate check
     if (awbSetRef.current.has(key)) {
       setDuplicateAwb(trimmed); beepErr(); setFlash('error');
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
       setRecentScans(p => [{ awb: trimmed, time: new Date().toLocaleTimeString('en-IN'), success: false }, ...p].slice(0, 30));
       focusInput();
       return;
@@ -266,6 +269,7 @@ export default function PackTime() {
 
     // SUCCESS — instant feedback
     beepOk(); setFlash('success');
+    if (navigator.vibrate) navigator.vibrate(100);
     awbSetRef.current.add(key);
     rowCountRef.current++;
     const count = rowCountRef.current;
