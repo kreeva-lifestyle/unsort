@@ -306,21 +306,24 @@ export default function PackTime() {
 
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); const v = awbInput.trim(); if (v) submitAwb(v); } };
 
-  // ── Undo last scan ──────────────────────────────────────────────────────────
+  // ── Undo last scan (removes from local + Google Sheet) ──────────────────────
   const undoLast = useCallback(() => {
     if (!lastScanned) return;
-    const key = lastScanned.toUpperCase();
+    const awb = lastScanned;
+    const key = awb.toUpperCase();
     awbSetRef.current.delete(key);
-    setRecentScans(p => p.filter(s => s.awb !== lastScanned));
+    setRecentScans(p => p.filter(s => s.awb !== awb));
     setSessionCount(p => Math.max(0, p - 1));
     setSheetTotal(p => Math.max(0, p - 1));
     rowCountRef.current = Math.max(0, rowCountRef.current - 1);
     setLastScanned('');
     beep(500, 0.15);
     focusInput();
-  }, [lastScanned, focusInput]);
+    // Background delete from Google Sheet
+    fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) }).catch(() => {});
+  }, [lastScanned, courierSheet, focusInput]);
 
-  // ── Delete a specific scan from recent list ─────────────────────────────────
+  // ── Delete a specific scan (removes from local + Google Sheet) ─────────────
   const deleteScan = useCallback((awb: string) => {
     awbSetRef.current.delete(awb.toUpperCase());
     setRecentScans(p => p.filter(s => s.awb !== awb));
@@ -332,7 +335,9 @@ export default function PackTime() {
     }
     if (lastScanned === awb) setLastScanned('');
     beep(500, 0.1);
-  }, [recentScans, lastScanned]);
+    // Background delete from Google Sheet
+    fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) }).catch(() => {});
+  }, [recentScans, lastScanned, courierSheet]);
 
   // ── Fetch today's summary across all couriers ──────────────────────────────
   const fetchTodaySummary = useCallback(async () => {
