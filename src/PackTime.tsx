@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Html5Qrcode } from 'html5-qrcode';
+import { BarcodeDetector } from 'barcode-detector/ponyfill';
 
 const supabase = createClient(
   'https://ulphprdnswznfztawbvg.supabase.co',
@@ -142,22 +142,22 @@ export default function PackTime() {
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 800); return () => clearTimeout(t); } }, [flash]);
   useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 2500); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
 
-  // ── Camera scanner ──────────────────────────────────────────────────────────
+  // ── Camera scanner (barcode-detector ZXing-WASM polyfill — works on all browsers) ──
   const submitRef = useRef<(awb: string) => void>(() => {});
   const streamRef = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<number>(0);
-  const html5QrRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const stopCam = useCallback(() => {
     cancelAnimationFrame(scanTimerRef.current);
+    scanTimerRef.current = 0;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
-    if (html5QrRef.current) {
-      html5QrRef.current.stop().catch(() => {});
-      html5QrRef.current.clear();
-      html5QrRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+      videoRef.current = null;
     }
   }, []);
 
@@ -165,70 +165,58 @@ export default function PackTime() {
     if (!cameraRef.current) return;
     setCameraError(''); scanLockRef.current = false;
     const container = cameraRef.current;
-
-    const onDetect = (code: string) => {
-      if (scanLockRef.current) return;
-      const val = code?.trim();
-      if (!val || val.length < 4) return;
-      scanLockRef.current = true;
-      if (navigator.vibrate) navigator.vibrate(100);
-      stopCam(); setCameraOpen(false);
-      setTimeout(() => submitRef.current(val), 50);
-    };
-
-    // Path 1: Native BarcodeDetector (iOS 17.2+, Chrome 83+)
-    if ('BarcodeDetector' in window) {
-      container.innerHTML = '';
-      const video = document.createElement('video');
-      video.autoplay = true;
-      video.muted = true;
-      video.playsInline = true;
-      video.setAttribute('playsinline', 'true');
-      video.setAttribute('webkit-playsinline', 'true');
-      video.style.cssText = 'width:100%;height:100%;object-fit:cover;';
-      container.appendChild(video);
-
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-        .then(stream => {
-          streamRef.current = stream;
-          video.srcObject = stream;
-          video.onloadedmetadata = () => {
-            video.play().then(() => {
-              const detector = new (window as any).BarcodeDetector({ formats: ['code_128', 'code_39'] });
-              const loop = async () => {
-                if (scanLockRef.current || !streamRef.current) return;
-                try {
-                  const results = await detector.detect(video);
-                  if (results.length > 0 && results[0].rawValue) {
-                    onDetect(results[0].rawValue);
-                    return;
-                  }
-                } catch {}
-                scanTimerRef.current = requestAnimationFrame(loop);
-              };
-              scanTimerRef.current = requestAnimationFrame(loop);
-            }).catch(() => setCameraError('Cannot play video'));
-          };
-        })
-        .catch(() => setCameraError('Camera not available'));
-      return;
-    }
-
-    // Path 2: html5-qrcode / ZXing fallback (older browsers)
-    const containerId = 'packtime-scanner';
-    container.id = containerId;
     container.innerHTML = '';
-    const scanner = new Html5Qrcode(containerId);
-    html5QrRef.current = scanner;
-    scanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 280, height: 100 }, aspectRatio: 1.333 },
-      (code: string) => onDetect(code),
-      () => {},
-    ).catch(() => setCameraError('Camera not available'));
+
+    // Create video with iOS-required attributes
+    const video = document.createElement('video');
+    video.autoplay = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute('playsinline', 'true');
+    video.setAttribute('webkit-playsinline', 'true');
+    video.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+    container.appendChild(video);
+    videoRef.current = video;
+
+    // ZXing-WASM polyfill — works on iOS Safari, Android Chrome, all browsers
+    const detector = new BarcodeDetector({ formats: ['code_128', 'code_39'] });
+
+    // Use high resolution to avoid iPhone 15 Pro ultra-wide lens selection
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    })
+    .then(stream => {
+      if (!videoRef.current) return; // component unmounted
+      streamRef.current = stream;
+      video.srcObject = stream;
+      video.onloadedmetadata = () => {
+        video.play().then(() => {
+          // Scan loop using requestAnimationFrame
+          const loop = async () => {
+            if (scanLockRef.current || !streamRef.current) return;
+            try {
+              const results = await detector.detect(video);
+              if (results.length > 0) {
+                const code = results[0].rawValue?.trim();
+                if (code && code.length >= 4 && !scanLockRef.current) {
+                  scanLockRef.current = true;
+                  if (navigator.vibrate) navigator.vibrate(100);
+                  stopCam(); setCameraOpen(false);
+                  setTimeout(() => submitRef.current(code), 50);
+                  return;
+                }
+              }
+            } catch {}
+            scanTimerRef.current = requestAnimationFrame(loop);
+          };
+          scanTimerRef.current = requestAnimationFrame(loop);
+        }).catch(() => setCameraError('Cannot start video. Check camera permissions.'));
+      };
+    })
+    .catch(() => setCameraError('Camera not available. Check permissions in Settings.'));
   }, [stopCam]);
 
-  useEffect(() => { if (cameraOpen) setTimeout(() => startCam(), 100); return () => stopCam(); }, [cameraOpen, startCam, stopCam]);
+  useEffect(() => { if (cameraOpen) setTimeout(() => startCam(), 150); return () => stopCam(); }, [cameraOpen, startCam, stopCam]);
 
   // ── Init sheet on start (loads existing AWBs for local duplicate detection) ─
   const handleStart = async () => {
