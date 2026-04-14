@@ -132,9 +132,20 @@ export default function PackTime() {
   const [todaySummaryOpen, setTodaySummaryOpen] = useState(false);
   const [todaySummary, setTodaySummary] = useState<{ courier: string; count: number }[]>([]);
 
-  // Local duplicate tracking (loaded from server on init, updated on each scan)
+  // History view
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyPage, setHistoryPage] = useState(0);
+  const [historyPageSize, setHistoryPageSize] = useState(25);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyFilterCourier, setHistoryFilterCourier] = useState('');
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Local duplicate tracking
   const awbSetRef = useRef<Set<string>>(new Set());
   const rowCountRef = useRef(0);
+  const sessionIdRef = useRef('');
 
   // Camera scanner
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -261,6 +272,7 @@ export default function PackTime() {
         awbSetRef.current = new Set((data.awbs || []).map((a: string) => a.trim().toUpperCase()));
         rowCountRef.current = data.totalRows || 0;
         setSheetTotal(data.totalRows || 0);
+        sessionIdRef.current = crypto.randomUUID();
         setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned('');
       }
     } catch {
@@ -299,10 +311,13 @@ export default function PackTime() {
     setSheetTotal(p => p + 1);
     setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true }, ...p].slice(0, 30));
 
-    // Background write — fire and forget
+    // Background write to Google Sheet
     const row = [count, trimmed, timestamp, camera];
     enqueueWrite([row], courierSheet);
     setPendingWrites(p => p + 1);
+
+    // Save to Supabase
+    supabase.from('packtime_scans').insert({ session_id: sessionIdRef.current, awb: trimmed, courier, camera, sheet_name: courierSheet }).then(() => {});
 
     // Mark as synced after a short delay (optimistic)
     setTimeout(() => {
@@ -371,7 +386,102 @@ export default function PackTime() {
     setTodaySummary(results);
   }, [couriers]);
 
+  // ── Fetch history from Supabase ────────────────────────────────────────────
+  const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    let query = supabase.from('packtime_scans').select('*', { count: 'exact' });
+    if (historySearch) query = query.ilike('awb', `%${historySearch}%`);
+    if (historyFilterCourier) query = query.eq('courier', historyFilterCourier);
+    query = query.order('scanned_at', { ascending: false }).range(historyPage * historyPageSize, (historyPage + 1) * historyPageSize - 1);
+    const { data, count } = await query;
+    setHistoryData(data || []);
+    setHistoryTotal(count || 0);
+    setHistoryLoading(false);
+  }, [historySearch, historyFilterCourier, historyPage, historyPageSize]);
+
+  useEffect(() => { if (showHistory) fetchHistory(); }, [showHistory, fetchHistory]);
+
+  const deleteHistoryScan = async (id: string) => {
+    await supabase.from('packtime_scans').delete().eq('id', id);
+    fetchHistory();
+  };
+
+  const exportHistory = () => {
+    if (historyData.length === 0) return;
+    const csv = 'AWB,Courier,Camera,Scanned At,Session ID\n' + historyData.map(r => `${r.awb},${r.courier},${r.camera},${new Date(r.scanned_at).toLocaleString('en-IN')},${r.session_id}`).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `PackTime_History_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
+  };
+
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  const totalPages = Math.ceil(historyTotal / historyPageSize);
+
+  // ── History Screen ─────────────────────────────────────────────────────────
+  if (showHistory) return (
+    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Scan History</span>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={exportHistory} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>Export CSV</button>
+          <button onClick={() => setShowHistory(false)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>Back</button>
+        </div>
+      </div>
+
+      {/* Search + Filter */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <input type="text" value={historySearch} onChange={e => { setHistorySearch(e.target.value); setHistoryPage(0); }} placeholder="Search AWB..."
+          style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 11, padding: '7px 10px', outline: 'none', boxSizing: 'border-box' }} />
+        <select value={historyFilterCourier} onChange={e => { setHistoryFilterCourier(e.target.value); setHistoryPage(0); }}
+          style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '7px 8px', outline: 'none' }}>
+          <option value="">All Couriers</option>
+          {couriers.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+        </select>
+        <select value={historyPageSize} onChange={e => { setHistoryPageSize(Number(e.target.value)); setHistoryPage(0); }}
+          style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '7px 6px', outline: 'none', width: 55 }}>
+          <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
+        </select>
+      </div>
+
+      {/* Count */}
+      <div style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{historyTotal} records found</div>
+
+      {/* Table */}
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 0, fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
+          <div style={{ padding: '8px 10px' }}>AWB</div>
+          <div style={{ padding: '8px 10px' }}>Courier</div>
+          <div style={{ padding: '8px 10px' }}>Time</div>
+          <div style={{ padding: '8px 6px' }}></div>
+        </div>
+        {historyLoading && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div>}
+        {!historyLoading && historyData.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No records found.</div>}
+        <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+          {historyData.map(r => (
+            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 0, borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
+              <div style={{ padding: '7px 10px', fontFamily: T.mono, color: T.tx, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.awb}</div>
+              <div style={{ padding: '7px 10px', color: T.tx2, fontSize: 10 }}>{r.courier}</div>
+              <div style={{ padding: '7px 10px', color: T.tx3, fontFamily: T.mono, fontSize: 9 }}>{new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+              <div style={{ padding: '7px 6px' }}>
+                <button type="button" onClick={() => deleteHistoryScan(r.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4 }}>
+                  <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 10 }}>
+          <button onClick={() => setHistoryPage(p => Math.max(0, p - 1))} disabled={historyPage === 0} style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: historyPage === 0 ? T.tx3 : T.tx, fontSize: 10, cursor: historyPage === 0 ? 'default' : 'pointer', opacity: historyPage === 0 ? 0.4 : 1 }}>Prev</button>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{historyPage + 1} / {totalPages}</span>
+          <button onClick={() => setHistoryPage(p => Math.min(totalPages - 1, p + 1))} disabled={historyPage >= totalPages - 1} style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: historyPage >= totalPages - 1 ? T.tx3 : T.tx, fontSize: 10, cursor: historyPage >= totalPages - 1 ? 'default' : 'pointer', opacity: historyPage >= totalPages - 1 ? 0.4 : 1 }}>Next</button>
+        </div>
+      )}
+    </div>
+  );
 
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (loadingConfig) return (
@@ -386,7 +496,7 @@ export default function PackTime() {
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Pack Time</span>
-        <span style={{ fontSize: 10, color: T.tx3 }}>Forward Scan Station</span>
+        <button onClick={() => setShowHistory(true)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
       </div>
 
       {/* Unicommerce Order Stats */}
