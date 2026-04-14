@@ -68,6 +68,8 @@ export default function CashChallan() {
   // Analytics
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number> }>({ totalRevenue: 0, count: 0, byMode: {} });
+  const [analyticsFrom, setAnalyticsFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; });
+  const [analyticsTo, setAnalyticsTo] = useState(() => new Date().toISOString().slice(0, 10));
 
   // Ledger
   const [showLedger, setShowLedger] = useState(false);
@@ -110,13 +112,13 @@ export default function CashChallan() {
 
   // ── Fetch analytics ────────────────────────────────────────────────────────
   const fetchAnalytics = useCallback(async () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const { data } = await supabase.from('cash_challans').select('total, payment_mode, status').gte('created_at', today + 'T00:00:00').neq('status', 'voided');
+    const { data } = await supabase.from('cash_challans').select('total, payment_mode, status')
+      .gte('created_at', analyticsFrom + 'T00:00:00').lte('created_at', analyticsTo + 'T23:59:59').neq('status', 'voided');
     const totalRevenue = (data || []).reduce((s: number, r: any) => s + Number(r.total), 0);
     const byMode: Record<string, number> = {};
     (data || []).forEach((r: any) => { const m = r.payment_mode || 'Unset'; byMode[m] = (byMode[m] || 0) + Number(r.total); });
     setAnalytics({ totalRevenue, count: (data || []).length, byMode });
-  }, []);
+  }, [analyticsFrom, analyticsTo]);
 
   // ── Fetch ledger ───────────────────────────────────────────────────────────
   const fetchLedger = useCallback(async () => {
@@ -244,9 +246,15 @@ export default function CashChallan() {
   // ── Analytics Screen ───────────────────────────────────────────────────────
   if (showAnalytics) return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Daily Analytics</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Analytics</span>
         <button onClick={() => setShowAnalytics(false)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Back</button>
+      </div>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12 }}>
+        <input type="date" value={analyticsFrom} onChange={e => setAnalyticsFrom(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }} />
+        <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
+        <input type="date" value={analyticsTo} onChange={e => setAnalyticsTo(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }} />
+        <button onClick={fetchAnalytics} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
         <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
