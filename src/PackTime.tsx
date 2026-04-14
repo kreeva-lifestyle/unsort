@@ -326,8 +326,10 @@ export default function PackTime() {
     enqueueWrite([row], courierSheet);
     setPendingWrites(p => p + 1);
 
-    // Save to Supabase
-    supabase.from('packtime_scans').insert({ session_id: sessionIdRef.current, awb: trimmed, courier, camera, sheet_name: courierSheet }).then(() => {});
+    // Save to Supabase DB
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      supabase.from('packtime_scans').insert({ session_id: sessionIdRef.current, awb: trimmed, courier, camera, sheet_name: courierSheet, user_id: user?.id });
+    });
 
     // Mark as synced after a short delay (optimistic)
     setTimeout(() => {
@@ -356,8 +358,9 @@ export default function PackTime() {
     setLastScanned('');
     beep(500, 0.15);
     focusInput();
-    // Background delete from Google Sheet
+    // Background delete from Google Sheet + Supabase DB
     fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) }).catch(() => {});
+    supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current);
   }, [lastScanned, courierSheet, focusInput]);
 
   // ── Delete a specific scan (removes from local + Google Sheet) ─────────────
@@ -372,8 +375,9 @@ export default function PackTime() {
     }
     if (lastScanned === awb) setLastScanned('');
     beep(500, 0.1);
-    // Background delete from Google Sheet
+    // Background delete from Google Sheet + Supabase DB
     fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) }).catch(() => {});
+    supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current);
   }, [recentScans, lastScanned, courierSheet]);
 
   // ── Fetch today's summary across all couriers ──────────────────────────────
