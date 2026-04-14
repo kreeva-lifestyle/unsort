@@ -57,6 +57,7 @@ export default function CashChallan() {
   const [items, setItems] = useState<ChallanItem[]>([{ sku: '', description: '', quantity: 1, price: 0, total: 0 }]);
   const [discountType, setDiscountType] = useState<string>('flat');
   const [discountValue, setDiscountValue] = useState(0);
+  const [shippingCharges, setShippingCharges] = useState(0);
   const [notes, setNotes] = useState('');
   const [tags, setTags] = useState('');
   const [paymentMode, setPaymentMode] = useState('');
@@ -80,7 +81,7 @@ export default function CashChallan() {
   // ── Computed values ────────────────────────────────────────────────────────
   const subtotal = items.reduce((s, i) => s + i.quantity * i.price, 0);
   const discountAmount = discountType === 'percentage' ? subtotal * discountValue / 100 : discountValue;
-  const afterDiscount = subtotal - discountAmount;
+  const afterDiscount = subtotal - discountAmount + shippingCharges;
   const roundOff = Math.round(afterDiscount) - afterDiscount;
   const grandTotal = Math.round(afterDiscount);
 
@@ -155,7 +156,7 @@ export default function CashChallan() {
     const challanData = {
       customer_id: custId, customer_name: customerName.trim(), status: challanStatus,
       subtotal, discount_type: discountType, discount_value: discountValue,
-      discount_amount: discountAmount, round_off: roundOff, total: grandTotal,
+      discount_amount: discountAmount, shipping_charges: shippingCharges, round_off: roundOff, total: grandTotal,
       amount_paid: amountPaid, payment_mode: paymentMode || null,
       payment_date: paymentDate || null, notes, tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       modified_by: user?.id,
@@ -191,6 +192,7 @@ export default function CashChallan() {
     setItems((citems || []).map(i => ({ sku: i.sku || '', description: i.description, quantity: i.quantity, price: Number(i.price), total: Number(i.total) })));
     setDiscountType(c.discount_type || 'flat');
     setDiscountValue(Number(c.discount_value));
+    setShippingCharges(Number((c as any).shipping_charges || 0));
     setNotes(c.notes || '');
     setTags((c.tags || []).join(', '));
     setPaymentMode(c.payment_mode || '');
@@ -203,7 +205,7 @@ export default function CashChallan() {
   const closeModal = () => {
     setShowModal(false); setEditing(null); setCustomerName(''); setSelectedCustomerId(null);
     setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0 }]);
-    setDiscountType('flat'); setDiscountValue(0); setNotes(''); setTags('');
+    setDiscountType('flat'); setDiscountValue(0); setShippingCharges(0); setNotes(''); setTags('');
     setPaymentMode(''); setPaymentDate(''); setAmountPaid(0); setChallanStatus('unpaid');
     setCustomerSuggestions([]);
   };
@@ -221,6 +223,7 @@ export default function CashChallan() {
     w.document.write(`</tbody></table>`);
     w.document.write(`<div style="text-align:right;font-size:12px"><p>Subtotal: <strong>${Number(c.subtotal).toFixed(2)}</strong></p>`);
     if (Number(c.discount_amount) > 0) w.document.write(`<p>Discount: -${Number(c.discount_amount).toFixed(2)}</p>`);
+    if (Number((c as any).shipping_charges) > 0) w.document.write(`<p>Shipping/Porter: +${Number((c as any).shipping_charges).toFixed(2)}</p>`);
     if (Number(c.round_off) !== 0) w.document.write(`<p>Round Off: ${Number(c.round_off).toFixed(2)}</p>`);
     w.document.write(`<p style="font-size:16px;font-weight:700">Total: ₹${Number(c.total).toFixed(2)}</p></div>`);
     if (c.notes) w.document.write(`<p style="font-size:11px;color:#666;margin-top:12px"><strong>Notes:</strong> ${c.notes}</p>`);
@@ -402,8 +405,8 @@ export default function CashChallan() {
             <button onClick={() => setItems([...items, { sku: '', description: '', quantity: 1, price: 0, total: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>
           </div>
 
-          {/* Discount + Tags */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+          {/* Discount + Shipping + Tags */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
             <div>
               <label style={lbl}>Discount</label>
               <div style={{ display: 'flex', gap: 4 }}>
@@ -412,6 +415,10 @@ export default function CashChallan() {
                 </select>
                 <input type="number" value={discountValue || ''} onChange={e => setDiscountValue(Number(e.target.value))} placeholder="0" style={{ ...inp, flex: 1, fontFamily: T.mono, fontSize: 11 }} />
               </div>
+            </div>
+            <div>
+              <label style={lbl}>Shipping/Porter</label>
+              <input type="number" value={shippingCharges || ''} onChange={e => setShippingCharges(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
             </div>
             <div>
               <label style={lbl}>Tags</label>
@@ -456,6 +463,7 @@ export default function CashChallan() {
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 16px', marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, marginBottom: 4 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{subtotal.toFixed(2)}</span></div>
           {discountAmount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Discount ({discountType === 'percentage' ? `${discountValue}%` : 'Flat'})</span><span style={{ fontFamily: T.mono }}>-₹{discountAmount.toFixed(2)}</span></div>}
+          {shippingCharges > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.bl, marginBottom: 4 }}><span>Shipping/Porter</span><span style={{ fontFamily: T.mono }}>+₹{shippingCharges.toFixed(2)}</span></div>}
           {roundOff !== 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx3, marginBottom: 4 }}><span>Round Off</span><span style={{ fontFamily: T.mono }}>{roundOff > 0 ? '+' : ''}₹{roundOff.toFixed(2)}</span></div>}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}><span>Total</span><span>₹{grandTotal.toLocaleString('en-IN')}</span></div>
         </div>
