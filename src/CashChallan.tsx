@@ -67,6 +67,9 @@ export default function CashChallan() {
   const [challanStatus, setChallanStatus] = useState('draft');
 
   // Analytics
+  const [showErpReminder, setShowErpReminder] = useState(false);
+  const [userName, setUserName] = useState('there');
+  const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number } | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number> }>({ totalRevenue: 0, count: 0, byMode: {} });
   const [analyticsFrom, setAnalyticsFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; });
@@ -103,6 +106,15 @@ export default function CashChallan() {
   }, [search, statusFilter, tagFilter, page, pageSize]);
 
   useEffect(() => { fetchChallans(); }, [fetchChallans]);
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+        setUserName(prof?.full_name || user.email?.split('@')[0] || 'there');
+      }
+    })();
+  }, []);
 
   // ── Customer auto-suggest ──────────────────────────────────────────────────
   const searchCustomers = useCallback(async (q: string) => {
@@ -195,8 +207,10 @@ export default function CashChallan() {
         await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: newChallan.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: it.quantity * it.price, sort_order: i })));
       }
     }
+    const wasNew = !editing;
     closeModal();
     fetchChallans();
+    if (wasNew) setShowErpReminder(true);
   };
 
   // ── Void challan ───────────────────────────────────────────────────────────
@@ -568,7 +582,7 @@ export default function CashChallan() {
                 <button onClick={e => { e.stopPropagation(); shareChallan(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.5 }}>
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.gr, strokeWidth: 2 }}><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></svg>
                 </button>
-                {c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); if (confirm('Void this challan?')) voidChallan(c.id); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.4 }}>
+                {c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number }); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.4 }}>
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M18 6L6 18M6 6l12 12" /></svg>
                 </button>}
               </div>
@@ -576,6 +590,33 @@ export default function CashChallan() {
           );
         })}
       </div>
+
+      {/* ERP Reminder Modal */}
+      {showErpReminder && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
+          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '24px 22px', textAlign: 'center', maxWidth: 380, width: '100%' }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Hi {userName}!</div>
+            <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 18 }}>Reminder to manually <strong style={{ color: T.yl }}>reduce these inventory items in ERP</strong>. Cash Challan does not sync inventory automatically.</div>
+            <button onClick={() => setShowErpReminder(false)} style={{ width: '100%', padding: '10px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer' }}>Got It</button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Action Modal */}
+      {confirmAction && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
+          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', textAlign: 'center', maxWidth: 340, width: '100%' }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>⚠️</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>{confirmAction.type === 'void' ? 'Void Challan?' : 'Delete Challan?'}</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>{confirmAction.type === 'void' ? `Challan #${confirmAction.challanNumber} will be marked voided. This cannot be undone.` : `Challan #${confirmAction.challanNumber} will be permanently deleted.`}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setConfirmAction(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { if (confirmAction.type === 'void') voidChallan(confirmAction.id); setConfirmAction(null); }} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: 'pointer' }}>{confirmAction.type === 'void' ? 'Void' : 'Delete'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pagination */}
       {totalPages > 0 && (

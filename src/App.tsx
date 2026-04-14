@@ -245,7 +245,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
     { id: 'inventory', icon: 'box', label: 'Inventory' },
     { id: 'reports', icon: 'file', label: 'Reports' },
     { id: 'brandtag', icon: 'tag', label: 'Brand Tags' },
-    { id: 'packtime', icon: 'scan', label: 'Pack Time' },
+    { id: 'packtime', icon: 'scan', label: 'PackStation' },
     { id: 'challan', icon: 'file', label: 'Cash Challan' },
     { id: 'settings', icon: 'settings', label: 'Settings' },
   ];
@@ -1670,7 +1670,7 @@ const SettingsPage = () => {
   const tabs = [{ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }];
   if (isAdmin) tabs.push({ id: 'users', label: 'Users' });
   tabs.push({ id: 'brands', label: 'Brands' });
-  tabs.push({ id: 'packtime', label: 'Pack Time' });
+  tabs.push({ id: 'packtime', label: 'PackStation' });
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ display: 'flex', gap: 3, marginBottom: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, width: 'fit-content', border: `1px solid ${T.bd}`, flexWrap: 'wrap' }}>
@@ -1830,7 +1830,7 @@ const MainApp = () => {
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', reports: 'Reports', brandtag: 'Brand Tags', packtime: 'Pack Time', challan: 'Cash Challan', settings: 'Settings' };
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', reports: 'Reports', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', settings: 'Settings' };
   const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
@@ -1860,7 +1860,7 @@ const MainApp = () => {
     <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
       {/* Mobile bottom nav */}
       <div className="mobile-hamburger" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 102, background: T.s, borderTop: `1px solid ${T.bd}`, padding: '8px 0', paddingBottom: 'max(8px, env(safe-area-inset-bottom))', justifyContent: 'space-around' }}>
-        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Items' }, { id: 'packtime', icon: 'scan', label: 'Pack Time' }, { id: 'challan', icon: 'file', label: 'Challan' }].map(t => (
+        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Items' }, { id: 'packtime', icon: 'scan', label: 'PackStation' }, { id: 'challan', icon: 'file', label: 'Challan' }].map(t => (
           <div key={t.id} onClick={() => { setTab(t.id); setMobileMenu(false); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: tab === t.id ? T.ac : T.tx3, fontSize: 9, fontWeight: 500 }}>
             <Icon name={t.icon} size={20} /><span>{t.label}</span>
           </div>
