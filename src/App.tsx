@@ -188,8 +188,8 @@ const AuthScreen = () => {
       <div style={{ position: 'absolute', width: 350, height: 350, background: T.bl, borderRadius: '50%', filter: 'blur(80px)', opacity: 0.15, bottom: -80, right: -80, animation: 'loginGlowFloat 10s ease-in-out infinite alternate', animationDelay: '-3s' }} />
       <div style={{ position: 'absolute', width: 250, height: 250, background: T.yl, borderRadius: '50%', filter: 'blur(80px)', opacity: 0.1, top: '50%', left: '60%', animation: 'loginGlowFloat 12s ease-in-out infinite alternate', animationDelay: '-5s' }} />
       <div style={{ position: 'relative', zIndex: 1, background: 'rgba(14,18,30,.90)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', border: `1px solid rgba(255,255,255,.06)`, borderRadius: 16, width: 360, maxWidth: 'calc(100vw - 32px)', padding: '32px 28px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,.5)', animation: 'loginBoxEnter .6s cubic-bezier(.16,1,.3,1) both' }}>
-        <div style={{ fontSize: 24, fontWeight: 700, color: T.ac, fontFamily: T.sora, marginBottom: 3, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'loginLogoShine 3s ease-in-out infinite alternate' }}>Unsort</div>
-        <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 3, textTransform: 'uppercase' as const, marginBottom: 26, opacity: 0, animation: 'loginFadeUp .5s .2s ease both' }}>Track Damaged & Unsorted Products</div>
+        <div style={{ fontSize: 24, fontWeight: 700, color: T.ac, fontFamily: T.sora, marginBottom: 3, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'loginLogoShine 3s ease-in-out infinite alternate' }}>DailyOffice</div>
+        <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 3, textTransform: 'uppercase' as const, marginBottom: 26, opacity: 0, animation: 'loginFadeUp .5s .2s ease both' }}>Track & Manage Warehouse Operations</div>
         <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${T.bd2}, transparent)`, marginBottom: 22, opacity: 0, animation: 'loginFadeUp .5s .25s ease both' }} />
         {error && <div style={{ background: 'rgba(245,87,92,.12)', border: '1px solid rgba(245,87,92,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.re, marginBottom: 14, animation: 'loginShake .4s ease' }}>{error}</div>}
         <form onSubmit={handleSubmit}>
@@ -244,8 +244,8 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
       <div style={{ position: 'absolute', top: -30, left: -20, width: 160, height: 160, background: `radial-gradient(circle, ${T.ac}10 0%, transparent 70%)`, pointerEvents: 'none', zIndex: 0 }} />
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
       <div style={{ padding: '14px 14px 11px', borderBottom: `1px solid ${T.bd}` }}>
-        <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'subtlePulse 4s ease-in-out infinite' }}>Unsort</div>
-        <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2.5, textTransform: 'uppercase' as const, marginTop: 2 }}>Product Tracking</div>
+        <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'subtlePulse 4s ease-in-out infinite' }}>DailyOffice</div>
+        <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2.5, textTransform: 'uppercase' as const, marginTop: 2 }}>Warehouse Operations</div>
       </div>
       <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2, textTransform: 'uppercase' as const, padding: '12px 14px 5px', fontWeight: 600 }}>Menu</div>
       <nav style={{ flex: 1, padding: '2px 8px 8px' }}>
@@ -1043,7 +1043,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
           <span style={{ fontSize: 10, fontWeight: 500, color: T.tx3 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length !== 1 ? 's' : ''}</span>
         </div>
         <div style={{ display: 'flex', gap: 5 }}>
-          {!isCompletedView && <div onClick={computeIntel} style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600, fontSize: 10 }}>Unsort Intel</div>}
+          {!isCompletedView && <div onClick={computeIntel} style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600, fontSize: 10 }}>Smart Intel</div>}
           {canEdit && !isCompletedView && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
         </div>
       </div>
@@ -1226,11 +1226,11 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
         <span onClick={undoDelete} style={{ ...S.btnPrimary, padding: '5px 14px', fontSize: 12, background: T.yl, color: '#000', boxShadow: 'none' }}>Undo</span>
       </div>}
 
-      {/* Unsort Intel Modal */}
+      {/* Smart Intel Modal */}
       {showIntel && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 580 }}>
         <div style={{ ...S.modalHead, background: 'rgba(251,191,36,.06)', borderBottom: '1px solid rgba(251,191,36,.2)' }}>
           <div>
-            <span style={{ fontSize: 14, fontWeight: 600, color: T.yl }}>Unsort Intel</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: T.yl }}>Smart Intel</span>
             <p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3 }}>Cross-size completion possibilities (adjacent size alteration)</p>
           </div>
           <span onClick={() => setShowIntel(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
