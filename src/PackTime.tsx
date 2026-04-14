@@ -20,7 +20,7 @@ const T = {
   sora: "'Sora', 'Inter', sans-serif",
 };
 
-interface Courier { id: string; name: string; sheet_name: string; }
+interface Courier { id: string; name: string; sheet_name: string; brand: string; }
 interface Camera { id: string; number: string; }
 interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; }
 
@@ -111,6 +111,7 @@ export default function PackTime() {
   // Setup
   const [courier, setCourier] = useState('');
   const [courierSheet, setCourierSheet] = useState('');
+  const [courierBrand, setCourierBrand] = useState('');
   const [camera, setCamera] = useState('');
   const [brand, setBrand] = useState('');
   const [started, setStarted] = useState(false);
@@ -269,6 +270,7 @@ export default function PackTime() {
     const c = couriers.find(x => x.name === courier);
     if (!c) return;
     setCourierSheet(c.sheet_name);
+    setCourierBrand(c.brand || 'FUSIONIC');
     setVerifying(true); setVerifyResult(null);
     try {
       const resp = await fetch(EDGE_FN, {
@@ -322,7 +324,7 @@ export default function PackTime() {
     setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true }, ...p].slice(0, 30));
 
     // Background write to Google Sheet
-    const row = [count, trimmed, timestamp, camera];
+    const row = [count, trimmed, timestamp, camera, courierBrand];
     enqueueWrite([row], courierSheet);
     setPendingWrites(p => p + 1);
 
@@ -338,7 +340,7 @@ export default function PackTime() {
     }, 1500);
 
     focusInput();
-  }, [camera, courierSheet, focusInput]);
+  }, [camera, courierSheet, courierBrand, focusInput]);
 
   // Keep submitRef in sync for camera callback
   useEffect(() => { submitRef.current = submitAwb; }, [submitAwb]);
