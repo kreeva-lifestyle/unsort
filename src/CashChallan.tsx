@@ -68,6 +68,13 @@ export default function CashChallan() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number> }>({ totalRevenue: 0, count: 0, byMode: {} });
 
+  // Ledger
+  const [showLedger, setShowLedger] = useState(false);
+  const [ledgerCustomers, setLedgerCustomers] = useState<{ name: string; total: number; paid: number; outstanding: number; count: number }[]>([]);
+  const [ledgerDetail, setLedgerDetail] = useState<string | null>(null);
+  const [ledgerChallans, setLedgerChallans] = useState<Challan[]>([]);
+  const [ledgerSearch, setLedgerSearch] = useState('');
+
   const searchTimeout = useRef<any>(null);
 
   // ── Computed values ────────────────────────────────────────────────────────
@@ -108,6 +115,28 @@ export default function CashChallan() {
     const byMode: Record<string, number> = {};
     (data || []).forEach((r: any) => { const m = r.payment_mode || 'Unset'; byMode[m] = (byMode[m] || 0) + Number(r.total); });
     setAnalytics({ totalRevenue, count: (data || []).length, byMode });
+  }, []);
+
+  // ── Fetch ledger ───────────────────────────────────────────────────────────
+  const fetchLedger = useCallback(async () => {
+    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, status').neq('status', 'voided');
+    const map: Record<string, { total: number; paid: number; count: number }> = {};
+    (data || []).forEach((r: any) => {
+      const name = r.customer_name;
+      if (!map[name]) map[name] = { total: 0, paid: 0, count: 0 };
+      map[name].total += Number(r.total);
+      map[name].paid += Number(r.amount_paid);
+      map[name].count++;
+    });
+    const list = Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count }));
+    list.sort((a, b) => b.outstanding - a.outstanding);
+    setLedgerCustomers(list);
+  }, []);
+
+  const fetchLedgerDetail = useCallback(async (name: string) => {
+    setLedgerDetail(name);
+    const { data } = await supabase.from('cash_challans').select('*').eq('customer_name', name).order('created_at', { ascending: false });
+    setLedgerChallans(data || []);
   }, []);
 
   // ── Save challan ───────────────────────────────────────────────────────────
@@ -239,6 +268,91 @@ export default function CashChallan() {
     </div>
   );
 
+  // ── Ledger Detail Screen ────────────────────────────────────────────────────
+  if (showLedger && ledgerDetail) {
+    const cust = ledgerCustomers.find(c => c.name === ledgerDetail);
+    return (
+      <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div>
+            <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>{ledgerDetail}</span>
+            {cust && <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{cust.count} challans | Outstanding: <span style={{ color: cust.outstanding > 0 ? T.re : T.gr, fontWeight: 600 }}>₹{cust.outstanding.toLocaleString('en-IN')}</span></div>}
+          </div>
+          <button onClick={() => setLedgerDetail(null)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Back</button>
+        </div>
+        {cust && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+            <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.12)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+              <div style={{ fontSize: 7, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Total Billed</div>
+              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>₹{cust.total.toLocaleString('en-IN')}</div>
+            </div>
+            <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.12)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+              <div style={{ fontSize: 7, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Paid</div>
+              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: T.gr }}>₹{cust.paid.toLocaleString('en-IN')}</div>
+            </div>
+            <div style={{ background: cust.outstanding > 0 ? 'rgba(239,68,68,.06)' : 'rgba(34,197,94,.06)', border: `1px solid ${cust.outstanding > 0 ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)'}`, borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+              <div style={{ fontSize: 7, color: cust.outstanding > 0 ? T.re : T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Outstanding</div>
+              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: cust.outstanding > 0 ? T.re : T.gr }}>₹{cust.outstanding.toLocaleString('en-IN')}</div>
+            </div>
+          </div>
+        )}
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+          {ledgerChallans.map(c => {
+            const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
+            return (
+              <div key={c.id} onClick={() => openEdit(c)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>#{c.challan_number}</span>
+                    <span style={{ fontSize: 9, color: T.tx3 }}>{new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
+                    <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: sc.bg, color: sc.color, fontWeight: 600, textTransform: 'uppercase' }}>{c.status}</span>
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(c.total).toLocaleString('en-IN')}</div>
+              </div>
+            );
+          })}
+          {ledgerChallans.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No challans found.</div>}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Ledger List Screen ─────────────────────────────────────────────────────
+  if (showLedger) {
+    const filtered = ledgerSearch ? ledgerCustomers.filter(c => c.name.toLowerCase().includes(ledgerSearch.toLowerCase())) : ledgerCustomers;
+    const totalOutstanding = filtered.reduce((s, c) => s + c.outstanding, 0);
+    return (
+      <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Customer Ledger</span>
+          <button onClick={() => { setShowLedger(false); setLedgerSearch(''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Back</button>
+        </div>
+        <input type="text" value={ledgerSearch} onChange={e => setLedgerSearch(e.target.value)} placeholder="Search customer..."
+          style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '7px 10px', outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ fontSize: 9, color: T.tx3 }}>{filtered.length} customers</span>
+          <span style={{ fontSize: 10, color: totalOutstanding > 0 ? T.re : T.gr, fontWeight: 600 }}>Total Outstanding: ₹{totalOutstanding.toLocaleString('en-IN')}</span>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+          {filtered.map(c => (
+            <div key={c.name} onClick={() => fetchLedgerDetail(c.name)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, marginBottom: 2 }}>{c.name}</div>
+                <div style={{ fontSize: 9, color: T.tx3 }}>{c.count} challans | Billed: ₹{c.total.toLocaleString('en-IN')} | Paid: ₹{c.paid.toLocaleString('en-IN')}</div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: c.outstanding > 0 ? T.re : T.gr }}>₹{c.outstanding.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase' }}>{c.outstanding > 0 ? 'Due' : 'Clear'}</div>
+              </div>
+            </div>
+          ))}
+          {filtered.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No customers found.</div>}
+        </div>
+      </div>
+    );
+  }
+
   // ── Shared label style ──────────────────────────────────────────────────────
   const lbl: React.CSSProperties = { display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 };
   const inp: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' };
@@ -358,6 +472,7 @@ export default function CashChallan() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Cash Challan</span>
         <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => { fetchLedger(); setShowLedger(true); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Ledger</button>
           <button onClick={() => { fetchAnalytics(); setShowAnalytics(true); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Analytics</button>
           <button onClick={() => setShowModal(true)} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', boxShadow: '0 2px 8px rgba(99,102,241,.25)' }}>+ New</button>
         </div>
