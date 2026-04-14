@@ -185,10 +185,10 @@ export default function CashChallan() {
     const w = window.open('', '_blank');
     if (!w) return;
     w.document.write(`<html><head><title>Cash Challan #${c.challan_number}</title><style>body{font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:auto}table{width:100%;border-collapse:collapse;margin:12px 0}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f5f5;font-weight:600}.right{text-align:right}.header{text-align:center;margin-bottom:16px}.status{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}</style></head><body>`);
-    w.document.write(`<div class="header"><h2 style="margin:0">Cash Challan</h2><p style="color:#666;font-size:12px;margin:4px 0">#${c.challan_number} | ${new Date(c.created_at).toLocaleDateString('en-IN')}</p></div>`);
+    w.document.write(`<div class="header"><h2 style="margin:0">Arya Designs</h2><p style="color:#666;font-size:11px;margin:4px 0">Cash Challan #${c.challan_number} | ${new Date(c.created_at).toLocaleDateString('en-IN')}</p></div>`);
     w.document.write(`<p><strong>Customer:</strong> ${c.customer_name}</p>`);
-    w.document.write(`<table><thead><tr><th>#</th><th>SKU</th><th>Description</th><th class="right">Qty</th><th class="right">Price</th><th class="right">Total</th></tr></thead><tbody>`);
-    (citems || []).forEach((it: any, i: number) => { w.document.write(`<tr><td>${i + 1}</td><td>${it.sku || '-'}</td><td>${it.description}</td><td class="right">${it.quantity}</td><td class="right">${Number(it.price).toFixed(2)}</td><td class="right">${Number(it.total).toFixed(2)}</td></tr>`); });
+    w.document.write(`<table><thead><tr><th>#</th><th>SKU</th><th class="right">Qty</th><th class="right">Price</th><th class="right">Total</th></tr></thead><tbody>`);
+    (citems || []).forEach((it: any, i: number) => { w.document.write(`<tr><td>${i + 1}</td><td>${it.sku || '-'}</td><td class="right">${it.quantity}</td><td class="right">${Number(it.price).toFixed(2)}</td><td class="right">${Number(it.total).toFixed(2)}</td></tr>`); });
     w.document.write(`</tbody></table>`);
     w.document.write(`<div style="text-align:right;font-size:12px"><p>Subtotal: <strong>${Number(c.subtotal).toFixed(2)}</strong></p>`);
     if (Number(c.discount_amount) > 0) w.document.write(`<p>Discount: -${Number(c.discount_amount).toFixed(2)}</p>`);
@@ -271,17 +271,15 @@ export default function CashChallan() {
           {/* Line Items */}
           <label style={lbl}>Items</label>
           <div style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 8, marginBottom: 12, overflow: 'hidden' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 45px 65px 24px', gap: 4, padding: '5px 8px', borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 24px', gap: 4, padding: '5px 8px', borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
               <span style={{ fontSize: 8, color: T.tx3, fontWeight: 600, letterSpacing: .5 }}>SKU</span>
-              <span style={{ fontSize: 8, color: T.tx3, fontWeight: 600, letterSpacing: .5 }}>DESCRIPTION</span>
               <span style={{ fontSize: 8, color: T.tx3, fontWeight: 600, letterSpacing: .5, textAlign: 'center' }}>QTY</span>
               <span style={{ fontSize: 8, color: T.tx3, fontWeight: 600, letterSpacing: .5, textAlign: 'right' }}>PRICE</span>
               <span />
             </div>
             {items.map((it, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 45px 65px 24px', gap: 4, padding: '5px 8px', borderBottom: `1px solid ${T.bd}`, alignItems: 'center' }}>
-                <input value={it.sku} onChange={e => { const n = [...items]; n[i].sku = e.target.value; setItems(n); }} placeholder="—" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', fontFamily: T.mono }} />
-                <input value={it.description} onChange={e => { const n = [...items]; n[i].description = e.target.value; setItems(n); }} placeholder="Item name" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none' }} />
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 24px', gap: 4, padding: '5px 8px', borderBottom: `1px solid ${T.bd}`, alignItems: 'center' }}>
+                <input value={it.sku} onChange={e => { const n = [...items]; n[i].sku = e.target.value; setItems(n); }} placeholder="SKU / Item name" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', fontFamily: T.mono }} />
                 <input type="number" value={it.quantity || ''} onChange={e => { const n = [...items]; n[i].quantity = Number(e.target.value); setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'center' }} />
                 <input type="number" value={it.price || ''} onChange={e => { const n = [...items]; n[i].price = Number(e.target.value); setItems(n); }} placeholder="0" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right', fontFamily: T.mono }} />
                 <button onClick={() => { if (items.length > 1) setItems(items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }}>×</button>
