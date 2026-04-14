@@ -90,7 +90,7 @@ export default function CashChallan() {
   // ── Fetch challans ─────────────────────────────────────────────────────────
   const fetchChallans = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('cash_challans').select('*', { count: 'exact' });
+    let query = supabase.from('cash_challans').select('*, cash_challan_items(sku)', { count: 'exact' });
     if (search) query = query.or(`customer_name.ilike.%${search}%,challan_number.eq.${isNaN(Number(search)) ? 0 : search}`);
     if (statusFilter) query = query.eq('status', statusFilter);
     if (tagFilter) query = query.contains('tags', [tagFilter]);
@@ -516,6 +516,8 @@ export default function CashChallan() {
         {!loading && challans.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No challans found. Create your first one.</div>}
         {challans.map(c => {
           const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
+          const skus = ((c as any).cash_challan_items || []).map((i: any) => i.sku).filter(Boolean).join(', ');
+          const pendingDays = (c.status === 'unpaid' || c.status === 'partial') ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : 0;
           return (
             <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }} onClick={() => openEdit(c)}>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -523,11 +525,13 @@ export default function CashChallan() {
                   <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>#{c.challan_number}</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.customer_name}</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 9, color: T.tx3 }}>{new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
                   <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: sc.bg, color: sc.color, fontWeight: 600, textTransform: 'uppercase' }}>{c.status}</span>
+                  {pendingDays > 0 && <span style={{ fontSize: 8, color: T.re, fontWeight: 600 }}>({pendingDays}d pending)</span>}
                   {(c.tags || []).map(t => <span key={t} style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: 'rgba(99,102,241,.08)', color: T.ac2 }}>{t}</span>)}
                 </div>
+                {skus && <div style={{ fontSize: 9, fontFamily: T.mono, color: T.tx3, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{skus}</div>}
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(c.total).toLocaleString('en-IN')}</div>
