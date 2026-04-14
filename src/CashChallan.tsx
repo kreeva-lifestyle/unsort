@@ -29,6 +29,7 @@ interface Challan {
 interface Customer { id: string; name: string; phone: string; address: string; }
 
 const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  draft: { bg: 'rgba(56,189,248,.10)', color: T.bl },
   paid: { bg: 'rgba(34,197,94,.10)', color: T.gr },
   unpaid: { bg: 'rgba(239,68,68,.10)', color: T.re },
   partial: { bg: 'rgba(245,158,11,.10)', color: T.yl },
@@ -63,7 +64,7 @@ export default function CashChallan() {
   const [paymentMode, setPaymentMode] = useState('');
   const [paymentDate, setPaymentDate] = useState('');
   const [amountPaid, setAmountPaid] = useState(0);
-  const [challanStatus, setChallanStatus] = useState('unpaid');
+  const [challanStatus, setChallanStatus] = useState('draft');
 
   // Analytics
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -120,9 +121,26 @@ export default function CashChallan() {
     setAnalytics({ totalRevenue, count: (data || []).length, byMode });
   }, [analyticsFrom, analyticsTo]);
 
-  // ── Fetch ledger ───────────────────────────────────────────────────────────
+  // ── Fetch ledger (recent 10 customers) ──────────────────────────────────────
   const fetchLedger = useCallback(async () => {
-    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, status').neq('status', 'voided');
+    // Get last 10 distinct customers by most recent challan
+    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, created_at').neq('status', 'voided').order('created_at', { ascending: false }).limit(100);
+    const map: Record<string, { total: number; paid: number; count: number; latest: string }> = {};
+    (data || []).forEach((r: any) => {
+      const name = r.customer_name;
+      if (!map[name]) map[name] = { total: 0, paid: 0, count: 0, latest: r.created_at };
+      map[name].total += Number(r.total);
+      map[name].paid += Number(r.amount_paid);
+      map[name].count++;
+    });
+    const list = Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count }));
+    list.sort((a, b) => (map[b.name].latest > map[a.name].latest ? 1 : -1));
+    setLedgerCustomers(list.slice(0, 10));
+  }, []);
+
+  const searchLedgerCustomer = useCallback(async (q: string) => {
+    if (!q.trim()) { fetchLedger(); return; }
+    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid').neq('status', 'voided').ilike('customer_name', `%${q}%`);
     const map: Record<string, { total: number; paid: number; count: number }> = {};
     (data || []).forEach((r: any) => {
       const name = r.customer_name;
@@ -131,10 +149,8 @@ export default function CashChallan() {
       map[name].paid += Number(r.amount_paid);
       map[name].count++;
     });
-    const list = Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count }));
-    list.sort((a, b) => b.outstanding - a.outstanding);
-    setLedgerCustomers(list);
-  }, []);
+    setLedgerCustomers(Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count })));
+  }, [fetchLedger]);
 
   const fetchLedgerDetail = useCallback(async (name: string) => {
     setLedgerDetail(name);
@@ -143,8 +159,13 @@ export default function CashChallan() {
   }, []);
 
   // ── Save challan ───────────────────────────────────────────────────────────
+  const [formError, setFormError] = useState('');
   const saveChallan = async () => {
-    if (!customerName.trim() || items.length === 0) return;
+    setFormError('');
+    if (!customerName.trim()) { setFormError('Customer name is required'); return; }
+    if (items.length === 0) { setFormError('Add at least one item'); return; }
+    const invalidItem = items.find(it => !it.sku.trim() || it.quantity <= 0 || it.price <= 0);
+    if (invalidItem) { setFormError('All items must have SKU, quantity > 0, and price > 0'); return; }
     const { data: { user } } = await supabase.auth.getUser();
 
     // Upsert customer
@@ -208,7 +229,7 @@ export default function CashChallan() {
     setShowModal(false); setEditing(null); setCustomerName(''); setSelectedCustomerId(null);
     setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0 }]);
     setDiscountType('flat'); setDiscountValue(0); setShippingCharges(0); setNotes(''); setTags('');
-    setPaymentMode(''); setPaymentDate(''); setAmountPaid(0); setChallanStatus('unpaid');
+    setPaymentMode(''); setPaymentDate(''); setAmountPaid(0); setChallanStatus('draft');
     setCustomerSuggestions([]);
   };
 
@@ -331,22 +352,25 @@ export default function CashChallan() {
 
   // ── Ledger List Screen ─────────────────────────────────────────────────────
   if (showLedger) {
-    const filtered = ledgerSearch ? ledgerCustomers.filter(c => c.name.toLowerCase().includes(ledgerSearch.toLowerCase())) : ledgerCustomers;
-    const totalOutstanding = filtered.reduce((s, c) => s + c.outstanding, 0);
+    const totalOutstanding = ledgerCustomers.reduce((s, c) => s + c.outstanding, 0);
     return (
       <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Customer Ledger</span>
           <button onClick={() => { setShowLedger(false); setLedgerSearch(''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Back</button>
         </div>
-        <input type="text" value={ledgerSearch} onChange={e => setLedgerSearch(e.target.value)} placeholder="Search customer..."
-          style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '7px 10px', outline: 'none', boxSizing: 'border-box', marginBottom: 8 }} />
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <input type="text" value={ledgerSearch} onChange={e => setLedgerSearch(e.target.value)} placeholder="Enter customer name..."
+            style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '7px 10px', outline: 'none', boxSizing: 'border-box' }} />
+          <button onClick={() => searchLedgerCustomer(ledgerSearch)} style={{ padding: '7px 12px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Search</button>
+        </div>
+        <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>{ledgerSearch ? 'Search Results' : 'Recent Customers'}</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 9, color: T.tx3 }}>{filtered.length} customers</span>
+          <span style={{ fontSize: 9, color: T.tx3 }}>{ledgerCustomers.length} customers</span>
           <span style={{ fontSize: 10, color: totalOutstanding > 0 ? T.re : T.gr, fontWeight: 600 }}>Total Outstanding: ₹{totalOutstanding.toLocaleString('en-IN')}</span>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-          {filtered.map(c => (
+          {ledgerCustomers.map(c => (
             <div key={c.name} onClick={() => fetchLedgerDetail(c.name)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, marginBottom: 2 }}>{c.name}</div>
@@ -358,7 +382,7 @@ export default function CashChallan() {
               </div>
             </div>
           ))}
-          {filtered.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No customers found.</div>}
+          {ledgerCustomers.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No customers found.</div>}
         </div>
       </div>
     );
@@ -445,7 +469,7 @@ export default function CashChallan() {
             <div>
               <label style={lbl}>Status</label>
               <select value={challanStatus} onChange={e => setChallanStatus(e.target.value)} style={{ ...inp, fontSize: 11 }}>
-                <option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="partial">Partial</option>
+                <option value="draft">Draft</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="partial">Partial</option>
               </select>
             </div>
             <div>
@@ -476,6 +500,7 @@ export default function CashChallan() {
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}><span>Total</span><span>₹{grandTotal.toLocaleString('en-IN')}</span></div>
         </div>
 
+        {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: T.re, marginBottom: 8 }}>{formError}</div>}
         <button onClick={saveChallan} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,.3)' }}>{editing ? 'Update Challan' : 'Create Challan'}</button>
       </div>
     </div>
@@ -498,7 +523,7 @@ export default function CashChallan() {
       <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
         <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search name or #..." style={{ flex: 1, minWidth: 120, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '6px 10px', outline: 'none' }} />
         <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '6px 8px', outline: 'none' }}>
-          <option value="">All Status</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option><option value="partial">Partial</option><option value="voided">Voided</option>
+          <option value="">All Status</option><option value="draft">Draft</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option><option value="partial">Partial</option><option value="voided">Voided</option>
         </select>
         {allTags.length > 0 && <select value={tagFilter} onChange={e => { setTagFilter(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '6px 8px', outline: 'none' }}>
           <option value="">All Tags</option>{allTags.map(t => <option key={t} value={t}>{t}</option>)}
@@ -553,11 +578,23 @@ export default function CashChallan() {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 10 }}>
-          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: page === 0 ? T.tx3 : T.tx, fontSize: 10, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.4 : 1 }}>Prev</button>
-          <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
-          <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: page >= totalPages - 1 ? T.tx3 : T.tx, fontSize: 10, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.4 : 1 }}>Next</button>
+      {totalPages > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
+          <span style={{ fontSize: 9, color: T.tx3 }}>Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalCount)} of {totalCount}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button onClick={() => setPage(0)} disabled={page === 0} style={{ padding: '3px 7px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: page === 0 ? 'transparent' : 'rgba(255,255,255,0.03)', color: page === 0 ? T.tx3 : T.tx, fontSize: 9, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }}>«</button>
+            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={{ padding: '3px 7px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: page === 0 ? 'transparent' : 'rgba(255,255,255,0.03)', color: page === 0 ? T.tx3 : T.tx, fontSize: 9, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }}>‹</button>
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              let p: number;
+              if (totalPages <= 5) p = i;
+              else if (page < 3) p = i;
+              else if (page > totalPages - 4) p = totalPages - 5 + i;
+              else p = page - 2 + i;
+              return <button key={p} onClick={() => setPage(p)} style={{ padding: '3px 8px', borderRadius: 4, border: p === page ? `1px solid ${T.ac}44` : `1px solid ${T.bd2}`, background: p === page ? `${T.ac}22` : 'rgba(255,255,255,0.03)', color: p === page ? T.ac2 : T.tx3, fontSize: 9, fontWeight: p === page ? 700 : 400, cursor: 'pointer' }}>{p + 1}</button>;
+            })}
+            <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} style={{ padding: '3px 7px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: page >= totalPages - 1 ? 'transparent' : 'rgba(255,255,255,0.03)', color: page >= totalPages - 1 ? T.tx3 : T.tx, fontSize: 9, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }}>›</button>
+            <button onClick={() => setPage(totalPages - 1)} disabled={page >= totalPages - 1} style={{ padding: '3px 7px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: page >= totalPages - 1 ? 'transparent' : 'rgba(255,255,255,0.03)', color: page >= totalPages - 1 ? T.tx3 : T.tx, fontSize: 9, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }}>»</button>
+          </div>
         </div>
       )}
     </div>
