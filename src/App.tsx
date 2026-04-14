@@ -1669,6 +1669,7 @@ const SettingsPage = () => {
   const isAdmin = profile?.role === 'admin';
   const tabs = [{ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }];
   if (isAdmin) tabs.push({ id: 'users', label: 'Users' });
+  tabs.push({ id: 'brands', label: 'Brands' });
   tabs.push({ id: 'packtime', label: 'Pack Time' });
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
@@ -1678,7 +1679,47 @@ const SettingsPage = () => {
       {tab === 'categories' && <Categories />}
       {tab === 'locations' && <Locations />}
       {tab === 'users' && <Users />}
+      {tab === 'brands' && <BrandsSettings />}
       {tab === 'packtime' && <PackTimeSettings />}
+    </div>
+  );
+};
+
+const BrandsSettings = () => {
+  const [brands, setBrands] = useState<any[]>([]);
+  const [newBrand, setNewBrand] = useState('');
+  const { addToast } = useNotifications();
+  const fetchBrands = () => { supabase.from('brands').select('*').order('name').then(({ data }) => setBrands(data || [])); };
+  useEffect(() => { fetchBrands(); }, []);
+  const addBrand = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBrand.trim()) return;
+    const { error } = await supabase.from('brands').insert({ name: newBrand.trim().toUpperCase() });
+    if (error) addToast(error.message, 'error');
+    else { addToast('Brand added!', 'success'); setNewBrand(''); fetchBrands(); }
+  };
+  const toggleBrand = async (id: string, active: boolean) => { await supabase.from('brands').update({ is_active: !active }).eq('id', id); fetchBrands(); };
+  const deleteBrand = async (id: string) => { await supabase.from('brands').delete().eq('id', id); addToast('Brand removed', 'success'); fetchBrands(); };
+  return (
+    <div>
+      <h3 style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: T.tx }}>Brands</h3>
+      <form onSubmit={addBrand} style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        <input value={newBrand} onChange={e => setNewBrand(e.target.value)} placeholder="Brand name (e.g. TANUKA)" style={{ ...S.fInput, flex: 1 }} />
+        <button type="submit" style={S.btnPrimary}>+ Add</button>
+      </form>
+      {brands.map(b => (
+        <div key={b.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${T.bd}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: b.is_active ? T.gr : T.tx3 }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{b.name}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <span onClick={() => toggleBrand(b.id, b.is_active)} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer' }}>{b.is_active ? 'Disable' : 'Enable'}</span>
+            <span onClick={() => deleteBrand(b.id)} style={{ ...S.btnDanger, cursor: 'pointer' }}>Delete</span>
+          </div>
+        </div>
+      ))}
+      {brands.length === 0 && <div style={{ fontSize: 11, color: T.tx3, padding: 10 }}>No brands. Add one above.</div>}
     </div>
   );
 };

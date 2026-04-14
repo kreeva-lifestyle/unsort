@@ -112,8 +112,9 @@ export default function PackTime() {
   const [courier, setCourier] = useState('');
   const [courierSheet, setCourierSheet] = useState('');
   const [courierBrand, setCourierBrand] = useState('');
+  const [selectedBrand, setSelectedBrand] = useState('');
   const [camera, setCamera] = useState('');
-  const [brand, setBrand] = useState('');
+
   const [started, setStarted] = useState(false);
 
   // Verify
@@ -160,20 +161,14 @@ export default function PackTime() {
   // ── Fetch config from Supabase ──────────────────────────────────────────────
   useEffect(() => {
     (async () => {
-      const [{ data: c }, { data: cam }, { data: bt }] = await Promise.all([
+      const [{ data: c }, { data: cam }, { data: b }] = await Promise.all([
         supabase.from('packtime_couriers').select('*').eq('is_active', true).order('name'),
         supabase.from('packtime_cameras').select('*').eq('is_active', true).order('number'),
-        supabase.from('brand_tags').select('brand').limit(1000),
+        supabase.from('brands').select('name').eq('is_active', true).order('name'),
       ]);
       setCouriers(c || []);
       setCameras(cam || []);
-      // Extract unique brand names
-      const brandSet = new Set<string>();
-      (bt || []).forEach((r: any) => {
-        const raw = (r.brand || '').replace(/^BRAND NAME:\s*/i, '').trim();
-        if (raw) brandSet.add(raw.toUpperCase());
-      });
-      setBrands([...brandSet].sort());
+      setBrands((b || []).map((x: any) => x.name));
       setLoadingConfig(false);
     })();
   }, []);
@@ -270,7 +265,7 @@ export default function PackTime() {
     const c = couriers.find(x => x.name === courier);
     if (!c) return;
     setCourierSheet(c.sheet_name);
-    setCourierBrand(c.brand || 'FUSIONIC');
+    setCourierBrand(selectedBrand || c.brand || 'FUSIONIC');
     setVerifying(true); setVerifyResult(null);
     try {
       const resp = await fetch(EDGE_FN, {
@@ -521,7 +516,7 @@ export default function PackTime() {
           {/* Brand */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5 }}>Brand Name</label>
-            <select value={brand} onChange={e => setBrand(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 14, padding: '11px 12px', outline: 'none', cursor: 'pointer' }}>
+            <select value={selectedBrand} onChange={e => setSelectedBrand(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 14, padding: '11px 12px', outline: 'none', cursor: 'pointer' }}>
               <option value="">Select brand...</option>
               {brands.map(b => <option key={b} value={b}>{b}</option>)}
             </select>
@@ -548,7 +543,7 @@ export default function PackTime() {
             {cameras.length === 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 4 }}>No cameras configured. Add them in Settings → Pack Time.</div>}
           </div>
 
-          <button onClick={handleStart} disabled={!brand || !courier || !camera || verifying} style={{ width: '100%', padding: '13px 0', borderRadius: 10, border: 'none', fontSize: 14, fontWeight: 700, fontFamily: T.sans, cursor: brand && courier && camera && !verifying ? 'pointer' : 'not-allowed', background: brand && courier && camera && !verifying ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.05)', color: brand && courier && camera ? '#fff' : T.tx3, boxShadow: brand && courier && camera && !verifying ? `0 4px 20px ${T.ac}40` : 'none', transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <button onClick={handleStart} disabled={!selectedBrand || !courier || !camera || verifying} style={{ width: '100%', padding: '13px 0', borderRadius: 10, border: 'none', fontSize: 14, fontWeight: 700, fontFamily: T.sans, cursor: selectedBrand && courier && camera && !verifying ? 'pointer' : 'not-allowed', background: selectedBrand && courier && camera && !verifying ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.05)', color: selectedBrand && courier && camera ? '#fff' : T.tx3, boxShadow: selectedBrand && courier && camera && !verifying ? `0 4px 20px ${T.ac}40` : 'none', transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             {verifying && <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'btnSpin .6s linear infinite' }} />}
             {verifying ? 'Verifying Sheet...' : 'Start Scanning'}
           </button>
@@ -602,7 +597,7 @@ export default function PackTime() {
           <div style={{ fontSize: 10, color: T.tx3, marginBottom: 2 }}>{dateStr}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>{courier}</span>
-            <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: 'rgba(34,197,94,.10)', color: T.gr, fontWeight: 600 }}>{brand}</span>
+            <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: 'rgba(34,197,94,.10)', color: T.gr, fontWeight: 600 }}>{courierBrand}</span>
             <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: 'rgba(99,102,241,.10)', color: T.ac2, fontWeight: 600, fontFamily: T.mono }}>CAM {camera}</span>
           </div>
         </div>
