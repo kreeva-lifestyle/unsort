@@ -144,6 +144,8 @@ export default function PackTime() {
   const [historyPageSize, setHistoryPageSize] = useState(25);
   const [historySearch, setHistorySearch] = useState('');
   const [historyFilterCourier, setHistoryFilterCourier] = useState('');
+  const [historyFilterBrand, setHistoryFilterBrand] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // Local duplicate tracking
@@ -325,7 +327,7 @@ export default function PackTime() {
 
     // Save to Supabase DB
     supabase.auth.getUser().then(({ data: { user } }) => {
-      supabase.from('packtime_scans').insert({ session_id: sessionIdRef.current, awb: trimmed, courier, camera, sheet_name: courierSheet, user_id: user?.id });
+      supabase.from('packtime_scans').insert({ session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: user?.id });
     });
 
     // Mark as synced after a short delay (optimistic)
@@ -403,12 +405,13 @@ export default function PackTime() {
     let query = supabase.from('packtime_scans').select('*', { count: 'exact' });
     if (historySearch) query = query.ilike('awb', `%${historySearch}%`);
     if (historyFilterCourier) query = query.eq('courier', historyFilterCourier);
+    if (historyFilterBrand) query = query.eq('brand', historyFilterBrand);
     query = query.order('scanned_at', { ascending: false }).range(historyPage * historyPageSize, (historyPage + 1) * historyPageSize - 1);
     const { data, count } = await query;
     setHistoryData(data || []);
     setHistoryTotal(count || 0);
     setHistoryLoading(false);
-  }, [historySearch, historyFilterCourier, historyPage, historyPageSize]);
+  }, [historySearch, historyFilterCourier, historyFilterBrand, historyPage, historyPageSize]);
 
   useEffect(() => { if (showHistory) fetchHistory(); }, [showHistory, fetchHistory]);
 
@@ -419,10 +422,10 @@ export default function PackTime() {
 
   const exportHistory = () => {
     if (historyData.length === 0) return;
-    const csv = 'AWB,Courier,Camera,Scanned At,Session ID\n' + historyData.map(r => `${r.awb},${r.courier},${r.camera},${new Date(r.scanned_at).toLocaleString('en-IN')},${r.session_id}`).join('\n');
+    const csv = 'AWB,Courier,Camera,Brand,Scanned At,Session ID\n' + historyData.map(r => `${r.awb},${r.courier},${r.camera},${r.brand || ''},${new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })},${r.session_id}`).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `PackTime_History_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = url; a.download = `PackStation_History_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
@@ -440,13 +443,18 @@ export default function PackTime() {
       </div>
 
       {/* Search + Filter */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
         <input type="text" value={historySearch} onChange={e => { setHistorySearch(e.target.value); setHistoryPage(0); }} placeholder="Search AWB..."
-          style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 11, padding: '7px 10px', outline: 'none', boxSizing: 'border-box' }} />
+          style={{ flex: '1 1 180px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 11, padding: '7px 10px', outline: 'none', boxSizing: 'border-box', minWidth: 140 }} />
         <select value={historyFilterCourier} onChange={e => { setHistoryFilterCourier(e.target.value); setHistoryPage(0); }}
           style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '7px 8px', outline: 'none' }}>
           <option value="">All Couriers</option>
           {couriers.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+        </select>
+        <select value={historyFilterBrand} onChange={e => { setHistoryFilterBrand(e.target.value); setHistoryPage(0); }}
+          style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '7px 8px', outline: 'none' }}>
+          <option value="">All Brands</option>
+          {brands.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
         <select value={historyPageSize} onChange={e => { setHistoryPageSize(Number(e.target.value)); setHistoryPage(0); }}
           style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '7px 6px', outline: 'none', width: 55 }}>
@@ -457,31 +465,54 @@ export default function PackTime() {
       {/* Count */}
       <div style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{historyTotal} records found</div>
 
-      {/* Table */}
+      {/* Table — horizontal scroll on mobile */}
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 0, fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
-          <div style={{ padding: '8px 10px' }}>AWB</div>
-          <div style={{ padding: '8px 10px' }}>Courier</div>
-          <div style={{ padding: '8px 10px' }}>Time</div>
-          <div style={{ padding: '8px 6px' }}></div>
-        </div>
-        {historyLoading && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div>}
-        {!historyLoading && historyData.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No records found.</div>}
-        <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-          {historyData.map(r => (
-            <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 0, borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
-              <div style={{ padding: '7px 10px', fontFamily: T.mono, color: T.tx, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.awb}</div>
-              <div style={{ padding: '7px 10px', color: T.tx2, fontSize: 10 }}>{r.courier}</div>
-              <div style={{ padding: '7px 10px', color: T.tx3, fontFamily: T.mono, fontSize: 9 }}>{new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
-              <div style={{ padding: '7px 6px' }}>
-                <button type="button" onClick={() => deleteHistoryScan(r.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4 }}>
-                  <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
-                </button>
-              </div>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ minWidth: 620 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '180px 110px 70px 110px 1fr 32px', gap: 0, fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
+              <div style={{ padding: '8px 10px' }}>AWB</div>
+              <div style={{ padding: '8px 10px' }}>Courier</div>
+              <div style={{ padding: '8px 10px' }}>Cam</div>
+              <div style={{ padding: '8px 10px' }}>Brand</div>
+              <div style={{ padding: '8px 10px' }}>Time</div>
+              <div style={{ padding: '8px 4px' }}></div>
             </div>
-          ))}
+            {historyLoading && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div>}
+            {!historyLoading && historyData.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No records found.</div>}
+            <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+              {historyData.map(r => (
+                <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '180px 110px 70px 110px 1fr 32px', gap: 0, borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
+                  <div style={{ padding: '7px 10px', fontFamily: T.mono, color: T.tx, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.awb}</div>
+                  <div style={{ padding: '7px 10px', color: T.tx2, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.courier}</div>
+                  <div style={{ padding: '7px 10px', color: T.tx3, fontFamily: T.mono, fontSize: 10 }}>{r.camera}</div>
+                  <div style={{ padding: '7px 10px', color: T.gr, fontSize: 10, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.brand || '—'}</div>
+                  <div style={{ padding: '7px 10px', color: T.tx3, fontFamily: T.mono, fontSize: 9, whiteSpace: 'nowrap' }}>{new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                  <div style={{ padding: '7px 4px' }}>
+                    <button type="button" onClick={() => setConfirmDeleteId(r.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4 }}>
+                      <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      {confirmDeleteId && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
+          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', textAlign: 'center', maxWidth: 340, width: '100%' }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>⚠️</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Delete Scan?</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This will permanently remove the scan from the database and Google Sheet.</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setConfirmDeleteId(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { deleteHistoryScan(confirmDeleteId); setConfirmDeleteId(null); }} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: 'pointer' }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -498,7 +529,7 @@ export default function PackTime() {
   if (loadingConfig) return (
     <div style={{ fontFamily: T.sans, color: T.tx, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300, flexDirection: 'column', gap: 12 }}>
       <div className="spinner" />
-      <span style={{ fontSize: 11, color: T.tx3 }}>Loading Pack Time...</span>
+      <span style={{ fontSize: 11, color: T.tx3 }}>Loading PackStation...</span>
     </div>
   );
 
@@ -506,7 +537,7 @@ export default function PackTime() {
   if (!started) return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Pack Time</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>PackStation</span>
         <button onClick={() => setShowHistory(true)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
       </div>
 
@@ -529,7 +560,7 @@ export default function PackTime() {
               <option value="">Select courier...</option>
               {couriers.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
-            {couriers.length === 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 4 }}>No couriers configured. Add them in Settings → Pack Time.</div>}
+            {couriers.length === 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 4 }}>No couriers configured. Add them in Settings → PackStation.</div>}
           </div>
 
           {/* Camera */}
@@ -540,7 +571,7 @@ export default function PackTime() {
                 <div key={c.id} onClick={() => setCamera(c.number)} style={{ padding: '12px 0', borderRadius: 8, textAlign: 'center', fontSize: 16, fontWeight: 700, fontFamily: T.mono, cursor: 'pointer', transition: 'all .15s', background: camera === c.number ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'rgba(255,255,255,0.03)', color: camera === c.number ? '#fff' : T.tx3, border: `1px solid ${camera === c.number ? T.ac + '44' : T.bd}`, boxShadow: camera === c.number ? `0 4px 16px ${T.ac}33` : 'none' }}>{c.number}</div>
               ))}
             </div>
-            {cameras.length === 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 4 }}>No cameras configured. Add them in Settings → Pack Time.</div>}
+            {cameras.length === 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 4 }}>No cameras configured. Add them in Settings → PackStation.</div>}
           </div>
 
           <button onClick={handleStart} disabled={!selectedBrand || !courier || !camera || verifying} style={{ width: '100%', padding: '13px 0', borderRadius: 10, border: 'none', fontSize: 14, fontWeight: 700, fontFamily: T.sans, cursor: selectedBrand && courier && camera && !verifying ? 'pointer' : 'not-allowed', background: selectedBrand && courier && camera && !verifying ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.05)', color: selectedBrand && courier && camera ? '#fff' : T.tx3, boxShadow: selectedBrand && courier && camera && !verifying ? `0 4px 20px ${T.ac}40` : 'none', transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
