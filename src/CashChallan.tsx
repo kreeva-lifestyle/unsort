@@ -239,100 +239,117 @@ export default function CashChallan() {
     </div>
   );
 
+  // ── Shared label style ──────────────────────────────────────────────────────
+  const lbl: React.CSSProperties = { display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 };
+  const inp: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' };
+
   // ── Create/Edit Modal ──────────────────────────────────────────────────────
   if (showModal) return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>{editing ? `Edit #${editing.challan_number}` : 'New Cash Challan'}</span>
-        <button onClick={closeModal} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Cancel</button>
-      </div>
+    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 520 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>{editing ? `Edit #${editing.challan_number}` : 'New Cash Challan'}</span>
+          <button onClick={closeModal} style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Cancel</button>
+        </div>
 
-      {/* Customer */}
-      <div style={{ marginBottom: 10, position: 'relative' }}>
-        <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Customer Name</label>
-        <input type="text" value={customerName} onChange={e => { setCustomerName(e.target.value); setSelectedCustomerId(null); clearTimeout(searchTimeout.current); searchTimeout.current = setTimeout(() => searchCustomers(e.target.value), 300); }}
-          placeholder="Type customer name..." style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
-        {customerSuggestions.length > 0 && (
-          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'rgba(14,18,30,.98)', border: `1px solid ${T.bd2}`, borderRadius: 6, maxHeight: 120, overflowY: 'auto' }}>
-            {customerSuggestions.map(c => (
-              <div key={c.id} onClick={() => { setCustomerName(c.name); setSelectedCustomerId(c.id); setCustomerSuggestions([]); }}
-                style={{ padding: '7px 10px', fontSize: 11, color: T.tx, cursor: 'pointer', borderBottom: `1px solid ${T.bd}` }}>{c.name} {c.phone && <span style={{ color: T.tx3 }}>({c.phone})</span>}</div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
+          {/* Customer */}
+          <div style={{ marginBottom: 12, position: 'relative' }}>
+            <label style={lbl}>Customer Name</label>
+            <input type="text" value={customerName} onChange={e => { setCustomerName(e.target.value); setSelectedCustomerId(null); clearTimeout(searchTimeout.current); searchTimeout.current = setTimeout(() => searchCustomers(e.target.value), 300); }}
+              placeholder="Type customer name..." style={inp} />
+            {customerSuggestions.length > 0 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'rgba(14,18,30,.98)', border: `1px solid ${T.bd2}`, borderRadius: 6, maxHeight: 120, overflowY: 'auto' }}>
+                {customerSuggestions.map(c => (
+                  <div key={c.id} onClick={() => { setCustomerName(c.name); setSelectedCustomerId(c.id); setCustomerSuggestions([]); }}
+                    style={{ padding: '8px 10px', fontSize: 11, color: T.tx, cursor: 'pointer', borderBottom: `1px solid ${T.bd}` }}>{c.name} {c.phone && <span style={{ color: T.tx3 }}>({c.phone})</span>}</div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Line Items */}
+          <label style={lbl}>Items</label>
+          <div style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 8, marginBottom: 12, overflow: 'hidden' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 45px 65px 24px', gap: 4, padding: '5px 8px', borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
+              <span style={{ fontSize: 8, color: T.tx3, fontWeight: 600, letterSpacing: .5 }}>SKU</span>
+              <span style={{ fontSize: 8, color: T.tx3, fontWeight: 600, letterSpacing: .5 }}>DESCRIPTION</span>
+              <span style={{ fontSize: 8, color: T.tx3, fontWeight: 600, letterSpacing: .5, textAlign: 'center' }}>QTY</span>
+              <span style={{ fontSize: 8, color: T.tx3, fontWeight: 600, letterSpacing: .5, textAlign: 'right' }}>PRICE</span>
+              <span />
+            </div>
+            {items.map((it, i) => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 45px 65px 24px', gap: 4, padding: '5px 8px', borderBottom: `1px solid ${T.bd}`, alignItems: 'center' }}>
+                <input value={it.sku} onChange={e => { const n = [...items]; n[i].sku = e.target.value; setItems(n); }} placeholder="—" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', fontFamily: T.mono }} />
+                <input value={it.description} onChange={e => { const n = [...items]; n[i].description = e.target.value; setItems(n); }} placeholder="Item name" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none' }} />
+                <input type="number" value={it.quantity || ''} onChange={e => { const n = [...items]; n[i].quantity = Number(e.target.value); setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'center' }} />
+                <input type="number" value={it.price || ''} onChange={e => { const n = [...items]; n[i].price = Number(e.target.value); setItems(n); }} placeholder="0" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right', fontFamily: T.mono }} />
+                <button onClick={() => { if (items.length > 1) setItems(items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }}>×</button>
+              </div>
             ))}
+            <button onClick={() => setItems([...items, { sku: '', description: '', quantity: 1, price: 0, total: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>
           </div>
-        )}
-      </div>
 
-      {/* Line Items */}
-      <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Items</label>
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, marginBottom: 10, overflow: 'hidden' }}>
-        {items.map((it, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 50px 70px 30px', gap: 4, padding: '6px 8px', borderBottom: `1px solid ${T.bd}`, alignItems: 'center' }}>
-            <input value={it.sku} onChange={e => { const n = [...items]; n[i].sku = e.target.value; setItems(n); }} placeholder="SKU" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 10, padding: '5px 6px', outline: 'none', fontFamily: T.mono }} />
-            <input value={it.description} onChange={e => { const n = [...items]; n[i].description = e.target.value; setItems(n); }} placeholder="Description" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 10, padding: '5px 6px', outline: 'none' }} />
-            <input type="number" value={it.quantity || ''} onChange={e => { const n = [...items]; n[i].quantity = Number(e.target.value); setItems(n); }} placeholder="Qty" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 10, padding: '5px 6px', outline: 'none', textAlign: 'center' }} />
-            <input type="number" value={it.price || ''} onChange={e => { const n = [...items]; n[i].price = Number(e.target.value); setItems(n); }} placeholder="Price" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 10, padding: '5px 6px', outline: 'none', textAlign: 'right', fontFamily: T.mono }} />
-            <button onClick={() => { if (items.length > 1) setItems(items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>
+          {/* Discount + Tags */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+            <div>
+              <label style={lbl}>Discount</label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <select value={discountType} onChange={e => setDiscountType(e.target.value)} style={{ ...inp, width: 'auto', padding: '6px 8px', fontSize: 11 }}>
+                  <option value="flat">₹ Flat</option><option value="percentage">%</option>
+                </select>
+                <input type="number" value={discountValue || ''} onChange={e => setDiscountValue(Number(e.target.value))} placeholder="0" style={{ ...inp, flex: 1, fontFamily: T.mono, fontSize: 11 }} />
+              </div>
+            </div>
+            <div>
+              <label style={lbl}>Tags</label>
+              <input value={tags} onChange={e => setTags(e.target.value)} placeholder="vip, urgent" style={{ ...inp, fontSize: 11 }} />
+            </div>
           </div>
-        ))}
-        <button onClick={() => setItems([...items, { sku: '', description: '', quantity: 1, price: 0, total: 0 }])} style={{ width: '100%', padding: '6px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>
-      </div>
 
-      {/* Discount + Notes + Tags */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-        <div>
-          <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Discount</label>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <select value={discountType} onChange={e => setDiscountType(e.target.value)} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 10, padding: '5px', outline: 'none' }}>
-              <option value="flat">₹ Flat</option><option value="percentage">%</option>
-            </select>
-            <input type="number" value={discountValue || ''} onChange={e => setDiscountValue(Number(e.target.value))} placeholder="0" style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 10, padding: '5px 6px', outline: 'none', fontFamily: T.mono }} />
+          {/* Notes */}
+          <div style={{ marginBottom: 12 }}>
+            <label style={lbl}>Notes</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Optional notes..." style={{ ...inp, resize: 'vertical', fontSize: 11 }} />
+          </div>
+
+          {/* Payment row */}
+          <div style={{ display: 'grid', gridTemplateColumns: (challanStatus === 'paid' || challanStatus === 'partial') ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: 8 }}>
+            <div>
+              <label style={lbl}>Status</label>
+              <select value={challanStatus} onChange={e => setChallanStatus(e.target.value)} style={{ ...inp, fontSize: 11 }}>
+                <option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="partial">Partial</option>
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Payment Mode</label>
+              <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)} style={{ ...inp, fontSize: 11 }}>
+                <option value="">Select...</option>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Amount Paid</label>
+              <input type="number" value={amountPaid || ''} onChange={e => setAmountPaid(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
+            </div>
+            {(challanStatus === 'paid' || challanStatus === 'partial') && (
+              <div>
+                <label style={lbl}>Payment Date</label>
+                <input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} style={{ ...inp, fontSize: 11 }} />
+              </div>
+            )}
           </div>
         </div>
-        <div>
-          <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Tags (comma sep.)</label>
-          <input value={tags} onChange={e => setTags(e.target.value)} placeholder="vip, urgent" style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 10, padding: '5px 6px', outline: 'none', boxSizing: 'border-box' }} />
-        </div>
-      </div>
-      <div style={{ marginBottom: 10 }}>
-        <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Notes</label>
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Optional notes..." style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '7px 10px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: T.sans }} />
-      </div>
 
-      {/* Payment */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
-        <div>
-          <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Status</label>
-          <select value={challanStatus} onChange={e => setChallanStatus(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 10, padding: '5px', outline: 'none' }}>
-            <option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="partial">Partial</option>
-          </select>
+        {/* Totals card */}
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 16px', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, marginBottom: 4 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{subtotal.toFixed(2)}</span></div>
+          {discountAmount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Discount ({discountType === 'percentage' ? `${discountValue}%` : 'Flat'})</span><span style={{ fontFamily: T.mono }}>-₹{discountAmount.toFixed(2)}</span></div>}
+          {roundOff !== 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx3, marginBottom: 4 }}><span>Round Off</span><span style={{ fontFamily: T.mono }}>{roundOff > 0 ? '+' : ''}₹{roundOff.toFixed(2)}</span></div>}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}><span>Total</span><span>₹{grandTotal.toLocaleString('en-IN')}</span></div>
         </div>
-        <div>
-          <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Payment Mode</label>
-          <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 10, padding: '5px', outline: 'none' }}>
-            <option value="">Select...</option>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Amount Paid</label>
-          <input type="number" value={amountPaid || ''} onChange={e => setAmountPaid(Number(e.target.value))} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 10, padding: '5px 6px', outline: 'none', fontFamily: T.mono, boxSizing: 'border-box' }} />
-        </div>
-      </div>
-      {(challanStatus === 'paid' || challanStatus === 'partial') && (
-        <div style={{ marginBottom: 10 }}>
-          <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Payment Date</label>
-          <input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 10, padding: '5px 6px', outline: 'none' }} />
-        </div>
-      )}
 
-      {/* Totals */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: 12, marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx2, marginBottom: 4 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{subtotal.toFixed(2)}</span></div>
-        {discountAmount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.re, marginBottom: 4 }}><span>Discount ({discountType === 'percentage' ? `${discountValue}%` : 'Flat'})</span><span style={{ fontFamily: T.mono }}>-₹{discountAmount.toFixed(2)}</span></div>}
-        {roundOff !== 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx3, marginBottom: 4 }}><span>Round Off</span><span style={{ fontFamily: T.mono }}>{roundOff > 0 ? '+' : ''}₹{roundOff.toFixed(2)}</span></div>}
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}><span>Total</span><span>₹{grandTotal.toLocaleString('en-IN')}</span></div>
+        <button onClick={saveChallan} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,.3)' }}>{editing ? 'Update Challan' : 'Create Challan'}</button>
       </div>
-
-      <button onClick={saveChallan} style={{ width: '100%', padding: '11px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,.3)' }}>{editing ? 'Update Challan' : 'Create Challan'}</button>
     </div>
   );
 
