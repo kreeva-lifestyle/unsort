@@ -189,7 +189,7 @@ const AuthScreen = () => {
       <div style={{ position: 'absolute', width: 250, height: 250, background: T.yl, borderRadius: '50%', filter: 'blur(80px)', opacity: 0.1, top: '50%', left: '60%', animation: 'loginGlowFloat 12s ease-in-out infinite alternate', animationDelay: '-5s' }} />
       <div style={{ position: 'relative', zIndex: 1, background: 'rgba(14,18,30,.90)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', border: `1px solid rgba(255,255,255,.06)`, borderRadius: 16, width: 360, maxWidth: 'calc(100vw - 32px)', padding: '32px 28px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,.5)', animation: 'loginBoxEnter .6s cubic-bezier(.16,1,.3,1) both' }}>
         <div style={{ fontSize: 24, fontWeight: 700, color: T.ac, fontFamily: T.sora, marginBottom: 3, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'loginLogoShine 3s ease-in-out infinite alternate' }}>DailyOffice</div>
-        <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 3, textTransform: 'uppercase' as const, marginBottom: 26, opacity: 0, animation: 'loginFadeUp .5s .2s ease both' }}>Track & Manage Warehouse Operations</div>
+        <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 3, textTransform: 'uppercase' as const, marginBottom: 26, opacity: 0, animation: 'loginFadeUp .5s .2s ease both' }}>Your Workspace, Simplified</div>
         <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${T.bd2}, transparent)`, marginBottom: 22, opacity: 0, animation: 'loginFadeUp .5s .25s ease both' }} />
         {error && <div style={{ background: 'rgba(245,87,92,.12)', border: '1px solid rgba(245,87,92,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.re, marginBottom: 14, animation: 'loginShake .4s ease' }}>{error}</div>}
         <form onSubmit={handleSubmit}>
@@ -245,7 +245,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
       <div style={{ padding: '14px 14px 11px', borderBottom: `1px solid ${T.bd}` }}>
         <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'subtlePulse 4s ease-in-out infinite' }}>DailyOffice</div>
-        <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2.5, textTransform: 'uppercase' as const, marginTop: 2 }}>Warehouse Operations</div>
+        <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2.5, textTransform: 'uppercase' as const, marginTop: 2 }}>Your Workspace, Simplified</div>
       </div>
       <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2, textTransform: 'uppercase' as const, padding: '12px 14px 5px', fontWeight: 600 }}>Menu</div>
       <nav style={{ flex: 1, padding: '2px 8px 8px' }}>
