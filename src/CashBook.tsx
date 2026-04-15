@@ -20,7 +20,7 @@ const T = {
 const CATEGORIES = ['Office Supplies', 'Rent', 'Salaries', 'Travel', 'Utilities', 'Food', 'Transport', 'Misc'];
 
 interface Expense { id: string; date: string; amount: number; category: string; description: string; created_at: string; }
-interface Handover { id: string; date: string; amount: number; from_user_name: string; to_user_name: string; notes: string; status: string; confirmed_at: string | null; created_at: string; }
+interface Handover { id: string; date: string; amount: number; from_user_id: string | null; from_user_name: string; to_user_id: string | null; to_user_name: string; notes: string; status: string; confirmed_at: string | null; created_at: string; }
 
 export default function CashBook() {
   const today = new Date().toISOString().slice(0, 10);
@@ -44,9 +44,12 @@ export default function CashBook() {
   // Handover form
   const [showHandover, setShowHandover] = useState(false);
   const [handAmount, setHandAmount] = useState('');
-  const [handTo, setHandTo] = useState('');
+  const [handToId, setHandToId] = useState('');
   const [handNotes, setHandNotes] = useState('');
   const [handError, setHandError] = useState('');
+  // Users list (for recipient dropdown)
+  const [users, setUsers] = useState<{ id: string; full_name: string; email: string; cash_pin: string | null }[]>([]);
+  const [currentUserId, setCurrentUserId] = useState('');
   // Confirm handover with PIN
   const [confirmingHandover, setConfirmingHandover] = useState<Handover | null>(null);
   const [confirmPin, setConfirmPin] = useState('');
@@ -73,6 +76,16 @@ export default function CashBook() {
   }, [fromDate, toDate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Load active users for handover recipient dropdown
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setCurrentUserId(user.id);
+      const { data } = await supabase.from('profiles').select('id, full_name, email, cash_pin').eq('is_active', true).order('full_name');
+      setUsers(data || []);
+    })();
+  }, []);
 
   // ── Realtime sync — multi-user safety ──────────────────────────────────────
   useEffect(() => {
@@ -113,15 +126,20 @@ export default function CashBook() {
     setHandError('');
     const amt = Number(handAmount);
     if (!amt || amt <= 0) { setHandError('Amount must be greater than 0'); return; }
-    if (!handTo.trim()) { setHandError('Recipient name is required'); return; }
+    if (!handToId) { setHandError('Select a recipient'); return; }
+    const recipient = users.find(u => u.id === handToId);
+    if (!recipient) { setHandError('Recipient not found'); return; }
+    if (handToId === currentUserId) { setHandError('Cannot hand over cash to yourself'); return; }
+    if (!recipient.cash_pin) { setHandError(`${recipient.full_name} has no PIN set. They must set it in Settings → Users first.`); return; }
     const { data: { user } } = await supabase.auth.getUser();
     const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user?.id).maybeSingle();
     await supabase.from('cash_handovers').insert({
       date: entryDate, amount: amt,
       from_user_id: user?.id, from_user_name: prof?.full_name || user?.email || 'Unknown',
-      to_user_name: handTo.trim(), notes: handNotes.trim() || null, status: 'pending'
+      to_user_id: recipient.id, to_user_name: recipient.full_name,
+      notes: handNotes.trim() || null, status: 'pending'
     });
-    setHandAmount(''); setHandTo(''); setHandNotes(''); setShowHandover(false);
+    setHandAmount(''); setHandToId(''); setHandNotes(''); setShowHandover(false);
     fetchData();
   };
 
@@ -129,14 +147,20 @@ export default function CashBook() {
     setConfirmError('');
     if (!confirmingHandover || !confirmPin.trim()) { setConfirmError('Enter PIN'); return; }
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: prof } = await supabase.from('profiles').select('cash_pin, full_name').eq('id', user?.id).maybeSingle();
+    if (!user) { setConfirmError('Not logged in'); return; }
+    // Verify the confirming user IS the intended recipient
+    if (confirmingHandover.to_user_id && confirmingHandover.to_user_id !== user.id) {
+      setConfirmError(`This handover is meant for ${confirmingHandover.to_user_name}. Only they can sign it.`);
+      return;
+    }
+    const { data: prof } = await supabase.from('profiles').select('cash_pin, full_name').eq('id', user.id).maybeSingle();
     if (!prof?.cash_pin) { setConfirmError('You have no PIN set. Go to Settings → Users to set one.'); return; }
     if (prof.cash_pin !== confirmPin.trim()) { setConfirmError('Incorrect PIN'); return; }
     await supabase.from('cash_handovers').update({
       status: 'confirmed',
       confirmed_at: new Date().toISOString(),
-      to_user_id: user?.id,
-      to_user_name: prof.full_name || user?.email || confirmingHandover.to_user_name,
+      to_user_id: user.id,
+      to_user_name: prof.full_name || user.email || confirmingHandover.to_user_name,
     }).eq('id', confirmingHandover.id);
     setConfirmingHandover(null); setConfirmPin('');
     fetchData();
@@ -292,8 +316,13 @@ export default function CashBook() {
               </div>
             </div>
             <div style={{ marginBottom: 10 }}>
-              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Recipient Name (Cashier)</label>
-              <input type="text" value={handTo} onChange={e => setHandTo(e.target.value)} placeholder="e.g., Ramesh" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Recipient (Cashier)</label>
+              <select value={handToId} onChange={e => setHandToId(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}>
+                <option value="">Select recipient...</option>
+                {users.filter(u => u.id !== currentUserId).map(u => (
+                  <option key={u.id} value={u.id}>{u.full_name}{!u.cash_pin ? ' (no PIN set)' : ''}</option>
+                ))}
+              </select>
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Notes (optional)</label>
