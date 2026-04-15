@@ -143,7 +143,13 @@ export default function CashChallan() {
     if (q.length < 2) { setCustomerSuggestions([]); return; }
     const { data } = await supabase.from('cash_challan_customers').select('*').ilike('name', `%${q}%`).limit(5);
     setCustomerSuggestions(data || []);
-  }, []);
+    // Auto-fill phone if exact match found (case-insensitive)
+    const exact = (data || []).find((c: any) => c.name.toLowerCase() === q.trim().toLowerCase());
+    if (exact) {
+      setSelectedCustomerId(exact.id);
+      if (exact.phone && !customerPhone) setCustomerPhone(exact.phone);
+    }
+  }, [customerPhone]);
 
   // ── Fetch analytics ────────────────────────────────────────────────────────
   const fetchAnalytics = useCallback(async () => {
@@ -558,7 +564,7 @@ export default function CashChallan() {
               )}
             </div>
             <div>
-              <label style={lbl}>Phone (for WhatsApp)</label>
+              <label style={lbl}>Phone (for WhatsApp){selectedCustomerId && customerPhone && <span style={{ marginLeft: 6, fontSize: 8, color: T.gr, textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>✓ Auto-filled</span>}</label>
               <input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="9876543210" style={{ ...inp, fontFamily: T.mono }} />
             </div>
           </div>
