@@ -22,7 +22,6 @@ import Quagga from '@ericblade/quagga2';
 import BrandTagPrinter from './BrandTagPrinter';
 import PackTime from './PackTime';
 import CashChallan from './CashChallan';
-import CashBook from './CashBook';
 
 const SUPABASE_URL = 'https://ulphprdnswznfztawbvg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0';
@@ -248,7 +247,6 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
     { id: 'brandtag', icon: 'tag', label: 'Brand Tags' },
     { id: 'packtime', icon: 'scan', label: 'PackStation' },
     { id: 'challan', icon: 'file', label: 'Cash Challan' },
-    { id: 'cashbook', icon: 'file', label: 'Cash Book' },
     { id: 'settings', icon: 'settings', label: 'Settings' },
   ];
 
@@ -1544,8 +1542,20 @@ const Users = () => {
   const [inviting, setInviting] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', password: '', role: 'viewer' });
   const [inviteResult, setInviteResult] = useState<{ email: string; password: string } | null>(null);
+  const [myPin, setMyPin] = useState('');
+  const [pinSaved, setPinSaved] = useState(false);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
+  useEffect(() => {
+    if (profile?.id) supabase.from('profiles').select('cash_pin').eq('id', profile.id).maybeSingle().then(({ data }) => setMyPin(data?.cash_pin || ''));
+  }, [profile?.id]);
+  const saveMyPin = async () => {
+    if (myPin.length < 4 || myPin.length > 6) { addToast('PIN must be 4-6 digits', 'error'); return; }
+    if (!/^\d+$/.test(myPin)) { addToast('PIN must be digits only', 'error'); return; }
+    await supabase.from('profiles').update({ cash_pin: myPin }).eq('id', profile.id);
+    setPinSaved(true); setTimeout(() => setPinSaved(false), 2000);
+    addToast('Cash PIN saved', 'success');
+  };
 
   const fetchUsers = () => { supabase.from('profiles').select('*').order('created_at', { ascending: false }).then(({ data }) => setUsers(data || [])); };
   useEffect(() => {
@@ -1599,6 +1609,15 @@ const Users = () => {
 
   return (
     <div>
+      {/* My Cash PIN — for confirming cash handovers */}
+      <div style={{ background: 'rgba(245,158,11,.05)', border: '1px solid rgba(245,158,11,.15)', borderRadius: 8, padding: 12, marginBottom: 14 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: T.yl, marginBottom: 4, fontFamily: T.sora }}>My Cash PIN</div>
+        <div style={{ fontSize: 10, color: T.tx3, marginBottom: 8 }}>Required to sign cash handovers received from accountant. 4-6 digits.</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input type="password" value={myPin} onChange={e => setMyPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••" inputMode="numeric" style={{ ...S.fInput, fontFamily: T.mono, letterSpacing: 4, textAlign: 'center', width: 120, fontSize: 14 }} />
+          <button onClick={saveMyPin} style={S.btnPrimary}>{pinSaved ? '✓ Saved' : 'Save PIN'}</button>
+        </div>
+      </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Users</span>
         <div onClick={() => setShowInvite(true)} style={S.btnPrimary}>+ Invite User</div>
@@ -1832,7 +1851,7 @@ const MainApp = () => {
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', reports: 'Reports', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', cashbook: 'Cash Book', settings: 'Settings' };
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', reports: 'Reports', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', settings: 'Settings' };
   const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
@@ -1862,7 +1881,7 @@ const MainApp = () => {
     <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
       {/* Mobile bottom nav */}
       <div className="mobile-hamburger" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 102, background: T.s, borderTop: `1px solid ${T.bd}`, padding: '8px 0', paddingBottom: 'max(8px, env(safe-area-inset-bottom))', justifyContent: 'space-around' }}>
-        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'packtime', icon: 'scan', label: 'PackStation' }, { id: 'challan', icon: 'file', label: 'Challan' }, { id: 'cashbook', icon: 'file', label: 'Cash Book' }].map(t => (
+        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'packtime', icon: 'scan', label: 'PackStation' }, { id: 'challan', icon: 'file', label: 'Challan' }].map(t => (
           <div key={t.id} onClick={() => { setTab(t.id); setMobileMenu(false); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: tab === t.id ? T.ac : T.tx3, fontSize: 9, fontWeight: 500 }}>
             <Icon name={t.icon} size={20} /><span>{t.label}</span>
           </div>
@@ -1876,7 +1895,6 @@ const MainApp = () => {
         {mounted.has('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
         {mounted.has('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime /></div>}
         {mounted.has('challan') && <div style={{ display: tab === 'challan' ? 'block' : 'none' }}><CashChallan /></div>}
-        {mounted.has('cashbook') && <div style={{ display: tab === 'cashbook' ? 'block' : 'none' }}><CashBook /></div>}
         {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage /></div>}
       </main>
     </div>
