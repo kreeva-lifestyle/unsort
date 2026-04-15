@@ -20,11 +20,14 @@ const T = {
 const CATEGORIES = ['Office Supplies', 'Rent', 'Salaries', 'Travel', 'Utilities', 'Food', 'Transport', 'Misc'];
 
 interface Expense { id: string; date: string; amount: number; category: string; description: string; created_at: string; }
-interface Handover { id: string; date: string; amount: number; from_user_name: string; to_user_name: string; notes: string; status: string; confirmed_at: string | null; created_at: string; }
+interface Handover { id: string; date: string; amount: number; from_user_id: string | null; from_user_name: string; to_user_id: string | null; to_user_name: string; notes: string; status: string; confirmed_at: string | null; created_at: string; }
 
 export default function CashBook() {
   const today = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState(today);
+  const [fromDate, setFromDate] = useState(today);
+  const [toDate, setToDate] = useState(today);
+  // Single 'date' for new expense/handover input — defaults to today
+  const [entryDate, setEntryDate] = useState(today);
   const [tab, setTab] = useState<'expenses' | 'sales' | 'handovers'>('expenses');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [sales, setSales] = useState<any[]>([]);
@@ -41,35 +44,48 @@ export default function CashBook() {
   // Handover form
   const [showHandover, setShowHandover] = useState(false);
   const [handAmount, setHandAmount] = useState('');
-  const [handTo, setHandTo] = useState('');
+  const [handToId, setHandToId] = useState('');
   const [handNotes, setHandNotes] = useState('');
   const [handError, setHandError] = useState('');
+  // Users list (for recipient dropdown)
+  const [users, setUsers] = useState<{ id: string; full_name: string; email: string; cash_pin: string | null }[]>([]);
+  const [currentUserId, setCurrentUserId] = useState('');
   // Confirm handover with PIN
   const [confirmingHandover, setConfirmingHandover] = useState<Handover | null>(null);
   const [confirmPin, setConfirmPin] = useState('');
   const [confirmError, setConfirmError] = useState('');
 
   const fetchData = useCallback(async () => {
-    // Opening balance
-    const { data: bal } = await supabase.from('cash_book_balances').select('opening_balance').eq('date', date).maybeSingle();
+    // Opening balance — uses From date
+    const { data: bal } = await supabase.from('cash_book_balances').select('opening_balance').eq('date', fromDate).maybeSingle();
     setOpeningBalance(Number(bal?.opening_balance || 0));
     setOpeningInput(String(bal?.opening_balance || 0));
 
-    // Expenses
-    const { data: exp } = await supabase.from('cash_expenses').select('*').eq('date', date).order('created_at', { ascending: false });
+    // Expenses in date range
+    const { data: exp } = await supabase.from('cash_expenses').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
     setExpenses(exp || []);
 
-    // Cash sales (challans paid in cash, created on this date)
+    // Cash sales (challans paid in cash, created in date range)
     const { data: ch } = await supabase.from('cash_challans').select('id, challan_number, customer_name, total, amount_paid, status, is_return, payment_mode, payment_date, created_at')
-      .eq('payment_mode', 'Cash').in('status', ['paid', 'partial']).gte('created_at', date + 'T00:00:00').lte('created_at', date + 'T23:59:59').order('created_at', { ascending: false });
+      .eq('payment_mode', 'Cash').in('status', ['paid', 'partial']).gte('created_at', fromDate + 'T00:00:00').lte('created_at', toDate + 'T23:59:59').order('created_at', { ascending: false });
     setSales(ch || []);
 
-    // Handovers
-    const { data: ho } = await supabase.from('cash_handovers').select('*').eq('date', date).order('created_at', { ascending: false });
+    // Handovers in date range
+    const { data: ho } = await supabase.from('cash_handovers').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
     setHandovers(ho || []);
-  }, [date]);
+  }, [fromDate, toDate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Load active users for handover recipient dropdown
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setCurrentUserId(user.id);
+      const { data } = await supabase.from('profiles').select('id, full_name, email, cash_pin').eq('is_active', true).order('full_name');
+      setUsers(data || []);
+    })();
+  }, []);
 
   // ── Realtime sync — multi-user safety ──────────────────────────────────────
   useEffect(() => {
@@ -90,7 +106,7 @@ export default function CashBook() {
 
   const saveOpening = async () => {
     const val = Number(openingInput) || 0;
-    await supabase.from('cash_book_balances').upsert({ date, opening_balance: val }, { onConflict: 'date' });
+    await supabase.from('cash_book_balances').upsert({ date: fromDate, opening_balance: val }, { onConflict: 'date' });
     setEditingOpening(false);
     fetchData();
   };
@@ -101,7 +117,7 @@ export default function CashBook() {
     if (!amt || amt <= 0) { setFormError('Amount must be greater than 0'); return; }
     if (!category) { setFormError('Category is required'); return; }
     const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('cash_expenses').insert({ date, amount: amt, category, description: description.trim() || null, paid_by: user?.id });
+    await supabase.from('cash_expenses').insert({ date: entryDate, amount: amt, category, description: description.trim() || null, paid_by: user?.id });
     setAmount(''); setDescription(''); setCategory(CATEGORIES[0]); setShowAdd(false);
     fetchData();
   };
@@ -110,15 +126,20 @@ export default function CashBook() {
     setHandError('');
     const amt = Number(handAmount);
     if (!amt || amt <= 0) { setHandError('Amount must be greater than 0'); return; }
-    if (!handTo.trim()) { setHandError('Recipient name is required'); return; }
+    if (!handToId) { setHandError('Select a recipient'); return; }
+    const recipient = users.find(u => u.id === handToId);
+    if (!recipient) { setHandError('Recipient not found'); return; }
+    if (handToId === currentUserId) { setHandError('Cannot hand over cash to yourself'); return; }
+    if (!recipient.cash_pin) { setHandError(`${recipient.full_name} has no PIN set. They must set it in Settings → Users first.`); return; }
     const { data: { user } } = await supabase.auth.getUser();
     const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user?.id).maybeSingle();
     await supabase.from('cash_handovers').insert({
-      date, amount: amt,
+      date: entryDate, amount: amt,
       from_user_id: user?.id, from_user_name: prof?.full_name || user?.email || 'Unknown',
-      to_user_name: handTo.trim(), notes: handNotes.trim() || null, status: 'pending'
+      to_user_id: recipient.id, to_user_name: recipient.full_name,
+      notes: handNotes.trim() || null, status: 'pending'
     });
-    setHandAmount(''); setHandTo(''); setHandNotes(''); setShowHandover(false);
+    setHandAmount(''); setHandToId(''); setHandNotes(''); setShowHandover(false);
     fetchData();
   };
 
@@ -126,14 +147,20 @@ export default function CashBook() {
     setConfirmError('');
     if (!confirmingHandover || !confirmPin.trim()) { setConfirmError('Enter PIN'); return; }
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: prof } = await supabase.from('profiles').select('cash_pin, full_name').eq('id', user?.id).maybeSingle();
+    if (!user) { setConfirmError('Not logged in'); return; }
+    // Verify the confirming user IS the intended recipient
+    if (confirmingHandover.to_user_id && confirmingHandover.to_user_id !== user.id) {
+      setConfirmError(`This handover is meant for ${confirmingHandover.to_user_name}. Only they can sign it.`);
+      return;
+    }
+    const { data: prof } = await supabase.from('profiles').select('cash_pin, full_name').eq('id', user.id).maybeSingle();
     if (!prof?.cash_pin) { setConfirmError('You have no PIN set. Go to Settings → Users to set one.'); return; }
     if (prof.cash_pin !== confirmPin.trim()) { setConfirmError('Incorrect PIN'); return; }
     await supabase.from('cash_handovers').update({
       status: 'confirmed',
       confirmed_at: new Date().toISOString(),
-      to_user_id: user?.id,
-      to_user_name: prof.full_name || user?.email || confirmingHandover.to_user_name,
+      to_user_id: user.id,
+      to_user_name: prof.full_name || user.email || confirmingHandover.to_user_name,
     }).eq('id', confirmingHandover.id);
     setConfirmingHandover(null); setConfirmPin('');
     fetchData();
@@ -146,16 +173,13 @@ export default function CashBook() {
   };
 
   const exportCSV = async () => {
-    // Export expenses for current month
-    const monthStart = date.slice(0, 7) + '-01';
-    const monthEndDate = new Date(new Date(monthStart).getFullYear(), new Date(monthStart).getMonth() + 1, 0);
-    const monthEnd = monthEndDate.toISOString().slice(0, 10);
-    const { data } = await supabase.from('cash_expenses').select('*').gte('date', monthStart).lte('date', monthEnd).order('date', { ascending: false });
+    // Export expenses for selected date range
+    const { data } = await supabase.from('cash_expenses').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false });
     const rows = (data || []).map(e => `${e.date},${e.amount},${e.category},"${(e.description || '').replace(/"/g, '""')}"`);
     const csv = 'Date,Amount,Category,Description\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `CashBook_${date.slice(0, 7)}.csv`; a.click(); URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = url; a.download = `CashBook_${fromDate}_to_${toDate}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
   return (
@@ -163,8 +187,10 @@ export default function CashBook() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>Cash Book</span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '5px 8px', outline: 'none' }} />
-          <button onClick={exportCSV} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>Export Month</button>
+          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '5px 8px', outline: 'none' }} />
+          <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
+          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '5px 8px', outline: 'none' }} />
+          <button onClick={exportCSV} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>Export CSV</button>
         </div>
       </div>
 
@@ -172,7 +198,7 @@ export default function CashBook() {
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, fontSize: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.tx2 }}>
-            Opening Balance
+            Opening Balance ({new Date(fromDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })})
             {!editingOpening ? <button onClick={() => setEditingOpening(true)} style={{ padding: '2px 6px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'transparent', color: T.tx3, fontSize: 8, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: 0.5 }}>Edit</button> : null}
           </div>
           {editingOpening ? (
@@ -211,11 +237,14 @@ export default function CashBook() {
       {tab === 'expenses' && <>
         <button onClick={() => setShowAdd(true)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>+ Add Expense</button>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-          {expenses.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No expenses on this date.</div>}
+          {expenses.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No expenses in this range.</div>}
           {expenses.map(e => (
             <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, marginBottom: 2 }}>{e.category}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{e.category}</span>
+                  <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3, fontFamily: T.mono }}>{new Date(e.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
+                </div>
                 {e.description && <div style={{ fontSize: 10, color: T.tx3 }}>{e.description}</div>}
               </div>
               <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.re }}>−₹{Number(e.amount).toLocaleString('en-IN')}</div>
@@ -230,7 +259,7 @@ export default function CashBook() {
       {/* Sales Tab */}
       {tab === 'sales' && (
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-          {sales.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No cash sales on this date.</div>}
+          {sales.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No cash sales in this range.</div>}
           {sales.map(s => (
             <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ flex: 1 }}>
@@ -251,12 +280,13 @@ export default function CashBook() {
       {tab === 'handovers' && <>
         <button onClick={() => setShowHandover(true)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.yl}, ${T.yl}cc)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>+ Initiate Handover</button>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-          {handovers.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No handovers on this date.</div>}
+          {handovers.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No handovers in this range.</div>}
           {handovers.map(h => (
             <div key={h.id} style={{ padding: '11px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{h.from_user_name} → {h.to_user_name}</span>
+                  <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3, fontFamily: T.mono }}>{new Date(h.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
                   <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓ Signed' : 'Pending'}</span>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(h.amount).toLocaleString('en-IN')}</span>
@@ -275,13 +305,24 @@ export default function CashBook() {
           <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 380, width: '100%' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Initiate Cash Handover</div>
             <div style={{ fontSize: 10, color: T.tx3, marginBottom: 12 }}>Recipient must sign with their PIN to confirm receipt</div>
-            <div style={{ marginBottom: 10 }}>
-              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Amount (₹)</label>
-              <input type="number" value={handAmount} onChange={e => setHandAmount(e.target.value)} autoFocus placeholder="0.00" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Date</label>
+                <input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Amount (₹)</label>
+                <input type="number" value={handAmount} onChange={e => setHandAmount(e.target.value)} autoFocus placeholder="0.00" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
             </div>
             <div style={{ marginBottom: 10 }}>
-              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Recipient Name (Cashier)</label>
-              <input type="text" value={handTo} onChange={e => setHandTo(e.target.value)} placeholder="e.g., Ramesh" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Recipient (Cashier)</label>
+              <select value={handToId} onChange={e => setHandToId(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}>
+                <option value="">Select recipient...</option>
+                {users.filter(u => u.id !== currentUserId).map(u => (
+                  <option key={u.id} value={u.id}>{u.full_name}{!u.cash_pin ? ' (no PIN set)' : ''}</option>
+                ))}
+              </select>
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Notes (optional)</label>
@@ -317,9 +358,15 @@ export default function CashBook() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
           <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 380, width: '100%' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 14 }}>Add Expense</div>
-            <div style={{ marginBottom: 10 }}>
-              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Amount (₹)</label>
-              <input type="number" value={amount} onChange={e => setAmount(e.target.value)} autoFocus placeholder="0.00" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Date</label>
+                <input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Amount (₹)</label>
+                <input type="number" value={amount} onChange={e => setAmount(e.target.value)} autoFocus placeholder="0.00" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
             </div>
             <div style={{ marginBottom: 10 }}>
               <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Category</label>
