@@ -7,6 +7,12 @@ const supabase = createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0'
 );
 
+const ccAudit = (action: string, details: string) => {
+  supabase.auth.getUser().then(({ data }) => {
+    supabase.from('audit_log').insert({ action, module: 'cash_challan', details, user_id: data.user?.id });
+  });
+};
+
 const T = {
   bg: '#060810',
   bd: 'rgba(255,255,255,0.05)', bd2: 'rgba(255,255,255,0.08)',
@@ -65,6 +71,11 @@ export default function CashChallan() {
   const [paymentDate, setPaymentDate] = useState('');
   const [amountPaid, setAmountPaid] = useState(0);
   const [challanStatus, setChallanStatus] = useState('draft');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [isReturn, setIsReturn] = useState(false);
+  const [auditTrail, setAuditTrail] = useState<any[] | null>(null);
+  const [reminderChallan, setReminderChallan] = useState<any | null>(null);
+  const [reminderPhone, setReminderPhone] = useState('');
 
   // Analytics
   const [showErpReminder, setShowErpReminder] = useState(false);
@@ -136,13 +147,14 @@ export default function CashChallan() {
   // ── Fetch ledger (recent 10 customers) ──────────────────────────────────────
   const fetchLedger = useCallback(async () => {
     // Get last 10 distinct customers by most recent challan
-    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, created_at').neq('status', 'voided').order('created_at', { ascending: false }).limit(100);
+    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return, created_at').neq('status', 'voided').order('created_at', { ascending: false }).limit(100);
     const map: Record<string, { total: number; paid: number; count: number; latest: string }> = {};
     (data || []).forEach((r: any) => {
       const name = r.customer_name;
+      const sign = r.is_return ? -1 : 1;
       if (!map[name]) map[name] = { total: 0, paid: 0, count: 0, latest: r.created_at };
-      map[name].total += Number(r.total);
-      map[name].paid += Number(r.amount_paid);
+      map[name].total += sign * Number(r.total);
+      map[name].paid += sign * Number(r.amount_paid || 0);
       map[name].count++;
     });
     const list = Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count }));
@@ -152,13 +164,14 @@ export default function CashChallan() {
 
   const searchLedgerCustomer = useCallback(async (q: string) => {
     if (!q.trim()) { fetchLedger(); return; }
-    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid').neq('status', 'voided').ilike('customer_name', `%${q}%`);
+    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return').neq('status', 'voided').ilike('customer_name', `%${q}%`);
     const map: Record<string, { total: number; paid: number; count: number }> = {};
     (data || []).forEach((r: any) => {
       const name = r.customer_name;
+      const sign = r.is_return ? -1 : 1;
       if (!map[name]) map[name] = { total: 0, paid: 0, count: 0 };
-      map[name].total += Number(r.total);
-      map[name].paid += Number(r.amount_paid);
+      map[name].total += sign * Number(r.total);
+      map[name].paid += sign * Number(r.amount_paid || 0);
       map[name].count++;
     });
     setLedgerCustomers(Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count })));
@@ -180,12 +193,19 @@ export default function CashChallan() {
     if (invalidItem) { setFormError('All items must have SKU, quantity > 0, and price > 0'); return; }
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Upsert customer
+    // Upsert customer (save phone too)
     let custId = selectedCustomerId;
     if (!custId) {
       const { data: existing } = await supabase.from('cash_challan_customers').select('id').eq('name', customerName.trim()).maybeSingle();
-      if (existing) { custId = existing.id; }
-      else { const { data: newCust } = await supabase.from('cash_challan_customers').insert({ name: customerName.trim() }).select('id').single(); custId = newCust?.id || null; }
+      if (existing) {
+        custId = existing.id;
+        if (customerPhone.trim()) await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId);
+      } else {
+        const { data: newCust } = await supabase.from('cash_challan_customers').insert({ name: customerName.trim(), phone: customerPhone.trim() || null }).select('id').single();
+        custId = newCust?.id || null;
+      }
+    } else if (customerPhone.trim()) {
+      await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId);
     }
 
     const challanData = {
@@ -194,6 +214,7 @@ export default function CashChallan() {
       discount_amount: discountAmount, shipping_charges: shippingCharges, round_off: roundOff, total: grandTotal,
       amount_paid: amountPaid, payment_mode: paymentMode || null,
       payment_date: paymentDate || null, notes, tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      is_return: isReturn,
       modified_by: user?.id,
     };
 
@@ -201,10 +222,12 @@ export default function CashChallan() {
       await supabase.from('cash_challans').update({ ...challanData, updated_at: new Date().toISOString() }).eq('id', editing.id);
       await supabase.from('cash_challan_items').delete().eq('challan_id', editing.id);
       await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: editing.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: it.quantity * it.price, sort_order: i })));
+      ccAudit('UPDATE', `Challan #${editing.challan_number} updated for ${customerName.trim()} - ₹${grandTotal}`);
     } else {
-      const { data: newChallan } = await supabase.from('cash_challans').insert({ ...challanData, created_by: user?.id }).select('id').single();
+      const { data: newChallan } = await supabase.from('cash_challans').insert({ ...challanData, created_by: user?.id }).select('id, challan_number').single();
       if (newChallan) {
         await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: newChallan.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: it.quantity * it.price, sort_order: i })));
+        ccAudit('CREATE', `${isReturn ? 'Return' : 'Challan'} #${newChallan.challan_number} created for ${customerName.trim()} - ₹${grandTotal}`);
       }
     }
     const wasNew = !editing;
@@ -216,16 +239,72 @@ export default function CashChallan() {
   // ── Void challan ───────────────────────────────────────────────────────────
   const voidChallan = async (id: string) => {
     const { data: { user } } = await supabase.auth.getUser();
+    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total').eq('id', id).single();
     await supabase.from('cash_challans').update({ status: 'voided', voided_by: user?.id, voided_at: new Date().toISOString() }).eq('id', id);
+    if (before) ccAudit('VOID', `Challan #${before.challan_number} (${before.customer_name}) voided - was ₹${before.total}`);
     fetchChallans();
+  };
+
+  // ── Audit trail for a challan ──────────────────────────────────────────────
+  const loadAuditTrail = async (challanNumber: number) => {
+    const { data } = await supabase.from('audit_log').select('*').eq('module', 'cash_challan').ilike('details', `%#${challanNumber} %`).order('created_at', { ascending: false });
+    setAuditTrail(data || []);
+  };
+
+  // ── WhatsApp payment reminder ──────────────────────────────────────────────
+  const sendReminder = async (c: any) => {
+    const outstanding = Number(c.total) - Number(c.amount_paid || 0);
+    // Try to get saved phone
+    const { data: cust } = await supabase.from('cash_challan_customers').select('phone').eq('name', c.customer_name).maybeSingle();
+    const phone = cust?.phone;
+    if (phone) {
+      const msg = encodeURIComponent(`Hi ${c.customer_name},\nGentle reminder — your Cash Challan #${c.challan_number} dated ${new Date(c.created_at).toLocaleDateString('en-IN')} for ₹${Number(c.total).toLocaleString('en-IN')} is pending.\nOutstanding: ₹${outstanding.toLocaleString('en-IN')}\nPlease arrange payment at your earliest convenience.\n— Arya Designs`);
+      window.open(`https://wa.me/91${phone.replace(/\D/g, '')}?text=${msg}`, '_blank');
+    } else {
+      setReminderChallan(c);
+      setReminderPhone('');
+    }
+  };
+
+  const saveReminderPhone = async () => {
+    if (!reminderChallan || !reminderPhone.trim()) return;
+    await supabase.from('cash_challan_customers').update({ phone: reminderPhone.trim() }).eq('name', reminderChallan.customer_name);
+    const c = reminderChallan;
+    const outstanding = Number(c.total) - Number(c.amount_paid || 0);
+    const msg = encodeURIComponent(`Hi ${c.customer_name},\nGentle reminder — your Cash Challan #${c.challan_number} dated ${new Date(c.created_at).toLocaleDateString('en-IN')} for ₹${Number(c.total).toLocaleString('en-IN')} is pending.\nOutstanding: ₹${outstanding.toLocaleString('en-IN')}\nPlease arrange payment at your earliest convenience.\n— Arya Designs`);
+    window.open(`https://wa.me/91${reminderPhone.trim().replace(/\D/g, '')}?text=${msg}`, '_blank');
+    setReminderChallan(null);
+  };
+
+  // ── Export customer ledger CSV ─────────────────────────────────────────────
+  const exportLedgerCSV = (customerName: string) => {
+    if (ledgerChallans.length === 0) return;
+    const rows = ledgerChallans.map(c => {
+      const sign = (c as any).is_return ? -1 : 1;
+      return `${c.challan_number},${new Date(c.created_at).toLocaleDateString('en-IN')},${(c as any).is_return ? 'Return' : 'Sale'},${sign * Number(c.total)},${sign * Number(c.amount_paid || 0)},${sign * (Number(c.total) - Number(c.amount_paid || 0))},${c.status},"${(c.notes || '').replace(/"/g, '""')}"`;
+    });
+    const totalBilled = ledgerChallans.filter(c => !(c as any).is_return).reduce((s, c) => s + Number(c.total), 0);
+    const totalReturns = ledgerChallans.filter(c => (c as any).is_return).reduce((s, c) => s + Number(c.total), 0);
+    const totalPaid = ledgerChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
+    const outstanding = totalBilled - totalReturns - totalPaid;
+    const csv = 'Challan #,Date,Type,Amount,Paid,Outstanding,Status,Notes\n' + rows.join('\n') +
+      `\n,,,Total Billed,${totalBilled},,\n,,,Total Returns,-${totalReturns},,\n,,,Total Paid,${totalPaid},,\n,,,Outstanding,${outstanding},,`;
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `Ledger_${customerName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
   // ── Open edit ──────────────────────────────────────────────────────────────
   const openEdit = async (c: Challan) => {
-    const { data: citems } = await supabase.from('cash_challan_items').select('*').eq('challan_id', c.id).order('sort_order');
+    const [{ data: citems }, { data: cust }] = await Promise.all([
+      supabase.from('cash_challan_items').select('*').eq('challan_id', c.id).order('sort_order'),
+      c.customer_id ? supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle() : Promise.resolve({ data: null }),
+    ]);
     setEditing(c);
     setCustomerName(c.customer_name);
     setSelectedCustomerId(c.customer_id);
+    setCustomerPhone(cust?.phone || '');
+    setIsReturn(!!(c as any).is_return);
     setItems((citems || []).map(i => ({ sku: i.sku || '', description: i.description, quantity: i.quantity, price: Number(i.price), total: Number(i.total) })));
     setDiscountType(c.discount_type || 'flat');
     setDiscountValue(Number(c.discount_value));
@@ -240,7 +319,7 @@ export default function CashChallan() {
   };
 
   const closeModal = () => {
-    setShowModal(false); setEditing(null); setCustomerName(''); setSelectedCustomerId(null);
+    setShowModal(false); setEditing(null); setCustomerName(''); setSelectedCustomerId(null); setCustomerPhone(''); setIsReturn(false);
     setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0 }]);
     setDiscountType('flat'); setDiscountValue(0); setShippingCharges(0); setNotes(''); setTags('');
     setPaymentMode(''); setPaymentDate(''); setAmountPaid(0); setChallanStatus('draft');
@@ -253,7 +332,7 @@ export default function CashChallan() {
     const w = window.open('', '_blank');
     if (!w) return;
     w.document.write(`<html><head><title>Cash Challan #${c.challan_number}</title><style>body{font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:auto}table{width:100%;border-collapse:collapse;margin:12px 0}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f5f5;font-weight:600}.right{text-align:right}.header{text-align:center;margin-bottom:16px}.status{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}</style></head><body>`);
-    w.document.write(`<div class="header"><h2 style="margin:0">Arya Designs</h2><p style="color:#666;font-size:11px;margin:4px 0">Cash Challan #${c.challan_number} | ${new Date(c.created_at).toLocaleDateString('en-IN')}</p></div>`);
+    w.document.write(`<div class="header"><h2 style="margin:0">Arya Designs</h2><p style="color:#666;font-size:11px;margin:4px 0">${(c as any).is_return ? 'Return Challan' : 'Cash Challan'} #${c.challan_number} | ${new Date(c.created_at).toLocaleDateString('en-IN')}</p></div>`);
     w.document.write(`<p><strong>Customer:</strong> ${c.customer_name}</p>`);
     w.document.write(`<table><thead><tr><th>#</th><th>SKU</th><th class="right">Qty</th><th class="right">Price</th><th class="right">Total</th></tr></thead><tbody>`);
     (citems || []).forEach((it: any, i: number) => { w.document.write(`<tr><td>${i + 1}</td><td>${it.sku || '-'}</td><td class="right">${it.quantity}</td><td class="right">${Number(it.price).toFixed(2)}</td><td class="right">${Number(it.total).toFixed(2)}</td></tr>`); });
@@ -324,7 +403,10 @@ export default function CashChallan() {
             <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>{ledgerDetail}</span>
             {cust && <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{cust.count} challans | Outstanding: <span style={{ color: cust.outstanding > 0 ? T.re : T.gr, fontWeight: 600 }}>₹{cust.outstanding.toLocaleString('en-IN')}</span></div>}
           </div>
-          <button onClick={() => setLedgerDetail(null)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Back</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => exportLedgerCSV(ledgerDetail)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer', fontFamily: T.sans }}>Export CSV</button>
+            <button onClick={() => setLedgerDetail(null)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Back</button>
+          </div>
         </div>
         {cust && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
@@ -411,24 +493,40 @@ export default function CashChallan() {
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', display: 'flex', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: 520 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>{editing ? `Edit #${editing.challan_number}` : 'New Cash Challan'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>{editing ? `Edit #${editing.challan_number}` : (isReturn ? 'New Return' : 'New Cash Challan')}</span>
+            {editing && <button onClick={() => loadAuditTrail(editing.challan_number)} style={{ padding: '3px 8px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>View History</button>}
+          </div>
           <button onClick={closeModal} style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Cancel</button>
+        </div>
+
+        {/* Sale / Return Toggle */}
+        <div style={{ display: 'flex', gap: 3, marginBottom: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, width: 'fit-content', border: `1px solid ${T.bd}` }}>
+          {([{ v: false, label: 'Sale', color: T.gr }, { v: true, label: '↩ Return', color: T.re }] as const).map(opt => (
+            <div key={String(opt.v)} onClick={() => !editing && setIsReturn(opt.v)} style={{ padding: '5px 14px', borderRadius: 4, fontSize: 10, fontWeight: isReturn === opt.v ? 600 : 400, cursor: editing ? 'not-allowed' : 'pointer', opacity: editing ? 0.6 : 1, background: isReturn === opt.v ? opt.color + '33' : 'transparent', color: isReturn === opt.v ? opt.color : T.tx3, border: isReturn === opt.v ? `1px solid ${opt.color}44` : 'none' }}>{opt.label}</div>
+          ))}
         </div>
 
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
           {/* Customer */}
-          <div style={{ marginBottom: 12, position: 'relative' }}>
-            <label style={lbl}>Customer Name</label>
-            <input type="text" value={customerName} onChange={e => { setCustomerName(e.target.value); setSelectedCustomerId(null); clearTimeout(searchTimeout.current); searchTimeout.current = setTimeout(() => searchCustomers(e.target.value), 300); }}
-              placeholder="Type customer name..." style={inp} />
-            {customerSuggestions.length > 0 && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'rgba(14,18,30,.98)', border: `1px solid ${T.bd2}`, borderRadius: 6, maxHeight: 120, overflowY: 'auto' }}>
-                {customerSuggestions.map(c => (
-                  <div key={c.id} onClick={() => { setCustomerName(c.name); setSelectedCustomerId(c.id); setCustomerSuggestions([]); }}
-                    style={{ padding: '8px 10px', fontSize: 11, color: T.tx, cursor: 'pointer', borderBottom: `1px solid ${T.bd}` }}>{c.name} {c.phone && <span style={{ color: T.tx3 }}>({c.phone})</span>}</div>
-                ))}
-              </div>
-            )}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 12 }}>
+            <div style={{ position: 'relative' }}>
+              <label style={lbl}>Customer Name *</label>
+              <input type="text" value={customerName} onChange={e => { setCustomerName(e.target.value); setSelectedCustomerId(null); clearTimeout(searchTimeout.current); searchTimeout.current = setTimeout(() => searchCustomers(e.target.value), 300); }}
+                placeholder="Type customer name..." style={inp} />
+              {customerSuggestions.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'rgba(14,18,30,.98)', border: `1px solid ${T.bd2}`, borderRadius: 6, maxHeight: 120, overflowY: 'auto' }}>
+                  {customerSuggestions.map(c => (
+                    <div key={c.id} onClick={() => { setCustomerName(c.name); setSelectedCustomerId(c.id); setCustomerPhone(c.phone || ''); setCustomerSuggestions([]); }}
+                      style={{ padding: '8px 10px', fontSize: 11, color: T.tx, cursor: 'pointer', borderBottom: `1px solid ${T.bd}` }}>{c.name} {c.phone && <span style={{ color: T.tx3 }}>({c.phone})</span>}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <label style={lbl}>Phone (for WhatsApp)</label>
+              <input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="9876543210" style={{ ...inp, fontFamily: T.mono }} />
+            </div>
           </div>
 
           {/* Line Items */}
@@ -557,12 +655,14 @@ export default function CashChallan() {
           const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
           const skus = ((c as any).cash_challan_items || []).map((i: any) => i.sku).filter(Boolean).join(', ');
           const pendingDays = (c.status === 'unpaid' || c.status === 'partial') ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : 0;
+          const isRet = !!(c as any).is_return;
           return (
             <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }} onClick={() => openEdit(c)}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>#{c.challan_number}</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.customer_name}</span>
+                  {isRet && <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>↩ Return</span>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 9, color: T.tx3 }}>{new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
@@ -573,16 +673,19 @@ export default function CashChallan() {
                 {skus && <div style={{ fontSize: 9, fontFamily: T.mono, color: T.tx3, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{skus}</div>}
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(c.total).toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: isRet ? T.re : T.tx }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
               </div>
               <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                 <button onClick={e => { e.stopPropagation(); printChallan(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.5 }}>
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.tx2, strokeWidth: 2 }}><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
                 </button>
-                <button onClick={e => { e.stopPropagation(); shareChallan(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.5 }}>
+                <button onClick={e => { e.stopPropagation(); shareChallan(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.5 }} title="Share">
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.gr, strokeWidth: 2 }}><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></svg>
                 </button>
-                {c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number }); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.4 }}>
+                {(c.status === 'unpaid' || c.status === 'partial') && <button onClick={e => { e.stopPropagation(); sendReminder(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.6 }} title="Send WhatsApp reminder">
+                  <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.yl, strokeWidth: 2 }}><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
+                </button>}
+                {c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number }); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.4 }} title="Void">
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M18 6L6 18M6 6l12 12" /></svg>
                 </button>}
               </div>
@@ -590,6 +693,43 @@ export default function CashChallan() {
           );
         })}
       </div>
+
+      {/* Audit Trail Modal */}
+      {auditTrail && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
+          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '18px 16px', maxWidth: 420, width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Audit Trail</span>
+              <button onClick={() => setAuditTrail(null)} style={{ padding: '3px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Close</button>
+            </div>
+            {auditTrail.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No history for this challan.</div>}
+            {auditTrail.map(a => (
+              <div key={a.id} style={{ padding: '8px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: a.action === 'VOID' ? 'rgba(239,68,68,.12)' : a.action === 'CREATE' ? 'rgba(34,197,94,.12)' : 'rgba(99,102,241,.12)', color: a.action === 'VOID' ? T.re : a.action === 'CREATE' ? T.gr : T.ac2, fontWeight: 700 }}>{a.action}</span>
+                  <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>{new Date(a.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <div style={{ color: T.tx2, fontSize: 11 }}>{a.details}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp Phone Prompt Modal */}
+      {reminderChallan && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
+          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 360, width: '100%' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Add Customer Phone</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>No phone saved for <strong style={{ color: T.tx }}>{reminderChallan.customer_name}</strong>. Enter a 10-digit mobile to send reminder:</div>
+            <input type="tel" value={reminderPhone} onChange={e => setReminderPhone(e.target.value)} placeholder="9876543210" autoFocus style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setReminderChallan(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={saveReminderPhone} disabled={!reminderPhone.trim()} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: reminderPhone.trim() ? `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)` : 'rgba(255,255,255,.05)', color: '#fff', cursor: reminderPhone.trim() ? 'pointer' : 'not-allowed' }}>Send</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ERP Reminder Modal */}
       {showErpReminder && (
