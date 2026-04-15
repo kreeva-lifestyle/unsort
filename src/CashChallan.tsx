@@ -117,6 +117,15 @@ export default function CashChallan() {
   }, [search, statusFilter, tagFilter, page, pageSize]);
 
   useEffect(() => { fetchChallans(); }, [fetchChallans]);
+
+  // ── Realtime sync — multi-user safety ──────────────────────────────────────
+  useEffect(() => {
+    const channel = supabase.channel('cash_challans_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, () => fetchChallans())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challan_items' }, () => fetchChallans())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchChallans]);
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();

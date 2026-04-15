@@ -55,6 +55,16 @@ export default function CashBook() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // ── Realtime sync — multi-user safety ──────────────────────────────────────
+  useEffect(() => {
+    const channel = supabase.channel('cash_book_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_expenses' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_book_balances' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, () => fetchData())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchData]);
+
   const cashInSales = sales.filter(s => !s.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
   const cashOutReturns = sales.filter(s => s.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
   const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
