@@ -1542,19 +1542,45 @@ const Users = () => {
   const [inviting, setInviting] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', password: '', role: 'viewer' });
   const [inviteResult, setInviteResult] = useState<{ email: string; password: string } | null>(null);
-  const [myPin, setMyPin] = useState('');
-  const [pinSaved, setPinSaved] = useState(false);
+  const [pinExists, setPinExists] = useState(false);
+  const [pinLength, setPinLength] = useState(0);
+  const [editingPin, setEditingPin] = useState(false);
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [pinSaving, setPinSaving] = useState(false);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
-  useEffect(() => {
-    if (profile?.id) supabase.from('profiles').select('cash_pin').eq('id', profile.id).maybeSingle().then(({ data }) => setMyPin(data?.cash_pin || ''));
+
+  const loadPin = useCallback(async () => {
+    if (!profile?.id) return;
+    const { data } = await supabase.from('profiles').select('cash_pin').eq('id', profile.id).maybeSingle();
+    const pin = data?.cash_pin || '';
+    setPinExists(!!pin);
+    setPinLength(pin.length);
   }, [profile?.id]);
+
+  useEffect(() => { loadPin(); }, [loadPin]);
+
   const saveMyPin = async () => {
-    if (myPin.length < 4 || myPin.length > 6) { addToast('PIN must be 4-6 digits', 'error'); return; }
-    if (!/^\d+$/.test(myPin)) { addToast('PIN must be digits only', 'error'); return; }
-    await supabase.from('profiles').update({ cash_pin: myPin }).eq('id', profile.id);
-    setPinSaved(true); setTimeout(() => setPinSaved(false), 2000);
-    addToast('Cash PIN saved', 'success');
+    setPinError('');
+    if (newPin.length < 4 || newPin.length > 6) { setPinError('PIN must be 4-6 digits'); return; }
+    if (!/^\d+$/.test(newPin)) { setPinError('PIN must be digits only'); return; }
+    if (newPin !== confirmPin) { setPinError('PINs do not match'); return; }
+    setPinSaving(true);
+    const { error } = await supabase.from('profiles').update({ cash_pin: newPin }).eq('id', profile.id);
+    setPinSaving(false);
+    if (error) { setPinError('Save failed: ' + error.message); return; }
+    setNewPin(''); setConfirmPin(''); setEditingPin(false);
+    await loadPin();
+    addToast('Cash PIN saved successfully', 'success');
+  };
+
+  const removePin = async () => {
+    if (!confirm('Remove your Cash PIN? You will not be able to confirm cash handovers without it.')) return;
+    await supabase.from('profiles').update({ cash_pin: null }).eq('id', profile.id);
+    await loadPin();
+    addToast('Cash PIN removed', 'success');
   };
 
   const fetchUsers = () => { supabase.from('profiles').select('*').order('created_at', { ascending: false }).then(({ data }) => setUsers(data || [])); };
@@ -1610,13 +1636,42 @@ const Users = () => {
   return (
     <div>
       {/* My Cash PIN — for confirming cash handovers */}
-      <div style={{ background: 'rgba(245,158,11,.05)', border: '1px solid rgba(245,158,11,.15)', borderRadius: 8, padding: 12, marginBottom: 14 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: T.yl, marginBottom: 4, fontFamily: T.sora }}>My Cash PIN</div>
-        <div style={{ fontSize: 10, color: T.tx3, marginBottom: 8 }}>Required to sign cash handovers received from accountant. 4-6 digits.</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <input type="password" value={myPin} onChange={e => setMyPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••" inputMode="numeric" style={{ ...S.fInput, fontFamily: T.mono, letterSpacing: 4, textAlign: 'center', width: 120, fontSize: 14 }} />
-          <button onClick={saveMyPin} style={S.btnPrimary}>{pinSaved ? '✓ Saved' : 'Save PIN'}</button>
+      <div style={{ background: 'rgba(245,158,11,.05)', border: '1px solid rgba(245,158,11,.15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: T.yl, fontFamily: T.sora }}>My Cash PIN</div>
+          {pinExists && !editingPin && (
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,.12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>✓ Set ({pinLength} digits)</span>
+          )}
+          {!pinExists && !editingPin && (
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Not Set</span>
+          )}
         </div>
+        <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10 }}>Required to sign cash handovers received from accountant. 4-6 digits.</div>
+
+        {!editingPin ? (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => { setEditingPin(true); setNewPin(''); setConfirmPin(''); setPinError(''); }} style={S.btnPrimary}>{pinExists ? 'Change PIN' : 'Set PIN'}</button>
+            {pinExists && <button onClick={removePin} style={S.btnDanger}>Remove PIN</button>}
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+              <div>
+                <label style={{ ...S.fLabel, marginBottom: 3 }}>{pinExists ? 'New PIN' : 'PIN'}</label>
+                <input type="password" value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••" inputMode="numeric" autoFocus style={{ ...S.fInput, fontFamily: T.mono, letterSpacing: 4, textAlign: 'center', fontSize: 14 }} />
+              </div>
+              <div>
+                <label style={{ ...S.fLabel, marginBottom: 3 }}>Confirm PIN</label>
+                <input type="password" value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••" inputMode="numeric" style={{ ...S.fInput, fontFamily: T.mono, letterSpacing: 4, textAlign: 'center', fontSize: 14 }} />
+              </div>
+            </div>
+            {pinError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '5px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{pinError}</div>}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={saveMyPin} disabled={pinSaving} style={{ ...S.btnPrimary, opacity: pinSaving ? 0.6 : 1 }}>{pinSaving ? 'Saving...' : 'Save PIN'}</button>
+              <button onClick={() => { setEditingPin(false); setNewPin(''); setConfirmPin(''); setPinError(''); }} style={S.btnGhost}>Cancel</button>
+            </div>
+          </div>
+        )}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Users</span>
