@@ -117,6 +117,15 @@ export default function CashChallan() {
   }, [search, statusFilter, tagFilter, page, pageSize]);
 
   useEffect(() => { fetchChallans(); }, [fetchChallans]);
+
+  // ── Realtime sync — multi-user safety ──────────────────────────────────────
+  useEffect(() => {
+    const channel = supabase.channel('cash_challans_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, () => fetchChallans())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challan_items' }, () => fetchChallans())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchChallans]);
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -193,16 +202,24 @@ export default function CashChallan() {
     if (invalidItem) { setFormError('All items must have SKU, quantity > 0, and price > 0'); return; }
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Upsert customer (save phone too)
+    // Upsert customer (case-insensitive match, save phone too)
     let custId = selectedCustomerId;
     if (!custId) {
-      const { data: existing } = await supabase.from('cash_challan_customers').select('id').eq('name', customerName.trim()).maybeSingle();
+      const trimmed = customerName.trim();
+      const { data: existing } = await supabase.from('cash_challan_customers').select('id').ilike('name', trimmed).maybeSingle();
       if (existing) {
         custId = existing.id;
         if (customerPhone.trim()) await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId);
       } else {
-        const { data: newCust } = await supabase.from('cash_challan_customers').insert({ name: customerName.trim(), phone: customerPhone.trim() || null }).select('id').single();
-        custId = newCust?.id || null;
+        const { data: newCust, error: insErr } = await supabase.from('cash_challan_customers').insert({ name: trimmed, phone: customerPhone.trim() || null }).select('id').single();
+        if (insErr && insErr.code === '23505') {
+          // Race: another user just created this customer — fetch them
+          const { data: raceCust } = await supabase.from('cash_challan_customers').select('id').ilike('name', trimmed).single();
+          custId = raceCust?.id || null;
+          if (custId && customerPhone.trim()) await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId);
+        } else {
+          custId = newCust?.id || null;
+        }
       }
     } else if (customerPhone.trim()) {
       await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId);
