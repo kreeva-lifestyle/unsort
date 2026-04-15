@@ -37,6 +37,30 @@ input:focus, select:focus, textarea:focus {
 select option { background: #0B0F19; color: #E2E8F0; }
 input::placeholder, textarea::placeholder { color: #4A5568; opacity: 1; }
 
+/* Date/time picker calendar icon — invert to be visible on dark theme */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="week"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.55;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  transition: opacity 0.15s, background 0.15s;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background: rgba(99,102,241,0.15);
+}
+/* Firefox doesn't have ::calendar-picker-indicator — color the input itself */
+input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"] {
+  color-scheme: dark;
+}
+
 /* Animations */
 @keyframes fi { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes su { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
