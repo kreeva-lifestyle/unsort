@@ -54,7 +54,8 @@ export default function CashBook() {
   const [handError, setHandError] = useState('');
   const [viewingHandover, setViewingHandover] = useState<Handover | null>(null);
   // Users list (for recipient dropdown)
-  const [users, setUsers] = useState<{ id: string; full_name: string; email: string; cash_pin: string | null }[]>([]);
+  const [users, setUsers] = useState<{ id: string; full_name: string; email: string; cash_pin: string | null; phone: string | null }[]>([]);
+  const [recentHandovers, setRecentHandovers] = useState<Handover[]>([]);
   const [currentUserId, setCurrentUserId] = useState('');
   // Confirm handover with PIN
   const [confirmingHandover, setConfirmingHandover] = useState<Handover | null>(null);
@@ -88,7 +89,7 @@ export default function CashBook() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) setCurrentUserId(user.id);
-      const { data } = await supabase.from('profiles').select('id, full_name, email, cash_pin').eq('is_active', true).order('full_name');
+      const { data } = await supabase.from('profiles').select('id, full_name, email, cash_pin, phone').eq('is_active', true).order('full_name');
       setUsers(data || []);
     })();
   }, []);
@@ -150,13 +151,15 @@ export default function CashBook() {
     return { opening, cashSales, cashReturns, expenses: expensesTotal, previousHandovers, available, periodFrom: from, periodTo: to };
   }, []);
 
-  // Recompute when range changes in modal
+  // Recompute when range changes in modal + load recent handovers
   useEffect(() => {
     if (showHandover) {
       computeBreakdown(handPeriodFrom, handPeriodTo).then(b => {
         setHandBreakdown(b);
         if (!handAmount) setHandAmount(String(Math.max(0, b.available)));
       });
+      // Load last 5 handovers
+      supabase.from('cash_handovers').select('*').order('created_at', { ascending: false }).limit(5).then(({ data }) => setRecentHandovers((data as any) || []));
     }
   }, [showHandover, handPeriodFrom, handPeriodTo, computeBreakdown]);
 
@@ -173,16 +176,25 @@ export default function CashBook() {
     if (amt > handBreakdown.available) { setHandError(`Cannot exceed available cash: ₹${handBreakdown.available.toLocaleString('en-IN')}`); return; }
     const amountDiffers = Math.abs(amt - handBreakdown.available) > 0.01;
     if (amountDiffers && !handReason.trim()) { setHandError('Amount differs from available cash. Add a reason in Notes/Reason field.'); return; }
+    // Enforce: only one handover per day per recipient
+    const todayDate = new Date().toISOString().slice(0, 10);
+    const { data: existing } = await supabase.from('cash_handovers').select('id, status, amount').eq('to_user_id', recipient.id).eq('date', todayDate).neq('status', 'expired').maybeSingle();
+    if (existing) { setHandError(`A handover already exists for ${recipient.full_name} today (₹${Number(existing.amount).toLocaleString('en-IN')}, ${existing.status}). Only one handover per recipient per day.`); return; }
     const { data: { user } } = await supabase.auth.getUser();
     const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user?.id).maybeSingle();
     await supabase.from('cash_handovers').insert({
-      date: entryDate, amount: amt,
+      date: todayDate, amount: amt,
       from_user_id: user?.id, from_user_name: prof?.full_name || user?.email || 'Unknown',
       to_user_id: recipient.id, to_user_name: recipient.full_name,
       notes: handNotes.trim() || null, status: 'pending',
       period_from: handPeriodFrom, period_to: handPeriodTo,
       breakdown: handBreakdown, reason: amountDiffers ? handReason.trim() : null,
     });
+    // WhatsApp notification to recipient
+    if (recipient.phone) {
+      const msg = encodeURIComponent(`Hi ${recipient.full_name},\n${prof?.full_name || 'Accountant'} has initiated a cash handover of ₹${amt.toLocaleString('en-IN')} for you (period ${handPeriodFrom} to ${handPeriodTo}).\nPlease open DailyOffice → Cash Book → Handovers and sign with your PIN to confirm receipt.\n— Arya Designs`);
+      window.open(`https://wa.me/91${recipient.phone.replace(/\D/g, '')}?text=${msg}`, '_blank');
+    }
     setHandAmount(''); setHandToId(''); setHandNotes(''); setHandReason(''); setHandBreakdown(null); setShowHandover(false);
     fetchData();
   };
@@ -443,15 +455,37 @@ export default function CashBook() {
               </div>
             )}
 
+            {/* Recent Handovers */}
+            {recentHandovers.length > 0 && (
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>
+                <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>Recent Handovers (last 5)</div>
+                {recentHandovers.map(h => (
+                  <div key={h.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: `1px solid ${T.bd}`, fontSize: 10 }}>
+                    <div>
+                      <span style={{ color: T.tx2 }}>{new Date(h.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} · </span>
+                      <span style={{ color: T.tx, fontWeight: 600 }}>{h.from_user_name} → {h.to_user_name}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontFamily: T.mono, color: T.tx, fontWeight: 600 }}>₹{Number(h.amount).toLocaleString('en-IN')}</span>
+                      <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓' : 'Pending'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Recipient + Amount */}
             <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 8, marginBottom: 10 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Recipient (Cashier)</label>
                 <select value={handToId} onChange={e => setHandToId(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}>
                   <option value="">Select recipient...</option>
-                  {users.filter(u => u.id !== currentUserId).map(u => (
-                    <option key={u.id} value={u.id}>{u.full_name}{!u.cash_pin ? ' (no PIN set)' : ''}</option>
-                  ))}
+                  {users.filter(u => u.id !== currentUserId).map(u => {
+                    const issues = [];
+                    if (!u.cash_pin) issues.push('no PIN');
+                    if (!u.phone) issues.push('no phone');
+                    return <option key={u.id} value={u.id}>{u.full_name}{issues.length ? ` (${issues.join(', ')})` : ''}</option>;
+                  })}
                 </select>
               </div>
               <div>

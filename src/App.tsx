@@ -1549,18 +1549,33 @@ const Users = () => {
   const [confirmPin, setConfirmPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [pinSaving, setPinSaving] = useState(false);
+  const [myPhone, setMyPhone] = useState('');
+  const [phoneSaving, setPhoneSaving] = useState(false);
+  const [phoneSaved, setPhoneSaved] = useState(false);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
 
   const loadPin = useCallback(async () => {
     if (!profile?.id) return;
-    const { data } = await supabase.from('profiles').select('cash_pin').eq('id', profile.id).maybeSingle();
+    const { data } = await supabase.from('profiles').select('cash_pin, phone').eq('id', profile.id).maybeSingle();
     const pin = data?.cash_pin || '';
     setPinExists(!!pin);
     setPinLength(pin.length);
+    setMyPhone(data?.phone || '');
   }, [profile?.id]);
 
   useEffect(() => { loadPin(); }, [loadPin]);
+
+  const savePhone = async () => {
+    const cleaned = myPhone.replace(/\D/g, '');
+    if (cleaned.length !== 10) { addToast('Phone must be 10 digits', 'error'); return; }
+    setPhoneSaving(true);
+    const { error } = await supabase.from('profiles').update({ phone: cleaned }).eq('id', profile.id);
+    setPhoneSaving(false);
+    if (error) { addToast('Save failed: ' + error.message, 'error'); return; }
+    setPhoneSaved(true); setTimeout(() => setPhoneSaved(false), 2000);
+    addToast('Phone saved', 'success');
+  };
 
   const saveMyPin = async () => {
     setPinError('');
@@ -1635,6 +1650,23 @@ const Users = () => {
 
   return (
     <div>
+      {/* My Phone — required for WhatsApp notifications */}
+      <div style={{ background: 'rgba(34,197,94,.05)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 8, padding: 14, marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: T.gr, fontFamily: T.sora }}>My Phone Number</div>
+          {myPhone.length === 10 ? (
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,.12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase' }}>✓ Set</span>
+          ) : (
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>Required</span>
+          )}
+        </div>
+        <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10 }}>Required to receive WhatsApp notifications for cash handovers and payment alerts.</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input type="tel" inputMode="numeric" value={myPhone} onChange={e => setMyPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="9876543210" style={{ ...S.fInput, fontFamily: T.mono, width: 200, fontSize: 13 }} />
+          <button onClick={savePhone} disabled={phoneSaving} style={{ ...S.btnPrimary, opacity: phoneSaving ? 0.6 : 1 }}>{phoneSaved ? '✓ Saved' : phoneSaving ? 'Saving...' : 'Save Phone'}</button>
+        </div>
+      </div>
+
       {/* My Cash PIN — for confirming cash handovers */}
       <div style={{ background: 'rgba(245,158,11,.05)', border: '1px solid rgba(245,158,11,.15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
