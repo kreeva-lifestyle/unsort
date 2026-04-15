@@ -20,13 +20,15 @@ const T = {
 const CATEGORIES = ['Office Supplies', 'Rent', 'Salaries', 'Travel', 'Utilities', 'Food', 'Transport', 'Misc'];
 
 interface Expense { id: string; date: string; amount: number; category: string; description: string; created_at: string; }
+interface Handover { id: string; date: string; amount: number; from_user_name: string; to_user_name: string; notes: string; status: string; confirmed_at: string | null; created_at: string; }
 
 export default function CashBook() {
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
-  const [tab, setTab] = useState<'expenses' | 'sales'>('expenses');
+  const [tab, setTab] = useState<'expenses' | 'sales' | 'handovers'>('expenses');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [sales, setSales] = useState<any[]>([]);
+  const [handovers, setHandovers] = useState<Handover[]>([]);
   const [openingBalance, setOpeningBalance] = useState(0);
   const [editingOpening, setEditingOpening] = useState(false);
   const [openingInput, setOpeningInput] = useState('0');
@@ -36,6 +38,16 @@ export default function CashBook() {
   const [description, setDescription] = useState('');
   const [formError, setFormError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  // Handover form
+  const [showHandover, setShowHandover] = useState(false);
+  const [handAmount, setHandAmount] = useState('');
+  const [handTo, setHandTo] = useState('');
+  const [handNotes, setHandNotes] = useState('');
+  const [handError, setHandError] = useState('');
+  // Confirm handover with PIN
+  const [confirmingHandover, setConfirmingHandover] = useState<Handover | null>(null);
+  const [confirmPin, setConfirmPin] = useState('');
+  const [confirmError, setConfirmError] = useState('');
 
   const fetchData = useCallback(async () => {
     // Opening balance
@@ -51,6 +63,10 @@ export default function CashBook() {
     const { data: ch } = await supabase.from('cash_challans').select('id, challan_number, customer_name, total, amount_paid, status, is_return, payment_mode, payment_date, created_at')
       .eq('payment_mode', 'Cash').in('status', ['paid', 'partial']).gte('created_at', date + 'T00:00:00').lte('created_at', date + 'T23:59:59').order('created_at', { ascending: false });
     setSales(ch || []);
+
+    // Handovers
+    const { data: ho } = await supabase.from('cash_handovers').select('*').eq('date', date).order('created_at', { ascending: false });
+    setHandovers(ho || []);
   }, [date]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -61,6 +77,7 @@ export default function CashBook() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_expenses' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_book_balances' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_handovers' }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
@@ -68,7 +85,8 @@ export default function CashBook() {
   const cashInSales = sales.filter(s => !s.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
   const cashOutReturns = sales.filter(s => s.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
   const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
-  const closingBalance = openingBalance + cashInSales - cashOutReturns - totalExpenses;
+  const totalHandovers = handovers.filter(h => h.status === 'confirmed').reduce((s, h) => s + Number(h.amount), 0);
+  const closingBalance = openingBalance + cashInSales - cashOutReturns - totalExpenses - totalHandovers;
 
   const saveOpening = async () => {
     const val = Number(openingInput) || 0;
@@ -85,6 +103,39 @@ export default function CashBook() {
     const { data: { user } } = await supabase.auth.getUser();
     await supabase.from('cash_expenses').insert({ date, amount: amt, category, description: description.trim() || null, paid_by: user?.id });
     setAmount(''); setDescription(''); setCategory(CATEGORIES[0]); setShowAdd(false);
+    fetchData();
+  };
+
+  const createHandover = async () => {
+    setHandError('');
+    const amt = Number(handAmount);
+    if (!amt || amt <= 0) { setHandError('Amount must be greater than 0'); return; }
+    if (!handTo.trim()) { setHandError('Recipient name is required'); return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user?.id).maybeSingle();
+    await supabase.from('cash_handovers').insert({
+      date, amount: amt,
+      from_user_id: user?.id, from_user_name: prof?.full_name || user?.email || 'Unknown',
+      to_user_name: handTo.trim(), notes: handNotes.trim() || null, status: 'pending'
+    });
+    setHandAmount(''); setHandTo(''); setHandNotes(''); setShowHandover(false);
+    fetchData();
+  };
+
+  const confirmHandover = async () => {
+    setConfirmError('');
+    if (!confirmingHandover || !confirmPin.trim()) { setConfirmError('Enter PIN'); return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: prof } = await supabase.from('profiles').select('cash_pin, full_name').eq('id', user?.id).maybeSingle();
+    if (!prof?.cash_pin) { setConfirmError('You have no PIN set. Go to Settings → Users to set one.'); return; }
+    if (prof.cash_pin !== confirmPin.trim()) { setConfirmError('Incorrect PIN'); return; }
+    await supabase.from('cash_handovers').update({
+      status: 'confirmed',
+      confirmed_at: new Date().toISOString(),
+      to_user_id: user?.id,
+      to_user_name: prof.full_name || user?.email || confirmingHandover.to_user_name,
+    }).eq('id', confirmingHandover.id);
+    setConfirmingHandover(null); setConfirmPin('');
     fetchData();
   };
 
@@ -140,6 +191,10 @@ export default function CashBook() {
           </>}
           <span style={{ color: T.re }}>− Expenses</span>
           <span style={{ fontFamily: T.mono, color: T.re, fontWeight: 600 }}>−₹{totalExpenses.toLocaleString('en-IN')}</span>
+          {totalHandovers > 0 && <>
+            <span style={{ color: T.yl }}>− Cash Handovers (signed)</span>
+            <span style={{ fontFamily: T.mono, color: T.yl, fontWeight: 600 }}>−₹{totalHandovers.toLocaleString('en-IN')}</span>
+          </>}
           <div style={{ display: 'flex', alignItems: 'center', color: T.tx, fontWeight: 700, fontFamily: T.sora, fontSize: 14, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4, gridColumn: '1 / 2' }}>= Closing Balance</div>
           <div style={{ fontFamily: T.mono, color: closingBalance >= 0 ? T.gr : T.re, fontWeight: 800, fontSize: 16, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}>₹{closingBalance.toLocaleString('en-IN')}</div>
         </div>
@@ -147,7 +202,7 @@ export default function CashBook() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 3, marginBottom: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, width: 'fit-content', border: `1px solid ${T.bd}` }}>
-        {([{ id: 'expenses', label: `Expenses (${expenses.length})` }, { id: 'sales', label: `Cash Sales (${sales.length})` }] as const).map(t => (
+        {([{ id: 'expenses', label: `Expenses (${expenses.length})` }, { id: 'sales', label: `Cash Sales (${sales.length})` }, { id: 'handovers', label: `Handovers (${handovers.length})` }] as const).map(t => (
           <div key={t.id} onClick={() => setTab(t.id)} style={{ padding: '5px 14px', borderRadius: 4, fontSize: 10, fontWeight: tab === t.id ? 600 : 400, cursor: 'pointer', background: tab === t.id ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'transparent', color: tab === t.id ? '#fff' : T.tx3 }}>{t.label}</div>
         ))}
       </div>
@@ -189,6 +244,71 @@ export default function CashBook() {
               <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: s.is_return ? T.re : T.gr }}>{s.is_return ? '−' : '+'}₹{Number(s.amount_paid).toLocaleString('en-IN')}</div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Handovers Tab */}
+      {tab === 'handovers' && <>
+        <button onClick={() => setShowHandover(true)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.yl}, ${T.yl}cc)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>+ Initiate Handover</button>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+          {handovers.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No handovers on this date.</div>}
+          {handovers.map(h => (
+            <div key={h.id} style={{ padding: '11px 12px', borderBottom: `1px solid ${T.bd}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{h.from_user_name} → {h.to_user_name}</span>
+                  <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓ Signed' : 'Pending'}</span>
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(h.amount).toLocaleString('en-IN')}</span>
+              </div>
+              {h.notes && <div style={{ fontSize: 10, color: T.tx3, marginBottom: 4 }}>{h.notes}</div>}
+              {h.status === 'confirmed' && h.confirmed_at && <div style={{ fontSize: 9, color: T.gr, fontFamily: T.mono }}>Signed at {new Date(h.confirmed_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
+              {h.status === 'pending' && <button onClick={() => setConfirmingHandover(h)} style={{ padding: '4px 12px', borderRadius: 5, border: 'none', background: T.gr, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Sign &amp; Confirm Receipt</button>}
+            </div>
+          ))}
+        </div>
+      </>}
+
+      {/* Initiate Handover Modal */}
+      {showHandover && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
+          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 380, width: '100%' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Initiate Cash Handover</div>
+            <div style={{ fontSize: 10, color: T.tx3, marginBottom: 12 }}>Recipient must sign with their PIN to confirm receipt</div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Amount (₹)</label>
+              <input type="number" value={handAmount} onChange={e => setHandAmount(e.target.value)} autoFocus placeholder="0.00" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Recipient Name (Cashier)</label>
+              <input type="text" value={handTo} onChange={e => setHandTo(e.target.value)} placeholder="e.g., Ramesh" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Notes (optional)</label>
+              <textarea value={handNotes} onChange={e => setHandNotes(e.target.value)} rows={2} placeholder="Reason / reference..." style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '7px 10px', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+            </div>
+            {handError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{handError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { setShowHandover(false); setHandError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={createHandover} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}, ${T.yl}cc)`, color: '#fff', cursor: 'pointer' }}>Initiate</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Handover (Sign with PIN) Modal */}
+      {confirmingHandover && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
+          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 360, width: '100%' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Sign &amp; Confirm Receipt</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>You are confirming receipt of <strong style={{ color: T.gr, fontFamily: T.mono }}>₹{Number(confirmingHandover.amount).toLocaleString('en-IN')}</strong> from <strong style={{ color: T.tx }}>{confirmingHandover.from_user_name}</strong>. This is a permanent legal record.</div>
+            <input type="password" value={confirmPin} onChange={e => setConfirmPin(e.target.value)} placeholder="Your 4-6 digit PIN" autoFocus inputMode="numeric" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 18, padding: '10px 12px', outline: 'none', boxSizing: 'border-box', textAlign: 'center', letterSpacing: 6, marginBottom: 10 }} />
+            {confirmError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{confirmError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { setConfirmingHandover(null); setConfirmPin(''); setConfirmError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={confirmHandover} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)`, color: '#fff', cursor: 'pointer' }}>Sign &amp; Confirm</button>
+            </div>
+          </div>
         </div>
       )}
 

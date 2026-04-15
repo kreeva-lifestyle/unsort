@@ -1,6 +1,7 @@
 /* eslint-disable */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import CashBook from './CashBook';
 
 const supabase = createClient(
   'https://ulphprdnswznfztawbvg.supabase.co',
@@ -88,6 +89,7 @@ export default function CashChallan() {
 
   // Ledger
   const [showLedger, setShowLedger] = useState(false);
+  const [showCashBook, setShowCashBook] = useState(false);
   const [ledgerCustomers, setLedgerCustomers] = useState<{ name: string; total: number; paid: number; outstanding: number; count: number }[]>([]);
   const [ledgerDetail, setLedgerDetail] = useState<string | null>(null);
   const [ledgerChallans, setLedgerChallans] = useState<Challan[]>([]);
@@ -145,12 +147,15 @@ export default function CashChallan() {
 
   // ── Fetch analytics ────────────────────────────────────────────────────────
   const fetchAnalytics = useCallback(async () => {
-    const { data } = await supabase.from('cash_challans').select('total, payment_mode, status')
+    const { data } = await supabase.from('cash_challans').select('total, payment_mode, status, is_return')
       .gte('created_at', analyticsFrom + 'T00:00:00').lte('created_at', analyticsTo + 'T23:59:59').neq('status', 'voided');
-    const totalRevenue = (data || []).reduce((s: number, r: any) => s + Number(r.total), 0);
+    // Returns reduce revenue (negative)
+    const totalRevenue = (data || []).reduce((s: number, r: any) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
     const byMode: Record<string, number> = {};
-    (data || []).forEach((r: any) => { const m = r.payment_mode || 'Unset'; byMode[m] = (byMode[m] || 0) + Number(r.total); });
-    setAnalytics({ totalRevenue, count: (data || []).length, byMode });
+    (data || []).forEach((r: any) => { const m = r.payment_mode || 'Unset'; byMode[m] = (byMode[m] || 0) + (r.is_return ? -1 : 1) * Number(r.total); });
+    const salesCount = (data || []).filter((r: any) => !r.is_return).length;
+    const returnsCount = (data || []).filter((r: any) => r.is_return).length;
+    setAnalytics({ totalRevenue, count: salesCount, byMode, returnsCount } as any);
   }, [analyticsFrom, analyticsTo]);
 
   // ── Fetch ledger (recent 10 customers) ──────────────────────────────────────
@@ -374,6 +379,16 @@ export default function CashChallan() {
   const totalPages = Math.ceil(totalCount / pageSize);
   const allTags = [...new Set(challans.flatMap(c => c.tags || []))];
 
+  // ── Cash Book Screen ───────────────────────────────────────────────────────
+  if (showCashBook) return (
+    <div>
+      <div style={{ padding: '10px 16px 0' }}>
+        <button onClick={() => setShowCashBook(false)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer', fontFamily: T.sans }}>← Back to Challans</button>
+      </div>
+      <CashBook />
+    </div>
+  );
+
   // ── Analytics Screen ───────────────────────────────────────────────────────
   if (showAnalytics) return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
@@ -444,16 +459,18 @@ export default function CashChallan() {
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
           {ledgerChallans.map(c => {
             const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
+            const isRet = !!(c as any).is_return;
             return (
               <div key={c.id} onClick={() => openEdit(c)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>#{c.challan_number}</span>
                     <span style={{ fontSize: 9, color: T.tx3 }}>{new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
                     <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: sc.bg, color: sc.color, fontWeight: 600, textTransform: 'uppercase' }}>{c.status}</span>
+                    {isRet && <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>↩ Return</span>}
                   </div>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(c.total).toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: isRet ? T.re : T.tx }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
               </div>
             );
           })}
@@ -642,6 +659,7 @@ export default function CashChallan() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Cash Challan</span>
         <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => setShowCashBook(true)} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.08)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Cash Book</button>
           <button onClick={() => { fetchLedger(); setShowLedger(true); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Ledger</button>
           <button onClick={() => { fetchAnalytics(); setShowAnalytics(true); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Analytics</button>
           <button onClick={() => setShowModal(true)} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', boxShadow: '0 2px 8px rgba(99,102,241,.25)' }}>+ New</button>
@@ -671,7 +689,7 @@ export default function CashChallan() {
         {challans.map(c => {
           const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
           const skus = ((c as any).cash_challan_items || []).map((i: any) => i.sku).filter(Boolean).join(', ');
-          const pendingDays = (c.status === 'unpaid' || c.status === 'partial') ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : 0;
+          const pendingDays = (!(c as any).is_return && (c.status === 'unpaid' || c.status === 'partial')) ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : 0;
           const isRet = !!(c as any).is_return;
           return (
             <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }} onClick={() => openEdit(c)}>
