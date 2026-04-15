@@ -1550,8 +1550,9 @@ const Users = () => {
   const [pinError, setPinError] = useState('');
   const [pinSaving, setPinSaving] = useState(false);
   const [myPhone, setMyPhone] = useState('');
+  const [phoneEditing, setPhoneEditing] = useState(false);
+  const [phoneInput, setPhoneInput] = useState('');
   const [phoneSaving, setPhoneSaving] = useState(false);
-  const [phoneSaved, setPhoneSaved] = useState(false);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
 
@@ -1567,13 +1568,14 @@ const Users = () => {
   useEffect(() => { loadPin(); }, [loadPin]);
 
   const savePhone = async () => {
-    const cleaned = myPhone.replace(/\D/g, '');
+    const cleaned = phoneInput.replace(/\D/g, '');
     if (cleaned.length !== 10) { addToast('Phone must be 10 digits', 'error'); return; }
     setPhoneSaving(true);
     const { error } = await supabase.from('profiles').update({ phone: cleaned }).eq('id', profile.id);
     setPhoneSaving(false);
     if (error) { addToast('Save failed: ' + error.message, 'error'); return; }
-    setPhoneSaved(true); setTimeout(() => setPhoneSaved(false), 2000);
+    setMyPhone(cleaned);
+    setPhoneEditing(false);
     addToast('Phone saved', 'success');
   };
 
@@ -1654,36 +1656,57 @@ const Users = () => {
       <div style={{ background: 'rgba(34,197,94,.05)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 8, padding: 14, marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: T.gr, fontFamily: T.sora }}>My Phone Number</div>
-          {myPhone.length === 10 ? (
-            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,.12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase' }}>✓ Set</span>
+          {!phoneEditing && (myPhone.length === 10 ? (
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,.12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase' }}>✓ Saved</span>
           ) : (
             <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>Required</span>
-          )}
+          ))}
         </div>
         <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10 }}>Required to receive WhatsApp notifications for cash handovers and payment alerts.</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <input type="tel" inputMode="numeric" value={myPhone} onChange={e => setMyPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="9876543210" style={{ ...S.fInput, fontFamily: T.mono, width: 200, fontSize: 13 }} />
-          <button onClick={savePhone} disabled={phoneSaving} style={{ ...S.btnPrimary, opacity: phoneSaving ? 0.6 : 1 }}>{phoneSaved ? '✓ Saved' : phoneSaving ? 'Saving...' : 'Save Phone'}</button>
-        </div>
+
+        {!phoneEditing ? (
+          // Read-only display + Edit button
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            {myPhone.length === 10 ? (
+              <span style={{ fontFamily: T.mono, fontSize: 16, color: T.tx, fontWeight: 600, letterSpacing: 1 }}>+91 {myPhone.slice(0, 5)} {myPhone.slice(5)}</span>
+            ) : (
+              <span style={{ fontSize: 11, color: T.tx3, fontStyle: 'italic' }}>No phone number saved</span>
+            )}
+            <button onClick={() => { setPhoneInput(myPhone); setPhoneEditing(true); }} style={S.btnPrimary}>{myPhone.length === 10 ? 'Edit' : 'Add Phone'}</button>
+          </div>
+        ) : (
+          // Edit mode: input + Save + Cancel
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input type="tel" inputMode="numeric" value={phoneInput} onChange={e => setPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="9876543210" autoFocus style={{ ...S.fInput, fontFamily: T.mono, flex: 1, maxWidth: 220, fontSize: 13 }} />
+            <button onClick={savePhone} disabled={phoneSaving} style={{ ...S.btnPrimary, opacity: phoneSaving ? 0.6 : 1 }}>{phoneSaving ? 'Saving...' : 'Save'}</button>
+            <button onClick={() => { setPhoneEditing(false); setPhoneInput(''); }} style={S.btnGhost}>Cancel</button>
+          </div>
+        )}
       </div>
 
       {/* My Cash PIN — for confirming cash handovers */}
       <div style={{ background: 'rgba(245,158,11,.05)', border: '1px solid rgba(245,158,11,.15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: T.yl, fontFamily: T.sora }}>My Cash PIN</div>
-          {pinExists && !editingPin && (
-            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,.12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>✓ Set ({pinLength} digits)</span>
-          )}
-          {!pinExists && !editingPin && (
+          {!editingPin && (pinExists ? (
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,.12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>✓ Saved</span>
+          ) : (
             <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Not Set</span>
-          )}
+          ))}
         </div>
         <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10 }}>Required to sign cash handovers received from accountant. 4-6 digits.</div>
 
         {!editingPin ? (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => { setEditingPin(true); setNewPin(''); setConfirmPin(''); setPinError(''); }} style={S.btnPrimary}>{pinExists ? 'Change PIN' : 'Set PIN'}</button>
-            {pinExists && <button onClick={removePin} style={S.btnDanger}>Remove PIN</button>}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            {pinExists ? (
+              <span style={{ fontFamily: T.mono, fontSize: 16, color: T.tx, fontWeight: 600, letterSpacing: 6 }}>{'•'.repeat(pinLength)}</span>
+            ) : (
+              <span style={{ fontSize: 11, color: T.tx3, fontStyle: 'italic' }}>No PIN configured</span>
+            )}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => { setEditingPin(true); setNewPin(''); setConfirmPin(''); setPinError(''); }} style={S.btnPrimary}>{pinExists ? 'Edit' : 'Set PIN'}</button>
+              {pinExists && <button onClick={removePin} style={S.btnDanger}>Remove</button>}
+            </div>
           </div>
         ) : (
           <div>
