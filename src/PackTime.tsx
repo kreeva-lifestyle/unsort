@@ -416,6 +416,13 @@ export default function PackTime() {
 
   useEffect(() => { if (showHistory) fetchHistory(); }, [showHistory, fetchHistory]);
 
+  // Browser back button support
+  useEffect(() => {
+    const onPop = () => { if (showHistory) setShowHistory(false); };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [showHistory]);
+
   const deleteHistoryScan = async (id: string) => {
     const record = historyData.find(r => r.id === id);
     if (record) {
@@ -449,7 +456,6 @@ export default function PackTime() {
         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Scan History</span>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={exportHistory} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>Export CSV</button>
-          <button onClick={() => setShowHistory(false)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>Back</button>
         </div>
       </div>
 
@@ -549,7 +555,7 @@ export default function PackTime() {
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>PackStation</span>
-        <button onClick={() => setShowHistory(true)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
+        <button onClick={() => { setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
       </div>
 
       {/* Unicommerce Order Stats */}
