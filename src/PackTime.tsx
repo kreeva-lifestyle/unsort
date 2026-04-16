@@ -417,6 +417,16 @@ export default function PackTime() {
   useEffect(() => { if (showHistory) fetchHistory(); }, [showHistory, fetchHistory]);
 
   const deleteHistoryScan = async (id: string) => {
+    const record = historyData.find(r => r.id === id);
+    if (record) {
+      try {
+        await fetch(EDGE_FN, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', awb: record.awb, sheetName: record.sheet_name }),
+        });
+      } catch {}
+    }
     await supabase.from('packtime_scans').delete().eq('id', id);
     fetchHistory();
   };
