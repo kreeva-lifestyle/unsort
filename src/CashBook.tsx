@@ -496,7 +496,7 @@ export default function CashBook() {
             </div>
 
             {/* Exclude Paise */}
-            {handBreakdown && handBreakdown.available !== Math.floor(handBreakdown.available) && (
+            {handBreakdown && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', marginBottom: 10, fontSize: 11, color: T.tx2 }}>
                 <input type="checkbox" checked={excludePaise} onChange={e => {
                   setExcludePaise(e.target.checked);
