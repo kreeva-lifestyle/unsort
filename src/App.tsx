@@ -736,6 +736,13 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
     return () => { supabase.removeChannel(ch); };
   }, []);
 
+  // Browser back button support
+  useEffect(() => {
+    const onPop = () => { if (showExtras) setShowExtras(false); };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [showExtras]);
+
   // Open item detail from notification click
   useEffect(() => {
     if (!openItemId) return;
@@ -1063,7 +1070,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
         </div>
         <div style={{ display: 'flex', gap: 5 }}>
           {!showExtras && !isCompletedView && <div onClick={computeIntel} style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600, fontSize: 10 }}>Smart Intel</div>}
-          <div onClick={() => setShowExtras(!showExtras)} style={{ ...S.btnGhost, background: showExtras ? 'rgba(99,102,241,.12)' : 'rgba(56,189,248,.05)', border: `1px solid ${showExtras ? 'rgba(99,102,241,.25)' : 'rgba(56,189,248,.15)'}`, color: showExtras ? T.ac2 : T.bl, fontWeight: 600, fontSize: 10 }}>{showExtras ? 'Back to Items' : 'Extras'}</div>
+          {!showExtras && <div onClick={() => { setShowExtras(true); window.history.pushState({ view: 'extras' }, ''); }} style={{ ...S.btnGhost, background: 'rgba(56,189,248,.05)', border: '1px solid rgba(56,189,248,.15)', color: T.bl, fontWeight: 600, fontSize: 10 }}>Extras</div>}
           {!showExtras && canEdit && !isCompletedView && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
         </div>
       </div>

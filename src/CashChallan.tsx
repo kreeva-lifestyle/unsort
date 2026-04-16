@@ -120,6 +120,18 @@ export default function CashChallan() {
 
   useEffect(() => { fetchChallans(); }, [fetchChallans]);
 
+  // Browser back button support
+  useEffect(() => {
+    const onPop = () => {
+      if (ledgerDetail) { setLedgerDetail(null); return; }
+      if (showLedger) { setShowLedger(false); setLedgerSearch(''); return; }
+      if (showAnalytics) { setShowAnalytics(false); return; }
+      if (showCashBook) { setShowCashBook(false); return; }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [ledgerDetail, showLedger, showAnalytics, showCashBook]);
+
   // ── Realtime sync — multi-user safety ──────────────────────────────────────
   useEffect(() => {
     const channel = supabase.channel('cash_challans_realtime')
@@ -199,6 +211,7 @@ export default function CashChallan() {
 
   const fetchLedgerDetail = useCallback(async (name: string) => {
     setLedgerDetail(name);
+    window.history.pushState({ view: 'ledger-detail' }, '');
     const { data } = await supabase.from('cash_challans').select('*').eq('customer_name', name).order('created_at', { ascending: false });
     setLedgerChallans(data || []);
   }, []);
@@ -388,9 +401,6 @@ export default function CashChallan() {
   // ── Cash Book Screen ───────────────────────────────────────────────────────
   if (showCashBook) return (
     <div>
-      <div style={{ padding: '10px 16px 0' }}>
-        <button onClick={() => setShowCashBook(false)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer', fontFamily: T.sans }}>← Back to Challans</button>
-      </div>
       <CashBook />
     </div>
   );
@@ -400,7 +410,6 @@ export default function CashChallan() {
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Analytics</span>
-        <button onClick={() => setShowAnalytics(false)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Back</button>
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12 }}>
         <input type="date" value={analyticsFrom} onChange={e => setAnalyticsFrom(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }} />
@@ -443,7 +452,6 @@ export default function CashChallan() {
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={() => exportLedgerCSV(ledgerDetail)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer', fontFamily: T.sans }}>Export CSV</button>
-            <button onClick={() => setLedgerDetail(null)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Back</button>
           </div>
         </div>
         {cust && (
@@ -493,7 +501,6 @@ export default function CashChallan() {
       <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Customer Ledger</span>
-          <button onClick={() => { setShowLedger(false); setLedgerSearch(''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Back</button>
         </div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
           <input type="text" value={ledgerSearch} onChange={e => setLedgerSearch(e.target.value)} placeholder="Enter customer name..."
@@ -687,9 +694,9 @@ export default function CashChallan() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Cash Challan</span>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => setShowCashBook(true)} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.08)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Cash Book</button>
-          <button onClick={() => { fetchLedger(); setShowLedger(true); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Ledger</button>
-          <button onClick={() => { fetchAnalytics(); setShowAnalytics(true); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Analytics</button>
+          <button onClick={() => { setShowCashBook(true); window.history.pushState({ view: 'cashbook' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.08)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Cash Book</button>
+          <button onClick={() => { fetchLedger(); setShowLedger(true); window.history.pushState({ view: 'ledger' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Ledger</button>
+          <button onClick={() => { fetchAnalytics(); setShowAnalytics(true); window.history.pushState({ view: 'analytics' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Analytics</button>
           <button onClick={() => setShowModal(true)} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', boxShadow: '0 2px 8px rgba(99,102,241,.25)' }}>+ New</button>
         </div>
       </div>
