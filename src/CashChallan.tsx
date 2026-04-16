@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import CashBook from './CashBook';

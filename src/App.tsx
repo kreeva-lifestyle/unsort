@@ -133,6 +133,7 @@ const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
       addToast(payload.new.title, payload.new.type);
     }).subscribe();
     return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchNotifications = async () => {
@@ -322,6 +323,7 @@ const BarcodeScanner = ({ onScan, onClose, scanError }: { onScan: (code: string)
         onScan(code).then(found => { if (!found && mountedRef.current) setTimeout(() => startBarcode(), 2000); });
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   // OCR mode - start camera
@@ -382,11 +384,13 @@ const BarcodeScanner = ({ onScan, onClose, scanError }: { onScan: (code: string)
     mountedRef.current = true;
     if (mode === 'barcode') startBarcode();
     if (mode === 'text') startOcrCamera();
+    const videoEl = ocrVideoRef.current;
     return () => {
       mountedRef.current = false;
       Quagga.stop(); Quagga.offDetected();
-      if (ocrVideoRef.current?.srcObject) (ocrVideoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+      if (videoEl?.srcObject) (videoEl.srcObject as MediaStream).getTracks().forEach(t => t.stop());
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   const switchMode = (m: 'barcode' | 'text') => {
@@ -734,6 +738,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tags' }, fetchData)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Browser back button support
@@ -751,6 +756,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
       if (item) { setSelected(item); await fetchComps(item.id); supabase.from('activity_logs').select('*, profiles:user_id(full_name)').eq('entity_id', item.id).order('created_at', { ascending: false }).limit(20).then(({ data }) => setItemLogs(data || [])); setShowCompModal(true); }
       onItemOpened?.();
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openItemId]);
 
   const fetchComps = async (id: string) => { const { data } = await supabase.from('item_components').select('*, components(name, component_code, is_critical)').eq('inventory_item_id', id); setComps(data || []); };
