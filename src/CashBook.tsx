@@ -57,6 +57,7 @@ export default function CashBook() {
   const [users, setUsers] = useState<{ id: string; full_name: string; email: string; cash_pin: string | null; phone: string | null }[]>([]);
   const [recentHandovers, setRecentHandovers] = useState<Handover[]>([]);
   const [currentUserId, setCurrentUserId] = useState('');
+  const [excludePaise, setExcludePaise] = useState(false);
   // Confirm handover with PIN
   const [confirmingHandover, setConfirmingHandover] = useState<Handover | null>(null);
   const [confirmPin, setConfirmPin] = useState('');
@@ -494,6 +495,18 @@ export default function CashBook() {
               </div>
             </div>
 
+            {/* Exclude Paise */}
+            {handBreakdown && handBreakdown.available !== Math.floor(handBreakdown.available) && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', marginBottom: 10, fontSize: 11, color: T.tx2 }}>
+                <input type="checkbox" checked={excludePaise} onChange={e => {
+                  setExcludePaise(e.target.checked);
+                  if (e.target.checked && handBreakdown) setHandAmount(String(Math.floor(handBreakdown.available)));
+                  else if (handBreakdown) setHandAmount(String(handBreakdown.available));
+                }} style={{ accentColor: T.ac, width: 14, height: 14, cursor: 'pointer' }} />
+                Exclude paise (round down to ₹{Math.floor(handBreakdown.available)})
+              </label>
+            )}
+
             {/* Mismatch warning + reason */}
             {handBreakdown && Math.abs(Number(handAmount) - handBreakdown.available) > 0.01 && (
               <div style={{ marginBottom: 10 }}>
@@ -510,7 +523,7 @@ export default function CashBook() {
             </div>
             {handError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{handError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setShowHandover(false); setHandError(''); setHandReason(''); setHandAmount(''); setHandToId(''); setHandNotes(''); setHandBreakdown(null); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { setShowHandover(false); setHandError(''); setHandReason(''); setHandAmount(''); setHandToId(''); setHandNotes(''); setHandBreakdown(null); setExcludePaise(false); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Cancel</button>
               <button onClick={createHandover} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}, ${T.yl}cc)`, color: '#fff', cursor: 'pointer' }}>Initiate</button>
             </div>
           </div>
