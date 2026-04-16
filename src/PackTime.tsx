@@ -327,7 +327,8 @@ export default function PackTime() {
 
     // Save to Supabase DB
     supabase.auth.getUser().then(({ data: { user } }) => {
-      supabase.from('packtime_scans').insert({ session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: user?.id });
+      supabase.from('packtime_scans').insert({ session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: user?.id })
+        .then(({ error }) => { if (error) console.error('PackStation DB insert failed:', error.message, error.details, error.code); });
     });
 
     // Mark as synced after a short delay (optimistic)
@@ -337,7 +338,7 @@ export default function PackTime() {
     }, 1500);
 
     focusInput();
-  }, [camera, courierSheet, courierBrand, focusInput]);
+  }, [camera, courier, courierSheet, courierBrand, focusInput]);
 
   // Keep submitRef in sync for camera callback
   useEffect(() => { submitRef.current = submitAwb; }, [submitAwb]);
