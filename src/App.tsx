@@ -1054,17 +1054,17 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
       {/* Stage toggle */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, border: `1px solid ${T.bd}` }}>
+          {!showExtras && <><div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, border: `1px solid ${T.bd}` }}>
             {(['pending', 'completed'] as const).map(s => (
               <div key={s} onClick={() => { setStage(s); setPage(0); }} style={{ padding: '4px 14px', borderRadius: 4, fontSize: 10, fontWeight: stage === s ? 600 : 400, cursor: 'pointer', background: stage === s ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'transparent', color: stage === s ? '#fff' : T.tx3, transition: 'all .15s', textTransform: 'capitalize' }}>{s}</div>
             ))}
           </div>
-          <span style={{ fontSize: 10, fontWeight: 500, color: T.tx3 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length !== 1 ? 's' : ''}</span>
+          <span style={{ fontSize: 10, fontWeight: 500, color: T.tx3 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length !== 1 ? 's' : ''}</span></>}
         </div>
         <div style={{ display: 'flex', gap: 5 }}>
-          {!isCompletedView && <div onClick={computeIntel} style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600, fontSize: 10 }}>Smart Intel</div>}
+          {!showExtras && !isCompletedView && <div onClick={computeIntel} style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600, fontSize: 10 }}>Smart Intel</div>}
           <div onClick={() => setShowExtras(!showExtras)} style={{ ...S.btnGhost, background: showExtras ? 'rgba(99,102,241,.12)' : 'rgba(56,189,248,.05)', border: `1px solid ${showExtras ? 'rgba(99,102,241,.25)' : 'rgba(56,189,248,.15)'}`, color: showExtras ? T.ac2 : T.bl, fontWeight: 600, fontSize: 10 }}>{showExtras ? 'Back to Items' : 'Extras'}</div>
-          {canEdit && !isCompletedView && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
+          {!showExtras && canEdit && !isCompletedView && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
         </div>
       </div>
       {showExtras ? <InventoryExtras /> : <>

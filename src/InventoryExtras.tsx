@@ -230,7 +230,7 @@ export default function InventoryExtras() {
         <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
           style={{ ...input, maxWidth: 180 }}>
           <option value="all">All Categories</option>
-          {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
         </select>
       </div>
 
@@ -246,7 +246,7 @@ export default function InventoryExtras() {
             {filtered.map(ex => (
               <tr key={ex.id} style={{ transition: 'background 150ms' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                 <td style={{ ...td, fontFamily: T.mono, fontSize: 11, color: T.tx }}>{ex.sku}</td>
-                <td style={td}>{ex.product_name}</td>
+                <td style={td}>{ex.product_name}{(() => { const p = products.find(pr => pr.id === ex.product_id); return p?.sku ? <span style={{ marginLeft: 4, fontSize: 9, color: T.tx3, fontFamily: T.mono }}>({p.sku})</span> : null; })()}</td>
                 <td style={td}>{ex.component_name}</td>
                 <td style={td}>{ex.size}</td>
                 <td style={{ ...td, fontWeight: 600, color: ex.quantity > 0 ? T.gr : T.re }}>{ex.quantity}</td>
@@ -279,7 +279,7 @@ export default function InventoryExtras() {
             <div><label style={label}>Category</label>
               <select value={fProductId} onChange={e => { setFProductId(e.target.value); setFComponentId(''); }} style={input}>
                 <option value="">Select category...</option>
-                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
               </select></div>
             <div><label style={label}>Component</label>
               <select value={fComponentId} onChange={e => setFComponentId(e.target.value)} style={input} disabled={!fProductId}>
