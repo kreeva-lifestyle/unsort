@@ -22,6 +22,7 @@ import Quagga from '@ericblade/quagga2';
 import BrandTagPrinter from './BrandTagPrinter';
 import PackTime from './PackTime';
 import CashChallan from './CashChallan';
+import InventoryExtras from './InventoryExtras';
 
 const SUPABASE_URL = 'https://ulphprdnswznfztawbvg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0';
@@ -659,6 +660,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
   const [showCompleteModal, setShowCompleteModal] = useState<{ itemId: string; pairId?: string } | null>(null);
   const [showIntel, setShowIntel] = useState(false);
   const [intelResults, setIntelResults] = useState<any[]>([]);
+  const [showExtras, setShowExtras] = useState(false);
 
   const fetchData = () => {
     supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).then(({ data }) => setItems(data || []));
@@ -1061,9 +1063,11 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
         </div>
         <div style={{ display: 'flex', gap: 5 }}>
           {!isCompletedView && <div onClick={computeIntel} style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600, fontSize: 10 }}>Smart Intel</div>}
+          <div onClick={() => setShowExtras(!showExtras)} style={{ ...S.btnGhost, background: showExtras ? 'rgba(99,102,241,.12)' : 'rgba(56,189,248,.05)', border: `1px solid ${showExtras ? 'rgba(99,102,241,.25)' : 'rgba(56,189,248,.15)'}`, color: showExtras ? T.ac2 : T.bl, fontWeight: 600, fontSize: 10 }}>{showExtras ? 'Back to Items' : 'Extras'}</div>
           {canEdit && !isCompletedView && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
         </div>
       </div>
+      {showExtras ? <InventoryExtras /> : <>
       <div className="filter-bar" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, SKU code, location, notes..." style={{ ...S.fInput, flex: 1, minWidth: 160, padding: '6px 9px' }} />
         <div style={{ width: 1, height: 24, background: T.bd2 }} />
@@ -1298,6 +1302,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
           </p>}
         </div>
       </div></div>)}
+      </>}
     </div>
   );
 };
