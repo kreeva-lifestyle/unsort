@@ -268,40 +268,55 @@ export default function InventoryExtras() {
       </div>
 
       {/* Add Extra Modal */}
-      {showAdd && <div style={overlay} onClick={() => setShowAdd(false)}>
+      {showAdd && <div style={overlay} onClick={() => { setShowAdd(false); setError(''); }}>
         <div className="modal-inner" style={modal} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Add Extra Component</span>
-            <span onClick={() => setShowAdd(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16 }}>&times;</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Add Extra</span>
+            <span onClick={() => { setShowAdd(false); setError(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
           </div>
-          <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div><label style={label}>Category</label>
+          <form onSubmit={e => { e.preventDefault(); addExtra(); }} style={{ padding: 16 }}>
+            <div style={{ marginBottom: 10 }}>
+              <label style={label}>Category *</label>
               <select value={fProductId} onChange={e => { setFProductId(e.target.value); setFComponentId(''); }} style={input}>
                 <option value="">Select category...</option>
                 {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
-              </select></div>
-            <div><label style={label}>Component</label>
+              </select>
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={label}>Component *</label>
               <select value={fComponentId} onChange={e => setFComponentId(e.target.value)} style={input} disabled={!fProductId}>
                 <option value="">Select component...</option>
                 {fComps.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div><label style={label}>SKU</label>
-                <input value={fSku} onChange={e => setFSku(e.target.value)} placeholder="e.g. SW-1234" style={input} /></div>
-              <div><label style={label}>Size</label>
+              </select>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div>
+                <label style={label}>SKU *</label>
+                <input value={fSku} onChange={e => setFSku(e.target.value)} placeholder="e.g. SW-1234" style={{ ...input, fontFamily: T.mono }} />
+              </div>
+              <div>
+                <label style={label}>Size</label>
                 <select value={fSize} onChange={e => setFSize(e.target.value)} style={input}>
                   {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select></div>
+                </select>
+              </div>
             </div>
-            <div><label style={label}>Initial Quantity</label>
-              <input type="number" min="1" value={fQty} onChange={e => setFQty(e.target.value)} style={input} /></div>
-            <div><label style={label}>Notes (optional)</label>
-              <input value={fNotes} onChange={e => setFNotes(e.target.value)} placeholder="Any notes..." style={input} /></div>
-            {error && <div style={{ color: T.re, fontSize: 11 }}>{error}</div>}
-            <div onClick={addExtra} style={{ ...btn, textAlign: 'center', justifyContent: 'center', display: 'flex', opacity: saving ? 0.5 : 1 }}>
-              {saving ? 'Saving...' : 'Save Extra'}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <label style={label}>Initial Quantity</label>
+                <input type="number" min="1" value={fQty} onChange={e => setFQty(e.target.value)} style={input} />
+              </div>
+              <div>
+                <label style={label}>Notes</label>
+                <input value={fNotes} onChange={e => setFNotes(e.target.value)} placeholder="Optional" style={input} />
+              </div>
             </div>
-          </div>
+            {error && <div style={{ color: T.re, fontSize: 11, marginBottom: 8 }}>{error}</div>}
+            <div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
+              <span onClick={() => { setShowAdd(false); setError(''); }} style={btnGhost}>Cancel</span>
+              <button type="submit" style={{ ...btn, opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving...' : 'Add'}</button>
+            </div>
+          </form>
         </div>
       </div>}
 
