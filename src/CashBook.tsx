@@ -322,6 +322,7 @@ export default function CashBook() {
             <div style={{ display: 'flex', gap: 4 }}>
               <input type="number" value={openingInput} onChange={e => setOpeningInput(e.target.value)} style={{ width: 100, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '3px 6px', outline: 'none', fontFamily: T.mono, textAlign: 'right' }} />
               <button onClick={saveOpening} style={{ padding: '3px 8px', borderRadius: 4, border: 'none', background: T.ac, color: '#fff', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Save</button>
+              <button onClick={() => { setEditingOpening(false); setOpeningInput(String(openingBalance)); }} style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid rgba(99,102,241,0.15)', background: 'rgba(99,102,241,0.06)', color: T.ac2, fontSize: 9, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
             </div>
           ) : (
             <span style={{ fontFamily: T.mono, color: T.tx, fontWeight: 600 }}>₹{openingBalance.toLocaleString('en-IN')}</span>
