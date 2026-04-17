@@ -623,7 +623,7 @@ export default function PackTime() {
 
   // ── Scanning Screen ─────────────────────────────────────────────────────────
   return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', minHeight: '100%', position: 'relative' }} onClick={focusInput}>
+    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80, minHeight: '100%', position: 'relative' }} onClick={focusInput}>
 
       {/* Flash */}
       {flash && <div style={{ position: 'fixed', inset: 0, zIndex: 300, pointerEvents: 'none', background: flash === 'success' ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.10)', animation: 'fi .15s ease' }} />}
