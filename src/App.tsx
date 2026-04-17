@@ -626,7 +626,7 @@ const canAlterSize = (a: string, b: string): boolean => {
 };
 const isDupatta = (name: string) => /dupatt?a/i.test(name);
 
-const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSearch?: string; openItemId?: string | null; onItemOpened?: () => void }) => {
+const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { globalSearch?: string; openItemId?: string | null; onItemOpened?: () => void; active?: boolean }) => {
   const [stage, setStage] = useState<'pending' | 'completed'>('pending');
   const instanceId = useId();
   const [items, setItems] = useState<any[]>([]);
@@ -665,6 +665,8 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened }: { globalSear
   const [showIntel, setShowIntel] = useState(false);
   const [intelResults, setIntelResults] = useState<any[]>([]);
   const [showExtras, setShowExtras] = useState(false);
+
+  useEffect(() => { if (active) setShowExtras(false); }, [active]);
 
   const fetchData = () => {
     supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).then(({ data }) => setItems(data || []));
@@ -2017,11 +2019,11 @@ const MainApp = () => {
       <Header title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} onOpenScanner={() => { setScanError(''); setScannerOpen(true); }} />
       <main style={{ flex: 1, overflow: 'auto' }}>
         {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard /></div>}
-        {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} /></div>}
+        {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
         {mounted.has('reports') && <div style={{ display: tab === 'reports' ? 'block' : 'none' }}><Reports /></div>}
         {mounted.has('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
-        {mounted.has('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime /></div>}
-        {mounted.has('challan') && <div style={{ display: tab === 'challan' ? 'block' : 'none' }}><CashChallan /></div>}
+        {mounted.has('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime active={tab === 'packtime'} /></div>}
+        {mounted.has('challan') && <div style={{ display: tab === 'challan' ? 'block' : 'none' }}><CashChallan active={tab === 'challan'} /></div>}
         {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage /></div>}
       </main>
     </div>
