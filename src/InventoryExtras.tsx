@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -268,11 +269,10 @@ export default function InventoryExtras() {
       </div>
 
       {/* Add Extra Modal */}
-      {showAdd && <div style={overlay} onClick={() => { setShowAdd(false); setError(''); }}>
+      {showAdd && createPortal(<div style={overlay} onClick={() => { setShowAdd(false); setError(''); }}>
         <div className="modal-inner" style={modal} onClick={e => e.stopPropagation()}>
-          <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}` }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Add Extra</span>
-            <span onClick={() => { setShowAdd(false); setError(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
           </div>
           <form onSubmit={e => { e.preventDefault(); addExtra(); }} style={{ padding: 16 }}>
             <div style={{ marginBottom: 10 }}>
@@ -318,10 +318,10 @@ export default function InventoryExtras() {
             </div>
           </form>
         </div>
-      </div>}
+      </div>, document.body)}
 
       {/* Adjust Quantity Modal */}
-      {adjustExtra && <div style={overlay} onClick={() => setAdjustExtra(null)}>
+      {adjustExtra && createPortal(<div style={overlay} onClick={() => setAdjustExtra(null)}>
         <div className="modal-inner" style={{ ...modal, width: 380 }} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{adjustMode === 'add' ? 'Add' : 'Remove'} Quantity</span>
@@ -342,10 +342,10 @@ export default function InventoryExtras() {
             </div>
           </div>
         </div>
-      </div>}
+      </div>, document.body)}
 
       {/* History Modal */}
-      {historyExtra && <div style={overlay} onClick={() => setHistoryExtra(null)}>
+      {historyExtra && createPortal(<div style={overlay} onClick={() => setHistoryExtra(null)}>
         <div className="modal-inner" style={{ ...modal, width: 540 }} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>History: {historyExtra.component_name} ({historyExtra.sku})</span>
@@ -375,10 +375,10 @@ export default function InventoryExtras() {
             </table>
           </div>
         </div>
-      </div>}
+      </div>, document.body)}
 
       {/* Matches Modal */}
-      {matchExtra && <div style={overlay} onClick={() => setMatchExtra(null)}>
+      {matchExtra && createPortal(<div style={overlay} onClick={() => setMatchExtra(null)}>
         <div className="modal-inner" style={{ ...modal, width: 520 }} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Matching Unsorted Items</span>
@@ -412,10 +412,10 @@ export default function InventoryExtras() {
             </table>
           </div>
         </div>
-      </div>}
+      </div>, document.body)}
 
       {/* Complete Confirmation Modal */}
-      {completeItem && <div style={overlay} onClick={() => setCompleteItem(null)}>
+      {completeItem && createPortal(<div style={overlay} onClick={() => setCompleteItem(null)}>
         <div className="modal-inner" style={{ ...modal, width: 400 }} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}` }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.yl }}>Confirm Completion</span>
@@ -433,7 +433,7 @@ export default function InventoryExtras() {
             <div onClick={completeWithExtra} style={{ ...btn, opacity: saving ? 0.5 : 1 }}>{saving ? 'Processing...' : 'Confirm'}</div>
           </div>
         </div>
-      </div>}
+      </div>, document.body)}
     </div>
   );
 }

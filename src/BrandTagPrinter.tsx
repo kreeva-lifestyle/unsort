@@ -311,7 +311,6 @@ const BrandTagModal = ({
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <span style={{ color: T.tx, fontSize: 13, fontWeight: 600 }}>{title}</span>
-          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span>
         </div>
         {/* Fields */}
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
