@@ -425,14 +425,16 @@ export default function PackTime() {
 
   const deleteHistoryScan = async (id: string) => {
     const record = historyData.find(r => r.id === id);
-    if (record) {
+    if (record && record.sheet_name) {
       try {
-        await fetch(EDGE_FN, {
+        const resp = await fetch(EDGE_FN, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'delete', awb: record.awb, sheetName: record.sheet_name }),
         });
-      } catch {}
+        const result = await resp.json();
+        if (!result.ok) console.error('Sheet delete failed:', result.error);
+      } catch (e) { console.error('Sheet delete error:', e); }
     }
     await supabase.from('packtime_scans').delete().eq('id', id);
     fetchHistory();
