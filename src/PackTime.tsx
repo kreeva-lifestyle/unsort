@@ -101,7 +101,7 @@ function enqueueWrite(rows: unknown[][], sheetName: string) {
 }
 
 // ── Component ───────────────────────────────────────────────────────────────────
-export default function PackTime() {
+export default function PackTime({ active }: { active?: boolean } = {}) {
   // Config from Supabase
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [cameras, setCameras] = useState<Camera[]>([]);
@@ -415,6 +415,8 @@ export default function PackTime() {
   }, [historySearch, historyFilterCourier, historyFilterBrand, historyPage, historyPageSize]);
 
   useEffect(() => { if (showHistory) fetchHistory(); }, [showHistory, fetchHistory]);
+
+  useEffect(() => { if (active) setShowHistory(false); }, [active]);
 
   // Browser back button support
   useEffect(() => {

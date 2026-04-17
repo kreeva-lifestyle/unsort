@@ -44,7 +44,7 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
 
 const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Other'];
 
-export default function CashChallan() {
+export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [challans, setChallans] = useState<Challan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,6 +118,10 @@ export default function CashChallan() {
   }, [search, statusFilter, tagFilter, page, pageSize]);
 
   useEffect(() => { fetchChallans(); }, [fetchChallans]);
+
+  useEffect(() => {
+    if (active) { setShowCashBook(false); setShowAnalytics(false); setShowLedger(false); setLedgerDetail(null); }
+  }, [active]);
 
   // Browser back button support
   useEffect(() => {
