@@ -486,9 +486,9 @@ export default function PackTime() {
 
       {/* Table — horizontal scroll on mobile */}
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <div style={{ minWidth: 620 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '180px 110px 70px 110px 1fr 32px', gap: 0, fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
+        <div className="table-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth', touchAction: 'pan-x pan-y' }}>
+          <div style={{ minWidth: 580 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '160px 100px 55px 90px 1fr 32px', gap: 0, fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
               <div style={{ padding: '8px 10px' }}>AWB</div>
               <div style={{ padding: '8px 10px' }}>Courier</div>
               <div style={{ padding: '8px 10px' }}>Cam</div>
@@ -500,7 +500,7 @@ export default function PackTime() {
             {!historyLoading && historyData.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No records found.</div>}
             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
               {historyData.map(r => (
-                <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '180px 110px 70px 110px 1fr 32px', gap: 0, borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
+                <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '160px 100px 55px 90px 1fr 32px', gap: 0, borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
                   <div style={{ padding: '7px 10px', fontFamily: T.mono, color: T.tx, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.awb}</div>
                   <div style={{ padding: '7px 10px', color: T.tx2, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.courier}</div>
                   <div style={{ padding: '7px 10px', color: T.tx3, fontFamily: T.mono, fontSize: 10 }}>{r.camera}</div>
