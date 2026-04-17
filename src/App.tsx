@@ -1971,12 +1971,39 @@ const PackTimeSettings = () => {
   );
 };
 
+const VALID_TABS = ['dashboard', 'inventory', 'reports', 'brandtag', 'packtime', 'challan', 'settings'];
+const getTabFromHash = () => {
+  const h = window.location.hash.replace(/^#\/?/, '').split('/')[0];
+  return VALID_TABS.includes(h) ? h : 'dashboard';
+};
+
 const MainApp = () => {
-  const [tab, setTab] = useState('dashboard');
+  const [tab, setTabState] = useState(getTabFromHash);
   const [globalSearch, setGlobalSearch] = useState('');
   const [notifItemId, setNotifItemId] = useState<string | null>(null);
   const [mobileMenu, setMobileMenu] = useState(false);
-  const [mounted, setMounted] = useState<Set<string>>(new Set(['dashboard']));
+  const [mounted, setMounted] = useState<Set<string>>(new Set([getTabFromHash()]));
+
+  // Central navigate — updates URL + state
+  const setTab = (t: string) => {
+    if (!VALID_TABS.includes(t)) t = 'dashboard';
+    const newHash = `#/${t}`;
+    if (window.location.hash !== newHash) window.history.pushState(null, '', newHash);
+    setTabState(t);
+  };
+
+  // Browser back/forward support
+  useEffect(() => {
+    const onPop = () => setTabState(getTabFromHash());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // Ensure initial hash exists so back button has something to pop
+  useEffect(() => {
+    if (!window.location.hash) window.history.replaceState(null, '', `#/${tab}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
