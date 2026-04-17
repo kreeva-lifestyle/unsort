@@ -316,22 +316,65 @@ export default function CashChallan() {
     setReminderChallan(null);
   };
 
-  // ── Export customer ledger CSV ─────────────────────────────────────────────
-  const exportLedgerCSV = (customerName: string) => {
+  // ── Export customer ledger PDF ─────────────────────────────────────────────
+  const exportLedgerPDF = (customerName: string) => {
     if (ledgerChallans.length === 0) return;
-    const rows = ledgerChallans.map(c => {
-      const sign = (c as any).is_return ? -1 : 1;
-      return `${c.challan_number},${new Date(c.created_at).toLocaleDateString('en-IN')},${(c as any).is_return ? 'Return' : 'Sale'},${sign * Number(c.total)},${sign * Number(c.amount_paid || 0)},${sign * (Number(c.total) - Number(c.amount_paid || 0))},${c.status},"${(c.notes || '').replace(/"/g, '""')}"`;
-    });
+    const cust = ledgerCustomers.find(c => c.name === customerName);
     const totalBilled = ledgerChallans.filter(c => !(c as any).is_return).reduce((s, c) => s + Number(c.total), 0);
     const totalReturns = ledgerChallans.filter(c => (c as any).is_return).reduce((s, c) => s + Number(c.total), 0);
     const totalPaid = ledgerChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
     const outstanding = totalBilled - totalReturns - totalPaid;
-    const csv = 'Challan #,Date,Type,Amount,Paid,Outstanding,Status,Notes\n' + rows.join('\n') +
-      `\n,,,Total Billed,${totalBilled},,\n,,,Total Returns,-${totalReturns},,\n,,,Total Paid,${totalPaid},,\n,,,Outstanding,${outstanding},,`;
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `Ledger_${customerName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
+    const rows = ledgerChallans.map(c => {
+      const isRet = (c as any).is_return;
+      const sign = isRet ? -1 : 1;
+      return `<tr>
+        <td>#${c.challan_number}</td>
+        <td>${new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+        <td>${isRet ? '<span style="color:#e53e3e">Return</span>' : 'Sale'}</td>
+        <td style="text-align:right">${isRet ? '−' : ''}₹${Number(c.total).toLocaleString('en-IN')}</td>
+        <td style="text-align:right">₹${(sign * Number(c.amount_paid || 0)).toLocaleString('en-IN')}</td>
+        <td style="text-align:right">₹${(sign * (Number(c.total) - Number(c.amount_paid || 0))).toLocaleString('en-IN')}</td>
+        <td><span style="padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;background:${c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : '#f8d7da'};color:${c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : '#721c24'}">${c.status}</span></td>
+      </tr>`;
+    }).join('');
+    const w = window.open('', '_blank', 'width=800,height=600');
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><title>Ledger - ${customerName}</title>
+      <style>
+        body{font-family:'Inter',sans-serif;padding:24px;color:#1a202c;font-size:12px}
+        h2{margin:0 0 4px;font-size:18px} .sub{color:#718096;font-size:11px;margin-bottom:16px}
+        .stats{display:flex;gap:12px;margin-bottom:16px}
+        .stat{flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:10px;text-align:center}
+        .stat .label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#a0aec0;font-weight:600;margin-bottom:4px}
+        .stat .val{font-size:18px;font-weight:800}
+        table{width:100%;border-collapse:collapse;margin-bottom:16px}
+        th{text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#a0aec0;padding:8px 10px;border-bottom:2px solid #e2e8f0;font-weight:600}
+        td{padding:8px 10px;border-bottom:1px solid #edf2f7;font-size:11px}
+        .totals{margin-top:8px;border-top:2px solid #2d3748;padding-top:8px}
+        .totals div{display:flex;justify-content:space-between;padding:3px 0;font-size:12px}
+        .totals .final{font-weight:800;font-size:14px;color:${outstanding > 0 ? '#e53e3e' : '#38a169'}}
+        .footer{margin-top:20px;text-align:center;font-size:9px;color:#a0aec0}
+        @media print{body{padding:12px}@page{margin:12mm}}
+      </style></head><body>
+      <h2>Customer Ledger</h2>
+      <div class="sub">${customerName} | Generated: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+      <div class="stats">
+        <div class="stat"><div class="label">Total Billed</div><div class="val" style="color:#6366f1">₹${totalBilled.toLocaleString('en-IN')}</div></div>
+        <div class="stat"><div class="label">Paid</div><div class="val" style="color:#38a169">₹${(cust?.paid || totalPaid).toLocaleString('en-IN')}</div></div>
+        <div class="stat"><div class="label">Outstanding</div><div class="val" style="color:${outstanding > 0 ? '#e53e3e' : '#38a169'}">₹${outstanding.toLocaleString('en-IN')}</div></div>
+      </div>
+      <table><thead><tr><th>Challan</th><th>Date</th><th>Type</th><th style="text-align:right">Amount</th><th style="text-align:right">Paid</th><th style="text-align:right">Balance</th><th>Status</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <div class="totals">
+        <div><span>Total Billed</span><span>₹${totalBilled.toLocaleString('en-IN')}</span></div>
+        ${totalReturns > 0 ? `<div><span>Returns</span><span style="color:#e53e3e">−₹${totalReturns.toLocaleString('en-IN')}</span></div>` : ''}
+        <div><span>Total Paid</span><span style="color:#38a169">₹${totalPaid.toLocaleString('en-IN')}</span></div>
+        <div class="final"><span>Outstanding</span><span>₹${outstanding.toLocaleString('en-IN')}</span></div>
+      </div>
+      <div class="footer">DailyOffice — Your Workspace, Simplified</div>
+    </body></html>`);
+    w.document.close();
+    setTimeout(() => w.print(), 300);
   };
 
   // ── Open edit ──────────────────────────────────────────────────────────────
@@ -450,7 +493,7 @@ export default function CashChallan() {
             {cust && <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{cust.count} challans | Outstanding: <span style={{ color: cust.outstanding > 0 ? T.re : T.gr, fontWeight: 600 }}>₹{cust.outstanding.toLocaleString('en-IN')}</span></div>}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => exportLedgerCSV(ledgerDetail)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer', fontFamily: T.sans }}>Export CSV</button>
+            <button onClick={() => exportLedgerPDF(ledgerDetail)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer', fontFamily: T.sans }}>Export PDF</button>
           </div>
         </div>
         {cust && (
