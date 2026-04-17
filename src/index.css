@@ -34,7 +34,7 @@ input:focus, select:focus, textarea:focus {
 
 :focus-visible { outline: 1.5px solid rgba(99,102,241,0.50); outline-offset: 2px; border-radius: 4px; }
 
-select option { background: #0B0F19; color: #E2E8F0; }
+select option { background: #0B0F19; color: #E2E8F0; padding: 8px 10px; }
 input::placeholder, textarea::placeholder { color: #4A5568; opacity: 1; }
 
 /* Date/time picker calendar icon — invert to be visible on dark theme */
