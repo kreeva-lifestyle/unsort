@@ -52,7 +52,7 @@ export default function InventoryExtras() {
   const [fProductId, setFProductId] = useState('');
   const [fComponentId, setFComponentId] = useState('');
   const [fSku, setFSku] = useState('');
-  const [fSize, setFSize] = useState('M');
+  const [fSize, setFSize] = useState('');
   const [fQty, setFQty] = useState('1');
   const [fNotes, setFNotes] = useState('');
   const [fComps, setFComps] = useState<any[]>([]);
@@ -144,7 +144,7 @@ export default function InventoryExtras() {
       extra_id: data.id, action: 'created', quantity_change: qty, quantity_after: qty, user_id: user?.id,
     });
     setSaving(false); setShowAdd(false);
-    setFProductId(''); setFComponentId(''); setFSku(''); setFSize('M'); setFQty('1'); setFNotes('');
+    setFProductId(''); setFComponentId(''); setFSku(''); setFSize(''); setFQty('1'); setFNotes('');
     fetchExtras();
   };
 
@@ -297,6 +297,7 @@ export default function InventoryExtras() {
               <div>
                 <label style={label}>Size</label>
                 <select value={fSize} onChange={e => setFSize(e.target.value)} style={input}>
+                  <option value="">Select size...</option>
                   {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
