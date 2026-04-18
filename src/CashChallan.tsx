@@ -13,15 +13,7 @@ const ccAudit = (action: string, details: string) => {
   });
 };
 
-const T = {
-  bg: '#060810',
-  bd: 'rgba(255,255,255,0.05)', bd2: 'rgba(255,255,255,0.08)',
-  tx: '#E2E8F0', tx2: '#8896B0', tx3: '#4A5568',
-  ac: '#6366F1', ac2: '#818CF8',
-  gr: '#22C55E', re: '#EF4444', yl: '#F59E0B', bl: '#38BDF8',
-  mono: "'JetBrains Mono', monospace", sans: "'Inter', -apple-system, sans-serif",
-  sora: "'Sora', 'Inter', sans-serif",
-};
+import { T } from './theme';
 
 interface ChallanItem { id?: string; sku: string; description: string; quantity: number; price: number; total: number; discount_type?: string; discount_value?: number; discount_amount?: number; }
 interface Challan {

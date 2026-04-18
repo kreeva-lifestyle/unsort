@@ -7,16 +7,7 @@ const supabase = createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0'
 );
 
-const T = {
-  bg: '#060810', s: '#0B0F19', s2: '#0F1420',
-  bd: 'rgba(255,255,255,0.05)', bd2: 'rgba(255,255,255,0.08)',
-  tx: '#E2E8F0', tx2: '#8896B0', tx3: '#4A5568',
-  ac: '#6366F1', ac2: '#818CF8',
-  gr: '#22C55E', re: '#EF4444', yl: '#F59E0B', bl: '#38BDF8',
-  mono: "'JetBrains Mono', monospace",
-  sans: "'Inter', -apple-system, sans-serif",
-  sora: "'Sora', 'Inter', sans-serif",
-};
+import { T } from './theme';
 
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', 'Semi-Stitched'];
 const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
