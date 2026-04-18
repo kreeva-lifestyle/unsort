@@ -19,7 +19,7 @@ const T = {
 };
 
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', 'Semi-Stitched'];
-const isDupatta = (name: string) => /dupatt?a/i.test(name);
+const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
 
 interface Extra {
   id: string; product_id: string; product_name: string;
@@ -80,8 +80,10 @@ export default function InventoryExtras() {
     // Compute match counts for each extra
     const counts: Record<string, number> = {};
     for (const ex of (data || [])) {
-      const { count } = await supabase.from('inventory_items').select('id', { count: 'exact', head: true })
-        .eq('status', 'unsorted').eq('serial_number', ex.sku).eq('size', ex.size).eq('product_id', ex.product_id);
+      let q = supabase.from('inventory_items').select('id', { count: 'exact', head: true })
+        .eq('status', 'unsorted').eq('serial_number', ex.sku).eq('product_id', ex.product_id);
+      if (ex.size && ex.size !== 'N/A') q = q.eq('size', ex.size);
+      const { count } = await q;
       counts[ex.id] = count || 0;
     }
     setMatchCounts(counts);
@@ -134,8 +136,10 @@ export default function InventoryExtras() {
   };
 
   const loadMatches = async (ex: Extra) => {
-    const { data } = await supabase.from('inventory_items').select('id, batch_number, serial_number, size, location, status')
-      .eq('status', 'unsorted').eq('serial_number', ex.sku).eq('size', ex.size).eq('product_id', ex.product_id);
+    let q = supabase.from('inventory_items').select('id, batch_number, serial_number, size, location, status')
+      .eq('status', 'unsorted').eq('serial_number', ex.sku).eq('product_id', ex.product_id);
+    if (ex.size && ex.size !== 'N/A') q = q.eq('size', ex.size);
+    const { data } = await q;
     setMatches(data || []);
     setMatchExtra(ex);
   };
