@@ -23,7 +23,7 @@ const T = {
   sora: "'Sora', 'Inter', sans-serif",
 };
 
-interface ChallanItem { id?: string; sku: string; description: string; quantity: number; price: number; total: number; }
+interface ChallanItem { id?: string; sku: string; description: string; quantity: number; price: number; total: number; discount_type?: string; discount_value?: number; discount_amount?: number; }
 interface Challan {
   id: string; challan_number: number; customer_id: string | null; customer_name: string;
   status: string; subtotal: number; discount_type: string | null; discount_value: number;
@@ -61,9 +61,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [customerName, setCustomerName] = useState('');
   const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-  const [items, setItems] = useState<ChallanItem[]>([{ sku: '', description: '', quantity: 1, price: 0, total: 0 }]);
-  const [discountType, setDiscountType] = useState<string>('flat');
-  const [discountValue, setDiscountValue] = useState(0);
+  const [items, setItems] = useState<ChallanItem[]>([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
   const [shippingCharges, setShippingCharges] = useState(0);
   const [notes, setNotes] = useState('');
   const [tags, setTags] = useState('');
@@ -73,6 +71,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [challanStatus, setChallanStatus] = useState('draft');
   const [customerPhone, setCustomerPhone] = useState('');
   const [isReturn, setIsReturn] = useState(false);
+  const [returnSource, setReturnSource] = useState<any>(null);
+  const [returnSearchQ, setReturnSearchQ] = useState('');
+  const [returnResults, setReturnResults] = useState<any[]>([]);
   const [auditTrail, setAuditTrail] = useState<any[] | null>(null);
   const [reminderChallan, setReminderChallan] = useState<any | null>(null);
   const [reminderPhone, setReminderPhone] = useState('');
@@ -96,12 +97,18 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   const searchTimeout = useRef<any>(null);
 
-  // ── Computed values ────────────────────────────────────────────────────────
-  const subtotal = Math.round(items.reduce((s, i) => s + i.quantity * i.price, 0) * 100) / 100;
-  const clampedDiscount = Math.min(discountType === 'percentage' ? subtotal * discountValue / 100 : discountValue, subtotal);
-  const discountAmount = Math.round(Math.max(0, clampedDiscount) * 100) / 100;
+  // ── Computed values (per-item discount) ─────────────────────────────────
+  const computeItemTotal = (it: ChallanItem) => {
+    const lineTotal = it.quantity * it.price;
+    const disc = it.discount_type === 'percentage'
+      ? Math.min(lineTotal * (it.discount_value || 0) / 100, lineTotal)
+      : Math.min(it.discount_value || 0, lineTotal);
+    return Math.round((lineTotal - Math.max(0, disc)) * 100) / 100;
+  };
+  const subtotal = Math.round(items.reduce((s, i) => s + computeItemTotal(i), 0) * 100) / 100;
+  const totalDiscount = Math.round(items.reduce((s, i) => s + (i.quantity * i.price - computeItemTotal(i)), 0) * 100) / 100;
   const clampedShipping = Math.max(0, shippingCharges);
-  const afterDiscount = Math.round((subtotal - discountAmount + clampedShipping) * 100) / 100;
+  const afterDiscount = Math.round((subtotal + clampedShipping) * 100) / 100;
   const roundOff = Math.round((Math.round(afterDiscount) - afterDiscount) * 100) / 100;
   const grandTotal = Math.round(afterDiscount);
 
@@ -142,6 +149,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const channel = supabase.channel('cash_challans_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, () => fetchChallans())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challan_items' }, () => fetchChallans())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challan_customers' }, () => {})
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchChallans]);
@@ -154,6 +162,30 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       }
     })();
   }, []);
+
+  // ── Return source invoice search ────────────────────────────────────────────
+  const searchReturnSource = useCallback(async (q: string) => {
+    if (!q.trim()) { setReturnResults([]); return; }
+    const num = parseInt(q);
+    let query = supabase.from('cash_challans').select('*, cash_challan_items(*)').eq('is_return', false).neq('status', 'voided');
+    if (num && !isNaN(num)) query = query.eq('challan_number', num);
+    else query = query.ilike('customer_name', `%${q}%`);
+    const { data } = await query.order('created_at', { ascending: false }).limit(10);
+    setReturnResults(data || []);
+  }, []);
+
+  const selectReturnSource = (challan: any) => {
+    setReturnSource(challan);
+    setReturnResults([]);
+    setReturnSearchQ('');
+    setCustomerName(challan.customer_name);
+    setSelectedCustomerId(challan.customer_id);
+    const sourceItems = (challan.cash_challan_items || []).map((it: any) => ({
+      sku: it.sku, description: it.description, quantity: it.quantity, price: Number(it.price),
+      total: Number(it.total), discount_type: it.discount_type || 'flat', discount_value: Number(it.discount_value || 0), discount_amount: Number(it.discount_amount || 0),
+    }));
+    setItems(sourceItems);
+  };
 
   // ── Customer auto-suggest ──────────────────────────────────────────────────
   const searchCustomers = useCallback(async (q: string) => {
@@ -226,6 +258,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const saveChallan = async () => {
     setFormError('');
     if (editing && editing.status === 'voided') { setFormError('Cannot edit a voided challan'); return; }
+    if (isReturn && !editing && !returnSource) { setFormError('Select the original invoice for this return'); return; }
     if (!customerName.trim()) { setFormError('Customer name is required'); return; }
     if (items.length === 0) { setFormError('Add at least one item'); return; }
     const invalidItem = items.find(it => !it.sku.trim() || it.quantity <= 0 || it.price <= 0);
@@ -259,8 +292,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
     const challanData = {
       customer_id: custId, customer_name: customerName.trim(), status: challanStatus,
-      subtotal, discount_type: discountType, discount_value: discountValue,
-      discount_amount: discountAmount, shipping_charges: shippingCharges, round_off: roundOff, total: grandTotal,
+      subtotal, discount_type: null, discount_value: 0,
+      discount_amount: totalDiscount, shipping_charges: clampedShipping, round_off: roundOff, total: grandTotal,
       amount_paid: amountPaid, payment_mode: paymentMode || null,
       payment_date: paymentDate || null, notes, tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       is_return: isReturn,
@@ -268,14 +301,19 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     };
 
     if (editing) {
+      const { data: current } = await supabase.from('cash_challans').select('updated_at').eq('id', editing.id).maybeSingle();
+      if (current && editing.updated_at && current.updated_at !== editing.updated_at) {
+        setFormError('This challan was modified by another user. Please close and reopen to get latest data.');
+        return;
+      }
       await supabase.from('cash_challans').update({ ...challanData, updated_at: new Date().toISOString() }).eq('id', editing.id);
       await supabase.from('cash_challan_items').delete().eq('challan_id', editing.id);
-      await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: editing.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: it.quantity * it.price, sort_order: i })));
+      await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: editing.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100, sort_order: i })));
       ccAudit('UPDATE', `Challan #${editing.challan_number} updated for ${customerName.trim()} - ₹${grandTotal}`);
     } else {
       const { data: newChallan } = await supabase.from('cash_challans').insert({ ...challanData, created_by: user?.id }).select('id, challan_number').single();
       if (newChallan) {
-        await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: newChallan.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: it.quantity * it.price, sort_order: i })));
+        await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: newChallan.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100, sort_order: i })));
         ccAudit('CREATE', `${isReturn ? 'Return' : 'Challan'} #${newChallan.challan_number} created for ${customerName.trim()} - ₹${grandTotal}`);
       }
     }
@@ -399,9 +437,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setSelectedCustomerId(c.customer_id);
     setCustomerPhone(cust?.phone || '');
     setIsReturn(!!(c as any).is_return);
-    setItems((citems || []).map(i => ({ sku: i.sku || '', description: i.description, quantity: i.quantity, price: Number(i.price), total: Number(i.total) })));
-    setDiscountType(c.discount_type || 'flat');
-    setDiscountValue(Number(c.discount_value));
+    setItems((citems || []).map(i => ({ sku: i.sku || '', description: i.description, quantity: i.quantity, price: Number(i.price), total: Number(i.total), discount_type: i.discount_type || 'flat', discount_value: Number(i.discount_value || 0), discount_amount: Number(i.discount_amount || 0) })));
     setShippingCharges(Number((c as any).shipping_charges || 0));
     setNotes(c.notes || '');
     setTags((c.tags || []).join(', '));
@@ -413,9 +449,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   const closeModal = () => {
-    setShowModal(false); setEditing(null); setCustomerName(''); setSelectedCustomerId(null); setCustomerPhone(''); setIsReturn(false);
-    setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0 }]);
-    setDiscountType('flat'); setDiscountValue(0); setShippingCharges(0); setNotes(''); setTags('');
+    setShowModal(false); setEditing(null); setCustomerName(''); setSelectedCustomerId(null); setCustomerPhone(''); setIsReturn(false); setReturnSource(null); setReturnSearchQ(''); setReturnResults([]);
+    setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
+    setShippingCharges(0); setNotes(''); setTags('');
     setPaymentMode(''); setPaymentDate(''); setAmountPaid(0); setChallanStatus('draft');
     setCustomerSuggestions([]);
   };
@@ -607,6 +643,36 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           ))}
         </div>
 
+        {/* Return: Select source invoice */}
+        {isReturn && !editing && !returnSource && (
+          <div style={{ background: 'rgba(239,68,68,.04)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 10, padding: 14, marginBottom: 12 }}>
+            <label style={{ ...lbl, color: T.re }}>Select Original Invoice *</label>
+            <input type="text" value={returnSearchQ} onChange={e => { setReturnSearchQ(e.target.value); searchReturnSource(e.target.value); }}
+              placeholder="Search by challan # or customer name..." style={inp} autoFocus />
+            {returnResults.length > 0 && <div style={{ marginTop: 6, border: `1px solid ${T.bd}`, borderRadius: 6, maxHeight: 200, overflowY: 'auto' }}>
+              {returnResults.map(c => (
+                <div key={c.id} onClick={() => selectReturnSource(c)} style={{ padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  <div>
+                    <span style={{ fontFamily: T.mono, fontSize: 11, color: T.ac2 }}>#{c.challan_number}</span>
+                    <span style={{ marginLeft: 8, fontSize: 11, color: T.tx }}>{c.customer_name}</span>
+                  </div>
+                  <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.tx }}>₹{Number(c.total).toLocaleString('en-IN')}</span>
+                </div>
+              ))}
+            </div>}
+          </div>
+        )}
+        {isReturn && returnSource && !editing && (
+          <div style={{ background: 'rgba(239,68,68,.04)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 10, padding: '8px 14px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span style={{ fontSize: 9, color: T.re, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>Return against</span>
+              <div style={{ fontSize: 12, color: T.tx, fontWeight: 600 }}>#{returnSource.challan_number} — {returnSource.customer_name} — ₹{Number(returnSource.total).toLocaleString('en-IN')}</div>
+            </div>
+            <span onClick={() => { setReturnSource(null); setCustomerName(''); setSelectedCustomerId(null); setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]); }} style={{ fontSize: 10, color: T.re, cursor: 'pointer', fontWeight: 600 }}>Change</span>
+          </div>
+        )}
+
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
           {/* Customer */}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 12 }}>
@@ -638,28 +704,32 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
               <span style={{ fontSize: 8, color: T.tx3, fontWeight: 600, letterSpacing: .5, textAlign: 'right' }}>PRICE</span>
               <span />
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 90px 24px', gap: 4, padding: '4px 8px', borderBottom: `1px solid ${T.bd}` }}>
+              <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>SKU</span>
+              <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, textAlign: 'center' }}>Qty</span>
+              <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, textAlign: 'right' }}>Price</span>
+              <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, textAlign: 'right' }}>Discount</span>
+              <span></span>
+            </div>
             {items.map((it, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 24px', gap: 4, padding: '5px 8px', borderBottom: `1px solid ${T.bd}`, alignItems: 'center' }}>
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 90px 24px', gap: 4, padding: '5px 8px', borderBottom: `1px solid ${T.bd}`, alignItems: 'center' }}>
                 <input value={it.sku} onChange={e => { const n = [...items]; n[i].sku = e.target.value; setItems(n); }} placeholder="SKU / Item name" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', fontFamily: T.mono }} />
                 <input type="number" value={it.quantity || ''} onChange={e => { const n = [...items]; n[i].quantity = Number(e.target.value); setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'center' }} />
                 <input type="number" value={it.price || ''} onChange={e => { const n = [...items]; n[i].price = Number(e.target.value); setItems(n); }} placeholder="0" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right', fontFamily: T.mono }} />
+                <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  <select value={it.discount_type || 'flat'} onChange={e => { const n = [...items]; n[i].discount_type = e.target.value; setItems(n); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx3, fontSize: 9, padding: '5px 2px', outline: 'none', width: 32 }}>
+                    <option value="flat">₹</option><option value="percentage">%</option>
+                  </select>
+                  <input type="number" value={it.discount_value || ''} onChange={e => { const n = [...items]; n[i].discount_value = Number(e.target.value); setItems(n); }} placeholder="0" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right', fontFamily: T.mono, flex: 1, minWidth: 0 }} />
+                </div>
                 <button onClick={() => { if (items.length > 1) setItems(items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }}>×</button>
               </div>
             ))}
-            <button onClick={() => setItems([...items, { sku: '', description: '', quantity: 1, price: 0, total: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>
+            <button onClick={() => setItems([...items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>
           </div>
 
-          {/* Discount + Shipping + Tags */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
-            <div>
-              <label style={lbl}>Discount</label>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <select value={discountType} onChange={e => setDiscountType(e.target.value)} style={{ ...inp, width: 'auto', padding: '6px 8px', fontSize: 11 }}>
-                  <option value="flat">₹ Flat</option><option value="percentage">%</option>
-                </select>
-                <input type="number" value={discountValue || ''} onChange={e => setDiscountValue(Number(e.target.value))} placeholder="0" style={{ ...inp, flex: 1, fontFamily: T.mono, fontSize: 11 }} />
-              </div>
-            </div>
+          {/* Shipping + Tags */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
             <div>
               <label style={lbl}>Shipping/Porter</label>
               <input type="number" value={shippingCharges || ''} onChange={e => setShippingCharges(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
@@ -706,7 +776,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         {/* Totals card */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 16px', marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, marginBottom: 4 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{subtotal.toFixed(2)}</span></div>
-          {discountAmount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Discount ({discountType === 'percentage' ? `${discountValue}%` : 'Flat'})</span><span style={{ fontFamily: T.mono }}>-₹{discountAmount.toFixed(2)}</span></div>}
+          {totalDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Item Discounts</span><span style={{ fontFamily: T.mono }}>-₹{totalDiscount.toFixed(2)}</span></div>}
           {shippingCharges > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.bl, marginBottom: 4 }}><span>Shipping/Porter</span><span style={{ fontFamily: T.mono }}>+₹{shippingCharges.toFixed(2)}</span></div>}
           {roundOff !== 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx3, marginBottom: 4 }}><span>Round Off</span><span style={{ fontFamily: T.mono }}>{roundOff > 0 ? '+' : ''}₹{roundOff.toFixed(2)}</span></div>}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}><span>Total</span><span>₹{grandTotal.toLocaleString('en-IN')}</span></div>
