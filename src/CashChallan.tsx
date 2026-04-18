@@ -285,9 +285,20 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (overDiscItem) { setFormError(`Item "${overDiscItem.sku}" discount cannot exceed 100%`); return; }
     if (isReturn && returnSource) {
       const sourceItems = returnSource.cash_challan_items || [];
+      // Check cumulative returns — fetch all previous returns for this source
+      const { data: prevReturns } = await supabase.from('cash_challans').select('id').eq('source_challan_id', returnSource.id).eq('is_return', true).neq('status', 'voided');
+      const prevReturnIds = (prevReturns || []).map((r: any) => r.id).filter((id: string) => !editing || id !== editing.id);
+      let prevQtyMap: Record<string, number> = {};
+      if (prevReturnIds.length > 0) {
+        const { data: prevItems } = await supabase.from('cash_challan_items').select('sku, quantity').in('challan_id', prevReturnIds);
+        (prevItems || []).forEach((pi: any) => { prevQtyMap[pi.sku] = (prevQtyMap[pi.sku] || 0) + pi.quantity; });
+      }
       for (const it of items) {
         const src = sourceItems.find((s: any) => s.sku === it.sku);
-        if (src && it.quantity > src.quantity) { setFormError(`Cannot return more than ${src.quantity} for "${it.sku}"`); return; }
+        if (!src) continue;
+        const alreadyReturned = prevQtyMap[it.sku] || 0;
+        const remaining = src.quantity - alreadyReturned;
+        if (it.quantity > remaining) { setFormError(`"${it.sku}": only ${remaining} remaining (${alreadyReturned} already returned of ${src.quantity})`); return; }
       }
     }
     if (subtotal <= 0) { setFormError('Subtotal must be greater than zero'); return; }
@@ -350,7 +361,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         if (upErr) throw new Error(upErr.message);
         ccAudit('UPDATE', `Challan #${editing.challan_number} updated for ${customerName.trim()} - ₹${grandTotal}`);
       } else {
-        const { data: newChallan, error: crErr } = await supabase.from('cash_challans').insert({ ...challanData, created_by: user?.id }).select('id, challan_number').single();
+        const { data: newChallan, error: crErr } = await supabase.from('cash_challans').insert({ ...challanData, created_by: user?.id, source_challan_id: isReturn && returnSource ? returnSource.id : null }).select('id, challan_number').single();
         if (crErr || !newChallan) throw new Error(crErr?.message || 'Failed to create challan');
         const { error: itErr } = await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: newChallan.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100, sort_order: i })));
         if (itErr) { await supabase.from('cash_challans').delete().eq('id', newChallan.id); throw new Error(itErr.message); }
