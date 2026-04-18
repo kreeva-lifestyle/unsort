@@ -994,7 +994,9 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
   };
 
   const handleCancelCompletion = async (itemId: string) => {
-    // Find the paired item and revert both
+    // Check if completed via extra — cannot revert
+    const { count: extraUsed } = await supabase.from('inventory_extras_history').select('id', { count: 'exact', head: true }).eq('related_inventory_item_id', itemId).eq('action', 'used');
+    if ((extraUsed || 0) > 0) { addToast('Cannot revert — item was completed using an extra. Extra quantity was already decremented.', 'error'); return; }
     const item = items.find(i => i.id === itemId);
     const pairedId = item?.paired_with;
     const idsToRevert = [itemId];
@@ -1392,6 +1394,10 @@ const Categories = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selected) {
+      if (selected.name !== form.name) {
+        const { count } = await supabase.from('inventory_items').select('id', { count: 'exact', head: true }).eq('product_id', selected.id);
+        if ((count || 0) > 0 && !confirm(`${count} item(s) use this category. Renaming will affect all. Continue?`)) return;
+      }
       const { error } = await supabase.from('products').update({ name: form.name, description: form.description, category: form.category }).eq('id', selected.id);
       if (error) { addToast(error.message, 'error'); return; }
       const validComps = newComps.filter(c => c.trim());
