@@ -152,6 +152,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const awbSetRef = useRef<Set<string>>(new Set());
   const rowCountRef = useRef(0);
   const sessionIdRef = useRef('');
+  const userIdRef = useRef<string | null>(null);
+  const [dbFails, setDbFails] = useState(0);
 
   // Camera scanner
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -172,6 +174,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       setCameras(cam || []);
       setBrands((b || []).map((x: any) => x.name));
       setLoadingConfig(false);
+      supabase.auth.getUser().then(({ data: { user } }) => { userIdRef.current = user?.id || null; });
     })();
   }, []);
 
@@ -325,10 +328,19 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     enqueueWrite([row], courierSheet);
     setPendingWrites(p => p + 1);
 
-    // Save to Supabase DB
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      supabase.from('packtime_scans').insert({ session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: user?.id })
-        .then(({ error }) => { if (error) console.error('PackStation DB insert failed:', error.message, error.details, error.code); });
+    // Save to Supabase DB (no nesting — userIdRef cached on mount)
+    const scanRow = { session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
+    supabase.from('packtime_scans').insert(scanRow).then(({ error }) => {
+      if (error) {
+        console.error('PackStation DB insert failed:', error.message, error.code);
+        setDbFails(p => p + 1);
+        setTimeout(() => {
+          supabase.from('packtime_scans').insert(scanRow).then(({ error: e2 }) => {
+            if (!e2) setDbFails(p => Math.max(0, p - 1));
+            else console.error('PackStation DB retry failed:', e2.message);
+          });
+        }, 2000);
+      }
     });
 
     // Mark as synced after a short delay (optimistic)
@@ -559,7 +571,10 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>PackStation</span>
-        <button onClick={() => { setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {dbFails > 0 && <span style={{ fontSize: 9, color: T.re, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)' }}>{dbFails} DB save failed</span>}
+          <button onClick={() => { setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
+        </div>
       </div>
 
       {/* Unicommerce Order Stats */}
