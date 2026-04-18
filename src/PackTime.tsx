@@ -299,13 +299,17 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       setVerifyResult(data);
       if (data.ok && data.columnsOk !== false) {
         const sheetAwbs = (data.awbs || []).map((a: string) => a.trim().toUpperCase());
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
-        const { data: dbScans } = await supabase.from('packtime_scans').select('awb').eq('sheet_name', c.sheet_name).gte('scanned_at', thirtyDaysAgo);
-        const dbAwbs = (dbScans || []).map((r: any) => r.awb.trim().toUpperCase());
+        let dbAwbs: string[] = [];
+        try {
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+          const { data: dbScans } = await supabase.from('packtime_scans').select('awb').eq('sheet_name', c.sheet_name).gte('scanned_at', thirtyDaysAgo).limit(5000);
+          dbAwbs = (dbScans || []).map((r: any) => r.awb.trim().toUpperCase());
+        } catch {}
         awbSetRef.current = new Set([...sheetAwbs, ...dbAwbs]);
         rowCountRef.current = data.totalRows || 0;
         setSheetTotal(data.totalRows || 0);
         sessionIdRef.current = crypto.randomUUID();
+        writeQueue.length = 0; flushing = false;
         setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned(''); setDbFails(0);
       }
     } catch {
@@ -350,6 +354,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
     // Save to Supabase DB first, then Sheet
     const scanRow = { session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
+    const row = [count, trimmed, timestamp, camera, courierBrand];
     supabase.from('packtime_scans').insert(scanRow).then(({ error }) => {
       if (error) {
         if (error.code === '23505') {
@@ -368,13 +373,12 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             else console.error('PackStation DB retry failed:', e2.message);
           });
         }, 2000);
+        return;
       }
+      // Only write to Sheet after DB success
+      enqueueWrite([row], courierSheet);
+      setPendingWrites(p => p + 1);
     });
-
-    // Write to Google Sheet after DB insert fires
-    const row = [count, trimmed, timestamp, camera, courierBrand];
-    enqueueWrite([row], courierSheet);
-    setPendingWrites(p => p + 1);
 
     // Mark as synced — bounded check (max 10s)
     let syncChecks = 0;
@@ -456,12 +460,13 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   // ── Fetch history from Supabase ────────────────────────────────────────────
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
-    let query = supabase.from('packtime_scans').select('*', { count: 'exact' });
+    let query = supabase.from('packtime_scans').select('*', { count: 'estimated' });
     if (historySearch) query = query.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
     if (historyFilterCourier) query = query.eq('courier', historyFilterCourier);
     if (historyFilterBrand) query = query.eq('brand', historyFilterBrand);
     query = query.order('scanned_at', { ascending: false }).range(historyPage * historyPageSize, (historyPage + 1) * historyPageSize - 1);
-    const { data, count } = await query;
+    const { data, count, error } = await query;
+    if (error) { console.error('History fetch failed:', error.message); setHistoryLoading(false); return; }
     setHistoryData(data || []);
     setHistoryTotal(count || 0);
     setHistoryLoading(false);
@@ -496,13 +501,22 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   };
 
   const exportHistory = async () => {
-    let query = supabase.from('packtime_scans').select('*');
-    if (historySearch) query = query.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
-    if (historyFilterCourier) query = query.eq('courier', historyFilterCourier);
-    if (historyFilterBrand) query = query.eq('brand', historyFilterBrand);
-    const { data } = await query.order('scanned_at', { ascending: false }).limit(10000);
-    if (!data || data.length === 0) return;
-    const csv = 'AWB,Courier,Camera,Brand,Scanned At,Session ID\n' + data.map((r: any) => `${r.awb},${r.courier},${r.camera},${r.brand || ''},${new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })},${r.session_id}`).join('\n');
+    let allData: any[] = [];
+    let page = 0;
+    const ps = 5000;
+    while (true) {
+      let q = supabase.from('packtime_scans').select('*');
+      if (historySearch) q = q.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
+      if (historyFilterCourier) q = q.eq('courier', historyFilterCourier);
+      if (historyFilterBrand) q = q.eq('brand', historyFilterBrand);
+      const { data } = await q.order('scanned_at', { ascending: false }).range(page * ps, (page + 1) * ps - 1);
+      if (!data || data.length === 0) break;
+      allData.push(...data);
+      if (data.length < ps) break;
+      page++;
+    }
+    if (allData.length === 0) return;
+    const csv = 'AWB,Courier,Camera,Brand,Scanned At,Session ID\n' + allData.map((r: any) => `${r.awb},${r.courier},${r.camera},${r.brand || ''},${new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })},${r.session_id}`).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `PackStation_History_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
