@@ -1394,10 +1394,10 @@ const Categories = () => {
   const openEdit = async (p: any) => { setSelected(p); setForm({ sku: p.sku || '', name: p.name, description: p.description || '', category: p.category || '' }); setNewComps(['']); await fetchComps(p.id); setShowModal(true); };
   const canEdit = profile && ['admin', 'manager'].includes(profile.role);
 
-  const compInputRow = (val: string, i: number, total: number) => (
+  const compInputRow = (val: string, i: number, total: number, offset = 0) => (
     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-      <span style={{ width: 22, height: 22, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: T.tx3, fontFamily: T.mono, flexShrink: 0 }}>{i + 1}</span>
-      <input value={val} onChange={(e) => updateCompRow(i, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (val.trim()) addCompRow(); } }} placeholder={i === 0 ? 'e.g. Lehenga' : i === 1 ? 'e.g. Blouse' : i === 2 ? 'e.g. Dupatta' : 'Component name'} style={{ ...S.fInput, flex: 1 }} />
+      <span style={{ width: 22, height: 22, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: T.tx3, fontFamily: T.mono, flexShrink: 0 }}>{offset + i + 1}</span>
+      <input value={val} onChange={(e) => updateCompRow(i, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (val.trim()) addCompRow(); } }} placeholder="Component name" style={{ ...S.fInput, flex: 1 }} />
       {total > 1 && <span onClick={() => removeCompRow(i)} style={{ cursor: 'pointer', color: T.re, fontSize: 16, lineHeight: 1, padding: '0 4px', flexShrink: 0 }}>✕</span>}
     </div>
   );
@@ -1429,7 +1429,7 @@ const Categories = () => {
           </div>))}
         </div>}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 10, marginBottom: 12 }}>
-          {newComps.map((c, i) => compInputRow(c, i, newComps.length))}
+          {newComps.map((c, i) => compInputRow(c, i, newComps.length, selected ? comps.length : 0))}
         </div>
         <div style={{ padding: '12px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 7 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add Category'}</button></div>
       </form></div></div>)}
