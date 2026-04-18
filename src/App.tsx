@@ -1062,6 +1062,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
         i.notes, i.location, i.order_id, i.marketplace, i.ticket_id, i.link, i.status,
         ...(itemTags[i.id] || []).map((t: any) => t?.name),
         ...(itemMissing[i.id] || []),
+        ...(itemDamaged[i.id] || []),
       ];
       if (!fields.some(f => (f || '').toLowerCase().includes(q))) return false;
     }
@@ -1371,9 +1372,10 @@ const Categories = () => {
   const fetchComps = async (id: string) => { const { data } = await supabase.from('components').select('*').eq('product_id', id).order('created_at', { ascending: true }); setComps(data || []); };
 
   const generateSku = (name: string) => {
-    const base = name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-    const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `${base}-${suffix}`;
+    const base = name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+    const ts = Date.now().toString(36).slice(-4).toUpperCase();
+    const rand = Math.random().toString(36).substring(2, 4).toUpperCase();
+    return `${base}-${ts}${rand}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
