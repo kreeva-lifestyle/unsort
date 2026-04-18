@@ -626,6 +626,8 @@ const canAlterSize = (a: string, b: string): boolean => {
   return Math.abs(ai - bi) === 1;
 };
 const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
+const isLehenga = (name: string) => /lehenga|lehnga|ghaghra/i.test(name);
+const isBottomType = (name: string) => /bottom|pant|trouser|skirt|salwar|churidar|palazzo/i.test(name);
 
 const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { globalSearch?: string; openItemId?: string | null; onItemOpened?: () => void; active?: boolean }) => {
   const [stage, setStage] = useState<'pending' | 'completed'>('pending');
@@ -943,9 +945,10 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
   const [pendingDelete, setPendingDelete] = useState<{ id: string; timer: number } | null>(null);
 
   const handleDelete = async (itemId: string) => {
-    // Soft-hide immediately, schedule permanent delete in 5s
     const item = items.find(i => i.id === itemId);
     if (!item) return;
+    if (item.paired_with) { addToast('Cannot delete — item is paired. Unpair first.', 'error'); return; }
+    if (item.status === 'completed') { addToast('Cannot delete a completed item.', 'error'); return; }
     setItems(prev => prev.filter(i => i.id !== itemId));
     const timer = window.setTimeout(async () => {
       await supabase.from('item_tags').delete().eq('inventory_item_id', itemId);
@@ -1411,18 +1414,26 @@ const Categories = () => {
   const removeCompRow = (i: number) => setNewComps(newComps.filter((_, idx) => idx !== i));
   const updateCompRow = (i: number, val: string) => { const c = [...newComps]; c[i] = val; setNewComps(c); };
 
+  const checkCategoryInUse = async (productId: string) => {
+    const { count } = await supabase.from('inventory_items').select('id', { count: 'exact', head: true }).eq('product_id', productId);
+    return (count || 0) > 0;
+  };
+
   const addCompToExisting = async (e: React.FormEvent) => {
     e.preventDefault();
     const validComps = newComps.filter(c => c.trim());
     if (validComps.length === 0) return;
+    if (await checkCategoryInUse(selected.id)) { addToast('Cannot modify components — inventory items use this category. Delink items first.', 'error'); return; }
     const compsToInsert = validComps.map((name, i) => ({ product_id: selected.id, name: name.trim(), component_code: `C${(comps.length || 0) + i + 1}` }));
     const { error } = await supabase.from('components').insert(compsToInsert);
     if (error) { addToast(error.message, 'error'); return; }
+    await supabase.from('products').update({ total_components: (comps.length || 0) + validComps.length }).eq('id', selected.id);
     addToast(`${validComps.length} component(s) added!`, 'success');
     setNewComps(['']); fetchComps(selected.id); fetchCategories();
   };
 
   const deleteComp = async (id: string) => {
+    if (await checkCategoryInUse(selected.id)) { addToast('Cannot delete component — inventory items use this category. Delink items first.', 'error'); return; }
     const { count: compCount } = await supabase.from('components').select('id', { count: 'exact', head: true }).eq('product_id', selected.id);
     if ((compCount || 0) <= 1) { addToast('Cannot delete — category must have at least 1 component', 'error'); return; }
     const [{ count: itemCount }, { count: extraCount }] = await Promise.all([
@@ -1431,7 +1442,9 @@ const Categories = () => {
     ]);
     const refs = (itemCount || 0) + (extraCount || 0);
     if (refs > 0) { addToast(`Cannot delete — used by ${itemCount || 0} item(s) and ${extraCount || 0} extra(s)`, 'error'); return; }
-    await supabase.from('components').delete().eq('id', id); addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories();
+    await supabase.from('components').delete().eq('id', id);
+    await supabase.from('products').update({ total_components: Math.max(0, (comps.length || 1) - 1) }).eq('id', selected.id);
+    addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories();
   };
 
   const openEdit = async (p: any) => { setSelected(p); setForm({ sku: p.sku || '', name: p.name, description: p.description || '', category: p.category || '' }); setNewComps(['']); await fetchComps(p.id); setShowModal(true); };

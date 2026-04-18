@@ -20,6 +20,8 @@ const T = {
 
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', 'Semi-Stitched'];
 const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
+const isLehenga = (name: string) => /lehenga|lehnga|ghaghra/i.test(name);
+const isBottomType = (name: string) => /bottom|pant|trouser|skirt|salwar|churidar|palazzo/i.test(name);
 
 interface Extra {
   id: string; product_id: string; product_name: string;
@@ -77,13 +79,17 @@ export default function InventoryExtras() {
   const fetchExtras = useCallback(async () => {
     const { data } = await supabase.from('inventory_extras').select('*').order('updated_at', { ascending: false });
     setExtras(data || []);
-    // Compute match counts — single query instead of N+1
+    // Compute match counts — check item actually has this component missing
     const counts: Record<string, number> = {};
     const { data: unsorted } = await supabase.from('inventory_items').select('id, serial_number, size, product_id').eq('status', 'unsorted');
+    const { data: allComps } = await supabase.from('item_components').select('inventory_item_id, component_id, status');
+    const missingMap: Record<string, Set<string>> = {};
+    (allComps || []).forEach((ic: any) => { if (ic.status === 'missing' || ic.status === 'damaged') { if (!missingMap[ic.inventory_item_id]) missingMap[ic.inventory_item_id] = new Set(); missingMap[ic.inventory_item_id].add(ic.component_id); } });
     for (const ex of (data || [])) {
       counts[ex.id] = (unsorted || []).filter(it =>
         it.serial_number === ex.sku && it.product_id === ex.product_id &&
-        (ex.size === 'N/A' || !ex.size || it.size === ex.size)
+        (ex.size === 'N/A' || !ex.size || it.size === ex.size) &&
+        missingMap[it.id]?.has(ex.component_id)
       ).length;
     }
     setMatchCounts(counts);
@@ -139,8 +145,11 @@ export default function InventoryExtras() {
     let q = supabase.from('inventory_items').select('id, batch_number, serial_number, size, location, status')
       .eq('status', 'unsorted').eq('serial_number', ex.sku).eq('product_id', ex.product_id);
     if (ex.size && ex.size !== 'N/A') q = q.eq('size', ex.size);
-    const { data } = await q;
-    setMatches(data || []);
+    const { data: candidates } = await q;
+    // Filter to only items missing this specific component
+    const { data: comps } = await supabase.from('item_components').select('inventory_item_id, component_id, status').in('inventory_item_id', (candidates || []).map(c => c.id));
+    const hasMissing = new Set((comps || []).filter((c: any) => (c.status === 'missing' || c.status === 'damaged') && c.component_id === ex.component_id).map((c: any) => c.inventory_item_id));
+    setMatches((candidates || []).filter(c => hasMissing.has(c.id)));
     setMatchExtra(ex);
   };
 
@@ -149,8 +158,12 @@ export default function InventoryExtras() {
     if (!fProductId || !fComponentId || !fSku.trim() || !fSize) { setError('All fields required'); return; }
     const comp = fComps.find(c => c.id === fComponentId);
     const compIsDupatta = comp && isDupatta(comp.name);
+    const compIsLehenga = comp && isLehenga(comp.name);
+    const compIsBottom = comp && isBottomType(comp.name);
     if (compIsDupatta && fSize !== 'N/A') { setError('Dupatta must have size "N/A"'); return; }
-    if (!compIsDupatta && fSize === 'N/A') { setError('Size is required for this component (N/A only for Dupatta)'); return; }
+    if (!compIsDupatta && fSize === 'N/A') { setError('N/A is only allowed for Dupatta/Orhni/Chunni/Stole'); return; }
+    if (fSize === 'Free Size' && !compIsLehenga) { setError('Free Size is only allowed for Lehenga'); return; }
+    if (compIsBottom && (fSize === 'N/A' || fSize === 'Free Size')) { setError('Bottom/Pant requires a specific size (not N/A or Free Size)'); return; }
     const qty = parseInt(fQty) || 0;
     if (qty < 1) { setError('Initial quantity must be at least 1 (cannot be zero)'); return; }
     setSaving(true);
