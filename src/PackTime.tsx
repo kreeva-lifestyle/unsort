@@ -570,7 +570,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         <div className="table-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth', touchAction: 'pan-x pan-y' }}>
           <div style={{ minWidth: 580 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '160px 100px 55px 90px 1fr 32px', gap: 0, fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '150px 90px 50px 80px 1fr 44px', gap: 0, fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
               <div style={{ padding: '8px 10px' }}>AWB</div>
               <div style={{ padding: '8px 10px' }}>Courier</div>
               <div style={{ padding: '8px 10px' }}>Cam</div>
@@ -582,12 +582,12 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             {!historyLoading && historyData.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No records found.</div>}
             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
               {historyData.map(r => (
-                <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '160px 100px 55px 90px 1fr 32px', gap: 0, borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
+                <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '150px 90px 50px 80px 1fr 44px', gap: 0, borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
                   <div style={{ padding: '7px 10px', fontFamily: T.mono, color: T.tx, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.awb}</div>
                   <div style={{ padding: '7px 10px', color: T.tx2, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.courier}</div>
                   <div style={{ padding: '7px 10px', color: T.tx3, fontFamily: T.mono, fontSize: 10 }}>{r.camera}</div>
                   <div style={{ padding: '7px 10px', color: T.gr, fontSize: 10, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.brand || '—'}</div>
-                  <div style={{ padding: '7px 10px', color: T.tx3, fontFamily: T.mono, fontSize: 9, whiteSpace: 'nowrap' }}>{new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                  <div style={{ padding: '7px 10px', color: T.tx3, fontFamily: T.mono, fontSize: 10, whiteSpace: 'nowrap' }}>{new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
                   <div style={{ padding: '7px 4px' }}>
                     <button type="button" onClick={() => setConfirmDeleteId(r.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4 }}>
                       <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
