@@ -290,7 +290,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (!paymentMode && amountPaid > 0) { setFormError('Select a payment mode when amount is paid'); return; }
     if (editing && editing.status !== 'draft' && challanStatus === 'draft') { setFormError('Cannot revert to Draft once saved'); return; }
     if (challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(`Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
-    if (challanStatus === 'partial' && (amountPaid <= 0 || amountPaid >= grandTotal)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
+    if (!isReturn && challanStatus === 'partial' && (amountPaid <= 0 || amountPaid >= grandTotal)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
     if (challanStatus === 'unpaid' && amountPaid > 0) { setFormError('Status is "Unpaid" but amount is paid. Change status to "Paid" or "Partial"'); return; }
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -786,17 +786,26 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             <div>
               <label style={lbl}>Status</label>
               <select value={challanStatus} onChange={e => setChallanStatus(e.target.value)} style={{ ...inp, fontSize: 11 }}>
-                {(!editing || editing.status === 'draft') && <option value="draft">Draft</option>}<option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="partial">Partial</option>
+                {isReturn ? (<>
+                  {(!editing || editing.status === 'draft') && <option value="draft">Draft</option>}
+                  <option value="unpaid">Pending Refund</option>
+                  <option value="paid">Refunded</option>
+                </>) : (<>
+                  {(!editing || editing.status === 'draft') && <option value="draft">Draft</option>}
+                  <option value="unpaid">Unpaid</option>
+                  <option value="paid">Paid</option>
+                  <option value="partial">Partial</option>
+                </>)}
               </select>
             </div>
             <div>
-              <label style={lbl}>Payment Mode</label>
+              <label style={lbl}>{isReturn ? 'Refund Mode' : 'Payment Mode'}</label>
               <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)} style={{ ...inp, fontSize: 11 }}>
                 <option value="">Select...</option>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
             <div>
-              <label style={lbl}>Amount Paid</label>
+              <label style={lbl}>{isReturn ? 'Refund Amount' : 'Amount Paid'}</label>
               <input type="number" value={amountPaid || ''} onChange={e => setAmountPaid(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
             </div>
             {(challanStatus === 'paid' || challanStatus === 'partial') && (
@@ -818,7 +827,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         </div>
 
         {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: T.re, marginBottom: 8 }}>{formError}</div>}
-        <button onClick={saveChallan} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,.3)' }}>{editing ? 'Update Challan' : 'Create Challan'}</button>
+        <button onClick={saveChallan} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,.3)' }}>{editing ? (isReturn ? 'Update Return' : 'Update Challan') : (isReturn ? 'Create Return' : 'Create Challan')}</button>
       </div>
 
       {/* Audit Trail Modal (also accessible from edit form) */}
