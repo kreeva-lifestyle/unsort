@@ -2196,6 +2196,7 @@ const getTabFromHash = () => {
 };
 
 const MainApp = () => {
+  const { profile } = useAuth();
   const [tab, setTabState] = useState(getTabFromHash);
   const [globalSearch, setGlobalSearch] = useState('');
   const [notifItemId, setNotifItemId] = useState<string | null>(null);
