@@ -103,6 +103,7 @@ function enqueueWrite(rows: unknown[][], sheetName: string) {
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', (e) => {
     if (writeQueue.length > 0) {
+      flushing = false;
       const pending = writeQueue.splice(0);
       for (const item of pending) {
         navigator.sendBeacon(EDGE_FN, new Blob([JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName })], { type: 'application/json' }));
@@ -200,6 +201,18 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   useEffect(() => { if (started && !cameraOpen) focusInput(); }, [started, cameraOpen, focusInput]);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 400); return () => clearTimeout(t); } }, [flash]);
   useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 1500); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
+
+  // Single interval to check sync status for all pending scans
+  useEffect(() => {
+    if (!started) return;
+    const interval = setInterval(() => {
+      if (writeQueue.length === 0 && !flushing) {
+        setRecentScans(p => { const hasP = p.some(s => s.pending); return hasP ? p.map(s => s.pending ? { ...s, pending: false } : s) : p; });
+        setPendingWrites(0);
+      } else { setPendingWrites(writeQueue.length); }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [started]);
 
   // ── Camera scanner (barcode-detector ZXing-WASM polyfill — works on all browsers) ──
   const submitRef = useRef<(awb: string) => void>(() => {});
@@ -380,18 +393,6 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       setPendingWrites(p => p + 1);
     });
 
-    // Mark as synced — bounded check (max 10s)
-    let syncChecks = 0;
-    const checkSync = () => {
-      syncChecks++;
-      if (writeQueue.length === 0 && !flushing) {
-        setRecentScans(p => p.map(s => s.awb === trimmed && s.pending ? { ...s, pending: false } : s));
-        setPendingWrites(0);
-      } else if (syncChecks < 20) { setTimeout(checkSync, 500); }
-      else { setRecentScans(p => p.map(s => s.awb === trimmed && s.pending ? { ...s, pending: false } : s)); }
-    };
-    setTimeout(checkSync, 1000);
-
     focusInput();
   }, [camera, courier, courierSheet, courierBrand, focusInput]);
 
@@ -484,7 +485,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   }, [showHistory]);
 
   const deleteHistoryScan = async (id: string) => {
-    const { data: record } = await supabase.from('packtime_scans').select('awb, sheet_name').eq('id', id).maybeSingle();
+    const record = historyData.find(r => r.id === id);
     if (record && record.sheet_name) {
       try {
         const resp = await fetch(EDGE_FN, {
