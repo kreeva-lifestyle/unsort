@@ -18,7 +18,8 @@ const T = {
   sora: "'Sora', 'Inter', sans-serif",
 };
 
-const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
+const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', 'Semi-Stitched'];
+const isDupatta = (name: string) => /dupatt?a/i.test(name);
 
 interface Extra {
   id: string; product_id: string; product_name: string;
@@ -52,6 +53,8 @@ export default function InventoryExtras() {
   const [fProductId, setFProductId] = useState('');
   const [fComponentId, setFComponentId] = useState('');
   const [fSku, setFSku] = useState('');
+  const [fSkuSuggestions, setFSkuSuggestions] = useState<string[]>([]);
+  const [showSkuDrop, setShowSkuDrop] = useState(false);
   const [fSize, setFSize] = useState('');
   const [fQty, setFQty] = useState('1');
   const [fNotes, setFNotes] = useState('');
@@ -102,11 +105,28 @@ export default function InventoryExtras() {
     return () => { supabase.removeChannel(ch); };
   }, [fetchExtras, historyExtra]);
 
+  // SKU autocomplete
+  const searchSkus = useCallback(async (q: string) => {
+    if (q.length < 2) { setFSkuSuggestions([]); return; }
+    const { data } = await supabase.from('inventory_items').select('serial_number').ilike('serial_number', `%${q}%`).limit(10);
+    const unique = [...new Set((data || []).map((r: any) => r.serial_number).filter(Boolean))];
+    setFSkuSuggestions(unique);
+    setShowSkuDrop(unique.length > 0);
+  }, []);
+
   // Load components when product selected in Add form
   useEffect(() => {
     if (!fProductId) { setFComps([]); return; }
     supabase.from('components').select('*').eq('product_id', fProductId).order('name').then(({ data }) => setFComps(data || []));
   }, [fProductId]);
+
+  // Auto-set size for dupatta components
+  useEffect(() => {
+    if (!fComponentId) return;
+    const comp = fComps.find(c => c.id === fComponentId);
+    if (comp && isDupatta(comp.name)) setFSize('N/A');
+    else if (fSize === 'N/A') setFSize('');
+  }, [fComponentId, fComps, fSize]);
 
   const loadHistory = async (extraId: string) => {
     const { data } = await supabase.from('inventory_extras_history').select('*').eq('extra_id', extraId).order('created_at', { ascending: false });
@@ -123,6 +143,10 @@ export default function InventoryExtras() {
   const addExtra = async () => {
     setError('');
     if (!fProductId || !fComponentId || !fSku.trim() || !fSize) { setError('All fields required'); return; }
+    const comp = fComps.find(c => c.id === fComponentId);
+    const compIsDupatta = comp && isDupatta(comp.name);
+    if (compIsDupatta && fSize !== 'N/A') { setError('Dupatta must have size "N/A"'); return; }
+    if (!compIsDupatta && fSize === 'N/A') { setError('Size is required for this component (N/A only for Dupatta)'); return; }
     const qty = parseInt(fQty) || 0;
     if (qty < 1) { setError('Quantity must be at least 1'); return; }
     setSaving(true);
@@ -290,13 +314,16 @@ export default function InventoryExtras() {
               </select>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-              <div>
+              <div style={{ position: 'relative' }}>
                 <label style={label}>SKU *</label>
-                <input value={fSku} onChange={e => setFSku(e.target.value)} placeholder="e.g. SW-1234" style={{ ...input, fontFamily: T.mono }} />
+                <input value={fSku} onChange={e => { setFSku(e.target.value); searchSkus(e.target.value); }} onFocus={() => { if (fSkuSuggestions.length > 0) setShowSkuDrop(true); }} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. SW-1234" style={{ ...input, fontFamily: T.mono }} autoComplete="off" />
+                {showSkuDrop && fSkuSuggestions.length > 0 && <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: 6, maxHeight: 140, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 20px rgba(0,0,0,.3)' }}>
+                  {fSkuSuggestions.map(s => <div key={s} onMouseDown={() => { setFSku(s); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}` }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>{s}</div>)}
+                </div>}
               </div>
               <div>
-                <label style={label}>Size</label>
-                <select value={fSize} onChange={e => setFSize(e.target.value)} style={input}>
+                <label style={label}>Size {(() => { const c = fComps.find(x => x.id === fComponentId); return c && isDupatta(c.name) ? '(N/A for Dupatta)' : '*'; })()}</label>
+                <select value={fSize} onChange={e => setFSize(e.target.value)} style={input} disabled={!!fComponentId && isDupatta(fComps.find(c => c.id === fComponentId)?.name || '')}>
                   <option value="">Select size...</option>
                   {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
