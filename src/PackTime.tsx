@@ -382,7 +382,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── Undo last scan (removes from local + Google Sheet) ──────────────────────
   const undoLast = useCallback(() => {
-    if (!lastScanned) return;
+    if (!lastScanned || writeQueue.length > 0) return;
     const awb = lastScanned;
     const key = awb.toUpperCase();
     awbSetRef.current.delete(key);
@@ -463,7 +463,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   }, [showHistory]);
 
   const deleteHistoryScan = async (id: string) => {
-    const record = historyData.find(r => r.id === id);
+    const { data: record } = await supabase.from('packtime_scans').select('awb, sheet_name').eq('id', id).maybeSingle();
     if (record && record.sheet_name) {
       try {
         const resp = await fetch(EDGE_FN, {
