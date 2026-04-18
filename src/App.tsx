@@ -549,56 +549,193 @@ const Dashboard = () => {
   const { profile } = useAuth();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const [stats, setStats] = useState<any>({ total_products: 0, total_inventory: 0, damaged_count: 0, unsorted_count: 0, complete_count: 0, open_reports: 0 });
+  const [pulse, setPulse] = useState({ scans: 0, revenue: 0, unsorted: 0, cashInHand: 0 });
+  const [alerts, setAlerts] = useState({ overdue: [] as any[], dryClean: [] as any[], pendingHandovers: 0 });
+  const [invBreakdown, setInvBreakdown] = useState<Record<string, number>>({});
+  const [topCustomers, setTopCustomers] = useState<{ name: string; outstanding: number }[]>([]);
+  const [scanTrend, setScanTrend] = useState<{ date: string; count: number }[]>([]);
+  const [revTrend, setRevTrend] = useState<{ date: string; amount: number }[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [newTask, setNewTask] = useState('');
-  const refreshStats = () => { supabase.from('dashboard_summary').select('*').limit(1).then(({ data }) => { if (data && data[0]) setStats(data[0]); }); };
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayISO = today.toISOString();
+
+  const fetchAll = useCallback(async () => {
+    const [{ data: scans }, { data: challans }, { data: items }, { data: expenses }, { data: handovers }, { data: balances }] = await Promise.all([
+      supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).gte('scanned_at', todayISO),
+      supabase.from('cash_challans').select('total, amount_paid, status, is_return, customer_name, created_at').neq('status', 'voided').neq('status', 'draft'),
+      supabase.from('inventory_items').select('status, status_changed_at'),
+      supabase.from('cash_expenses').select('amount').gte('date', today.toISOString().slice(0,10)),
+      supabase.from('cash_handovers').select('amount, status, date'),
+      supabase.from('cash_book_balances').select('opening_balance').eq('date', today.toISOString().slice(0,10)).maybeSingle(),
+    ]);
+
+    // Pulse
+    const todayChallans = (challans || []).filter(c => new Date(c.created_at) >= today);
+    const todayRev = todayChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
+    const unsortedCount = (items || []).filter(i => i.status === 'unsorted').length;
+    const opening = Number(balances?.opening_balance || 0);
+    const cashSales = todayChallans.filter(c => !(c as any).is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
+    const cashReturns = todayChallans.filter(c => (c as any).is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
+    const totalExp = (expenses || []).reduce((s, e) => s + Number(e.amount), 0);
+    const confirmedHand = (handovers || []).filter(h => h.status === 'confirmed' && h.date === today.toISOString().slice(0,10)).reduce((s, h) => s + Number(h.amount), 0);
+    setPulse({ scans: scans as any || 0, revenue: Math.round(todayRev), unsorted: unsortedCount, cashInHand: Math.round(opening + cashSales - cashReturns - totalExp - confirmedHand) });
+
+    // Alerts
+    const sevenDaysAgo = Date.now() - 7 * 86400000;
+    const overdue = (challans || []).filter(c => !c.is_return && (c.status === 'unpaid' || c.status === 'partial') && new Date(c.created_at).getTime() < sevenDaysAgo)
+      .map(c => ({ name: c.customer_name, amount: Number(c.total) - Number(c.amount_paid || 0), days: Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) }));
+    const dryClean = (items || []).filter(i => i.status === 'dry_clean').map(i => ({ days: Math.floor((Date.now() - new Date(i.status_changed_at || Date.now()).getTime()) / 86400000) }));
+    const pendHand = (handovers || []).filter(h => h.status === 'pending').length;
+    setAlerts({ overdue, dryClean, pendingHandovers: pendHand });
+
+    // Inventory breakdown
+    const breakdown: Record<string, number> = {};
+    (items || []).forEach(i => { breakdown[i.status] = (breakdown[i.status] || 0) + 1; });
+    setInvBreakdown(breakdown);
+
+    // Top 5 customers
+    const custMap: Record<string, number> = {};
+    (challans || []).filter(c => !c.is_return && (c.status === 'unpaid' || c.status === 'partial')).forEach(c => {
+      custMap[c.customer_name] = (custMap[c.customer_name] || 0) + (Number(c.total) - Number(c.amount_paid || 0));
+    });
+    setTopCustomers(Object.entries(custMap).map(([name, outstanding]) => ({ name, outstanding })).sort((a, b) => b.outstanding - a.outstanding).slice(0, 5));
+
+    // Scan trend (7 days)
+    const { data: scanData } = await supabase.from('packtime_scans').select('scanned_at').gte('scanned_at', new Date(Date.now() - 7 * 86400000).toISOString());
+    const scanByDay: Record<string, number> = {};
+    for (let d = 6; d >= 0; d--) { const dt = new Date(Date.now() - d * 86400000); scanByDay[dt.toISOString().slice(0,10)] = 0; }
+    (scanData || []).forEach(s => { const d = new Date(s.scanned_at).toISOString().slice(0,10); if (scanByDay[d] !== undefined) scanByDay[d]++; });
+    setScanTrend(Object.entries(scanByDay).map(([date, count]) => ({ date, count })));
+
+    // Revenue trend (30 days)
+    const revByDay: Record<string, number> = {};
+    for (let d = 29; d >= 0; d--) { const dt = new Date(Date.now() - d * 86400000); revByDay[dt.toISOString().slice(0,10)] = 0; }
+    (challans || []).forEach(c => { const d = new Date(c.created_at).toISOString().slice(0,10); if (revByDay[d] !== undefined) revByDay[d] += ((c as any).is_return ? -1 : 1) * Number(c.amount_paid || 0); });
+    setRevTrend(Object.entries(revByDay).map(([date, amount]) => ({ date, amount: Math.round(amount) })));
+  }, []);
+
   const fetchTasks = () => { supabase.from('tasks').select('*').order('created_at', { ascending: false }).then(({ data }) => setTasks(data || [])); };
 
   useEffect(() => {
-    refreshStats(); fetchTasks();
+    fetchAll(); fetchTasks();
     const ch = supabase.channel('dash-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, refreshStats)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, refreshStats)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'damage_reports' }, refreshStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'packtime_scans' }, fetchAll)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, fetchTasks)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addTask = async (e: React.FormEvent) => { e.preventDefault(); if (!newTask.trim()) return; await supabase.from('tasks').insert({ title: newTask.trim(), created_by: profile?.id }); setNewTask(''); fetchTasks(); };
   const toggleTask = async (id: string, done: boolean) => { await supabase.from('tasks').update({ is_done: !done }).eq('id', id); fetchTasks(); };
   const deleteTask = async (id: string) => { await supabase.from('tasks').delete().eq('id', id); fetchTasks(); };
 
-  const cards = [
-    { label: 'Categories', value: stats.total_products, color: T.ac },
-    { label: 'Total items', value: stats.total_inventory, color: T.bl },
-    { label: 'Unsorted', value: stats.unsorted_count, color: T.yl },
-    { label: 'Damaged', value: stats.damaged_count, color: T.re },
-    { label: 'Dry clean', value: stats.dry_clean_count || 0, color: '#06b6d4' },
-    { label: 'Complete', value: stats.complete_count, color: T.gr },
-    { label: 'Completed', value: stats.completed_count || 0, color: '#10b981' },
-  ];
+  const maxScan = Math.max(...scanTrend.map(s => s.count), 1);
+  const maxRev = Math.max(...revTrend.map(r => r.amount), 1);
+  const statusColors: Record<string, string> = { unsorted: T.yl, damaged: T.re, dry_clean: '#06b6d4', complete: T.gr, completed: '#10b981' };
 
   return (
-    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease', position: 'relative' }}>
-      {/* Ambient glow */}
-      <div style={{ position: 'absolute', top: -60, right: -40, width: 250, height: 250, background: `radial-gradient(circle, ${T.ac}12 0%, transparent 70%)`, pointerEvents: 'none', zIndex: 0 }} />
-      <div style={{ position: 'relative', zIndex: 1 }}>
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease', paddingBottom: 80 }}>
       <div style={{ marginBottom: 14 }}>
         <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>{greeting}, {profile?.full_name?.split(' ')[0] || 'there'}</h2>
-        <p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3 }}>Here's your overview for today</p>
+        <p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3 }}>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</p>
       </div>
-      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 14 }}>
-        {cards.map((c, i) => (
-          <div key={i} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', transition: 'transform .2s, box-shadow .2s', cursor: 'default', position: 'relative', overflow: 'hidden', backdropFilter: 'blur(8px)' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 8px 24px ${c.color}18`; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+
+      {/* Row 1: Today's Pulse */}
+      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
+        {[
+          { label: "Today's Scans", value: pulse.scans, color: T.ac, prefix: '' },
+          { label: "Today's Revenue", value: pulse.revenue, color: T.gr, prefix: '₹' },
+          { label: 'Unsorted Items', value: pulse.unsorted, color: T.yl, prefix: '' },
+          { label: 'Cash in Hand', value: pulse.cashInHand, color: T.bl, prefix: '₹' },
+        ].map((c, i) => (
+          <div key={i} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${c.color}cc, ${c.color}33)` }} />
-            <p style={{ fontSize: 9, color: T.tx3, letterSpacing: 0.8, marginBottom: 5, fontWeight: 600, textTransform: 'uppercase' }}>{c.label}</p>
-            <p style={{ fontFamily: T.sora, fontSize: 24, fontWeight: 700, color: c.color, margin: 0, letterSpacing: -0.5 }}>{c.value}</p>
+            <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, marginBottom: 4, fontWeight: 600, textTransform: 'uppercase' }}>{c.label}</p>
+            <p style={{ fontFamily: T.sora, fontSize: 20, fontWeight: 700, color: c.color, margin: 0 }}>{c.prefix}{c.value.toLocaleString('en-IN')}</p>
           </div>
         ))}
       </div>
-      {/* Tasker */}
+
+      {/* Row 2: Alerts */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
+        <div style={{ background: alerts.overdue.length > 0 ? 'rgba(239,68,68,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.overdue.length > 0 ? 'rgba(239,68,68,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
+          <p style={{ fontSize: 8, color: alerts.overdue.length > 0 ? T.re : T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Overdue Payments</p>
+          <p style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: alerts.overdue.length > 0 ? T.re : T.tx3, margin: 0 }}>{alerts.overdue.length}</p>
+          {alerts.overdue.slice(0, 2).map((o, i) => <p key={i} style={{ fontSize: 9, color: T.tx3, margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}: ₹{o.amount.toLocaleString('en-IN')} ({o.days}d)</p>)}
+        </div>
+        <div style={{ background: alerts.dryClean.length > 0 ? 'rgba(6,182,212,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.dryClean.length > 0 ? 'rgba(6,182,212,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
+          <p style={{ fontSize: 8, color: '#06b6d4', letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>In Dry Clean</p>
+          <p style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: '#06b6d4', margin: 0 }}>{alerts.dryClean.length}</p>
+          {alerts.dryClean.length > 0 && <p style={{ fontSize: 9, color: T.tx3, margin: '3px 0 0' }}>Avg {Math.round(alerts.dryClean.reduce((s, d) => s + d.days, 0) / alerts.dryClean.length)} days</p>}
+        </div>
+        <div style={{ background: alerts.pendingHandovers > 0 ? 'rgba(245,158,11,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.pendingHandovers > 0 ? 'rgba(245,158,11,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
+          <p style={{ fontSize: 8, color: T.yl, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Pending Handovers</p>
+          <p style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: alerts.pendingHandovers > 0 ? T.yl : T.tx3, margin: 0 }}>{alerts.pendingHandovers}</p>
+        </div>
+      </div>
+
+      {/* Row 3: Trends */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+        {/* Scan Trend 7d */}
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
+          <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Scans — Last 7 Days</p>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 60 }}>
+            {scanTrend.map((s, i) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <span style={{ fontSize: 8, color: T.tx3, fontFamily: T.mono }}>{s.count}</span>
+                <div style={{ width: '100%', background: `linear-gradient(180deg, ${T.ac}cc, ${T.ac}44)`, borderRadius: 3, height: Math.max(4, (s.count / maxScan) * 50) }} />
+                <span style={{ fontSize: 7, color: T.tx3 }}>{new Date(s.date).toLocaleDateString('en-IN', { day: '2-digit' })}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Revenue Trend 30d */}
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
+          <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Revenue — Last 30 Days</p>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1, height: 60 }}>
+            {revTrend.map((r, i) => (
+              <div key={i} style={{ flex: 1, background: r.amount >= 0 ? `${T.gr}88` : `${T.re}88`, borderRadius: 2, height: Math.max(2, (Math.abs(r.amount) / maxRev) * 50) }} title={`${r.date}: ₹${r.amount}`} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+        {/* Inventory Breakdown */}
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
+          <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Inventory Breakdown</p>
+          {Object.entries(invBreakdown).map(([status, count]) => {
+            const total = Object.values(invBreakdown).reduce((a, b) => a + b, 0) || 1;
+            return (
+              <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 9, color: T.tx2, width: 65, textTransform: 'capitalize' }}>{status.replace('_', ' ')}</span>
+                <div style={{ flex: 1, background: T.s2, borderRadius: 3, height: 8, overflow: 'hidden' }}>
+                  <div style={{ width: `${(count / total) * 100}%`, height: '100%', background: statusColors[status] || T.tx3, borderRadius: 3 }} />
+                </div>
+                <span style={{ fontSize: 9, fontFamily: T.mono, color: statusColors[status] || T.tx3, width: 28, textAlign: 'right' }}>{count}</span>
+              </div>
+            );
+          })}
+        </div>
+        {/* Top 5 Customers Outstanding */}
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
+          <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Top Outstanding</p>
+          {topCustomers.length === 0 && <p style={{ fontSize: 10, color: T.tx3 }}>No outstanding dues</p>}
+          {topCustomers.map((c, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: `1px solid ${T.bd}` }}>
+              <span style={{ fontSize: 10, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{c.name}</span>
+              <span style={{ fontSize: 10, fontFamily: T.mono, color: T.re, fontWeight: 600, flexShrink: 0 }}>₹{c.outstanding.toLocaleString('en-IN')}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Row 4: Tasks */}
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         <div style={{ padding: '10px 14px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Tasks</span>
@@ -608,7 +745,7 @@ const Dashboard = () => {
           <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Add a task..." style={{ ...S.fInput, flex: 1 }} />
           <button type="submit" style={S.btnPrimary}>Add</button>
         </form>
-        <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+        <div style={{ maxHeight: 200, overflowY: 'auto' }}>
           {tasks.map(t => (
             <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: `1px solid ${T.bd}`, opacity: t.is_done ? 0.45 : 1 }}>
               <div onClick={() => toggleTask(t.id, t.is_done)} style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${t.is_done ? T.gr : T.bd2}`, background: t.is_done ? T.gr : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#000', fontWeight: 700, flexShrink: 0 }}>{t.is_done && '✓'}</div>
@@ -618,7 +755,6 @@ const Dashboard = () => {
           ))}
           {tasks.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: T.tx3, fontSize: 10 }}>No tasks yet</div>}
         </div>
-      </div>
       </div>
     </div>
   );
@@ -1604,310 +1740,6 @@ const Locations = () => {
         ))}
         {locations.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No locations yet. Add your first location above.</div>}
       </div>
-    </div>
-  );
-};
-
-const _Reports = () => {
-  const [reports, setReports] = useState<any[]>([]);
-  const [items, setItems] = useState<any[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const { profile } = useAuth();
-  const { addToast } = useNotifications();
-  const [form, setForm] = useState({ inventory_item_id: '', damage_type: '', cause: '', estimated_loss: '' });
-
-  const fetchData = () => {
-    supabase.from('damage_reports').select('*, inventory_items(*, products(name, sku)), profiles:reported_by(full_name)').order('created_at', { ascending: false }).then(({ data }) => setReports(data || []));
-    supabase.from('inventory_items').select('*, products(name, sku)').in('status', ['damaged', 'unsorted']).then(({ data }) => setItems(data || []));
-  };
-  useEffect(() => {
-    fetchData();
-    const ch = supabase.channel('rep-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'damage_reports' }, fetchData).subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); const { error } = await supabase.from('damage_reports').insert({ ...form, estimated_loss: form.estimated_loss ? parseFloat(form.estimated_loss) : null, reported_by: profile?.id }); if (error) addToast(error.message, 'error'); else { addToast('Created!', 'success'); setShowModal(false); setForm({ inventory_item_id: '', damage_type: '', cause: '', estimated_loss: '' }); fetchData(); } };
-
-  const updateStatus = async (id: string, status: string) => { await supabase.from('damage_reports').update({ status }).eq('id', id); addToast('Updated!', 'success'); fetchData(); };
-
-  const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
-
-  const reportStatusTag = (status: string) => {
-    const m: Record<string, { bg: string; color: string; bd: string }> = {
-      open: { bg: 'rgba(239,68,68,0.10)', color: '#FCA5A5', bd: 'rgba(239,68,68,0.25)' },
-      investigating: { bg: 'rgba(245,158,11,0.10)', color: '#FCD34D', bd: 'rgba(245,158,11,0.25)' },
-      resolved: { bg: 'rgba(34,197,94,0.10)', color: '#4ADE80', bd: 'rgba(34,197,94,0.25)' },
-      closed: { bg: T.glass2, color: T.tx3, bd: T.bd },
-    };
-    const s = m[status] || m.open;
-    return { display: 'inline-block' as const, padding: '2px 7px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: s.bg, color: s.color, border: `1px solid ${s.bd}`, textTransform: 'uppercase' as const, letterSpacing: '0.05em' };
-  };
-
-  return (
-    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Damage Reports</span>{canEdit && <div onClick={() => setShowModal(true)} style={S.btnPrimary}>+ New Report</div>}</div>
-      {reports.map((r) => (<div key={r.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '12px 14px', marginBottom: 8, transition: 'border-color .15s' }} onMouseEnter={e => e.currentTarget.style.borderColor = T.bd2} onMouseLeave={e => e.currentTarget.style.borderColor = T.bd}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><div><span style={{ fontFamily: T.mono, color: T.ac, fontSize: 10, fontWeight: 500 }}>{r.report_number}</span><span style={{ marginLeft: 6, ...reportStatusTag(r.status) }}>{r.status}</span><h3 style={{ margin: '4px 0 0', fontSize: 12, fontWeight: 600, color: T.tx }}>{r.inventory_items?.products?.name}</h3></div>{canEdit && <select value={r.status} onChange={(e) => updateStatus(r.id, e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '4px 8px', cursor: 'pointer', height: 'fit-content', fontSize: 10 }}><option value="open">Open</option><option value="investigating">Investigating</option><option value="resolved">Resolved</option></select>}</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}><div><p style={{ margin: 0, color: T.tx3, fontSize: 9, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>Type</p><p style={{ margin: '3px 0 0', fontSize: 11, color: T.tx }}>{r.damage_type}</p></div><div><p style={{ margin: 0, color: T.tx3, fontSize: 9, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>Cause</p><p style={{ margin: '3px 0 0', fontSize: 11, color: T.tx }}>{r.cause || '-'}</p></div><div><p style={{ margin: 0, color: T.tx3, fontSize: 9, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>Est. Loss</p><p style={{ margin: '3px 0 0', fontSize: 11, fontFamily: T.mono, color: r.estimated_loss ? T.re : T.tx3 }}>{r.estimated_loss ? `₹${r.estimated_loss.toLocaleString()}` : '-'}</p></div></div></div>))}
-      {reports.length === 0 && <div style={{ textAlign: 'center', padding: 36, color: T.tx3, fontSize: 11 }}>No reports</div>}
-
-      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>New Report</span><span onClick={() => setShowModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span></div><form onSubmit={handleSubmit} style={{ padding: 16 }}><div style={{ marginBottom: 10 }}><label style={S.fLabel}>Item *</label><select value={form.inventory_item_id} onChange={(e) => setForm({ ...form, inventory_item_id: e.target.value })} required style={S.fInput}><option value="">Select</option>{items.map((i) => <option key={i.id} value={i.id}>{i.products?.name}</option>)}</select></div><div style={{ marginBottom: 10 }}><label style={S.fLabel}>Damage Type *</label><input value={form.damage_type} onChange={(e) => setForm({ ...form, damage_type: e.target.value })} required placeholder="e.g. Tear, Stain, Broken" style={S.fInput} /></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}><div><label style={S.fLabel}>Cause</label><input value={form.cause} onChange={(e) => setForm({ ...form, cause: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Est. Loss (₹)</label><input type="number" value={form.estimated_loss} onChange={(e) => setForm({ ...form, estimated_loss: e.target.value })} placeholder="0" style={S.fInput} /></div></div><div style={{ padding: '12px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 7 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>Submit</button></div></form></div></div>)}
-    </div>
-  );
-};
-
-const Users = () => {
-  const [users, setUsers] = useState<any[]>([]);
-  const [showInvite, setShowInvite] = useState(false);
-  const [inviting, setInviting] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', password: '', role: 'viewer' });
-  const [inviteResult, setInviteResult] = useState<{ email: string; password: string } | null>(null);
-  const [pinExists, setPinExists] = useState(false);
-  const [pinLength, setPinLength] = useState(0);
-  const [editingPin, setEditingPin] = useState(false);
-  const [newPin, setNewPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
-  const [pinError, setPinError] = useState('');
-  const [pinSaving, setPinSaving] = useState(false);
-  const [myPhone, setMyPhone] = useState('');
-  const [phoneEditing, setPhoneEditing] = useState(false);
-  const [phoneInput, setPhoneInput] = useState('');
-  const [phoneSaving, setPhoneSaving] = useState(false);
-  const { profile } = useAuth();
-  const { addToast } = useNotifications();
-
-  const loadPin = useCallback(async () => {
-    if (!profile?.id) return;
-    const { data } = await supabase.from('profiles').select('cash_pin, phone').eq('id', profile.id).maybeSingle();
-    const pin = data?.cash_pin || '';
-    setPinExists(!!pin);
-    setPinLength(pin.length);
-    setMyPhone(data?.phone || '');
-  }, [profile?.id]);
-
-  useEffect(() => { loadPin(); }, [loadPin]);
-
-  const savePhone = async () => {
-    const cleaned = phoneInput.replace(/\D/g, '');
-    if (cleaned.length !== 10) { addToast('Phone must be 10 digits', 'error'); return; }
-    setPhoneSaving(true);
-    const { error } = await supabase.from('profiles').update({ phone: cleaned }).eq('id', profile.id);
-    setPhoneSaving(false);
-    if (error) { addToast('Save failed: ' + error.message, 'error'); return; }
-    setMyPhone(cleaned);
-    setPhoneEditing(false);
-    addToast('Phone saved', 'success');
-  };
-
-  const saveMyPin = async () => {
-    setPinError('');
-    if (newPin.length < 4 || newPin.length > 6) { setPinError('PIN must be 4-6 digits'); return; }
-    if (!/^\d+$/.test(newPin)) { setPinError('PIN must be digits only'); return; }
-    if (newPin !== confirmPin) { setPinError('PINs do not match'); return; }
-    setPinSaving(true);
-    const { error } = await supabase.from('profiles').update({ cash_pin: newPin }).eq('id', profile.id);
-    setPinSaving(false);
-    if (error) { setPinError('Save failed: ' + error.message); return; }
-    setNewPin(''); setConfirmPin(''); setEditingPin(false);
-    await loadPin();
-    addToast('Cash PIN saved successfully', 'success');
-  };
-
-  const removePin = async () => {
-    if (!confirm('Remove your Cash PIN? You will not be able to confirm cash handovers without it.')) return;
-    await supabase.from('profiles').update({ cash_pin: null }).eq('id', profile.id);
-    await loadPin();
-    addToast('Cash PIN removed', 'success');
-  };
-
-  const fetchUsers = () => { supabase.from('profiles').select('*').order('created_at', { ascending: false }).then(({ data }) => setUsers(data || [])); };
-  useEffect(() => {
-    fetchUsers();
-    const ch = supabase.channel('usr-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fetchUsers).subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []);
-
-  const updateRole = async (id: string, role: string) => { const { error } = await supabase.from('profiles').update({ role }).eq('id', id); if (error) addToast('Failed: ' + error.message, 'error'); else { addToast('Role updated!', 'success'); fetchUsers(); } };
-  const toggleActive = async (id: string, isActive: boolean) => { await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id); addToast(isActive ? 'Access revoked' : 'Access granted', 'success'); fetchUsers(); };
-
-  const generatePassword = () => {
-    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
-    let pwd = '';
-    for (let i = 0; i < 12; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
-    return pwd;
-  };
-
-  const handleInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setInviting(true);
-    const password = inviteForm.password || generatePassword();
-    const { data, error } = await supabase.auth.signUp({
-      email: inviteForm.email,
-      password,
-      options: { data: { full_name: inviteForm.full_name } }
-    });
-    if (error) {
-      addToast(error.message, 'error');
-      setInviting(false);
-      return;
-    }
-    // Auto-confirm email + update role
-    if (data.user) {
-      await supabase.rpc('confirm_user_email', { target_user_id: data.user.id });
-      if (inviteForm.role !== 'viewer') {
-        await supabase.from('profiles').update({ role: inviteForm.role }).eq('id', data.user.id);
-      }
-    }
-    setInviteResult({ email: inviteForm.email, password });
-    addToast(`User ${inviteForm.full_name} invited!`, 'success');
-    setInviting(false);
-    fetchUsers();
-  };
-
-  const closeInvite = () => {
-    setShowInvite(false);
-    setInviteResult(null);
-    setInviteForm({ email: '', full_name: '', password: '', role: 'viewer' });
-  };
-
-  return (
-    <div>
-      {/* My Phone — required for WhatsApp notifications */}
-      <div style={{ background: 'rgba(34,197,94,.05)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 8, padding: 14, marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: T.gr, fontFamily: T.sora }}>My Phone Number</div>
-          {!phoneEditing && (myPhone.length === 10 ? (
-            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,.12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase' }}>✓ Saved</span>
-          ) : (
-            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>Required</span>
-          ))}
-        </div>
-        <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10 }}>Required to receive WhatsApp notifications for cash handovers and payment alerts.</div>
-
-        {!phoneEditing ? (
-          // Read-only display + Edit button
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-            {myPhone.length === 10 ? (
-              <span style={{ fontFamily: T.mono, fontSize: 16, color: T.tx, fontWeight: 600, letterSpacing: 1 }}>+91 {myPhone.slice(0, 5)} {myPhone.slice(5)}</span>
-            ) : (
-              <span style={{ fontSize: 11, color: T.tx3, fontStyle: 'italic' }}>No phone number saved</span>
-            )}
-            <button onClick={() => { setPhoneInput(myPhone); setPhoneEditing(true); }} style={S.btnPrimary}>{myPhone.length === 10 ? 'Edit' : 'Add Phone'}</button>
-          </div>
-        ) : (
-          // Edit mode: input + Save + Cancel
-          <div style={{ display: 'flex', gap: 6 }}>
-            <input type="tel" inputMode="numeric" value={phoneInput} onChange={e => setPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="9876543210" autoFocus style={{ ...S.fInput, fontFamily: T.mono, flex: 1, maxWidth: 220, fontSize: 13 }} />
-            <button onClick={savePhone} disabled={phoneSaving} style={{ ...S.btnPrimary, opacity: phoneSaving ? 0.6 : 1 }}>{phoneSaving ? 'Saving...' : 'Save'}</button>
-            <button onClick={() => { setPhoneEditing(false); setPhoneInput(''); }} style={S.btnGhost}>Cancel</button>
-          </div>
-        )}
-      </div>
-
-      {/* My Cash PIN — for confirming cash handovers */}
-      <div style={{ background: 'rgba(245,158,11,.05)', border: '1px solid rgba(245,158,11,.15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: T.yl, fontFamily: T.sora }}>My Cash PIN</div>
-          {!editingPin && (pinExists ? (
-            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,.12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>✓ Saved</span>
-          ) : (
-            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Not Set</span>
-          ))}
-        </div>
-        <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10 }}>Required to sign cash handovers received from accountant. 4-6 digits.</div>
-
-        {!editingPin ? (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-            {pinExists ? (
-              <span style={{ fontFamily: T.mono, fontSize: 16, color: T.tx, fontWeight: 600, letterSpacing: 6 }}>{'•'.repeat(pinLength)}</span>
-            ) : (
-              <span style={{ fontSize: 11, color: T.tx3, fontStyle: 'italic' }}>No PIN configured</span>
-            )}
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={() => { setEditingPin(true); setNewPin(''); setConfirmPin(''); setPinError(''); }} style={S.btnPrimary}>{pinExists ? 'Edit' : 'Set PIN'}</button>
-              {pinExists && <button onClick={removePin} style={S.btnDanger}>Remove</button>}
-            </div>
-          </div>
-        ) : (
-          <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-              <div>
-                <label style={{ ...S.fLabel, marginBottom: 3 }}>{pinExists ? 'New PIN' : 'PIN'}</label>
-                <input type="password" value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••" inputMode="numeric" autoFocus style={{ ...S.fInput, fontFamily: T.mono, letterSpacing: 4, textAlign: 'center', fontSize: 14 }} />
-              </div>
-              <div>
-                <label style={{ ...S.fLabel, marginBottom: 3 }}>Confirm PIN</label>
-                <input type="password" value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••" inputMode="numeric" style={{ ...S.fInput, fontFamily: T.mono, letterSpacing: 4, textAlign: 'center', fontSize: 14 }} />
-              </div>
-            </div>
-            {pinError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '5px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{pinError}</div>}
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={saveMyPin} disabled={pinSaving} style={{ ...S.btnPrimary, opacity: pinSaving ? 0.6 : 1 }}>{pinSaving ? 'Saving...' : 'Save PIN'}</button>
-              <button onClick={() => { setEditingPin(false); setNewPin(''); setConfirmPin(''); setPinError(''); }} style={S.btnGhost}>Cancel</button>
-            </div>
-          </div>
-        )}
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Users</span>
-        <div onClick={() => setShowInvite(true)} style={S.btnPrimary}>+ Invite User</div>
-      </div>
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>{['User', 'Role', 'Status', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
-          <tbody>{users.map((u) => (
-            <tr key={u.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.015)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-              <td style={S.tdStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 26, height: 26, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{(u.full_name || u.email || '?')[0].toUpperCase()}</div>
-                  <div><p style={{ margin: 0, fontWeight: 600, fontSize: 11, color: T.tx }}>{u.full_name || 'Unnamed'}</p><p style={{ margin: '1px 0 0', fontSize: 10, color: T.tx3 }}>{u.email}</p></div>
-                </div>
-              </td>
-              <td style={S.tdStyle}><select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} disabled={u.id === profile?.id} style={{ ...S.fInput, width: 'auto', minWidth: 90, padding: '4px 8px', cursor: u.id === profile?.id ? 'not-allowed' : 'pointer', opacity: u.id === profile?.id ? 0.5 : 1, fontSize: 10 }}><option value="admin">Admin</option><option value="manager">Manager</option><option value="operator">Operator</option><option value="viewer">Viewer</option></select></td>
-              <td style={S.tdStyle}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, ...(u.is_active ? { background: 'rgba(45,212,160,.10)', color: T.gr } : { background: 'rgba(245,87,92,.10)', color: T.re }) }}>{u.is_active ? 'Active' : 'Inactive'}</span></td>
-              <td style={S.tdStyle}>{u.id !== profile?.id && <span onClick={() => toggleActive(u.id, u.is_active)} style={{ padding: '4px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 600, fontFamily: T.sans, display: 'inline-block', ...(u.is_active ? { background: 'rgba(245,87,92,.08)', color: T.re, border: '1px solid rgba(245,87,92,.18)' } : { background: 'rgba(45,212,160,.08)', color: T.gr, border: '1px solid rgba(45,212,160,.18)' }) }}>{u.is_active ? 'Revoke' : 'Grant'}</span>}</td>
-            </tr>
-          ))}</tbody>
-        </table>
-      </div>
-
-      {showInvite && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}>
-        <div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Invite New User</span></div>
-        {inviteResult ? (
-          <div style={{ padding: 16 }}>
-            <div style={{ background: 'rgba(45,212,160,.06)', border: '1px solid rgba(45,212,160,.18)', borderRadius: T.r, padding: 12, marginBottom: 12 }}>
-              <p style={{ fontSize: 11, fontWeight: 600, color: T.gr, margin: '0 0 4px' }}>User invited successfully!</p>
-              <p style={{ fontSize: 10, color: T.tx2, margin: 0 }}>Share these credentials with the user:</p>
-            </div>
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 12 }}>
-              <div style={{ marginBottom: 10 }}>
-                <p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 3 }}>Email</p>
-                <p style={{ fontSize: 12, fontFamily: T.mono, color: T.tx, margin: 0, userSelect: 'all' as const }}>{inviteResult.email}</p>
-              </div>
-              <div>
-                <p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 3 }}>Password</p>
-                <p style={{ fontSize: 12, fontFamily: T.mono, color: T.ac, margin: 0, userSelect: 'all' as const }}>{inviteResult.password}</p>
-              </div>
-            </div>
-            <p style={{ fontSize: 10, color: T.tx3, marginTop: 10, textAlign: 'center' }}>The user should change their password after first login</p>
-            <div style={{ padding: '12px 0 0', display: 'flex', justifyContent: 'flex-end' }}>
-              <div onClick={closeInvite} style={S.btnPrimary}>Done</div>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={handleInvite} style={{ padding: 16 }}>
-            <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Full Name *</label><input value={inviteForm.full_name} onChange={(e) => setInviteForm({ ...inviteForm, full_name: e.target.value })} required placeholder="e.g. Mahesh Dhameliya" style={S.fInput} /></div>
-            <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Email *</label><input type="email" value={inviteForm.email} onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })} required placeholder="user@aryadesigns.co.in" style={S.fInput} /></div>
-            <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-              <div><label style={S.fLabel}>Password</label><input value={inviteForm.password} onChange={(e) => setInviteForm({ ...inviteForm, password: e.target.value })} placeholder="Auto-generate if empty" style={S.fInput} /></div>
-              <div><label style={S.fLabel}>Role</label><select value={inviteForm.role} onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })} style={S.fInput}><option value="viewer">Viewer</option><option value="operator">Operator</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>
-            </div>
-            <div style={{ background: 'rgba(99,102,241,.05)', border: `1px solid rgba(99,102,241,.15)`, borderRadius: T.r, padding: '8px 12px', fontSize: 10, color: T.ac2, marginBottom: 12 }}>The user will be created with the credentials above. Share the email and password with them so they can sign in.</div>
-            <div style={{ padding: '12px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 7 }}>
-              <span onClick={closeInvite} style={S.btnGhost}>Cancel</span>
-              <button type="submit" disabled={inviting} style={S.btnPrimary}>{inviting ? 'Creating...' : 'Create & Invite'}</button>
-            </div>
-          </form>
-        )}
-      </div></div>)}
     </div>
   );
 };
