@@ -512,6 +512,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (Number((c as any).shipping_charges) > 0) w.document.write(`<p>Shipping/Porter: +${Number((c as any).shipping_charges).toFixed(2)}</p>`);
     if (Number(c.round_off) !== 0) w.document.write(`<p>Round Off: ${Number(c.round_off).toFixed(2)}</p>`);
     w.document.write(`<p style="font-size:16px;font-weight:700">Total: ₹${Number(c.total).toFixed(2)}</p></div>`);
+    const statusLabel = (c as any).is_return ? (c.status === 'paid' ? 'Refunded' : 'Pending Refund') : c.status.charAt(0).toUpperCase() + c.status.slice(1);
+    const statusColor = c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : c.status === 'draft' ? '#0c5460' : '#721c24';
+    const statusBg = c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : c.status === 'draft' ? '#d1ecf1' : '#f8d7da';
+    w.document.write(`<div style="margin:12px 0;padding:10px 14px;border-radius:6px;background:${statusBg};display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;color:${statusColor};font-size:13px">Status: ${statusLabel}</span>`);
+    if (Number(c.amount_paid) > 0) w.document.write(`<span style="font-size:12px;color:${statusColor}">${(c as any).is_return ? 'Refunded' : 'Paid'}: ₹${Number(c.amount_paid).toFixed(2)}${c.payment_mode ? ' (' + c.payment_mode + ')' : ''}</span>`);
+    if (c.status !== 'paid' && c.status !== 'draft' && !((c as any).is_return)) { const due = Number(c.total) - Number(c.amount_paid || 0); w.document.write(`<span style="font-size:12px;color:#721c24;font-weight:600">Due: ₹${due.toFixed(2)}</span>`); }
+    w.document.write(`</div>`);
     if (c.notes) w.document.write(`<p style="font-size:11px;color:#666;margin-top:12px"><strong>Notes:</strong> ${c.notes}</p>`);
     w.document.write(`<hr><p style="text-align:center;font-size:10px;color:#999">Powered by DailyOffice</p></body></html>`);
     w.document.close();

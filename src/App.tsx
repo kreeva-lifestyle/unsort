@@ -117,6 +117,17 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => { await supabase.auth.signOut(); };
 
+  // Session timeout — auto-logout after 30 min of inactivity
+  useEffect(() => {
+    if (!user) return;
+    let timer: any;
+    const resetTimer = () => { clearTimeout(timer); timer = setTimeout(() => { supabase.auth.signOut(); }, 30 * 60 * 1000); };
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }));
+    resetTimer();
+    return () => { clearTimeout(timer); events.forEach(e => window.removeEventListener(e, resetTimer)); };
+  }, [user]);
+
   return <AuthContext.Provider value={{ user, profile, loading, ready, signIn, signUp, signOut }}>{children}</AuthContext.Provider>;
 };
 
@@ -245,7 +256,6 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
   const tabs = [
     { id: 'dashboard', icon: 'grid', label: 'Dashboard' },
     { id: 'inventory', icon: 'box', label: 'Inventory' },
-    { id: 'reports', icon: 'file', label: 'Reports' },
     { id: 'brandtag', icon: 'tag', label: 'Brand Tags' },
     { id: 'packtime', icon: 'scan', label: 'PackStation' },
     { id: 'challan', icon: 'file', label: 'Cash Challan' },
@@ -2060,7 +2070,7 @@ const PackTimeSettings = () => {
   );
 };
 
-const VALID_TABS = ['dashboard', 'inventory', 'reports', 'brandtag', 'packtime', 'challan', 'settings'];
+const VALID_TABS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'settings'];
 const getTabFromHash = () => {
   const h = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   return VALID_TABS.includes(h) ? h : 'dashboard';
@@ -2096,7 +2106,7 @@ const MainApp = () => {
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', reports: 'Reports', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', settings: 'Settings' };
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', settings: 'Settings' };
   const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
@@ -2136,7 +2146,7 @@ const MainApp = () => {
       <main style={{ flex: 1, overflow: 'auto' }}>
         {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard /></div>}
         {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
-        {mounted.has('reports') && <div style={{ display: tab === 'reports' ? 'block' : 'none' }}><Reports /></div>}
+
         {mounted.has('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
         {mounted.has('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime active={tab === 'packtime'} /></div>}
         {mounted.has('challan') && <div style={{ display: tab === 'challan' ? 'block' : 'none' }}><CashChallan active={tab === 'challan'} /></div>}
