@@ -288,7 +288,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       // Check cumulative returns — fetch all previous returns for this source
       const { data: prevReturns } = await supabase.from('cash_challans').select('id').eq('source_challan_id', returnSource.id).eq('is_return', true).neq('status', 'voided');
       const prevReturnIds = (prevReturns || []).map((r: any) => r.id).filter((id: string) => !editing || id !== editing.id);
-      let prevQtyMap: Record<string, number> = {};
+      const prevQtyMap: Record<string, number> = {};
       if (prevReturnIds.length > 0) {
         const { data: prevItems } = await supabase.from('cash_challan_items').select('sku, quantity').in('challan_id', prevReturnIds);
         (prevItems || []).forEach((pi: any) => { prevQtyMap[pi.sku] = (prevQtyMap[pi.sku] || 0) + pi.quantity; });
