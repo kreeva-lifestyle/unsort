@@ -1701,6 +1701,10 @@ const Locations = () => {
   };
 
   const deleteLocation = async (id: string) => {
+    if (!confirm('Delete this location?')) return;
+    const loc = locations.find(l => l.id === id);
+    const { count } = await supabase.from('inventory_items').select('id', { count: 'exact', head: true }).eq('location', loc?.name);
+    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} item(s) use this location`, 'error'); return; }
     const { error } = await supabase.from('locations').delete().eq('id', id);
     if (error) addToast(error.message, 'error');
     else { addToast('Deleted!', 'success'); fetchLocations(); }
@@ -2038,7 +2042,15 @@ const BrandsSettings = () => {
     else { addToast('Brand added!', 'success'); setNewBrand(''); fetchBrands(); }
   };
   const toggleBrand = async (id: string, active: boolean) => { await supabase.from('brands').update({ is_active: !active }).eq('id', id); fetchBrands(); };
-  const deleteBrand = async (id: string) => { await supabase.from('brands').delete().eq('id', id); addToast('Brand removed', 'success'); fetchBrands(); };
+  const deleteBrand = async (id: string) => {
+    if (!confirm('Delete this brand?')) return;
+    const b = brands.find(x => x.id === id);
+    const { count } = await supabase.from('packtime_couriers').select('id', { count: 'exact', head: true }).eq('brand', b?.name);
+    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} courier(s) use this brand`, 'error'); return; }
+    const { error } = await supabase.from('brands').delete().eq('id', id);
+    if (error) addToast(error.message, 'error');
+    else { addToast('Brand removed', 'success'); fetchBrands(); }
+  };
   return (
     <div>
       <h3 style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: T.tx }}>Brands</h3>
@@ -2091,8 +2103,13 @@ const PackTimeSettings = () => {
   };
 
   const deleteCourier = async (id: string) => {
-    await supabase.from('packtime_couriers').delete().eq('id', id);
-    addToast('Courier removed', 'success'); fetchData();
+    if (!confirm('Delete this courier?')) return;
+    const c = couriers.find(x => x.id === id);
+    const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('courier', c?.name);
+    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this courier`, 'error'); return; }
+    const { error } = await supabase.from('packtime_couriers').delete().eq('id', id);
+    if (error) addToast(error.message, 'error');
+    else { addToast('Courier removed', 'success'); fetchData(); }
   };
 
   const addCamera = async (e: React.FormEvent) => {
@@ -2104,8 +2121,13 @@ const PackTimeSettings = () => {
   };
 
   const deleteCamera = async (id: string) => {
-    await supabase.from('packtime_cameras').delete().eq('id', id);
-    addToast('Camera removed', 'success'); fetchData();
+    if (!confirm('Delete this camera?')) return;
+    const cam = cameras.find(x => x.id === id);
+    const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('camera', cam?.number);
+    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this camera`, 'error'); return; }
+    const { error } = await supabase.from('packtime_cameras').delete().eq('id', id);
+    if (error) addToast(error.message, 'error');
+    else { addToast('Camera removed', 'success'); fetchData(); }
   };
 
   return (
