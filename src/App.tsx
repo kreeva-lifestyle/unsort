@@ -1235,7 +1235,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
         const pairItems = pairIds.map(pid => items.find(i => i.id === pid)).filter(Boolean);
         const selectedPair = showCompleteModal.pairId ? items.find(i => i.id === showCompleteModal.pairId) : null;
 
-        return (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 540 }}>
+        return (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 540, maxWidth: '100%' }}>
           <div style={{ ...S.modalHead, background: 'rgba(16,185,129,.06)', borderBottom: '1px solid rgba(16,185,129,.2)' }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: '#10b981' }}>Complete Product</span>
           </div>
@@ -1293,7 +1293,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
       </div>}
 
       {/* Smart Intel Modal */}
-      {showIntel && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 580 }}>
+      {showIntel && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 580, maxWidth: '100%' }}>
         <div style={{ ...S.modalHead, background: 'rgba(251,191,36,.06)', borderBottom: '1px solid rgba(251,191,36,.2)' }}>
           <div>
             <span style={{ fontSize: 14, fontWeight: 600, color: T.yl }}>Smart Intel</span>

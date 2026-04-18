@@ -39,7 +39,7 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   paid: { bg: 'rgba(34,197,94,.10)', color: T.gr },
   unpaid: { bg: 'rgba(239,68,68,.10)', color: T.re },
   partial: { bg: 'rgba(245,158,11,.10)', color: T.yl },
-  voided: { bg: 'rgba(255,255,255,.05)', color: T.tx3 },
+  voided: { bg: 'rgba(255,255,255,.10)', color: T.tx3 },
 };
 
 const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Other'];
@@ -546,7 +546,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         <input type="date" value={analyticsTo} onChange={e => setAnalyticsTo(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }} />
         <button onClick={fetchAnalytics} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
+      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
         <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
           <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Net Revenue</div>
           <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.gr }}>₹{analytics.totalRevenue.toLocaleString('en-IN')}</div>
@@ -662,7 +662,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
               </div>
             </div>
           ))}
-          {ledgerCustomers.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No customers found.</div>}
+          {ledgerCustomers.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 12 }}>No customers found. Search by name or click "Load More" below.</div>}
           <button onClick={() => { const newLimit = ledgerFetchLimit + 500; setLedgerFetchLimit(newLimit); fetchLedger(newLimit); }} style={{ width: '100%', padding: '8px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer', borderRadius: '0 0 8px 8px' }}>Load More Customers</button>
         </div>
       </div>
@@ -787,7 +787,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           </div>
 
           {/* Status + Payment */}
-          <div style={{ display: 'grid', gridTemplateColumns: (challanStatus === 'paid' || challanStatus === 'partial') ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
             <div>
               <label style={lbl}>Status</label>
               <select value={challanStatus} onChange={e => setChallanStatus(e.target.value)} style={{ ...inp, fontSize: 11 }}>
@@ -813,12 +813,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
               <label style={lbl}>{isReturn ? 'Refund Amount' : 'Amount Paid'}</label>
               <input type="number" value={amountPaid || ''} onChange={e => setAmountPaid(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
             </div>
-            {(challanStatus === 'paid' || challanStatus === 'partial') && (
-              <div>
-                <label style={lbl}>Payment Date</label>
-                <input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} style={{ ...inp, fontSize: 11 }} />
-              </div>
-            )}
+            <div>
+              <label style={lbl}>{isReturn ? 'Refund Date' : 'Payment Date'}</label>
+              <input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} style={{ ...inp, fontSize: 11 }} />
+            </div>
           </div>
         </div>
 
@@ -831,7 +829,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}><span>Total</span><span>₹{grandTotal.toLocaleString('en-IN')}</span></div>
         </div>
 
-        {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: T.re, marginBottom: 8 }}>{formError}</div>}
+        {formError && <div style={{ background: 'rgba(239,68,68,.15)', borderLeft: `4px solid ${T.re}`, borderRadius: 6, padding: '10px 14px', fontSize: 11, color: T.tx, marginBottom: 8 }}>{formError}</div>}
         <button onClick={saveChallan} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,.3)' }}>{editing ? (isReturn ? 'Update Return' : 'Update Challan') : (isReturn ? 'Create Return' : 'Create Challan')}</button>
       </div>
 

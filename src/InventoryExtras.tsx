@@ -297,9 +297,9 @@ export default function InventoryExtras() {
                   ) : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
                 </td>
                 <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...btnGhost, padding: '3px 8px', fontSize: 9, cursor: 'pointer', color: T.gr, borderColor: 'rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Add</span>{' '}
-                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...btnGhost, padding: '3px 8px', fontSize: 9, cursor: 'pointer', color: T.re, borderColor: 'rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Remove</span>{' '}
-                  <span onClick={() => { setHistoryExtra(ex); loadHistory(ex.id); }} style={{ ...btnGhost, padding: '3px 8px', fontSize: 9, cursor: 'pointer' }}>History</span>
+                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...btnGhost, padding: '5px 10px', fontSize: 10, cursor: 'pointer', color: T.gr, borderColor: 'rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Add</span>{' '}
+                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...btnGhost, padding: '5px 10px', fontSize: 10, cursor: 'pointer', color: T.re, borderColor: 'rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Remove</span>{' '}
+                  <span onClick={() => { setHistoryExtra(ex); loadHistory(ex.id); }} style={{ ...btnGhost, padding: '5px 10px', fontSize: 10, cursor: 'pointer' }}>History</span>
                 </td>
               </tr>
             ))}
