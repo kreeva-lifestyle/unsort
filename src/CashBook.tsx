@@ -277,7 +277,7 @@ export default function CashBook() {
       status: 'confirmed',
       confirmed_at: new Date().toISOString(),
       to_user_id: user.id,
-      to_user_name: prof.full_name || user.email || confirmingHandover.to_user_name,
+      to_user_name: confirmingHandover.to_user_name || user.email || 'User',
     }).eq('id', confirmingHandover.id);
     setConfirmingHandover(null); setConfirmPin('');
     fetchData();
