@@ -297,7 +297,10 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       const data = await resp.json();
       setVerifyResult(data);
       if (data.ok && data.columnsOk !== false) {
-        awbSetRef.current = new Set((data.awbs || []).map((a: string) => a.trim().toUpperCase()));
+        const sheetAwbs = (data.awbs || []).map((a: string) => a.trim().toUpperCase());
+        const { data: dbScans } = await supabase.from('packtime_scans').select('awb').eq('sheet_name', c.sheet_name);
+        const dbAwbs = (dbScans || []).map((r: any) => r.awb.trim().toUpperCase());
+        awbSetRef.current = new Set([...sheetAwbs, ...dbAwbs]);
         rowCountRef.current = data.totalRows || 0;
         setSheetTotal(data.totalRows || 0);
         sessionIdRef.current = crypto.randomUUID();
@@ -352,11 +355,12 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     const scanRow = { session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
     supabase.from('packtime_scans').insert(scanRow).then(({ error }) => {
       if (error) {
+        if (error.code === '23505') { console.warn('PackStation: duplicate AWB in DB, skipping'); return; }
         console.error('PackStation DB insert failed:', error.message, error.code);
         setDbFails(p => p + 1);
         setTimeout(() => {
           supabase.from('packtime_scans').insert(scanRow).then(({ error: e2 }) => {
-            if (!e2) setDbFails(p => Math.max(0, p - 1));
+            if (!e2 || e2.code === '23505') setDbFails(p => Math.max(0, p - 1));
             else console.error('PackStation DB retry failed:', e2.message);
           });
         }, 2000);
