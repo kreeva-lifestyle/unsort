@@ -310,8 +310,11 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   };
 
   // ── Submit scan — OPTIMISTIC (instant feedback, background write) ───────────
+  const submitLockRef = useRef(false);
   const submitAwb = useCallback((awb: string) => {
-    if (!awb) return;
+    if (!awb || submitLockRef.current) return;
+    submitLockRef.current = true;
+    setTimeout(() => { submitLockRef.current = false; }, 300);
     const trimmed = awb.trim().slice(0, 100);
     if (!trimmed || /[\x00-\x1f]/.test(trimmed)) return;
     const key = trimmed.toUpperCase();
@@ -438,7 +441,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
     let query = supabase.from('packtime_scans').select('*', { count: 'exact' });
-    if (historySearch) query = query.ilike('awb', `%${historySearch}%`);
+    if (historySearch) query = query.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
     if (historyFilterCourier) query = query.eq('courier', historyFilterCourier);
     if (historyFilterBrand) query = query.eq('brand', historyFilterBrand);
     query = query.order('scanned_at', { ascending: false }).range(historyPage * historyPageSize, (historyPage + 1) * historyPageSize - 1);
@@ -478,7 +481,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   const exportHistory = async () => {
     let query = supabase.from('packtime_scans').select('*');
-    if (historySearch) query = query.ilike('awb', `%${historySearch}%`);
+    if (historySearch) query = query.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
     if (historyFilterCourier) query = query.eq('courier', historyFilterCourier);
     if (historyFilterBrand) query = query.eq('brand', historyFilterBrand);
     const { data } = await query.order('scanned_at', { ascending: false }).limit(10000);
@@ -864,7 +867,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             </div>
             <button onClick={() => {
               const successScans = recentScans.filter(s => s.success);
-              if (successScans.length === 0) return;
+              if (successScans.length === 0) { alert('No successful scans to export'); return; }
               const csv = 'AWB,Time,Courier,Camera\n' + successScans.map(s => `${s.awb},${s.time},${courier},${camera}`).join('\n');
               const blob = new Blob([csv], { type: 'text/csv' });
               const url = URL.createObjectURL(blob);
