@@ -42,6 +42,7 @@ export default function CashBook() {
   const [description, setDescription] = useState('');
   const [formError, setFormError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [pendingExpDel, setPendingExpDel] = useState<{ id: string; timer: number } | null>(null);
   // Handover form
   const [showHandover, setShowHandover] = useState(false);
   const [handAmount, setHandAmount] = useState('');
@@ -284,10 +285,14 @@ export default function CashBook() {
   };
 
   const deleteExpense = async (id: string) => {
-    await supabase.from('cash_expenses').delete().eq('id', id);
     setConfirmDelete(null);
-    fetchData();
+    setExpenses(prev => prev.filter(e => e.id !== id));
+    if (pendingExpDel) clearTimeout(pendingExpDel.timer);
+    const timer = window.setTimeout(async () => { await supabase.from('cash_expenses').delete().eq('id', id); setPendingExpDel(null); fetchData(); }, 5000);
+    setPendingExpDel({ id, timer });
   };
+  const undoExpDel = () => { if (pendingExpDel) { clearTimeout(pendingExpDel.timer); setPendingExpDel(null); fetchData(); } };
+  const dismissExpDel = () => { if (pendingExpDel) { clearTimeout(pendingExpDel.timer); supabase.from('cash_expenses').delete().eq('id', pendingExpDel.id).then(() => fetchData()); setPendingExpDel(null); } };
 
   const exportCSV = async () => {
     // Export expenses for selected date range
@@ -635,6 +640,10 @@ export default function CashBook() {
           </div>
         </div>
       )}
+      {pendingExpDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: '#0B0F19', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, overflow: 'hidden', minWidth: 260 }}>
+        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: '#E2E8F0', flex: 1 }}>Expense deleted</span><span onClick={undoExpDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: '#F59E0B', color: '#000' }}>Undo</span><span onClick={dismissExpDel} style={{ cursor: 'pointer', color: '#4A5568', fontSize: 14 }}>✕</span></div>
+        <div className="undo-bar" key={pendingExpDel.id} />
+      </div>}
     </div>
   );
 }
