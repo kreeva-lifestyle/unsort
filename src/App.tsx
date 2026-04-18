@@ -670,7 +670,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
   useEffect(() => { if (active) setShowExtras(false); }, [active]);
 
   const fetchData = () => {
-    supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).then(({ data }) => setItems(data || []));
+    supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).limit(5000).then(({ data }) => setItems(data || []));
     supabase.from('products').select('*').eq('is_active', true).then(({ data }) => setProducts(data || []));
     supabase.from('locations').select('*').order('name').then(({ data }) => setLocations(data || []));
     supabase.from('tags').select('*').order('name').then(({ data }) => setTags(data || []));
@@ -705,7 +705,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
   // Compute all completable pairs: must match category + SKU + size
   useEffect(() => {
     if (items.length === 0) return;
-    const unsorted = items.filter(i => i.status === 'unsorted');
+    const unsorted = items.filter(i => i.status === 'unsorted').slice(0, 500);
     const pairs: Record<string, string[]> = {};
     for (const a of unsorted) {
       const aPresent = itemPresent[a.id];
@@ -861,7 +861,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
     if (hasDupatta && !hasNonDupatta && form.size && form.size !== 'N/A' && form.size !== '') {
       addToast('Dupatta-only items must have size N/A or empty', 'error'); return;
     }
-    if (form.status === 'unsorted' && catComps.length > 0 && missingComps.size === 0 && damagedComps.size === 0) {
+    if (!selected && form.status === 'unsorted' && catComps.length > 0 && missingComps.size === 0 && damagedComps.size === 0) {
       addToast('All components are present — status should be "Complete" not "Unsorted"', 'error'); return;
     }
     if (form.status === 'unsorted' && catComps.length > 0 && missingComps.size === catComps.length) {
@@ -967,13 +967,12 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
     const [{ data: aComps }, { data: bComps }, { data: prod }] = await Promise.all([
       supabase.from('item_components').select('component_id, status').eq('inventory_item_id', itemId),
       supabase.from('item_components').select('component_id, status').eq('inventory_item_id', pairId),
-      supabase.from('inventory_items').select('product_id').eq('id', itemId).maybeSingle(),
+      supabase.from('inventory_items').select('product_id, products(total_components)').eq('id', itemId).maybeSingle() as any,
     ]);
     const aP = new Set((aComps || []).filter(c => c.status === 'present').map(c => c.component_id));
     const bP = new Set((bComps || []).filter(c => c.status === 'present').map(c => c.component_id));
     const union = new Set([...aP, ...bP]);
-    const prodData = prod?.product_id ? products.find(p => p.id === prod.product_id) : null;
-    const total = prodData?.total_components || 0;
+    const total = (prod as any)?.products?.total_components || 0;
     if (total > 0 && union.size < total) { addToast('Cannot complete — combined components do not cover all required parts. Data may have changed.', 'error'); setShowCompleteModal(null); fetchData(); return; }
     const { error: e1 } = await supabase.from('inventory_items').update({ status: 'completed', paired_with: pairId }).eq('id', itemId);
     const { error: e2 } = await supabase.from('inventory_items').update({ status: 'completed', paired_with: itemId }).eq('id', pairId);
@@ -1421,12 +1420,13 @@ const Categories = () => {
   };
 
   const deleteComp = async (id: string) => {
+    if (comps.length <= 1) { addToast('Cannot delete — category must have at least 1 component', 'error'); return; }
     const [{ count: itemCount }, { count: extraCount }] = await Promise.all([
       supabase.from('item_components').select('id', { count: 'exact', head: true }).eq('component_id', id),
       supabase.from('inventory_extras').select('id', { count: 'exact', head: true }).eq('component_id', id),
     ]);
-    const total = (itemCount || 0) + (extraCount || 0);
-    if (total > 0) { addToast(`Cannot delete — used by ${itemCount || 0} item(s) and ${extraCount || 0} extra(s)`, 'error'); return; }
+    const refs = (itemCount || 0) + (extraCount || 0);
+    if (refs > 0) { addToast(`Cannot delete — used by ${itemCount || 0} item(s) and ${extraCount || 0} extra(s)`, 'error'); return; }
     await supabase.from('components').delete().eq('id', id); addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories();
   };
 
