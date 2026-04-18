@@ -197,7 +197,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   // ── Focus ───────────────────────────────────────────────────────────────────
   const focusInput = useCallback(() => { setTimeout(() => inputRef.current?.focus(), 50); }, []);
   useEffect(() => { if (started && !cameraOpen) focusInput(); }, [started, cameraOpen, focusInput]);
-  useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 800); return () => clearTimeout(t); } }, [flash]);
+  useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 400); return () => clearTimeout(t); } }, [flash]);
   useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 1500); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
 
   // ── Camera scanner (barcode-detector ZXing-WASM polyfill — works on all browsers) ──
@@ -750,7 +750,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {todaySummaryOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={() => setTodaySummaryOpen(false)}>
           <div className="modal-inner" onClick={e => e.stopPropagation()} style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '18px 16px', maxWidth: 340, width: '100%' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 12, textAlign: 'center' }}>Today's Summary</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4, textAlign: 'center' }}>Today's Summary</div>
+            <div style={{ fontSize: 9, color: T.tx3, textAlign: 'center', marginBottom: 10 }}>As of {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} · {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</div>
             {todaySummary.length === 0 && <div style={{ textAlign: 'center', color: T.tx3, fontSize: 11, padding: 16 }}>Loading...</div>}
             {todaySummary.map((s, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: `1px solid ${T.bd}` }}>
