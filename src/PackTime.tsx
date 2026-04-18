@@ -105,7 +105,7 @@ if (typeof window !== 'undefined') {
     if (writeQueue.length > 0) {
       const pending = writeQueue.splice(0);
       for (const item of pending) {
-        navigator.sendBeacon(EDGE_FN, JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName }));
+        navigator.sendBeacon(EDGE_FN, new Blob([JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName })], { type: 'application/json' }));
       }
       e.returnValue = '';
     }
@@ -158,6 +158,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const [historyFilterCourier, setHistoryFilterCourier] = useState('');
   const [historyFilterBrand, setHistoryFilterBrand] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // Local duplicate tracking
@@ -298,7 +299,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       setVerifyResult(data);
       if (data.ok && data.columnsOk !== false) {
         const sheetAwbs = (data.awbs || []).map((a: string) => a.trim().toUpperCase());
-        const { data: dbScans } = await supabase.from('packtime_scans').select('awb').eq('sheet_name', c.sheet_name);
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+        const { data: dbScans } = await supabase.from('packtime_scans').select('awb').eq('sheet_name', c.sheet_name).gte('scanned_at', thirtyDaysAgo);
         const dbAwbs = (dbScans || []).map((r: any) => r.awb.trim().toUpperCase());
         awbSetRef.current = new Set([...sheetAwbs, ...dbAwbs]);
         rowCountRef.current = data.totalRows || 0;
@@ -350,7 +352,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     const scanRow = { session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
     supabase.from('packtime_scans').insert(scanRow).then(({ error }) => {
       if (error) {
-        if (error.code === '23505') { console.warn('PackStation: duplicate AWB in DB, skipping'); return; }
+        if (error.code === '23505') {
+          console.warn('PackStation: duplicate AWB in DB, rolling back');
+          setSessionCount(p => Math.max(0, p - 1));
+          setSheetTotal(p => Math.max(0, p - 1));
+          rowCountRef.current = Math.max(0, rowCountRef.current - 1);
+          setRecentScans(p => p.map(s => s.awb === trimmed ? { ...s, success: false } : s));
+          return;
+        }
         console.error('PackStation DB insert failed:', error.message, error.code);
         setDbFails(p => p + 1);
         setTimeout(() => {
@@ -367,12 +376,15 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     enqueueWrite([row], courierSheet);
     setPendingWrites(p => p + 1);
 
-    // Mark as synced once queue is empty
+    // Mark as synced — bounded check (max 10s)
+    let syncChecks = 0;
     const checkSync = () => {
+      syncChecks++;
       if (writeQueue.length === 0 && !flushing) {
         setRecentScans(p => p.map(s => s.awb === trimmed && s.pending ? { ...s, pending: false } : s));
-        setPendingWrites(writeQueue.length);
-      } else { setTimeout(checkSync, 500); }
+        setPendingWrites(0);
+      } else if (syncChecks < 20) { setTimeout(checkSync, 500); }
+      else { setRecentScans(p => p.map(s => s.awb === trimmed && s.pending ? { ...s, pending: false } : s)); }
     };
     setTimeout(checkSync, 1000);
 
@@ -505,7 +517,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Scan History</span>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={exportHistory} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>Export CSV</button>
+          <button onClick={() => { setExporting(true); exportHistory().finally(() => setExporting(false)); }} disabled={exporting} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: exporting ? 'default' : 'pointer', fontFamily: T.sans, opacity: exporting ? 0.5 : 1 }}>{exporting ? 'Exporting...' : 'Export CSV'}</button>
         </div>
       </div>
 
