@@ -171,7 +171,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Fetch analytics ────────────────────────────────────────────────────────
   const fetchAnalytics = useCallback(async () => {
     const { data } = await supabase.from('cash_challans').select('total, payment_mode, status, is_return')
-      .gte('created_at', analyticsFrom + 'T00:00:00').lte('created_at', analyticsTo + 'T23:59:59').neq('status', 'voided');
+      .gte('created_at', new Date(analyticsFrom + 'T00:00:00').toISOString()).lte('created_at', new Date(analyticsTo + 'T23:59:59').toISOString()).neq('status', 'voided');
     // Returns reduce revenue (negative)
     const totalRevenue = (data || []).reduce((s: number, r: any) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
     const byMode: Record<string, number> = {};

@@ -197,16 +197,22 @@ export default function InventoryExtras() {
     if (extra.quantity < 1) { setError('No quantity available'); return; }
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
-    // 1. Mark inventory item complete
-    await supabase.from('inventory_items').update({ status: 'complete', updated_at: new Date().toISOString() }).eq('id', item.id);
-    // 2. Set missing component to present
-    await supabase.from('item_components').update({ status: 'present', notes: 'Filled from extras' })
-      .eq('inventory_item_id', item.id).eq('component_id', extra.component_id);
-    // 3. Decrement extra qty
+    // 1. Decrement extra qty FIRST (race-safe check)
     const newQty = extra.quantity - 1;
     const { data: updated, error: upErr } = await supabase.from('inventory_extras')
       .update({ quantity: newQty, updated_at: new Date().toISOString() }).eq('id', extra.id).gt('quantity', 0).select().single();
     if (upErr || !updated) { setError('Race condition: extra already used by another user'); setSaving(false); return; }
+    // 2. Verify item still exists and is unsorted
+    const { data: freshItem } = await supabase.from('inventory_items').select('status').eq('id', item.id).maybeSingle();
+    if (!freshItem || freshItem.status !== 'unsorted') {
+      await supabase.from('inventory_extras').update({ quantity: extra.quantity }).eq('id', extra.id);
+      setError('Item no longer available (already completed or deleted)'); setSaving(false); return;
+    }
+    // 3. Mark inventory item complete
+    await supabase.from('inventory_items').update({ status: 'complete', updated_at: new Date().toISOString() }).eq('id', item.id);
+    // 4. Set missing component to present
+    await supabase.from('item_components').update({ status: 'present', notes: 'Filled from extras' })
+      .eq('inventory_item_id', item.id).eq('component_id', extra.component_id);
     // 4. History
     await supabase.from('inventory_extras_history').insert({
       extra_id: extra.id, action: 'used', quantity_change: -1, quantity_after: newQty,

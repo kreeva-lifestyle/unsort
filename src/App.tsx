@@ -1367,10 +1367,11 @@ const Categories = () => {
       }
       addToast('Updated!', 'success');
     } else {
-      const sku = generateSku(form.name);
-      const { data, error } = await supabase.from('products').insert({ sku, name: form.name, description: form.description, category: form.category, created_by: profile?.id }).select().single();
-      if (error || !data) { addToast(error?.message || 'Error', 'error'); return; }
       const validComps = newComps.filter(c => c.trim());
+      if (validComps.length === 0) { addToast('Add at least 1 component', 'error'); return; }
+      const sku = generateSku(form.name);
+      const { data, error } = await supabase.from('products').insert({ sku, name: form.name, description: form.description, category: form.category, created_by: profile?.id, total_components: validComps.length }).select().single();
+      if (error || !data) { addToast(error?.message || 'Error', 'error'); return; }
       if (validComps.length > 0) {
         const compsToInsert = validComps.map((name, i) => ({ product_id: data.id, name: name.trim(), component_code: `C${i + 1}` }));
         await supabase.from('components').insert(compsToInsert);
@@ -1395,7 +1396,11 @@ const Categories = () => {
     setNewComps(['']); fetchComps(selected.id); fetchCategories();
   };
 
-  const deleteComp = async (id: string) => { await supabase.from('components').delete().eq('id', id); addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories(); };
+  const deleteComp = async (id: string) => {
+    const { count } = await supabase.from('item_components').select('id', { count: 'exact', head: true }).eq('component_id', id);
+    if (count && count > 0) { addToast(`Cannot delete — ${count} item(s) use this component`, 'error'); return; }
+    await supabase.from('components').delete().eq('id', id); addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories();
+  };
 
   const openEdit = async (p: any) => { setSelected(p); setForm({ sku: p.sku || '', name: p.name, description: p.description || '', category: p.category || '' }); setNewComps(['']); await fetchComps(p.id); setShowModal(true); };
   const canEdit = profile && ['admin', 'manager'].includes(profile.role);
