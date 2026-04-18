@@ -204,15 +204,18 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Fetch analytics ────────────────────────────────────────────────────────
   const fetchAnalytics = useCallback(async () => {
-    const { data } = await supabase.from('cash_challans').select('total, payment_mode, status, is_return')
-      .gte('created_at', new Date(analyticsFrom + 'T00:00:00').toISOString()).lte('created_at', new Date(analyticsTo + 'T23:59:59').toISOString()).neq('status', 'voided');
-    // Returns reduce revenue (negative)
+    const fromISO = new Date(analyticsFrom + 'T00:00:00').toISOString();
+    const toISO = new Date(analyticsTo + 'T23:59:59').toISOString();
+    const [{ data }, { count: voidedCount }] = await Promise.all([
+      supabase.from('cash_challans').select('total, payment_mode, status, is_return').gte('created_at', fromISO).lte('created_at', toISO).neq('status', 'voided'),
+      supabase.from('cash_challans').select('id', { count: 'exact', head: true }).gte('created_at', fromISO).lte('created_at', toISO).eq('status', 'voided'),
+    ]);
     const totalRevenue = (data || []).reduce((s: number, r: any) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
     const byMode: Record<string, number> = {};
     (data || []).forEach((r: any) => { const m = r.payment_mode || 'Unset'; byMode[m] = (byMode[m] || 0) + (r.is_return ? -1 : 1) * Number(r.total); });
     const salesCount = (data || []).filter((r: any) => !r.is_return).length;
     const returnsCount = (data || []).filter((r: any) => r.is_return).length;
-    setAnalytics({ totalRevenue, count: salesCount, byMode, returnsCount } as any);
+    setAnalytics({ totalRevenue, count: salesCount, byMode, returnsCount, voidedCount: voidedCount || 0 } as any);
   }, [analyticsFrom, analyticsTo]);
 
   // ── Fetch ledger (recent 10 customers) ──────────────────────────────────────
@@ -508,14 +511,22 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         <input type="date" value={analyticsTo} onChange={e => setAnalyticsTo(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }} />
         <button onClick={fetchAnalytics} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
         <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Revenue (excl. discount)</div>
-          <div style={{ fontSize: 22, fontWeight: 800, fontFamily: T.sora, color: T.gr }}>₹{analytics.totalRevenue.toLocaleString('en-IN')}</div>
+          <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Net Revenue</div>
+          <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.gr }}>₹{analytics.totalRevenue.toLocaleString('en-IN')}</div>
         </div>
         <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.12)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 8, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Challans Today</div>
-          <div style={{ fontSize: 22, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>{analytics.count}</div>
+          <div style={{ fontSize: 8, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Sales</div>
+          <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>{analytics.count}</div>
+        </div>
+        <div style={{ background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.12)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 8, color: T.re, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Returns</div>
+          <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.re }}>{(analytics as any).returnsCount || 0}</div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,.03)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px', textAlign: 'center' }}>
+          <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Voided</div>
+          <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.tx3 }}>{(analytics as any).voidedCount || 0}</div>
         </div>
       </div>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
