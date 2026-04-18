@@ -867,6 +867,12 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
     if (hasDupatta && !hasNonDupatta && form.size !== 'N/A') {
       addToast('Dupatta-only items must have size N/A', 'error'); return;
     }
+    if (form.size === 'Free Size' && !catComps.some(c => isLehenga(c.name))) {
+      addToast('Free Size is only allowed for Lehenga', 'error'); return;
+    }
+    if (catComps.some(c => isBottomType(c.name)) && (form.size === 'N/A' || form.size === 'Free Size')) {
+      addToast('Bottom/Pant requires a specific size (not N/A or Free Size)', 'error'); return;
+    }
     if (!selected && form.status === 'unsorted' && catComps.length > 0 && missingComps.size === 0 && damagedComps.size === 0) {
       addToast('All components are present — status should be "Complete" not "Unsorted"', 'error'); return;
     }
