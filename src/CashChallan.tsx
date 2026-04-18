@@ -117,7 +117,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const fetchChallans = useCallback(async () => {
     setLoading(true);
     let query = supabase.from('cash_challans').select('*, cash_challan_items(sku)', { count: 'estimated' });
-    if (search) query = query.or(`customer_name.ilike.%${search}%,challan_number.eq.${isNaN(Number(search)) ? 0 : search}`);
+    if (search) {
+      const s = search.replace(/[%_,().]/g, '');
+      const num = parseInt(s);
+      if (num && !isNaN(num)) query = query.eq('challan_number', num);
+      else if (s.trim()) query = query.ilike('customer_name', `%${s}%`);
+    }
     if (statusFilter) query = query.eq('status', statusFilter);
     if (tagFilter) query = query.contains('tags', [tagFilter]);
     query = query.order('created_at', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
@@ -170,7 +175,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const num = parseInt(q);
     let query = supabase.from('cash_challans').select('*, cash_challan_items(*)').eq('is_return', false).neq('status', 'voided');
     if (num && !isNaN(num)) query = query.eq('challan_number', num);
-    else query = query.ilike('customer_name', `%${q}%`);
+    else query = query.ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
     const { data } = await query.order('created_at', { ascending: false }).limit(10);
     setReturnResults(data || []);
   }, []);
@@ -191,7 +196,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Customer auto-suggest ──────────────────────────────────────────────────
   const searchCustomers = useCallback(async (q: string) => {
     if (q.length < 2) { setCustomerSuggestions([]); return; }
-    const { data } = await supabase.from('cash_challan_customers').select('*').ilike('name', `%${q}%`).limit(5);
+    const { data } = await supabase.from('cash_challan_customers').select('*').ilike('name', `%${q.replace(/[%_]/g, '\\$&')}%`).limit(5);
     setCustomerSuggestions(data || []);
     // Auto-fill phone if exact match found (case-insensitive)
     const exact = (data || []).find((c: any) => c.name.toLowerCase() === q.trim().toLowerCase());
@@ -238,7 +243,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   const searchLedgerCustomer = useCallback(async (q: string) => {
     if (!q.trim()) { fetchLedger(); return; }
-    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return').neq('status', 'voided').ilike('customer_name', `%${q}%`);
+    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return').neq('status', 'voided').ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
     const map: Record<string, { total: number; paid: number; count: number }> = {};
     (data || []).forEach((r: any) => {
       const name = r.customer_name;

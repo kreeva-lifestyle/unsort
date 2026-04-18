@@ -54,7 +54,7 @@ export default function CashBook() {
   const [handError, setHandError] = useState('');
   const [viewingHandover, setViewingHandover] = useState<Handover | null>(null);
   // Users list (for recipient dropdown)
-  const [users, setUsers] = useState<{ id: string; full_name: string; email: string; cash_pin: string | null; phone: string | null }[]>([]);
+  const [users, setUsers] = useState<{ id: string; full_name: string; email: string; has_pin: boolean; phone: string | null }[]>([]);
   const [recentHandovers, setRecentHandovers] = useState<Handover[]>([]);
   const [currentUserId, setCurrentUserId] = useState('');
   const [excludePaise, setExcludePaise] = useState(false);
@@ -90,8 +90,8 @@ export default function CashBook() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) setCurrentUserId(user.id);
-      const { data } = await supabase.from('profiles').select('id, full_name, email, cash_pin, phone').eq('is_active', true).order('full_name');
-      setUsers(data || []);
+      const { data } = await supabase.from('profiles').select('id, full_name, email, phone').eq('is_active', true).order('full_name');
+      setUsers((data || []).map((u: any) => ({ id: u.id, full_name: u.full_name, email: u.email, has_pin: true, phone: u.phone })));
     })();
   }, []);
 
@@ -172,7 +172,7 @@ export default function CashBook() {
     const recipient = users.find(u => u.id === handToId);
     if (!recipient) { setHandError('Recipient not found'); return; }
     if (handToId === currentUserId) { setHandError('Cannot hand over cash to yourself'); return; }
-    if (!recipient.cash_pin) { setHandError(`${recipient.full_name} has no PIN set. They must set it in Settings → Users first.`); return; }
+    if (!recipient.has_pin) { setHandError(`${recipient.full_name} has no PIN set. They must set it in Settings → Users first.`); return; }
     if (!handBreakdown) { setHandError('Breakdown not loaded — try again'); return; }
     if (amt > handBreakdown.available) { setHandError(`Cannot exceed available cash: ₹${handBreakdown.available.toLocaleString('en-IN')}`); return; }
     const amountDiffers = Math.abs(amt - handBreakdown.available) > 0.01;
@@ -484,7 +484,7 @@ export default function CashBook() {
                   <option value="">Select recipient...</option>
                   {users.filter(u => u.id !== currentUserId).map(u => {
                     const issues = [];
-                    if (!u.cash_pin) issues.push('no PIN');
+                    if (!u.has_pin) issues.push('no PIN');
                     if (!u.phone) issues.push('no phone');
                     return <option key={u.id} value={u.id}>{u.full_name}{issues.length ? ` (${issues.join(', ')})` : ''}</option>;
                   })}
