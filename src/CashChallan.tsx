@@ -306,7 +306,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         const { data: newCust, error: insErr } = await supabase.from('cash_challan_customers').insert({ name: trimmed, phone: customerPhone.trim() || null }).select('id').single();
         if (insErr && insErr.code === '23505') {
           // Race: another user just created this customer — fetch them
-          const { data: raceCust } = await supabase.from('cash_challan_customers').select('id').ilike('name', trimmed).single();
+          const { data: raceCust } = await supabase.from('cash_challan_customers').select('id').ilike('name', trimmed).maybeSingle();
           custId = raceCust?.id || null;
           if (custId && customerPhone.trim()) await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId);
         } else {
@@ -361,7 +361,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Void challan ───────────────────────────────────────────────────────────
   const voidChallan = async (id: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total').eq('id', id).single();
+    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total').eq('id', id).maybeSingle();
     await supabase.from('cash_challans').update({ status: 'voided', voided_by: user?.id, voided_at: new Date().toISOString() }).eq('id', id);
     if (before) ccAudit('VOID', `Challan #${before.challan_number} (${before.customer_name}) voided - was ₹${before.total}`);
     fetchChallans();
