@@ -1608,7 +1608,7 @@ const Locations = () => {
   );
 };
 
-const Reports = () => {
+const _Reports = () => {
   const [reports, setReports] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
