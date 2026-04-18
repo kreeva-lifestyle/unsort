@@ -181,6 +181,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   }, []);
 
   const selectReturnSource = (challan: any) => {
+    if (challan.status === 'voided') { setReturnResults([]); return; }
+    if (challan.is_return) { setReturnResults([]); return; }
     setReturnSource(challan);
     setReturnResults([]);
     setReturnSearchQ('');
@@ -259,7 +261,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const fetchLedgerDetail = useCallback(async (name: string) => {
     setLedgerDetail(name);
     window.history.pushState({ view: 'ledger-detail' }, '');
-    const { data } = await supabase.from('cash_challans').select('*').eq('customer_name', name).neq('status', 'voided').order('created_at', { ascending: false }).limit(500);
+    const { data } = await supabase.from('cash_challans').select('*').ilike('customer_name', name.replace(/[%_]/g, '\\$&')).neq('status', 'voided').order('created_at', { ascending: false }).limit(500);
     setLedgerChallans(data || []);
   }, []);
 
@@ -296,6 +298,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (editing && editing.status !== 'draft' && challanStatus === 'draft') { setFormError('Cannot revert to Draft once saved'); return; }
     if (challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(`Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
     if (!isReturn && challanStatus === 'partial' && (amountPaid <= 0 || amountPaid >= grandTotal)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
+    if (challanStatus === 'draft' && amountPaid > 0) { setFormError('Draft challans cannot have payment. Change status first.'); return; }
     if (challanStatus === 'unpaid' && amountPaid > 0) { setFormError('Status is "Unpaid" but amount is paid. Change status to "Paid" or "Partial"'); return; }
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -339,18 +342,18 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           setFormError('This challan was modified by another user. Please close and reopen to get latest data.');
           return;
         }
-        const { error: upErr } = await supabase.from('cash_challans').update({ ...challanData, updated_at: new Date().toISOString() }).eq('id', editing.id);
-        if (upErr) throw new Error(upErr.message);
         const { error: delErr } = await supabase.from('cash_challan_items').delete().eq('challan_id', editing.id);
         if (delErr) throw new Error(delErr.message);
         const { error: insErr2 } = await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: editing.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100, sort_order: i })));
         if (insErr2) throw new Error(insErr2.message);
+        const { error: upErr } = await supabase.from('cash_challans').update({ ...challanData, updated_at: new Date().toISOString() }).eq('id', editing.id);
+        if (upErr) throw new Error(upErr.message);
         ccAudit('UPDATE', `Challan #${editing.challan_number} updated for ${customerName.trim()} - ₹${grandTotal}`);
       } else {
         const { data: newChallan, error: crErr } = await supabase.from('cash_challans').insert({ ...challanData, created_by: user?.id }).select('id, challan_number').single();
         if (crErr || !newChallan) throw new Error(crErr?.message || 'Failed to create challan');
         const { error: itErr } = await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: newChallan.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100, sort_order: i })));
-        if (itErr) throw new Error(itErr.message);
+        if (itErr) { await supabase.from('cash_challans').delete().eq('id', newChallan.id); throw new Error(itErr.message); }
         ccAudit('CREATE', `${isReturn ? 'Return' : 'Challan'} #${newChallan.challan_number} created for ${customerName.trim()} - ₹${grandTotal}`);
       }
     } catch (e: any) {
@@ -404,8 +407,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   // ── Export customer ledger PDF ─────────────────────────────────────────────
+  const escHtml = (s: string) => s.replace(/[<>"&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', '&': '&amp;' }[c] || c));
   const exportLedgerPDF = (customerName: string) => {
     if (ledgerChallans.length === 0) return;
+    const safeName = escHtml(customerName);
     const cust = ledgerCustomers.find(c => c.name === customerName);
     const netTotal = ledgerChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.total), 0);
     const totalPaid = ledgerChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
@@ -445,7 +450,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         @media print{body{padding:12px}@page{margin:12mm}}
       </style></head><body>
       <h2>Customer Ledger</h2>
-      <div class="sub">${customerName} | Generated: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+      <div class="sub">${safeName} | Generated: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
       <div class="stats">
         <div class="stat"><div class="label">Total Billed</div><div class="val" style="color:#6366f1">₹${totalBilled.toLocaleString('en-IN')}</div></div>
         <div class="stat"><div class="label">Paid</div><div class="val" style="color:#38a169">₹${(cust?.paid || totalPaid).toLocaleString('en-IN')}</div></div>
