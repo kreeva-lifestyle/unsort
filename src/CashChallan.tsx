@@ -71,6 +71,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [challanStatus, setChallanStatus] = useState('draft');
   const [customerPhone, setCustomerPhone] = useState('');
   const [isReturn, setIsReturn] = useState(false);
+  const [returnSource, setReturnSource] = useState<any>(null);
+  const [returnSearchQ, setReturnSearchQ] = useState('');
+  const [returnResults, setReturnResults] = useState<any[]>([]);
   const [auditTrail, setAuditTrail] = useState<any[] | null>(null);
   const [reminderChallan, setReminderChallan] = useState<any | null>(null);
   const [reminderPhone, setReminderPhone] = useState('');
@@ -159,6 +162,30 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     })();
   }, []);
 
+  // ── Return source invoice search ────────────────────────────────────────────
+  const searchReturnSource = useCallback(async (q: string) => {
+    if (!q.trim()) { setReturnResults([]); return; }
+    const num = parseInt(q);
+    let query = supabase.from('cash_challans').select('*, cash_challan_items(*)').eq('is_return', false).neq('status', 'voided');
+    if (num && !isNaN(num)) query = query.eq('challan_number', num);
+    else query = query.ilike('customer_name', `%${q}%`);
+    const { data } = await query.order('created_at', { ascending: false }).limit(10);
+    setReturnResults(data || []);
+  }, []);
+
+  const selectReturnSource = (challan: any) => {
+    setReturnSource(challan);
+    setReturnResults([]);
+    setReturnSearchQ('');
+    setCustomerName(challan.customer_name);
+    setSelectedCustomerId(challan.customer_id);
+    const sourceItems = (challan.cash_challan_items || []).map((it: any) => ({
+      sku: it.sku, description: it.description, quantity: it.quantity, price: Number(it.price),
+      total: Number(it.total), discount_type: it.discount_type || 'flat', discount_value: Number(it.discount_value || 0), discount_amount: Number(it.discount_amount || 0),
+    }));
+    setItems(sourceItems);
+  };
+
   // ── Customer auto-suggest ──────────────────────────────────────────────────
   const searchCustomers = useCallback(async (q: string) => {
     if (q.length < 2) { setCustomerSuggestions([]); return; }
@@ -230,6 +257,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const saveChallan = async () => {
     setFormError('');
     if (editing && editing.status === 'voided') { setFormError('Cannot edit a voided challan'); return; }
+    if (isReturn && !editing && !returnSource) { setFormError('Select the original invoice for this return'); return; }
     if (!customerName.trim()) { setFormError('Customer name is required'); return; }
     if (items.length === 0) { setFormError('Add at least one item'); return; }
     const invalidItem = items.find(it => !it.sku.trim() || it.quantity <= 0 || it.price <= 0);
@@ -415,7 +443,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   const closeModal = () => {
-    setShowModal(false); setEditing(null); setCustomerName(''); setSelectedCustomerId(null); setCustomerPhone(''); setIsReturn(false);
+    setShowModal(false); setEditing(null); setCustomerName(''); setSelectedCustomerId(null); setCustomerPhone(''); setIsReturn(false); setReturnSource(null); setReturnSearchQ(''); setReturnResults([]);
     setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
     setShippingCharges(0); setNotes(''); setTags('');
     setPaymentMode(''); setPaymentDate(''); setAmountPaid(0); setChallanStatus('draft');
@@ -608,6 +636,36 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             <div key={String(opt.v)} onClick={() => !editing && setIsReturn(opt.v)} style={{ padding: '5px 14px', borderRadius: 4, fontSize: 10, fontWeight: isReturn === opt.v ? 600 : 400, cursor: editing ? 'not-allowed' : 'pointer', opacity: editing ? 0.6 : 1, background: isReturn === opt.v ? opt.color + '33' : 'transparent', color: isReturn === opt.v ? opt.color : T.tx3, border: isReturn === opt.v ? `1px solid ${opt.color}44` : 'none' }}>{opt.label}</div>
           ))}
         </div>
+
+        {/* Return: Select source invoice */}
+        {isReturn && !editing && !returnSource && (
+          <div style={{ background: 'rgba(239,68,68,.04)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 10, padding: 14, marginBottom: 12 }}>
+            <label style={{ ...lbl, color: T.re }}>Select Original Invoice *</label>
+            <input type="text" value={returnSearchQ} onChange={e => { setReturnSearchQ(e.target.value); searchReturnSource(e.target.value); }}
+              placeholder="Search by challan # or customer name..." style={inp} autoFocus />
+            {returnResults.length > 0 && <div style={{ marginTop: 6, border: `1px solid ${T.bd}`, borderRadius: 6, maxHeight: 200, overflowY: 'auto' }}>
+              {returnResults.map(c => (
+                <div key={c.id} onClick={() => selectReturnSource(c)} style={{ padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  <div>
+                    <span style={{ fontFamily: T.mono, fontSize: 11, color: T.ac2 }}>#{c.challan_number}</span>
+                    <span style={{ marginLeft: 8, fontSize: 11, color: T.tx }}>{c.customer_name}</span>
+                  </div>
+                  <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.tx }}>₹{Number(c.total).toLocaleString('en-IN')}</span>
+                </div>
+              ))}
+            </div>}
+          </div>
+        )}
+        {isReturn && returnSource && !editing && (
+          <div style={{ background: 'rgba(239,68,68,.04)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 10, padding: '8px 14px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span style={{ fontSize: 9, color: T.re, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>Return against</span>
+              <div style={{ fontSize: 12, color: T.tx, fontWeight: 600 }}>#{returnSource.challan_number} — {returnSource.customer_name} — ₹{Number(returnSource.total).toLocaleString('en-IN')}</div>
+            </div>
+            <span onClick={() => { setReturnSource(null); setCustomerName(''); setSelectedCustomerId(null); setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]); }} style={{ fontSize: 10, color: T.re, cursor: 'pointer', fontWeight: 600 }}>Change</span>
+          </div>
+        )}
 
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
           {/* Customer */}
