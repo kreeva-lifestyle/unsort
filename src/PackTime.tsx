@@ -39,10 +39,10 @@ if (typeof window !== 'undefined') {
   document.addEventListener('click', warmAudio);
 }
 
-function beep(freq: number, dur: number, type: OscillatorType = 'square') {
+async function beep(freq: number, dur: number, type: OscillatorType = 'square') {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    if (audioCtx.state !== 'running') audioCtx.resume();
+    if (audioCtx.state !== 'running') await audioCtx.resume();
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.connect(g); g.connect(audioCtx.destination);
     o.type = type; o.frequency.value = freq; g.gain.value = 0.3;
@@ -89,7 +89,7 @@ async function flushQueue() {
         writeQueue.unshift({ rows: batch, sheetName, retries });
         await new Promise(r => setTimeout(r, 2000));
       }
-      // Silently drop after 3 retries
+      if (retries > 3) console.error('PackStation: dropped batch after 3 retries', batch);
     }
   }
   flushing = false;
@@ -98,6 +98,18 @@ async function flushQueue() {
 function enqueueWrite(rows: unknown[][], sheetName: string) {
   writeQueue.push({ rows, sheetName, retries: 0 });
   flushQueue();
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', (e) => {
+    if (writeQueue.length > 0) {
+      const pending = writeQueue.splice(0);
+      for (const item of pending) {
+        navigator.sendBeacon(EDGE_FN, JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName }));
+      }
+      e.returnValue = '';
+    }
+  });
 }
 
 // ── Component ───────────────────────────────────────────────────────────────────
@@ -176,12 +188,16 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       setLoadingConfig(false);
       supabase.auth.getUser().then(({ data: { user } }) => { userIdRef.current = user?.id || null; });
     })();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      userIdRef.current = session?.user?.id || null;
+    });
+    return () => { subscription.unsubscribe(); };
   }, []);
 
   // ── Focus ───────────────────────────────────────────────────────────────────
   const focusInput = useCallback(() => { setTimeout(() => inputRef.current?.focus(), 50); }, []);
   useEffect(() => { if (started && !cameraOpen) focusInput(); }, [started, cameraOpen, focusInput]);
-  useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 800); return () => clearTimeout(t); } }, [flash]);
+  useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 400); return () => clearTimeout(t); } }, [flash]);
   useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 1500); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
 
   // ── Camera scanner (barcode-detector ZXing-WASM polyfill — works on all browsers) ──
@@ -237,7 +253,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           const loop = async () => {
             if (scanLockRef.current || !streamRef.current) return;
             try {
-              const results = await detector.detect(video);
+              const results = await Promise.race([detector.detect(video), new Promise<any[]>(r => setTimeout(() => r([]), 3000))]);
               if (results.length > 0) {
                 const code = results[0].rawValue?.trim();
                 if (code && code.length >= 4 && !scanLockRef.current) {
@@ -253,13 +269,13 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                 }
               }
             } catch {}
-            scanTimerRef.current = requestAnimationFrame(loop);
+            if (streamRef.current && !scanLockRef.current) scanTimerRef.current = requestAnimationFrame(loop);
           };
           scanTimerRef.current = requestAnimationFrame(loop);
         }).catch(() => setCameraError('Cannot start video. Check camera permissions.'));
       };
     })
-    .catch(() => setCameraError('Camera not available. Check permissions in Settings.'));
+    .catch(() => setCameraError('Camera blocked. Go to browser Settings → Site Settings → Camera → Allow.'));
   }, [stopCam]);
 
   useEffect(() => { if (cameraOpen) setTimeout(() => startCam(), 150); return () => stopCam(); }, [cameraOpen, startCam, stopCam]);
@@ -281,11 +297,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       const data = await resp.json();
       setVerifyResult(data);
       if (data.ok && data.columnsOk !== false) {
-        awbSetRef.current = new Set((data.awbs || []).map((a: string) => a.trim().toUpperCase()));
+        const sheetAwbs = (data.awbs || []).map((a: string) => a.trim().toUpperCase());
+        const { data: dbScans } = await supabase.from('packtime_scans').select('awb').eq('sheet_name', c.sheet_name);
+        const dbAwbs = (dbScans || []).map((r: any) => r.awb.trim().toUpperCase());
+        awbSetRef.current = new Set([...sheetAwbs, ...dbAwbs]);
         rowCountRef.current = data.totalRows || 0;
         setSheetTotal(data.totalRows || 0);
         sessionIdRef.current = crypto.randomUUID();
-        setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned('');
+        setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned(''); setDbFails(0);
       }
     } catch {
       setVerifyResult({ ok: false, error: 'Cannot connect to server. Try again.' });
@@ -294,9 +313,13 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   };
 
   // ── Submit scan — OPTIMISTIC (instant feedback, background write) ───────────
+  const submitLockRef = useRef(false);
   const submitAwb = useCallback((awb: string) => {
-    if (!awb) return;
-    const trimmed = awb.trim();
+    if (!awb || submitLockRef.current) return;
+    submitLockRef.current = true;
+    setTimeout(() => { submitLockRef.current = false; }, 300);
+    const trimmed = awb.trim().slice(0, 100);
+    if (!trimmed || /[\x00-\x1f]/.test(trimmed)) return;
     const key = trimmed.toUpperCase();
     setAwbInput('');
 
@@ -323,31 +346,35 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setSheetTotal(p => p + 1);
     setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true }, ...p].slice(0, 30));
 
-    // Background write to Google Sheet
-    const row = [count, trimmed, timestamp, camera, courierBrand];
-    enqueueWrite([row], courierSheet);
-    setPendingWrites(p => p + 1);
-
-    // Save to Supabase DB (no nesting — userIdRef cached on mount)
+    // Save to Supabase DB first, then Sheet
     const scanRow = { session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
     supabase.from('packtime_scans').insert(scanRow).then(({ error }) => {
       if (error) {
+        if (error.code === '23505') { console.warn('PackStation: duplicate AWB in DB, skipping'); return; }
         console.error('PackStation DB insert failed:', error.message, error.code);
         setDbFails(p => p + 1);
         setTimeout(() => {
           supabase.from('packtime_scans').insert(scanRow).then(({ error: e2 }) => {
-            if (!e2) setDbFails(p => Math.max(0, p - 1));
+            if (!e2 || e2.code === '23505') setDbFails(p => Math.max(0, p - 1));
             else console.error('PackStation DB retry failed:', e2.message);
           });
         }, 2000);
       }
     });
 
-    // Mark as synced after a short delay (optimistic)
-    setTimeout(() => {
-      setRecentScans(p => p.map(s => s.awb === trimmed && s.pending ? { ...s, pending: false } : s));
-      setPendingWrites(p => Math.max(0, p - 1));
-    }, 1500);
+    // Write to Google Sheet after DB insert fires
+    const row = [count, trimmed, timestamp, camera, courierBrand];
+    enqueueWrite([row], courierSheet);
+    setPendingWrites(p => p + 1);
+
+    // Mark as synced once queue is empty
+    const checkSync = () => {
+      if (writeQueue.length === 0 && !flushing) {
+        setRecentScans(p => p.map(s => s.awb === trimmed && s.pending ? { ...s, pending: false } : s));
+        setPendingWrites(writeQueue.length);
+      } else { setTimeout(checkSync, 500); }
+    };
+    setTimeout(checkSync, 1000);
 
     focusInput();
   }, [camera, courier, courierSheet, courierBrand, focusInput]);
@@ -359,7 +386,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── Undo last scan (removes from local + Google Sheet) ──────────────────────
   const undoLast = useCallback(() => {
-    if (!lastScanned) return;
+    if (!lastScanned || writeQueue.length > 0) return;
     const awb = lastScanned;
     const key = awb.toUpperCase();
     awbSetRef.current.delete(key);
@@ -371,7 +398,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     beep(500, 0.15);
     focusInput();
     // Background delete from Google Sheet + Supabase DB
-    fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) }).catch(() => {});
+    fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
+      .then(r => r.json()).then(d => { if (!d.ok) console.error('Sheet undo failed:', d.error); }).catch(e => console.error('Sheet undo error:', e));
     supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current);
   }, [lastScanned, courierSheet, focusInput]);
 
@@ -388,7 +416,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     if (lastScanned === awb) setLastScanned('');
     beep(500, 0.1);
     // Background delete from Google Sheet + Supabase DB
-    fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) }).catch(() => {});
+    fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
+      .then(r => r.json()).then(d => { if (!d.ok) console.error('Sheet delete failed:', d.error); }).catch(e => console.error('Sheet delete error:', e));
     supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current);
   }, [recentScans, lastScanned, courierSheet]);
 
@@ -416,7 +445,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
     let query = supabase.from('packtime_scans').select('*', { count: 'exact' });
-    if (historySearch) query = query.ilike('awb', `%${historySearch}%`);
+    if (historySearch) query = query.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
     if (historyFilterCourier) query = query.eq('courier', historyFilterCourier);
     if (historyFilterBrand) query = query.eq('brand', historyFilterBrand);
     query = query.order('scanned_at', { ascending: false }).range(historyPage * historyPageSize, (historyPage + 1) * historyPageSize - 1);
@@ -438,7 +467,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   }, [showHistory]);
 
   const deleteHistoryScan = async (id: string) => {
-    const record = historyData.find(r => r.id === id);
+    const { data: record } = await supabase.from('packtime_scans').select('awb, sheet_name').eq('id', id).maybeSingle();
     if (record && record.sheet_name) {
       try {
         const resp = await fetch(EDGE_FN, {
@@ -454,9 +483,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     fetchHistory();
   };
 
-  const exportHistory = () => {
-    if (historyData.length === 0) return;
-    const csv = 'AWB,Courier,Camera,Brand,Scanned At,Session ID\n' + historyData.map(r => `${r.awb},${r.courier},${r.camera},${r.brand || ''},${new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })},${r.session_id}`).join('\n');
+  const exportHistory = async () => {
+    let query = supabase.from('packtime_scans').select('*');
+    if (historySearch) query = query.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
+    if (historyFilterCourier) query = query.eq('courier', historyFilterCourier);
+    if (historyFilterBrand) query = query.eq('brand', historyFilterBrand);
+    const { data } = await query.order('scanned_at', { ascending: false }).limit(10000);
+    if (!data || data.length === 0) return;
+    const csv = 'AWB,Courier,Camera,Brand,Scanned At,Session ID\n' + data.map((r: any) => `${r.awb},${r.courier},${r.camera},${r.brand || ''},${new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })},${r.session_id}`).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `PackStation_History_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
@@ -467,7 +501,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── History Screen ─────────────────────────────────────────────────────────
   if (showHistory) return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Scan History</span>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -568,7 +602,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── Setup Screen ────────────────────────────────────────────────────────────
   if (!started) return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>PackStation</span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -716,7 +750,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {todaySummaryOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={() => setTodaySummaryOpen(false)}>
           <div className="modal-inner" onClick={e => e.stopPropagation()} style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '18px 16px', maxWidth: 340, width: '100%' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 12, textAlign: 'center' }}>Today's Summary</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4, textAlign: 'center' }}>Today's Summary</div>
+            <div style={{ fontSize: 9, color: T.tx3, textAlign: 'center', marginBottom: 10 }}>As of {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} · {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</div>
             {todaySummary.length === 0 && <div style={{ textAlign: 'center', color: T.tx3, fontSize: 11, padding: 16 }}>Loading...</div>}
             {todaySummary.map((s, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: `1px solid ${T.bd}` }}>
@@ -797,7 +832,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         <div style={{ maxHeight: 280, overflowY: 'auto' }}>
           {recentScans.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans yet. Start scanning AWB barcodes.</div>}
           {recentScans.map((s, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .15s ease' : undefined }}>
+            <div key={`${s.awb}-${s.time}`} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .15s ease' : undefined }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: s.success ? T.gr : T.re, flexShrink: 0, boxShadow: `0 0 5px ${s.success ? T.gr : T.re}55`, opacity: s.pending ? 0.5 : 1 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 11, fontFamily: T.mono, color: T.tx, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.awb}</div>
@@ -837,8 +872,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             </div>
             <button onClick={() => {
               const successScans = recentScans.filter(s => s.success);
-              if (successScans.length === 0) return;
-              const csv = 'AWB,Time,Courier,Camera\n' + successScans.map(s => `${s.awb},${s.time},${courier},${camera}`).join('\n');
+              if (successScans.length === 0) { alert('No successful scans to export'); return; }
+              const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n');
               const blob = new Blob([csv], { type: 'text/csv' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
