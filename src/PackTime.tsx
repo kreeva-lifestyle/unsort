@@ -306,6 +306,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         rowCountRef.current = data.totalRows || 0;
         setSheetTotal(data.totalRows || 0);
         sessionIdRef.current = crypto.randomUUID();
+        writeQueue.length = 0; flushing = false;
         setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned(''); setDbFails(0);
       }
     } catch {
@@ -350,6 +351,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
     // Save to Supabase DB first, then Sheet
     const scanRow = { session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
+    const row = [count, trimmed, timestamp, camera, courierBrand];
     supabase.from('packtime_scans').insert(scanRow).then(({ error }) => {
       if (error) {
         if (error.code === '23505') {
@@ -368,13 +370,12 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             else console.error('PackStation DB retry failed:', e2.message);
           });
         }, 2000);
+        return;
       }
+      // Only write to Sheet after DB success
+      enqueueWrite([row], courierSheet);
+      setPendingWrites(p => p + 1);
     });
-
-    // Write to Google Sheet after DB insert fires
-    const row = [count, trimmed, timestamp, camera, courierBrand];
-    enqueueWrite([row], courierSheet);
-    setPendingWrites(p => p + 1);
 
     // Mark as synced — bounded check (max 10s)
     let syncChecks = 0;
