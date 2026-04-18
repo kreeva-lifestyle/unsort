@@ -360,11 +360,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       }
     });
 
-    // Mark as synced after a short delay (optimistic)
-    setTimeout(() => {
-      setRecentScans(p => p.map(s => s.awb === trimmed && s.pending ? { ...s, pending: false } : s));
-      setPendingWrites(p => Math.max(0, p - 1));
-    }, 1500);
+    // Mark as synced once queue is empty
+    const checkSync = () => {
+      if (writeQueue.length === 0 && !flushing) {
+        setRecentScans(p => p.map(s => s.awb === trimmed && s.pending ? { ...s, pending: false } : s));
+        setPendingWrites(writeQueue.length);
+      } else { setTimeout(checkSync, 500); }
+    };
+    setTimeout(checkSync, 1000);
 
     focusInput();
   }, [camera, courier, courierSheet, courierBrand, focusInput]);
@@ -388,7 +391,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     beep(500, 0.15);
     focusInput();
     // Background delete from Google Sheet + Supabase DB
-    fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) }).catch(() => {});
+    fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
+      .then(r => r.json()).then(d => { if (!d.ok) console.error('Sheet undo failed:', d.error); }).catch(e => console.error('Sheet undo error:', e));
     supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current);
   }, [lastScanned, courierSheet, focusInput]);
 
@@ -405,7 +409,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     if (lastScanned === awb) setLastScanned('');
     beep(500, 0.1);
     // Background delete from Google Sheet + Supabase DB
-    fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) }).catch(() => {});
+    fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
+      .then(r => r.json()).then(d => { if (!d.ok) console.error('Sheet delete failed:', d.error); }).catch(e => console.error('Sheet delete error:', e));
     supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current);
   }, [recentScans, lastScanned, courierSheet]);
 
