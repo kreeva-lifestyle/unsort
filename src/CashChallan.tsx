@@ -266,10 +266,23 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (isReturn && !editing && !returnSource) { setFormError('Select the original invoice for this return'); return; }
     if (!customerName.trim()) { setFormError('Customer name is required'); return; }
     if (items.length === 0) { setFormError('Add at least one item'); return; }
-    const invalidItem = items.find(it => !it.sku.trim() || it.quantity <= 0 || it.price <= 0);
-    if (invalidItem) { setFormError('All items must have SKU, quantity > 0, and price > 0'); return; }
+    const emptySkuItem = items.find(it => !it.sku.trim());
+    if (emptySkuItem) { setFormError('SKU is required for all items'); return; }
+    const zeroQtyItem = items.find(it => it.quantity <= 0);
+    if (zeroQtyItem) { setFormError(`Item "${zeroQtyItem.sku}" has invalid quantity (must be > 0)`); return; }
+    const zeroPriceItem = items.find(it => it.price <= 0);
+    if (zeroPriceItem) { setFormError(`Item "${zeroPriceItem.sku}" has invalid price (must be > 0)`); return; }
+    const negDiscItem = items.find(it => (it.discount_value || 0) < 0);
+    if (negDiscItem) { setFormError(`Item "${negDiscItem.sku}" has negative discount`); return; }
+    const overDiscItem = items.find(it => it.discount_type === 'percentage' && (it.discount_value || 0) > 100);
+    if (overDiscItem) { setFormError(`Item "${overDiscItem.sku}" discount cannot exceed 100%`); return; }
+    if (subtotal <= 0) { setFormError('Subtotal must be greater than zero'); return; }
+    if (grandTotal < 0) { setFormError('Total cannot be negative. Check item discounts.'); return; }
+    if (amountPaid < 0) { setFormError('Amount paid cannot be negative'); return; }
     if (amountPaid > grandTotal && !isReturn) { setFormError(`Amount paid (₹${amountPaid}) cannot exceed total (₹${grandTotal})`); return; }
-    if (grandTotal < 0 && !isReturn) { setFormError('Total cannot be negative. Use Sales Return for refunds.'); return; }
+    if (!paymentMode && amountPaid > 0) { setFormError('Select a payment mode when amount is paid'); return; }
+    if (challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(`Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
+    if (challanStatus === 'unpaid' && amountPaid > 0) { setFormError('Status is "Unpaid" but amount is paid. Change status to "Paid" or "Partial"'); return; }
     const { data: { user } } = await supabase.auth.getUser();
 
     // Upsert customer (case-insensitive match, save phone too)
