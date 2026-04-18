@@ -740,15 +740,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           </div>
 
           {/* Line Items */}
-          <label style={lbl}>Items</label>
           <div style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 8, marginBottom: 12, overflow: 'hidden' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 24px', gap: 4, padding: '5px 8px', borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
-              <span style={{ fontSize: 8, color: T.tx3, fontWeight: 600, letterSpacing: .5 }}>SKU</span>
-              <span style={{ fontSize: 8, color: T.tx3, fontWeight: 600, letterSpacing: .5, textAlign: 'center' }}>QTY</span>
-              <span style={{ fontSize: 8, color: T.tx3, fontWeight: 600, letterSpacing: .5, textAlign: 'right' }}>PRICE</span>
-              <span />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 90px 24px', gap: 4, padding: '4px 8px', borderBottom: `1px solid ${T.bd}` }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 90px 24px', gap: 4, padding: '6px 8px', borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
               <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>SKU</span>
               <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, textAlign: 'center' }}>Qty</span>
               <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, textAlign: 'right' }}>Price</span>
@@ -772,8 +765,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             {!(isReturn && returnSource) && <button onClick={() => setItems([...items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>}
           </div>
 
-          {/* Shipping + Tags */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+          {/* Shipping + Tags + Notes */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
             <div>
               <label style={lbl}>Shipping/Porter</label>
               <input type="number" value={shippingCharges || ''} onChange={e => setShippingCharges(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
@@ -782,15 +775,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
               <label style={lbl}>Tags</label>
               <input value={tags} onChange={e => setTags(e.target.value)} placeholder="vip, urgent" style={{ ...inp, fontSize: 11 }} />
             </div>
+            <div>
+              <label style={lbl}>Notes</label>
+              <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional" style={{ ...inp, fontSize: 11 }} />
+            </div>
           </div>
 
-          {/* Notes */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={lbl}>Notes</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Optional notes..." style={{ ...inp, resize: 'vertical', fontSize: 11 }} />
-          </div>
-
-          {/* Payment row */}
+          {/* Status + Payment */}
           <div style={{ display: 'grid', gridTemplateColumns: (challanStatus === 'paid' || challanStatus === 'partial') ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: 8 }}>
             <div>
               <label style={lbl}>Status</label>
