@@ -149,6 +149,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const channel = supabase.channel('cash_challans_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, () => fetchChallans())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challan_items' }, () => fetchChallans())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challan_customers' }, () => {})
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchChallans]);
@@ -300,6 +301,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     };
 
     if (editing) {
+      const { data: current } = await supabase.from('cash_challans').select('updated_at').eq('id', editing.id).maybeSingle();
+      if (current && editing.updated_at && current.updated_at !== editing.updated_at) {
+        setFormError('This challan was modified by another user. Please close and reopen to get latest data.');
+        return;
+      }
       await supabase.from('cash_challans').update({ ...challanData, updated_at: new Date().toISOString() }).eq('id', editing.id);
       await supabase.from('cash_challan_items').delete().eq('challan_id', editing.id);
       await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: editing.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100, sort_order: i })));
