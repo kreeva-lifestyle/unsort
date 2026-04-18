@@ -269,13 +269,13 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                 }
               }
             } catch {}
-            scanTimerRef.current = requestAnimationFrame(loop);
+            if (streamRef.current && !scanLockRef.current) scanTimerRef.current = requestAnimationFrame(loop);
           };
           scanTimerRef.current = requestAnimationFrame(loop);
         }).catch(() => setCameraError('Cannot start video. Check camera permissions.'));
       };
     })
-    .catch(() => setCameraError('Camera not available. Check permissions in Settings.'));
+    .catch(() => setCameraError('Camera blocked. Go to browser Settings → Site Settings → Camera → Allow.'));
   }, [stopCam]);
 
   useEffect(() => { if (cameraOpen) setTimeout(() => startCam(), 150); return () => stopCam(); }, [cameraOpen, startCam, stopCam]);
