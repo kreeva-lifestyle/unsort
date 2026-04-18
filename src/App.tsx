@@ -615,16 +615,17 @@ const Dashboard = () => {
 };
 
 const MARKETPLACES = ['Myntra-Fusionic', 'Ajio-Fusionic', 'Tanuka', 'Svaraa', 'Amazon'];
-const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
+const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', 'Semi-Stitched'];
 const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 const canAlterSize = (a: string, b: string): boolean => {
   if (a === b) return true;
   if (a === 'Semi-Stitched' || b === 'Semi-Stitched') return true;
+  if (a === 'N/A' || b === 'N/A') return true;
   const ai = SIZE_ORDER.indexOf(a), bi = SIZE_ORDER.indexOf(b);
   if (ai === -1 || bi === -1) return false;
   return Math.abs(ai - bi) === 1;
 };
-const isDupatta = (name: string) => /dupatt?a/i.test(name);
+const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
 
 const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { globalSearch?: string; openItemId?: string | null; onItemOpened?: () => void; active?: boolean }) => {
   const [stage, setStage] = useState<'pending' | 'completed'>('pending');
@@ -717,7 +718,8 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
         // Must match: same category, same SKU, same size
         if (a.product_id !== b.product_id) continue;
         if ((a.serial_number || '') !== (b.serial_number || '')) continue;
-        if ((a.size || '') !== (b.size || '')) continue;
+        const sA = a.size || '', sB = b.size || '';
+        if (sA !== sB && sA !== 'N/A' && sB !== 'N/A') continue;
         const bPresent = itemPresent[b.id];
         if (!bPresent) continue;
         const union = new Set([...aPresent, ...bPresent]);
@@ -807,7 +809,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
       .eq('status', 'unsorted')
       .neq('id', currentItemId);
     if (currentItem.serial_number) query = query.eq('serial_number', currentItem.serial_number);
-    if (currentItem.size) query = query.eq('size', currentItem.size);
+    if (currentItem.size && currentItem.size !== 'N/A') query = query.eq('size', currentItem.size);
     const { data: otherItems } = await query;
     if (!otherItems || otherItems.length === 0) return;
 
@@ -848,10 +850,13 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Size required only if item has non-dupatta components
+    const hasDupatta = catComps.some(c => isDupatta(c.name));
     const hasNonDupatta = catComps.some(c => !isDupatta(c.name));
-    if (!form.size && hasNonDupatta) {
-      addToast('Please select a size', 'error'); return;
+    if (hasNonDupatta && (!form.size || form.size === 'N/A')) {
+      addToast('Size is required (N/A only allowed for Dupatta-only items)', 'error'); return;
+    }
+    if (hasDupatta && !hasNonDupatta && form.size && form.size !== 'N/A' && form.size !== '') {
+      addToast('Dupatta-only items must have size N/A or empty', 'error'); return;
     }
     if (form.status === 'unsorted' && catComps.length > 0 && missingComps.size === catComps.length) {
       addToast('All components are missing — entire product is missing. Change status or deselect some.', 'error'); return;
