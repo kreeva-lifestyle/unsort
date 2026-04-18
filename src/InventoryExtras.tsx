@@ -19,6 +19,7 @@ const T = {
 };
 
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', 'Semi-Stitched'];
+const isDupatta = (name: string) => /dupatt?a/i.test(name);
 
 interface Extra {
   id: string; product_id: string; product_name: string;
@@ -119,6 +120,14 @@ export default function InventoryExtras() {
     supabase.from('components').select('*').eq('product_id', fProductId).order('name').then(({ data }) => setFComps(data || []));
   }, [fProductId]);
 
+  // Auto-set size for dupatta components
+  useEffect(() => {
+    if (!fComponentId) return;
+    const comp = fComps.find(c => c.id === fComponentId);
+    if (comp && isDupatta(comp.name)) setFSize('N/A');
+    else if (fSize === 'N/A') setFSize('');
+  }, [fComponentId, fComps, fSize]);
+
   const loadHistory = async (extraId: string) => {
     const { data } = await supabase.from('inventory_extras_history').select('*').eq('extra_id', extraId).order('created_at', { ascending: false });
     setHistory(data || []);
@@ -134,6 +143,10 @@ export default function InventoryExtras() {
   const addExtra = async () => {
     setError('');
     if (!fProductId || !fComponentId || !fSku.trim() || !fSize) { setError('All fields required'); return; }
+    const comp = fComps.find(c => c.id === fComponentId);
+    const compIsDupatta = comp && isDupatta(comp.name);
+    if (compIsDupatta && fSize !== 'N/A') { setError('Dupatta must have size "N/A"'); return; }
+    if (!compIsDupatta && fSize === 'N/A') { setError('Size is required for this component (N/A only for Dupatta)'); return; }
     const qty = parseInt(fQty) || 0;
     if (qty < 1) { setError('Quantity must be at least 1'); return; }
     setSaving(true);
@@ -309,8 +322,8 @@ export default function InventoryExtras() {
                 </div>}
               </div>
               <div>
-                <label style={label}>Size</label>
-                <select value={fSize} onChange={e => setFSize(e.target.value)} style={input}>
+                <label style={label}>Size {(() => { const c = fComps.find(x => x.id === fComponentId); return c && isDupatta(c.name) ? '(N/A for Dupatta)' : '*'; })()}</label>
+                <select value={fSize} onChange={e => setFSize(e.target.value)} style={input} disabled={!!fComponentId && isDupatta(fComps.find(c => c.id === fComponentId)?.name || '')}>
                   <option value="">Select size...</option>
                   {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
