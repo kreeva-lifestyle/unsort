@@ -253,13 +253,14 @@ const Icon = ({ name, size = 16 }: { name: string; size?: number }) => {
 
 const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (t: string) => void }) => {
   const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   const tabs = [
     { id: 'dashboard', icon: 'grid', label: 'Dashboard' },
     { id: 'inventory', icon: 'box', label: 'Inventory' },
     { id: 'brandtag', icon: 'tag', label: 'Brand Tags' },
     { id: 'packtime', icon: 'scan', label: 'PackStation' },
     { id: 'challan', icon: 'file', label: 'Cash Challan' },
-    { id: 'settings', icon: 'settings', label: 'Settings' },
+    ...(isAdmin ? [{ id: 'settings', icon: 'settings', label: 'Settings' }] : []),
   ];
 
   const handleSignOut = async () => {
@@ -2004,6 +2005,7 @@ const SettingsPage = () => {
   const [tab, setTab] = useState('categories');
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
+  if (!isAdmin) return <div style={{ padding: 40, textAlign: 'center', color: '#4A5568', fontSize: 12 }}>Admin access required</div>;
   const tabs = [{ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }];
   if (isAdmin) tabs.push({ id: 'users', label: 'Users' });
   tabs.push({ id: 'brands', label: 'Brands' });
@@ -2174,6 +2176,7 @@ const MainApp = () => {
   // Central navigate — updates URL + state
   const setTab = (t: string) => {
     if (!VALID_TABS.includes(t)) t = 'dashboard';
+    if (t === 'settings' && profile?.role !== 'admin') t = 'dashboard';
     const newHash = `#/${t}`;
     if (window.location.hash !== newHash) window.history.pushState(null, '', newHash);
     setTabState(t);
