@@ -632,7 +632,7 @@ const Dashboard = () => {
 
   const addTask = async (e: React.FormEvent) => { e.preventDefault(); if (!newTask.trim()) return; await supabase.from('tasks').insert({ title: newTask.trim(), created_by: profile?.id }); setNewTask(''); fetchTasks(); };
   const toggleTask = async (id: string, done: boolean) => { await supabase.from('tasks').update({ is_done: !done }).eq('id', id); fetchTasks(); };
-  const deleteTask = async (id: string) => { await supabase.from('tasks').delete().eq('id', id); fetchTasks(); };
+  const deleteTask = async (id: string) => { if (!confirm('Delete this task?')) return; await supabase.from('tasks').delete().eq('id', id); fetchTasks(); };
 
   const maxScan = Math.max(...scanTrend.map(s => s.count), 1);
   const maxRev = Math.max(...revTrend.map(r => r.amount), 1);
@@ -2067,6 +2067,7 @@ const SettingsPage = () => {
 const BrandsSettings = () => {
   const [brands, setBrands] = useState<any[]>([]);
   const [newBrand, setNewBrand] = useState('');
+  const [pendingDel, setPendingDel] = useState<{ id: string; timer: number } | null>(null);
   const { addToast } = useNotifications();
   const fetchBrands = () => { supabase.from('brands').select('*').order('name').then(({ data }) => setBrands(data || [])); };
   useEffect(() => { fetchBrands(); }, []);
@@ -2085,10 +2086,13 @@ const BrandsSettings = () => {
     const b = brands.find(x => x.id === id);
     const { count } = await supabase.from('packtime_couriers').select('id', { count: 'exact', head: true }).eq('brand', b?.name);
     if ((count || 0) > 0) { addToast(`Cannot delete — ${count} courier(s) use this brand`, 'error'); return; }
-    const { error } = await supabase.from('brands').delete().eq('id', id);
-    if (error) addToast(error.message, 'error');
-    else { addToast('Brand removed', 'success'); fetchBrands(); }
+    setBrands(prev => prev.filter(x => x.id !== id));
+    if (pendingDel) clearTimeout(pendingDel.timer);
+    const timer = window.setTimeout(async () => { await supabase.from('brands').delete().eq('id', id); setPendingDel(null); fetchBrands(); }, 5000);
+    setPendingDel({ id, timer });
   };
+  const undoDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); setPendingDel(null); fetchBrands(); } };
+  const dismissDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); supabase.from('brands').delete().eq('id', pendingDel.id).then(() => fetchBrands()); setPendingDel(null); } };
   return (
     <div>
       <h3 style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: T.tx }}>Brands</h3>
@@ -2109,6 +2113,10 @@ const BrandsSettings = () => {
         </div>
       ))}
       {brands.length === 0 && <div style={{ fontSize: 11, color: T.tx3, padding: 10 }}>No brands. Add one above.</div>}
+      {pendingDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, animation: 'su .2s ease', overflow: 'hidden', minWidth: 260 }}>
+        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: T.tx, flex: 1 }}>Brand deleted</span><span onClick={undoDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#000' }}>Undo</span><span onClick={dismissDel} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span></div>
+        <div className="undo-bar" key={pendingDel.id} />
+      </div>}
     </div>
   );
 };
@@ -2118,6 +2126,7 @@ const PackTimeSettings = () => {
   const [cameras, setCameras] = useState<any[]>([]);
   const [newCourier, setNewCourier] = useState('');
   const [newSheet, setNewSheet] = useState('');
+  const [pendingDel, setPendingDel] = useState<{ id: string; type: string; timer: number } | null>(null);
   const [newCamera, setNewCamera] = useState('');
   const { addToast } = useNotifications();
 
@@ -2148,9 +2157,10 @@ const PackTimeSettings = () => {
     const c = couriers.find(x => x.id === id);
     const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('courier', c?.name);
     if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this courier`, 'error'); return; }
-    const { error } = await supabase.from('packtime_couriers').delete().eq('id', id);
-    if (error) addToast(error.message, 'error');
-    else { addToast('Courier removed', 'success'); fetchData(); }
+    setCouriers(prev => prev.filter(x => x.id !== id));
+    if (pendingDel) clearTimeout(pendingDel.timer);
+    const timer = window.setTimeout(async () => { await supabase.from('packtime_couriers').delete().eq('id', id); setPendingDel(null); fetchData(); }, 5000);
+    setPendingDel({ id, type: 'Courier', timer });
   };
 
   const addCamera = async (e: React.FormEvent) => {
@@ -2166,10 +2176,13 @@ const PackTimeSettings = () => {
     const cam = cameras.find(x => x.id === id);
     const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('camera', cam?.number);
     if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this camera`, 'error'); return; }
-    const { error } = await supabase.from('packtime_cameras').delete().eq('id', id);
-    if (error) addToast(error.message, 'error');
-    else { addToast('Camera removed', 'success'); fetchData(); }
+    setCameras(prev => prev.filter(x => x.id !== id));
+    if (pendingDel) clearTimeout(pendingDel.timer);
+    const timer = window.setTimeout(async () => { await supabase.from('packtime_cameras').delete().eq('id', id); setPendingDel(null); fetchData(); }, 5000);
+    setPendingDel({ id, type: 'Camera', timer });
   };
+  const undoDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); setPendingDel(null); fetchData(); } };
+  const dismissDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); const table = pendingDel.type === 'Courier' ? 'packtime_couriers' : 'packtime_cameras'; supabase.from(table).delete().eq('id', pendingDel.id).then(() => fetchData()); setPendingDel(null); } };
 
   return (
     <div>
@@ -2219,6 +2232,10 @@ const PackTimeSettings = () => {
           {cameras.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No cameras configured</div>}
         </div>
       </div>
+      {pendingDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, animation: 'su .2s ease', overflow: 'hidden', minWidth: 260 }}>
+        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: T.tx, flex: 1 }}>{pendingDel.type} deleted</span><span onClick={undoDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#000' }}>Undo</span><span onClick={dismissDel} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span></div>
+        <div className="undo-bar" key={pendingDel.id} />
+      </div>}
     </div>
   );
 };
