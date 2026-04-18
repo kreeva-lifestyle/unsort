@@ -97,10 +97,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const searchTimeout = useRef<any>(null);
 
   // ── Computed values ────────────────────────────────────────────────────────
-  const subtotal = items.reduce((s, i) => s + i.quantity * i.price, 0);
-  const discountAmount = discountType === 'percentage' ? subtotal * discountValue / 100 : discountValue;
-  const afterDiscount = subtotal - discountAmount + shippingCharges;
-  const roundOff = Math.round(afterDiscount) - afterDiscount;
+  const subtotal = Math.round(items.reduce((s, i) => s + i.quantity * i.price, 0) * 100) / 100;
+  const clampedDiscount = Math.min(discountType === 'percentage' ? subtotal * discountValue / 100 : discountValue, subtotal);
+  const discountAmount = Math.round(Math.max(0, clampedDiscount) * 100) / 100;
+  const clampedShipping = Math.max(0, shippingCharges);
+  const afterDiscount = Math.round((subtotal - discountAmount + clampedShipping) * 100) / 100;
+  const roundOff = Math.round((Math.round(afterDiscount) - afterDiscount) * 100) / 100;
   const grandTotal = Math.round(afterDiscount);
 
   // ── Fetch challans ─────────────────────────────────────────────────────────
@@ -169,7 +171,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Fetch analytics ────────────────────────────────────────────────────────
   const fetchAnalytics = useCallback(async () => {
     const { data } = await supabase.from('cash_challans').select('total, payment_mode, status, is_return')
-      .gte('created_at', analyticsFrom + 'T00:00:00').lte('created_at', analyticsTo + 'T23:59:59').neq('status', 'voided');
+      .gte('created_at', new Date(analyticsFrom + 'T00:00:00').toISOString()).lte('created_at', new Date(analyticsTo + 'T23:59:59').toISOString()).neq('status', 'voided');
     // Returns reduce revenue (negative)
     const totalRevenue = (data || []).reduce((s: number, r: any) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
     const byMode: Record<string, number> = {};
@@ -215,7 +217,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const fetchLedgerDetail = useCallback(async (name: string) => {
     setLedgerDetail(name);
     window.history.pushState({ view: 'ledger-detail' }, '');
-    const { data } = await supabase.from('cash_challans').select('*').eq('customer_name', name).order('created_at', { ascending: false });
+    const { data } = await supabase.from('cash_challans').select('*').eq('customer_name', name).neq('status', 'voided').order('created_at', { ascending: false }).limit(500);
     setLedgerChallans(data || []);
   }, []);
 
@@ -223,10 +225,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [formError, setFormError] = useState('');
   const saveChallan = async () => {
     setFormError('');
+    if (editing && editing.status === 'voided') { setFormError('Cannot edit a voided challan'); return; }
     if (!customerName.trim()) { setFormError('Customer name is required'); return; }
     if (items.length === 0) { setFormError('Add at least one item'); return; }
     const invalidItem = items.find(it => !it.sku.trim() || it.quantity <= 0 || it.price <= 0);
     if (invalidItem) { setFormError('All items must have SKU, quantity > 0, and price > 0'); return; }
+    if (amountPaid > grandTotal && !isReturn) { setFormError(`Amount paid (₹${amountPaid}) cannot exceed total (₹${grandTotal})`); return; }
+    if (grandTotal < 0 && !isReturn) { setFormError('Total cannot be negative. Use Sales Return for refunds.'); return; }
     const { data: { user } } = await supabase.auth.getUser();
 
     // Upsert customer (case-insensitive match, save phone too)
@@ -324,10 +329,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const exportLedgerPDF = (customerName: string) => {
     if (ledgerChallans.length === 0) return;
     const cust = ledgerCustomers.find(c => c.name === customerName);
+    const netTotal = ledgerChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.total), 0);
+    const totalPaid = ledgerChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
+    const outstanding = Math.round((netTotal - totalPaid) * 100) / 100;
     const totalBilled = ledgerChallans.filter(c => !(c as any).is_return).reduce((s, c) => s + Number(c.total), 0);
     const totalReturns = ledgerChallans.filter(c => (c as any).is_return).reduce((s, c) => s + Number(c.total), 0);
-    const totalPaid = ledgerChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
-    const outstanding = totalBilled - totalReturns - totalPaid;
     const rows = ledgerChallans.map(c => {
       const isRet = (c as any).is_return;
       const sign = isRet ? -1 : 1;
@@ -383,6 +389,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Open edit ──────────────────────────────────────────────────────────────
   const openEdit = async (c: Challan) => {
+    if (c.status === 'voided') { addToast('Cannot edit a voided challan', 'error'); return; }
     const [{ data: citems }, { data: cust }] = await Promise.all([
       supabase.from('cash_challan_items').select('*').eq('challan_id', c.id).order('sort_order'),
       c.customer_id ? supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle() : Promise.resolve({ data: null }),
