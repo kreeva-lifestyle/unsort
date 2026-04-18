@@ -276,10 +276,17 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (negDiscItem) { setFormError(`Item "${negDiscItem.sku}" has negative discount`); return; }
     const overDiscItem = items.find(it => it.discount_type === 'percentage' && (it.discount_value || 0) > 100);
     if (overDiscItem) { setFormError(`Item "${overDiscItem.sku}" discount cannot exceed 100%`); return; }
+    if (isReturn && returnSource) {
+      const sourceItems = returnSource.cash_challan_items || [];
+      for (const it of items) {
+        const src = sourceItems.find((s: any) => s.sku === it.sku);
+        if (src && it.quantity > src.quantity) { setFormError(`Cannot return more than ${src.quantity} for "${it.sku}"`); return; }
+      }
+    }
     if (subtotal <= 0) { setFormError('Subtotal must be greater than zero'); return; }
     if (grandTotal < 0) { setFormError('Total cannot be negative. Check item discounts.'); return; }
     if (amountPaid < 0) { setFormError('Amount paid cannot be negative'); return; }
-    if (amountPaid > grandTotal && !isReturn) { setFormError(`Amount paid (₹${amountPaid}) cannot exceed total (₹${grandTotal})`); return; }
+    if (amountPaid > grandTotal) { setFormError(`Amount paid (₹${amountPaid}) cannot exceed total (₹${grandTotal})`); return; }
     if (!paymentMode && amountPaid > 0) { setFormError('Select a payment mode when amount is paid'); return; }
     if (editing && editing.status !== 'draft' && challanStatus === 'draft') { setFormError('Cannot revert to Draft once saved'); return; }
     if (challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(`Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
@@ -299,7 +306,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         const { data: newCust, error: insErr } = await supabase.from('cash_challan_customers').insert({ name: trimmed, phone: customerPhone.trim() || null }).select('id').single();
         if (insErr && insErr.code === '23505') {
           // Race: another user just created this customer — fetch them
-          const { data: raceCust } = await supabase.from('cash_challan_customers').select('id').ilike('name', trimmed).single();
+          const { data: raceCust } = await supabase.from('cash_challan_customers').select('id').ilike('name', trimmed).maybeSingle();
           custId = raceCust?.id || null;
           if (custId && customerPhone.trim()) await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId);
         } else {
@@ -354,7 +361,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Void challan ───────────────────────────────────────────────────────────
   const voidChallan = async (id: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total').eq('id', id).single();
+    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total').eq('id', id).maybeSingle();
     await supabase.from('cash_challans').update({ status: 'voided', voided_by: user?.id, voided_at: new Date().toISOString() }).eq('id', id);
     if (before) ccAudit('VOID', `Challan #${before.challan_number} (${before.customer_name}) voided - was ₹${before.total}`);
     fetchChallans();
@@ -492,8 +499,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     w.document.write(`<html><head><title>Cash Challan #${c.challan_number}</title><style>body{font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:auto}table{width:100%;border-collapse:collapse;margin:12px 0}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f5f5;font-weight:600}.right{text-align:right}.header{text-align:center;margin-bottom:16px}.status{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}</style></head><body>`);
     w.document.write(`<div class="header"><h2 style="margin:0">Arya Designs</h2><p style="color:#666;font-size:11px;margin:4px 0">${(c as any).is_return ? 'Return Challan' : 'Cash Challan'} #${c.challan_number} | ${new Date(c.created_at).toLocaleDateString('en-IN')}</p></div>`);
     w.document.write(`<p><strong>Customer:</strong> ${c.customer_name}</p>`);
-    w.document.write(`<table><thead><tr><th>#</th><th>SKU</th><th class="right">Qty</th><th class="right">Price</th><th class="right">Total</th></tr></thead><tbody>`);
-    (citems || []).forEach((it: any, i: number) => { w.document.write(`<tr><td>${i + 1}</td><td>${it.sku || '-'}</td><td class="right">${it.quantity}</td><td class="right">${Number(it.price).toFixed(2)}</td><td class="right">${Number(it.total).toFixed(2)}</td></tr>`); });
+    w.document.write(`<table><thead><tr><th>#</th><th>SKU</th><th class="right">Qty</th><th class="right">Price</th><th class="right">Disc.</th><th class="right">Total</th></tr></thead><tbody>`);
+    (citems || []).forEach((it: any, i: number) => { const da = Number(it.discount_amount || 0); w.document.write(`<tr><td>${i + 1}</td><td>${it.sku || '-'}</td><td class="right">${it.quantity}</td><td class="right">${Number(it.price).toFixed(2)}</td><td class="right">${da > 0 ? '-' + da.toFixed(2) : '-'}</td><td class="right">${Number(it.total).toFixed(2)}</td></tr>`); });
     w.document.write(`</tbody></table>`);
     w.document.write(`<div style="text-align:right;font-size:12px"><p>Subtotal: <strong>${Number(c.subtotal).toFixed(2)}</strong></p>`);
     if (Number(c.discount_amount) > 0) w.document.write(`<p>Discount: -${Number(c.discount_amount).toFixed(2)}</p>`);
@@ -750,19 +757,19 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             </div>
             {items.map((it, i) => (
               <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 90px 24px', gap: 4, padding: '5px 8px', borderBottom: `1px solid ${T.bd}`, alignItems: 'center' }}>
-                <input value={it.sku} onChange={e => { const n = [...items]; n[i].sku = e.target.value; setItems(n); }} placeholder="SKU / Item name" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', fontFamily: T.mono }} />
+                <input value={it.sku} onChange={e => { const n = [...items]; n[i].sku = e.target.value; setItems(n); }} placeholder="SKU / Item name" disabled={!!(isReturn && returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', fontFamily: T.mono, opacity: isReturn && returnSource ? 0.6 : 1 }} />
                 <input type="number" value={it.quantity || ''} onChange={e => { const n = [...items]; n[i].quantity = Number(e.target.value); setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'center' }} />
-                <input type="number" value={it.price || ''} onChange={e => { const n = [...items]; n[i].price = Number(e.target.value); setItems(n); }} placeholder="0" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right', fontFamily: T.mono }} />
-                <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <select value={it.discount_type || 'flat'} onChange={e => { const n = [...items]; n[i].discount_type = e.target.value; setItems(n); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx3, fontSize: 9, padding: '5px 2px', outline: 'none', width: 32 }}>
+                <input type="number" value={it.price || ''} onChange={e => { const n = [...items]; n[i].price = Number(e.target.value); setItems(n); }} placeholder="0" disabled={!!(isReturn && returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right', fontFamily: T.mono, opacity: isReturn && returnSource ? 0.6 : 1 }} />
+                <div style={{ display: 'flex', gap: 2, alignItems: 'center', opacity: isReturn && returnSource ? 0.6 : 1 }}>
+                  <select value={it.discount_type || 'flat'} onChange={e => { const n = [...items]; n[i].discount_type = e.target.value; setItems(n); }} disabled={!!(isReturn && returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx3, fontSize: 9, padding: '5px 2px', outline: 'none', width: 32 }}>
                     <option value="flat">₹</option><option value="percentage">%</option>
                   </select>
-                  <input type="number" value={it.discount_value || ''} onChange={e => { const n = [...items]; n[i].discount_value = Number(e.target.value); setItems(n); }} placeholder="0" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right', fontFamily: T.mono, flex: 1, minWidth: 0 }} />
+                  <input type="number" value={it.discount_value || ''} onChange={e => { const n = [...items]; n[i].discount_value = Number(e.target.value); setItems(n); }} placeholder="0" disabled={!!(isReturn && returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right', fontFamily: T.mono, flex: 1, minWidth: 0 }} />
                 </div>
                 <button onClick={() => { if (items.length > 1) setItems(items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }}>×</button>
               </div>
             ))}
-            <button onClick={() => setItems([...items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>
+            {!(isReturn && returnSource) && <button onClick={() => setItems([...items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>}
           </div>
 
           {/* Shipping + Tags */}
