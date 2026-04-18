@@ -253,7 +253,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           const loop = async () => {
             if (scanLockRef.current || !streamRef.current) return;
             try {
-              const results = await detector.detect(video);
+              const results = await Promise.race([detector.detect(video), new Promise<any[]>(r => setTimeout(() => r([]), 3000))]);
               if (results.length > 0) {
                 const code = results[0].rawValue?.trim();
                 if (code && code.length >= 4 && !scanLockRef.current) {
@@ -824,7 +824,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         <div style={{ maxHeight: 280, overflowY: 'auto' }}>
           {recentScans.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans yet. Start scanning AWB barcodes.</div>}
           {recentScans.map((s, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .15s ease' : undefined }}>
+            <div key={`${s.awb}-${s.time}`} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .15s ease' : undefined }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: s.success ? T.gr : T.re, flexShrink: 0, boxShadow: `0 0 5px ${s.success ? T.gr : T.re}55`, opacity: s.pending ? 0.5 : 1 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 11, fontFamily: T.mono, color: T.tx, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.awb}</div>
