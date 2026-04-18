@@ -1757,7 +1757,6 @@ const Users = () => {
   const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', password: '', role: 'viewer' });
   const [inviteResult, setInviteResult] = useState<{ email: string; password: string } | null>(null);
   const [pinExists, setPinExists] = useState(false);
-  const [pinLength, setPinLength] = useState(0);
   const [editingPin, setEditingPin] = useState(false);
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -1775,7 +1774,6 @@ const Users = () => {
     const { data } = await supabase.from('profiles').select('cash_pin, phone').eq('id', profile.id).maybeSingle();
     const pin = data?.cash_pin || '';
     setPinExists(!!pin);
-    setPinLength(pin.length);
     setMyPhone(data?.phone || '');
   }, [profile?.id]);
 
