@@ -328,7 +328,7 @@ export default function InventoryExtras() {
           </div>
           <form onSubmit={e => { e.preventDefault(); addExtra(); }} style={{ padding: 16 }}>
             <div style={{ marginBottom: 10 }}>
-              <label style={label}>Category *</label>
+              <label style={label}>Category * <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0, fontSize: 8, color: '#4A5568' }}>Select product category</span></label>
               <select value={fProductId} onChange={e => { setFProductId(e.target.value); setFComponentId(''); }} style={input}>
                 <option value="">Select category...</option>
                 {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}

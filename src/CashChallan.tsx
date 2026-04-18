@@ -757,7 +757,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
               <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>SKU</span>
               <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, textAlign: 'center' }}>Qty</span>
               <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, textAlign: 'right' }}>Price</span>
-              <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, textAlign: 'right' }}>Discount</span>
+              <span title="Per-item discount: ₹ flat or % of line total" style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, textAlign: 'right', cursor: 'help' }}>Discount</span>
               <span></span>
             </div>
             {items.map((it, i) => (
@@ -784,7 +784,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
               <input type="number" value={shippingCharges || ''} onChange={e => setShippingCharges(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
             </div>
             <div>
-              <label style={lbl}>Tags</label>
+              <label style={lbl}>Tags <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: 7 }}>comma separated</span></label>
               <input value={tags} onChange={e => setTags(e.target.value)} placeholder="vip, urgent" style={{ ...inp, fontSize: 11 }} />
             </div>
             <div>
