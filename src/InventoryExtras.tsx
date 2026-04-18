@@ -77,14 +77,14 @@ export default function InventoryExtras() {
   const fetchExtras = useCallback(async () => {
     const { data } = await supabase.from('inventory_extras').select('*').order('updated_at', { ascending: false });
     setExtras(data || []);
-    // Compute match counts for each extra
+    // Compute match counts — single query instead of N+1
     const counts: Record<string, number> = {};
+    const { data: unsorted } = await supabase.from('inventory_items').select('id, serial_number, size, product_id').eq('status', 'unsorted');
     for (const ex of (data || [])) {
-      let q = supabase.from('inventory_items').select('id', { count: 'exact', head: true })
-        .eq('status', 'unsorted').eq('serial_number', ex.sku).eq('product_id', ex.product_id);
-      if (ex.size && ex.size !== 'N/A') q = q.eq('size', ex.size);
-      const { count } = await q;
-      counts[ex.id] = count || 0;
+      counts[ex.id] = (unsorted || []).filter(it =>
+        it.serial_number === ex.sku && it.product_id === ex.product_id &&
+        (ex.size === 'N/A' || !ex.size || it.size === ex.size)
+      ).length;
     }
     setMatchCounts(counts);
   }, []);
