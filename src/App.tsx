@@ -1678,6 +1678,7 @@ const Locations = () => {
   const [newLoc, setNewLoc] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [pendingDel, setPendingDel] = useState<{ id: string; timer: number } | null>(null);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
   const canEdit = profile && ['admin', 'manager'].includes(profile.role);
@@ -1711,10 +1712,13 @@ const Locations = () => {
     const loc = locations.find(l => l.id === id);
     const { count } = await supabase.from('inventory_items').select('id', { count: 'exact', head: true }).eq('location', loc?.name);
     if ((count || 0) > 0) { addToast(`Cannot delete — ${count} item(s) use this location`, 'error'); return; }
-    const { error } = await supabase.from('locations').delete().eq('id', id);
-    if (error) addToast(error.message, 'error');
-    else { addToast('Deleted!', 'success'); fetchLocations(); }
+    setLocations(prev => prev.filter(l => l.id !== id));
+    if (pendingDel) clearTimeout(pendingDel.timer);
+    const timer = window.setTimeout(async () => { await supabase.from('locations').delete().eq('id', id); setPendingDel(null); fetchLocations(); }, 5000);
+    setPendingDel({ id, timer });
   };
+  const undoDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); setPendingDel(null); fetchLocations(); } };
+  const dismissDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); supabase.from('locations').delete().eq('id', pendingDel.id).then(() => fetchLocations()); setPendingDel(null); } };
 
   return (
     <div>
@@ -1750,6 +1754,14 @@ const Locations = () => {
         ))}
         {locations.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No locations yet. Add your first location above.</div>}
       </div>
+      {pendingDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, animation: 'su .2s ease', overflow: 'hidden', minWidth: 260 }}>
+        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 12, color: T.tx, flex: 1 }}>Location deleted</span>
+          <span onClick={undoDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#000' }}>Undo</span>
+          <span onClick={dismissDel} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span>
+        </div>
+        <div className="undo-bar" key={pendingDel.id} />
+      </div>}
     </div>
   );
 };
