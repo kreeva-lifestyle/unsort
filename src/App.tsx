@@ -1343,14 +1343,26 @@ const Categories = () => {
   }, []);
   const fetchComps = async (id: string) => { const { data } = await supabase.from('components').select('*').eq('product_id', id).order('created_at', { ascending: true }); setComps(data || []); };
 
+  const generateSku = (name: string) => {
+    const base = name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `${base}-${suffix}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selected) {
-      const { error } = await supabase.from('products').update({ sku: form.sku, name: form.name, description: form.description, category: form.category }).eq('id', selected.id);
+      const { error } = await supabase.from('products').update({ name: form.name, description: form.description, category: form.category }).eq('id', selected.id);
       if (error) { addToast(error.message, 'error'); return; }
+      const validComps = newComps.filter(c => c.trim());
+      if (validComps.length > 0) {
+        const compsToInsert = validComps.map((name, i) => ({ product_id: selected.id, name: name.trim(), component_code: `C${(comps.length || 0) + i + 1}` }));
+        await supabase.from('components').insert(compsToInsert);
+      }
       addToast('Updated!', 'success');
     } else {
-      const { data, error } = await supabase.from('products').insert({ sku: form.sku, name: form.name, description: form.description, category: form.category, created_by: profile?.id }).select().single();
+      const sku = generateSku(form.name);
+      const { data, error } = await supabase.from('products').insert({ sku, name: form.name, description: form.description, category: form.category, created_by: profile?.id }).select().single();
       if (error || !data) { addToast(error?.message || 'Error', 'error'); return; }
       const validComps = newComps.filter(c => c.trim());
       if (validComps.length > 0) {
@@ -1379,7 +1391,7 @@ const Categories = () => {
 
   const deleteComp = async (id: string) => { await supabase.from('components').delete().eq('id', id); addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories(); };
 
-  const openEdit = (p: any) => { setSelected(p); setForm({ sku: p.sku || '', name: p.name, description: p.description || '', category: p.category || '' }); setNewComps(['']); setShowModal(true); };
+  const openEdit = async (p: any) => { setSelected(p); setForm({ sku: p.sku || '', name: p.name, description: p.description || '', category: p.category || '' }); setNewComps(['']); await fetchComps(p.id); setShowModal(true); };
   const openComps = async (p: any) => { setSelected(p); setNewComps(['']); await fetchComps(p.id); setShowCompModal(true); };
   const canEdit = profile && ['admin', 'manager'].includes(profile.role);
 
@@ -1402,7 +1414,6 @@ const Categories = () => {
         {p.description && <p style={{ color: T.tx3, fontSize: 11, margin: '0 0 10px' }}>{p.description}</p>}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 0', borderTop: `1px solid ${T.bd}` }}>
           <span style={{ fontSize: 10, color: T.tx3 }}>{p.total_components} component{p.total_components !== 1 ? 's' : ''}</span>
-          <span onClick={() => openComps(p)} style={{ ...S.btnPrimary, ...S.btnSm }}>Manage Components</span>
         </div>
       </div>))}</div>
       {categories.length === 0 && <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 36, textAlign: 'center' }}><p style={{ color: T.tx3, fontSize: 12, marginBottom: 6 }}>No categories yet</p><p style={{ color: T.tx3, fontSize: 10 }}>Add a category like "Lehenga Choli" with components like Lehenga, Blouse, Dupatta</p>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={{ ...S.btnPrimary, marginTop: 12, display: 'inline-flex' }}>+ Add First Category</div>}</div>}
@@ -1410,12 +1421,17 @@ const Categories = () => {
       {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 480 }}><div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Category</span></div><form onSubmit={handleSubmit} style={{ padding: 16 }}>
         <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Category name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Lehenga Choli" style={S.fInput} /></div>
         <div style={{ marginBottom: 12 }}><label style={S.fLabel}>Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description (optional)" style={S.fInput} /></div>
-        {!selected && <>
-          <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ ...S.fLabel, margin: 0 }}>Components</label><span onClick={addCompRow} style={{ ...S.btnPrimary, ...S.btnSm }}>+ Add More</span></div>
-          <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 10, marginBottom: 12 }}>
-            {newComps.map((c, i) => compInputRow(c, i, newComps.length))}
-          </div>
-        </>}
+        <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ ...S.fLabel, margin: 0 }}>Components</label><span onClick={addCompRow} style={{ ...S.btnPrimary, ...S.btnSm }}>+ Add More</span></div>
+        {selected && comps.length > 0 && <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 8, marginBottom: 8 }}>
+          {comps.map((c: any, i: number) => (<div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, marginBottom: 3, background: 'transparent', border: `1px solid ${T.bd}` }}>
+            <span style={{ width: 22, height: 22, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: T.tx3, fontFamily: T.mono, flexShrink: 0 }}>{i + 1}</span>
+            <span style={{ fontSize: 12, color: T.tx, flex: 1 }}>{c.name}</span>
+            {canEdit && <span onClick={() => deleteComp(c.id)} style={{ ...S.btnDanger, padding: '2px 8px', fontSize: 9 }}>Delete</span>}
+          </div>))}
+        </div>}
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 10, marginBottom: 12 }}>
+          {newComps.map((c, i) => compInputRow(c, i, newComps.length))}
+        </div>
         <div style={{ padding: '12px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 7 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add Category'}</button></div>
       </form></div></div>)}
 
