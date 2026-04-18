@@ -967,12 +967,13 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
     const [{ data: aComps }, { data: bComps }, { data: prod }] = await Promise.all([
       supabase.from('item_components').select('component_id, status').eq('inventory_item_id', itemId),
       supabase.from('item_components').select('component_id, status').eq('inventory_item_id', pairId),
-      supabase.from('inventory_items').select('products(total_components)').eq('id', itemId).maybeSingle(),
+      supabase.from('inventory_items').select('product_id').eq('id', itemId).maybeSingle(),
     ]);
     const aP = new Set((aComps || []).filter(c => c.status === 'present').map(c => c.component_id));
     const bP = new Set((bComps || []).filter(c => c.status === 'present').map(c => c.component_id));
     const union = new Set([...aP, ...bP]);
-    const total = prod?.products?.total_components || 0;
+    const prodData = prod?.product_id ? products.find(p => p.id === prod.product_id) : null;
+    const total = prodData?.total_components || 0;
     if (total > 0 && union.size < total) { addToast('Cannot complete — combined components do not cover all required parts. Data may have changed.', 'error'); setShowCompleteModal(null); fetchData(); return; }
     const { error: e1 } = await supabase.from('inventory_items').update({ status: 'completed', paired_with: pairId }).eq('id', itemId);
     const { error: e2 } = await supabase.from('inventory_items').update({ status: 'completed', paired_with: itemId }).eq('id', pairId);
