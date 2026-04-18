@@ -152,7 +152,7 @@ export default function InventoryExtras() {
     if (compIsDupatta && fSize !== 'N/A') { setError('Dupatta must have size "N/A"'); return; }
     if (!compIsDupatta && fSize === 'N/A') { setError('Size is required for this component (N/A only for Dupatta)'); return; }
     const qty = parseInt(fQty) || 0;
-    if (qty < 1) { setError('Quantity must be at least 1'); return; }
+    if (qty < 1) { setError('Initial quantity must be at least 1 (cannot be zero)'); return; }
     setSaving(true);
     const prod = products.find(p => p.id === fProductId);
     const { data: { user } } = await supabase.auth.getUser();
@@ -252,6 +252,12 @@ export default function InventoryExtras() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Extras</span>
         <div style={{ display: 'flex', gap: 6 }}>
+          <div onClick={() => {
+            if (filtered.length === 0) return;
+            const csv = 'SKU,Category,Component,Size,Qty\n' + filtered.map(ex => `${ex.sku},"${ex.product_name}",${ex.component_name},${ex.size},${ex.quantity}`).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Extras_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+          }} style={btnGhost}>Export CSV</div>
           <div onClick={() => setShowAdd(true)} style={btn}>+ Add Extra</div>
         </div>
       </div>
@@ -290,10 +296,10 @@ export default function InventoryExtras() {
                     </span>
                   ) : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
                 </td>
-                <td style={{ ...td, display: 'flex', gap: 4 }}>
-                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, cursor: 'pointer' }}>+</span>
-                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, cursor: 'pointer' }}>-</span>
-                  <span onClick={() => { setHistoryExtra(ex); loadHistory(ex.id); }} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, cursor: 'pointer' }} title="History">H</span>
+                <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...btnGhost, padding: '3px 8px', fontSize: 9, cursor: 'pointer', color: T.gr, borderColor: 'rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Add</span>{' '}
+                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...btnGhost, padding: '3px 8px', fontSize: 9, cursor: 'pointer', color: T.re, borderColor: 'rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Remove</span>{' '}
+                  <span onClick={() => { setHistoryExtra(ex); loadHistory(ex.id); }} style={{ ...btnGhost, padding: '3px 8px', fontSize: 9, cursor: 'pointer' }}>History</span>
                 </td>
               </tr>
             ))}
