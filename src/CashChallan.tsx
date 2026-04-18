@@ -196,9 +196,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const exact = (data || []).find((c: any) => c.name.toLowerCase() === q.trim().toLowerCase());
     if (exact) {
       setSelectedCustomerId(exact.id);
-      if (exact.phone && !customerPhone) setCustomerPhone(exact.phone);
+      if (exact.phone) setCustomerPhone(exact.phone);
+    } else {
+      setSelectedCustomerId(null);
     }
-  }, [customerPhone]);
+  }, []);
 
   // ── Fetch analytics ────────────────────────────────────────────────────────
   const fetchAnalytics = useCallback(async () => {
@@ -427,7 +429,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Open edit ──────────────────────────────────────────────────────────────
   const openEdit = async (c: Challan) => {
-    if (c.status === 'voided') { addToast('Cannot edit a voided challan', 'error'); return; }
+    if (c.status === 'voided') { alert('Cannot edit a voided challan'); return; }
     const [{ data: citems }, { data: cust }] = await Promise.all([
       supabase.from('cash_challan_items').select('*').eq('challan_id', c.id).order('sort_order'),
       c.customer_id ? supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle() : Promise.resolve({ data: null }),

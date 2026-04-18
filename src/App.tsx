@@ -733,15 +733,17 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
   }, [items, itemMissing, itemPresent]);
   useEffect(() => {
     fetchData();
+    let debounceTimer: any;
+    const debouncedFetch = () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(fetchData, 500); };
     const ch = supabase.channel('inv-sync-' + instanceId.replace(/:/g, ''))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'item_components' }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'item_tags' }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tags' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'item_components' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'item_tags' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tags' }, debouncedFetch)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => { clearTimeout(debounceTimer); supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -859,6 +861,9 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
     if (hasDupatta && !hasNonDupatta && form.size && form.size !== 'N/A' && form.size !== '') {
       addToast('Dupatta-only items must have size N/A or empty', 'error'); return;
     }
+    if (form.status === 'unsorted' && catComps.length > 0 && missingComps.size === 0 && damagedComps.size === 0) {
+      addToast('All components are present — status should be "Complete" not "Unsorted"', 'error'); return;
+    }
     if (form.status === 'unsorted' && catComps.length > 0 && missingComps.size === catComps.length) {
       addToast('All components are missing — entire product is missing. Change status or deselect some.', 'error'); return;
     }
@@ -959,6 +964,16 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
   };
 
   const handleComplete = async (itemId: string, pairId: string) => {
+    const [{ data: aComps }, { data: bComps }, { data: prod }] = await Promise.all([
+      supabase.from('item_components').select('component_id, status').eq('inventory_item_id', itemId),
+      supabase.from('item_components').select('component_id, status').eq('inventory_item_id', pairId),
+      supabase.from('inventory_items').select('products(total_components)').eq('id', itemId).maybeSingle(),
+    ]);
+    const aP = new Set((aComps || []).filter(c => c.status === 'present').map(c => c.component_id));
+    const bP = new Set((bComps || []).filter(c => c.status === 'present').map(c => c.component_id));
+    const union = new Set([...aP, ...bP]);
+    const total = prod?.products?.total_components || 0;
+    if (total > 0 && union.size < total) { addToast('Cannot complete — combined components do not cover all required parts. Data may have changed.', 'error'); setShowCompleteModal(null); fetchData(); return; }
     const { error: e1 } = await supabase.from('inventory_items').update({ status: 'completed', paired_with: pairId }).eq('id', itemId);
     const { error: e2 } = await supabase.from('inventory_items').update({ status: 'completed', paired_with: itemId }).eq('id', pairId);
     if (e1 || e2) { addToast(`Error: ${e1?.message || e2?.message}`, 'error'); return; }
@@ -1047,6 +1062,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
         i.notes, i.location, i.order_id, i.marketplace, i.ticket_id, i.link, i.status,
         ...(itemTags[i.id] || []).map((t: any) => t?.name),
         ...(itemMissing[i.id] || []),
+        ...(itemDamaged[i.id] || []),
       ];
       if (!fields.some(f => (f || '').toLowerCase().includes(q))) return false;
     }
@@ -1356,9 +1372,10 @@ const Categories = () => {
   const fetchComps = async (id: string) => { const { data } = await supabase.from('components').select('*').eq('product_id', id).order('created_at', { ascending: true }); setComps(data || []); };
 
   const generateSku = (name: string) => {
-    const base = name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-    const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `${base}-${suffix}`;
+    const base = name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+    const ts = Date.now().toString(36).slice(-4).toUpperCase();
+    const rand = Math.random().toString(36).substring(2, 4).toUpperCase();
+    return `${base}-${ts}${rand}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
