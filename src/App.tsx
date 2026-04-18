@@ -850,6 +850,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.product_id) { addToast('Please select a category', 'error'); return; }
     const hasDupatta = catComps.some(c => isDupatta(c.name));
     const hasNonDupatta = catComps.some(c => !isDupatta(c.name));
     if (hasNonDupatta && (!form.size || form.size === 'N/A')) {
