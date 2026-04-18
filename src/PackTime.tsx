@@ -301,7 +301,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         rowCountRef.current = data.totalRows || 0;
         setSheetTotal(data.totalRows || 0);
         sessionIdRef.current = crypto.randomUUID();
-        setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned('');
+        setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned(''); setDbFails(0);
       }
     } catch {
       setVerifyResult({ ok: false, error: 'Cannot connect to server. Try again.' });
@@ -312,7 +312,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   // ── Submit scan — OPTIMISTIC (instant feedback, background write) ───────────
   const submitAwb = useCallback((awb: string) => {
     if (!awb) return;
-    const trimmed = awb.trim();
+    const trimmed = awb.trim().slice(0, 100);
+    if (!trimmed || /[\x00-\x1f]/.test(trimmed)) return;
     const key = trimmed.toUpperCase();
     setAwbInput('');
 
@@ -470,9 +471,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     fetchHistory();
   };
 
-  const exportHistory = () => {
-    if (historyData.length === 0) return;
-    const csv = 'AWB,Courier,Camera,Brand,Scanned At,Session ID\n' + historyData.map(r => `${r.awb},${r.courier},${r.camera},${r.brand || ''},${new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })},${r.session_id}`).join('\n');
+  const exportHistory = async () => {
+    let query = supabase.from('packtime_scans').select('*');
+    if (historySearch) query = query.ilike('awb', `%${historySearch}%`);
+    if (historyFilterCourier) query = query.eq('courier', historyFilterCourier);
+    if (historyFilterBrand) query = query.eq('brand', historyFilterBrand);
+    const { data } = await query.order('scanned_at', { ascending: false }).limit(10000);
+    if (!data || data.length === 0) return;
+    const csv = 'AWB,Courier,Camera,Brand,Scanned At,Session ID\n' + data.map((r: any) => `${r.awb},${r.courier},${r.camera},${r.brand || ''},${new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })},${r.session_id}`).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `PackStation_History_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
@@ -483,7 +489,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── History Screen ─────────────────────────────────────────────────────────
   if (showHistory) return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Scan History</span>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -584,7 +590,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── Setup Screen ────────────────────────────────────────────────────────────
   if (!started) return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>PackStation</span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
