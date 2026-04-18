@@ -7,19 +7,7 @@ const supabase = createClient('https://ulphprdnswznfztawbvg.supabase.co', 'eyJhb
 const btAudit = (action: string, details: string) => { supabase.auth.getUser().then(({ data }) => { supabase.from('audit_log').insert({ action, module: 'brand_tags', details, user_id: data.user?.id }); }); };
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
-const T = {
-  bg: '#060810', s: '#0B0F19', s2: '#0F1420', s3: '#141B2B',
-  bd: 'rgba(255,255,255,0.05)', bd2: 'rgba(255,255,255,0.08)',
-  tx: '#E2E8F0', tx2: '#8896B0', tx3: '#4A5568',
-  ac: '#6366F1', ac2: '#818CF8',
-  gr: '#22C55E', re: '#EF4444', bl: '#38BDF8', yl: '#F59E0B',
-  r: 8,
-  mono: "'JetBrains Mono', monospace",
-  sans: "'Inter', -apple-system, sans-serif",
-  sora: "'Sora', 'Inter', sans-serif",
-  glass1: 'rgba(255,255,255,0.02)', glass2: 'rgba(255,255,255,0.04)',
-  transition: 'all 180ms cubic-bezier(0.4, 0, 0.2, 1)',
-};
+import { T } from './theme';
 
 // ── Reusable style helpers ─────────────────────────────────────────────────────
 const btnBase: React.CSSProperties = {
