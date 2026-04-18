@@ -97,10 +97,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const searchTimeout = useRef<any>(null);
 
   // ── Computed values ────────────────────────────────────────────────────────
-  const subtotal = items.reduce((s, i) => s + i.quantity * i.price, 0);
-  const discountAmount = discountType === 'percentage' ? subtotal * discountValue / 100 : discountValue;
-  const afterDiscount = subtotal - discountAmount + shippingCharges;
-  const roundOff = Math.round(afterDiscount) - afterDiscount;
+  const subtotal = Math.round(items.reduce((s, i) => s + i.quantity * i.price, 0) * 100) / 100;
+  const clampedDiscount = Math.min(discountType === 'percentage' ? subtotal * discountValue / 100 : discountValue, subtotal);
+  const discountAmount = Math.round(Math.max(0, clampedDiscount) * 100) / 100;
+  const clampedShipping = Math.max(0, shippingCharges);
+  const afterDiscount = Math.round((subtotal - discountAmount + clampedShipping) * 100) / 100;
+  const roundOff = Math.round((Math.round(afterDiscount) - afterDiscount) * 100) / 100;
   const grandTotal = Math.round(afterDiscount);
 
   // ── Fetch challans ─────────────────────────────────────────────────────────
@@ -223,10 +225,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [formError, setFormError] = useState('');
   const saveChallan = async () => {
     setFormError('');
+    if (editing && editing.status === 'voided') { setFormError('Cannot edit a voided challan'); return; }
     if (!customerName.trim()) { setFormError('Customer name is required'); return; }
     if (items.length === 0) { setFormError('Add at least one item'); return; }
     const invalidItem = items.find(it => !it.sku.trim() || it.quantity <= 0 || it.price <= 0);
     if (invalidItem) { setFormError('All items must have SKU, quantity > 0, and price > 0'); return; }
+    if (amountPaid > grandTotal && !isReturn) { setFormError(`Amount paid (₹${amountPaid}) cannot exceed total (₹${grandTotal})`); return; }
+    if (grandTotal < 0 && !isReturn) { setFormError('Total cannot be negative. Use Sales Return for refunds.'); return; }
     const { data: { user } } = await supabase.auth.getUser();
 
     // Upsert customer (case-insensitive match, save phone too)
@@ -383,6 +388,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Open edit ──────────────────────────────────────────────────────────────
   const openEdit = async (c: Challan) => {
+    if (c.status === 'voided') { addToast('Cannot edit a voided challan', 'error'); return; }
     const [{ data: citems }, { data: cust }] = await Promise.all([
       supabase.from('cash_challan_items').select('*').eq('challan_id', c.id).order('sort_order'),
       c.customer_id ? supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle() : Promise.resolve({ data: null }),
