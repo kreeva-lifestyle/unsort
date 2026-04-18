@@ -110,7 +110,7 @@ export default function InventoryExtras() {
   // SKU autocomplete
   const searchSkus = useCallback(async (q: string) => {
     if (q.length < 2) { setFSkuSuggestions([]); return; }
-    const { data } = await supabase.from('inventory_items').select('serial_number').ilike('serial_number', `%${q}%`).limit(10);
+    const { data } = await supabase.from('inventory_items').select('serial_number').ilike('serial_number', `%${q.replace(/[%_]/g, '\\$&')}%`).limit(10);
     const unique = [...new Set((data || []).map((r: any) => r.serial_number).filter(Boolean))];
     setFSkuSuggestions(unique);
     setShowSkuDrop(unique.length > 0);
