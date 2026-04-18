@@ -1392,7 +1392,6 @@ const Categories = () => {
   const deleteComp = async (id: string) => { await supabase.from('components').delete().eq('id', id); addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories(); };
 
   const openEdit = async (p: any) => { setSelected(p); setForm({ sku: p.sku || '', name: p.name, description: p.description || '', category: p.category || '' }); setNewComps(['']); await fetchComps(p.id); setShowModal(true); };
-  const openComps = async (p: any) => { setSelected(p); setNewComps(['']); await fetchComps(p.id); setShowCompModal(true); };
   const canEdit = profile && ['admin', 'manager'].includes(profile.role);
 
   const compInputRow = (val: string, i: number, total: number) => (
