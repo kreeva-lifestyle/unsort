@@ -1611,7 +1611,8 @@ const Categories = () => {
     const refs = (itemCount || 0) + (extraCount || 0);
     if (refs > 0) { addToast(`Cannot delete — used by ${itemCount || 0} item(s) and ${extraCount || 0} extra(s)`, 'error'); return; }
     await supabase.from('components').delete().eq('id', id);
-    await supabase.from('products').update({ total_components: Math.max(0, (comps.length || 1) - 1) }).eq('id', selected.id);
+    const { count: remaining } = await supabase.from('components').select('id', { count: 'exact', head: true }).eq('product_id', selected.id);
+    await supabase.from('products').update({ total_components: remaining || 0 }).eq('id', selected.id);
     addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories();
   };
 
