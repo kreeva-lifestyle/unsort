@@ -89,7 +89,7 @@ async function flushQueue() {
         writeQueue.unshift({ rows: batch, sheetName, retries });
         await new Promise(r => setTimeout(r, 2000));
       }
-      // Silently drop after 3 retries
+      if (retries > 3) console.error('PackStation: dropped batch after 3 retries', batch);
     }
   }
   flushing = false;
@@ -98,6 +98,18 @@ async function flushQueue() {
 function enqueueWrite(rows: unknown[][], sheetName: string) {
   writeQueue.push({ rows, sheetName, retries: 0 });
   flushQueue();
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', (e) => {
+    if (writeQueue.length > 0) {
+      const pending = writeQueue.splice(0);
+      for (const item of pending) {
+        navigator.sendBeacon(EDGE_FN, JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName }));
+      }
+      e.returnValue = '';
+    }
+  });
 }
 
 // ── Component ───────────────────────────────────────────────────────────────────
@@ -176,6 +188,10 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       setLoadingConfig(false);
       supabase.auth.getUser().then(({ data: { user } }) => { userIdRef.current = user?.id || null; });
     })();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      userIdRef.current = session?.user?.id || null;
+    });
+    return () => { subscription.unsubscribe(); };
   }, []);
 
   // ── Focus ───────────────────────────────────────────────────────────────────
