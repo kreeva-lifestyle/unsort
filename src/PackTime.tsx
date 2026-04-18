@@ -346,12 +346,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setSheetTotal(p => p + 1);
     setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true }, ...p].slice(0, 30));
 
-    // Background write to Google Sheet
-    const row = [count, trimmed, timestamp, camera, courierBrand];
-    enqueueWrite([row], courierSheet);
-    setPendingWrites(p => p + 1);
-
-    // Save to Supabase DB (no nesting — userIdRef cached on mount)
+    // Save to Supabase DB first, then Sheet
     const scanRow = { session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
     supabase.from('packtime_scans').insert(scanRow).then(({ error }) => {
       if (error) {
@@ -366,6 +361,11 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         }, 2000);
       }
     });
+
+    // Write to Google Sheet after DB insert fires
+    const row = [count, trimmed, timestamp, camera, courierBrand];
+    enqueueWrite([row], courierSheet);
+    setPendingWrites(p => p + 1);
 
     // Mark as synced once queue is empty
     const checkSync = () => {
