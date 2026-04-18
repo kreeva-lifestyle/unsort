@@ -88,7 +88,7 @@ export default function InventoryExtras() {
     for (const ex of (data || [])) {
       counts[ex.id] = (unsorted || []).filter(it =>
         it.serial_number === ex.sku && it.product_id === ex.product_id &&
-        (ex.size === 'N/A' || !ex.size || it.size === ex.size) &&
+        (ex.size === 'N/A' || !ex.size || (it.size || 'N/A') === ex.size) &&
         missingMap[it.id]?.has(ex.component_id)
       ).length;
     }
