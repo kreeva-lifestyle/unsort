@@ -1821,8 +1821,27 @@ const Users = () => {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
-  const updateRole = async (id: string, role: string) => { const { error } = await supabase.from('profiles').update({ role }).eq('id', id); if (error) addToast('Failed: ' + error.message, 'error'); else { addToast('Role updated!', 'success'); fetchUsers(); } };
-  const toggleActive = async (id: string, isActive: boolean) => { await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id); addToast(isActive ? 'Access revoked' : 'Access granted', 'success'); fetchUsers(); };
+  const updateRole = async (id: string, role: string) => {
+    const u = users.find(x => x.id === id);
+    if (!confirm(`Change ${u?.full_name || 'user'} role to "${role}"?`)) { fetchUsers(); return; }
+    if (u?.role === 'admin' && role !== 'admin') {
+      const adminCount = users.filter(x => x.role === 'admin' && x.is_active && x.id !== id).length;
+      if (adminCount < 1) { addToast('Cannot demote — at least 1 admin must remain', 'error'); fetchUsers(); return; }
+    }
+    const { error } = await supabase.from('profiles').update({ role }).eq('id', id);
+    if (error) addToast('Failed: ' + error.message, 'error'); else { addToast('Role updated!', 'success'); fetchUsers(); }
+  };
+  const toggleActive = async (id: string, isActive: boolean) => {
+    if (isActive) {
+      const u = users.find(x => x.id === id);
+      if (u?.role === 'admin') {
+        const adminCount = users.filter(x => x.role === 'admin' && x.is_active && x.id !== id).length;
+        if (adminCount < 1) { addToast('Cannot deactivate — last active admin', 'error'); return; }
+      }
+    }
+    const { error } = await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id);
+    if (error) addToast(error.message, 'error'); else { addToast(isActive ? 'Access revoked' : 'Access granted', 'success'); fetchUsers(); }
+  };
 
   const generatePassword = () => {
     const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
@@ -1853,6 +1872,7 @@ const Users = () => {
       }
     }
     setInviteResult({ email: inviteForm.email, password });
+    setTimeout(() => setInviteResult(null), 15000);
     addToast(`User ${inviteForm.full_name} invited!`, 'success');
     setInviting(false);
     fetchUsers();
@@ -1913,7 +1933,7 @@ const Users = () => {
         {!editingPin ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
             {pinExists ? (
-              <span style={{ fontFamily: T.mono, fontSize: 16, color: T.tx, fontWeight: 600, letterSpacing: 6 }}>{'•'.repeat(pinLength)}</span>
+              <span style={{ fontFamily: T.mono, fontSize: 16, color: T.tx, fontWeight: 600, letterSpacing: 6 }}>{'•••••'}</span>
             ) : (
               <span style={{ fontSize: 11, color: T.tx3, fontStyle: 'italic' }}>No PIN configured</span>
             )}
