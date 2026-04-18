@@ -217,7 +217,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const fetchLedgerDetail = useCallback(async (name: string) => {
     setLedgerDetail(name);
     window.history.pushState({ view: 'ledger-detail' }, '');
-    const { data } = await supabase.from('cash_challans').select('*').eq('customer_name', name).order('created_at', { ascending: false });
+    const { data } = await supabase.from('cash_challans').select('*').eq('customer_name', name).neq('status', 'voided').order('created_at', { ascending: false }).limit(500);
     setLedgerChallans(data || []);
   }, []);
 
@@ -329,10 +329,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const exportLedgerPDF = (customerName: string) => {
     if (ledgerChallans.length === 0) return;
     const cust = ledgerCustomers.find(c => c.name === customerName);
+    const netTotal = ledgerChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.total), 0);
+    const totalPaid = ledgerChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
+    const outstanding = Math.round((netTotal - totalPaid) * 100) / 100;
     const totalBilled = ledgerChallans.filter(c => !(c as any).is_return).reduce((s, c) => s + Number(c.total), 0);
     const totalReturns = ledgerChallans.filter(c => (c as any).is_return).reduce((s, c) => s + Number(c.total), 0);
-    const totalPaid = ledgerChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
-    const outstanding = totalBilled - totalReturns - totalPaid;
     const rows = ledgerChallans.map(c => {
       const isRet = (c as any).is_return;
       const sign = isRet ? -1 : 1;
