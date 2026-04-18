@@ -1289,18 +1289,18 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
       <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         <div className="table-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 850 }}>
-          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Size', 'Tags', 'Notes', 'Link', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
+          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Size', 'Tags', 'Notes', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
           <tbody>{paged.map((item) => {
             const missing = itemMissing[item.id] || [];
             const damaged = itemDamaged[item.id] || [];
             return (<tr key={item.id} id={'row-' + item.id} style={{ transition: 'background .2s', background: highlightId === item.id ? 'rgba(99,102,241,.08)' : 'transparent' }} onMouseEnter={e => { if (highlightId !== item.id) e.currentTarget.style.background = 'rgba(255,255,255,.015)'; }} onMouseLeave={e => { if (highlightId !== item.id) e.currentTarget.style.background = 'transparent'; }}>
             <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 10, whiteSpace: 'nowrap' }}><span style={{ color: T.gr }}>{item.batch_number || '—'}</span>{isCompletedView && item.paired_with && (() => { const pair = items.find(p => p.id === item.paired_with); return pair ? <span onClick={() => scrollToPair(item.paired_with)} style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2, cursor: 'pointer' }} title="Click to find paired item"><svg viewBox="0 0 24 24" style={{ width: 9, height: 9, fill: 'none', stroke: T.ac2, strokeWidth: 2, flexShrink: 0 }}><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg><span style={{ fontSize: 9, color: T.ac2 }}>{pair.batch_number}</span></span> : null; })()}</td>
-            <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 10 }}>{item.serial_number || '—'}</td>
+            <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 10 }}>{item.serial_number || '—'}{item.link && <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 4, color: T.bl, verticalAlign: 'middle' }}><Icon name="link" size={10} /></a>}</td>
             <td style={{ ...S.tdStyle, fontSize: 11 }}><span style={{ fontWeight: 500 }}>{item.products?.name}</span></td>
             <td style={{ ...S.tdStyle, fontSize: 10, fontWeight: 500 }}>{item.size || '—'}</td>
             <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(99,102,241,.10)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 10 }}>—</span>}</div></td>
             <td style={{ ...S.tdStyle, fontSize: 11, maxWidth: 140 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 25 ? item.notes.slice(0, 25) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
-            <td style={S.tdStyle}>{item.link ? <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ color: T.ac, display: 'inline-flex', alignItems: 'center', gap: 3 }}><Icon name="link" size={12} /></a> : <span style={{ color: T.tx3 }}>—</span>}</td>
+
             <td style={S.tdStyle}><span style={statusTag(item.status)}><span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor', opacity: 0.6 }} />{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></td>
             <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(251,191,36,.08)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(248,113,113,.08)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 10 }}>{item.status === 'completed' || item.status === 'complete' ? 'All good' : '—'}</span>}</td>
             <td style={S.tdStyle}>
@@ -1688,6 +1688,8 @@ const Locations = () => {
   const addLocation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLoc.trim()) return;
+    const exists = locations.some(l => l.name.toLowerCase() === newLoc.trim().toLowerCase());
+    if (exists) { addToast('Location already exists', 'error'); return; }
     const { error } = await supabase.from('locations').insert({ name: newLoc.trim() });
     if (error) addToast(error.message, 'error');
     else { addToast('Location added!', 'success'); setNewLoc(''); fetchLocations(); }
@@ -1701,6 +1703,10 @@ const Locations = () => {
   };
 
   const deleteLocation = async (id: string) => {
+    if (!confirm('Delete this location?')) return;
+    const loc = locations.find(l => l.id === id);
+    const { count } = await supabase.from('inventory_items').select('id', { count: 'exact', head: true }).eq('location', loc?.name);
+    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} item(s) use this location`, 'error'); return; }
     const { error } = await supabase.from('locations').delete().eq('id', id);
     if (error) addToast(error.message, 'error');
     else { addToast('Deleted!', 'success'); fetchLocations(); }
@@ -1815,8 +1821,27 @@ const Users = () => {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
-  const updateRole = async (id: string, role: string) => { const { error } = await supabase.from('profiles').update({ role }).eq('id', id); if (error) addToast('Failed: ' + error.message, 'error'); else { addToast('Role updated!', 'success'); fetchUsers(); } };
-  const toggleActive = async (id: string, isActive: boolean) => { await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id); addToast(isActive ? 'Access revoked' : 'Access granted', 'success'); fetchUsers(); };
+  const updateRole = async (id: string, role: string) => {
+    const u = users.find(x => x.id === id);
+    if (!confirm(`Change ${u?.full_name || 'user'} role to "${role}"?`)) { fetchUsers(); return; }
+    if (u?.role === 'admin' && role !== 'admin') {
+      const adminCount = users.filter(x => x.role === 'admin' && x.is_active && x.id !== id).length;
+      if (adminCount < 1) { addToast('Cannot demote — at least 1 admin must remain', 'error'); fetchUsers(); return; }
+    }
+    const { error } = await supabase.from('profiles').update({ role }).eq('id', id);
+    if (error) addToast('Failed: ' + error.message, 'error'); else { addToast('Role updated!', 'success'); fetchUsers(); }
+  };
+  const toggleActive = async (id: string, isActive: boolean) => {
+    if (isActive) {
+      const u = users.find(x => x.id === id);
+      if (u?.role === 'admin') {
+        const adminCount = users.filter(x => x.role === 'admin' && x.is_active && x.id !== id).length;
+        if (adminCount < 1) { addToast('Cannot deactivate — last active admin', 'error'); return; }
+      }
+    }
+    const { error } = await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id);
+    if (error) addToast(error.message, 'error'); else { addToast(isActive ? 'Access revoked' : 'Access granted', 'success'); fetchUsers(); }
+  };
 
   const generatePassword = () => {
     const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
@@ -1847,6 +1872,7 @@ const Users = () => {
       }
     }
     setInviteResult({ email: inviteForm.email, password });
+    setTimeout(() => setInviteResult(null), 15000);
     addToast(`User ${inviteForm.full_name} invited!`, 'success');
     setInviting(false);
     fetchUsers();
@@ -1907,7 +1933,7 @@ const Users = () => {
         {!editingPin ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
             {pinExists ? (
-              <span style={{ fontFamily: T.mono, fontSize: 16, color: T.tx, fontWeight: 600, letterSpacing: 6 }}>{'•'.repeat(pinLength)}</span>
+              <span style={{ fontFamily: T.mono, fontSize: 16, color: T.tx, fontWeight: 600, letterSpacing: 6 }}>{'•••••'}</span>
             ) : (
               <span style={{ fontSize: 11, color: T.tx3, fontStyle: 'italic' }}>No PIN configured</span>
             )}
@@ -2033,12 +2059,22 @@ const BrandsSettings = () => {
   const addBrand = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBrand.trim()) return;
+    const exists = brands.some(b => b.name.toLowerCase() === newBrand.trim().toLowerCase());
+    if (exists) { addToast('Brand already exists', 'error'); return; }
     const { error } = await supabase.from('brands').insert({ name: newBrand.trim().toUpperCase() });
     if (error) addToast(error.message, 'error');
     else { addToast('Brand added!', 'success'); setNewBrand(''); fetchBrands(); }
   };
-  const toggleBrand = async (id: string, active: boolean) => { await supabase.from('brands').update({ is_active: !active }).eq('id', id); fetchBrands(); };
-  const deleteBrand = async (id: string) => { await supabase.from('brands').delete().eq('id', id); addToast('Brand removed', 'success'); fetchBrands(); };
+  const toggleBrand = async (id: string, active: boolean) => { const { error } = await supabase.from('brands').update({ is_active: !active }).eq('id', id); if (error) addToast(error.message, 'error'); else fetchBrands(); };
+  const deleteBrand = async (id: string) => {
+    if (!confirm('Delete this brand?')) return;
+    const b = brands.find(x => x.id === id);
+    const { count } = await supabase.from('packtime_couriers').select('id', { count: 'exact', head: true }).eq('brand', b?.name);
+    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} courier(s) use this brand`, 'error'); return; }
+    const { error } = await supabase.from('brands').delete().eq('id', id);
+    if (error) addToast(error.message, 'error');
+    else { addToast('Brand removed', 'success'); fetchBrands(); }
+  };
   return (
     <div>
       <h3 style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: T.tx }}>Brands</h3>
@@ -2080,19 +2116,27 @@ const PackTimeSettings = () => {
   const addCourier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourier.trim() || !newSheet.trim()) return;
+    const exists = couriers.some(c => c.name.toLowerCase() === newCourier.trim().toLowerCase());
+    if (exists) { addToast('Courier already exists', 'error'); return; }
     const { error } = await supabase.from('packtime_couriers').insert({ name: newCourier.trim(), sheet_name: newSheet.trim() });
     if (error) addToast(error.message, 'error');
     else { addToast('Courier added!', 'success'); setNewCourier(''); setNewSheet(''); fetchData(); }
   };
 
   const toggleCourier = async (id: string, active: boolean) => {
-    await supabase.from('packtime_couriers').update({ is_active: !active }).eq('id', id);
-    fetchData();
+    if (!active) { const activeCount = couriers.filter(c => c.is_active && c.id !== id).length; if (activeCount < 1) { addToast('At least 1 courier must remain active', 'error'); return; } }
+    const { error } = await supabase.from('packtime_couriers').update({ is_active: !active }).eq('id', id);
+    if (error) addToast(error.message, 'error'); else fetchData();
   };
 
   const deleteCourier = async (id: string) => {
-    await supabase.from('packtime_couriers').delete().eq('id', id);
-    addToast('Courier removed', 'success'); fetchData();
+    if (!confirm('Delete this courier?')) return;
+    const c = couriers.find(x => x.id === id);
+    const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('courier', c?.name);
+    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this courier`, 'error'); return; }
+    const { error } = await supabase.from('packtime_couriers').delete().eq('id', id);
+    if (error) addToast(error.message, 'error');
+    else { addToast('Courier removed', 'success'); fetchData(); }
   };
 
   const addCamera = async (e: React.FormEvent) => {
@@ -2104,8 +2148,13 @@ const PackTimeSettings = () => {
   };
 
   const deleteCamera = async (id: string) => {
-    await supabase.from('packtime_cameras').delete().eq('id', id);
-    addToast('Camera removed', 'success'); fetchData();
+    if (!confirm('Delete this camera?')) return;
+    const cam = cameras.find(x => x.id === id);
+    const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('camera', cam?.number);
+    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this camera`, 'error'); return; }
+    const { error } = await supabase.from('packtime_cameras').delete().eq('id', id);
+    if (error) addToast(error.message, 'error');
+    else { addToast('Camera removed', 'success'); fetchData(); }
   };
 
   return (
@@ -2167,6 +2216,7 @@ const getTabFromHash = () => {
 };
 
 const MainApp = () => {
+  const { profile } = useAuth();
   const [tab, setTabState] = useState(getTabFromHash);
   const [globalSearch, setGlobalSearch] = useState('');
   const [notifItemId, setNotifItemId] = useState<string | null>(null);
