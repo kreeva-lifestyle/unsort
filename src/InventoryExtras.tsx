@@ -20,6 +20,8 @@ const T = {
 
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', 'Semi-Stitched'];
 const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
+const isLehenga = (name: string) => /lehenga|lehnga|ghaghra/i.test(name);
+const isBottomType = (name: string) => /bottom|pant|trouser|skirt|salwar|churidar|palazzo/i.test(name);
 
 interface Extra {
   id: string; product_id: string; product_name: string;
@@ -156,8 +158,12 @@ export default function InventoryExtras() {
     if (!fProductId || !fComponentId || !fSku.trim() || !fSize) { setError('All fields required'); return; }
     const comp = fComps.find(c => c.id === fComponentId);
     const compIsDupatta = comp && isDupatta(comp.name);
+    const compIsLehenga = comp && isLehenga(comp.name);
+    const compIsBottom = comp && isBottomType(comp.name);
     if (compIsDupatta && fSize !== 'N/A') { setError('Dupatta must have size "N/A"'); return; }
-    if (!compIsDupatta && fSize === 'N/A') { setError('Size is required for this component (N/A only for Dupatta)'); return; }
+    if (!compIsDupatta && fSize === 'N/A') { setError('N/A is only allowed for Dupatta/Orhni/Chunni/Stole'); return; }
+    if (fSize === 'Free Size' && !compIsLehenga) { setError('Free Size is only allowed for Lehenga'); return; }
+    if (compIsBottom && (fSize === 'N/A' || fSize === 'Free Size')) { setError('Bottom/Pant requires a specific size (not N/A or Free Size)'); return; }
     const qty = parseInt(fQty) || 0;
     if (qty < 1) { setError('Initial quantity must be at least 1 (cannot be zero)'); return; }
     setSaving(true);

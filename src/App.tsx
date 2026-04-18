@@ -626,6 +626,8 @@ const canAlterSize = (a: string, b: string): boolean => {
   return Math.abs(ai - bi) === 1;
 };
 const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
+const isLehenga = (name: string) => /lehenga|lehnga|ghaghra/i.test(name);
+const isBottomType = (name: string) => /bottom|pant|trouser|skirt|salwar|churidar|palazzo/i.test(name);
 
 const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { globalSearch?: string; openItemId?: string | null; onItemOpened?: () => void; active?: boolean }) => {
   const [stage, setStage] = useState<'pending' | 'completed'>('pending');
@@ -943,9 +945,10 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
   const [pendingDelete, setPendingDelete] = useState<{ id: string; timer: number } | null>(null);
 
   const handleDelete = async (itemId: string) => {
-    // Soft-hide immediately, schedule permanent delete in 5s
     const item = items.find(i => i.id === itemId);
     if (!item) return;
+    if (item.paired_with) { addToast('Cannot delete — item is paired. Unpair first.', 'error'); return; }
+    if (item.status === 'completed') { addToast('Cannot delete a completed item.', 'error'); return; }
     setItems(prev => prev.filter(i => i.id !== itemId));
     const timer = window.setTimeout(async () => {
       await supabase.from('item_tags').delete().eq('inventory_item_id', itemId);
