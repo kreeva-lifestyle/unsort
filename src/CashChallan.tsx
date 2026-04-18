@@ -91,6 +91,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [showLedger, setShowLedger] = useState(false);
   const [showCashBook, setShowCashBook] = useState(false);
   const [ledgerCustomers, setLedgerCustomers] = useState<{ name: string; total: number; paid: number; outstanding: number; count: number }[]>([]);
+  const [ledgerFetchLimit, setLedgerFetchLimit] = useState(100);
   const [ledgerDetail, setLedgerDetail] = useState<string | null>(null);
   const [ledgerChallans, setLedgerChallans] = useState<Challan[]>([]);
   const [ledgerSearch, setLedgerSearch] = useState('');
@@ -115,7 +116,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Fetch challans ─────────────────────────────────────────────────────────
   const fetchChallans = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('cash_challans').select('*, cash_challan_items(sku)', { count: 'exact' });
+    let query = supabase.from('cash_challans').select('*, cash_challan_items(sku)', { count: 'estimated' });
     if (search) query = query.or(`customer_name.ilike.%${search}%,challan_number.eq.${isNaN(Number(search)) ? 0 : search}`);
     if (statusFilter) query = query.eq('status', statusFilter);
     if (tagFilter) query = query.contains('tags', [tagFilter]);
@@ -208,7 +209,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const toISO = new Date(analyticsTo + 'T23:59:59').toISOString();
     const [{ data }, { count: voidedCount }] = await Promise.all([
       supabase.from('cash_challans').select('total, payment_mode, status, is_return').gte('created_at', fromISO).lte('created_at', toISO).neq('status', 'voided'),
-      supabase.from('cash_challans').select('id', { count: 'exact', head: true }).gte('created_at', fromISO).lte('created_at', toISO).eq('status', 'voided'),
+      supabase.from('cash_challans').select('id', { count: 'estimated', head: true }).gte('created_at', fromISO).lte('created_at', toISO).eq('status', 'voided'),
     ]);
     const totalRevenue = (data || []).reduce((s: number, r: any) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
     const byMode: Record<string, number> = {};
@@ -219,9 +220,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   }, [analyticsFrom, analyticsTo]);
 
   // ── Fetch ledger (recent 10 customers) ──────────────────────────────────────
-  const fetchLedger = useCallback(async () => {
-    // Get last 10 distinct customers by most recent challan
-    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return, created_at').neq('status', 'voided').order('created_at', { ascending: false }).limit(100);
+  const fetchLedger = useCallback(async (limit = ledgerFetchLimit) => {
+    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return, created_at').neq('status', 'voided').order('created_at', { ascending: false }).limit(limit);
     const map: Record<string, { total: number; paid: number; count: number; latest: string }> = {};
     (data || []).forEach((r: any) => {
       const name = r.customer_name;
@@ -234,7 +234,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const list = Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count }));
     list.sort((a, b) => (map[b.name].latest > map[a.name].latest ? 1 : -1));
     setLedgerCustomers(list.slice(0, 10));
-  }, []);
+  }, [ledgerFetchLimit]);
 
   const searchLedgerCustomer = useCallback(async (q: string) => {
     if (!q.trim()) { fetchLedger(); return; }
@@ -281,7 +281,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (amountPaid < 0) { setFormError('Amount paid cannot be negative'); return; }
     if (amountPaid > grandTotal && !isReturn) { setFormError(`Amount paid (₹${amountPaid}) cannot exceed total (₹${grandTotal})`); return; }
     if (!paymentMode && amountPaid > 0) { setFormError('Select a payment mode when amount is paid'); return; }
+    if (editing && editing.status !== 'draft' && challanStatus === 'draft') { setFormError('Cannot revert to Draft once saved'); return; }
     if (challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(`Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
+    if (challanStatus === 'partial' && (amountPaid <= 0 || amountPaid >= grandTotal)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
     if (challanStatus === 'unpaid' && amountPaid > 0) { setFormError('Status is "Unpaid" but amount is paid. Change status to "Paid" or "Partial"'); return; }
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -318,22 +320,30 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       modified_by: user?.id,
     };
 
-    if (editing) {
-      const { data: current } = await supabase.from('cash_challans').select('updated_at').eq('id', editing.id).maybeSingle();
-      if (current && editing.updated_at && current.updated_at !== editing.updated_at) {
-        setFormError('This challan was modified by another user. Please close and reopen to get latest data.');
-        return;
-      }
-      await supabase.from('cash_challans').update({ ...challanData, updated_at: new Date().toISOString() }).eq('id', editing.id);
-      await supabase.from('cash_challan_items').delete().eq('challan_id', editing.id);
-      await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: editing.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100, sort_order: i })));
-      ccAudit('UPDATE', `Challan #${editing.challan_number} updated for ${customerName.trim()} - ₹${grandTotal}`);
-    } else {
-      const { data: newChallan } = await supabase.from('cash_challans').insert({ ...challanData, created_by: user?.id }).select('id, challan_number').single();
-      if (newChallan) {
-        await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: newChallan.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100, sort_order: i })));
+    try {
+      if (editing) {
+        const { data: current } = await supabase.from('cash_challans').select('updated_at').eq('id', editing.id).maybeSingle();
+        if (current && editing.updated_at && current.updated_at !== editing.updated_at) {
+          setFormError('This challan was modified by another user. Please close and reopen to get latest data.');
+          return;
+        }
+        const { error: upErr } = await supabase.from('cash_challans').update({ ...challanData, updated_at: new Date().toISOString() }).eq('id', editing.id);
+        if (upErr) throw new Error(upErr.message);
+        const { error: delErr } = await supabase.from('cash_challan_items').delete().eq('challan_id', editing.id);
+        if (delErr) throw new Error(delErr.message);
+        const { error: insErr2 } = await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: editing.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100, sort_order: i })));
+        if (insErr2) throw new Error(insErr2.message);
+        ccAudit('UPDATE', `Challan #${editing.challan_number} updated for ${customerName.trim()} - ₹${grandTotal}`);
+      } else {
+        const { data: newChallan, error: crErr } = await supabase.from('cash_challans').insert({ ...challanData, created_by: user?.id }).select('id, challan_number').single();
+        if (crErr || !newChallan) throw new Error(crErr?.message || 'Failed to create challan');
+        const { error: itErr } = await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: newChallan.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100, sort_order: i })));
+        if (itErr) throw new Error(itErr.message);
         ccAudit('CREATE', `${isReturn ? 'Return' : 'Challan'} #${newChallan.challan_number} created for ${customerName.trim()} - ₹${grandTotal}`);
       }
+    } catch (e: any) {
+      setFormError(`Save failed: ${e.message || 'Unknown error'}. Please try again.`);
+      return;
     }
     const wasNew = !editing;
     closeModal();
@@ -641,6 +651,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             </div>
           ))}
           {ledgerCustomers.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No customers found.</div>}
+          <button onClick={() => { const newLimit = ledgerFetchLimit + 500; setLedgerFetchLimit(newLimit); fetchLedger(newLimit); }} style={{ width: '100%', padding: '8px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer', borderRadius: '0 0 8px 8px' }}>Load More Customers</button>
         </div>
       </div>
     );
@@ -777,7 +788,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             <div>
               <label style={lbl}>Status</label>
               <select value={challanStatus} onChange={e => setChallanStatus(e.target.value)} style={{ ...inp, fontSize: 11 }}>
-                <option value="draft">Draft</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="partial">Partial</option>
+                {(!editing || editing.status === 'draft') && <option value="draft">Draft</option>}<option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="partial">Partial</option>
               </select>
             </div>
             <div>

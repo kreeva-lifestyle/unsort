@@ -1421,8 +1421,12 @@ const Categories = () => {
   };
 
   const deleteComp = async (id: string) => {
-    const { count } = await supabase.from('item_components').select('id', { count: 'exact', head: true }).eq('component_id', id);
-    if (count && count > 0) { addToast(`Cannot delete — ${count} item(s) use this component`, 'error'); return; }
+    const [{ count: itemCount }, { count: extraCount }] = await Promise.all([
+      supabase.from('item_components').select('id', { count: 'exact', head: true }).eq('component_id', id),
+      supabase.from('inventory_extras').select('id', { count: 'exact', head: true }).eq('component_id', id),
+    ]);
+    const total = (itemCount || 0) + (extraCount || 0);
+    if (total > 0) { addToast(`Cannot delete — used by ${itemCount || 0} item(s) and ${extraCount || 0} extra(s)`, 'error'); return; }
     await supabase.from('components').delete().eq('id', id); addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories();
   };
 
