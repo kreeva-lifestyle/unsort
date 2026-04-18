@@ -39,10 +39,10 @@ if (typeof window !== 'undefined') {
   document.addEventListener('click', warmAudio);
 }
 
-function beep(freq: number, dur: number, type: OscillatorType = 'square') {
+async function beep(freq: number, dur: number, type: OscillatorType = 'square') {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    if (audioCtx.state !== 'running') audioCtx.resume();
+    if (audioCtx.state !== 'running') await audioCtx.resume();
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.connect(g); g.connect(audioCtx.destination);
     o.type = type; o.frequency.value = freq; g.gain.value = 0.3;
@@ -873,7 +873,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             <button onClick={() => {
               const successScans = recentScans.filter(s => s.success);
               if (successScans.length === 0) { alert('No successful scans to export'); return; }
-              const csv = 'AWB,Time,Courier,Camera\n' + successScans.map(s => `${s.awb},${s.time},${courier},${camera}`).join('\n');
+              const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n');
               const blob = new Blob([csv], { type: 'text/csv' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
