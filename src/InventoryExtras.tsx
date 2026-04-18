@@ -151,7 +151,6 @@ export default function InventoryExtras() {
     if (qty < 1) { setError('Quantity must be at least 1'); return; }
     setSaving(true);
     const prod = products.find(p => p.id === fProductId);
-    const comp = fComps.find(c => c.id === fComponentId);
     const { data: { user } } = await supabase.auth.getUser();
     const { data, error: err } = await supabase.from('inventory_extras').insert({
       product_id: fProductId, product_name: prod?.name || '', component_id: fComponentId,
