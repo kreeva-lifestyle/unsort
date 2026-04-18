@@ -76,9 +76,9 @@ async function flushQueue() {
       batch.push(...item.rows);
     }
     try {
+      const headers = await getAuthHeaders();
       const resp = await fetch(EDGE_FN, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers,
         body: JSON.stringify({ action: 'batch', rows: batch, sheetName }),
       });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -106,12 +106,19 @@ if (typeof window !== 'undefined') {
       flushing = false;
       const pending = writeQueue.splice(0);
       for (const item of pending) {
-        navigator.sendBeacon(EDGE_FN, new Blob([JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName })], { type: 'application/json' }));
+        fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cachedToken}` }, body: JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName }), keepalive: true }).catch(() => {});
       }
       e.returnValue = '';
     }
   });
 }
+
+let cachedToken = '';
+const getAuthHeaders = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  cachedToken = session?.access_token || '';
+  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cachedToken}` };
+};
 
 // ── Component ───────────────────────────────────────────────────────────────────
 export default function PackTime({ active }: { active?: boolean } = {}) {
@@ -303,9 +310,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setCourierBrand(selectedBrand || c.brand || 'FUSIONIC');
     setVerifying(true); setVerifyResult(null);
     try {
+      const headers = await getAuthHeaders();
       const resp = await fetch(EDGE_FN, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers,
         body: JSON.stringify({ action: 'init', sheetName: c.sheet_name }),
       });
       const data = await resp.json();
@@ -415,8 +422,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     beep(500, 0.15);
     focusInput();
     // Background delete from Google Sheet + Supabase DB
-    fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
-      .then(r => r.json()).then(d => { if (!d.ok) console.error('Sheet undo failed:', d.error); }).catch(e => console.error('Sheet undo error:', e));
+    getAuthHeaders().then(headers => fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
+      .then(r => r.json()).then(d => { if (!d.ok) console.error('Sheet undo failed:', d.error); })).catch(e => console.error('Sheet undo error:', e));
     supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current);
   }, [lastScanned, courierSheet, focusInput]);
 
@@ -433,19 +440,19 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     if (lastScanned === awb) setLastScanned('');
     beep(500, 0.1);
     // Background delete from Google Sheet + Supabase DB
-    fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
-      .then(r => r.json()).then(d => { if (!d.ok) console.error('Sheet delete failed:', d.error); }).catch(e => console.error('Sheet delete error:', e));
+    getAuthHeaders().then(headers => fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
+      .then(r => r.json()).then(d => { if (!d.ok) console.error('Sheet delete failed:', d.error); })).catch(e => console.error('Sheet delete error:', e));
     supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current);
   }, [recentScans, lastScanned, courierSheet]);
 
   // ── Fetch today's summary across all couriers ──────────────────────────────
   const fetchTodaySummary = useCallback(async () => {
     const results: { courier: string; count: number }[] = [];
+    const headers = await getAuthHeaders();
     for (const c of couriers) {
       try {
         const resp = await fetch(EDGE_FN, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers,
           body: JSON.stringify({ action: 'init', sheetName: c.sheet_name }),
         });
         const data = await resp.json();
@@ -488,9 +495,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     const record = historyData.find(r => r.id === id);
     if (record && record.sheet_name) {
       try {
+        const headers = await getAuthHeaders();
         const resp = await fetch(EDGE_FN, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers,
           body: JSON.stringify({ action: 'delete', awb: record.awb, sheetName: record.sheet_name }),
         });
         const result = await resp.json();
