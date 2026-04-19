@@ -10,7 +10,6 @@ import type {
   ItemComponent,
   InventoryExtra,
   InventoryExtraHistory,
-  ActivityLogInsert,
 } from './types/database';
 
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', 'Semi-Stitched'];
@@ -160,9 +159,10 @@ export default function InventoryExtras() {
       setSaving(false); return;
     }
     // History entry
-    await supabase.from('inventory_extras_history').insert({
+    const { error: histErr } = await supabase.from('inventory_extras_history').insert({
       extra_id: data.id, action: 'created', quantity_change: qty, quantity_after: qty, user_id: user?.id,
     });
+    if (histErr) setError('Extra created but history log failed: ' + histErr.message);
     setSaving(false); setShowAdd(false);
     setFProductId(''); setFComponentId(''); setFSku(''); setFSize(''); setFQty('1'); setFNotes('');
     fetchExtras();
@@ -175,12 +175,19 @@ export default function InventoryExtras() {
     const newQty = adjustMode === 'add' ? adjustExtra.quantity + qty : adjustExtra.quantity - qty;
     if (newQty < 0) { setError('Cannot go below 0'); return; }
     const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('inventory_extras').update({ quantity: newQty, updated_at: new Date().toISOString() }).eq('id', adjustExtra.id);
-    await supabase.from('inventory_extras_history').insert({
+    // Optimistic concurrency check: fail if another user changed the quantity
+    const { data: updated, error: upErr } = await supabase.from('inventory_extras')
+      .update({ quantity: newQty, updated_at: new Date().toISOString() })
+      .eq('id', adjustExtra.id)
+      .eq('quantity', adjustExtra.quantity)
+      .select().single();
+    if (upErr || !updated) { setError('Another user just updated this extra. Close and reopen to retry.'); return; }
+    const { error: histErr } = await supabase.from('inventory_extras_history').insert({
       extra_id: adjustExtra.id, action: adjustMode === 'add' ? 'added' : 'removed',
       quantity_change: adjustMode === 'add' ? qty : -qty, quantity_after: newQty,
       reason: adjustReason.trim() || null, user_id: user?.id,
     });
+    if (histErr) setError('Quantity updated but history log failed: ' + histErr.message);
     setAdjustExtra(null); setAdjustQty('1'); setAdjustReason(''); fetchExtras();
   };
 
@@ -189,34 +196,14 @@ export default function InventoryExtras() {
     const { extra, item } = completeItem;
     if (extra.quantity < 1) { setError('No quantity available'); return; }
     setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    // 1. Decrement extra qty FIRST (race-safe check)
-    const newQty = extra.quantity - 1;
-    const { data: updated, error: upErr } = await supabase.from('inventory_extras')
-      .update({ quantity: newQty, updated_at: new Date().toISOString() }).eq('id', extra.id).gt('quantity', 0).select().single();
-    if (upErr || !updated) { setError('Race condition: extra already used by another user'); setSaving(false); return; }
-    // 2. Verify item still exists and is unsorted
-    const { data: freshItem } = await supabase.from('inventory_items').select('status').eq('id', item.id).maybeSingle();
-    if (!freshItem || freshItem.status !== 'unsorted') {
-      await supabase.from('inventory_extras').update({ quantity: extra.quantity }).eq('id', extra.id);
-      setError('Item no longer available (already completed or deleted)'); setSaving(false); return;
-    }
-    // 3. Mark inventory item complete
-    await supabase.from('inventory_items').update({ status: 'complete', updated_at: new Date().toISOString() }).eq('id', item.id);
-    // 4. Set missing component to present
-    await supabase.from('item_components').update({ status: 'present', notes: 'Filled from extras' })
-      .eq('inventory_item_id', item.id).eq('component_id', extra.component_id);
-    // 4. History
-    await supabase.from('inventory_extras_history').insert({
-      extra_id: extra.id, action: 'used', quantity_change: -1, quantity_after: newQty,
-      related_inventory_item_id: item.id, user_id: user?.id,
+    // Atomic RPC: decrements extra, verifies item, marks complete, fills
+    // component, and writes history + activity log — all in one transaction.
+    const { error } = await supabase.rpc('complete_item_with_extra', {
+      p_extra_id: extra.id,
+      p_item_id: item.id,
+      p_reason: null,
     });
-    // 5. Activity log
-    const logEntry: ActivityLogInsert = {
-      user_id: user?.id ?? null, action: 'complete-via-extra', entity_type: 'inventory_item',
-      entity_id: item.id, description: `Completed using extra ${extra.component_name} (SKU: ${extra.sku})`,
-    };
-    await supabase.from('activity_logs').insert(logEntry);
+    if (error) { setError(error.message); setSaving(false); return; }
     setSaving(false); setCompleteItem(null); setMatchExtra(null); fetchExtras();
   };
 

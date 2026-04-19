@@ -135,7 +135,8 @@ export default function CashBook() {
     if (!category) { setFormError('Category is required'); return; }
     const { data: { user } } = await supabase.auth.getUser();
     const payload: CashExpenseInsert = { date: entryDate, amount: amt, category, description: description.trim() || null, paid_by: user?.id ?? null };
-    await supabase.from('cash_expenses').insert(payload);
+    const { error } = await supabase.from('cash_expenses').insert(payload);
+    if (error) { setFormError('Save failed: ' + error.message); return; }
     setAmount(''); setDescription(''); setCategory(CATEGORIES[0]); setShowAdd(false);
     fetchData();
   };

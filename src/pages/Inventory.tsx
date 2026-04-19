@@ -307,15 +307,24 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     }
     // Save tags
     if (savedItemId && tagInput.trim()) {
-      await supabase.from('item_tags').delete().eq('inventory_item_id', savedItemId);
+      const { error: delTagErr } = await supabase.from('item_tags').delete().eq('inventory_item_id', savedItemId);
+      if (delTagErr) addToast('Tag update warning: ' + delTagErr.message, 'error');
       const tagNames = tagInput.split(',').map(t => t.trim()).filter(Boolean);
       for (const name of tagNames) {
         let { data: existing } = await supabase.from('tags').select('id').eq('name', name).maybeSingle();
-        if (!existing) { const { data: created } = await supabase.from('tags').insert({ name }).select('id').single(); existing = created; }
-        if (existing) await supabase.from('item_tags').insert({ inventory_item_id: savedItemId, tag_id: existing.id });
+        if (!existing) {
+          const { data: created, error: createErr } = await supabase.from('tags').insert({ name }).select('id').single();
+          if (createErr) { addToast(`Tag "${name}" failed: ${createErr.message}`, 'error'); continue; }
+          existing = created;
+        }
+        if (existing) {
+          const { error: linkErr } = await supabase.from('item_tags').insert({ inventory_item_id: savedItemId, tag_id: existing.id });
+          if (linkErr) addToast(`Tag "${name}" link failed: ${linkErr.message}`, 'error');
+        }
       }
     } else if (savedItemId && !tagInput.trim()) {
-      await supabase.from('item_tags').delete().eq('inventory_item_id', savedItemId);
+      const { error: delTagErr } = await supabase.from('item_tags').delete().eq('inventory_item_id', savedItemId);
+      if (delTagErr) addToast('Tag clear warning: ' + delTagErr.message, 'error');
     }
 
     const savedProductId = form.product_id;
