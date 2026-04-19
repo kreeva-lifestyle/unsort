@@ -7,6 +7,9 @@
  *   - XxxInsert:  Shape for INSERT. Auto-generated fields and fields with DB defaults
  *                 are optional. Required fields are plain strings.
  *
+ * Naming note: the `components` table is exported as `ProductComponent` (not `Component`)
+ * to avoid colliding with `React.Component` in files that import both.
+ *
  * When schema changes: update DATABASE-SCHEMA.md first, then this file, then consumers.
  * Do NOT redefine these types inline in feature files — import from here.
  */
@@ -66,8 +69,9 @@ export type ProductInsert = {
 };
 
 // ─── components (7 cols) ─────────────────────────────────────────────────
+// Exported as ProductComponent to avoid clashing with React.Component.
 
-export interface Component {
+export interface ProductComponent {
   id: string;
   product_id: string;
   component_code: string;
@@ -77,7 +81,7 @@ export interface Component {
   created_at: string | null;
 }
 
-export type ComponentInsert = {
+export type ProductComponentInsert = {
   id?: string;
   product_id: string;
   component_code: string;
@@ -238,6 +242,64 @@ export type DamageReportInsert = {
   reported_by?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+// ─── inventory_extras (12 cols) ──────────────────────────────────────────
+
+export interface InventoryExtra {
+  id: string;
+  product_id: string;
+  product_name: string;
+  component_id: string;
+  component_name: string;
+  sku: string;
+  size: string;
+  quantity: number;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export type InventoryExtraInsert = {
+  id?: string;
+  product_id: string;
+  product_name: string;
+  component_id: string;
+  component_name: string;
+  sku: string;
+  size: string;
+  quantity: number;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+// ─── inventory_extras_history (9 cols) ───────────────────────────────────
+
+export interface InventoryExtraHistory {
+  id: string;
+  extra_id: string | null;
+  action: string;
+  quantity_change: number;
+  quantity_after: number;
+  reason: string | null;
+  related_inventory_item_id: string | null;
+  user_id: string | null;
+  created_at: string | null;
+}
+
+export type InventoryExtraHistoryInsert = {
+  id?: string;
+  extra_id?: string | null;
+  action: string;
+  quantity_change: number;
+  quantity_after: number;
+  reason?: string | null;
+  related_inventory_item_id?: string | null;
+  user_id?: string | null;
+  created_at?: string | null;
 };
 
 // ─── Status enum helpers ─────────────────────────────────────────────────
