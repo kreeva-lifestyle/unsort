@@ -1,25 +1,45 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import CashBook from './CashBook';
 import { supabase } from './lib/supabase';
+import type {
+  CashChallan,
+  CashChallanItem as DbCashChallanItem,
+  CashChallanCustomer,
+  AuditLog,
+  AuditLogInsert,
+} from './types/database';
 
 const ccAudit = (action: string, details: string) => {
   supabase.auth.getUser().then(({ data }) => {
-    supabase.from('audit_log').insert({ action, module: 'cash_challan', details, user_id: data.user?.id });
+    const entry: AuditLogInsert = { action, module: 'cash_challan', details, user_id: data.user?.id ?? null };
+    supabase.from('audit_log').insert(entry);
   });
 };
 
 import { T } from './lib/theme';
 
+// View model: form-state representation of a cash_challan_items row.
+// Differs from DB row: `id` optional (unsaved items), no challan_id/sort_order
+// (managed at save-time), discount_* are optional (defaulted to flat/0).
 interface ChallanItem { id?: string; sku: string; description: string; quantity: number; price: number; total: number; discount_type?: string; discount_value?: number; discount_amount?: number; }
-interface Challan {
-  id: string; challan_number: number; customer_id: string | null; customer_name: string;
-  status: string; subtotal: number; discount_type: string | null; discount_value: number;
-  discount_amount: number; round_off: number; total: number; amount_paid: number;
-  payment_mode: string | null; payment_date: string | null; notes: string; tags: string[];
-  created_by: string; modified_by: string; voided_by: string | null; voided_at: string | null;
-  created_at: string; updated_at: string; items?: ChallanItem[];
-}
-interface Customer { id: string; name: string; phone: string; address: string; }
+
+// Local widened status union. The app writes values beyond what Phase 3.7.5
+// captured (the DB column is free-text); follow-up work: tighten the central
+// CashChallan.status union to match reality.
+type ChallanStatus = 'draft' | 'unpaid' | 'paid' | 'partial' | 'voided';
+
+// View model: central CashChallan row + widened status + joined nested items.
+// created_at/updated_at asserted non-null — DB defaults always populate them.
+type Challan = Omit<CashChallan, 'status' | 'created_at' | 'updated_at'> & {
+  status: ChallanStatus;
+  created_at: string;
+  updated_at: string;
+  items?: ChallanItem[];
+  cash_challan_items?: Array<Partial<DbCashChallanItem>>;
+};
+
+// Narrow customer row used by the auto-suggest dropdown.
+type Customer = Pick<CashChallanCustomer, 'id' | 'name' | 'phone' | 'address'>;
 
 const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   draft: { bg: 'rgba(56,189,248,.10)', color: T.bl },
@@ -58,11 +78,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [challanStatus, setChallanStatus] = useState('draft');
   const [customerPhone, setCustomerPhone] = useState('');
   const [isReturn, setIsReturn] = useState(false);
-  const [returnSource, setReturnSource] = useState<any>(null);
+  const [returnSource, setReturnSource] = useState<Challan | null>(null);
   const [returnSearchQ, setReturnSearchQ] = useState('');
-  const [returnResults, setReturnResults] = useState<any[]>([]);
-  const [auditTrail, setAuditTrail] = useState<any[] | null>(null);
-  const [reminderChallan, setReminderChallan] = useState<any | null>(null);
+  const [returnResults, setReturnResults] = useState<Challan[]>([]);
+  const [auditTrail, setAuditTrail] = useState<AuditLog[] | null>(null);
+  const [reminderChallan, setReminderChallan] = useState<Challan | null>(null);
   const [reminderPhone, setReminderPhone] = useState('');
 
   // Analytics
@@ -70,7 +90,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [userName, setUserName] = useState('there');
   const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number } | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number> }>({ totalRevenue: 0, count: 0, byMode: {} });
+  const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number>; returnsCount?: number; voidedCount?: number }>({ totalRevenue: 0, count: 0, byMode: {} });
   const [analyticsFrom, setAnalyticsFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; });
   const [analyticsTo, setAnalyticsTo] = useState(() => new Date().toISOString().slice(0, 10));
 
@@ -114,7 +134,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (tagFilter) query = query.contains('tags', [tagFilter]);
     query = query.order('created_at', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
     const { data, count } = await query;
-    setChallans(data || []);
+    setChallans((data as Challan[] | null) || []);
     setTotalCount(count || 0);
     setLoading(false);
   }, [search, statusFilter, tagFilter, page, pageSize]);
@@ -164,10 +184,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (num && !isNaN(num)) query = query.eq('challan_number', num);
     else query = query.ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
     const { data } = await query.order('created_at', { ascending: false }).limit(10);
-    setReturnResults(data || []);
+    setReturnResults((data as Challan[] | null) || []);
   }, []);
 
-  const selectReturnSource = (challan: any) => {
+  const selectReturnSource = (challan: Challan) => {
     if (challan.status === 'voided') { setReturnResults([]); return; }
     if (challan.is_return) { setReturnResults([]); return; }
     setReturnSource(challan);
@@ -175,9 +195,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setReturnSearchQ('');
     setCustomerName(challan.customer_name);
     setSelectedCustomerId(challan.customer_id);
-    const sourceItems = (challan.cash_challan_items || []).map((it: any) => ({
-      sku: it.sku, description: it.description, quantity: it.quantity, price: Number(it.price),
-      total: Number(it.total), discount_type: it.discount_type || 'flat', discount_value: Number(it.discount_value || 0), discount_amount: Number(it.discount_amount || 0),
+    const sourceItems: ChallanItem[] = (challan.cash_challan_items || []).map((it) => ({
+      sku: it.sku ?? '', description: it.description ?? '', quantity: it.quantity ?? 0, price: Number(it.price ?? 0),
+      total: Number(it.total ?? 0), discount_type: it.discount_type || 'flat', discount_value: Number(it.discount_value || 0), discount_amount: Number(it.discount_amount || 0),
     }));
     setItems(sourceItems);
   };
@@ -186,9 +206,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const searchCustomers = useCallback(async (q: string) => {
     if (q.length < 2) { setCustomerSuggestions([]); return; }
     const { data } = await supabase.from('cash_challan_customers').select('*').ilike('name', `%${q.replace(/[%_]/g, '\\$&')}%`).limit(5);
-    setCustomerSuggestions(data || []);
+    const rows = (data as Customer[] | null) || [];
+    setCustomerSuggestions(rows);
     // Auto-fill phone if exact match found (case-insensitive)
-    const exact = (data || []).find((c: any) => c.name.toLowerCase() === q.trim().toLowerCase());
+    const exact = rows.find((c) => c.name.toLowerCase() === q.trim().toLowerCase());
     if (exact) {
       setSelectedCustomerId(exact.id);
       if (exact.phone) setCustomerPhone(exact.phone);
@@ -201,26 +222,29 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const fetchAnalytics = useCallback(async () => {
     const fromISO = new Date(analyticsFrom + 'T00:00:00').toISOString();
     const toISO = new Date(analyticsTo + 'T23:59:59').toISOString();
+    type AnalyticsRow = Pick<CashChallan, 'total' | 'payment_mode' | 'status' | 'is_return'>;
     const [{ data }, { count: voidedCount }] = await Promise.all([
       supabase.from('cash_challans').select('total, payment_mode, status, is_return').gte('created_at', fromISO).lte('created_at', toISO).neq('status', 'voided'),
       supabase.from('cash_challans').select('id', { count: 'estimated', head: true }).gte('created_at', fromISO).lte('created_at', toISO).eq('status', 'voided'),
     ]);
-    const totalRevenue = (data || []).reduce((s: number, r: any) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
+    const rows = (data as AnalyticsRow[] | null) || [];
+    const totalRevenue = rows.reduce((s, r) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
     const byMode: Record<string, number> = {};
-    (data || []).forEach((r: any) => { const m = r.payment_mode || 'Unset'; byMode[m] = (byMode[m] || 0) + (r.is_return ? -1 : 1) * Number(r.total); });
-    const salesCount = (data || []).filter((r: any) => !r.is_return).length;
-    const returnsCount = (data || []).filter((r: any) => r.is_return).length;
-    setAnalytics({ totalRevenue, count: salesCount, byMode, returnsCount, voidedCount: voidedCount || 0 } as any);
+    rows.forEach((r) => { const m = r.payment_mode || 'Unset'; byMode[m] = (byMode[m] || 0) + (r.is_return ? -1 : 1) * Number(r.total); });
+    const salesCount = rows.filter((r) => !r.is_return).length;
+    const returnsCount = rows.filter((r) => r.is_return).length;
+    setAnalytics({ totalRevenue, count: salesCount, byMode, returnsCount, voidedCount: voidedCount || 0 } as typeof analytics);
   }, [analyticsFrom, analyticsTo]);
 
   // ── Fetch ledger (recent 10 customers) ──────────────────────────────────────
   const fetchLedger = useCallback(async (limit = ledgerFetchLimit) => {
     const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return, created_at').neq('status', 'voided').order('created_at', { ascending: false }).limit(limit);
+    type LedgerRow = Pick<CashChallan, 'customer_name' | 'total' | 'amount_paid' | 'is_return' | 'created_at'>;
     const map: Record<string, { total: number; paid: number; count: number; latest: string }> = {};
-    (data || []).forEach((r: any) => {
+    ((data as LedgerRow[] | null) || []).forEach((r) => {
       const name = r.customer_name;
       const sign = r.is_return ? -1 : 1;
-      if (!map[name]) map[name] = { total: 0, paid: 0, count: 0, latest: r.created_at };
+      if (!map[name]) map[name] = { total: 0, paid: 0, count: 0, latest: r.created_at ?? '' };
       map[name].total += sign * Number(r.total);
       map[name].paid += sign * Number(r.amount_paid || 0);
       map[name].count++;
@@ -233,8 +257,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const searchLedgerCustomer = useCallback(async (q: string) => {
     if (!q.trim()) { fetchLedger(); return; }
     const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return').neq('status', 'voided').ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
+    type LedgerSearchRow = Pick<CashChallan, 'customer_name' | 'total' | 'amount_paid' | 'is_return'>;
     const map: Record<string, { total: number; paid: number; count: number }> = {};
-    (data || []).forEach((r: any) => {
+    ((data as LedgerSearchRow[] | null) || []).forEach((r) => {
       const name = r.customer_name;
       const sign = r.is_return ? -1 : 1;
       if (!map[name]) map[name] = { total: 0, paid: 0, count: 0 };
@@ -249,7 +274,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setLedgerDetail(name);
     window.history.pushState({ view: 'ledger-detail' }, '');
     const { data } = await supabase.from('cash_challans').select('*').ilike('customer_name', name.replace(/[%_]/g, '\\$&')).neq('status', 'voided').order('created_at', { ascending: false }).limit(500);
-    setLedgerChallans(data || []);
+    setLedgerChallans((data as Challan[] | null) || []);
   }, []);
 
   // ── Save challan ───────────────────────────────────────────────────────────
@@ -274,18 +299,21 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       const sourceItems = returnSource.cash_challan_items || [];
       // Check cumulative returns — fetch all previous returns for this source
       const { data: prevReturns } = await supabase.from('cash_challans').select('id').eq('source_challan_id', returnSource.id).eq('is_return', true).neq('status', 'voided');
-      const prevReturnIds = (prevReturns || []).map((r: any) => r.id).filter((id: string) => !editing || id !== editing.id);
+      type IdRow = Pick<CashChallan, 'id'>;
+      const prevReturnIds = ((prevReturns as IdRow[] | null) || []).map((r) => r.id).filter((id) => !editing || id !== editing.id);
       const prevQtyMap: Record<string, number> = {};
       if (prevReturnIds.length > 0) {
         const { data: prevItems } = await supabase.from('cash_challan_items').select('sku, quantity').in('challan_id', prevReturnIds);
-        (prevItems || []).forEach((pi: any) => { prevQtyMap[pi.sku] = (prevQtyMap[pi.sku] || 0) + pi.quantity; });
+        type PrevItemRow = Pick<DbCashChallanItem, 'sku' | 'quantity'>;
+        ((prevItems as PrevItemRow[] | null) || []).forEach((pi) => { const key = pi.sku ?? ''; prevQtyMap[key] = (prevQtyMap[key] || 0) + pi.quantity; });
       }
       for (const it of items) {
-        const src = sourceItems.find((s: any) => s.sku === it.sku);
+        const src = sourceItems.find((s: Partial<DbCashChallanItem>) => s.sku === it.sku);
         if (!src) continue;
+        const srcQty = src.quantity ?? 0;
         const alreadyReturned = prevQtyMap[it.sku] || 0;
-        const remaining = src.quantity - alreadyReturned;
-        if (it.quantity > remaining) { setFormError(`"${it.sku}": only ${remaining} remaining (${alreadyReturned} already returned of ${src.quantity})`); return; }
+        const remaining = srcQty - alreadyReturned;
+        if (it.quantity > remaining) { setFormError(`"${it.sku}": only ${remaining} remaining (${alreadyReturned} already returned of ${srcQty})`); return; }
       }
     }
     if (subtotal <= 0) { setFormError('Subtotal must be greater than zero'); return; }
@@ -530,7 +558,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── WhatsApp share ─────────────────────────────────────────────────────────
   const shareChallan = (c: Challan) => {
-    const text = `*Cash Challan #${c.challan_number}*\nCustomer: ${c.customer_name}\nDate: ${new Date(c.created_at).toLocaleDateString('en-IN')}\nTotal: ₹${Number(c.total).toFixed(2)}\nStatus: ${c.status.toUpperCase()}\n${c.amount_paid > 0 ? `Paid: ₹${Number(c.amount_paid).toFixed(2)}` : ''}\n\n_Powered by DailyOffice_`;
+    const text = `*Cash Challan #${c.challan_number}*\nCustomer: ${c.customer_name}\nDate: ${new Date(c.created_at).toLocaleDateString('en-IN')}\nTotal: ₹${Number(c.total).toFixed(2)}\nStatus: ${c.status.toUpperCase()}\n${(c.amount_paid ?? 0) > 0 ? `Paid: ₹${Number(c.amount_paid).toFixed(2)}` : ''}\n\n_Powered by DailyOffice_`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -856,7 +884,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
               <div key={a.id} style={{ padding: '8px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
                   <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: a.action === 'VOID' ? 'rgba(239,68,68,.12)' : a.action === 'CREATE' ? 'rgba(34,197,94,.12)' : 'rgba(99,102,241,.12)', color: a.action === 'VOID' ? T.re : a.action === 'CREATE' ? T.gr : T.ac2, fontWeight: 700 }}>{a.action}</span>
-                  <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>{new Date(a.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                  <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>{a.created_at ? new Date(a.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
                 </div>
                 <div style={{ color: T.tx2, fontSize: 11 }}>{a.details}</div>
               </div>
@@ -957,7 +985,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
               <div key={a.id} style={{ padding: '8px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
                   <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: a.action === 'VOID' ? 'rgba(239,68,68,.12)' : a.action === 'CREATE' ? 'rgba(34,197,94,.12)' : 'rgba(99,102,241,.12)', color: a.action === 'VOID' ? T.re : a.action === 'CREATE' ? T.gr : T.ac2, fontWeight: 700 }}>{a.action}</span>
-                  <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>{new Date(a.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                  <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>{a.created_at ? new Date(a.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
                 </div>
                 <div style={{ color: T.tx2, fontSize: 11 }}>{a.details}</div>
               </div>
