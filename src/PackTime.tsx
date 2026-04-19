@@ -10,7 +10,7 @@ const supabase = createClient(
 
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
 
-import { T } from './theme';
+import { T } from './lib/theme';
 
 interface Courier { id: string; name: string; sheet_name: string; brand: string; }
 interface Camera { id: string; number: string; }

@@ -7,7 +7,7 @@ const supabase = createClient('https://ulphprdnswznfztawbvg.supabase.co', 'eyJhb
 const btAudit = (action: string, details: string) => { supabase.auth.getUser().then(({ data }) => { supabase.from('audit_log').insert({ action, module: 'brand_tags', details, user_id: data.user?.id }); }); };
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
-import { T } from './theme';
+import { T } from './lib/theme';
 
 // ── Reusable style helpers ─────────────────────────────────────────────────────
 const btnBase: React.CSSProperties = {
