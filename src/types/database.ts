@@ -4,7 +4,8 @@
  *
  * Covers the 8 core tables, the 2 inventory_extras* tables, the 6 cash_*
  * tables used by the invoicing / cash-book modules, the brand_tags catalogue,
- * and the cross-module audit_log.
+ * the cross-module audit_log, the brands directory, and the 3 packtime_*
+ * tables used by the Pack Station scanning workflow.
  *
  * Each table has two types:
  *   - Xxx:        Row shape as returned by SELECT. Nullable DB columns are `| null`.
@@ -556,6 +557,84 @@ export type AuditLogInsert = {
   user_id?: string | null;
   user_email?: string | null;
   created_at?: string | null;
+};
+
+// ─── brands (4 cols) ─────────────────────────────────────────────────────
+
+export interface Brand {
+  id: string;
+  name: string;
+  is_active: boolean | null;
+  created_at: string | null;
+}
+
+export type BrandInsert = {
+  id?: string;
+  name: string;
+  is_active?: boolean | null;
+  created_at?: string | null;
+};
+
+// ─── packtime_cameras (4 cols) ───────────────────────────────────────────
+
+export interface PackTimeCamera {
+  id: string;
+  number: string;
+  is_active: boolean | null;
+  created_at: string | null;
+}
+
+export type PackTimeCameraInsert = {
+  id?: string;
+  number: string;
+  is_active?: boolean | null;
+  created_at?: string | null;
+};
+
+// ─── packtime_couriers (6 cols) ──────────────────────────────────────────
+
+export interface PackTimeCourier {
+  id: string;
+  name: string;
+  sheet_name: string;
+  is_active: boolean | null;
+  created_at: string | null;
+  brand: string | null;
+}
+
+export type PackTimeCourierInsert = {
+  id?: string;
+  name: string;
+  sheet_name: string;
+  is_active?: boolean | null;
+  created_at?: string | null;
+  brand?: string | null;
+};
+
+// ─── packtime_scans (9 cols) ─────────────────────────────────────────────
+
+export interface PackTimeScan {
+  id: string;
+  session_id: string;
+  awb: string;
+  courier: string;
+  camera: string;
+  sheet_name: string;
+  scanned_at: string | null;
+  user_id: string | null;
+  brand: string | null;
+}
+
+export type PackTimeScanInsert = {
+  id?: string;
+  session_id: string;
+  awb: string;
+  courier: string;
+  camera: string;
+  sheet_name: string;
+  scanned_at?: string | null;
+  user_id?: string | null;
+  brand?: string | null;
 };
 
 // ─── Status enum helpers ─────────────────────────────────────────────────
