@@ -368,6 +368,60 @@ Tables in the `cash_*` namespace support the Cash Book and Cash Challan (invoici
 
 ---
 
+## Brand tagging + cross-module audit
+
+### `brand_tags` (16 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| brand | NO | text |
+| ean | NO | text |
+| sku | NO | text |
+| qty | NO | text |
+| mrp | NO | numeric |
+| size | NO | text |
+| product | NO | text |
+| color | NO | text |
+| mktd | NO | text |
+| jio_code | NO | text |
+| copies | NO | integer |
+| created_by | YES | uuid |
+| created_at | YES | timestamptz |
+| updated_at | YES | timestamptz |
+| search_text | YES | text |
+
+**Notes:**
+- Master catalogue for printable brand labels (Tanuka / Fusionic / Svaraa). One row per EAN+SKU+size.
+- Upsert conflict key used by the app: `(ean, sku, size)`.
+- `qty` is a free-text "INCLUDES: …" string (not a count); `mrp` is numeric (rupees).
+- `jio_code` is the barcode payload used for label printing.
+- `search_text` is a nullable denormalised search column (likely populated by a DB trigger) — clients filter with `ilike` on it. Not written from the app.
+- Feature file `BrandTagPrinter.tsx` uses a local UI view model named `BrandTagRow` that camel-cases `jio_code` → `jioCode`; it composes from the central `BrandTag` type.
+
+---
+
+### `audit_log` (8 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| action | NO | text |
+| module | NO | text |
+| record_id | YES | text |
+| details | YES | text |
+| user_id | YES | uuid |
+| user_email | YES | text |
+| created_at | YES | timestamptz |
+
+**Notes:**
+- Cross-module audit trail distinct from `activity_logs`. Written by `btAudit()` in BrandTagPrinter and `ccAudit()` in CashChallan (and likely elsewhere).
+- `module` identifies the feature area (e.g. `brand_tags`, `cash_challan`).
+- `record_id` is text, not uuid — lets the table record primary keys from mixed sources.
+- `user_email` is a denormalised snapshot for the case where the profile row is later deleted.
+
+---
+
 ## Known drift from `UNSORT-CLAUDE-CODE-CONTEXT.md`
 
 The old context doc is stale. Highlights:
