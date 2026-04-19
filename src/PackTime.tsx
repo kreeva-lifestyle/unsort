@@ -99,39 +99,35 @@ if (typeof window !== 'undefined') {
       flushing = false;
       const pending = writeQueue.splice(0);
       for (const item of pending) {
-        fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cachedToken}`, 'apikey': SUPABASE_ANON_KEY }, body: JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName }), keepalive: true }).catch(() => {});
+        fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body: JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName }), keepalive: true }).catch(() => {});
       }
       e.returnValue = '';
     }
   });
 }
 
-let cachedToken = '';
-const getAuthHeaders = async (forceRefresh = false) => {
-  let session = (await supabase.auth.getSession()).data.session;
-  // If token is missing or within 60s of expiry, refresh so the Edge Function
-  // gateway doesn't reject with 401 due to a stale cached JWT.
-  const nearExpiry = !!session && typeof session.expires_at === 'number'
-    && session.expires_at - Math.floor(Date.now() / 1000) < 60;
-  if (forceRefresh || !session || nearExpiry) {
-    const { data } = await supabase.auth.refreshSession();
-    if (data.session) session = data.session;
-  }
-  cachedToken = session?.access_token || '';
-  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cachedToken}`, 'apikey': SUPABASE_ANON_KEY };
-};
+// The packtime Edge Function is authenticated by the Supabase gateway via
+// apikey + Authorization; it does not consume the user's JWT (it uses a Google
+// service account internally). The project now issues user sessions as ES256,
+// but the function's runtime only verifies HS256, so forwarding the user token
+// produced "HTTP 401 — Unsupported JWT algorithm ES256". Sending the anon key
+// (HS256) in both headers satisfies verify_jwt without changing function code.
+const getAuthHeaders = async () => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  'apikey': SUPABASE_ANON_KEY,
+});
 
-// POST to the packtime Edge Function with a timeout, auth refresh on 401/403,
-// and a single retry on transient network failures. Returns a parsed body plus
-// diagnostic fields so the UI can show real error text instead of a generic
-// "Cannot connect to server".
+// POST to the packtime Edge Function with a timeout and a single retry on
+// transient network failures. Returns a parsed body plus diagnostic fields so
+// the UI can show real error text instead of a generic "Cannot connect".
 async function callEdge(body: unknown, timeoutMs = 20000): Promise<any> {
   let lastDetails = '';
   for (let attempt = 0; attempt < 2; attempt++) {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), timeoutMs);
     try {
-      const headers = await getAuthHeaders(attempt === 1);
+      const headers = await getAuthHeaders();
       const resp = await fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify(body), signal: ctl.signal });
       clearTimeout(t);
       const text = await resp.text();
@@ -140,8 +136,6 @@ async function callEdge(body: unknown, timeoutMs = 20000): Promise<any> {
       if (resp.ok) return parsed ?? { ok: false, error: 'Empty response from server.' };
       const gatewayMsg = parsed?.error || parsed?.message || parsed?.msg || text.slice(0, 180);
       lastDetails = `HTTP ${resp.status}${gatewayMsg ? ` — ${gatewayMsg}` : ''}`;
-      // 401/403 means auth was rejected at the gateway — refresh and retry once.
-      if ((resp.status === 401 || resp.status === 403) && attempt === 0) continue;
       return { ok: false, error: resp.status >= 500 ? 'Server error. Try again in a moment.' : 'Request rejected by server.', details: lastDetails };
     } catch (err: any) {
       clearTimeout(t);
