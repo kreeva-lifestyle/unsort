@@ -22,10 +22,10 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
 
   const loadPin = useCallback(async () => {
     if (!profile?.id) return;
-    const { data } = await supabase.from('profiles').select('cash_pin, phone').eq('id', profile.id).maybeSingle();
-    const pin = data?.cash_pin || '';
+    const { data: pin } = await supabase.rpc('get_own_pin');
     setPinExists(!!pin);
-    setMyPhone(data?.phone || '');
+    const { data: prof } = await supabase.from('profiles').select('phone').eq('id', profile.id).maybeSingle();
+    setMyPhone(prof?.phone || '');
   }, [profile?.id]);
 
   useEffect(() => { loadPin(); }, [loadPin]);
@@ -63,7 +63,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     addToast('Cash PIN removed', 'success');
   };
 
-  const fetchUsers = () => { supabase.from('profiles').select('*').order('created_at', { ascending: false }).then(({ data }) => setUsers(data || [])); };
+  const fetchUsers = () => { supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').order('created_at', { ascending: false }).then(({ data }) => setUsers(data || [])); };
   useEffect(() => {
     fetchUsers();
     const ch = supabase.channel('usr-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fetchUsers).subscribe();
