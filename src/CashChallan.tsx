@@ -408,7 +408,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   // ── WhatsApp payment reminder ──────────────────────────────────────────────
-  const sendReminder = async (c: any) => {
+  const sendReminder = async (c: Challan) => {
     const outstanding = Number(c.total) - Number(c.amount_paid || 0);
     // Try to get saved phone
     const { data: cust } = await supabase.from('cash_challan_customers').select('phone').eq('name', c.customer_name).maybeSingle();
@@ -438,13 +438,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (ledgerChallans.length === 0) return;
     const safeName = escHtml(customerName);
     const cust = ledgerCustomers.find(c => c.name === customerName);
-    const netTotal = ledgerChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.total), 0);
-    const totalPaid = ledgerChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
+    const netTotal = ledgerChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total), 0);
+    const totalPaid = ledgerChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
     const outstanding = Math.round((netTotal - totalPaid) * 100) / 100;
-    const totalBilled = ledgerChallans.filter(c => !(c as any).is_return).reduce((s, c) => s + Number(c.total), 0);
-    const totalReturns = ledgerChallans.filter(c => (c as any).is_return).reduce((s, c) => s + Number(c.total), 0);
+    const totalBilled = ledgerChallans.filter(c => !c.is_return).reduce((s, c) => s + Number(c.total), 0);
+    const totalReturns = ledgerChallans.filter(c => c.is_return).reduce((s, c) => s + Number(c.total), 0);
     const rows = ledgerChallans.map(c => {
-      const isRet = (c as any).is_return;
+      const isRet = c.is_return;
       const sign = isRet ? -1 : 1;
       return `<tr>
         <td>#${c.challan_number}</td>
@@ -507,9 +507,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setCustomerName(c.customer_name);
     setSelectedCustomerId(c.customer_id);
     setCustomerPhone(cust?.phone || '');
-    setIsReturn(!!(c as any).is_return);
+    setIsReturn(!!c.is_return);
     setItems((citems || []).map(i => ({ sku: i.sku || '', description: i.description, quantity: i.quantity, price: Number(i.price), total: Number(i.total), discount_type: i.discount_type || 'flat', discount_value: Number(i.discount_value || 0), discount_amount: Number(i.discount_amount || 0) })));
-    setShippingCharges(Number((c as any).shipping_charges || 0));
+    setShippingCharges(Number(c.shipping_charges || 0));
     setNotes(c.notes || '');
     setTags((c.tags || []).join(', '));
     setPaymentMode(c.payment_mode || '');
@@ -533,22 +533,22 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const w = window.open('', '_blank');
     if (!w) return;
     w.document.write(`<html><head><title>Cash Challan #${c.challan_number}</title><style>body{font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:auto}table{width:100%;border-collapse:collapse;margin:12px 0}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f5f5;font-weight:600}.right{text-align:right}.header{text-align:center;margin-bottom:16px}.status{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}</style></head><body>`);
-    w.document.write(`<div class="header"><h2 style="margin:0">Arya Designs</h2><p style="color:#666;font-size:11px;margin:4px 0">${(c as any).is_return ? 'Return Challan' : 'Cash Challan'} #${c.challan_number} | ${new Date(c.created_at).toLocaleDateString('en-IN')}</p></div>`);
+    w.document.write(`<div class="header"><h2 style="margin:0">Arya Designs</h2><p style="color:#666;font-size:11px;margin:4px 0">${c.is_return ? 'Return Challan' : 'Cash Challan'} #${c.challan_number} | ${new Date(c.created_at).toLocaleDateString('en-IN')}</p></div>`);
     w.document.write(`<p><strong>Customer:</strong> ${c.customer_name}</p>`);
     w.document.write(`<table><thead><tr><th>#</th><th>SKU</th><th class="right">Qty</th><th class="right">Price</th><th class="right">Disc.</th><th class="right">Total</th></tr></thead><tbody>`);
-    (citems || []).forEach((it: any, i: number) => { const da = Number(it.discount_amount || 0); w.document.write(`<tr><td>${i + 1}</td><td>${it.sku || '-'}</td><td class="right">${it.quantity}</td><td class="right">${Number(it.price).toFixed(2)}</td><td class="right">${da > 0 ? '-' + da.toFixed(2) : '-'}</td><td class="right">${Number(it.total).toFixed(2)}</td></tr>`); });
+    (citems || []).forEach((it, i) => { const da = Number(it.discount_amount || 0); w.document.write(`<tr><td>${i + 1}</td><td>${it.sku || '-'}</td><td class="right">${it.quantity}</td><td class="right">${Number(it.price).toFixed(2)}</td><td class="right">${da > 0 ? '-' + da.toFixed(2) : '-'}</td><td class="right">${Number(it.total).toFixed(2)}</td></tr>`); });
     w.document.write(`</tbody></table>`);
     w.document.write(`<div style="text-align:right;font-size:12px"><p>Subtotal: <strong>${Number(c.subtotal).toFixed(2)}</strong></p>`);
     if (Number(c.discount_amount) > 0) w.document.write(`<p>Discount: -${Number(c.discount_amount).toFixed(2)}</p>`);
-    if (Number((c as any).shipping_charges) > 0) w.document.write(`<p>Shipping/Porter: +${Number((c as any).shipping_charges).toFixed(2)}</p>`);
+    if (Number(c.shipping_charges) > 0) w.document.write(`<p>Shipping/Porter: +${Number(c.shipping_charges).toFixed(2)}</p>`);
     if (Number(c.round_off) !== 0) w.document.write(`<p>Round Off: ${Number(c.round_off).toFixed(2)}</p>`);
     w.document.write(`<p style="font-size:16px;font-weight:700">Total: ₹${Number(c.total).toFixed(2)}</p></div>`);
-    const statusLabel = (c as any).is_return ? (c.status === 'paid' ? 'Refunded' : 'Pending Refund') : c.status.charAt(0).toUpperCase() + c.status.slice(1);
+    const statusLabel = c.is_return ? (c.status === 'paid' ? 'Refunded' : 'Pending Refund') : c.status.charAt(0).toUpperCase() + c.status.slice(1);
     const statusColor = c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : c.status === 'draft' ? '#0c5460' : '#721c24';
     const statusBg = c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : c.status === 'draft' ? '#d1ecf1' : '#f8d7da';
     w.document.write(`<div style="margin:12px 0;padding:10px 14px;border-radius:6px;background:${statusBg};display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;color:${statusColor};font-size:13px">Status: ${statusLabel}</span>`);
-    if (Number(c.amount_paid) > 0) w.document.write(`<span style="font-size:12px;color:${statusColor}">${(c as any).is_return ? 'Refunded' : 'Paid'}: ₹${Number(c.amount_paid).toFixed(2)}${c.payment_mode ? ' (' + c.payment_mode + ')' : ''}</span>`);
-    if (c.status !== 'paid' && c.status !== 'draft' && !((c as any).is_return)) { const due = Number(c.total) - Number(c.amount_paid || 0); w.document.write(`<span style="font-size:12px;color:#721c24;font-weight:600">Due: ₹${due.toFixed(2)}</span>`); }
+    if (Number(c.amount_paid) > 0) w.document.write(`<span style="font-size:12px;color:${statusColor}">${c.is_return ? 'Refunded' : 'Paid'}: ₹${Number(c.amount_paid).toFixed(2)}${c.payment_mode ? ' (' + c.payment_mode + ')' : ''}</span>`);
+    if (c.status !== 'paid' && c.status !== 'draft' && !c.is_return) { const due = Number(c.total) - Number(c.amount_paid || 0); w.document.write(`<span style="font-size:12px;color:#721c24;font-weight:600">Due: ₹${due.toFixed(2)}</span>`); }
     w.document.write(`</div>`);
     if (c.notes) w.document.write(`<p style="font-size:11px;color:#666;margin-top:12px"><strong>Notes:</strong> ${c.notes}</p>`);
     w.document.write(`<hr><p style="text-align:center;font-size:10px;color:#999">Powered by DailyOffice</p></body></html>`);
@@ -595,11 +595,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         </div>
         <div style={{ background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.12)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
           <div style={{ fontSize: 8, color: T.re, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Returns</div>
-          <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.re }}>{(analytics as any).returnsCount || 0}</div>
+          <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.re }}>{analytics.returnsCount || 0}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,.03)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px', textAlign: 'center' }}>
           <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Voided</div>
-          <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.tx3 }}>{(analytics as any).voidedCount || 0}</div>
+          <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.tx3 }}>{analytics.voidedCount || 0}</div>
         </div>
       </div>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
@@ -648,7 +648,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
           {ledgerChallans.map(c => {
             const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
-            const isRet = !!(c as any).is_return;
+            const isRet = !!c.is_return;
             return (
               <div key={c.id} onClick={() => openEdit(c)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }}>
                 <div style={{ flex: 1 }}>
@@ -931,9 +931,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         {!loading && challans.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No challans found. Create your first one.</div>}
         {challans.map(c => {
           const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
-          const skus = ((c as any).cash_challan_items || []).map((i: any) => i.sku).filter(Boolean).join(', ');
-          const pendingDays = (!(c as any).is_return && (c.status === 'unpaid' || c.status === 'partial')) ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : 0;
-          const isRet = !!(c as any).is_return;
+          const skus = (c.cash_challan_items || []).map((i) => i.sku).filter(Boolean).join(', ');
+          const pendingDays = (!c.is_return && (c.status === 'unpaid' || c.status === 'partial')) ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : 0;
+          const isRet = !!c.is_return;
           return (
             <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }} onClick={() => openEdit(c)}>
               <div style={{ flex: 1, minWidth: 0 }}>
