@@ -1,1 +1,0 @@
-// Custom SVG icon system
