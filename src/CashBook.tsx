@@ -3,12 +3,31 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabase';
 
 import { T } from './lib/theme';
+import type {
+  CashExpense,
+  CashExpenseInsert,
+  CashHandover,
+  CashHandoverInsert,
+  CashBookBalanceInsert,
+  CashChallan,
+  Profile,
+} from './types/database';
 
 const CATEGORIES = ['Office Supplies', 'Rent', 'Salaries', 'Travel', 'Utilities', 'Food', 'Transport', 'Misc'];
 
-interface Expense { id: string; date: string; amount: number; category: string; description: string; created_at: string; }
+// In-memory / jsonb-embedded cash-flow snapshot. Stored in
+// cash_handovers.breakdown as jsonb, read back and cast to this shape.
 interface Breakdown { opening: number; cashSales: number; cashReturns: number; expenses: number; previousHandovers: number; available: number; periodFrom: string; periodTo: string; }
-interface Handover { id: string; date: string; amount: number; from_user_id: string | null; from_user_name: string; to_user_id: string | null; to_user_name: string; notes: string; status: string; confirmed_at: string | null; created_at: string; period_from: string | null; period_to: string | null; breakdown: Breakdown | null; reason: string | null; }
+
+// View model: central CashHandover row but with the jsonb breakdown
+// narrowed to the local Breakdown shape for typed access.
+type Handover = Omit<CashHandover, 'breakdown'> & { breakdown: Breakdown | null };
+
+// View model: narrowed cash_expenses projection used by the expenses tab.
+type ExpenseRow = Pick<CashExpense, 'id' | 'date' | 'amount' | 'category' | 'description' | 'created_at'>;
+
+// View model: narrowed cash_challans projection used by the sales tab.
+type CashSaleRow = Pick<CashChallan, 'id' | 'challan_number' | 'customer_name' | 'total' | 'amount_paid' | 'status' | 'is_return' | 'payment_mode' | 'payment_date' | 'created_at'>;
 
 export default function CashBook() {
   const today = new Date().toISOString().slice(0, 10);
@@ -17,8 +36,8 @@ export default function CashBook() {
   // Single 'date' for new expense/handover input — defaults to today
   const [entryDate, setEntryDate] = useState(today);
   const [tab, setTab] = useState<'expenses' | 'sales' | 'handovers'>('expenses');
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [sales, setSales] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
+  const [sales, setSales] = useState<CashSaleRow[]>([]);
   const [handovers, setHandovers] = useState<Handover[]>([]);
   const [openingBalance, setOpeningBalance] = useState(0);
   const [editingOpening, setEditingOpening] = useState(false);
@@ -68,7 +87,7 @@ export default function CashBook() {
 
     // Handovers in date range
     const { data: ho } = await supabase.from('cash_handovers').select('id, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
-    setHandovers(ho || []);
+    setHandovers((ho as Handover[] | null) || []);
   }, [fromDate, toDate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -79,7 +98,8 @@ export default function CashBook() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) setCurrentUserId(user.id);
       const { data } = await supabase.from('profiles').select('id, full_name, email, phone').eq('is_active', true).order('full_name');
-      setUsers((data || []).map((u: any) => ({ id: u.id, full_name: u.full_name, email: u.email, has_pin: true, phone: u.phone })));
+      type UserRow = Pick<Profile, 'id' | 'full_name' | 'email' | 'phone'>;
+      setUsers((data as UserRow[] | null || []).map((u) => ({ id: u.id, full_name: u.full_name ?? '', email: u.email, has_pin: true, phone: u.phone })));
     })();
   }, []);
 
@@ -102,7 +122,8 @@ export default function CashBook() {
 
   const saveOpening = async () => {
     const val = Number(openingInput) || 0;
-    await supabase.from('cash_book_balances').upsert({ date: fromDate, opening_balance: val }, { onConflict: 'date' });
+    const payload: CashBookBalanceInsert = { date: fromDate, opening_balance: val };
+    await supabase.from('cash_book_balances').upsert(payload, { onConflict: 'date' });
     setEditingOpening(false);
     fetchData();
   };
@@ -113,7 +134,8 @@ export default function CashBook() {
     if (!amt || amt <= 0) { setFormError('Amount must be greater than 0'); return; }
     if (!category) { setFormError('Category is required'); return; }
     const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('cash_expenses').insert({ date: entryDate, amount: amt, category, description: description.trim() || null, paid_by: user?.id });
+    const payload: CashExpenseInsert = { date: entryDate, amount: amt, category, description: description.trim() || null, paid_by: user?.id ?? null };
+    await supabase.from('cash_expenses').insert(payload);
     setAmount(''); setDescription(''); setCategory(CATEGORIES[0]); setShowAdd(false);
     fetchData();
   };
@@ -127,15 +149,18 @@ export default function CashBook() {
       supabase.from('cash_handovers').select('amount, status, period_from, period_to, date').eq('status', 'confirmed'),
     ]);
     const opening = Number(bal?.opening_balance || 0);
-    const cashSales = (ch || []).filter((r: any) => !r.is_return).reduce((s: number, r: any) => s + Number(r.amount_paid || 0), 0);
-    const cashReturns = (ch || []).filter((r: any) => r.is_return).reduce((s: number, r: any) => s + Number(r.amount_paid || 0), 0);
-    const expensesTotal = (exp || []).reduce((s: number, r: any) => s + Number(r.amount), 0);
+    type ChRow = Pick<CashChallan, 'amount_paid' | 'is_return' | 'status'>;
+    type ExpRow = Pick<CashExpense, 'amount'>;
+    type HoRow = Pick<CashHandover, 'amount' | 'status' | 'period_from' | 'period_to' | 'date'>;
+    const cashSales = ((ch as ChRow[] | null) || []).filter((r) => !r.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
+    const cashReturns = ((ch as ChRow[] | null) || []).filter((r) => r.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
+    const expensesTotal = ((exp as ExpRow[] | null) || []).reduce((s, r) => s + Number(r.amount), 0);
     // Previous handovers that overlap this range
-    const previousHandovers = (ho || []).filter((h: any) => {
+    const previousHandovers = ((ho as HoRow[] | null) || []).filter((h) => {
       const hFrom = h.period_from || h.date;
       const hTo = h.period_to || h.date;
       return hFrom <= to && hTo >= from;
-    }).reduce((s: number, h: any) => s + Number(h.amount), 0);
+    }).reduce((s, h) => s + Number(h.amount), 0);
     const available = opening + cashSales - cashReturns - expensesTotal - previousHandovers;
     return { opening, cashSales, cashReturns, expenses: expensesTotal, previousHandovers, available, periodFrom: from, periodTo: to };
   }, []);
@@ -148,7 +173,7 @@ export default function CashBook() {
         if (!handAmount) setHandAmount(String(Math.max(0, b.available)));
       });
       // Load last 5 handovers
-      supabase.from('cash_handovers').select('*').order('created_at', { ascending: false }).limit(5).then(({ data }) => setRecentHandovers((data as any) || []));
+      supabase.from('cash_handovers').select('*').order('created_at', { ascending: false }).limit(5).then(({ data }) => setRecentHandovers((data as Handover[] | null) || []));
     }
   }, [showHandover, handPeriodFrom, handPeriodTo, computeBreakdown]);
 
@@ -171,14 +196,17 @@ export default function CashBook() {
     if (existing) { setHandError(`A handover already exists for ${recipient.full_name} today (₹${Number(existing.amount).toLocaleString('en-IN')}, ${existing.status}). Only one handover per recipient per day.`); return; }
     const { data: { user } } = await supabase.auth.getUser();
     const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user?.id).maybeSingle();
-    await supabase.from('cash_handovers').insert({
+    const handoverPayload: CashHandoverInsert = {
       date: todayDate, amount: amt,
-      from_user_id: user?.id, from_user_name: prof?.full_name || user?.email || 'Unknown',
+      from_user_id: user?.id ?? null, from_user_name: prof?.full_name || user?.email || 'Unknown',
       to_user_id: recipient.id, to_user_name: recipient.full_name,
       notes: handNotes.trim() || null, status: 'pending',
       period_from: handPeriodFrom, period_to: handPeriodTo,
-      breakdown: handBreakdown, reason: amountDiffers ? handReason.trim() : null,
-    });
+      // handBreakdown is a local Breakdown view; it shape-matches Record<string, unknown>
+      breakdown: handBreakdown as unknown as Record<string, unknown> | null,
+      reason: amountDiffers ? handReason.trim() : null,
+    };
+    await supabase.from('cash_handovers').insert(handoverPayload);
     // WhatsApp notification to recipient
     if (recipient.phone) {
       const msg = encodeURIComponent(`Hi ${recipient.full_name},\n${prof?.full_name || 'Accountant'} has initiated a cash handover of ₹${amt.toLocaleString('en-IN')} for you (period ${handPeriodFrom} to ${handPeriodTo}).\nPlease open DailyOffice → Cash Book → Handovers and sign with your PIN to confirm receipt.\n— Arya Designs`);
@@ -213,7 +241,8 @@ export default function CashBook() {
       .sig-box{border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#666}
       .receipt-no{font-family:monospace;color:#666;font-size:12px}
     </style></head><body>`);
-    w.document.write(`<div class="header"><h2>Arya Designs</h2><p style="margin:6px 0;color:#666;font-size:13px">CASH HANDOVER RECEIPT</p><p class="receipt-no">Receipt #${h.id.slice(0, 8).toUpperCase()} | ${new Date(h.created_at).toLocaleDateString('en-IN')}</p></div>`);
+    const receiptDate = h.created_at ? new Date(h.created_at).toLocaleDateString('en-IN') : '—';
+    w.document.write(`<div class="header"><h2>Arya Designs</h2><p style="margin:6px 0;color:#666;font-size:13px">CASH HANDOVER RECEIPT</p><p class="receipt-no">Receipt #${h.id.slice(0, 8).toUpperCase()} | ${receiptDate}</p></div>`);
     w.document.write(`<div class="meta">
       <div><strong>From (Accountant)</strong>${h.from_user_name}</div>
       <div><strong>To (Cashier)</strong>${h.to_user_name}</div>
