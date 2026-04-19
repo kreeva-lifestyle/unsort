@@ -69,6 +69,9 @@ export default function CashBook() {
   const [confirmingHandover, setConfirmingHandover] = useState<Handover | null>(null);
   const [confirmPin, setConfirmPin] = useState('');
   const [confirmError, setConfirmError] = useState('');
+  // PIN lockout — exponential backoff after wrong attempts (audit P1)
+  const [pinAttempts, setPinAttempts] = useState(0);
+  const [pinLockUntil, setPinLockUntil] = useState<number>(0);
 
   const fetchData = useCallback(async () => {
     // Opening balance — uses From date
@@ -282,6 +285,13 @@ export default function CashBook() {
   const confirmHandover = async () => {
     setConfirmError('');
     if (!confirmingHandover || !confirmPin.trim()) { setConfirmError('Enter PIN'); return; }
+    // Lockout window check
+    const now = Date.now();
+    if (pinLockUntil > now) {
+      const secs = Math.ceil((pinLockUntil - now) / 1000);
+      setConfirmError(`Too many wrong attempts. Try again in ${secs}s.`);
+      return;
+    }
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setConfirmError('Not logged in'); return; }
     // Verify the confirming user IS the intended recipient
@@ -291,7 +301,22 @@ export default function CashBook() {
     }
     const { data: myPin } = await supabase.rpc('get_own_pin');
     if (!myPin) { setConfirmError('You have no PIN set. Go to Settings → Users to set one.'); return; }
-    if (myPin !== confirmPin.trim()) { setConfirmError('Incorrect PIN'); return; }
+    if (myPin !== confirmPin.trim()) {
+      // Exponential backoff: 5s * 2^attempts, capped at 5 min
+      const nextAttempts = pinAttempts + 1;
+      setPinAttempts(nextAttempts);
+      if (nextAttempts >= 3) {
+        const waitMs = Math.min(5000 * Math.pow(2, nextAttempts - 3), 5 * 60 * 1000);
+        setPinLockUntil(now + waitMs);
+        setConfirmError(`Incorrect PIN. Locked for ${Math.ceil(waitMs / 1000)}s (${nextAttempts} failed attempts).`);
+      } else {
+        setConfirmError(`Incorrect PIN. ${3 - nextAttempts} attempt${3 - nextAttempts === 1 ? '' : 's'} before lockout.`);
+      }
+      setConfirmPin('');
+      return;
+    }
+    // Success — reset counters
+    setPinAttempts(0); setPinLockUntil(0);
     await supabase.from('cash_handovers').update({
       status: 'confirmed',
       confirmed_at: new Date().toISOString(),

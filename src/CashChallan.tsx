@@ -385,7 +385,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const wasNew = !editing;
     closeModal();
     fetchChallans();
-    if (wasNew) setShowErpReminder(true);
+    // Show ERP reminder unless user suppressed it this week
+    if (wasNew) {
+      const suppressed = localStorage.getItem('ccErpReminderHidden');
+      const aWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      if (!suppressed || Number(suppressed) < aWeekAgo) setShowErpReminder(true);
+    }
   };
 
   // ── Void challan ───────────────────────────────────────────────────────────
@@ -779,7 +784,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           </div>
 
           {/* Line Items */}
-          <div style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 8, marginBottom: 12, overflow: 'hidden' }}>
+          <div data-items style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 8, marginBottom: 12, overflow: 'hidden' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 90px 24px', gap: 4, padding: '6px 8px', borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
               <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>SKU</span>
               <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, textAlign: 'center' }}>Qty</span>
@@ -789,19 +794,38 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             </div>
             {items.map((it, i) => (
               <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 90px 24px', gap: 4, padding: '5px 8px', borderBottom: `1px solid ${T.bd}`, alignItems: 'center' }}>
-                <input value={it.sku} onChange={e => { const n = [...items]; n[i].sku = e.target.value; setItems(n); }} placeholder="SKU / Item name" disabled={!!(isReturn && returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', fontFamily: T.mono, opacity: isReturn && returnSource ? 0.6 : 1 }} />
+                <input data-sku value={it.sku} onChange={e => { const n = [...items]; n[i].sku = e.target.value; setItems(n); }} placeholder="SKU / Item name" disabled={!!(isReturn && returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', fontFamily: T.mono, opacity: isReturn && returnSource ? 0.6 : 1 }} />
                 <input type="number" value={it.quantity || ''} onChange={e => { const n = [...items]; n[i].quantity = Number(e.target.value); setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'center' }} />
                 <input type="number" value={it.price || ''} onChange={e => { const n = [...items]; n[i].price = Number(e.target.value); setItems(n); }} placeholder="0" disabled={!!(isReturn && returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right', fontFamily: T.mono, opacity: isReturn && returnSource ? 0.6 : 1 }} />
                 <div style={{ display: 'flex', gap: 2, alignItems: 'center', opacity: isReturn && returnSource ? 0.6 : 1 }}>
                   <select value={it.discount_type || 'flat'} onChange={e => { const n = [...items]; n[i].discount_type = e.target.value; setItems(n); }} disabled={!!(isReturn && returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx3, fontSize: 9, padding: '5px 2px', outline: 'none', width: 32 }}>
                     <option value="flat">₹</option><option value="percentage">%</option>
                   </select>
-                  <input type="number" value={it.discount_value || ''} onChange={e => { const n = [...items]; n[i].discount_value = Number(e.target.value); setItems(n); }} placeholder="0" disabled={!!(isReturn && returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right', fontFamily: T.mono, flex: 1, minWidth: 0 }} />
+                  <input
+                    type="number"
+                    value={it.discount_value || ''}
+                    onChange={e => { const n = [...items]; n[i].discount_value = Number(e.target.value); setItems(n); }}
+                    onKeyDown={e => {
+                      // Enter on last row's last field appends a new row (audit P1)
+                      if (e.key === 'Enter' && i === items.length - 1 && !(isReturn && returnSource)) {
+                        e.preventDefault();
+                        setItems([...items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
+                        // Focus the new row's SKU input after render
+                        setTimeout(() => {
+                          const inputs = (e.currentTarget.closest('[data-items]') as HTMLElement | null)?.querySelectorAll<HTMLInputElement>('input[data-sku]');
+                          inputs?.[inputs.length - 1]?.focus();
+                        }, 0);
+                      }
+                    }}
+                    placeholder="0"
+                    disabled={!!(isReturn && returnSource)}
+                    style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right', fontFamily: T.mono, flex: 1, minWidth: 0 }}
+                  />
                 </div>
                 <button onClick={() => { if (items.length > 1) setItems(items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }}>×</button>
               </div>
             ))}
-            {!(isReturn && returnSource) && <button onClick={() => setItems([...items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>}
+            {!(isReturn && returnSource) && <button onClick={() => setItems([...items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item (or press Enter on last row)</button>}
           </div>
 
           {/* Shipping + Tags + Notes */}
@@ -959,6 +983,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
                 {(c.status === 'unpaid' || c.status === 'partial') && <button onClick={e => { e.stopPropagation(); sendReminder(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.6 }} title="Send WhatsApp reminder">
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.yl, strokeWidth: 2 }}><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
                 </button>}
+                {!isRet && c.status !== 'voided' && c.status !== 'draft' && <button onClick={e => { e.stopPropagation(); setIsReturn(true); selectReturnSource(c); setShowModal(true); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.6 }} title="Create return for this challan">
+                  <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M9 14L4 9l5-5M4 9h11a5 5 0 015 5v0a5 5 0 01-5 5H8" /></svg>
+                </button>}
                 {c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number }); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.4 }} title="Void">
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M18 6L6 18M6 6l12 12" /></svg>
                 </button>}
@@ -1012,7 +1039,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Hi {userName}!</div>
             <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 18 }}>Reminder to manually <strong style={{ color: T.yl }}>reduce these inventory items in ERP</strong>. Cash Challan does not sync inventory automatically.</div>
-            <button onClick={() => setShowErpReminder(false)} style={{ width: '100%', padding: '10px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer' }}>Got It</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { localStorage.setItem('ccErpReminderHidden', String(Date.now())); setShowErpReminder(false); }} style={{ flex: 1, padding: '10px', borderRadius: 8, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Don't show for a week</button>
+              <button onClick={() => setShowErpReminder(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer' }}>Got It</button>
+            </div>
           </div>
         </div>
       )}
