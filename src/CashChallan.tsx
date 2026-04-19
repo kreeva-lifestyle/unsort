@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase';
 import { useNotifications } from './hooks/useNotifications';
 import ChallanAnalytics from './components/challan/ChallanAnalytics';
 import Empty from './components/ui/Empty';
+import { friendlyError } from './lib/friendlyError';
 import type {
   CashChallan,
   CashChallanItem as DbCashChallanItem,
@@ -389,7 +390,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         ccAudit('CREATE', `${isReturn ? 'Return' : 'Challan'} #${newChallan.challan_number} created for ${customerName.trim()} - ₹${grandTotal}`);
       }
     } catch (e: any) {
-      setFormError(`Save failed: ${e.message || 'Unknown error'}. Please try again.`);
+      setFormError(`Save failed — ${friendlyError(e)}`);
       return;
     }
     const wasNew = !editing;

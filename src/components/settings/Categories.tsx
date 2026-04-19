@@ -52,7 +52,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
       if (validComps.length === 0) { addToast('Add at least 1 component', 'error'); return; }
       const sku = generateSku(form.name);
       const { data, error } = await supabase.from('products').insert({ sku, name: form.name, description: form.description, category: form.category, created_by: profile?.id, total_components: validComps.length }).select().single();
-      if (error || !data) { addToast(error?.message || 'Error', 'error'); return; }
+      if (error || !data) { addToast(error ? friendlyError(error) : 'Save failed', 'error'); return; }
       if (validComps.length > 0) {
         const compsToInsert = validComps.map((name, i) => ({ product_id: data.id, name: name.trim(), component_code: `C${i + 1}` }));
         const { error: compsErr } = await supabase.from('components').insert(compsToInsert);

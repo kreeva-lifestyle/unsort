@@ -56,15 +56,16 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
   const [locations, setLocations] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
   const [itemTags, setItemTags] = useState<Record<string, any[]>>({});
-  const [statusFilter, setStatusFilter] = useState('all');
+  // Multi-select filters (Claude-design feedback): each field holds an array of selected values.
+  // Empty array = no filter on that field.
+  const [filters, setFilters] = useState<{ status: string[]; category: string[]; location: string[]; marketplace: string[]; tag: string[] }>({
+    status: [], category: [], location: [], marketplace: [], tag: [],
+  });
+  const [preset, setPreset] = useState<string>('all');
   const [showFiltersPopover, setShowFiltersPopover] = useState(false);
   // Bulk selection (audit P1: docked action bar)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [catFilter, setCatFilter] = useState('all');
-  const [locFilter, setLocFilter] = useState('all');
-  const [tagFilter, setTagFilter] = useState('all');
-  const [mpFilter, setMpFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [expandedNote, setExpandedNote] = useState<string | null>(null);
   const { profile } = useAuth();
@@ -313,7 +314,7 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
       const uniqueId = generateUniqueId();
       const insertData = { ...form, batch_number: uniqueId, reported_by: profile?.id };
       const { data, error } = await supabase.from('inventory_items').insert(insertData).select().single();
-      if (error || !data) { addToast(error?.message || 'Error', 'error'); return; }
+      if (error || !data) { addToast(error ? friendlyError(error) : 'Save failed', 'error'); return; }
       if (form.status === 'unsorted' || form.status === 'damaged' || form.status === 'dry_clean') await updateComponentStatuses(data.id);
       savedItemId = data.id;
       addToast(`Item added! ID: ${uniqueId}`, 'success');
@@ -493,11 +494,11 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     // Pending stage hides completed items; completed stage only shows them
     if (!isCompletedView && i.status === 'completed') return false;
     if (isCompletedView && i.status !== 'completed') return false;
-    if (statusFilter !== 'all' && i.status !== statusFilter) return false;
-    if (catFilter !== 'all' && i.product_id !== catFilter) return false;
-    if (locFilter !== 'all' && (i.location || '') !== locFilter) return false;
-    if (mpFilter !== 'all' && (i.marketplace || '') !== mpFilter) return false;
-    if (tagFilter !== 'all') { const t = itemTags[i.id] || []; if (!t.some((tg: any) => tg?.id === tagFilter)) return false; }
+    if (filters.status.length > 0 && !filters.status.includes(i.status)) return false;
+    if (filters.category.length > 0 && !filters.category.includes(i.product_id)) return false;
+    if (filters.location.length > 0 && !filters.location.includes(i.location || '')) return false;
+    if (filters.marketplace.length > 0 && !filters.marketplace.includes(i.marketplace || '')) return false;
+    if (filters.tag.length > 0) { const t = itemTags[i.id] || []; if (!t.some((tg: any) => filters.tag.includes(tg?.id))) return false; }
     const searchTerm = globalSearch || search;
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
@@ -513,15 +514,31 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     return true;
   });
 
-  const hasActiveFilters = statusFilter !== 'all' || catFilter !== 'all' || locFilter !== 'all' || mpFilter !== 'all' || tagFilter !== 'all' || search !== '' || globalSearch !== '';
-  const clearFilters = () => { setStatusFilter('all'); setCatFilter('all'); setLocFilter('all'); setMpFilter('all'); setTagFilter('all'); setSearch(''); setPage(0); };
+  const activeFilterCount = filters.status.length + filters.category.length + filters.location.length + filters.marketplace.length + filters.tag.length;
+  const hasActiveFilters = activeFilterCount > 0 || search !== '' || globalSearch !== '';
+  const clearFilters = () => { setFilters({ status: [], category: [], location: [], marketplace: [], tag: [] }); setPreset('all'); setSearch(''); setPage(0); };
+  const toggleFilterVal = (field: keyof typeof filters, v: string) => {
+    setPreset('custom');
+    setFilters(f => ({ ...f, [field]: f[field].includes(v) ? f[field].filter(x => x !== v) : [...f[field], v] }));
+  };
+  const removeChip = (field: keyof typeof filters, v: string) => setFilters(f => ({ ...f, [field]: f[field].filter(x => x !== v) }));
+  const PRESETS: { id: string; label: string; filters: Partial<typeof filters> }[] = [
+    { id: 'all', label: 'All items', filters: {} },
+    { id: 'unsorted', label: 'Unsorted', filters: { status: ['unsorted'] } },
+    { id: 'damaged', label: 'Damaged', filters: { status: ['damaged'] } },
+    { id: 'dryclean', label: 'In dry clean', filters: { status: ['dry_clean'] } },
+  ];
+  const applyPreset = (p: typeof PRESETS[number]) => {
+    setPreset(p.id);
+    setFilters({ status: [], category: [], location: [], marketplace: [], tag: [], ...p.filters });
+  };
 
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [perPage, setPerPage] = useState(25);
   const totalPages = Math.ceil(filtered.length / perPage);
   const paged = filtered.slice(page * perPage, (page + 1) * perPage);
-  useEffect(() => { setPage(0); }, [statusFilter, catFilter, locFilter, mpFilter, tagFilter, search, globalSearch, stage]);
+  useEffect(() => { setPage(0); }, [filters, search, globalSearch, stage]);
 
   const scrollToPair = (pairId: string) => {
     setHighlightId(pairId);
@@ -555,34 +572,100 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
         </div>
       </div>
       {showExtras ? <InventoryExtras /> : <>
-      {/* Collapsible filter bar — search + status stay visible; others collapse into a Filters popover (audit P1) */}
-      <div className="filter-bar" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, SKU code, location, notes..." style={{ ...S.fInput, flex: 1, minWidth: 160, padding: '6px 9px' }} />
-        <div style={{ width: 1, height: 24, background: T.bd2 }} />
-        {!isCompletedView && <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Status</option><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select>}
-        <div style={{ position: 'relative' }}>
-          {(() => {
-            const activeCount = [catFilter, locFilter, mpFilter, tagFilter].filter(f => f !== 'all').length;
-            return (
-              <button onClick={() => setShowFiltersPopover(v => !v)} style={{ ...S.btnGhost, padding: '6px 11px', fontSize: 11, background: activeCount > 0 ? 'rgba(99,102,241,.10)' : undefined, borderColor: activeCount > 0 ? 'rgba(99,102,241,.3)' : undefined }}>
-                Filters{activeCount > 0 ? ` · ${activeCount}` : ''} {showFiltersPopover ? '▴' : '▾'}
-              </button>
-            );
-          })()}
-          {showFiltersPopover && (
-            <>
-              <div onClick={() => setShowFiltersPopover(false)} style={{ position: 'fixed', inset: 0, zIndex: 50 }} />
-              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 51, background: 'rgba(14,18,30,0.98)', border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 10px 32px rgba(0,0,0,.55)', padding: 10, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} style={{ ...S.fInput, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Categories</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-                <select value={locFilter} onChange={(e) => setLocFilter(e.target.value)} style={{ ...S.fInput, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Locations</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select>
-                <select value={mpFilter} onChange={(e) => setMpFilter(e.target.value)} style={{ ...S.fInput, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Marketplaces</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select>
-                {tags.length > 0 && <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} style={{ ...S.fInput, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Tags</option>{tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>}
-              </div>
-            </>
-          )}
+      {/* Preset strip + search + Filters popover (Claude-design v2 multi-select filter UX) */}
+      <div className="filter-bar" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: activeFilterCount > 0 ? 10 : 14, flexWrap: 'wrap' }}>
+        {/* Preset strip */}
+        <div style={{ display: 'flex', gap: 4, padding: 3, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, flexWrap: 'wrap' }}>
+          {PRESETS.filter(p => isCompletedView ? p.id === 'all' : true).map(p => (
+            <button key={p.id} onClick={() => applyPreset(p)} style={{ padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: preset === p.id ? 600 : 500, background: preset === p.id ? 'rgba(99,102,241,.15)' : 'transparent', color: preset === p.id ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition }}>{p.label}</button>
+          ))}
         </div>
-        {hasActiveFilters && <span onClick={clearFilters} style={{ fontSize: 10, color: T.ac, cursor: 'pointer', padding: '3px 8px', border: '1px solid rgba(99,102,241,.2)', borderRadius: 4, background: 'rgba(99,102,241,.06)' }}>Clear filters</span>}
+
+        {/* Search */}
+        <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
+          <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.6 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search SKU, product, notes…" style={{ ...S.fInput, width: '100%', padding: '7px 10px 7px 30px' }} />
+        </div>
+
+        {/* Filters button with multi-select popover */}
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => setShowFiltersPopover(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 34, padding: '0 12px', background: showFiltersPopover || activeFilterCount > 0 ? 'rgba(99,102,241,.10)' : 'rgba(255,255,255,0.03)', border: `1px solid ${showFiltersPopover || activeFilterCount > 0 ? 'rgba(99,102,241,.35)' : T.bd}`, borderRadius: 8, color: activeFilterCount > 0 ? T.ac2 : T.tx, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>
+            <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" /></svg>
+            Filters
+            {activeFilterCount > 0 && <span style={{ background: T.ac, color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 10, fontFamily: T.mono, fontWeight: 600, minWidth: 18, textAlign: 'center' as const }}>{activeFilterCount}</span>}
+            <span style={{ fontSize: 10, color: T.tx3 }}>{showFiltersPopover ? '▴' : '▾'}</span>
+          </button>
+
+          {showFiltersPopover && (<>
+            <div onClick={() => setShowFiltersPopover(false)} style={{ position: 'fixed', inset: 0, zIndex: 100 }} />
+            <div style={{ position: 'absolute', top: 40, right: 0, width: 460, zIndex: 101, background: 'rgba(14,18,30,0.98)', border: `1px solid ${T.bd2}`, borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,.55)', overflow: 'hidden', animation: 'fi .15s ease' }}>
+              <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Filter items</div>
+                {activeFilterCount > 0 && <button onClick={clearFilters} style={{ background: 'transparent', border: 'none', color: T.tx3, fontSize: 11, cursor: 'pointer', fontFamily: T.sans }}>Clear all</button>}
+              </div>
+              <div style={{ padding: '6px 0', maxHeight: 440, overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                {([
+                  { key: 'status' as const, label: 'Status', options: ['unsorted','damaged','dry_clean','completed'].map(v => ({ value: v, label: v.replace('_',' ') })), show: !isCompletedView },
+                  { key: 'category' as const, label: 'Category', options: products.map(p => ({ value: p.id, label: p.name })), show: products.length > 0 },
+                  { key: 'location' as const, label: 'Location', options: locations.map(l => ({ value: l.name, label: l.name })), show: locations.length > 0 },
+                  { key: 'marketplace' as const, label: 'Marketplace', options: MARKETPLACES.map(m => ({ value: m, label: m })), show: true },
+                  { key: 'tag' as const, label: 'Tag', options: tags.map(t => ({ value: t.id, label: t.name })), show: tags.length > 0 },
+                ].filter(f => f.show)).map(f => (
+                  <div key={f.key} style={{ padding: '10px 16px' }}>
+                    <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1.3, fontWeight: 600, marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>{f.label}</span>
+                      {filters[f.key].length > 0 && <span style={{ color: T.ac2, letterSpacing: 0 }}>{filters[f.key].length} selected</span>}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 2, maxHeight: 140, overflowY: 'auto' }}>
+                      {f.options.map(opt => {
+                        const on = filters[f.key].includes(opt.value);
+                        return (
+                          <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 7px', borderRadius: 5, cursor: 'pointer', background: on ? 'rgba(99,102,241,.10)' : 'transparent', transition: 'background .1s' }} onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,.02)'; }} onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent'; }}>
+                            <input type="checkbox" checked={on} onChange={() => toggleFilterVal(f.key, opt.value)} style={{ cursor: 'pointer', flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, color: T.tx, textTransform: f.key === 'status' ? 'capitalize' as const : 'none' }}>{opt.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding: '10px 16px', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                <span style={{ fontSize: 10, color: T.tx3 }}>{activeFilterCount > 0 ? `Showing ${filtered.length} of ${items.length}` : 'No filters applied'}</span>
+                <button onClick={() => setShowFiltersPopover(false)} style={{ ...S.btnPrimary, padding: '6px 14px', fontSize: 11 }}>Done</button>
+              </div>
+            </div>
+          </>)}
+        </div>
       </div>
+
+      {/* Active filter chips */}
+      {activeFilterCount > 0 && (() => {
+        const chips: { field: keyof typeof filters; value: string; label: string; display: string }[] = [];
+        (['status','category','location','marketplace','tag'] as const).forEach(field => {
+          const fieldLabel = { status: 'Status', category: 'Category', location: 'Location', marketplace: 'Marketplace', tag: 'Tag' }[field];
+          filters[field].forEach(v => {
+            let display = v;
+            if (field === 'category') display = products.find(p => p.id === v)?.name || v;
+            else if (field === 'tag') display = tags.find(t => t.id === v)?.name || v;
+            else if (field === 'status') display = v.replace('_', ' ');
+            chips.push({ field, value: v, label: fieldLabel, display });
+          });
+        });
+        return (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1.4, fontWeight: 600, marginRight: 2 }}>Active:</span>
+            {chips.map(c => (
+              <button key={`${c.field}-${c.value}`} onClick={() => removeChip(c.field, c.value)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 6px 4px 10px', background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 6, color: T.ac2, fontSize: 11, fontFamily: T.sans, cursor: 'pointer' }}>
+                <span style={{ color: T.tx3, fontSize: 10 }}>{c.label}:</span>
+                <span style={{ textTransform: c.field === 'status' ? 'capitalize' as const : 'none' }}>{c.display}</span>
+                <span style={{ width: 15, height: 15, borderRadius: 3, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.06)', fontSize: 11, lineHeight: 1 }}>×</span>
+              </button>
+            ))}
+            <button onClick={clearFilters} style={{ background: 'transparent', border: 'none', color: T.tx3, fontSize: 10, cursor: 'pointer', textDecoration: 'underline', fontFamily: T.sans, marginLeft: 2 }}>Clear all</button>
+          </div>
+        );
+      })()}
       <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         <div className="table-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 880 }}>
