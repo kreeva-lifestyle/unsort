@@ -23,15 +23,9 @@ import { T } from './lib/theme';
 // (managed at save-time), discount_* are optional (defaulted to flat/0).
 interface ChallanItem { id?: string; sku: string; description: string; quantity: number; price: number; total: number; discount_type?: string; discount_value?: number; discount_amount?: number; }
 
-// Local widened status union. The app writes values beyond what Phase 3.7.5
-// captured (the DB column is free-text); follow-up work: tighten the central
-// CashChallan.status union to match reality.
-type ChallanStatus = 'draft' | 'unpaid' | 'paid' | 'partial' | 'voided';
-
-// View model: central CashChallan row + widened status + joined nested items.
+// View model: central CashChallan row + joined nested items.
 // created_at/updated_at asserted non-null — DB defaults always populate them.
-type Challan = Omit<CashChallan, 'status' | 'created_at' | 'updated_at'> & {
-  status: ChallanStatus;
+type Challan = Omit<CashChallan, 'created_at' | 'updated_at'> & {
   created_at: string;
   updated_at: string;
   items?: ChallanItem[];

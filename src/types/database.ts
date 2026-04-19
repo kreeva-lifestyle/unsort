@@ -103,10 +103,10 @@ export interface InventoryItem {
   product_id: string;
   batch_number: string | null;
   serial_number: string | null;
-  status: 'unsorted' | 'damaged' | 'complete' | 'repaired' | 'disposed' | null;
+  status: 'unsorted' | 'damaged' | 'dry_clean' | 'complete' | 'completed' | null;
   damage_type: string | null;
   damage_description: string | null;
-  damage_severity: string | null;
+  damage_severity: 'minor' | 'moderate' | 'severe' | 'critical' | null;
   location: string | null;
   notes: string | null;
   reported_by: string | null;
@@ -126,10 +126,10 @@ export type InventoryItemInsert = {
   product_id: string;
   batch_number?: string | null;
   serial_number?: string | null;
-  status?: 'unsorted' | 'damaged' | 'complete' | 'repaired' | 'disposed' | null;
+  status?: 'unsorted' | 'damaged' | 'dry_clean' | 'complete' | 'completed' | null;
   damage_type?: string | null;
   damage_description?: string | null;
-  damage_severity?: string | null;
+  damage_severity?: 'minor' | 'moderate' | 'severe' | 'critical' | null;
   location?: string | null;
   notes?: string | null;
   reported_by?: string | null;
@@ -197,8 +197,7 @@ export interface Notification {
   user_id: string | null;
   title: string;
   message: string;
-  // TODO: tighten to union once notification types are finalized
-  type: string | null;
+  type: 'info' | 'success' | 'warning' | 'error' | 'pair_complete' | null;
   entity_type: string | null;
   entity_id: string | null;
   is_read: boolean | null;
@@ -210,7 +209,7 @@ export type NotificationInsert = {
   user_id?: string | null;
   title: string;
   message: string;
-  type?: string | null;
+  type?: 'info' | 'success' | 'warning' | 'error' | 'pair_complete' | null;
   entity_type?: string | null;
   entity_id?: string | null;
   is_read?: boolean | null;
@@ -286,7 +285,7 @@ export type InventoryExtraInsert = {
 export interface InventoryExtraHistory {
   id: string;
   extra_id: string | null;
-  action: string;
+  action: 'created' | 'added' | 'removed' | 'used';
   quantity_change: number;
   quantity_after: number;
   reason: string | null;
@@ -298,7 +297,7 @@ export interface InventoryExtraHistory {
 export type InventoryExtraHistoryInsert = {
   id?: string;
   extra_id?: string | null;
-  action: string;
+  action: 'created' | 'added' | 'removed' | 'used';
   quantity_change: number;
   quantity_after: number;
   reason?: string | null;
@@ -357,7 +356,7 @@ export interface CashHandover {
   to_user_id: string | null;
   to_user_name: string;
   notes: string | null;
-  status: 'pending' | 'confirmed' | 'expired';
+  status: 'pending' | 'confirmed' | 'disputed';
   confirmed_at: string | null;
   created_at: string | null;
   period_from: string | null;
@@ -376,7 +375,7 @@ export type CashHandoverInsert = {
   to_user_id?: string | null;
   to_user_name: string;
   notes?: string | null;
-  status: 'pending' | 'confirmed' | 'expired';
+  status: 'pending' | 'confirmed' | 'disputed';
   confirmed_at?: string | null;
   created_at?: string | null;
   period_from?: string | null;
@@ -392,9 +391,9 @@ export interface CashChallan {
   challan_number: number;
   customer_id: string | null;
   customer_name: string;
-  status: 'paid' | 'partial' | 'pending' | 'void';
+  status: 'draft' | 'paid' | 'unpaid' | 'partial' | 'voided';
   subtotal: number;
-  discount_type: string | null;
+  discount_type: 'flat' | 'percentage' | null;
   discount_value: number | null;
   discount_amount: number | null;
   round_off: number | null;
@@ -421,9 +420,9 @@ export type CashChallanInsert = {
   challan_number: number;
   customer_id?: string | null;
   customer_name: string;
-  status: 'paid' | 'partial' | 'pending' | 'void';
+  status: 'draft' | 'paid' | 'unpaid' | 'partial' | 'voided';
   subtotal: number;
-  discount_type?: string | null;
+  discount_type?: 'flat' | 'percentage' | null;
   discount_value?: number | null;
   discount_amount?: number | null;
   round_off?: number | null;
@@ -455,8 +454,7 @@ export interface CashChallanItem {
   price: number;
   total: number;
   sort_order: number | null;
-  // TODO: tighten to union once discount types are finalised (likely 'percent' | 'flat')
-  discount_type: string | null;
+  discount_type: 'flat' | 'percentage' | null;
   discount_value: number | null;
   discount_amount: number | null;
 }
@@ -470,7 +468,7 @@ export type CashChallanItemInsert = {
   price: number;
   total: number;
   sort_order?: number | null;
-  discount_type?: string | null;
+  discount_type?: 'flat' | 'percentage' | null;
   discount_value?: number | null;
   discount_amount?: number | null;
 };
@@ -642,14 +640,16 @@ export type PackTimeScanInsert = {
 export type InventoryStatus = NonNullable<InventoryItem['status']>;
 export type ComponentStatus = NonNullable<ItemComponent['status']>;
 export type DamageReportStatus = NonNullable<DamageReport['status']>;
+export type DamageSeverity = NonNullable<InventoryItem['damage_severity']>;
 export type UserRole = NonNullable<Profile['role']>;
 export type CashChallanStatus = NonNullable<CashChallan['status']>;
 export type CashHandoverStatus = NonNullable<CashHandover['status']>;
 
 // Constant arrays for dropdowns / validation
-export const INVENTORY_STATUSES: InventoryStatus[] = ['unsorted', 'damaged', 'complete', 'repaired', 'disposed'];
+export const INVENTORY_STATUSES: InventoryStatus[] = ['unsorted', 'damaged', 'dry_clean', 'complete', 'completed'];
 export const COMPONENT_STATUSES: ComponentStatus[] = ['missing', 'present', 'damaged'];
 export const DAMAGE_REPORT_STATUSES: DamageReportStatus[] = ['open', 'investigating', 'resolved', 'closed'];
+export const DAMAGE_SEVERITIES: DamageSeverity[] = ['minor', 'moderate', 'severe', 'critical'];
 export const USER_ROLES: UserRole[] = ['admin', 'manager', 'operator', 'viewer'];
-export const CASH_CHALLAN_STATUSES: CashChallanStatus[] = ['paid', 'partial', 'pending', 'void'];
-export const CASH_HANDOVER_STATUSES: CashHandoverStatus[] = ['pending', 'confirmed', 'expired'];
+export const CASH_CHALLAN_STATUSES: CashChallanStatus[] = ['draft', 'paid', 'unpaid', 'partial', 'voided'];
+export const CASH_HANDOVER_STATUSES: CashHandoverStatus[] = ['pending', 'confirmed', 'disputed'];
