@@ -42,7 +42,8 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
       const validComps = newComps.filter(c => c.trim());
       if (validComps.length > 0) {
         const compsToInsert = validComps.map((name, i) => ({ product_id: selected.id, name: name.trim(), component_code: `C${(comps.length || 0) + i + 1}` }));
-        await supabase.from('components').insert(compsToInsert);
+        const { error: compsErr } = await supabase.from('components').insert(compsToInsert);
+        if (compsErr) { addToast('Component add failed: ' + compsErr.message, 'error'); return; }
       }
       addToast('Updated!', 'success');
     } else {
@@ -53,7 +54,8 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
       if (error || !data) { addToast(error?.message || 'Error', 'error'); return; }
       if (validComps.length > 0) {
         const compsToInsert = validComps.map((name, i) => ({ product_id: data.id, name: name.trim(), component_code: `C${i + 1}` }));
-        await supabase.from('components').insert(compsToInsert);
+        const { error: compsErr } = await supabase.from('components').insert(compsToInsert);
+        if (compsErr) { addToast('Component add failed: ' + compsErr.message, 'error'); return; }
       }
       addToast(`Category "${form.name}" added with ${validComps.length} components!`, 'success');
     }
@@ -77,7 +79,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
     const compsToInsert = validComps.map((name, i) => ({ product_id: selected.id, name: name.trim(), component_code: `C${(comps.length || 0) + i + 1}` }));
     const { error } = await supabase.from('components').insert(compsToInsert);
     if (error) { addToast(error.message, 'error'); return; }
-    await supabase.from('products').update({ total_components: (comps.length || 0) + validComps.length }).eq('id', selected.id);
+    // total_components is auto-maintained by trigger_update_component_count
     addToast(`${validComps.length} component(s) added!`, 'success');
     setNewComps(['']); fetchComps(selected.id); fetchCategories();
   };
@@ -92,9 +94,9 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
     ]);
     const refs = (itemCount || 0) + (extraCount || 0);
     if (refs > 0) { addToast(`Cannot delete — used by ${itemCount || 0} item(s) and ${extraCount || 0} extra(s)`, 'error'); return; }
-    await supabase.from('components').delete().eq('id', id);
-    const { count: remaining } = await supabase.from('components').select('id', { count: 'exact', head: true }).eq('product_id', selected.id);
-    await supabase.from('products').update({ total_components: remaining || 0 }).eq('id', selected.id);
+    const { error: delErr } = await supabase.from('components').delete().eq('id', id);
+    if (delErr) { addToast('Delete failed: ' + delErr.message, 'error'); return; }
+    // total_components is auto-maintained by trigger_update_component_count
     addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories();
   };
 

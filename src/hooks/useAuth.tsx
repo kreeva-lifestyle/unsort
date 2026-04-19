@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!mounted) return;
         if (refreshed?.session?.user) {
           setUser(refreshed.session.user);
-          const { data: prof } = await supabase.from('profiles').select('*').eq('id', refreshed.session.user.id).maybeSingle();
+          const { data: prof } = await supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').eq('id', refreshed.session.user.id).maybeSingle();
           if (mounted) setProfile(prof);
         } else {
           setUser(null); setProfile(null);
@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (!mounted) return;
       if (session?.user) {
         setUser(session.user);
-        supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle().then(({ data }) => {
+        supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').eq('id', session.user.id).maybeSingle().then(({ data }) => {
           if (mounted) { setProfile(data); setLoading(false); setReady(true); }
         });
       } else {

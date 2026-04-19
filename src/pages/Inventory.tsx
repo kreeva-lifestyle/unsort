@@ -307,15 +307,24 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     }
     // Save tags
     if (savedItemId && tagInput.trim()) {
-      await supabase.from('item_tags').delete().eq('inventory_item_id', savedItemId);
+      const { error: delTagErr } = await supabase.from('item_tags').delete().eq('inventory_item_id', savedItemId);
+      if (delTagErr) addToast('Tag update warning: ' + delTagErr.message, 'error');
       const tagNames = tagInput.split(',').map(t => t.trim()).filter(Boolean);
       for (const name of tagNames) {
         let { data: existing } = await supabase.from('tags').select('id').eq('name', name).maybeSingle();
-        if (!existing) { const { data: created } = await supabase.from('tags').insert({ name }).select('id').single(); existing = created; }
-        if (existing) await supabase.from('item_tags').insert({ inventory_item_id: savedItemId, tag_id: existing.id });
+        if (!existing) {
+          const { data: created, error: createErr } = await supabase.from('tags').insert({ name }).select('id').single();
+          if (createErr) { addToast(`Tag "${name}" failed: ${createErr.message}`, 'error'); continue; }
+          existing = created;
+        }
+        if (existing) {
+          const { error: linkErr } = await supabase.from('item_tags').insert({ inventory_item_id: savedItemId, tag_id: existing.id });
+          if (linkErr) addToast(`Tag "${name}" link failed: ${linkErr.message}`, 'error');
+        }
       }
     } else if (savedItemId && !tagInput.trim()) {
-      await supabase.from('item_tags').delete().eq('inventory_item_id', savedItemId);
+      const { error: delTagErr } = await supabase.from('item_tags').delete().eq('inventory_item_id', savedItemId);
+      if (delTagErr) addToast('Tag clear warning: ' + delTagErr.message, 'error');
     }
 
     const savedProductId = form.product_id;
@@ -368,9 +377,8 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     if (item.status === 'completed') { addToast('Cannot delete a completed item.', 'error'); return; }
     setItems(prev => prev.filter(i => i.id !== itemId));
     const timer = window.setTimeout(async () => {
-      await supabase.from('item_tags').delete().eq('inventory_item_id', itemId);
-      await supabase.from('item_components').delete().eq('inventory_item_id', itemId);
-      await supabase.from('inventory_items').delete().eq('id', itemId);
+      const { error } = await supabase.rpc('delete_inventory_item_cascade', { p_item_id: itemId });
+      if (error) addToast('Delete failed: ' + error.message, 'error');
       setPendingDelete(null);
       fetchData();
     }, 5000);
@@ -389,16 +397,18 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     const [{ data: aComps }, { data: bComps }, { data: prod }] = await Promise.all([
       supabase.from('item_components').select('component_id, status').eq('inventory_item_id', itemId),
       supabase.from('item_components').select('component_id, status').eq('inventory_item_id', pairId),
-      supabase.from('inventory_items').select('product_id, products(total_components)').eq('id', itemId).maybeSingle() as any,
+      supabase.from('inventory_items').select('product_id, products(total_components)').eq('id', itemId).maybeSingle(),
     ]);
     const aP = new Set((aComps || []).filter(c => c.status === 'present').map(c => c.component_id));
     const bP = new Set((bComps || []).filter(c => c.status === 'present').map(c => c.component_id));
     const union = new Set([...aP, ...bP]);
-    const total = (prod as any)?.products?.total_components || 0;
+    type ProdJoin = { product_id: string; products: { total_components: number } | { total_components: number }[] | null };
+    const prodRow = prod as ProdJoin | null;
+    const prodProducts = prodRow?.products;
+    const total = Array.isArray(prodProducts) ? (prodProducts[0]?.total_components ?? 0) : (prodProducts?.total_components ?? 0);
     if (total > 0 && union.size < total) { addToast('Cannot complete — combined components do not cover all required parts. Data may have changed.', 'error'); setShowCompleteModal(null); fetchData(); return; }
-    const { error: e1 } = await supabase.from('inventory_items').update({ status: 'completed', paired_with: pairId }).eq('id', itemId);
-    const { error: e2 } = await supabase.from('inventory_items').update({ status: 'completed', paired_with: itemId }).eq('id', pairId);
-    if (e1 || e2) { addToast(`Error: ${e1?.message || e2?.message}`, 'error'); return; }
+    const { error } = await supabase.rpc('complete_inventory_pair', { p_a: itemId, p_b: pairId });
+    if (error) { addToast('Error: ' + error.message, 'error'); return; }
     setItems(prev => prev.map(i => (i.id === itemId || i.id === pairId) ? { ...i, status: 'completed' } : i));
     addToast('Both items moved to Completed!', 'success');
     setShowCompleteModal(null);
@@ -411,12 +421,9 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     if ((extraUsed || 0) > 0) { addToast('Cannot revert — item was completed using an extra. Extra quantity was already decremented.', 'error'); return; }
     const item = items.find(i => i.id === itemId);
     const pairedId = item?.paired_with;
-    const idsToRevert = [itemId];
-    if (pairedId) idsToRevert.push(pairedId);
-
-    for (const id of idsToRevert) {
-      await supabase.from('inventory_items').update({ status: 'unsorted', paired_with: null }).eq('id', id);
-    }
+    const { error } = await supabase.rpc('revert_inventory_pair', { p_a: itemId, p_b: pairedId || null });
+    if (error) { addToast('Error: ' + error.message, 'error'); return; }
+    const idsToRevert = pairedId ? [itemId, pairedId] : [itemId];
     setItems(prev => prev.map(i => idsToRevert.includes(i.id) ? { ...i, status: 'unsorted', paired_with: null } : i));
     addToast(pairedId ? 'Both paired items moved back to Inventory' : 'Item moved back to Inventory', 'success');
     fetchData();

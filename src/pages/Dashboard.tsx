@@ -4,23 +4,32 @@ import { supabase } from '../lib/supabase';
 import { T, S } from '../lib/theme';
 import { useAuth } from '../hooks/useAuth';
 
+type ChallanRow = { total: number | string; amount_paid: number | string | null; status: string; is_return: boolean; customer_name: string; created_at: string };
+type InventoryRow = { status: string; status_changed_at: string | null };
+type ExpenseRow = { amount: number | string };
+type HandoverRow = { amount: number | string; status: string; date: string };
+type BalanceRow = { opening_balance: number | string };
+type OverdueAlert = { name: string; amount: number; days: number };
+type DryCleanAlert = { days: number };
+type TaskRow = { id: string; title: string; is_done: boolean; created_at: string };
+
 export default function Dashboard() {
   const { profile } = useAuth();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const [pulse, setPulse] = useState({ scans: 0, revenue: 0, unsorted: 0, cashInHand: 0 });
-  const [alerts, setAlerts] = useState({ overdue: [] as any[], dryClean: [] as any[], pendingHandovers: 0 });
+  const [alerts, setAlerts] = useState<{ overdue: OverdueAlert[]; dryClean: DryCleanAlert[]; pendingHandovers: number }>({ overdue: [], dryClean: [], pendingHandovers: 0 });
   const [invBreakdown, setInvBreakdown] = useState<Record<string, number>>({});
   const [topCustomers, setTopCustomers] = useState<{ name: string; outstanding: number }[]>([]);
   const [scanTrend, setScanTrend] = useState<{ date: string; count: number }[]>([]);
   const [revTrend, setRevTrend] = useState<{ date: string; amount: number }[]>([]);
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [newTask, setNewTask] = useState('');
 
   const fetchAll = useCallback(async () => {
     const today = new Date(); today.setHours(0,0,0,0);
     const todayISO = today.toISOString();
-    const [{ data: scans }, { data: challans }, { data: items }, { data: expenses }, { data: handovers }, { data: balances }] = await Promise.all([
+    const [scansRes, challansRes, itemsRes, expensesRes, handoversRes, balancesRes] = await Promise.all([
       supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).gte('scanned_at', todayISO),
       supabase.from('cash_challans').select('total, amount_paid, status, is_return, customer_name, created_at').neq('status', 'voided').neq('status', 'draft'),
       supabase.from('inventory_items').select('status, status_changed_at'),
@@ -28,34 +37,40 @@ export default function Dashboard() {
       supabase.from('cash_handovers').select('amount, status, date'),
       supabase.from('cash_book_balances').select('opening_balance').eq('date', today.toISOString().slice(0,10)).maybeSingle(),
     ]);
+    const challans = (challansRes.data ?? []) as ChallanRow[];
+    const items = (itemsRes.data ?? []) as InventoryRow[];
+    const expenses = (expensesRes.data ?? []) as ExpenseRow[];
+    const handovers = (handoversRes.data ?? []) as HandoverRow[];
+    const balances = balancesRes.data as BalanceRow | null;
+    const scanCount = scansRes.count ?? 0;
 
     // Pulse
-    const todayChallans = (challans || []).filter(c => new Date(c.created_at) >= today);
-    const todayRev = todayChallans.reduce((s, c) => s + ((c as any).is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
-    const unsortedCount = (items || []).filter(i => i.status === 'unsorted').length;
+    const todayChallans = challans.filter(c => new Date(c.created_at) >= today);
+    const todayRev = todayChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
+    const unsortedCount = items.filter(i => i.status === 'unsorted').length;
     const opening = Number(balances?.opening_balance || 0);
-    const cashSales = todayChallans.filter(c => !(c as any).is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
-    const cashReturns = todayChallans.filter(c => (c as any).is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
-    const totalExp = (expenses || []).reduce((s, e) => s + Number(e.amount), 0);
-    const confirmedHand = (handovers || []).filter(h => h.status === 'confirmed' && h.date === today.toISOString().slice(0,10)).reduce((s, h) => s + Number(h.amount), 0);
-    setPulse({ scans: scans as any || 0, revenue: Math.round(todayRev), unsorted: unsortedCount, cashInHand: Math.round(opening + cashSales - cashReturns - totalExp - confirmedHand) });
+    const cashSales = todayChallans.filter(c => !c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
+    const cashReturns = todayChallans.filter(c => c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
+    const totalExp = expenses.reduce((s, e) => s + Number(e.amount), 0);
+    const confirmedHand = handovers.filter(h => h.status === 'confirmed' && h.date === today.toISOString().slice(0,10)).reduce((s, h) => s + Number(h.amount), 0);
+    setPulse({ scans: scanCount, revenue: Math.round(todayRev), unsorted: unsortedCount, cashInHand: Math.round(opening + cashSales - cashReturns - totalExp - confirmedHand) });
 
     // Alerts
     const sevenDaysAgo = Date.now() - 7 * 86400000;
-    const overdue = (challans || []).filter(c => !c.is_return && (c.status === 'unpaid' || c.status === 'partial') && new Date(c.created_at).getTime() < sevenDaysAgo)
+    const overdue: OverdueAlert[] = challans.filter(c => !c.is_return && (c.status === 'unpaid' || c.status === 'partial') && new Date(c.created_at).getTime() < sevenDaysAgo)
       .map(c => ({ name: c.customer_name, amount: Number(c.total) - Number(c.amount_paid || 0), days: Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) }));
-    const dryClean = (items || []).filter(i => i.status === 'dry_clean').map(i => ({ days: Math.floor((Date.now() - new Date(i.status_changed_at || Date.now()).getTime()) / 86400000) }));
-    const pendHand = (handovers || []).filter(h => h.status === 'pending').length;
+    const dryClean: DryCleanAlert[] = items.filter(i => i.status === 'dry_clean').map(i => ({ days: Math.floor((Date.now() - new Date(i.status_changed_at || Date.now()).getTime()) / 86400000) }));
+    const pendHand = handovers.filter(h => h.status === 'pending').length;
     setAlerts({ overdue, dryClean, pendingHandovers: pendHand });
 
     // Inventory breakdown
     const breakdown: Record<string, number> = {};
-    (items || []).forEach(i => { breakdown[i.status] = (breakdown[i.status] || 0) + 1; });
+    items.forEach(i => { breakdown[i.status] = (breakdown[i.status] || 0) + 1; });
     setInvBreakdown(breakdown);
 
     // Top 5 customers
     const custMap: Record<string, number> = {};
-    (challans || []).filter(c => !c.is_return && (c.status === 'unpaid' || c.status === 'partial')).forEach(c => {
+    challans.filter(c => !c.is_return && (c.status === 'unpaid' || c.status === 'partial')).forEach(c => {
       custMap[c.customer_name] = (custMap[c.customer_name] || 0) + (Number(c.total) - Number(c.amount_paid || 0));
     });
     setTopCustomers(Object.entries(custMap).map(([name, outstanding]) => ({ name, outstanding })).sort((a, b) => b.outstanding - a.outstanding).slice(0, 5));
@@ -64,17 +79,17 @@ export default function Dashboard() {
     const { data: scanData } = await supabase.from('packtime_scans').select('scanned_at').gte('scanned_at', new Date(Date.now() - 7 * 86400000).toISOString());
     const scanByDay: Record<string, number> = {};
     for (let d = 6; d >= 0; d--) { const dt = new Date(Date.now() - d * 86400000); scanByDay[dt.toISOString().slice(0,10)] = 0; }
-    (scanData || []).forEach(s => { const d = new Date(s.scanned_at).toISOString().slice(0,10); if (scanByDay[d] !== undefined) scanByDay[d]++; });
+    ((scanData ?? []) as { scanned_at: string }[]).forEach(s => { const d = new Date(s.scanned_at).toISOString().slice(0,10); if (scanByDay[d] !== undefined) scanByDay[d]++; });
     setScanTrend(Object.entries(scanByDay).map(([date, count]) => ({ date, count })));
 
     // Revenue trend (30 days)
     const revByDay: Record<string, number> = {};
     for (let d = 29; d >= 0; d--) { const dt = new Date(Date.now() - d * 86400000); revByDay[dt.toISOString().slice(0,10)] = 0; }
-    (challans || []).forEach(c => { const d = new Date(c.created_at).toISOString().slice(0,10); if (revByDay[d] !== undefined) revByDay[d] += ((c as any).is_return ? -1 : 1) * Number(c.amount_paid || 0); });
+    challans.forEach(c => { const d = new Date(c.created_at).toISOString().slice(0,10); if (revByDay[d] !== undefined) revByDay[d] += (c.is_return ? -1 : 1) * Number(c.amount_paid || 0); });
     setRevTrend(Object.entries(revByDay).map(([date, amount]) => ({ date, amount: Math.round(amount) })));
   }, []);
 
-  const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(100).then(({ data }) => setTasks(data || [])); };
+  const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(100).then(({ data }) => setTasks((data ?? []) as TaskRow[])); };
 
   useEffect(() => {
     fetchAll(); fetchTasks();
@@ -105,13 +120,13 @@ export default function Dashboard() {
 
       {/* Row 1: Today's Pulse */}
       <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
-        {[
+        {([
           { label: "Today's Scans", value: pulse.scans, color: T.ac, prefix: '', tip: 'Total barcodes scanned today in PackStation' },
           { label: "Today's Revenue", value: pulse.revenue, color: T.gr, prefix: '₹', tip: 'Net cash received today (sales - returns)' },
           { label: 'Unsorted Items', value: pulse.unsorted, color: T.yl, prefix: '', tip: 'Items awaiting sorting in Inventory' },
           { label: 'Cash in Hand', value: pulse.cashInHand, color: T.bl, prefix: '₹', tip: 'Opening balance + sales - expenses - handovers' },
-        ].map((c, i) => (
-          <div key={i} title={(c as any).tip} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px', position: 'relative', overflow: 'hidden', cursor: 'default' }}>
+        ] as const).map((c, i) => (
+          <div key={i} title={c.tip} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px', position: 'relative', overflow: 'hidden', cursor: 'default' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${c.color}cc, ${c.color}33)` }} />
             <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, marginBottom: 4, fontWeight: 600, textTransform: 'uppercase' }}>{c.label}</p>
             <p style={{ fontFamily: T.sora, fontSize: 20, fontWeight: 700, color: c.color, margin: 0 }}>{c.prefix}{c.value.toLocaleString('en-IN')}</p>
