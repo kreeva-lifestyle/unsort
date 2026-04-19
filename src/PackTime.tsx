@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BarcodeDetector } from 'barcode-detector/ponyfill';
 import { supabase, SUPABASE_ANON_KEY } from './lib/supabase';
+import { useNotifications } from './hooks/useNotifications';
 
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
 
@@ -150,6 +151,7 @@ async function callEdge(body: unknown, timeoutMs = 20000): Promise<any> {
 
 // ── Component ───────────────────────────────────────────────────────────────────
 export default function PackTime({ active }: { active?: boolean } = {}) {
+  const { addToast } = useNotifications();
   // Config from Supabase
   const [couriers, setCouriers] = useState<PackTimeCourier[]>([]);
   const [cameras, setCameras] = useState<PackTimeCamera[]>([]);
@@ -736,15 +738,15 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {/* Flash */}
       {flash && <div style={{ position: 'fixed', inset: 0, zIndex: 300, pointerEvents: 'none', background: flash === 'success' ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.10)', animation: 'fi .15s ease' }} />}
 
-      {/* Duplicate modal */}
+      {/* Duplicate — non-blocking banner (audit P0: let operator keep scanning) */}
       {duplicateAwb && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
-          <div className="modal-inner" style={{ background: 'rgba(30,10,10,.95)', border: '2px solid rgba(239,68,68,.4)', borderRadius: 16, padding: '24px 20px', textAlign: 'center', maxWidth: 340, width: '100%' }}>
-            <div style={{ fontSize: 40, marginBottom: 6 }}>⚠️</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: T.re, fontFamily: T.sora, marginBottom: 6 }}>Duplicate Detected!</div>
-            <div style={{ fontSize: 12, color: T.tx2, marginBottom: 10 }}>AWB already scanned:</div>
-            <div style={{ fontSize: 16, fontFamily: T.mono, color: '#fff', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '8px 14px', wordBreak: 'break-all' }}>{duplicateAwb}</div>
-            <div style={{ marginTop: 10, fontSize: 10, color: T.tx3 }}>Not written to sheet</div>
+        <div style={{ position: 'fixed', top: 56, left: '50%', transform: 'translateX(-50%)', zIndex: 400, pointerEvents: 'none', animation: 'slideDown .15s ease' }}>
+          <div style={{ background: 'rgba(60,15,15,.95)', border: '1px solid rgba(239,68,68,.45)', borderRadius: 10, padding: '8px 14px', boxShadow: '0 8px 24px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 10, color: '#fff' }}>
+            <span style={{ fontSize: 16 }}>⚠️</span>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.re, textTransform: 'uppercase', letterSpacing: 1 }}>Duplicate — not saved</div>
+              <div style={{ fontSize: 12, fontFamily: T.mono, color: '#fff', wordBreak: 'break-all' }}>{duplicateAwb}</div>
+            </div>
           </div>
         </div>
       )}
@@ -929,7 +931,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             </div>
             <button onClick={() => {
               const successScans = recentScans.filter(s => s.success);
-              if (successScans.length === 0) { alert('No successful scans to export'); return; }
+              if (successScans.length === 0) { addToast('No successful scans to export', 'error'); return; }
               const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n');
               const blob = new Blob([csv], { type: 'text/csv' });
               const url = URL.createObjectURL(blob);
