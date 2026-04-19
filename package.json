@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ericblade/quagga2": "^1.12.1",
     "@supabase/supabase-js": "^2.39.0",
     "barcode-detector": "^3.1.2",
     "jsbarcode": "^3.12.3",

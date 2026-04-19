@@ -3,6 +3,7 @@ import React, { useState, useEffect, useId } from 'react';
 import JsBarcode from 'jsbarcode';
 import { supabase } from '../lib/supabase';
 import { T, S, Icon } from '../lib/theme';
+import { friendlyError } from '../lib/friendlyError';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import InventoryExtras from '../InventoryExtras';
@@ -56,6 +57,9 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
   const [itemTags, setItemTags] = useState<Record<string, any[]>>({});
   const [statusFilter, setStatusFilter] = useState('all');
   const [showFiltersPopover, setShowFiltersPopover] = useState(false);
+  // Bulk selection (audit P1: docked action bar)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [catFilter, setCatFilter] = useState('all');
   const [locFilter, setLocFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('all');
@@ -299,7 +303,7 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
         if ((count || 0) > 0) { addToast(`Cannot change SKU — ${count} extra(s) reference "${selected.serial_number}". Update extras first.`, 'error'); return; }
       }
       const { error } = await supabase.from('inventory_items').update(form).eq('id', selected.id);
-      if (error) { addToast(error.message, 'error'); return; }
+      if (error) { addToast(friendlyError(error), 'error'); return; }
       if (form.status === 'unsorted' || form.status === 'damaged' || form.status === 'dry_clean') await updateComponentStatuses(selected.id);
       savedItemId = selected.id;
       addToast('Updated!', 'success');
@@ -346,7 +350,7 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     }
   };
 
-  const updateComp = async (id: string, status: string) => { const { error } = await supabase.from('item_components').update({ status }).eq('id', id); if (error) addToast(error.message, 'error'); else { addToast('Updated!', 'success'); fetchComps(selected.id); fetchData(); } };
+  const updateComp = async (id: string, status: string) => { const { error } = await supabase.from('item_components').update({ status }).eq('id', id); if (error) addToast(friendlyError(error), 'error'); else { addToast('Updated!', 'success'); fetchComps(selected.id); fetchData(); } };
 
   const openEdit = async (item: any) => {
     setSelected(item); setForm({ product_id: item.product_id, serial_number: item.serial_number || '', size: item.size || '', status: item.status, location: item.location || '', notes: item.notes || '', order_id: item.order_id || '', marketplace: item.marketplace || '', ticket_id: item.ticket_id || '', link: item.link || '' }); setCatSearch(item.products?.name || '');
@@ -386,7 +390,7 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     setItems(prev => prev.filter(i => i.id !== itemId));
     const timer = window.setTimeout(async () => {
       const { error } = await supabase.rpc('delete_inventory_item_cascade', { p_item_id: itemId });
-      if (error) addToast('Delete failed: ' + error.message, 'error');
+      if (error) addToast('Delete failed — ' + friendlyError(error), 'error');
       setPendingDelete(null);
       fetchData();
     }, 5000);
@@ -416,7 +420,7 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     const total = Array.isArray(prodProducts) ? (prodProducts[0]?.total_components ?? 0) : (prodProducts?.total_components ?? 0);
     if (total > 0 && union.size < total) { addToast('Cannot complete — combined components do not cover all required parts. Data may have changed.', 'error'); setShowCompleteModal(null); fetchData(); return; }
     const { error } = await supabase.rpc('complete_inventory_pair', { p_a: itemId, p_b: pairId });
-    if (error) { addToast('Error: ' + error.message, 'error'); return; }
+    if (error) { addToast(friendlyError(error), 'error'); return; }
     setItems(prev => prev.map(i => (i.id === itemId || i.id === pairId) ? { ...i, status: 'completed' } : i));
     addToast('Both items moved to Completed!', 'success');
     setShowCompleteModal(null);
@@ -430,7 +434,7 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     const item = items.find(i => i.id === itemId);
     const pairedId = item?.paired_with;
     const { error } = await supabase.rpc('revert_inventory_pair', { p_a: itemId, p_b: pairedId || null });
-    if (error) { addToast('Error: ' + error.message, 'error'); return; }
+    if (error) { addToast(friendlyError(error), 'error'); return; }
     const idsToRevert = pairedId ? [itemId, pairedId] : [itemId];
     setItems(prev => prev.map(i => idsToRevert.includes(i.id) ? { ...i, status: 'unsorted', paired_with: null } : i));
     addToast(pairedId ? 'Both paired items moved back to Inventory' : 'Item moved back to Inventory', 'success');
@@ -580,15 +584,44 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
       </div>
       <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         <div className="table-wrap">
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 850 }}>
-          <thead><tr>{['Unique ID', 'SKU', 'Category', 'Size', 'Tags', 'Notes', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 880 }}>
+          <thead><tr>
+            {canEdit && <th style={{ ...S.thStyle, width: 32, paddingLeft: 10, paddingRight: 4 }}>
+              <input
+                type="checkbox"
+                checked={paged.length > 0 && paged.every(i => selectedIds.has(i.id))}
+                onChange={e => {
+                  const next = new Set(selectedIds);
+                  if (e.target.checked) paged.forEach(i => next.add(i.id));
+                  else paged.forEach(i => next.delete(i.id));
+                  setSelectedIds(next);
+                }}
+                title="Select all on page"
+                style={{ cursor: 'pointer' }}
+              />
+            </th>}
+            {['Unique ID', 'SKU', 'Category', 'Size', 'Tags', 'Notes', 'Status', 'Issues', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}
+          </tr></thead>
           <tbody>{paged.map((item) => {
             const missing = itemMissing[item.id] || [];
             const damaged = itemDamaged[item.id] || [];
-            return (<tr key={item.id} id={'row-' + item.id} style={{ transition: 'background .2s', background: highlightId === item.id ? 'rgba(99,102,241,.08)' : 'transparent' }} onMouseEnter={e => { if (highlightId !== item.id) e.currentTarget.style.background = 'rgba(255,255,255,.015)'; }} onMouseLeave={e => { if (highlightId !== item.id) e.currentTarget.style.background = 'transparent'; }}>
+            return (<tr key={item.id} id={'row-' + item.id} style={{ transition: 'background .2s', background: selectedIds.has(item.id) ? 'rgba(99,102,241,.10)' : highlightId === item.id ? 'rgba(99,102,241,.08)' : 'transparent' }} onMouseEnter={e => { if (highlightId !== item.id && !selectedIds.has(item.id)) e.currentTarget.style.background = 'rgba(255,255,255,.015)'; }} onMouseLeave={e => { if (highlightId !== item.id && !selectedIds.has(item.id)) e.currentTarget.style.background = 'transparent'; }}>
+            {canEdit && <td style={{ ...S.tdStyle, width: 32, paddingLeft: 10, paddingRight: 4 }}>
+              <input
+                type="checkbox"
+                checked={selectedIds.has(item.id)}
+                onClick={e => e.stopPropagation()}
+                onChange={e => {
+                  const next = new Set(selectedIds);
+                  if (e.target.checked) next.add(item.id); else next.delete(item.id);
+                  setSelectedIds(next);
+                }}
+                style={{ cursor: 'pointer' }}
+              />
+            </td>}
             <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 10, whiteSpace: 'nowrap' }}><span style={{ color: T.gr }}>{item.batch_number || '—'}</span>{isCompletedView && item.paired_with && (() => { const pair = items.find(p => p.id === item.paired_with); return pair ? <span onClick={() => scrollToPair(item.paired_with)} style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2, cursor: 'pointer' }} title="Click to find paired item"><svg viewBox="0 0 24 24" style={{ width: 9, height: 9, fill: 'none', stroke: T.ac2, strokeWidth: 2, flexShrink: 0 }}><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg><span style={{ fontSize: 9, color: T.ac2 }}>{pair.batch_number}</span></span> : null; })()}</td>
-            <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 10 }}>{item.serial_number || '—'}{item.link && <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 4, color: T.bl, verticalAlign: 'middle' }}><Icon name="link" size={10} /></a>}</td>
-            <td style={{ ...S.tdStyle, fontSize: 11 }}><span style={{ fontWeight: 500 }}>{item.products?.name}</span></td>
+            <td title={item.serial_number || ''} style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 10 }}>{item.serial_number || '—'}{item.link && <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 4, color: T.bl, verticalAlign: 'middle' }}><Icon name="link" size={10} /></a>}</td>
+            <td title={item.products?.name || ''} style={{ ...S.tdStyle, fontSize: 11 }}><span style={{ fontWeight: 500 }}>{item.products?.name}</span></td>
             <td style={{ ...S.tdStyle, fontSize: 10, fontWeight: 500 }}>{item.size || '—'}</td>
             <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(99,102,241,.10)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 10 }}>—</span>}</div></td>
             <td style={{ ...S.tdStyle, fontSize: 11, maxWidth: 140 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 25 ? item.notes.slice(0, 25) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
@@ -619,6 +652,57 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
         </>}
         {invTruncated && <span onClick={() => { setInvLimit(p => p + 5000); fetchData(); }} style={{ ...S.btnGhost, fontSize: 9, color: T.yl, borderColor: 'rgba(245,158,11,.2)', background: 'rgba(245,158,11,.06)' }}>Load More Items ({invLimit} loaded)</span>}
       </div>
+
+      {/* Bulk-actions dock — appears when rows are selected (audit P1) */}
+      {canEdit && selectedIds.size > 0 && (
+        <div style={{ position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 120, background: 'rgba(14,18,30,0.98)', backdropFilter: 'blur(24px)', border: `1px solid ${T.bd2}`, borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,.55)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', maxWidth: 'calc(100vw - 24px)', animation: 'slideDown .18s ease' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{selectedIds.size} selected</span>
+          <span style={{ width: 1, height: 18, background: T.bd2 }} />
+          <select
+            value=""
+            disabled={bulkBusy}
+            onChange={async e => {
+              const newStatus = e.target.value;
+              if (!newStatus) return;
+              if (!confirm(`Change status of ${selectedIds.size} item${selectedIds.size === 1 ? '' : 's'} to "${newStatus}"?`)) { e.target.value = ''; return; }
+              setBulkBusy(true);
+              const ids = Array.from(selectedIds);
+              const { error } = await supabase.from('inventory_items').update({ status: newStatus }).in('id', ids);
+              setBulkBusy(false);
+              if (error) { addToast(friendlyError(error), 'error'); return; }
+              addToast(`${ids.length} item${ids.length === 1 ? '' : 's'} → ${newStatus}`, 'success');
+              setSelectedIds(new Set());
+              fetchData();
+            }}
+            style={{ ...S.fInput, width: 'auto', padding: '6px 10px', fontSize: 11, cursor: 'pointer' }}
+          >
+            <option value="">Change status to…</option>
+            <option value="unsorted">Unsorted</option>
+            <option value="dry_clean">Dry Clean</option>
+            <option value="damaged">Damaged</option>
+          </select>
+          <button
+            disabled={bulkBusy}
+            onClick={async () => {
+              if (!confirm(`Delete ${selectedIds.size} item${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return;
+              setBulkBusy(true);
+              const ids = Array.from(selectedIds);
+              let failed = 0;
+              for (const id of ids) {
+                const { error } = await supabase.rpc('delete_inventory_item_cascade', { p_item_id: id });
+                if (error) failed++;
+              }
+              setBulkBusy(false);
+              if (failed > 0) addToast(`${ids.length - failed} deleted, ${failed} failed`, 'error');
+              else addToast(`${ids.length} item${ids.length === 1 ? '' : 's'} deleted`, 'success');
+              setSelectedIds(new Set());
+              fetchData();
+            }}
+            style={{ ...S.btnDanger, padding: '6px 12px', fontSize: 11 }}
+          >Delete</button>
+          <button onClick={() => setSelectedIds(new Set())} style={{ ...S.btnGhost, padding: '6px 12px', fontSize: 11 }}>Clear</button>
+        </div>
+      )}
 
       {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={S.modalBox}><div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Item</span></div><form onSubmit={handleSubmit} style={{ padding: 16 }}><div style={{ marginBottom: 10, position: 'relative' }}><label style={S.fLabel}>Category *</label><input value={catSearch} onChange={(e) => { setCatSearch(e.target.value); setShowCatDrop(true); setForm({ ...form, product_id: '' }); }} onFocus={() => setShowCatDrop(true)} placeholder="Type to search categories by name or SKU..." style={{ ...S.fInput, opacity: selected ? 0.6 : 1 }} autoComplete="off" disabled={!!selected} /><input type="hidden" value={form.product_id} required />{form.product_id && <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: T.r, background: 'rgba(139,92,246,.1)', border: '1px solid rgba(139,92,246,.25)', fontSize: 12, color: T.ac2 }}>{products.find(p => p.id === form.product_id)?.name} <span style={{ fontFamily: T.mono, opacity: 0.7 }}>{products.find(p => p.id === form.product_id)?.sku}</span><span onClick={() => { setForm({ ...form, product_id: '' }); setCatSearch(''); }} style={{ cursor: 'pointer', marginLeft: 4, opacity: 0.6 }}>✕</span></div>}{showCatDrop && !form.product_id && (() => { const q = catSearch.toLowerCase(); const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))); return filtered.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)' }}>{filtered.map(p => <div key={p.id} onClick={() => { setForm({ ...form, product_id: p.id }); setCatSearch(p.name); setShowCatDrop(false); supabase.from('components').select('*').eq('product_id', p.id).then(({ data }) => { setCatComps(data || []); setMissingComps(new Set()); setDamagedComps(new Set()); const allDup = (data || []).length > 0 && (data || []).every((c: any) => isDupatta(c.name)); if (allDup) setForm(f => ({ ...f, size: 'N/A' })); }); }} style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}><span style={{ fontSize: 13, color: T.tx }}>{p.name}</span><span style={{ fontSize: 11, fontFamily: T.mono, color: T.tx3 }}>{p.sku}</span></div>)}</div> : catSearch ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, padding: '12px 14px', fontSize: 12, color: T.tx3, zIndex: 10 }}>No categories found</div> : null; })()}</div><div style={{ marginBottom: 10, position: 'relative' }}><label style={S.fLabel}>SKU Code <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0, fontSize: 8 }}>(unique identifier)</span></label><input value={form.serial_number} onChange={(e) => { setForm({ ...form, serial_number: e.target.value }); setShowSkuDrop(true); }} onFocus={() => setShowSkuDrop(true)} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. LC-001-A" style={{ ...S.fInput, fontFamily: T.mono }} autoComplete="off" />{showSkuDrop && form.serial_number && (() => { const q = form.serial_number.toLowerCase(); const existing = [...new Set(items.map(i => i.serial_number).filter(Boolean))]; const matches = existing.filter(s => s.toLowerCase().includes(q) && s !== form.serial_number); return matches.length > 0 ? <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: T.r, maxHeight: 140, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 20px rgba(0,0,0,.3)' }}>{matches.slice(0, 8).map(s => <div key={s} onMouseDown={() => { setForm({ ...form, serial_number: s }); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}`, transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{s}</div>)}</div> : null; })()}</div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Size <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0, fontSize: 8 }}>(N/A for Dupatta · Free Size for Lehenga)</span></label><select value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} style={S.fInput}><option value="">Select size...</option>{SIZES.map(s => <option key={s} value={s}>{s}</option>)}</select></div><div><label style={S.fLabel}>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={S.fInput}><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select></div></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Location</label><select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={S.fInput}><option value="">Select location</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div><div><label style={S.fLabel}>Marketplace</label><select value={form.marketplace} onChange={(e) => setForm({ ...form, marketplace: e.target.value })} style={S.fInput}><option value="">Select</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select></div></div>{(form.status === 'unsorted' || form.status === 'damaged' || form.status === 'dry_clean') && catComps.length > 0 && <div style={{ marginBottom: 14 }}>
   <label style={S.fLabel}>Component Status <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(click to toggle: Present → Missing → Damaged)</span></label>

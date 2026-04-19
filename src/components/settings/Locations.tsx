@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
 
 export default function Locations({ addToast, canEdit }: { addToast: (msg: string, type?: string) => void; canEdit: boolean }) {
   const [locations, setLocations] = useState<any[]>([]);
@@ -23,14 +24,14 @@ export default function Locations({ addToast, canEdit }: { addToast: (msg: strin
     const exists = locations.some(l => l.name.toLowerCase() === newLoc.trim().toLowerCase());
     if (exists) { addToast('Location already exists', 'error'); return; }
     const { error } = await supabase.from('locations').insert({ name: newLoc.trim() });
-    if (error) addToast(error.message, 'error');
+    if (error) addToast(friendlyError(error), 'error');
     else { addToast('Location added!', 'success'); setNewLoc(''); fetchLocations(); }
   };
 
   const updateLocation = async (id: string) => {
     if (!editName.trim()) return;
     const { error } = await supabase.from('locations').update({ name: editName.trim() }).eq('id', id);
-    if (error) addToast(error.message, 'error');
+    if (error) addToast(friendlyError(error), 'error');
     else { addToast('Updated!', 'success'); setEditId(null); fetchLocations(); }
   };
 

@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
 
 export default function Users({ addToast, profile }: { addToast: (msg: string, type?: string) => void; profile: any }) {
   const [users, setUsers] = useState<any[]>([]);
@@ -36,7 +37,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     setPhoneSaving(true);
     const { error } = await supabase.from('profiles').update({ phone: cleaned }).eq('id', profile.id);
     setPhoneSaving(false);
-    if (error) { addToast('Save failed: ' + error.message, 'error'); return; }
+    if (error) { addToast('Save failed — ' + friendlyError(error), 'error'); return; }
     setMyPhone(cleaned);
     setPhoneEditing(false);
     addToast('Phone saved', 'success');
@@ -50,7 +51,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     setPinSaving(true);
     const { error } = await supabase.from('profiles').update({ cash_pin: newPin }).eq('id', profile.id);
     setPinSaving(false);
-    if (error) { setPinError('Save failed: ' + error.message); return; }
+    if (error) { setPinError('Save failed — ' + friendlyError(error)); return; }
     setNewPin(''); setConfirmPin(''); setEditingPin(false);
     await loadPin();
     addToast('Cash PIN saved successfully', 'success');
@@ -78,7 +79,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
       if (adminCount < 1) { addToast('Cannot demote — at least 1 admin must remain', 'error'); fetchUsers(); return; }
     }
     const { error } = await supabase.from('profiles').update({ role }).eq('id', id);
-    if (error) addToast('Failed: ' + error.message, 'error'); else { addToast('Role updated!', 'success'); fetchUsers(); }
+    if (error) addToast('Role change failed — ' + friendlyError(error), 'error'); else { addToast('Role updated!', 'success'); fetchUsers(); }
   };
   const toggleActive = async (id: string, isActive: boolean) => {
     if (isActive) {
@@ -89,7 +90,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
       }
     }
     const { error } = await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id);
-    if (error) addToast(error.message, 'error'); else { addToast(isActive ? 'Access revoked' : 'Access granted', 'success'); fetchUsers(); }
+    if (error) addToast(friendlyError(error), 'error'); else { addToast(isActive ? 'Access revoked' : 'Access granted', 'success'); fetchUsers(); }
   };
 
   const generatePassword = () => {
@@ -109,7 +110,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
       options: { data: { full_name: inviteForm.full_name } }
     });
     if (error) {
-      addToast(error.message, 'error');
+      addToast(friendlyError(error), 'error');
       setInviting(false);
       return;
     }

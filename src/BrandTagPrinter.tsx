@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from './lib/supabase';
 import { useNotifications } from './hooks/useNotifications';
+import { friendlyError } from './lib/friendlyError';
 import type { BrandTag, BrandTagInsert, AuditLogInsert } from './types/database';
 
 const btAudit = (action: string, details: string) => {
@@ -599,9 +600,9 @@ export default function BrandTagPrinter() {
   const handleModalSave = useCallback((updated: BrandTagRow) => {
     const dbRow: BrandTagInsert = { brand: updated.brand, ean: updated.ean, sku: updated.sku, qty: updated.qty, mrp: updated.mrp, size: updated.size, product: updated.product, color: updated.color, mktd: updated.mktd, jio_code: updated.jioCode, copies: updated.copies };
     if (modalMode === 'add') {
-      supabase.from('brand_tags').insert(dbRow).then(({ error }) => { if (error) addToast('Save failed: ' + error.message, 'error'); else { btAudit('add', `Added SKU: ${updated.sku}`); addToast(`SKU ${updated.sku} added`, 'success'); fetchPage(); } });
+      supabase.from('brand_tags').insert(dbRow).then(({ error }) => { if (error) addToast('Save failed — ' + friendlyError(error), 'error'); else { btAudit('add', `Added SKU: ${updated.sku}`); addToast(`SKU ${updated.sku} added`, 'success'); fetchPage(); } });
     } else {
-      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(({ error }) => { if (error) addToast('Update failed: ' + error.message, 'error'); else { btAudit('edit', `Edited SKU: ${updated.sku}`); addToast(`SKU ${updated.sku} updated`, 'success'); fetchPage(); } });
+      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(({ error }) => { if (error) addToast('Update failed — ' + friendlyError(error), 'error'); else { btAudit('edit', `Edited SKU: ${updated.sku}`); addToast(`SKU ${updated.sku} updated`, 'success'); fetchPage(); } });
     }
     setModalRow(null);
   }, [modalMode, fetchPage]);

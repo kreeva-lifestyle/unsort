@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
 
 export default function Categories({ addToast, profile }: { addToast: (msg: string, type?: string) => void; profile: any }) {
   const [categories, setCategories] = useState<any[]>([]);
@@ -38,12 +39,12 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
         if ((count || 0) > 0 && !confirm(`${count} item(s) use this category. Renaming will affect all. Continue?`)) return;
       }
       const { error } = await supabase.from('products').update({ name: form.name, description: form.description, category: form.category }).eq('id', selected.id);
-      if (error) { addToast(error.message, 'error'); return; }
+      if (error) { addToast(friendlyError(error), 'error'); return; }
       const validComps = newComps.filter(c => c.trim());
       if (validComps.length > 0) {
         const compsToInsert = validComps.map((name, i) => ({ product_id: selected.id, name: name.trim(), component_code: `C${(comps.length || 0) + i + 1}` }));
         const { error: compsErr } = await supabase.from('components').insert(compsToInsert);
-        if (compsErr) { addToast('Component add failed: ' + compsErr.message, 'error'); return; }
+        if (compsErr) { addToast('Component add failed — ' + friendlyError(compsErr), 'error'); return; }
       }
       addToast('Updated!', 'success');
     } else {
@@ -55,7 +56,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
       if (validComps.length > 0) {
         const compsToInsert = validComps.map((name, i) => ({ product_id: data.id, name: name.trim(), component_code: `C${i + 1}` }));
         const { error: compsErr } = await supabase.from('components').insert(compsToInsert);
-        if (compsErr) { addToast('Component add failed: ' + compsErr.message, 'error'); return; }
+        if (compsErr) { addToast('Component add failed — ' + friendlyError(compsErr), 'error'); return; }
       }
       addToast(`Category "${form.name}" added with ${validComps.length} components!`, 'success');
     }
@@ -78,7 +79,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
     if (await checkCategoryInUse(selected.id)) { addToast('Cannot modify components — inventory items use this category. Delink items first.', 'error'); return; }
     const compsToInsert = validComps.map((name, i) => ({ product_id: selected.id, name: name.trim(), component_code: `C${(comps.length || 0) + i + 1}` }));
     const { error } = await supabase.from('components').insert(compsToInsert);
-    if (error) { addToast(error.message, 'error'); return; }
+    if (error) { addToast(friendlyError(error), 'error'); return; }
     // total_components is auto-maintained by trigger_update_component_count
     addToast(`${validComps.length} component(s) added!`, 'success');
     setNewComps(['']); fetchComps(selected.id); fetchCategories();
@@ -95,7 +96,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
     const refs = (itemCount || 0) + (extraCount || 0);
     if (refs > 0) { addToast(`Cannot delete — used by ${itemCount || 0} item(s) and ${extraCount || 0} extra(s)`, 'error'); return; }
     const { error: delErr } = await supabase.from('components').delete().eq('id', id);
-    if (delErr) { addToast('Delete failed: ' + delErr.message, 'error'); return; }
+    if (delErr) { addToast('Delete failed — ' + friendlyError(delErr), 'error'); return; }
     // total_components is auto-maintained by trigger_update_component_count
     addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories();
   };
