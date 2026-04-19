@@ -13,7 +13,7 @@ const ccAudit = (action: string, details: string) => {
   });
 };
 
-import { T } from './theme';
+import { T } from './lib/theme';
 
 interface ChallanItem { id?: string; sku: string; description: string; quantity: number; price: number; total: number; discount_type?: string; discount_value?: number; discount_amount?: number; }
 interface Challan {

@@ -16,19 +16,14 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: an
     return this.props.children;
   }
 }
-import { createClient } from '@supabase/supabase-js';
 import JsBarcode from 'jsbarcode';
 import Quagga from '@ericblade/quagga2';
 import BrandTagPrinter from './BrandTagPrinter';
 import PackTime from './PackTime';
 import CashChallan from './CashChallan';
 import InventoryExtras from './InventoryExtras';
-
-const SUPABASE_URL = 'https://ulphprdnswznfztawbvg.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscGhwcmRuc3d6bmZ6dGF3YnZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNjE4NzYsImV4cCI6MjA4OTkzNzg3Nn0.RRNY3KQhYnkJzSfh-GRoTCgdhDQNhE7kJJrpTq2n_K0';
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-import { T, S, Icon } from './theme';
+import { supabase } from './lib/supabase';
+import { T, S, Icon } from './lib/theme';
 
 const AuthContext = createContext<any>(null);
 const NotificationContext = createContext<any>(null);
