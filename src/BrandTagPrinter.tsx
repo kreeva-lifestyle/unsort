@@ -2,7 +2,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from './lib/supabase';
-const btAudit = (action: string, details: string) => { supabase.auth.getUser().then(({ data }) => { supabase.from('audit_log').insert({ action, module: 'brand_tags', details, user_id: data.user?.id }); }); };
+import type { BrandTag, BrandTagInsert, AuditLogInsert } from './types/database';
+
+const btAudit = (action: string, details: string) => {
+  supabase.auth.getUser().then(({ data }) => {
+    const entry: AuditLogInsert = { action, module: 'brand_tags', details, user_id: data.user?.id ?? null };
+    supabase.from('audit_log').insert(entry);
+  });
+};
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
 import { T } from './lib/theme';
@@ -32,6 +39,8 @@ const tdS: React.CSSProperties = { padding: '9px 12px', fontSize: 12, borderBott
 const fLabel: React.CSSProperties = { display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, marginBottom: 5, letterSpacing: '0.06em', textTransform: 'uppercase' as const, fontFamily: T.sans };
 
 // ── Types ──────────────────────────────────────────────────────────────────────
+// UI view model: central BrandTag fields renamed for camelCase ergonomics
+// (jio_code -> jioCode). Omit server-managed columns that the UI doesn't need.
 interface BrandTagRow {
   id: string;
   brand: string;
@@ -381,7 +390,8 @@ export default function BrandTagPrinter() {
     if (colorFilter) query = query.eq('color', colorFilter);
     const from = btPage * btPerPage;
     const { data, count } = await query.order('created_at', { ascending: false }).range(from, from + btPerPage - 1);
-    if (data) setRows(data.map(d => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies })));
+    type BrandTagFetchRow = Pick<BrandTag, 'id' | 'brand' | 'ean' | 'sku' | 'qty' | 'mrp' | 'size' | 'product' | 'color' | 'mktd' | 'jio_code' | 'copies'>;
+    if (data) setRows((data as BrandTagFetchRow[]).map((d): BrandTagRow => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies })));
     if (count !== null) setTotalCount(count);
     setLoading(false);
   }, [btPage, btPerPage, search, brandFilter, sizeFilter, colorFilter]);
@@ -397,14 +407,14 @@ export default function BrandTagPrinter() {
 
   // Smart realtime: apply individual row changes without re-fetching entire page
   useEffect(() => {
-    const mapRow = (d: any): BrandTagRow => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies });
+    const mapRow = (d: BrandTag): BrandTagRow => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies });
     const ch = supabase.channel('bt-smart')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'brand_tags' }, (payload) => {
-        const updated = mapRow(payload.new);
+        const updated = mapRow(payload.new as BrandTag);
         setRows(prev => prev.map(r => r.id === updated.id ? updated : r));
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'brand_tags' }, (payload) => {
-        const id = (payload.old as any)?.id;
+        const id = (payload.old as Partial<BrandTag> | null)?.id;
         if (id) { setRows(prev => prev.filter(r => r.id !== id)); setTotalCount(c => c - 1); }
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'brand_tags' }, () => {
@@ -477,7 +487,7 @@ export default function BrandTagPrinter() {
           return;
         }
         // Smart import with queue persistence
-        const toUpsert = imported.map(r => ({
+        const toUpsert: BrandTagInsert[] = imported.map(r => ({
           brand: r.brand, ean: r.ean, sku: r.sku, qty: r.qty, mrp: r.mrp,
           size: r.size, product: r.product, color: r.color, mktd: r.mktd,
           jio_code: r.jioCode, copies: r.copies,
@@ -554,7 +564,7 @@ export default function BrandTagPrinter() {
   }, []);
 
   const handleModalSave = useCallback((updated: BrandTagRow) => {
-    const dbRow = { brand: updated.brand, ean: updated.ean, sku: updated.sku, qty: updated.qty, mrp: updated.mrp, size: updated.size, product: updated.product, color: updated.color, mktd: updated.mktd, jio_code: updated.jioCode, copies: updated.copies };
+    const dbRow: BrandTagInsert = { brand: updated.brand, ean: updated.ean, sku: updated.sku, qty: updated.qty, mrp: updated.mrp, size: updated.size, product: updated.product, color: updated.color, mktd: updated.mktd, jio_code: updated.jioCode, copies: updated.copies };
     if (modalMode === 'add') {
       supabase.from('brand_tags').insert(dbRow).then(({ error }) => { if (error) alert('Save failed: ' + error.message); else { btAudit('add', `Added SKU: ${updated.sku}`); fetchPage(); } });
     } else {
@@ -583,16 +593,16 @@ export default function BrandTagPrinter() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const json: any[] = XLSX.utils.sheet_to_json(ws);
         setOrderLoadMsg(`${json.length} rows parsed. Loading master data...`);
-        const allMaster: any[] = [];
+        const allMaster: BrandTag[] = [];
         let from = 0; let more = true;
         while (more) {
           const { data } = await supabase.from('brand_tags').select('*').range(from, from + 999);
-          if (data && data.length > 0) { allMaster.push(...data); from += 1000; }
+          if (data && data.length > 0) { allMaster.push(...(data as BrandTag[])); from += 1000; }
           if (!data || data.length < 1000) more = false;
           setOrderLoadMsg(`${json.length} rows parsed. Master data: ${allMaster.length} loaded...`);
         }
         setOrderLoadMsg(`Matching ${json.length} orders against ${allMaster.length} SKUs...`);
-        const masterRows: BrandTagRow[] = allMaster.map(d => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies }));
+        const masterRows: BrandTagRow[] = allMaster.map((d): BrandTagRow => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies }));
         const parsed = parseOrderSheet(json, masterRows);
         setOrderRows(parsed); setOrderPage(0);
         setOrderLoading(false); setOrderLoadMsg('');

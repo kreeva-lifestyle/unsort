@@ -2,8 +2,9 @@
  * Database types for Unsort.
  * Source of truth: DATABASE-SCHEMA.md (derived from live Supabase schema).
  *
- * Covers the 8 core tables, the 2 inventory_extras* tables, and the 6 cash_*
- * tables used by the invoicing / cash-book modules.
+ * Covers the 8 core tables, the 2 inventory_extras* tables, the 6 cash_*
+ * tables used by the invoicing / cash-book modules, the brand_tags catalogue,
+ * and the cross-module audit_log.
  *
  * Each table has two types:
  *   - Xxx:        Row shape as returned by SELECT. Nullable DB columns are `| null`.
@@ -488,6 +489,72 @@ export type CashChallanCustomerInsert = {
   name: string;
   phone?: string | null;
   address?: string | null;
+  created_at?: string | null;
+};
+
+// ─── brand_tags (16 cols) ────────────────────────────────────────────────
+
+export interface BrandTag {
+  id: string;
+  brand: string;
+  ean: string;
+  sku: string;
+  qty: string;
+  mrp: number;
+  size: string;
+  product: string;
+  color: string;
+  mktd: string;
+  jio_code: string;
+  copies: number;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  // Populated by a DB trigger; clients filter on this via ilike. Do not set on insert.
+  search_text: string | null;
+}
+
+export type BrandTagInsert = {
+  id?: string;
+  brand: string;
+  ean: string;
+  sku: string;
+  qty: string;
+  mrp: number;
+  size: string;
+  product: string;
+  color: string;
+  mktd: string;
+  jio_code: string;
+  copies: number;
+  created_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  search_text?: string | null;
+};
+
+// ─── audit_log (8 cols) ──────────────────────────────────────────────────
+// Cross-module audit trail distinct from activity_logs.
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  module: string;
+  record_id: string | null;
+  details: string | null;
+  user_id: string | null;
+  user_email: string | null;
+  created_at: string | null;
+}
+
+export type AuditLogInsert = {
+  id?: string;
+  action: string;
+  module: string;
+  record_id?: string | null;
+  details?: string | null;
+  user_id?: string | null;
+  user_email?: string | null;
   created_at?: string | null;
 };
 
