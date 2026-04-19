@@ -2,7 +2,7 @@
 
 **This is the authoritative schema reference for this project.**
 
-Generated from the live Supabase database (`information_schema.columns`) on 2026-04-19.
+Generated from the live Supabase database (`information_schema.columns` + `pg_constraint`) on 2026-04-19 (reconciled in Phase 3.12).
 TypeScript types in `src/types/database.ts` are derived from this file.
 
 When the schema changes:
@@ -92,7 +92,8 @@ When the schema changes:
 | status_changed_at | YES | timestamptz |
 
 **Notes:**
-- `status` values used by app: `unsorted`, `damaged`, `complete`, `repaired`, `disposed`
+- `status` values (DB CHECK): `unsorted`, `damaged`, `dry_clean`, `complete`, `completed`. Default: `'unsorted'`.
+- `damage_severity` values (DB CHECK): `minor`, `moderate`, `severe`, `critical`.
 - `paired_with` is a self-referential FK for matched/paired items
 - `marketplace` tracks the source (Myntra, Ajio, Amazon, etc.) for return flows
 - Damage info (`damage_type`, `damage_description`, `damage_severity`) lives directly on the item
@@ -152,7 +153,7 @@ When the schema changes:
 
 **Notes:**
 - No `metadata` column — schema uses `entity_type` + `entity_id` for polymorphic references
-- `type` enum is not yet finalized; typed as `string | null` for now
+- `type` values (DB CHECK): `info`, `success`, `warning`, `error`, `pair_complete`. Default: `'info'`.
 
 ---
 
@@ -200,7 +201,7 @@ When the schema changes:
 **Notes:**
 - App use: stand-alone inventory of spare components (e.g., a loose Dupatta) available to complete an unsorted item. Used by `src/InventoryExtras.tsx` to list/add/adjust extras and match them against unsorted `inventory_items` by `(product_id, sku, size, component_id)`.
 - `product_name` and `component_name` are denormalised snapshots of the related product/component at time of insert.
-- Unique constraint (implied by app error-handling on code `23505`) across `(product_id, component_id, sku, size)`.
+- `quantity` has a DB CHECK constraint (`>= 0`); app also guards at write time.
 
 ---
 
@@ -220,7 +221,7 @@ When the schema changes:
 
 **Notes:**
 - Append-only audit trail for `inventory_extras`. Each row records a quantity change and the resulting balance.
-- `action` values used by app: `created`, `added`, `removed`, `used`.
+- `action` values (DB CHECK): `created`, `added`, `removed`, `used`.
 - `related_inventory_item_id` is populated when `action = 'used'` (an extra was consumed to complete an inventory item).
 - `extra_id` is nullable to let history rows survive a future delete of the parent extra (soft-reference).
 
@@ -284,7 +285,7 @@ Tables in the `cash_*` namespace support the Cash Book and Cash Challan (invoici
 | reason | YES | text |
 
 **Notes:**
-- `status` values: `pending` | `confirmed` | `expired`.
+- `status` values (DB CHECK): `pending`, `confirmed`, `disputed`. Default: `'pending'`.
 - Immutable once created — only `status` and `confirmed_at` flip on PIN sign-off; there is no `updated_at` column.
 - `from_user_name` / `to_user_name` are denormalised snapshots; the corresponding `*_user_id` FKs may be null if the profile was deleted.
 - `breakdown` is jsonb — the app stores a snapshot of the cash-flow calculation (opening, sales, returns, expenses, previous handovers, available) at handover time. Typed as `Record<string, unknown> | null`; consumers cast to a local view type.
@@ -323,7 +324,8 @@ Tables in the `cash_*` namespace support the Cash Book and Cash Challan (invoici
 | source_challan_id | YES | uuid |
 
 **Notes:**
-- `status` values: `paid` | `partial` | `pending` | `void`.
+- `status` values (DB CHECK): `draft`, `paid`, `unpaid`, `partial`, `voided`. Default: `'unpaid'`.
+- `discount_type` values (DB CHECK): `flat`, `percentage`, or `null`.
 - `payment_mode` is free text today (Cash/UPI/etc.); enum not yet fixed — typed as `string | null` with a TODO.
 - `tags` is a Postgres `text[]` — typed as `string[] | null` in TS.
 - `source_challan_id` is a self-reference back to the original challan for returns (`is_return = true`).
@@ -349,7 +351,7 @@ Tables in the `cash_*` namespace support the Cash Book and Cash Challan (invoici
 
 **Notes:**
 - Line items belonging to a `cash_challans` row (1-N). `challan_id` is nullable to allow orphan recovery but the app always sets it.
-- `discount_type` allowed values are not yet fixed (likely `percent` / `flat`) — typed as `string | null` with a TODO.
+- `discount_type` values (DB CHECK): `flat`, `percentage`, or `null`.
 
 ---
 
