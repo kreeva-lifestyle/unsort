@@ -923,7 +923,6 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
 
     // Batch fetch all candidate components at once (not N+1)
     const { data: allCandidateComps } = await supabase.from('item_components').select('inventory_item_id, component_id, status').in('inventory_item_id', otherItems.map(o => o.id));
-    const compNames = Object.fromEntries((allComps || []).map(c => [c.id, '']));
     // Get component names once
     const { data: compNameData } = await supabase.from('components').select('id, name').eq('product_id', productId);
     const nameMap = Object.fromEntries((compNameData || []).map(c => [c.id, c.name]));
