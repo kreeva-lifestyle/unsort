@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext, useId, Component, useCallback } from 'react';
+import React, { useState, useEffect, useId, Component, useCallback } from 'react';
 
 // Error boundary to prevent blank screen crashes
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: any }> {
@@ -29,119 +29,8 @@ import HeaderComponent from './components/layout/Header';
 import ToastContainerComponent from './components/layout/ToastContainer';
 import { supabase } from './lib/supabase';
 import { T, S, Icon } from './lib/theme';
-
-const AuthContext = createContext<any>(null);
-const NotificationContext = createContext<any>(null);
-const useAuth = () => useContext(AuthContext);
-const useNotifications = () => useContext(NotificationContext);
-
-const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    const timeout = setTimeout(() => { if (mounted) { setLoading(false); setReady(true); } }, 3000);
-
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!mounted) return;
-      if (session?.user) {
-        // Verify the session is still valid by refreshing
-        const { data: refreshed } = await supabase.auth.refreshSession();
-        if (!mounted) return;
-        if (refreshed?.session?.user) {
-          setUser(refreshed.session.user);
-          const { data: prof } = await supabase.from('profiles').select('*').eq('id', refreshed.session.user.id).maybeSingle();
-          if (mounted) setProfile(prof);
-        } else {
-          setUser(null); setProfile(null);
-        }
-      } else {
-        setUser(null); setProfile(null);
-      }
-      if (mounted) { setLoading(false); setReady(true); clearTimeout(timeout); }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return;
-      if (session?.user) {
-        setUser(session.user);
-        supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle().then(({ data }) => {
-          if (mounted) { setProfile(data); setLoading(false); setReady(true); }
-        });
-      } else {
-        setUser(null); setProfile(null);
-        setLoading(false); setReady(true);
-      }
-    });
-
-    return () => { mounted = false; subscription.unsubscribe(); clearTimeout(timeout); };
-  }, []);
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
-  };
-
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
-    return { error };
-  };
-
-  const signOut = async () => { await supabase.auth.signOut(); };
-
-  // Session timeout — auto-logout after 30 min of inactivity
-  useEffect(() => {
-    if (!user) return;
-    let timer: any;
-    const resetTimer = () => { clearTimeout(timer); timer = setTimeout(() => { supabase.auth.signOut(); }, 30 * 60 * 1000); };
-    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
-    events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }));
-    resetTimer();
-    return () => { clearTimeout(timer); events.forEach(e => window.removeEventListener(e, resetTimer)); };
-  }, [user]);
-
-  return <AuthContext.Provider value={{ user, profile, loading, ready, signIn, signUp, signOut }}>{children}</AuthContext.Provider>;
-};
-
-const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [toasts, setToasts] = useState<any[]>([]);
-  const { user } = useAuth();
-
-  useEffect(() => {
-    if (!user) return;
-    fetchNotifications();
-    const channel = supabase.channel('notifications').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload: any) => {
-      setNotifications((prev) => [payload.new, ...prev]);
-      addToast(payload.new.title, payload.new.type);
-    }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
-  const fetchNotifications = async () => {
-    if (!user) return;
-    const { data } = await supabase.from('notifications').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50);
-    setNotifications(data || []);
-  };
-
-  const markAsRead = async (id: string) => {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
-  };
-
-  const addToast = (message: string, type = 'info') => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
-  };
-
-  return <NotificationContext.Provider value={{ notifications, toasts, markAsRead, addToast, fetchNotifications }}>{children}</NotificationContext.Provider>;
-};
-
+import { AuthProvider, useAuth } from './hooks/useAuth';
+import { NotificationProvider, useNotifications } from './hooks/useNotifications';
 
 const statusTag = (status: string) => {
   const m: Record<string, { bg: string; color: string; bd: string }> = {
