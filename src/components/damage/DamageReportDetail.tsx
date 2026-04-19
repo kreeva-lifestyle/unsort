@@ -1,1 +1,0 @@
-// Damage report detail view
