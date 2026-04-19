@@ -313,7 +313,7 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
       const uniqueId = generateUniqueId();
       const insertData = { ...form, batch_number: uniqueId, reported_by: profile?.id };
       const { data, error } = await supabase.from('inventory_items').insert(insertData).select().single();
-      if (error || !data) { addToast(error?.message || 'Error', 'error'); return; }
+      if (error || !data) { addToast(error ? friendlyError(error) : 'Save failed', 'error'); return; }
       if (form.status === 'unsorted' || form.status === 'damaged' || form.status === 'dry_clean') await updateComponentStatuses(data.id);
       savedItemId = data.id;
       addToast(`Item added! ID: ${uniqueId}`, 'success');
