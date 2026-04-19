@@ -422,6 +422,76 @@ Tables in the `cash_*` namespace support the Cash Book and Cash Challan (invoici
 
 ---
 
+## Pack Station tables
+
+Tables supporting the warehouse scan / pack-station workflow.
+
+### `brands` (4 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| name | NO | text |
+| is_active | YES | boolean |
+| created_at | YES | timestamptz |
+
+**Notes:**
+- Simple brand directory used by Pack Station setup (brand selector) and potentially other features.
+
+---
+
+### `packtime_cameras` (4 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| number | NO | text |
+| is_active | YES | boolean |
+| created_at | YES | timestamptz |
+
+**Notes:**
+- Physical camera identifiers (numeric strings) used to tag every scan.
+
+---
+
+### `packtime_couriers` (6 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| name | NO | text |
+| sheet_name | NO | text |
+| is_active | YES | boolean |
+| created_at | YES | timestamptz |
+| brand | YES | text |
+
+**Notes:**
+- Couriers mapped to Google Sheet tabs. `sheet_name` is the exact tab name written to by the `packtime` Edge Function.
+- `brand` is a default brand for the courier; users can override with `selectedBrand` on session start.
+
+---
+
+### `packtime_scans` (9 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| session_id | NO | uuid |
+| awb | NO | text |
+| courier | NO | text |
+| camera | NO | text |
+| sheet_name | NO | text |
+| scanned_at | YES | timestamptz |
+| user_id | YES | uuid |
+| brand | YES | text |
+
+**Notes:**
+- Append-only scan log. Writes are the source of truth; Google Sheet writes happen afterwards via the `packtime` Edge Function.
+- Unique-constraint violation on duplicate AWB is handled client-side (error code `23505`) — the app rolls back optimistic UI updates.
+- `session_id` groups scans made in one continuous pack session (generated client-side via `crypto.randomUUID()`).
+
+---
+
 ## Known drift from `UNSORT-CLAUDE-CODE-CONTEXT.md`
 
 The old context doc is stale. Highlights:

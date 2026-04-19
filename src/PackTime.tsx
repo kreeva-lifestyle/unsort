@@ -6,9 +6,15 @@ import { supabase } from './lib/supabase';
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
 
 import { T } from './lib/theme';
+import type {
+  Brand,
+  PackTimeCourier,
+  PackTimeCamera,
+  PackTimeScan,
+  PackTimeScanInsert,
+} from './types/database';
 
-interface Courier { id: string; name: string; sheet_name: string; brand: string; }
-interface Camera { id: string; number: string; }
+// In-memory view model for the recent-scans strip. Not a DB row.
 interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; }
 
 // ── Beep ────────────────────────────────────────────────────────────────────────
@@ -110,8 +116,8 @@ const getAuthHeaders = async () => {
 // ── Component ───────────────────────────────────────────────────────────────────
 export default function PackTime({ active }: { active?: boolean } = {}) {
   // Config from Supabase
-  const [couriers, setCouriers] = useState<Courier[]>([]);
-  const [cameras, setCameras] = useState<Camera[]>([]);
+  const [couriers, setCouriers] = useState<PackTimeCourier[]>([]);
+  const [cameras, setCameras] = useState<PackTimeCamera[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
   const [loadingConfig, setLoadingConfig] = useState(true);
 
@@ -145,7 +151,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // History view
   const [showHistory, setShowHistory] = useState(false);
-  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [historyData, setHistoryData] = useState<PackTimeScan[]>([]);
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyPage, setHistoryPage] = useState(0);
   const [historyPageSize, setHistoryPageSize] = useState(25);
@@ -180,7 +186,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       ]);
       setCouriers(c || []);
       setCameras(cam || []);
-      setBrands((b || []).map((x: any) => x.name));
+      setBrands(((b as Pick<Brand, 'name'>[] | null) || []).map((x) => x.name));
       setLoadingConfig(false);
       supabase.auth.getUser().then(({ data: { user } }) => { userIdRef.current = user?.id || null; });
     })();
@@ -310,7 +316,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         try {
           const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
           const { data: dbScans } = await supabase.from('packtime_scans').select('awb').eq('sheet_name', c.sheet_name).gte('scanned_at', thirtyDaysAgo).limit(5000);
-          dbAwbs = (dbScans || []).map((r: any) => r.awb.trim().toUpperCase());
+          type AwbRow = Pick<PackTimeScan, 'awb'>;
+          dbAwbs = ((dbScans as AwbRow[] | null) || []).map((r) => r.awb.trim().toUpperCase());
         } catch {}
         awbSetRef.current = new Set([...sheetAwbs, ...dbAwbs]);
         rowCountRef.current = data.totalRows || 0;
@@ -360,7 +367,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true }, ...p].slice(0, 30));
 
     // Save to Supabase DB first, then Sheet
-    const scanRow = { session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
+    const scanRow: PackTimeScanInsert = { session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
     const row = [count, trimmed, timestamp, camera, courierBrand];
     supabase.from('packtime_scans').insert(scanRow).then(({ error }) => {
       if (error) {
@@ -462,7 +469,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     query = query.order('scanned_at', { ascending: false }).range(historyPage * historyPageSize, (historyPage + 1) * historyPageSize - 1);
     const { data, count, error } = await query;
     if (error) { console.error('History fetch failed:', error.message); setHistoryLoading(false); return; }
-    setHistoryData(data || []);
+    setHistoryData((data as PackTimeScan[] | null) || []);
     setHistoryTotal(count || 0);
     setHistoryLoading(false);
   }, [historySearch, historyFilterCourier, historyFilterBrand, historyPage, historyPageSize]);
@@ -496,7 +503,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   };
 
   const exportHistory = async () => {
-    let allData: any[] = [];
+    const allData: PackTimeScan[] = [];
     let page = 0;
     const ps = 5000;
     while (true) {
@@ -506,12 +513,15 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       if (historyFilterBrand) q = q.eq('brand', historyFilterBrand);
       const { data } = await q.order('scanned_at', { ascending: false }).range(page * ps, (page + 1) * ps - 1);
       if (!data || data.length === 0) break;
-      allData.push(...data);
+      allData.push(...(data as PackTimeScan[]));
       if (data.length < ps) break;
       page++;
     }
     if (allData.length === 0) return;
-    const csv = 'AWB,Courier,Camera,Brand,Scanned At,Session ID\n' + allData.map((r: any) => `${r.awb},${r.courier},${r.camera},${r.brand || ''},${new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })},${r.session_id}`).join('\n');
+    const csv = 'AWB,Courier,Camera,Brand,Scanned At,Session ID\n' + allData.map((r) => {
+      const when = r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+      return `${r.awb},${r.courier},${r.camera},${r.brand || ''},${when},${r.session_id}`;
+    }).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `PackStation_History_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
@@ -574,7 +584,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                   <div style={{ padding: '7px 10px', color: T.tx2, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.courier}</div>
                   <div style={{ padding: '7px 10px', color: T.tx3, fontFamily: T.mono, fontSize: 10 }}>{r.camera}</div>
                   <div style={{ padding: '7px 10px', color: T.gr, fontSize: 10, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.brand || '—'}</div>
-                  <div style={{ padding: '7px 10px', color: T.tx3, fontFamily: T.mono, fontSize: 10, whiteSpace: 'nowrap' }}>{new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                  <div style={{ padding: '7px 10px', color: T.tx3, fontFamily: T.mono, fontSize: 10, whiteSpace: 'nowrap' }}>{r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</div>
                   <div style={{ padding: '7px 4px' }}>
                     <button type="button" onClick={() => setConfirmDeleteId(r.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4 }}>
                       <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
