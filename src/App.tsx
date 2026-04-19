@@ -86,11 +86,9 @@ const MainApp = () => {
     return false;
   };
   return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflow: 'hidden', position: 'relative' }}>
-    {/* Ambient background glows */}
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 0 }}>
-      <div style={{ position: 'absolute', top: -100, right: -50, width: 400, height: 400, background: `radial-gradient(circle, ${T.ac}08 0%, transparent 70%)` }} />
-      <div style={{ position: 'absolute', bottom: -100, left: -50, width: 350, height: 350, background: `radial-gradient(circle, ${T.bl}06 0%, transparent 70%)` }} />
-    </div>
+    {/* Ambient glows are static CSS (see .app-glows in index.css) — not React children so
+        they don't re-render on tab change (audit P3 performance) */}
+    <div className="app-glows" aria-hidden="true" />
     <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} profile={profile} />
     {/* Mobile overlay */}
     <div className="mobile-overlay" onClick={() => setMobileMenu(false)} style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 98, opacity: mobileMenu ? 1 : 0, pointerEvents: mobileMenu ? 'auto' : 'none', transition: 'opacity .25s ease', backdropFilter: 'blur(2px)' }} />
