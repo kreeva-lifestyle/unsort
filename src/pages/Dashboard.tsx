@@ -113,9 +113,9 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
 
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease', paddingBottom: 80 }}>
-      <div style={{ marginBottom: 14 }}>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>{greeting}, {profile?.full_name?.split(' ')[0] || 'there'}</h2>
-        <p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3 }}>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</p>
+      <div style={{ marginBottom: 16 }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>{greeting}, {profile?.full_name?.split(' ')[0] || 'there'}</h2>
+        <p style={{ margin: '4px 0 0', fontSize: 14, color: T.tx2, fontWeight: 500 }}>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</p>
       </div>
 
       {/* Row 1a: Today's Revenue — hero card (audit P1: the one number that matters) */}

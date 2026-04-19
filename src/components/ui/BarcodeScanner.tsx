@@ -71,12 +71,11 @@ export default function BarcodeScanner({ onScan, onClose, scanError }: { onScan:
       const blob = await new Promise<Blob>((res) => canvas.toBlob(b => res(b!), 'image/png'));
       const formData = new FormData();
       formData.append('file', blob, 'scan.png');
-      formData.append('apikey', 'K85858938588957');
       formData.append('language', 'eng');
-      formData.append('isOverlayRequired', 'false');
       formData.append('OCREngine', '2');
 
-      const resp = await fetch('https://api.ocr.space/parse/image', { method: 'POST', body: formData });
+      // Proxy through Supabase Edge Function so the OCR.space API key stays server-side (security audit)
+      const resp = await fetch('https://ulphprdnswznfztawbvg.supabase.co/functions/v1/ocr', { method: 'POST', body: formData });
       const json = await resp.json();
       const text = json?.ParsedResults?.[0]?.ParsedText || '';
       const id = extractId(text);

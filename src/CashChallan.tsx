@@ -86,7 +86,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [userName, setUserName] = useState('there');
   const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number } | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number>; returnsCount?: number; voidedCount?: number }>({ totalRevenue: 0, count: 0, byMode: {} });
+  const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number>; returnsCount?: number; voidedCount?: number; prevRevenue?: number; prevCount?: number }>({ totalRevenue: 0, count: 0, byMode: {} });
   const [analyticsFrom, setAnalyticsFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; });
   const [analyticsTo, setAnalyticsTo] = useState(() => new Date().toISOString().slice(0, 10));
 
@@ -216,12 +216,17 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Fetch analytics ────────────────────────────────────────────────────────
   const fetchAnalytics = useCallback(async () => {
-    const fromISO = new Date(analyticsFrom + 'T00:00:00').toISOString();
-    const toISO = new Date(analyticsTo + 'T23:59:59').toISOString();
+    const fromDt = new Date(analyticsFrom + 'T00:00:00');
+    const toDt = new Date(analyticsTo + 'T23:59:59');
+    const rangeMs = toDt.getTime() - fromDt.getTime();
+    // Previous comparable period (audit P2: "This period vs Previous")
+    const prevToDt = new Date(fromDt.getTime() - 1);
+    const prevFromDt = new Date(prevToDt.getTime() - rangeMs);
     type AnalyticsRow = Pick<CashChallan, 'total' | 'payment_mode' | 'status' | 'is_return'>;
-    const [{ data }, { count: voidedCount }] = await Promise.all([
-      supabase.from('cash_challans').select('total, payment_mode, status, is_return').gte('created_at', fromISO).lte('created_at', toISO).neq('status', 'voided'),
-      supabase.from('cash_challans').select('id', { count: 'estimated', head: true }).gte('created_at', fromISO).lte('created_at', toISO).eq('status', 'voided'),
+    const [{ data }, { count: voidedCount }, { data: prevData }] = await Promise.all([
+      supabase.from('cash_challans').select('total, payment_mode, status, is_return').gte('created_at', fromDt.toISOString()).lte('created_at', toDt.toISOString()).neq('status', 'voided'),
+      supabase.from('cash_challans').select('id', { count: 'estimated', head: true }).gte('created_at', fromDt.toISOString()).lte('created_at', toDt.toISOString()).eq('status', 'voided'),
+      supabase.from('cash_challans').select('total, is_return').gte('created_at', prevFromDt.toISOString()).lte('created_at', prevToDt.toISOString()).neq('status', 'voided'),
     ]);
     const rows = (data as AnalyticsRow[] | null) || [];
     const totalRevenue = rows.reduce((s, r) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
@@ -229,7 +234,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     rows.forEach((r) => { const m = r.payment_mode || 'Unset'; byMode[m] = (byMode[m] || 0) + (r.is_return ? -1 : 1) * Number(r.total); });
     const salesCount = rows.filter((r) => !r.is_return).length;
     const returnsCount = rows.filter((r) => r.is_return).length;
-    setAnalytics({ totalRevenue, count: salesCount, byMode, returnsCount, voidedCount: voidedCount || 0 } as typeof analytics);
+    const prevRows = (prevData as Pick<CashChallan, 'total' | 'is_return'>[] | null) || [];
+    const prevRevenue = prevRows.reduce((s, r) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
+    const prevCount = prevRows.filter(r => !r.is_return).length;
+    setAnalytics({ totalRevenue, count: salesCount, byMode, returnsCount, voidedCount: voidedCount || 0, prevRevenue, prevCount } as typeof analytics);
   }, [analyticsFrom, analyticsTo]);
 
   // ── Fetch ledger (recent 10 customers) ──────────────────────────────────────
@@ -586,22 +594,37 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         <button onClick={fetchAnalytics} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
       </div>
       <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
-        <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Net Revenue</div>
-          <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.gr }}>₹{analytics.totalRevenue.toLocaleString('en-IN')}</div>
-        </div>
-        <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.12)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 8, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Sales</div>
-          <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>{analytics.count}</div>
-        </div>
-        <div style={{ background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.12)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 8, color: T.re, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Returns</div>
-          <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.re }}>{analytics.returnsCount || 0}</div>
-        </div>
-        <div style={{ background: 'rgba(255,255,255,.03)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Voided</div>
-          <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.tx3 }}>{analytics.voidedCount || 0}</div>
-        </div>
+        {(() => {
+          const pctChange = (curr: number, prev: number | undefined): { label: string; color: string } | null => {
+            if (prev === undefined || prev === 0) return null;
+            const diff = ((curr - prev) / Math.abs(prev)) * 100;
+            const rounded = Math.round(diff);
+            if (rounded === 0) return { label: '±0%', color: T.tx3 };
+            return { label: `${rounded > 0 ? '▲' : '▼'} ${Math.abs(rounded)}%`, color: rounded > 0 ? T.gr : T.re };
+          };
+          const revChange = pctChange(analytics.totalRevenue, analytics.prevRevenue);
+          const salesChange = pctChange(analytics.count, analytics.prevCount);
+          return <>
+            <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
+              <div style={{ fontSize: 9, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Net Revenue</div>
+              <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.gr }}>₹{analytics.totalRevenue.toLocaleString('en-IN')}</div>
+              {revChange && <div style={{ fontSize: 9, color: revChange.color, marginTop: 4, fontFamily: T.mono, fontWeight: 600 }}>{revChange.label} vs prev · ₹{(analytics.prevRevenue ?? 0).toLocaleString('en-IN')}</div>}
+            </div>
+            <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.12)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
+              <div style={{ fontSize: 9, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Sales</div>
+              <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>{analytics.count}</div>
+              {salesChange && <div style={{ fontSize: 9, color: salesChange.color, marginTop: 4, fontFamily: T.mono, fontWeight: 600 }}>{salesChange.label} vs prev · {analytics.prevCount ?? 0}</div>}
+            </div>
+            <div style={{ background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.12)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
+              <div style={{ fontSize: 9, color: T.re, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Returns</div>
+              <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.re }}>{analytics.returnsCount || 0}</div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,.03)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px', textAlign: 'center' }}>
+              <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Voided</div>
+              <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.tx3 }}>{analytics.voidedCount || 0}</div>
+            </div>
+          </>;
+        })()}
       </div>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         <div style={{ padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, fontSize: 10, fontWeight: 600, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1 }}>Payment Mode Breakup</div>

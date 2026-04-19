@@ -142,12 +142,9 @@ const parseOrderSheet = (data: any[], masterRows: BrandTagRow[]): OrderRow[] => 
   return Array.from(map.values());
 };
 
-// ── Print function: renders labels into a new window for clean printing ───────
+// ── Build label print HTML (rendered inside an in-app iframe instead of a popup) ─
 const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
-const printLabelsInWindow = (labels: BrandTagRow[]) => {
-  const win = window.open('', '_blank', 'width=300,height=500');
-  if (!win) { alert('Popup blocked. Allow popups for this site.'); return; }
-
+const buildLabelsHtml = (labels: BrandTagRow[]): string => {
   const html = labels.map(r => {
     const brand = r.brand.replace(/^BRAND NAME:\s*/i, '').trim().toUpperCase();
     const product = r.product.replace(/^PRODUCT DESC:\s*/i, '').trim();
@@ -169,8 +166,7 @@ const printLabelsInWindow = (labels: BrandTagRow[]) => {
   <div class="ean"><span>EAN: ${esc(r.sku)}</span></div>
 </div>`;
   }).join('');
-
-  win.document.write(`<!DOCTYPE html><html><head>
+  return `<!DOCTYPE html><html><head>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000}
@@ -198,9 +194,7 @@ document.querySelectorAll('.barcode svg').forEach(function(svg){
   var row=${JSON.stringify(labels.map(r=>({id:r.id,jio:r.jioCode,sku:r.sku})))}.find(function(r){return r.id===id});
   if(row&&row.jio)try{JsBarcode(svg,row.jio,{format:'CODE128',width:1.5,height:34,displayValue:true,text:row.sku,fontSize:8,font:'Arial',margin:0,textMargin:1})}catch(e){}
 });
-setTimeout(function(){window.print()},600);
-<\/script></body></html>`);
-  win.document.close();
+<\/script></body></html>`;
 };
 
 const DEFAULT_MKTD = 'Arya Designs, 16, Amba Bhuvan, Near Kasanagar Circle, Opp- Kumar Gurukul Vidhyalay Katargam, Surat-395004, Gujarat, India';
@@ -257,18 +251,28 @@ const QTY_OPTIONS = [
 ];
 
 // ── Add / Edit Modal ───────────────────────────────────────────────────────────
-const MODAL_FIELDS: { key: keyof BrandTagRow; label: string; type?: string; multiline?: boolean; options?: string[]; searchable?: boolean; defaultVal?: string }[] = [
-  { key: 'brand', label: 'Brand Name', options: BRAND_OPTIONS },
-  { key: 'ean', label: 'EAN' },
-  { key: 'sku', label: 'SKU' },
-  { key: 'product', label: 'Product', options: PRODUCT_OPTIONS },
-  { key: 'qty', label: 'Includes', options: QTY_OPTIONS, searchable: true },
-  { key: 'size', label: 'Size', options: SIZE_OPTIONS },
-  { key: 'color', label: 'Color', options: COLOR_OPTIONS, searchable: true },
-  { key: 'mrp', label: 'MRP', type: 'number' },
-  { key: 'mktd', label: 'MKTD & DIST. BY', multiline: true, defaultVal: DEFAULT_MKTD },
-  { key: 'jioCode', label: 'Jio Code' },
+type ModalField = { key: keyof BrandTagRow; label: string; type?: string; multiline?: boolean; options?: string[]; searchable?: boolean; defaultVal?: string };
+
+// Grouped into Identity / Description / Commercial per audit P2
+const MODAL_FIELD_GROUPS: { title: string; fields: ModalField[] }[] = [
+  { title: 'Identity', fields: [
+    { key: 'brand', label: 'Brand Name', options: BRAND_OPTIONS },
+    { key: 'sku', label: 'SKU' },
+    { key: 'ean', label: 'EAN' },
+    { key: 'jioCode', label: 'Jio Code' },
+  ]},
+  { title: 'Description', fields: [
+    { key: 'product', label: 'Product', options: PRODUCT_OPTIONS },
+    { key: 'qty', label: 'Includes', options: QTY_OPTIONS, searchable: true },
+    { key: 'size', label: 'Size', options: SIZE_OPTIONS },
+    { key: 'color', label: 'Color', options: COLOR_OPTIONS, searchable: true },
+  ]},
+  { title: 'Commercial', fields: [
+    { key: 'mrp', label: 'MRP', type: 'number' },
+    { key: 'mktd', label: 'MKTD & DIST. BY', multiline: true, defaultVal: DEFAULT_MKTD },
+  ]},
 ];
+
 
 const BrandTagModal = ({
   title,
@@ -310,42 +314,49 @@ const BrandTagModal = ({
           <span style={{ color: T.tx, fontSize: 13, fontWeight: 600 }}>{title}</span>
         </div>
         {/* Fields */}
-        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {MODAL_FIELDS.map(f => (
-            <div key={f.key} style={{ position: 'relative' }}>
-              <label style={fLabel}>{f.label}</label>
-              {f.searchable && f.options ? (
-                <SearchableSelect
-                  value={String(form[f.key])}
-                  options={f.options}
-                  placeholder={`Type to search ${f.label.toLowerCase()}...`}
-                  stripPrefix={f.key === 'qty' ? /^INCLUDES:\s*/i : undefined}
-                  onChange={v => set(f.key, v)}
-                />
-              ) : f.options ? (
-                <select
-                  style={{ ...inp, width: '100%', cursor: 'pointer' }}
-                  value={String(form[f.key])}
-                  onChange={e => set(f.key, e.target.value)}
-                >
-                  <option value="">Select {f.label.toLowerCase()}</option>
-                  {f.options.map(o => <option key={o} value={o}>{o.replace(/^BRAND NAME:\s*/i, '').replace(/^PRODUCT DESC:\s*/i, '').replace(/^INCLUDES:\s*/i, '')}</option>)}
-                </select>
-              ) : f.multiline ? (
-                <textarea
-                  rows={2}
-                  style={{ ...inp, width: '100%', resize: 'vertical' }}
-                  value={String(form[f.key])}
-                  onChange={e => set(f.key, f.type === 'number' ? Number(e.target.value) : e.target.value)}
-                />
-              ) : (
-                <input
-                  type={f.type || 'text'}
-                  style={{ ...inp, width: '100%' }}
-                  value={String(form[f.key])}
-                  onChange={e => set(f.key, f.type === 'number' ? Number(e.target.value) : e.target.value)}
-                />
-              )}
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {MODAL_FIELD_GROUPS.map(group => (
+            <div key={group.title}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' as const, marginBottom: 8, paddingBottom: 4, borderBottom: `1px solid ${T.bd}` }}>{group.title}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: group.fields.length > 1 ? '1fr 1fr' : '1fr', gap: 10 }}>
+                {group.fields.map(f => (
+                  <div key={f.key} style={{ position: 'relative', gridColumn: f.multiline ? '1 / -1' : undefined }}>
+                    <label style={fLabel}>{f.label}</label>
+                    {f.searchable && f.options ? (
+                      <SearchableSelect
+                        value={String(form[f.key])}
+                        options={f.options}
+                        placeholder={`Type to search ${f.label.toLowerCase()}...`}
+                        stripPrefix={f.key === 'qty' ? /^INCLUDES:\s*/i : undefined}
+                        onChange={v => set(f.key, v)}
+                      />
+                    ) : f.options ? (
+                      <select
+                        style={{ ...inp, width: '100%', cursor: 'pointer' }}
+                        value={String(form[f.key])}
+                        onChange={e => set(f.key, e.target.value)}
+                      >
+                        <option value="">Select {f.label.toLowerCase()}</option>
+                        {f.options.map(o => <option key={o} value={o}>{o.replace(/^BRAND NAME:\s*/i, '').replace(/^PRODUCT DESC:\s*/i, '').replace(/^INCLUDES:\s*/i, '')}</option>)}
+                      </select>
+                    ) : f.multiline ? (
+                      <textarea
+                        rows={2}
+                        style={{ ...inp, width: '100%', resize: 'vertical' }}
+                        value={String(form[f.key])}
+                        onChange={e => set(f.key, f.type === 'number' ? Number(e.target.value) : e.target.value)}
+                      />
+                    ) : (
+                      <input
+                        type={f.type || 'text'}
+                        style={{ ...inp, width: '100%' }}
+                        value={String(form[f.key])}
+                        onChange={e => set(f.key, f.type === 'number' ? Number(e.target.value) : e.target.value)}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
@@ -368,6 +379,16 @@ export default function BrandTagPrinter() {
   const [refreshMsg, setRefreshMsg] = useState('');
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState('');
+  // Print-preview iframe (in-app, replaces popup window per audit P0)
+  const [printHtml, setPrintHtml] = useState<string | null>(null);
+  const [printCount, setPrintCount] = useState(0);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const printIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const openLabelPrint = useCallback((labels: BrandTagRow[]) => {
+    if (labels.length === 0) return;
+    setPrintCount(labels.length);
+    setPrintHtml(buildLabelsHtml(labels));
+  }, []);
   const [search, setSearch] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [sizeFilter, setSizeFilter] = useState('');
@@ -580,7 +601,7 @@ export default function BrandTagPrinter() {
   const printSingle = useCallback((row: BrandTagRow) => {
     const bad = validateRow(row);
     if (bad) { addToast(`Cannot print — "${bad}" is missing for SKU: ${row.sku || 'empty'}`, 'error'); return; }
-    printLabelsInWindow([row]);
+    openLabelPrint([row]);
   }, [addToast]);
 
   // ── Order Sheet Import ──
@@ -626,12 +647,12 @@ export default function BrandTagPrinter() {
       for (let i = 0; i < r.copies; i++) labels.push({ ...r.masterData, brand: `BRAND NAME: ${r.brand}`, copies: 1 });
     });
     if (labels.length === 0) { addToast('No printable labels. Ensure SKUs exist in master data and copies > 0.', 'error'); return; }
-    printLabelsInWindow(labels);
+    openLabelPrint(labels);
   };
 
   const printTestLabel = useCallback(() => {
     const s = rows[0] || sampleRow();
-    printLabelsInWindow([s]);
+    openLabelPrint([s]);
   }, [rows]);
 
 
@@ -652,15 +673,31 @@ export default function BrandTagPrinter() {
           <span style={{ fontSize: 10, fontWeight: 500, color: T.tx3, marginLeft: 8 }}>{totalCount} rows</span>
           {importing && <span style={{ fontSize: 10, color: T.yl, marginLeft: 8, fontWeight: 600 }}>Importing {importProgress}...</span>}
         </div>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          <button style={btnGhost} onClick={async () => { setRefreshMsg('Refreshing...'); await fetchPage(); setRefreshMsg('Updated!'); setTimeout(() => setRefreshMsg(''), 2000); }}>{refreshMsg || 'Refresh'}</button>
-          <button style={btnGhost} onClick={() => fileRef.current?.click()}>Import</button>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
-          <button style={btnGhost} onClick={handleExport}>Export</button>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Primary action: Order Sheet (daily use) */}
           <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.12)', opacity: orderLoading ? 0.5 : 1, pointerEvents: orderLoading ? 'none' : 'auto' }} onClick={() => orderFileRef.current?.click()}>Order Sheet</button>
           <input ref={orderFileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleOrderImport} />
           {orderLoading && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: T.yl }}><span style={{ width: 10, height: 10, border: '1.5px solid rgba(251,191,36,.2)', borderTopColor: T.yl, borderRadius: '50%', animation: 'btnSpin .6s linear infinite', flexShrink: 0 }} />{orderLoadMsg}</span>}
-          <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.12)' }} onClick={printTestLabel}>Test Print</button>
+          {/* Secondary actions collapsed into More menu (audit P1: stops wrap on 13" screens) */}
+          <div style={{ position: 'relative' }}>
+            <button style={btnGhost} onClick={() => setMoreMenuOpen(o => !o)}>More ▾</button>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
+            {moreMenuOpen && (
+              <>
+                <div onClick={() => setMoreMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 50 }} />
+                <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 51, background: 'rgba(14,18,30,0.98)', border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 10px 32px rgba(0,0,0,.55)', minWidth: 170, padding: 4 }}>
+                  {[
+                    { label: refreshMsg || 'Refresh data', action: async () => { setRefreshMsg('Refreshing...'); await fetchPage(); setRefreshMsg('Updated!'); setTimeout(() => setRefreshMsg(''), 2000); } },
+                    { label: 'Import from Excel', action: () => fileRef.current?.click() },
+                    { label: 'Export to Excel', action: handleExport },
+                    { label: 'Test print', action: printTestLabel },
+                  ].map((opt, i) => (
+                    <div key={i} onClick={() => { setMoreMenuOpen(false); opt.action(); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 11, color: T.tx2, borderRadius: 5, transition: 'all .12s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,.08)'; e.currentTarget.style.color = T.tx; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx2; }}>{opt.label}</div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           <button style={btnPrimary} onClick={openAdd}>+ Add SKU</button>
         </div>
       </div>
@@ -798,6 +835,30 @@ export default function BrandTagPrinter() {
           onSave={handleModalSave}
           onClose={() => setModalRow(null)}
         />
+      )}
+
+      {/* ── Label Print Preview (iframe-based; no popup required) ── */}
+      {printHtml && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setPrintHtml(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: 'min(540px, 100%)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,.6)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#111', fontFamily: T.sora }}>Label Print Preview</div>
+                <div style={{ fontSize: 11, color: '#6B7890' }}>{printCount} label{printCount === 1 ? '' : 's'} ready to print</div>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => { printIframeRef.current?.contentWindow?.print(); }} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', boxShadow: '0 2px 10px rgba(99,102,241,.3)' }}>Print</button>
+                <button onClick={() => setPrintHtml(null)} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Close</button>
+              </div>
+            </div>
+            <iframe
+              ref={printIframeRef}
+              title="Label print preview"
+              srcDoc={printHtml}
+              style={{ flex: 1, width: '100%', minHeight: 420, border: 'none', background: '#fff' }}
+            />
+          </div>
+        </div>
       )}
       </>}
     </div>
