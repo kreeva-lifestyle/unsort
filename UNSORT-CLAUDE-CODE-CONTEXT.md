@@ -27,6 +27,10 @@ Region: South Asia (Mumbai)
 
 ## Database Schema
 
+> **⚠️ This section is historical and may be outdated.**
+> The authoritative schema lives in DATABASE-SCHEMA.md and is derived from the live Supabase instance.
+> TypeScript types in src/types/database.ts match DATABASE-SCHEMA.md, not this section.
+
 ### Tables
 1. **profiles** - User profiles (linked to auth.users)
    - id, email, full_name, role, is_active, created_at, updated_at
