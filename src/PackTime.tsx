@@ -107,11 +107,52 @@ if (typeof window !== 'undefined') {
 }
 
 let cachedToken = '';
-const getAuthHeaders = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
+const getAuthHeaders = async (forceRefresh = false) => {
+  let session = (await supabase.auth.getSession()).data.session;
+  // If token is missing or within 60s of expiry, refresh so the Edge Function
+  // gateway doesn't reject with 401 due to a stale cached JWT.
+  const nearExpiry = !!session && typeof session.expires_at === 'number'
+    && session.expires_at - Math.floor(Date.now() / 1000) < 60;
+  if (forceRefresh || !session || nearExpiry) {
+    const { data } = await supabase.auth.refreshSession();
+    if (data.session) session = data.session;
+  }
   cachedToken = session?.access_token || '';
   return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cachedToken}`, 'apikey': SUPABASE_ANON_KEY };
 };
+
+// POST to the packtime Edge Function with a timeout, auth refresh on 401/403,
+// and a single retry on transient network failures. Returns a parsed body plus
+// diagnostic fields so the UI can show real error text instead of a generic
+// "Cannot connect to server".
+async function callEdge(body: unknown, timeoutMs = 20000): Promise<any> {
+  let lastDetails = '';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), timeoutMs);
+    try {
+      const headers = await getAuthHeaders(attempt === 1);
+      const resp = await fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify(body), signal: ctl.signal });
+      clearTimeout(t);
+      const text = await resp.text();
+      let parsed: any = null;
+      try { parsed = text ? JSON.parse(text) : null; } catch { /* non-JSON response */ }
+      if (resp.ok) return parsed ?? { ok: false, error: 'Empty response from server.' };
+      const gatewayMsg = parsed?.error || parsed?.message || parsed?.msg || text.slice(0, 180);
+      lastDetails = `HTTP ${resp.status}${gatewayMsg ? ` — ${gatewayMsg}` : ''}`;
+      // 401/403 means auth was rejected at the gateway — refresh and retry once.
+      if ((resp.status === 401 || resp.status === 403) && attempt === 0) continue;
+      return { ok: false, error: resp.status >= 500 ? 'Server error. Try again in a moment.' : 'Request rejected by server.', details: lastDetails };
+    } catch (err: any) {
+      clearTimeout(t);
+      const isTimeout = err?.name === 'AbortError';
+      lastDetails = isTimeout ? `timeout after ${timeoutMs}ms` : (err?.message || 'network error');
+      if (attempt === 0) { await new Promise(r => setTimeout(r, 1500)); continue; }
+      return { ok: false, error: isTimeout ? 'Server timed out. Try again.' : 'Cannot connect to server. Try again.', details: lastDetails };
+    }
+  }
+  return { ok: false, error: 'Cannot connect to server. Try again.', details: lastDetails };
+}
 
 // ── Component ───────────────────────────────────────────────────────────────────
 export default function PackTime({ active }: { active?: boolean } = {}) {
@@ -302,32 +343,23 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setCourierSheet(c.sheet_name);
     setCourierBrand(selectedBrand || c.brand || 'FUSIONIC');
     setVerifying(true); setVerifyResult(null);
-    try {
-      const headers = await getAuthHeaders();
-      const resp = await fetch(EDGE_FN, {
-        method: 'POST', headers,
-        body: JSON.stringify({ action: 'init', sheetName: c.sheet_name }),
-      });
-      const data = await resp.json();
-      setVerifyResult(data);
-      if (data.ok && data.columnsOk !== false) {
-        const sheetAwbs = (data.awbs || []).map((a: string) => a.trim().toUpperCase());
-        let dbAwbs: string[] = [];
-        try {
-          const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
-          const { data: dbScans } = await supabase.from('packtime_scans').select('awb').eq('sheet_name', c.sheet_name).gte('scanned_at', thirtyDaysAgo).limit(5000);
-          type AwbRow = Pick<PackTimeScan, 'awb'>;
-          dbAwbs = ((dbScans as AwbRow[] | null) || []).map((r) => r.awb.trim().toUpperCase());
-        } catch {}
-        awbSetRef.current = new Set([...sheetAwbs, ...dbAwbs]);
-        rowCountRef.current = data.totalRows || 0;
-        setSheetTotal(data.totalRows || 0);
-        sessionIdRef.current = crypto.randomUUID();
-        writeQueue.length = 0; flushing = false;
-        setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned(''); setDbFails(0);
-      }
-    } catch {
-      setVerifyResult({ ok: false, error: 'Cannot connect to server. Try again.' });
+    const data = await callEdge({ action: 'init', sheetName: c.sheet_name });
+    setVerifyResult(data);
+    if (data.ok && data.columnsOk !== false) {
+      const sheetAwbs = (data.awbs || []).map((a: string) => a.trim().toUpperCase());
+      let dbAwbs: string[] = [];
+      try {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+        const { data: dbScans } = await supabase.from('packtime_scans').select('awb').eq('sheet_name', c.sheet_name).gte('scanned_at', thirtyDaysAgo).limit(5000);
+        type AwbRow = Pick<PackTimeScan, 'awb'>;
+        dbAwbs = ((dbScans as AwbRow[] | null) || []).map((r) => r.awb.trim().toUpperCase());
+      } catch {}
+      awbSetRef.current = new Set([...sheetAwbs, ...dbAwbs]);
+      rowCountRef.current = data.totalRows || 0;
+      setSheetTotal(data.totalRows || 0);
+      sessionIdRef.current = crypto.randomUUID();
+      writeQueue.length = 0; flushing = false;
+      setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned(''); setDbFails(0);
     }
     setVerifying(false);
   };
