@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext, useId, Component, useCallback } from 'react';
+import React, { useState, useEffect, useId, Component, useCallback } from 'react';
 
 // Error boundary to prevent blank screen crashes
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: any }> {
@@ -24,247 +24,13 @@ import InventoryExtras from './InventoryExtras';
 import Login from './pages/Login';
 import SettingsPage from './pages/Settings';
 import BarcodeScanner from './components/ui/BarcodeScanner';
+import SidebarComponent from './components/layout/Sidebar';
+import HeaderComponent from './components/layout/Header';
+import ToastContainerComponent from './components/layout/ToastContainer';
 import { supabase } from './lib/supabase';
 import { T, S, Icon } from './lib/theme';
-
-const AuthContext = createContext<any>(null);
-const NotificationContext = createContext<any>(null);
-const useAuth = () => useContext(AuthContext);
-const useNotifications = () => useContext(NotificationContext);
-
-const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    const timeout = setTimeout(() => { if (mounted) { setLoading(false); setReady(true); } }, 3000);
-
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!mounted) return;
-      if (session?.user) {
-        // Verify the session is still valid by refreshing
-        const { data: refreshed } = await supabase.auth.refreshSession();
-        if (!mounted) return;
-        if (refreshed?.session?.user) {
-          setUser(refreshed.session.user);
-          const { data: prof } = await supabase.from('profiles').select('*').eq('id', refreshed.session.user.id).maybeSingle();
-          if (mounted) setProfile(prof);
-        } else {
-          setUser(null); setProfile(null);
-        }
-      } else {
-        setUser(null); setProfile(null);
-      }
-      if (mounted) { setLoading(false); setReady(true); clearTimeout(timeout); }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return;
-      if (session?.user) {
-        setUser(session.user);
-        supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle().then(({ data }) => {
-          if (mounted) { setProfile(data); setLoading(false); setReady(true); }
-        });
-      } else {
-        setUser(null); setProfile(null);
-        setLoading(false); setReady(true);
-      }
-    });
-
-    return () => { mounted = false; subscription.unsubscribe(); clearTimeout(timeout); };
-  }, []);
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
-  };
-
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
-    return { error };
-  };
-
-  const signOut = async () => { await supabase.auth.signOut(); };
-
-  // Session timeout — auto-logout after 30 min of inactivity
-  useEffect(() => {
-    if (!user) return;
-    let timer: any;
-    const resetTimer = () => { clearTimeout(timer); timer = setTimeout(() => { supabase.auth.signOut(); }, 30 * 60 * 1000); };
-    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
-    events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }));
-    resetTimer();
-    return () => { clearTimeout(timer); events.forEach(e => window.removeEventListener(e, resetTimer)); };
-  }, [user]);
-
-  return <AuthContext.Provider value={{ user, profile, loading, ready, signIn, signUp, signOut }}>{children}</AuthContext.Provider>;
-};
-
-const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [toasts, setToasts] = useState<any[]>([]);
-  const { user } = useAuth();
-
-  useEffect(() => {
-    if (!user) return;
-    fetchNotifications();
-    const channel = supabase.channel('notifications').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload: any) => {
-      setNotifications((prev) => [payload.new, ...prev]);
-      addToast(payload.new.title, payload.new.type);
-    }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
-  const fetchNotifications = async () => {
-    if (!user) return;
-    const { data } = await supabase.from('notifications').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50);
-    setNotifications(data || []);
-  };
-
-  const markAsRead = async (id: string) => {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
-  };
-
-  const addToast = (message: string, type = 'info') => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
-  };
-
-  return <NotificationContext.Provider value={{ notifications, toasts, markAsRead, addToast, fetchNotifications }}>{children}</NotificationContext.Provider>;
-};
-
-const ToastContainer = () => {
-  const { toasts } = useNotifications();
-  return (
-    <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 999 }}>
-      {toasts.map((t: any) => (
-        <div key={t.id} style={{ background: 'rgba(12,16,28,0.95)', backdropFilter: 'blur(16px)', border: `1px solid ${T.bd2}`, borderRadius: 6, padding: '8px 14px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 20px rgba(0,0,0,.5)', animation: 'su .18s ease', marginBottom: 6, borderLeft: `2px solid ${t.type === 'error' ? T.re : T.gr}`, color: T.tx, maxWidth: 'calc(100vw - 32px)' }}>{t.message}</div>
-      ))}
-    </div>
-  );
-};
-
-// SVG icons for modern look
-
-const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (t: string) => void }) => {
-  const { profile } = useAuth();
-  const isAdmin = profile?.role === 'admin';
-  const tabs = [
-    { id: 'dashboard', icon: 'grid', label: 'Dashboard' },
-    { id: 'inventory', icon: 'box', label: 'Inventory' },
-    { id: 'brandtag', icon: 'tag', label: 'Brand Tags' },
-    { id: 'packtime', icon: 'scan', label: 'PackStation' },
-    { id: 'challan', icon: 'file', label: 'Cash Challan' },
-    ...(isAdmin ? [{ id: 'settings', icon: 'settings', label: 'Settings' }] : []),
-  ];
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    window.location.reload();
-  };
-
-  return (
-    <div className="sidebar" style={{ width: 220, height: '100vh', background: 'rgba(8,11,20,0.85)', backdropFilter: 'blur(36px)', WebkitBackdropFilter: 'blur(36px)', borderRight: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, zIndex: 100, overflowY: 'auto' }}>
-      {/* Sidebar ambient glow */}
-      <div style={{ position: 'absolute', top: -30, left: -20, width: 160, height: 160, background: `radial-gradient(circle, ${T.ac}10 0%, transparent 70%)`, pointerEvents: 'none', zIndex: 0 }} />
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <div style={{ padding: '14px 14px 11px', borderBottom: `1px solid ${T.bd}` }}>
-        <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'subtlePulse 4s ease-in-out infinite' }}>DailyOffice</div>
-        <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2.5, textTransform: 'uppercase' as const, marginTop: 2 }}>Your Workspace, Simplified</div>
-      </div>
-      <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2, textTransform: 'uppercase' as const, padding: '12px 14px 5px', fontWeight: 600 }}>Menu</div>
-      <nav style={{ flex: 1, padding: '2px 8px 8px' }}>
-        {tabs.map((t) => (
-          <div key={t.id} onClick={() => setActiveTab(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 10px', margin: '2px 0', cursor: 'pointer', background: activeTab === t.id ? 'rgba(99,102,241,.08)' : 'transparent', color: activeTab === t.id ? T.ac2 : T.tx3, fontSize: 11, fontWeight: activeTab === t.id ? 600 : 400, fontFamily: T.sans, borderRadius: 6, transition: 'all .18s ease', position: 'relative' }}
-            onMouseEnter={e => { if (activeTab !== t.id) { e.currentTarget.style.background = 'rgba(99,102,241,.04)'; e.currentTarget.style.color = T.tx2; } }}
-            onMouseLeave={e => { if (activeTab !== t.id) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx3; } }}>
-            <span style={{ width: 28, height: 28, borderRadius: 7, background: activeTab === t.id ? 'rgba(99,102,241,.12)' : 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s ease' }}><Icon name={t.icon} size={14} /></span>
-            {t.label}
-            {activeTab === t.id && <span style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 3, height: 18, borderRadius: '0 3px 3px 0', background: T.ac, boxShadow: `0 0 8px ${T.ac}88`, animation: 'pulseGlow 2s ease-in-out infinite' }} />}
-          </div>
-        ))}
-      </nav>
-      <div style={{ padding: '10px 10px', borderTop: `1px solid ${T.bd}`, marginTop: 'auto' }}>
-        {profile && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '7px 9px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, border: `1px solid ${T.bd}`, transition: 'all .15s' }} onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'} onMouseLeave={e => e.currentTarget.style.borderColor = T.bd}>
-          <div style={{ width: 28, height: 28, borderRadius: 7, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{(profile.full_name || 'U')[0].toUpperCase()}</div>
-          <div style={{ flex: 1, minWidth: 0 }}><p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.full_name}</p><p style={{ margin: 0, fontSize: 8, color: T.tx3, textTransform: 'capitalize' as const }}>{profile.role}</p></div>
-        </div>}
-        <div onClick={handleSignOut} style={{ width: '100%', padding: '6px 10px', borderRadius: 6, background: 'rgba(248,113,113,.04)', border: '1px solid rgba(248,113,113,.10)', color: '#f87171', cursor: 'pointer', fontSize: 10, fontWeight: 500, fontFamily: T.sans, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,113,113,.08)'; e.currentTarget.style.borderColor = 'rgba(248,113,113,.20)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(248,113,113,.04)'; e.currentTarget.style.borderColor = 'rgba(248,113,113,.10)'; }}>Sign Out</div>
-        <p style={{ margin: '8px 0 0', fontSize: 7, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' as const, textAlign: 'center', opacity: 0.3 }}>Powered by Arya Designs</p>
-      </div>
-      </div>
-    </div>
-  );
-};
-
-
-const Header = ({ title, onSearch, onNotifClick, onOpenScanner }: { title: string; onSearch?: (q: string) => void; onNotifClick?: (n: any) => void; onOpenScanner?: () => void }) => {
-  const { notifications, markAsRead } = useNotifications();
-  const [show, setShow] = useState(false);
-  const unread = notifications.filter((n: any) => !n.is_read).length;
-  const [globalSearch, setGlobalSearch] = useState('');
-
-  const handleNotifClick = (n: any) => {
-    markAsRead(n.id);
-    setShow(false);
-    if (onNotifClick) onNotifClick(n);
-  };
-
-  return (
-    <header className="header-bar" style={{ background: 'rgba(8,11,20,0.60)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', borderBottom: `1px solid ${T.bd}`, padding: '0 16px', position: 'sticky', top: 0, zIndex: 50, height: 44, display: 'flex', alignItems: 'center' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
-        {/* Title with accent dot */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, boxShadow: `0 0 8px ${T.ac}55` }} />
-          <h1 className="header-title" style={{ margin: 0, fontSize: 13, fontWeight: 700, color: T.tx, whiteSpace: 'nowrap', fontFamily: T.sora, letterSpacing: -0.2 }}>{title}</h1>
-        </div>
-        {/* Separator */}
-        <div style={{ width: 1, height: 18, background: `linear-gradient(180deg, transparent, ${T.bd2}, transparent)`, flexShrink: 0 }} />
-        {/* Search */}
-        <div className="header-search" style={{ flex: 1, maxWidth: 320 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '5px 10px', transition: 'all .18s' }}>
-            <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, flexShrink: 0, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
-            <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search items, IDs, SKUs..." style={{ background: 'transparent', border: 'none', outline: 'none', color: T.tx, fontFamily: T.sans, fontSize: 11, flex: 1, minWidth: 0 }} />
-            {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 12, lineHeight: 1 }}>×</span>}
-          </div>
-        </div>
-        {/* Right actions */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-        <button onClick={() => onOpenScanner?.()} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} title="Scan barcode" onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = T.bd2; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = T.bd; }}>
-          <Icon name="scan" size={14} />
-        </button>
-        <div style={{ position: 'relative' }}>
-        <button onClick={() => setShow(!show)} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', position: 'relative', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = T.bd2; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = T.bd; }}>
-          <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
-          {unread > 0 && <span style={{ position: 'absolute', top: -3, right: -3, width: 14, height: 14, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 8, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono, boxShadow: `0 0 6px ${T.ac}66` }}>{unread}</span>}
-        </button>
-        {show && (
-          <div className="notif-dropdown" style={{ position: 'absolute', right: 0, top: 38, width: 290, background: 'rgba(12,16,28,0.96)', backdropFilter: 'blur(24px)', borderRadius: 8, boxShadow: '0 10px 40px rgba(0,0,0,.55)', border: `1px solid ${T.bd2}`, zIndex: 50, maxHeight: 360, overflowY: 'auto' }}>
-            <div style={{ padding: '10px 14px', borderBottom: `1px solid ${T.bd}`, fontWeight: 600, fontSize: 11, color: T.tx, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>Notifications {unread > 0 && <span style={{ fontSize: 9, fontFamily: T.mono, color: T.ac, background: 'rgba(99,102,241,.10)', padding: '2px 6px', borderRadius: 4 }}>{unread} new</span>}</div>
-            {notifications.length === 0 ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No notifications</div> : notifications.slice(0, 10).map((n: any) => (
-              <div key={n.id} onClick={() => handleNotifClick(n)} style={{ padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: n.is_read ? 'transparent' : 'rgba(99,102,241,.04)', transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseLeave={e => e.currentTarget.style.background = n.is_read ? 'transparent' : 'rgba(99,102,241,.04)'}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-                  <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: T.tx }}>{n.title}</p>
-                  {!n.is_read && <span style={{ width: 5, height: 5, borderRadius: '50%', background: T.ac, flexShrink: 0, marginTop: 4 }} />}
-                </div>
-                <p style={{ margin: '2px 0 0', fontSize: 10, color: T.tx3, lineHeight: 1.4 }}>{n.message}</p>
-                <p style={{ margin: '3px 0 0', fontSize: 9, color: T.tx3, opacity: 0.5 }}>{new Date(n.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      </div>
-      </div>
-    </header>
-  );
-};
+import { AuthProvider, useAuth } from './hooks/useAuth';
+import { NotificationProvider, useNotifications } from './hooks/useNotifications';
 
 const statusTag = (status: string) => {
   const m: Record<string, { bg: string; color: string; bd: string }> = {
@@ -1264,7 +1030,7 @@ const getTabFromHash = () => {
 
 const MainApp = () => {
   const { profile } = useAuth();
-  const { addToast } = useNotifications();
+  const { addToast, notifications, markAsRead, toasts } = useNotifications();
   const [tab, setTabState] = useState(getTabFromHash);
   const [globalSearch, setGlobalSearch] = useState('');
   const [notifItemId, setNotifItemId] = useState<string | null>(null);
@@ -1315,12 +1081,12 @@ const MainApp = () => {
       <div style={{ position: 'absolute', top: -100, right: -50, width: 400, height: 400, background: `radial-gradient(circle, ${T.ac}08 0%, transparent 70%)` }} />
       <div style={{ position: 'absolute', bottom: -100, left: -50, width: 350, height: 350, background: `radial-gradient(circle, ${T.bl}06 0%, transparent 70%)` }} />
     </div>
-    <Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} />
+    <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} profile={profile} />
     {/* Mobile overlay */}
     <div className="mobile-overlay" onClick={() => setMobileMenu(false)} style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 98, opacity: mobileMenu ? 1 : 0, pointerEvents: mobileMenu ? 'auto' : 'none', transition: 'opacity .25s ease', backdropFilter: 'blur(2px)' }} />
     {/* Mobile sidebar drawer */}
     <div className="mobile-drawer" style={{ display: 'none', position: 'fixed', top: 0, left: 0, width: 260, height: '100vh', zIndex: 101, transform: mobileMenu ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform .3s cubic-bezier(.4,0,.2,1)', boxShadow: mobileMenu ? '4px 0 24px rgba(0,0,0,.4)' : 'none' }}>
-      <Sidebar activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} />
+      <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} profile={profile} />
     </div>
     <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
       {/* Mobile bottom nav */}
@@ -1331,7 +1097,7 @@ const MainApp = () => {
           </div>
         ))}
       </div>
-      <Header title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} onOpenScanner={() => { setScanError(''); setScannerOpen(true); }} />
+      <HeaderComponent title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} onOpenScanner={() => { setScanError(''); setScannerOpen(true); }} notifications={notifications} markAsRead={markAsRead} />
       <main style={{ flex: 1, overflow: 'auto' }}>
         {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard /></div>}
         {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
@@ -1342,7 +1108,7 @@ const MainApp = () => {
         {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage profile={profile} addToast={addToast} /></div>}
       </main>
     </div>
-    <ToastContainer />
+    <ToastContainerComponent toasts={toasts} />
     {scannerOpen && <BarcodeScanner onScan={handleScan} onClose={() => setScannerOpen(false)} scanError={scanError} />}
   </div>);
 };
