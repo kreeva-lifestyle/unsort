@@ -21,7 +21,7 @@ export default function Settings({ profile, addToast }: { profile: any; addToast
         {tabs.map(t => <div key={t.id} onClick={() => setTab(t.id)} style={{ padding: '5px 14px', borderRadius: 4, fontSize: 10, fontWeight: tab === t.id ? 600 : 400, cursor: 'pointer', background: tab === t.id ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'transparent', color: tab === t.id ? '#fff' : T.tx3, transition: 'all .15s' }}>{t.label}</div>)}
       </div>
       {tab === 'categories' && <CategoriesSettings addToast={addToast} profile={profile} />}
-      {tab === 'locations' && <LocationsSettings addToast={addToast} canEdit={!!isAdmin} />}
+      {tab === 'locations' && <LocationsSettings addToast={addToast} canEdit={profile?.role === 'admin' || profile?.role === 'manager'} />}
       {tab === 'users' && <UsersSettings addToast={addToast} profile={profile} />}
       {tab === 'brands' && <BrandsSettings addToast={addToast} />}
       {tab === 'packtime' && <PackStationSettings addToast={addToast} />}
