@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
 
 export default function PackStation({ addToast }: { addToast: (msg: string, type?: string) => void }) {
   const [couriers, setCouriers] = useState<any[]>([]);
@@ -23,14 +24,14 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
     const exists = couriers.some(c => c.name.toLowerCase() === newCourier.trim().toLowerCase());
     if (exists) { addToast('Courier already exists', 'error'); return; }
     const { error } = await supabase.from('packtime_couriers').insert({ name: newCourier.trim(), sheet_name: newSheet.trim() });
-    if (error) addToast(error.message, 'error');
+    if (error) addToast(friendlyError(error), 'error');
     else { addToast('Courier added!', 'success'); setNewCourier(''); setNewSheet(''); fetchData(); }
   };
 
   const toggleCourier = async (id: string, active: boolean) => {
     if (!active) { const activeCount = couriers.filter(c => c.is_active && c.id !== id).length; if (activeCount < 1) { addToast('At least 1 courier must remain active', 'error'); return; } }
     const { error } = await supabase.from('packtime_couriers').update({ is_active: !active }).eq('id', id);
-    if (error) addToast(error.message, 'error'); else fetchData();
+    if (error) addToast(friendlyError(error), 'error'); else fetchData();
   };
 
   const deleteCourier = async (id: string) => {
@@ -48,7 +49,7 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
     e.preventDefault();
     if (!newCamera.trim()) return;
     const { error } = await supabase.from('packtime_cameras').insert({ number: newCamera.trim() });
-    if (error) addToast(error.message, 'error');
+    if (error) addToast(friendlyError(error), 'error');
     else { addToast('Camera added!', 'success'); setNewCamera(''); fetchData(); }
   };
 

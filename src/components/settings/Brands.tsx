@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
 
 export default function Brands({ addToast }: { addToast: (msg: string, type?: string) => void }) {
   const [brands, setBrands] = useState<any[]>([]);
@@ -15,10 +16,10 @@ export default function Brands({ addToast }: { addToast: (msg: string, type?: st
     const exists = brands.some(b => b.name.toLowerCase() === newBrand.trim().toLowerCase());
     if (exists) { addToast('Brand already exists', 'error'); return; }
     const { error } = await supabase.from('brands').insert({ name: newBrand.trim().toUpperCase() });
-    if (error) addToast(error.message, 'error');
+    if (error) addToast(friendlyError(error), 'error');
     else { addToast('Brand added!', 'success'); setNewBrand(''); fetchBrands(); }
   };
-  const toggleBrand = async (id: string, active: boolean) => { const { error } = await supabase.from('brands').update({ is_active: !active }).eq('id', id); if (error) addToast(error.message, 'error'); else fetchBrands(); };
+  const toggleBrand = async (id: string, active: boolean) => { const { error } = await supabase.from('brands').update({ is_active: !active }).eq('id', id); if (error) addToast(friendlyError(error), 'error'); else fetchBrands(); };
   const deleteBrand = async (id: string) => {
     if (!confirm('Delete this brand?')) return;
     const b = brands.find(x => x.id === id);

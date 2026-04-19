@@ -1,10 +1,14 @@
 // BarcodeScanner modal — barcode + OCR text scanning
+// Uses the same barcode-detector ponyfill as PackTime for library consistency (audit P1).
 import { useState, useEffect, useRef, useCallback } from 'react';
-import Quagga from '@ericblade/quagga2';
+import { BarcodeDetector } from 'barcode-detector/ponyfill';
 import { T, S } from '../../lib/theme';
 
 export default function BarcodeScanner({ onScan, onClose, scanError }: { onScan: (code: string) => Promise<boolean>; onClose: () => void; scanError?: string }) {
-  const videoRef = useRef<HTMLDivElement>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanLockRef = useRef(false);
   const ocrVideoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [mode, setMode] = useState<'barcode' | 'text'>('barcode');
@@ -14,29 +18,60 @@ export default function BarcodeScanner({ onScan, onClose, scanError }: { onScan:
   const [scanning, setScanning] = useState(true);
   const [ocrProcessing, setOcrProcessing] = useState(false);
   const [ocrStatus, setOcrStatus] = useState('');
-  const scannedRef = useRef(false);
   const mountedRef = useRef(true);
 
-  // Barcode mode
+  const stopBarcode = useCallback(() => {
+    scanLockRef.current = true;
+    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+    if (videoRef.current) { videoRef.current.srcObject = null; videoRef.current = null; }
+  }, []);
+
+  // Barcode mode — BarcodeDetector (ZXing-WASM ponyfill works on iOS/Android/desktop)
   const startBarcode = useCallback(() => {
-    if (!videoRef.current || mode !== 'barcode') return;
-    scannedRef.current = false; setScanning(true); setLastCode('');
-    Quagga.init({
-      inputStream: { type: 'LiveStream', target: videoRef.current, constraints: { facingMode: 'environment', width: { ideal: 480 }, height: { ideal: 320 } } },
-      decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader', 'ean_8_reader'], multiple: false },
-      locate: true, frequency: 10,
-    }, (err: any) => { if (err) setCameraError('Camera not available.'); else Quagga.start(); });
-    Quagga.onDetected((result: any) => {
-      const code = result?.codeResult?.code;
-      if (code && !scannedRef.current) {
-        scannedRef.current = true; setLastCode(code);
-        if (navigator.vibrate) navigator.vibrate(100);
-        Quagga.stop(); setScanning(false);
-        onScan(code).then(found => { if (!found && mountedRef.current) setTimeout(() => startBarcode(), 2000); });
-      }
-    });
+    if (!videoContainerRef.current || mode !== 'barcode') return;
+    const container = videoContainerRef.current;
+    container.innerHTML = '';
+    scanLockRef.current = false; setScanning(true); setLastCode('');
+
+    const video = document.createElement('video');
+    video.autoplay = true; video.muted = true; video.playsInline = true;
+    video.setAttribute('playsinline', 'true');
+    video.setAttribute('webkit-playsinline', 'true');
+    video.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+    container.appendChild(video);
+    videoRef.current = video;
+
+    const detector = new BarcodeDetector({ formats: ['code_128', 'code_39', 'ean_13', 'ean_8'] });
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } })
+      .then(stream => {
+        if (!videoRef.current) return;
+        streamRef.current = stream;
+        video.srcObject = stream;
+        video.onloadedmetadata = () => video.play().then(() => {
+          const loop = async () => {
+            if (scanLockRef.current || !streamRef.current) return;
+            try {
+              const results = await detector.detect(video);
+              if (results.length > 0) {
+                const code = results[0].rawValue?.trim();
+                if (code && code.length >= 4) {
+                  scanLockRef.current = true;
+                  setLastCode(code); setScanning(false);
+                  if (navigator.vibrate) navigator.vibrate(100);
+                  const found = await onScan(code);
+                  if (!found && mountedRef.current) setTimeout(() => { if (mountedRef.current) startBarcode(); }, 2000);
+                  return;
+                }
+              }
+            } catch {}
+            if (streamRef.current) requestAnimationFrame(loop);
+          };
+          requestAnimationFrame(loop);
+        }).catch(() => setCameraError('Camera not available.'));
+      })
+      .catch(() => setCameraError('Camera not available.'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  }, [mode, onScan]);
 
   // OCR mode - start camera
   const startOcrCamera = useCallback(async () => {
@@ -98,14 +133,14 @@ export default function BarcodeScanner({ onScan, onClose, scanError }: { onScan:
     const videoEl = ocrVideoRef.current;
     return () => {
       mountedRef.current = false;
-      Quagga.stop(); Quagga.offDetected();
+      stopBarcode();
       if (videoEl?.srcObject) (videoEl.srcObject as MediaStream).getTracks().forEach(t => t.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   const switchMode = (m: 'barcode' | 'text') => {
-    Quagga.stop(); Quagga.offDetected();
+    stopBarcode();
     if (ocrVideoRef.current?.srcObject) (ocrVideoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
     setLastCode(''); setOcrStatus(''); setCameraError(''); setMode(m);
   };
@@ -128,7 +163,7 @@ export default function BarcodeScanner({ onScan, onClose, scanError }: { onScan:
 
           {/* Barcode camera */}
           {mode === 'barcode' && !cameraError && <div style={{ position: 'relative', width: '100%', borderRadius: 10, overflow: 'hidden', marginBottom: 10, background: '#000', aspectRatio: '4/3' }}>
-            <div ref={videoRef} style={{ position: 'absolute', inset: 0 }} />
+            <div ref={videoContainerRef} style={{ position: 'absolute', inset: 0 }} />
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 2 }}>
               <div style={{ width: '75%', height: 50, border: `2px solid ${scanning ? T.ac : T.gr}`, borderRadius: 8, position: 'relative' }}>
                 {scanning && <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', height: 2, background: T.re, boxShadow: `0 0 10px ${T.re}`, animation: 'scanLine 2s ease-in-out infinite' }} />}
