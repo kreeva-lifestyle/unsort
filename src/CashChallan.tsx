@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import CashBook from './CashBook';
 import { supabase } from './lib/supabase';
 import { useNotifications } from './hooks/useNotifications';
 import ChallanAnalytics from './components/challan/ChallanAnalytics';
 import ChallanLedger from './components/challan/ChallanLedger';
+import ChallanForm from './components/challan/ChallanForm';
 import Empty from './components/ui/Empty';
 import { friendlyError } from './lib/friendlyError';
 import type {
@@ -48,7 +49,6 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   voided: { bg: 'rgba(255,255,255,.10)', color: T.tx3 },
 };
 
-const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Other'];
 
 export default function CashChallan({ active }: { active?: boolean } = {}) {
   const { addToast } = useNotifications();
@@ -103,7 +103,6 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [ledgerChallans, setLedgerChallans] = useState<Challan[]>([]);
   const [ledgerSearch, setLedgerSearch] = useState('');
 
-  const searchTimeout = useRef<any>(null);
 
   // ── Computed values (per-item discount) ─────────────────────────────────
   const computeItemTotal = (it: ChallanItem) => {
@@ -614,211 +613,55 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     />
   );
 
-  // ── Shared label style ──────────────────────────────────────────────────────
-  const lbl: React.CSSProperties = { display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 };
-  const inp: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' };
-
-  // ── Create/Edit Modal ──────────────────────────────────────────────────────
+  // ── Create/Edit Modal — extracted to components/challan/ChallanForm.tsx ──
   if (showModal) return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 520 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>{editing ? `Edit #${editing.challan_number}` : (isReturn ? 'New Return' : 'New Cash Challan')}</span>
-            {editing && <button onClick={() => loadAuditTrail(editing.challan_number)} style={{ padding: '3px 8px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>View History</button>}
-          </div>
-          <button onClick={closeModal} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', background: 'rgba(99,102,241,0.06)', color: T.ac2, fontSize: 10, cursor: 'pointer' }}>Cancel</button>
-        </div>
-
-        {/* Sale / Return Toggle */}
-        <div style={{ display: 'flex', gap: 3, marginBottom: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, width: 'fit-content', border: `1px solid ${T.bd}` }}>
-          {([{ v: false, label: 'Sale', color: T.gr }, { v: true, label: '↩ Return', color: T.re }] as const).map(opt => (
-            <div key={String(opt.v)} onClick={() => !editing && setIsReturn(opt.v)} style={{ padding: '5px 14px', borderRadius: 4, fontSize: 10, fontWeight: isReturn === opt.v ? 600 : 400, cursor: editing ? 'not-allowed' : 'pointer', opacity: editing ? 0.6 : 1, background: isReturn === opt.v ? opt.color + '33' : 'transparent', color: isReturn === opt.v ? opt.color : T.tx3, border: isReturn === opt.v ? `1px solid ${opt.color}44` : 'none' }}>{opt.label}</div>
-          ))}
-        </div>
-
-        {/* Return: Select source invoice */}
-        {isReturn && !editing && !returnSource && (
-          <div style={{ background: 'rgba(239,68,68,.04)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 10, padding: 14, marginBottom: 12 }}>
-            <label style={{ ...lbl, color: T.re }}>Select Original Invoice *</label>
-            <input type="text" value={returnSearchQ} onChange={e => { setReturnSearchQ(e.target.value); searchReturnSource(e.target.value); }}
-              placeholder="Search by challan # or customer name..." style={inp} autoFocus />
-            {returnResults.length > 0 && <div style={{ marginTop: 6, border: `1px solid ${T.bd}`, borderRadius: 6, maxHeight: 200, overflowY: 'auto' }}>
-              {returnResults.map(c => (
-                <div key={c.id} onClick={() => selectReturnSource(c)} style={{ padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <div>
-                    <span style={{ fontFamily: T.mono, fontSize: 11, color: T.ac2 }}>#{c.challan_number}</span>
-                    <span style={{ marginLeft: 8, fontSize: 11, color: T.tx }}>{c.customer_name}</span>
-                  </div>
-                  <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.tx }}>₹{Number(c.total).toLocaleString('en-IN')}</span>
-                </div>
-              ))}
-            </div>}
-          </div>
-        )}
-        {isReturn && returnSource && !editing && (
-          <div style={{ background: 'rgba(239,68,68,.04)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 10, padding: '8px 14px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <span style={{ fontSize: 9, color: T.re, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>Return against</span>
-              <div style={{ fontSize: 12, color: T.tx, fontWeight: 600 }}>#{returnSource.challan_number} — {returnSource.customer_name} — ₹{Number(returnSource.total).toLocaleString('en-IN')}</div>
-            </div>
-            <span onClick={() => { setReturnSource(null); setCustomerName(''); setSelectedCustomerId(null); setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]); }} style={{ fontSize: 10, color: T.re, cursor: 'pointer', fontWeight: 600 }}>Change</span>
-          </div>
-        )}
-
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
-          {/* Customer */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 12 }}>
-            <div style={{ position: 'relative' }}>
-              <label style={lbl}>Customer Name *</label>
-              <input type="text" value={customerName} onChange={e => { setCustomerName(e.target.value); setSelectedCustomerId(null); clearTimeout(searchTimeout.current); searchTimeout.current = setTimeout(() => searchCustomers(e.target.value), 300); }}
-                placeholder="Type customer name..." style={inp} />
-              {customerSuggestions.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'rgba(14,18,30,.98)', border: `1px solid ${T.bd2}`, borderRadius: 6, maxHeight: 120, overflowY: 'auto' }}>
-                  {customerSuggestions.map(c => (
-                    <div key={c.id} onClick={() => { setCustomerName(c.name); setSelectedCustomerId(c.id); setCustomerPhone(c.phone || ''); setCustomerSuggestions([]); }}
-                      style={{ padding: '8px 10px', fontSize: 11, color: T.tx, cursor: 'pointer', borderBottom: `1px solid ${T.bd}` }}>{c.name} {c.phone && <span style={{ color: T.tx3 }}>({c.phone})</span>}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div>
-              <label style={lbl}>Phone (for WhatsApp){selectedCustomerId && customerPhone && <span style={{ marginLeft: 6, fontSize: 8, color: T.gr, textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>✓ Auto-filled</span>}</label>
-              <input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="9876543210" style={{ ...inp, fontFamily: T.mono }} />
-            </div>
-          </div>
-
-          {/* Line Items */}
-          <div data-items style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 8, marginBottom: 12, overflow: 'hidden' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 90px 24px', gap: 4, padding: '6px 8px', borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
-              <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>SKU</span>
-              <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, textAlign: 'center' }}>Qty</span>
-              <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, textAlign: 'right' }}>Price</span>
-              <span title="Per-item discount: ₹ flat or % of line total" style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, textAlign: 'right', cursor: 'help' }}>Discount</span>
-              <span></span>
-            </div>
-            {items.map((it, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 90px 24px', gap: 4, padding: '5px 8px', borderBottom: `1px solid ${T.bd}`, alignItems: 'center' }}>
-                <input data-sku value={it.sku} onChange={e => { const n = [...items]; n[i].sku = e.target.value; setItems(n); }} placeholder="SKU / Item name" disabled={!!(isReturn && returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', fontFamily: T.mono, opacity: isReturn && returnSource ? 0.6 : 1 }} />
-                <input type="number" value={it.quantity || ''} onChange={e => { const n = [...items]; n[i].quantity = Number(e.target.value); setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'center' }} />
-                <input type="number" value={it.price || ''} onChange={e => { const n = [...items]; n[i].price = Number(e.target.value); setItems(n); }} placeholder="0" disabled={!!(isReturn && returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right', fontFamily: T.mono, opacity: isReturn && returnSource ? 0.6 : 1 }} />
-                <div style={{ display: 'flex', gap: 2, alignItems: 'center', opacity: isReturn && returnSource ? 0.6 : 1 }}>
-                  <select value={it.discount_type || 'flat'} onChange={e => { const n = [...items]; n[i].discount_type = e.target.value; setItems(n); }} disabled={!!(isReturn && returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx3, fontSize: 9, padding: '5px 2px', outline: 'none', width: 32 }}>
-                    <option value="flat">₹</option><option value="percentage">%</option>
-                  </select>
-                  <input
-                    type="number"
-                    value={it.discount_value || ''}
-                    onChange={e => { const n = [...items]; n[i].discount_value = Number(e.target.value); setItems(n); }}
-                    onKeyDown={e => {
-                      // Enter on last row's last field appends a new row (audit P1)
-                      if (e.key === 'Enter' && i === items.length - 1 && !(isReturn && returnSource)) {
-                        e.preventDefault();
-                        setItems([...items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
-                        // Focus the new row's SKU input after render
-                        setTimeout(() => {
-                          const inputs = (e.currentTarget.closest('[data-items]') as HTMLElement | null)?.querySelectorAll<HTMLInputElement>('input[data-sku]');
-                          inputs?.[inputs.length - 1]?.focus();
-                        }, 0);
-                      }
-                    }}
-                    placeholder="0"
-                    disabled={!!(isReturn && returnSource)}
-                    style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right', fontFamily: T.mono, flex: 1, minWidth: 0 }}
-                  />
-                </div>
-                <button onClick={() => { if (items.length > 1) setItems(items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }}>×</button>
-              </div>
-            ))}
-            {!(isReturn && returnSource) && <button onClick={() => setItems([...items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item (or press Enter on last row)</button>}
-          </div>
-
-          {/* Shipping + Tags + Notes */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
-            <div>
-              <label style={lbl}>Shipping/Porter</label>
-              <input type="number" value={shippingCharges || ''} onChange={e => setShippingCharges(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
-            </div>
-            <div>
-              <label style={lbl}>Tags <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: 7 }}>comma separated</span></label>
-              <input value={tags} onChange={e => setTags(e.target.value)} placeholder="vip, urgent" style={{ ...inp, fontSize: 11 }} />
-            </div>
-            <div>
-              <label style={lbl}>Notes</label>
-              <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional" style={{ ...inp, fontSize: 11 }} />
-            </div>
-          </div>
-
-          {/* Status + Payment */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
-            <div>
-              <label style={lbl}>Status</label>
-              <select value={challanStatus} onChange={e => setChallanStatus(e.target.value)} style={{ ...inp, fontSize: 11 }}>
-                {isReturn ? (<>
-                  {(!editing || editing.status === 'draft') && <option value="draft">Draft</option>}
-                  <option value="unpaid">Pending Refund</option>
-                  <option value="paid">Refunded</option>
-                </>) : (<>
-                  {(!editing || editing.status === 'draft') && <option value="draft">Draft</option>}
-                  <option value="unpaid">Unpaid</option>
-                  <option value="paid">Paid</option>
-                  <option value="partial">Partial</option>
-                </>)}
-              </select>
-            </div>
-            <div>
-              <label style={lbl}>{isReturn ? 'Refund Mode' : 'Payment Mode'}</label>
-              <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)} style={{ ...inp, fontSize: 11 }}>
-                <option value="">Select...</option>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={lbl}>{isReturn ? 'Refund Amount' : 'Amount Paid'}</label>
-              <input type="number" value={amountPaid || ''} onChange={e => setAmountPaid(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
-            </div>
-            <div>
-              <label style={lbl}>{isReturn ? 'Refund Date' : 'Payment Date'}</label>
-              <input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} style={{ ...inp, fontSize: 11 }} />
-            </div>
-          </div>
-        </div>
-
-        {/* Totals card */}
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 16px', marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, marginBottom: 4 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{subtotal.toFixed(2)}</span></div>
-          {totalDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Item Discounts</span><span style={{ fontFamily: T.mono }}>-₹{totalDiscount.toFixed(2)}</span></div>}
-          {shippingCharges > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.bl, marginBottom: 4 }}><span>Shipping/Porter</span><span style={{ fontFamily: T.mono }}>+₹{shippingCharges.toFixed(2)}</span></div>}
-          {roundOff !== 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx3, marginBottom: 4 }}><span>Round Off</span><span style={{ fontFamily: T.mono }}>{roundOff > 0 ? '+' : ''}₹{roundOff.toFixed(2)}</span></div>}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}><span>Total</span><span>₹{grandTotal.toLocaleString('en-IN')}</span></div>
-        </div>
-
-        {formError && <div style={{ background: 'rgba(239,68,68,.15)', borderLeft: `4px solid ${T.re}`, borderRadius: 6, padding: '10px 14px', fontSize: 11, color: T.tx, marginBottom: 8 }}>{formError}</div>}
-        <button onClick={saveChallan} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,.3)' }}>{editing ? (isReturn ? 'Update Return' : 'Update Challan') : (isReturn ? 'Create Return' : 'Create Challan')}</button>
-      </div>
-
-      {/* Audit Trail Modal (also accessible from edit form) */}
-      {auditTrail && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
-          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '18px 16px', maxWidth: 420, width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Audit Trail</span>
-              <button onClick={() => setAuditTrail(null)} style={{ padding: '3px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Close</button>
-            </div>
-            {auditTrail.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No history for this challan.</div>}
-            {auditTrail.map(a => (
-              <div key={a.id} style={{ padding: '8px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: a.action === 'VOID' ? 'rgba(239,68,68,.12)' : a.action === 'CREATE' ? 'rgba(34,197,94,.12)' : 'rgba(99,102,241,.12)', color: a.action === 'VOID' ? T.re : a.action === 'CREATE' ? T.gr : T.ac2, fontWeight: 700 }}>{a.action}</span>
-                  <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>{a.created_at ? new Date(a.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
-                </div>
-                <div style={{ color: T.tx2, fontSize: 11 }}>{a.details}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    <ChallanForm
+      editing={editing}
+      isReturn={isReturn}
+      setIsReturn={setIsReturn}
+      returnSource={returnSource}
+      returnSearchQ={returnSearchQ}
+      setReturnSearchQ={setReturnSearchQ}
+      returnResults={returnResults}
+      searchReturnSource={searchReturnSource}
+      selectReturnSource={selectReturnSource}
+      onClearReturnSource={() => { setReturnSource(null); setCustomerName(''); setSelectedCustomerId(null); setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]); }}
+      customerName={customerName}
+      setCustomerName={setCustomerName}
+      customerPhone={customerPhone}
+      setCustomerPhone={setCustomerPhone}
+      selectedCustomerId={selectedCustomerId}
+      setSelectedCustomerId={setSelectedCustomerId}
+      customerSuggestions={customerSuggestions}
+      setCustomerSuggestions={setCustomerSuggestions}
+      searchCustomers={searchCustomers}
+      items={items}
+      setItems={setItems}
+      shippingCharges={shippingCharges}
+      setShippingCharges={setShippingCharges}
+      tags={tags}
+      setTags={setTags}
+      notes={notes}
+      setNotes={setNotes}
+      paymentMode={paymentMode}
+      setPaymentMode={setPaymentMode}
+      paymentDate={paymentDate}
+      setPaymentDate={setPaymentDate}
+      amountPaid={amountPaid}
+      setAmountPaid={setAmountPaid}
+      challanStatus={challanStatus}
+      setChallanStatus={setChallanStatus}
+      subtotal={subtotal}
+      totalDiscount={totalDiscount}
+      roundOff={roundOff}
+      grandTotal={grandTotal}
+      auditTrail={auditTrail}
+      setAuditTrail={setAuditTrail}
+      loadAuditTrail={loadAuditTrail}
+      onClose={closeModal}
+      onSave={saveChallan}
+      formError={formError}
+    />
   );
 
   // ── List View ──────────────────────────────────────────────────────────────
