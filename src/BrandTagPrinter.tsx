@@ -507,7 +507,16 @@ export default function BrandTagPrinter() {
           if (bad) errors.push(`Row ${i + 1} (SKU: ${r.sku || 'empty'}): missing "${bad}"`);
         });
         if (errors.length > 0) {
-          addToast(`Import rejected — ${errors.length} row(s) missing data. First issue: ${errors[0]}`, 'error');
+          // Actionable error report — user can fix in Excel and re-import (audit P2)
+          const errorRows = imported.map((r, i) => {
+            const bad = validateRow(r);
+            return bad ? { Row: i + 2, SKU: r.sku || '(empty)', MissingField: bad, EAN: r.ean, Size: r.size, Brand: r.brand } : null;
+          }).filter(Boolean);
+          const ws = XLSX.utils.json_to_sheet(errorRows as any[]);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, 'Import Errors');
+          XLSX.writeFile(wb, `brand_tags_import_errors_${new Date().toISOString().slice(0, 10)}.xlsx`);
+          addToast(`Import rejected — ${errors.length} row(s) missing data. Error report downloaded.`, 'error');
           return;
         }
         // Smart import with queue persistence
@@ -772,7 +781,7 @@ export default function BrandTagPrinter() {
               <div style={{ display: 'flex', gap: 5 }}>
                 {missing.length === 0
                   ? <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={() => printOrderLabels(ready)}>Print All ({totalCopies})</button>
-                  : <button style={{ ...btnGhost, opacity: 0.4, cursor: 'not-allowed' }} title="Resolve missing SKUs first">Print blocked</button>
+                  : <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={() => { if (confirm(`Print the ${ready.length} ready label${ready.length === 1 ? '' : 's'} (${totalCopies} copies)? ${missing.length} missing SKU${missing.length === 1 ? '' : 's'} will be skipped — resolve ${missing.length === 1 ? 'it' : 'them'} later and re-run.`)) printOrderLabels(ready); }}>Print Ready ({totalCopies}) · Skip {missing.length}</button>
                 }
                 <button style={btnGhost} onClick={() => {
                   const exportData = (orderRows || []).map(r => ({

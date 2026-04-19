@@ -108,7 +108,6 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
   const deleteTask = async (id: string) => { if (!confirm('Delete this task?')) return; await supabase.from('tasks').delete().eq('id', id); fetchTasks(); };
 
   const maxScan = Math.max(...scanTrend.map(s => s.count), 1);
-  const maxRev = Math.max(...revTrend.map(r => r.amount), 1);
   const statusColors: Record<string, string> = { unsorted: T.yl, damaged: T.re, dry_clean: '#06b6d4', complete: T.gr, completed: '#10b981' };
 
   return (
@@ -198,14 +197,42 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
             ))}
           </div>
         </div>
-        {/* Revenue Trend 30d */}
+        {/* Revenue Trend 30d — with peak labels + 7-day moving avg (audit P2) */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
-          <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Revenue — Last 30 Days</p>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1, height: 60 }}>
-            {revTrend.map((r, i) => (
-              <div key={i} style={{ flex: 1, background: r.amount >= 0 ? `${T.gr}88` : `${T.re}88`, borderRadius: 2, height: Math.max(2, (Math.abs(r.amount) / maxRev) * 50) }} title={`${r.date}: ₹${r.amount}`} />
-            ))}
-          </div>
+          {(() => {
+            const peak = revTrend.reduce((acc, r) => r.amount > acc.amount ? r : acc, { date: '', amount: -Infinity });
+            const trough = revTrend.reduce((acc, r) => r.amount < acc.amount ? r : acc, { date: '', amount: Infinity });
+            // 7-day trailing moving average
+            const avgs = revTrend.map((_, i) => {
+              const win = revTrend.slice(Math.max(0, i - 6), i + 1);
+              return win.reduce((s, r) => s + r.amount, 0) / win.length;
+            });
+            const range = Math.max(1, Math.abs(peak.amount), Math.abs(trough.amount));
+            return (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                  <p style={{ fontSize: 9, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', margin: 0 }}>Revenue — Last 30 Days</p>
+                  <p style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, margin: 0 }}>peak ₹{peak.amount.toLocaleString('en-IN')}</p>
+                </div>
+                <div style={{ position: 'relative', height: 64 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1, height: 50, position: 'relative', zIndex: 1 }}>
+                    {revTrend.map((r, i) => (
+                      <div key={i} style={{ flex: 1, background: r.amount >= 0 ? `${T.gr}88` : `${T.re}88`, borderRadius: 2, height: Math.max(2, (Math.abs(r.amount) / range) * 46), border: r.date === peak.date ? `1px solid ${T.gr}` : 'none' }} title={`${r.date}: ₹${r.amount.toLocaleString('en-IN')}`} />
+                    ))}
+                  </div>
+                  {/* Moving-avg overlay as an SVG polyline */}
+                  <svg width="100%" height="50" preserveAspectRatio="none" style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }} viewBox={`0 0 ${revTrend.length} 50`}>
+                    <polyline points={avgs.map((a, i) => `${i + 0.5},${50 - Math.max(2, (Math.abs(a) / range) * 46)}`).join(' ')} fill="none" stroke={T.ac2} strokeWidth="0.4" strokeOpacity="0.85" />
+                  </svg>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: T.tx3, fontFamily: T.mono }}>
+                    <span>{revTrend[0] ? new Date(revTrend[0].date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}</span>
+                    <span style={{ color: T.ac2 }}>— 7d avg</span>
+                    <span>{revTrend.length > 0 ? new Date(revTrend[revTrend.length - 1].date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}</span>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
 

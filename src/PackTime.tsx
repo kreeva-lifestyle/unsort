@@ -684,12 +684,13 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             {verifying ? 'Verifying Sheet...' : 'Start Scanning'}
           </button>
 
-          {/* Verify error */}
+          {/* Verify error — with retry (audit P1) */}
           {verifyResult && !verifyResult.ok && (
             <div style={{ marginTop: 12, background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.18)', borderRadius: 8, padding: 12, animation: 'fi .2s ease' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: T.re, marginBottom: 4 }}>Connection Failed</div>
               <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5 }}>{verifyResult.error}</div>
               {verifyResult.details && <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, marginTop: 4, lineHeight: 1.5 }}>{verifyResult.details}</div>}
+              <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re}44`, background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>↻ Retry</button>
             </div>
           )}
           {verifyResult && verifyResult.ok && verifyResult.columnsOk === false && (
@@ -700,6 +701,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                 Please fix the sheet columns before scanning. Expected order:<br/>
                 <strong style={{ color: T.tx }}>A:</strong> Count &nbsp; <strong style={{ color: T.tx }}>B:</strong> AWB &nbsp; <strong style={{ color: T.tx }}>C:</strong> Timestamp &nbsp; <strong style={{ color: T.tx }}>D:</strong> Camera Number
               </div>
+              <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re}44`, background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>↻ Re-check sheet</button>
             </div>
           )}
         </div>
@@ -865,7 +867,11 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <input ref={inputRef} type="text" inputMode="text" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
             value={awbInput} onChange={e => setAwbInput(e.target.value)} onKeyDown={handleKeyDown}
             placeholder="Scan or type AWB number..."
-            style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${flash === 'success' ? T.gr : flash === 'error' ? T.re : T.ac + '55'}`, borderRadius: 10, color: T.tx, fontFamily: T.mono, fontSize: 17, padding: '14px 50px 14px 14px', outline: 'none', transition: 'border-color .15s', boxSizing: 'border-box', boxShadow: `0 0 16px ${flash === 'success' ? 'rgba(34,197,94,.15)' : flash === 'error' ? 'rgba(239,68,68,.15)' : 'rgba(99,102,241,.06)'}` }} />
+            style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${flash === 'success' ? T.gr : flash === 'error' ? T.re : T.ac + '55'}`, borderRadius: 10, color: T.tx, fontFamily: T.mono, fontSize: 17, padding: '14px 90px 14px 14px', outline: 'none', transition: 'border-color .15s', boxSizing: 'border-box', boxShadow: `0 0 16px ${flash === 'success' ? 'rgba(34,197,94,.15)' : flash === 'error' ? 'rgba(239,68,68,.15)' : 'rgba(99,102,241,.06)'}` }} />
+          {/* Camera trigger inside input (audit P3: shave a click on the heavy-use path) */}
+          {!cameraOpen && <button type="button" onClick={() => setCameraOpen(true)} title="Scan barcode with camera" style={{ position: 'absolute', right: 48, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: 7, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" /></svg>
+          </button>}
           <button onClick={() => { const v = awbInput.trim(); if (v) submitAwb(v); }} disabled={!awbInput.trim()} style={{ position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)', width: 38, height: 38, borderRadius: 7, border: 'none', background: awbInput.trim() ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.05)', color: '#fff', cursor: awbInput.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M5 12h14M12 5l7 7-7 7" /></svg>
           </button>
