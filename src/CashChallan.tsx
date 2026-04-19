@@ -3,6 +3,7 @@ import CashBook from './CashBook';
 import { supabase } from './lib/supabase';
 import { useNotifications } from './hooks/useNotifications';
 import ChallanAnalytics from './components/challan/ChallanAnalytics';
+import Empty from './components/ui/Empty';
 import type {
   CashChallan,
   CashChallanItem as DbCashChallanItem,
@@ -926,7 +927,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       {/* Table */}
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         {loading && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div>}
-        {!loading && challans.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No challans found. Create your first one.</div>}
+        {!loading && challans.length === 0 && <div style={{ padding: 14 }}><Empty icon="🧾" title="No challans yet" message="Create your first challan — invoice customers, record payments, and track outstanding amounts all from one place." cta="+ New Challan" onCta={() => setShowModal(true)} /></div>}
         {challans.map(c => {
           const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
           const skus = (c.cash_challan_items || []).map((i) => i.sku).filter(Boolean).join(', ');

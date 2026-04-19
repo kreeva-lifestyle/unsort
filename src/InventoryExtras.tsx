@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from './lib/supabase';
+import { friendlyError } from './lib/friendlyError';
 
 import { T } from './lib/theme';
 import type {
@@ -155,14 +156,14 @@ export default function InventoryExtras() {
     }).select().single();
     if (err) {
       if (err.code === '23505') setError('This exact extra (category+component+SKU+size) already exists');
-      else setError(err.message);
+      else setError(friendlyError(err));
       setSaving(false); return;
     }
     // History entry
     const { error: histErr } = await supabase.from('inventory_extras_history').insert({
       extra_id: data.id, action: 'created', quantity_change: qty, quantity_after: qty, user_id: user?.id,
     });
-    if (histErr) setError('Extra created but history log failed: ' + histErr.message);
+    if (histErr) setError('Extra created but history log failed — ' + friendlyError(histErr));
     setSaving(false); setShowAdd(false);
     setFProductId(''); setFComponentId(''); setFSku(''); setFSize(''); setFQty('1'); setFNotes('');
     fetchExtras();
@@ -187,7 +188,7 @@ export default function InventoryExtras() {
       quantity_change: adjustMode === 'add' ? qty : -qty, quantity_after: newQty,
       reason: adjustReason.trim() || null, user_id: user?.id,
     });
-    if (histErr) setError('Quantity updated but history log failed: ' + histErr.message);
+    if (histErr) setError('Quantity updated but history log failed — ' + friendlyError(histErr));
     setAdjustExtra(null); setAdjustQty('1'); setAdjustReason(''); fetchExtras();
   };
 
@@ -203,7 +204,7 @@ export default function InventoryExtras() {
       p_item_id: item.id,
       p_reason: null,
     });
-    if (error) { setError(error.message); setSaving(false); return; }
+    if (error) { setError(friendlyError(error)); setSaving(false); return; }
     setSaving(false); setCompleteItem(null); setMatchExtra(null); fetchExtras();
   };
 

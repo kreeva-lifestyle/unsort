@@ -1,6 +1,7 @@
 /* eslint-disable */
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabase';
+import { friendlyError } from './lib/friendlyError';
 
 import { T } from './lib/theme';
 import type {
@@ -129,7 +130,7 @@ export default function CashBook() {
     const { data: { user } } = await supabase.auth.getUser();
     const payload: CashBookBalanceInsert = { date: fromDate, opening_balance: val };
     const { error } = await supabase.from('cash_book_balances').upsert(payload, { onConflict: 'date' });
-    if (error) { setFormError('Save failed: ' + error.message); return; }
+    if (error) { setFormError('Save failed — ' + friendlyError(error)); return; }
     // Audit trail — log the change (audit P1: opening balance is reconciliation anchor)
     await supabase.from('audit_log').insert({
       action: 'update',
@@ -149,7 +150,7 @@ export default function CashBook() {
     const { data: { user } } = await supabase.auth.getUser();
     const payload: CashExpenseInsert = { date: entryDate, amount: amt, category, description: description.trim() || null, paid_by: user?.id ?? null };
     const { error } = await supabase.from('cash_expenses').insert(payload);
-    if (error) { setFormError('Save failed: ' + error.message); return; }
+    if (error) { setFormError('Save failed — ' + friendlyError(error)); return; }
     setAmount(''); setDescription(''); setCategory(CATEGORIES[0]); setShowAdd(false);
     fetchData();
   };
