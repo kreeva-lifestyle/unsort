@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BarcodeDetector } from 'barcode-detector/ponyfill';
-import { supabase } from './lib/supabase';
+import { supabase, SUPABASE_ANON_KEY } from './lib/supabase';
 
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
 
@@ -99,7 +99,7 @@ if (typeof window !== 'undefined') {
       flushing = false;
       const pending = writeQueue.splice(0);
       for (const item of pending) {
-        fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cachedToken}` }, body: JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName }), keepalive: true }).catch(() => {});
+        fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cachedToken}`, 'apikey': SUPABASE_ANON_KEY }, body: JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName }), keepalive: true }).catch(() => {});
       }
       e.returnValue = '';
     }
@@ -110,7 +110,7 @@ let cachedToken = '';
 const getAuthHeaders = async () => {
   const { data: { session } } = await supabase.auth.getSession();
   cachedToken = session?.access_token || '';
-  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cachedToken}` };
+  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cachedToken}`, 'apikey': SUPABASE_ANON_KEY };
 };
 
 // ── Component ───────────────────────────────────────────────────────────────────
