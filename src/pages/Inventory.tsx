@@ -397,12 +397,15 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     const [{ data: aComps }, { data: bComps }, { data: prod }] = await Promise.all([
       supabase.from('item_components').select('component_id, status').eq('inventory_item_id', itemId),
       supabase.from('item_components').select('component_id, status').eq('inventory_item_id', pairId),
-      supabase.from('inventory_items').select('product_id, products(total_components)').eq('id', itemId).maybeSingle() as any,
+      supabase.from('inventory_items').select('product_id, products(total_components)').eq('id', itemId).maybeSingle(),
     ]);
     const aP = new Set((aComps || []).filter(c => c.status === 'present').map(c => c.component_id));
     const bP = new Set((bComps || []).filter(c => c.status === 'present').map(c => c.component_id));
     const union = new Set([...aP, ...bP]);
-    const total = (prod as any)?.products?.total_components || 0;
+    type ProdJoin = { product_id: string; products: { total_components: number } | { total_components: number }[] | null };
+    const prodRow = prod as ProdJoin | null;
+    const prodProducts = prodRow?.products;
+    const total = Array.isArray(prodProducts) ? (prodProducts[0]?.total_components ?? 0) : (prodProducts?.total_components ?? 0);
     if (total > 0 && union.size < total) { addToast('Cannot complete — combined components do not cover all required parts. Data may have changed.', 'error'); setShowCompleteModal(null); fetchData(); return; }
     const { error } = await supabase.rpc('complete_inventory_pair', { p_a: itemId, p_b: pairId });
     if (error) { addToast('Error: ' + error.message, 'error'); return; }
