@@ -22,6 +22,11 @@ import BrandTagPrinter from './BrandTagPrinter';
 import PackTime from './PackTime';
 import CashChallan from './CashChallan';
 import InventoryExtras from './InventoryExtras';
+import Login from './pages/Login';
+import BrandsSettings from './components/settings/Brands';
+import LocationsSettings from './components/settings/Locations';
+import PackStationSettings from './components/settings/PackStation';
+import CategoriesSettings from './components/settings/Categories';
 import { supabase } from './lib/supabase';
 import { T, S, Icon } from './lib/theme';
 
@@ -144,60 +149,6 @@ const ToastContainer = () => {
       {toasts.map((t: any) => (
         <div key={t.id} style={{ background: 'rgba(12,16,28,0.95)', backdropFilter: 'blur(16px)', border: `1px solid ${T.bd2}`, borderRadius: 6, padding: '8px 14px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 20px rgba(0,0,0,.5)', animation: 'su .18s ease', marginBottom: 6, borderLeft: `2px solid ${t.type === 'error' ? T.re : T.gr}`, color: T.tx, maxWidth: 'calc(100vw - 32px)' }}>{t.message}</div>
       ))}
-    </div>
-  );
-};
-
-const AuthScreen = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    const { error } = await signIn(email, password);
-    if (error) setError(error.message);
-    setLoading(false);
-  };
-
-  const inputStyle: React.CSSProperties = { width: '100%', background: `rgba(20,25,40,.8)`, border: `1px solid ${T.bd2}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '9px 12px', transition: 'all .2s', outline: 'none', marginBottom: 12 };
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-      {/* Static glow orbs — no looping animation */}
-      <div style={{ position: 'absolute', width: 400, height: 400, background: T.ac, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, top: -100, left: -100, animation: 'loginGlowIn 2s .3s ease forwards' }} />
-      <div style={{ position: 'absolute', width: 350, height: 350, background: T.bl, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, bottom: -80, right: -80, animation: 'loginGlowIn 2s .5s ease forwards' }} />
-      <div style={{ position: 'absolute', width: 250, height: 250, background: T.yl, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, top: '50%', left: '60%', animation: 'loginGlowIn 2.5s .7s ease forwards' }} />
-      <div style={{ position: 'absolute', width: 300, height: 300, background: T.gr, borderRadius: '50%', filter: 'blur(100px)', opacity: 0, bottom: '20%', left: '15%', animation: 'loginGlowIn 2.5s .9s ease forwards' }} />
-      <div style={{ position: 'absolute', width: 200, height: 200, background: '#E879F9', borderRadius: '50%', filter: 'blur(80px)', opacity: 0, top: '15%', right: '20%', animation: 'loginGlowIn 2s 1.1s ease forwards' }} />
-
-      {/* Dot grid overlay */}
-      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)', backgroundSize: '24px 24px', pointerEvents: 'none' }} />
-
-      {/* Login card */}
-      <div style={{ position: 'relative', zIndex: 1, background: 'rgba(14,18,30,.88)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', border: `1px solid rgba(255,255,255,.08)`, borderRadius: 18, width: 370, maxWidth: 'calc(100vw - 32px)', padding: '36px 30px', textAlign: 'center', boxShadow: '0 24px 80px rgba(0,0,0,.6), 0 0 40px rgba(99,102,241,0.06)', animation: 'loginBoxEnter 1.2s cubic-bezier(.16,1,.3,1) both' }}>
-
-        {/* Logo */}
-        <div style={{ fontSize: 28, fontWeight: 800, fontFamily: T.sora, marginBottom: 4, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', opacity: 0, animation: 'loginFadeUp 1s .3s ease both' }}>DailyOffice</div>
-
-        {/* Tagline */}
-        <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 3, textTransform: 'uppercase' as const, marginBottom: 8, opacity: 0, animation: 'loginFadeUp 1s .5s ease both' }}>Your Workspace, Simplified</div>
-
-        {/* Divider */}
-        <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${T.bd2}, transparent)`, marginBottom: 24, opacity: 0, animation: 'loginFadeUp 1s .6s ease both' }} />
-
-        {error && <div style={{ background: 'rgba(245,87,92,.12)', border: '1px solid rgba(245,87,92,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.re, marginBottom: 14, animation: 'loginShake .4s ease' }}>{error}</div>}
-        <form onSubmit={handleSubmit}>
-          <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp 1s .7s ease both' }}><label style={{ fontSize: 9, color: T.tx3, marginBottom: 5, textTransform: 'uppercase' as const, letterSpacing: 1.5, display: 'block', fontWeight: 600 }}>Email</label><input type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required style={inputStyle} /></div>
-          <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp 1s .85s ease both' }}><label style={{ fontSize: 9, color: T.tx3, marginBottom: 5, textTransform: 'uppercase' as const, letterSpacing: 1.5, display: 'block', fontWeight: 600 }}>Password</label><input type="password" placeholder="Enter password" value={password} onChange={(e) => setPassword(e.target.value)} required style={inputStyle} /></div>
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '11px 18px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: T.sans, color: '#fff', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, letterSpacing: 0.3, opacity: 0, animation: 'loginFadeUp 1s 1s ease both', position: 'relative', overflow: 'hidden', boxShadow: '0 4px 20px rgba(99,102,241,0.35)' }}>{loading ? 'Please wait...' : 'Sign In'}</button>
-        </form>
-        <p style={{ fontSize: 8, color: T.tx3, marginTop: 22, letterSpacing: 1.5, textTransform: 'uppercase' as const, opacity: 0, animation: 'loginFadeUp 1s 1.2s ease both' }}>Powered by Arya Designs</p>
-      </div>
     </div>
   );
 };
@@ -1471,253 +1422,8 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
   );
 };
 
-const Categories = () => {
-  const [categories, setCategories] = useState<any[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [showCompModal, setShowCompModal] = useState(false);
-  const [selected, setSelected] = useState<any>(null);
-  const [comps, setComps] = useState<any[]>([]);
-  const { profile } = useAuth();
-  const { addToast } = useNotifications();
-  const [form, setForm] = useState({ sku: '', name: '', description: '', category: '' });
-  const [newComps, setNewComps] = useState<string[]>(['']);
-
-  const fetchCategories = () => { supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }).then(({ data }) => setCategories(data || [])); };
-  useEffect(() => {
-    fetchCategories();
-    const ch = supabase.channel('cat-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchCategories)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'components' }, fetchCategories)
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []);
-  const fetchComps = async (id: string) => { const { data } = await supabase.from('components').select('*').eq('product_id', id).order('created_at', { ascending: true }); setComps(data || []); };
-
-  const generateSku = (name: string) => {
-    const base = name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
-    const ts = Date.now().toString(36).slice(-4).toUpperCase();
-    const rand = Math.random().toString(36).substring(2, 4).toUpperCase();
-    return `${base}-${ts}${rand}`;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (selected) {
-      if (selected.name !== form.name) {
-        const { count } = await supabase.from('inventory_items').select('id', { count: 'exact', head: true }).eq('product_id', selected.id);
-        if ((count || 0) > 0 && !confirm(`${count} item(s) use this category. Renaming will affect all. Continue?`)) return;
-      }
-      const { error } = await supabase.from('products').update({ name: form.name, description: form.description, category: form.category }).eq('id', selected.id);
-      if (error) { addToast(error.message, 'error'); return; }
-      const validComps = newComps.filter(c => c.trim());
-      if (validComps.length > 0) {
-        const compsToInsert = validComps.map((name, i) => ({ product_id: selected.id, name: name.trim(), component_code: `C${(comps.length || 0) + i + 1}` }));
-        await supabase.from('components').insert(compsToInsert);
-      }
-      addToast('Updated!', 'success');
-    } else {
-      const validComps = newComps.filter(c => c.trim());
-      if (validComps.length === 0) { addToast('Add at least 1 component', 'error'); return; }
-      const sku = generateSku(form.name);
-      const { data, error } = await supabase.from('products').insert({ sku, name: form.name, description: form.description, category: form.category, created_by: profile?.id, total_components: validComps.length }).select().single();
-      if (error || !data) { addToast(error?.message || 'Error', 'error'); return; }
-      if (validComps.length > 0) {
-        const compsToInsert = validComps.map((name, i) => ({ product_id: data.id, name: name.trim(), component_code: `C${i + 1}` }));
-        await supabase.from('components').insert(compsToInsert);
-      }
-      addToast(`Category "${form.name}" added with ${validComps.length} components!`, 'success');
-    }
-    setShowModal(false); setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); fetchCategories();
-  };
-
-  const addCompRow = () => setNewComps([...newComps, '']);
-  const removeCompRow = (i: number) => setNewComps(newComps.filter((_, idx) => idx !== i));
-  const updateCompRow = (i: number, val: string) => { const c = [...newComps]; c[i] = val; setNewComps(c); };
-
-  const checkCategoryInUse = async (productId: string) => {
-    const { count } = await supabase.from('inventory_items').select('id', { count: 'exact', head: true }).eq('product_id', productId);
-    return (count || 0) > 0;
-  };
-
-  const addCompToExisting = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const validComps = newComps.filter(c => c.trim());
-    if (validComps.length === 0) return;
-    if (await checkCategoryInUse(selected.id)) { addToast('Cannot modify components — inventory items use this category. Delink items first.', 'error'); return; }
-    const compsToInsert = validComps.map((name, i) => ({ product_id: selected.id, name: name.trim(), component_code: `C${(comps.length || 0) + i + 1}` }));
-    const { error } = await supabase.from('components').insert(compsToInsert);
-    if (error) { addToast(error.message, 'error'); return; }
-    await supabase.from('products').update({ total_components: (comps.length || 0) + validComps.length }).eq('id', selected.id);
-    addToast(`${validComps.length} component(s) added!`, 'success');
-    setNewComps(['']); fetchComps(selected.id); fetchCategories();
-  };
-
-  const deleteComp = async (id: string) => {
-    if (await checkCategoryInUse(selected.id)) { addToast('Cannot delete component — inventory items use this category. Delink items first.', 'error'); return; }
-    const { count: compCount } = await supabase.from('components').select('id', { count: 'exact', head: true }).eq('product_id', selected.id);
-    if ((compCount || 0) <= 1) { addToast('Cannot delete — category must have at least 1 component', 'error'); return; }
-    const [{ count: itemCount }, { count: extraCount }] = await Promise.all([
-      supabase.from('item_components').select('id', { count: 'exact', head: true }).eq('component_id', id),
-      supabase.from('inventory_extras').select('id', { count: 'exact', head: true }).eq('component_id', id),
-    ]);
-    const refs = (itemCount || 0) + (extraCount || 0);
-    if (refs > 0) { addToast(`Cannot delete — used by ${itemCount || 0} item(s) and ${extraCount || 0} extra(s)`, 'error'); return; }
-    await supabase.from('components').delete().eq('id', id);
-    const { count: remaining } = await supabase.from('components').select('id', { count: 'exact', head: true }).eq('product_id', selected.id);
-    await supabase.from('products').update({ total_components: remaining || 0 }).eq('id', selected.id);
-    addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories();
-  };
-
-  const openEdit = async (p: any) => { setSelected(p); setForm({ sku: p.sku || '', name: p.name, description: p.description || '', category: p.category || '' }); setNewComps(['']); await fetchComps(p.id); setShowModal(true); };
-  const canEdit = profile && ['admin', 'manager'].includes(profile.role);
-
-  const compInputRow = (val: string, i: number, total: number, offset = 0) => (
-    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-      <span style={{ width: 22, height: 22, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: T.tx3, fontFamily: T.mono, flexShrink: 0 }}>{offset + i + 1}</span>
-      <input value={val} onChange={(e) => updateCompRow(i, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (val.trim()) addCompRow(); } }} placeholder="Component name" style={{ ...S.fInput, flex: 1 }} />
-      {total > 1 && <span onClick={() => removeCompRow(i)} style={{ cursor: 'pointer', color: T.re, fontSize: 16, lineHeight: 1, padding: '0 4px', flexShrink: 0 }}>✕</span>}
-    </div>
-  );
-
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}><span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Categories</span>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={S.btnPrimary}>+ Add</div>}</div>
-      <div className="cat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>{categories.map((p) => (<div key={p.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: '14px 16px', transition: 'border-color .15s, box-shadow .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = T.bd2; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,.2)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.boxShadow = 'none'; }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-          <div><h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: T.tx }}>{p.name}</h3><span style={{ fontSize: 10, fontFamily: T.mono, color: T.ac2 }}>{p.sku}</span></div>
-          {canEdit && <span onClick={() => openEdit(p)} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>}
-        </div>
-        {p.description && <p style={{ color: T.tx3, fontSize: 11, margin: '0 0 10px' }}>{p.description}</p>}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 0', borderTop: `1px solid ${T.bd}` }}>
-          <span style={{ fontSize: 10, color: T.tx3 }}>{p.total_components} component{p.total_components !== 1 ? 's' : ''}</span>
-        </div>
-      </div>))}</div>
-      {categories.length === 0 && <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 36, textAlign: 'center' }}><p style={{ color: T.tx3, fontSize: 12, marginBottom: 6 }}>No categories yet</p><p style={{ color: T.tx3, fontSize: 10 }}>Add a category like "Lehenga Choli" with components like Lehenga, Blouse, Dupatta</p>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={{ ...S.btnPrimary, marginTop: 12, display: 'inline-flex' }}>+ Add First Category</div>}</div>}
-
-      {showModal && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 480 }}><div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Category</span></div><form onSubmit={handleSubmit} style={{ padding: 16 }}>
-        <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Category name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Lehenga Choli" style={S.fInput} /></div>
-        <div style={{ marginBottom: 12 }}><label style={S.fLabel}>Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description (optional)" style={S.fInput} /></div>
-        <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ ...S.fLabel, margin: 0 }}>Components</label><span onClick={addCompRow} style={{ ...S.btnPrimary, ...S.btnSm }}>+ Add More</span></div>
-        {selected && comps.length > 0 && <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 8, marginBottom: 8 }}>
-          {comps.map((c: any, i: number) => (<div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, marginBottom: 3, background: 'transparent', border: `1px solid ${T.bd}` }}>
-            <span style={{ width: 22, height: 22, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: T.tx3, fontFamily: T.mono, flexShrink: 0 }}>{i + 1}</span>
-            <span style={{ fontSize: 12, color: T.tx, flex: 1 }}>{c.name}</span>
-            {canEdit && <span onClick={() => deleteComp(c.id)} style={{ ...S.btnDanger, padding: '2px 8px', fontSize: 9 }}>Delete</span>}
-          </div>))}
-        </div>}
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 10, marginBottom: 12 }}>
-          {newComps.map((c, i) => compInputRow(c, i, newComps.length, selected ? comps.length : 0))}
-        </div>
-        <div style={{ padding: '12px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 7 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add Category'}</button></div>
-      </form></div></div>)}
-
-      {showCompModal && selected && (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 500 }}><div style={S.modalHead}><div><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Components of "{selected.name}"</span><p style={{ margin: '3px 0 0', fontSize: 10, color: T.tx3 }}>Manage the individual parts of this category</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span></div><div style={{ padding: 16 }}>
-        {canEdit && <form onSubmit={addCompToExisting} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, padding: 12, borderRadius: T.r, marginBottom: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}><p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, margin: 0 }}>Add Components</p><span onClick={addCompRow} style={{ fontSize: 10, color: T.ac, cursor: 'pointer' }}>+ Add More</span></div>
-          {newComps.map((c, i) => compInputRow(c, i, newComps.length))}
-          <button type="submit" style={{ ...S.btnPrimary, marginTop: 4 }}>+ Add Component{newComps.filter(c => c.trim()).length > 1 ? 's' : ''}</button>
-        </form>}
-        {comps.length > 0 && <p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 8 }}>{comps.length} Component{comps.length !== 1 ? 's' : ''}</p>}
-        {comps.map((c, i) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', border: `1px solid ${T.bd}`, borderRadius: 6, marginBottom: 5, background: 'rgba(255,255,255,0.02)' }}><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 20, height: 20, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 600, color: T.tx3, fontFamily: T.mono }}>{i + 1}</span><span style={{ fontSize: 12, color: T.tx, fontWeight: 500 }}>{c.name}</span></div>{canEdit && <span onClick={() => deleteComp(c.id)} style={S.btnDanger}>Delete</span>}</div>))}
-        {comps.length === 0 && <div style={{ textAlign: 'center', padding: 16, color: T.tx3 }}><p style={{ fontSize: 11 }}>No components yet</p></div>}
-      </div></div></div>)}
-    </div>
-  );
-};
 
 
-const Locations = () => {
-  const [locations, setLocations] = useState<any[]>([]);
-  const [newLoc, setNewLoc] = useState('');
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [pendingDel, setPendingDel] = useState<{ id: string; timer: number } | null>(null);
-  const { profile } = useAuth();
-  const { addToast } = useNotifications();
-  const canEdit = profile && ['admin', 'manager'].includes(profile.role);
-
-  const fetchLocations = () => { supabase.from('locations').select('*').order('name').then(({ data }) => setLocations(data || [])); };
-  useEffect(() => {
-    fetchLocations();
-    const ch = supabase.channel('loc-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, fetchLocations).subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []);
-
-  const addLocation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newLoc.trim()) return;
-    const exists = locations.some(l => l.name.toLowerCase() === newLoc.trim().toLowerCase());
-    if (exists) { addToast('Location already exists', 'error'); return; }
-    const { error } = await supabase.from('locations').insert({ name: newLoc.trim() });
-    if (error) addToast(error.message, 'error');
-    else { addToast('Location added!', 'success'); setNewLoc(''); fetchLocations(); }
-  };
-
-  const updateLocation = async (id: string) => {
-    if (!editName.trim()) return;
-    const { error } = await supabase.from('locations').update({ name: editName.trim() }).eq('id', id);
-    if (error) addToast(error.message, 'error');
-    else { addToast('Updated!', 'success'); setEditId(null); fetchLocations(); }
-  };
-
-  const deleteLocation = async (id: string) => {
-    if (!confirm('Delete this location?')) return;
-    const loc = locations.find(l => l.id === id);
-    const { count } = await supabase.from('inventory_items').select('id', { count: 'exact', head: true }).eq('location', loc?.name);
-    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} item(s) use this location`, 'error'); return; }
-    setLocations(prev => prev.filter(l => l.id !== id));
-    if (pendingDel) clearTimeout(pendingDel.timer);
-    const timer = window.setTimeout(async () => { await supabase.from('locations').delete().eq('id', id); setPendingDel(null); fetchLocations(); }, 5000);
-    setPendingDel({ id, timer });
-  };
-  const undoDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); setPendingDel(null); fetchLocations(); } };
-  const dismissDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); supabase.from('locations').delete().eq('id', pendingDel.id).then(() => fetchLocations()); setPendingDel(null); } };
-
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Locations</span>
-      </div>
-      {canEdit && <form onSubmit={addLocation} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <input value={newLoc} onChange={(e) => setNewLoc(e.target.value)} placeholder="Add new location..." style={{ ...S.fInput, flex: 1 }} />
-        <button type="submit" style={S.btnPrimary}>+ Add</button>
-      </form>}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r }}>
-        {locations.map((loc, i) => (
-          <div key={loc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderBottom: i < locations.length - 1 ? `1px solid ${T.bd}` : 'none' }}>
-            {editId === loc.id ? (
-              <div style={{ display: 'flex', gap: 6, flex: 1 }}>
-                <input value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') updateLocation(loc.id); if (e.key === 'Escape') setEditId(null); }} style={{ ...S.fInput, flex: 1 }} autoFocus />
-                <span onClick={() => updateLocation(loc.id)} style={S.btnPrimary}>Save</span>
-                <span onClick={() => setEditId(null)} style={S.btnGhost}>Cancel</span>
-              </div>
-            ) : (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13 }}>📍</span>
-                  <span style={{ fontSize: 12, color: T.tx, fontWeight: 500 }}>{loc.name}</span>
-                </div>
-                {canEdit && <div style={{ display: 'flex', gap: 4 }}>
-                  <span onClick={() => { setEditId(loc.id); setEditName(loc.name); }} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>
-                  <span onClick={() => deleteLocation(loc.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
-                </div>}
-              </>
-            )}
-          </div>
-        ))}
-        {locations.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No locations yet. Add your first location above.</div>}
-      </div>
-      {pendingDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, animation: 'su .2s ease', overflow: 'hidden', minWidth: 260 }}>
-        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 12, color: T.tx, flex: 1 }}>Location deleted</span>
-          <span onClick={undoDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#000' }}>Undo</span>
-          <span onClick={dismissDel} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span>
-        </div>
-        <div className="undo-bar" key={pendingDel.id} />
-      </div>}
-    </div>
-  );
-};
 
 const Users = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -1997,6 +1703,7 @@ const Users = () => {
 const SettingsPage = () => {
   const [tab, setTab] = useState('categories');
   const { profile } = useAuth();
+  const { addToast } = useNotifications();
   const isAdmin = profile?.role === 'admin';
   if (!isAdmin) return <div style={{ padding: 40, textAlign: 'center', color: '#4A5568', fontSize: 12 }}>Admin access required</div>;
   const tabs = [{ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }];
@@ -2008,190 +1715,16 @@ const SettingsPage = () => {
       <div style={{ display: 'flex', gap: 3, marginBottom: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, width: 'fit-content', border: `1px solid ${T.bd}`, flexWrap: 'wrap' }}>
         {tabs.map(t => <div key={t.id} onClick={() => setTab(t.id)} style={{ padding: '5px 14px', borderRadius: 4, fontSize: 10, fontWeight: tab === t.id ? 600 : 400, cursor: 'pointer', background: tab === t.id ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'transparent', color: tab === t.id ? '#fff' : T.tx3, transition: 'all .15s' }}>{t.label}</div>)}
       </div>
-      {tab === 'categories' && <Categories />}
-      {tab === 'locations' && <Locations />}
+      {tab === 'categories' && <CategoriesSettings addToast={addToast} profile={profile} />}
+      {tab === 'locations' && <LocationsSettings addToast={addToast} canEdit={!!isAdmin} />}
       {tab === 'users' && <Users />}
-      {tab === 'brands' && <BrandsSettings />}
-      {tab === 'packtime' && <PackTimeSettings />}
+      {tab === 'brands' && <BrandsSettings addToast={addToast} />}
+      {tab === 'packtime' && <PackStationSettings addToast={addToast} />}
     </div>
   );
 };
 
-const BrandsSettings = () => {
-  const [brands, setBrands] = useState<any[]>([]);
-  const [newBrand, setNewBrand] = useState('');
-  const [pendingDel, setPendingDel] = useState<{ id: string; timer: number } | null>(null);
-  const { addToast } = useNotifications();
-  const fetchBrands = () => { supabase.from('brands').select('*').order('name').then(({ data }) => setBrands(data || [])); };
-  useEffect(() => { fetchBrands(); }, []);
-  const addBrand = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newBrand.trim()) return;
-    const exists = brands.some(b => b.name.toLowerCase() === newBrand.trim().toLowerCase());
-    if (exists) { addToast('Brand already exists', 'error'); return; }
-    const { error } = await supabase.from('brands').insert({ name: newBrand.trim().toUpperCase() });
-    if (error) addToast(error.message, 'error');
-    else { addToast('Brand added!', 'success'); setNewBrand(''); fetchBrands(); }
-  };
-  const toggleBrand = async (id: string, active: boolean) => { const { error } = await supabase.from('brands').update({ is_active: !active }).eq('id', id); if (error) addToast(error.message, 'error'); else fetchBrands(); };
-  const deleteBrand = async (id: string) => {
-    if (!confirm('Delete this brand?')) return;
-    const b = brands.find(x => x.id === id);
-    const { count } = await supabase.from('packtime_couriers').select('id', { count: 'exact', head: true }).eq('brand', b?.name);
-    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} courier(s) use this brand`, 'error'); return; }
-    setBrands(prev => prev.filter(x => x.id !== id));
-    if (pendingDel) clearTimeout(pendingDel.timer);
-    const timer = window.setTimeout(async () => { await supabase.from('brands').delete().eq('id', id); setPendingDel(null); fetchBrands(); }, 5000);
-    setPendingDel({ id, timer });
-  };
-  const undoDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); setPendingDel(null); fetchBrands(); } };
-  const dismissDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); supabase.from('brands').delete().eq('id', pendingDel.id).then(() => fetchBrands()); setPendingDel(null); } };
-  return (
-    <div>
-      <h3 style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: T.tx }}>Brands</h3>
-      <form onSubmit={addBrand} style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-        <input value={newBrand} onChange={e => setNewBrand(e.target.value)} placeholder="Brand name (e.g. TANUKA)" style={{ ...S.fInput, flex: 1 }} />
-        <button type="submit" style={S.btnPrimary}>+ Add</button>
-      </form>
-      {brands.map(b => (
-        <div key={b.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${T.bd}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: b.is_active ? T.gr : T.tx3 }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{b.name}</span>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <span onClick={() => toggleBrand(b.id, b.is_active)} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer' }}>{b.is_active ? 'Disable' : 'Enable'}</span>
-            <span onClick={() => deleteBrand(b.id)} style={{ ...S.btnDanger, cursor: 'pointer' }}>Delete</span>
-          </div>
-        </div>
-      ))}
-      {brands.length === 0 && <div style={{ fontSize: 11, color: T.tx3, padding: 10 }}>No brands. Add one above.</div>}
-      {pendingDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, animation: 'su .2s ease', overflow: 'hidden', minWidth: 260 }}>
-        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: T.tx, flex: 1 }}>Brand deleted</span><span onClick={undoDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#000' }}>Undo</span><span onClick={dismissDel} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span></div>
-        <div className="undo-bar" key={pendingDel.id} />
-      </div>}
-    </div>
-  );
-};
 
-const PackTimeSettings = () => {
-  const [couriers, setCouriers] = useState<any[]>([]);
-  const [cameras, setCameras] = useState<any[]>([]);
-  const [newCourier, setNewCourier] = useState('');
-  const [newSheet, setNewSheet] = useState('');
-  const [pendingDel, setPendingDel] = useState<{ id: string; type: string; timer: number } | null>(null);
-  const [newCamera, setNewCamera] = useState('');
-  const { addToast } = useNotifications();
-
-  const fetchData = () => {
-    supabase.from('packtime_couriers').select('*').order('name').then(({ data }) => setCouriers(data || []));
-    supabase.from('packtime_cameras').select('*').order('number').then(({ data }) => setCameras(data || []));
-  };
-  useEffect(() => { fetchData(); }, []);
-
-  const addCourier = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCourier.trim() || !newSheet.trim()) return;
-    const exists = couriers.some(c => c.name.toLowerCase() === newCourier.trim().toLowerCase());
-    if (exists) { addToast('Courier already exists', 'error'); return; }
-    const { error } = await supabase.from('packtime_couriers').insert({ name: newCourier.trim(), sheet_name: newSheet.trim() });
-    if (error) addToast(error.message, 'error');
-    else { addToast('Courier added!', 'success'); setNewCourier(''); setNewSheet(''); fetchData(); }
-  };
-
-  const toggleCourier = async (id: string, active: boolean) => {
-    if (!active) { const activeCount = couriers.filter(c => c.is_active && c.id !== id).length; if (activeCount < 1) { addToast('At least 1 courier must remain active', 'error'); return; } }
-    const { error } = await supabase.from('packtime_couriers').update({ is_active: !active }).eq('id', id);
-    if (error) addToast(error.message, 'error'); else fetchData();
-  };
-
-  const deleteCourier = async (id: string) => {
-    if (!confirm('Delete this courier?')) return;
-    const c = couriers.find(x => x.id === id);
-    const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('courier', c?.name);
-    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this courier`, 'error'); return; }
-    setCouriers(prev => prev.filter(x => x.id !== id));
-    if (pendingDel) clearTimeout(pendingDel.timer);
-    const timer = window.setTimeout(async () => { await supabase.from('packtime_couriers').delete().eq('id', id); setPendingDel(null); fetchData(); }, 5000);
-    setPendingDel({ id, type: 'Courier', timer });
-  };
-
-  const addCamera = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCamera.trim()) return;
-    const { error } = await supabase.from('packtime_cameras').insert({ number: newCamera.trim() });
-    if (error) addToast(error.message, 'error');
-    else { addToast('Camera added!', 'success'); setNewCamera(''); fetchData(); }
-  };
-
-  const deleteCamera = async (id: string) => {
-    if (!confirm('Delete this camera?')) return;
-    const cam = cameras.find(x => x.id === id);
-    const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('camera', cam?.number);
-    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this camera`, 'error'); return; }
-    setCameras(prev => prev.filter(x => x.id !== id));
-    if (pendingDel) clearTimeout(pendingDel.timer);
-    const timer = window.setTimeout(async () => { await supabase.from('packtime_cameras').delete().eq('id', id); setPendingDel(null); fetchData(); }, 5000);
-    setPendingDel({ id, type: 'Camera', timer });
-  };
-  const undoDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); setPendingDel(null); fetchData(); } };
-  const dismissDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); const table = pendingDel.type === 'Courier' ? 'packtime_couriers' : 'packtime_cameras'; supabase.from(table).delete().eq('id', pendingDel.id).then(() => fetchData()); setPendingDel(null); } };
-
-  return (
-    <div>
-      {/* Couriers */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Courier Companies</div>
-        <form onSubmit={addCourier} style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-          <input value={newCourier} onChange={e => setNewCourier(e.target.value)} placeholder="Courier name..." style={{ ...S.fInput, flex: 1 }} />
-          <input value={newSheet} onChange={e => setNewSheet(e.target.value)} placeholder="Sheet tab name (e.g. Sheet7)" style={{ ...S.fInput, flex: 1 }} />
-          <button type="submit" style={S.btnPrimary}>+ Add</button>
-        </form>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r }}>
-          {couriers.map((c, i) => (
-            <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: i < couriers.length - 1 ? `1px solid ${T.bd}` : 'none' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 7, height: 7, borderRadius: '50%', background: c.is_active ? T.gr : T.tx3, flexShrink: 0 }} />
-                <span style={{ fontSize: 12, color: T.tx, fontWeight: 500 }}>{c.name}</span>
-                <span style={{ fontSize: 9, fontFamily: T.mono, color: T.tx3, background: 'rgba(255,255,255,0.03)', padding: '1px 6px', borderRadius: 3 }}>{c.sheet_name}</span>
-              </div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <span onClick={() => toggleCourier(c.id, c.is_active)} style={{ ...S.btnGhost, ...S.btnSm, color: c.is_active ? T.yl : T.gr }}>{c.is_active ? 'Disable' : 'Enable'}</span>
-                <span onClick={() => deleteCourier(c.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
-              </div>
-            </div>
-          ))}
-          {couriers.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No couriers configured</div>}
-        </div>
-      </div>
-
-      {/* Cameras */}
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Cameras</div>
-        <form onSubmit={addCamera} style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-          <input value={newCamera} onChange={e => setNewCamera(e.target.value)} placeholder="Camera number (e.g. 5)" style={{ ...S.fInput, flex: 1 }} />
-          <button type="submit" style={S.btnPrimary}>+ Add</button>
-        </form>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r }}>
-          {cameras.map((c, i) => (
-            <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: i < cameras.length - 1 ? `1px solid ${T.bd}` : 'none' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 14, fontFamily: T.mono, fontWeight: 600, color: T.tx }}>{c.number}</span>
-                {!c.is_active && <span style={{ fontSize: 8, color: T.tx3, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.03)' }}>disabled</span>}
-              </div>
-              <span onClick={() => deleteCamera(c.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
-            </div>
-          ))}
-          {cameras.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No cameras configured</div>}
-        </div>
-      </div>
-      {pendingDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, animation: 'su .2s ease', overflow: 'hidden', minWidth: 260 }}>
-        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: T.tx, flex: 1 }}>{pendingDel.type} deleted</span><span onClick={undoDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#000' }}>Undo</span><span onClick={dismissDel} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span></div>
-        <div className="undo-bar" key={pendingDel.id} />
-      </div>}
-    </div>
-  );
-};
 
 const VALID_TABS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'settings'];
 const getTabFromHash = () => {
@@ -2288,6 +1821,6 @@ export default function App() { return <ErrorBoundary><AuthProvider><AppContent 
 const AppContent = () => {
   const auth = useAuth();
   if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100vh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}><div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Unsort</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase' }}>LOADING</p></div>;
-  if (!auth?.user) return <AuthScreen />;
+  if (!auth?.user) return <Login signIn={auth.signIn} />;
   return <NotificationProvider><MainApp /></NotificationProvider>;
 };
