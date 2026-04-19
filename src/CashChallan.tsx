@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import CashBook from './CashBook';
 import { supabase } from './lib/supabase';
+import { useNotifications } from './hooks/useNotifications';
 import type {
   CashChallan,
   CashChallanItem as DbCashChallanItem,
@@ -46,6 +47,7 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
 const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Other'];
 
 export default function CashChallan({ active }: { active?: boolean } = {}) {
+  const { addToast } = useNotifications();
   // ── State ──────────────────────────────────────────────────────────────────
   const [challans, setChallans] = useState<Challan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -492,7 +494,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Open edit ──────────────────────────────────────────────────────────────
   const openEdit = async (c: Challan) => {
-    if (c.status === 'voided') { alert('Cannot edit a voided challan'); return; }
+    if (c.status === 'voided') { addToast('Cannot edit a voided challan', 'error'); return; }
     const [{ data: citems }, { data: cust }] = await Promise.all([
       supabase.from('cash_challan_items').select('*').eq('challan_id', c.id).order('sort_order'),
       c.customer_id ? supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle() : Promise.resolve({ data: null }),
@@ -929,7 +931,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           const pendingDays = (!c.is_return && (c.status === 'unpaid' || c.status === 'partial')) ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : 0;
           const isRet = !!c.is_return;
           return (
-            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }} onClick={() => openEdit(c)}>
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: isRet ? 'rgba(239,68,68,.04)' : undefined, transition: 'background .15s' }} onClick={() => openEdit(c)} onMouseEnter={e => e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.08)' : 'rgba(255,255,255,.02)'} onMouseLeave={e => e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.04)' : ''}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>#{c.challan_number}</span>

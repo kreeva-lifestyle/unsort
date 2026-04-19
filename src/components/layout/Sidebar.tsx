@@ -3,14 +3,14 @@ import { supabase } from '../../lib/supabase';
 import { T, Icon } from '../../lib/theme';
 
 export default function Sidebar({ activeTab, setActiveTab, profile }: { activeTab: string; setActiveTab: (t: string) => void; profile: any }) {
-  const isAdmin = profile?.role === 'admin';
+  const canAccessSettings = profile?.role === 'admin' || profile?.role === 'manager';
   const tabs = [
     { id: 'dashboard', icon: 'grid', label: 'Dashboard' },
     { id: 'inventory', icon: 'box', label: 'Inventory' },
     { id: 'brandtag', icon: 'tag', label: 'Brand Tags' },
     { id: 'packtime', icon: 'scan', label: 'PackStation' },
     { id: 'challan', icon: 'file', label: 'Cash Challan' },
-    ...(isAdmin ? [{ id: 'settings', icon: 'settings', label: 'Settings' }] : []),
+    ...(canAccessSettings ? [{ id: 'settings', icon: 'settings', label: 'Settings' }] : []),
   ];
 
   const handleSignOut = async () => {
@@ -44,7 +44,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile }: { activeTa
           <div style={{ width: 28, height: 28, borderRadius: 7, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{(profile.full_name || 'U')[0].toUpperCase()}</div>
           <div style={{ flex: 1, minWidth: 0 }}><p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.full_name}</p><p style={{ margin: 0, fontSize: 8, color: T.tx3, textTransform: 'capitalize' as const }}>{profile.role}</p></div>
         </div>}
-        <div onClick={handleSignOut} style={{ width: '100%', padding: '6px 10px', borderRadius: 6, background: 'rgba(248,113,113,.04)', border: '1px solid rgba(248,113,113,.10)', color: '#f87171', cursor: 'pointer', fontSize: 10, fontWeight: 500, fontFamily: T.sans, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,113,113,.08)'; e.currentTarget.style.borderColor = 'rgba(248,113,113,.20)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(248,113,113,.04)'; e.currentTarget.style.borderColor = 'rgba(248,113,113,.10)'; }}>Sign Out</div>
+        <div onClick={handleSignOut} style={{ width: '100%', padding: '7px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, color: T.tx2, cursor: 'pointer', fontSize: 11, fontWeight: 500, fontFamily: T.sans, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = T.bd2; e.currentTarget.style.color = T.tx; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.color = T.tx2; }}>Sign Out</div>
         <p style={{ margin: '8px 0 0', fontSize: 7, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' as const, textAlign: 'center', opacity: 0.3 }}>Powered by Arya Designs</p>
       </div>
       </div>

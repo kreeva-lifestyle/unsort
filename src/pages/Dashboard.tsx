@@ -13,7 +13,7 @@ type OverdueAlert = { name: string; amount: number; days: number };
 type DryCleanAlert = { days: number };
 type TaskRow = { id: string; title: string; is_done: boolean; created_at: string };
 
-export default function Dashboard() {
+export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) => void } = {}) {
   const { profile } = useAuth();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -134,20 +134,20 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Row 2: Alerts */}
+      {/* Row 2: Alerts — clickable, deep-link to filtered views */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
-        <div style={{ background: alerts.overdue.length > 0 ? 'rgba(239,68,68,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.overdue.length > 0 ? 'rgba(239,68,68,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
-          <p style={{ fontSize: 8, color: alerts.overdue.length > 0 ? T.re : T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Overdue Payments</p>
+        <div role="button" tabIndex={0} onClick={() => navigateTo?.('challan')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('challan'); }} style={{ background: alerts.overdue.length > 0 ? 'rgba(239,68,68,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.overdue.length > 0 ? 'rgba(239,68,68,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(239,68,68,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.overdue.length > 0 ? 'rgba(239,68,68,.15)' : T.bd)}>
+          <p style={{ fontSize: 9, color: alerts.overdue.length > 0 ? T.re : T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Overdue Payments</p>
           <p style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: alerts.overdue.length > 0 ? T.re : T.tx3, margin: 0 }}>{alerts.overdue.length}</p>
-          {alerts.overdue.slice(0, 2).map((o, i) => <p key={i} style={{ fontSize: 9, color: T.tx3, margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}: ₹{o.amount.toLocaleString('en-IN')} ({o.days}d)</p>)}
+          {alerts.overdue.slice(0, 2).map((o, i) => <p key={i} style={{ fontSize: 10, color: T.tx3, margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}: ₹{o.amount.toLocaleString('en-IN')} ({o.days}d)</p>)}
         </div>
-        <div style={{ background: alerts.dryClean.length > 0 ? 'rgba(6,182,212,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.dryClean.length > 0 ? 'rgba(6,182,212,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
-          <p style={{ fontSize: 8, color: '#06b6d4', letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>In Dry Clean</p>
+        <div role="button" tabIndex={0} onClick={() => navigateTo?.('inventory')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('inventory'); }} style={{ background: alerts.dryClean.length > 0 ? 'rgba(6,182,212,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.dryClean.length > 0 ? 'rgba(6,182,212,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(6,182,212,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.dryClean.length > 0 ? 'rgba(6,182,212,.15)' : T.bd)}>
+          <p style={{ fontSize: 9, color: '#06b6d4', letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>In Dry Clean</p>
           <p style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: '#06b6d4', margin: 0 }}>{alerts.dryClean.length}</p>
-          {alerts.dryClean.length > 0 && <p style={{ fontSize: 9, color: T.tx3, margin: '3px 0 0' }}>Avg {Math.round(alerts.dryClean.reduce((s, d) => s + d.days, 0) / alerts.dryClean.length)} days</p>}
+          {alerts.dryClean.length > 0 && <p style={{ fontSize: 10, color: T.tx3, margin: '3px 0 0' }}>Avg {Math.round(alerts.dryClean.reduce((s, d) => s + d.days, 0) / alerts.dryClean.length)} days</p>}
         </div>
-        <div style={{ background: alerts.pendingHandovers > 0 ? 'rgba(245,158,11,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.pendingHandovers > 0 ? 'rgba(245,158,11,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
-          <p style={{ fontSize: 8, color: T.yl, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Pending Handovers</p>
+        <div role="button" tabIndex={0} onClick={() => navigateTo?.('challan')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('challan'); }} style={{ background: alerts.pendingHandovers > 0 ? 'rgba(245,158,11,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.pendingHandovers > 0 ? 'rgba(245,158,11,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(245,158,11,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.pendingHandovers > 0 ? 'rgba(245,158,11,.15)' : T.bd)}>
+          <p style={{ fontSize: 9, color: T.yl, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Pending Handovers</p>
           <p style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: alerts.pendingHandovers > 0 ? T.yl : T.tx3, margin: 0 }}>{alerts.pendingHandovers}</p>
         </div>
       </div>

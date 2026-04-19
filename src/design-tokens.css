@@ -25,7 +25,7 @@
   /* ── Text ── */
   --do-tx-1:      #E2E8F0;   /* primary */
   --do-tx-2:      #8896B0;   /* secondary */
-  --do-tx-3:      #4A5568;   /* tertiary / labels */
+  --do-tx-3:      #6B7890;   /* tertiary / labels (bumped from #4A5568 for WCAG contrast) */
 
   /* ── Brand / accent (indigo) ── */
   --do-ac:        #6366F1;   /* primary accent */
@@ -118,7 +118,7 @@
 }
 
 /* ── Semantic typography roles ─────────────────────────────── */
-html { font-size: 12px; line-height: 1.5; }
+html { font-size: 13px; line-height: 1.55; }
 
 body {
   background: var(--do-bg);
@@ -222,7 +222,7 @@ body {
 
 /* ── Focus ring matches app ── */
 :focus-visible {
-  outline: 1.5px solid rgba(99,102,241,0.50);
+  outline: 2px solid var(--do-ac);
   outline-offset: 2px;
   border-radius: 4px;
 }

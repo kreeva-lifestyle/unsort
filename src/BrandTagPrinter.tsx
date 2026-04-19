@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from './lib/supabase';
+import { useNotifications } from './hooks/useNotifications';
 import type { BrandTag, BrandTagInsert, AuditLogInsert } from './types/database';
 
 const btAudit = (action: string, details: string) => {
@@ -359,6 +360,7 @@ const BrandTagModal = ({
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function BrandTagPrinter() {
+  const { addToast } = useNotifications();
   // Server-side pagination + filtering
   const [rows, setRows] = useState<BrandTagRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -474,7 +476,7 @@ export default function BrandTagPrinter() {
           copies: Number(d['COPIES']) || 0,
         }});
         if (imported.length === 0) {
-          alert('No rows found. Check that column headers match the expected format.');
+          addToast('No rows found. Check that column headers match the expected format.', 'error');
           return;
         }
         // Validate all rows - reject file if any row has missing data
@@ -484,7 +486,7 @@ export default function BrandTagPrinter() {
           if (bad) errors.push(`Row ${i + 1} (SKU: ${r.sku || 'empty'}): missing "${bad}"`);
         });
         if (errors.length > 0) {
-          alert(`Import rejected — ${errors.length} row(s) have missing data:\n\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? `\n...and ${errors.length - 10} more` : ''}\n\nFix the Excel file and re-import.`);
+          addToast(`Import rejected — ${errors.length} row(s) missing data. First issue: ${errors[0]}`, 'error');
           return;
         }
         // Smart import with queue persistence
@@ -515,10 +517,10 @@ export default function BrandTagPrinter() {
         setImporting(false);
         setImportProgress('');
         btAudit('import', `Imported ${toUpsert.length} rows${failed > 0 ? `, ${failed} failed` : ''}`);
-        alert(`Import complete! ${toUpsert.length} rows processed.${failed > 0 ? ` ${failed} failed.` : ''}`);
+        addToast(`Import complete! ${toUpsert.length} rows processed.${failed > 0 ? ` ${failed} failed.` : ''}`, failed > 0 ? 'error' : 'success');
         fetchPage();
       } catch (_) {
-        alert('Failed to parse Excel file. Ensure it is a valid .xlsx / .xls / .csv file.');
+        addToast('Failed to parse Excel file. Ensure it is a valid .xlsx / .xls / .csv file.', 'error');
       }
     };
     reader.readAsArrayBuffer(file);
@@ -567,9 +569,9 @@ export default function BrandTagPrinter() {
   const handleModalSave = useCallback((updated: BrandTagRow) => {
     const dbRow: BrandTagInsert = { brand: updated.brand, ean: updated.ean, sku: updated.sku, qty: updated.qty, mrp: updated.mrp, size: updated.size, product: updated.product, color: updated.color, mktd: updated.mktd, jio_code: updated.jioCode, copies: updated.copies };
     if (modalMode === 'add') {
-      supabase.from('brand_tags').insert(dbRow).then(({ error }) => { if (error) alert('Save failed: ' + error.message); else { btAudit('add', `Added SKU: ${updated.sku}`); fetchPage(); } });
+      supabase.from('brand_tags').insert(dbRow).then(({ error }) => { if (error) addToast('Save failed: ' + error.message, 'error'); else { btAudit('add', `Added SKU: ${updated.sku}`); addToast(`SKU ${updated.sku} added`, 'success'); fetchPage(); } });
     } else {
-      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(({ error }) => { if (error) alert('Update failed: ' + error.message); else { btAudit('edit', `Edited SKU: ${updated.sku}`); fetchPage(); } });
+      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(({ error }) => { if (error) addToast('Update failed: ' + error.message, 'error'); else { btAudit('edit', `Edited SKU: ${updated.sku}`); addToast(`SKU ${updated.sku} updated`, 'success'); fetchPage(); } });
     }
     setModalRow(null);
   }, [modalMode, fetchPage]);
@@ -577,9 +579,9 @@ export default function BrandTagPrinter() {
   // ── Print Handlers ──
   const printSingle = useCallback((row: BrandTagRow) => {
     const bad = validateRow(row);
-    if (bad) { alert(`Cannot print — "${bad}" is missing for SKU: ${row.sku || 'empty'}`); return; }
+    if (bad) { addToast(`Cannot print — "${bad}" is missing for SKU: ${row.sku || 'empty'}`, 'error'); return; }
     printLabelsInWindow([row]);
-  }, []);
+  }, [addToast]);
 
   // ── Order Sheet Import ──
   const handleOrderImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -607,7 +609,7 @@ export default function BrandTagPrinter() {
         const parsed = parseOrderSheet(json, masterRows);
         setOrderRows(parsed); setOrderPage(0);
         setOrderLoading(false); setOrderLoadMsg('');
-      } catch { alert('Failed to parse order sheet.'); setOrderLoading(false); setOrderLoadMsg(''); }
+      } catch { addToast('Failed to parse order sheet.', 'error'); setOrderLoading(false); setOrderLoadMsg(''); }
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
@@ -623,7 +625,7 @@ export default function BrandTagPrinter() {
       if (!r.found || !r.masterData || r.copies <= 0) return;
       for (let i = 0; i < r.copies; i++) labels.push({ ...r.masterData, brand: `BRAND NAME: ${r.brand}`, copies: 1 });
     });
-    if (labels.length === 0) { alert('No printable labels. Ensure SKUs exist in master data and copies > 0.'); return; }
+    if (labels.length === 0) { addToast('No printable labels. Ensure SKUs exist in master data and copies > 0.', 'error'); return; }
     printLabelsInWindow(labels);
   };
 

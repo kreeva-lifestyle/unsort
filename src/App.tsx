@@ -50,7 +50,7 @@ const MainApp = () => {
   // Central navigate — updates URL + state
   const setTab = (t: string) => {
     if (!VALID_TABS.includes(t)) t = 'dashboard';
-    if (t === 'settings' && profile?.role !== 'admin') t = 'dashboard';
+    if (t === 'settings' && profile?.role !== 'admin' && profile?.role !== 'manager') t = 'dashboard';
     const newHash = `#/${t}`;
     if (window.location.hash !== newHash) window.history.pushState(null, '', newHash);
     setTabState(t);
@@ -106,10 +106,15 @@ const MainApp = () => {
             <Icon name={t.icon} size={20} /><span>{t.label}</span>
           </div>
         ))}
+        {/* More — opens full sidebar drawer for Brand Tags / Settings / anything else */}
+        <div onClick={() => setMobileMenu(true)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: mobileMenu ? T.ac : T.tx3, fontSize: 9, fontWeight: 500 }}>
+          <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' }}><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+          <span>More</span>
+        </div>
       </div>
       <HeaderComponent title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} onOpenScanner={() => { setScanError(''); setScannerOpen(true); }} notifications={notifications} markAsRead={markAsRead} />
       <main style={{ flex: 1, overflow: 'auto' }}>
-        {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard /></div>}
+        {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard navigateTo={setTab} /></div>}
         {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
 
         {mounted.has('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
