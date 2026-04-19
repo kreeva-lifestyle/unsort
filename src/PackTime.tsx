@@ -56,9 +56,6 @@ function formatTimestamp(d: Date) {
 type QueueItem = { rows: unknown[][]; sheetName: string; retries: number; };
 const writeQueue: QueueItem[] = [];
 let flushing = false;
-// Flipped to true when init fails — stops us from pounding a dead Edge Function
-// on every scan. Scans still persist to packtime_scans via supabase-js.
-let sheetSyncOffline = false;
 
 async function flushQueue() {
   if (flushing || writeQueue.length === 0) return;
@@ -92,7 +89,6 @@ async function flushQueue() {
 }
 
 function enqueueWrite(rows: unknown[][], sheetName: string) {
-  if (sheetSyncOffline) return; // Edge Function is down; skip pointless retries.
   writeQueue.push({ rows, sheetName, retries: 0 });
   flushQueue();
 }
@@ -172,7 +168,6 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   // Verify
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<any>(null);
-  const [sheetOffline, setSheetOffline] = useState(false);
 
   // Scanning — optimistic
   const [awbInput, setAwbInput] = useState('');
@@ -342,49 +337,24 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setCourierSheet(c.sheet_name);
     setCourierBrand(selectedBrand || c.brand || 'FUSIONIC');
     setVerifying(true); setVerifyResult(null);
-
     const data = await callEdge({ action: 'init', sheetName: c.sheet_name });
-
-    // Column mismatch is a hard block — refuse to scan or data ends up in wrong columns.
-    if (data.ok === true && data.columnsOk === false) {
-      setVerifyResult(data);
-      setVerifying(false);
-      return;
-    }
-
-    // Always pull DB AWBs so duplicate detection has something to work with,
-    // whether or not the Edge Function is healthy.
-    let dbAwbs: string[] = [];
-    try {
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
-      const { data: dbScans } = await supabase.from('packtime_scans').select('awb').eq('sheet_name', c.sheet_name).gte('scanned_at', thirtyDaysAgo).limit(5000);
-      type AwbRow = Pick<PackTimeScan, 'awb'>;
-      dbAwbs = ((dbScans as AwbRow[] | null) || []).map((r) => r.awb.trim().toUpperCase());
-    } catch {}
-
-    if (data.ok) {
+    setVerifyResult(data);
+    if (data.ok && data.columnsOk !== false) {
       const sheetAwbs = (data.awbs || []).map((a: string) => a.trim().toUpperCase());
+      let dbAwbs: string[] = [];
+      try {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+        const { data: dbScans } = await supabase.from('packtime_scans').select('awb').eq('sheet_name', c.sheet_name).gte('scanned_at', thirtyDaysAgo).limit(5000);
+        type AwbRow = Pick<PackTimeScan, 'awb'>;
+        dbAwbs = ((dbScans as AwbRow[] | null) || []).map((r) => r.awb.trim().toUpperCase());
+      } catch {}
       awbSetRef.current = new Set([...sheetAwbs, ...dbAwbs]);
       rowCountRef.current = data.totalRows || 0;
       setSheetTotal(data.totalRows || 0);
-      sheetSyncOffline = false;
-      setSheetOffline(false);
-    } else {
-      // Edge Function is crashing (e.g. malformed Google service-account key).
-      // Proceed with DB-only duplicate detection — scans still persist via supabase-js;
-      // the Google Sheet just stops mirroring until the server is fixed.
-      awbSetRef.current = new Set(dbAwbs);
-      rowCountRef.current = dbAwbs.length;
-      setSheetTotal(dbAwbs.length);
-      sheetSyncOffline = true;
-      setSheetOffline(true);
-      console.warn('PackStation: proceeding in Sheet-offline mode —', data.details || data.error);
+      sessionIdRef.current = crypto.randomUUID();
+      writeQueue.length = 0; flushing = false;
+      setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned(''); setDbFails(0);
     }
-
-    sessionIdRef.current = crypto.randomUUID();
-    writeQueue.length = 0; flushing = false;
-    setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned(''); setDbFails(0);
-    setVerifyResult(null);
     setVerifying(false);
   };
 
@@ -765,13 +735,6 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Flash */}
       {flash && <div style={{ position: 'fixed', inset: 0, zIndex: 300, pointerEvents: 'none', background: flash === 'success' ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.10)', animation: 'fi .15s ease' }} />}
-
-      {/* Sheet-offline banner: scans are still persisted to the DB; only Google Sheet mirroring is paused. */}
-      {sheetOffline && (
-        <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(234,179,8,.08)', border: '1px solid rgba(234,179,8,.28)', fontSize: 11, color: T.yl, lineHeight: 1.4 }}>
-          Sheet sync offline — scans saved to database only. Google Sheet will not update until the server is fixed.
-        </div>
-      )}
 
       {/* Duplicate modal */}
       {duplicateAwb && (
