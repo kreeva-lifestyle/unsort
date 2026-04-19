@@ -5,9 +5,11 @@ import { supabase } from './lib/supabase';
 import { T } from './lib/theme';
 import type {
   Product,
-  Component as ProductComponent,
+  ProductComponent,
   InventoryItem,
   ItemComponent,
+  InventoryExtra,
+  InventoryExtraHistory,
   ActivityLogInsert,
 } from './types/database';
 
@@ -16,29 +18,11 @@ const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
 const isLehenga = (name: string) => /lehenga|lehnga|ghaghra/i.test(name);
 const isBottomType = (name: string) => /bottom|pant|trouser|skirt|salwar|churidar|palazzo/i.test(name);
 
-// Local types: inventory_extras and inventory_extras_history are not yet in
-// src/types/database.ts (DATABASE-SCHEMA.md only covers the 8 core tables).
-// These interfaces describe those tables' row shapes at point of use.
-interface Extra {
-  id: string; product_id: string; product_name: string;
-  component_id: string; component_name: string;
-  sku: string; size: string; quantity: number;
-  notes: string | null; created_by: string | null;
-  created_at: string; updated_at: string;
-}
-
-interface HistoryRow {
-  id: string; extra_id: string; action: string;
-  quantity_change: number; quantity_after: number;
-  reason: string | null; related_inventory_item_id: string | null;
-  user_id: string | null; created_at: string;
-}
-
 // View model: narrowed inventory_items row for the matching UI.
 type InventoryItemMatch = Pick<InventoryItem, 'id' | 'batch_number' | 'serial_number' | 'size' | 'location' | 'status'>;
 
 export default function InventoryExtras() {
-  const [extras, setExtras] = useState<Extra[]>([]);
+  const [extras, setExtras] = useState<InventoryExtra[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('all');
@@ -56,19 +40,19 @@ export default function InventoryExtras() {
   const [fNotes, setFNotes] = useState('');
   const [fComps, setFComps] = useState<ProductComponent[]>([]);
   // Adjust qty
-  const [adjustExtra, setAdjustExtra] = useState<Extra | null>(null);
+  const [adjustExtra, setAdjustExtra] = useState<InventoryExtra | null>(null);
   const [adjustMode, setAdjustMode] = useState<'add' | 'remove'>('add');
   const [adjustQty, setAdjustQty] = useState('1');
   const [adjustReason, setAdjustReason] = useState('');
   // History
-  const [historyExtra, setHistoryExtra] = useState<Extra | null>(null);
-  const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [historyExtra, setHistoryExtra] = useState<InventoryExtra | null>(null);
+  const [history, setHistory] = useState<InventoryExtraHistory[]>([]);
   // Matches
-  const [matchExtra, setMatchExtra] = useState<Extra | null>(null);
+  const [matchExtra, setMatchExtra] = useState<InventoryExtra | null>(null);
   const [matches, setMatches] = useState<InventoryItemMatch[]>([]);
   const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
   // Complete confirm
-  const [completeItem, setCompleteItem] = useState<{ extra: Extra; item: InventoryItemMatch } | null>(null);
+  const [completeItem, setCompleteItem] = useState<{ extra: InventoryExtra; item: InventoryItemMatch } | null>(null);
 
   const fetchExtras = useCallback(async () => {
     const { data } = await supabase.from('inventory_extras').select('*').order('updated_at', { ascending: false }).limit(1000);
@@ -136,7 +120,7 @@ export default function InventoryExtras() {
     setHistory(data || []);
   };
 
-  const loadMatches = async (ex: Extra) => {
+  const loadMatches = async (ex: InventoryExtra) => {
     let q = supabase.from('inventory_items').select('id, batch_number, serial_number, size, location, status')
       .eq('status', 'unsorted').eq('serial_number', ex.sku).eq('product_id', ex.product_id);
     if (ex.size && ex.size !== 'N/A') q = q.eq('size', ex.size);
@@ -421,7 +405,7 @@ export default function InventoryExtras() {
                     <td style={{ ...td, fontFamily: T.mono, color: h.quantity_change > 0 ? T.gr : T.re }}>{h.quantity_change > 0 ? '+' : ''}{h.quantity_change}</td>
                     <td style={{ ...td, fontWeight: 600 }}>{h.quantity_after}</td>
                     <td style={{ ...td, fontSize: 10, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.reason || '--'}</td>
-                    <td style={{ ...td, fontSize: 10, whiteSpace: 'nowrap' }}>{new Date(h.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td style={{ ...td, fontSize: 10, whiteSpace: 'nowrap' }}>{h.created_at ? new Date(h.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '--'}</td>
                   </tr>
                 ))}
               </tbody>

@@ -180,6 +180,52 @@ When the schema changes:
 
 ---
 
+### `inventory_extras` (12 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| product_id | NO | uuid |
+| product_name | NO | text |
+| component_id | NO | uuid |
+| component_name | NO | text |
+| sku | NO | text |
+| size | NO | text |
+| quantity | NO | integer |
+| notes | YES | text |
+| created_by | YES | uuid |
+| created_at | YES | timestamptz |
+| updated_at | YES | timestamptz |
+
+**Notes:**
+- App use: stand-alone inventory of spare components (e.g., a loose Dupatta) available to complete an unsorted item. Used by `src/InventoryExtras.tsx` to list/add/adjust extras and match them against unsorted `inventory_items` by `(product_id, sku, size, component_id)`.
+- `product_name` and `component_name` are denormalised snapshots of the related product/component at time of insert.
+- Unique constraint (implied by app error-handling on code `23505`) across `(product_id, component_id, sku, size)`.
+
+---
+
+### `inventory_extras_history` (9 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| extra_id | YES | uuid |
+| action | NO | text |
+| quantity_change | NO | integer |
+| quantity_after | NO | integer |
+| reason | YES | text |
+| related_inventory_item_id | YES | uuid |
+| user_id | YES | uuid |
+| created_at | YES | timestamptz |
+
+**Notes:**
+- Append-only audit trail for `inventory_extras`. Each row records a quantity change and the resulting balance.
+- `action` values used by app: `created`, `added`, `removed`, `used`.
+- `related_inventory_item_id` is populated when `action = 'used'` (an extra was consumed to complete an inventory item).
+- `extra_id` is nullable to let history rows survive a future delete of the parent extra (soft-reference).
+
+---
+
 ## Known drift from `UNSORT-CLAUDE-CODE-CONTEXT.md`
 
 The old context doc is stale. Highlights:
