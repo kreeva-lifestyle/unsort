@@ -3,12 +3,22 @@ import { createPortal } from 'react-dom';
 import { supabase } from './lib/supabase';
 
 import { T } from './lib/theme';
+import type {
+  Product,
+  Component as ProductComponent,
+  InventoryItem,
+  ItemComponent,
+  ActivityLogInsert,
+} from './types/database';
 
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', 'Semi-Stitched'];
 const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
 const isLehenga = (name: string) => /lehenga|lehnga|ghaghra/i.test(name);
 const isBottomType = (name: string) => /bottom|pant|trouser|skirt|salwar|churidar|palazzo/i.test(name);
 
+// Local types: inventory_extras and inventory_extras_history are not yet in
+// src/types/database.ts (DATABASE-SCHEMA.md only covers the 8 core tables).
+// These interfaces describe those tables' row shapes at point of use.
 interface Extra {
   id: string; product_id: string; product_name: string;
   component_id: string; component_name: string;
@@ -24,14 +34,12 @@ interface HistoryRow {
   user_id: string | null; created_at: string;
 }
 
-interface MatchItem {
-  id: string; batch_number: string; serial_number: string;
-  size: string; location: string | null; status: string;
-}
+// View model: narrowed inventory_items row for the matching UI.
+type InventoryItemMatch = Pick<InventoryItem, 'id' | 'batch_number' | 'serial_number' | 'size' | 'location' | 'status'>;
 
 export default function InventoryExtras() {
   const [extras, setExtras] = useState<Extra[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
@@ -46,7 +54,7 @@ export default function InventoryExtras() {
   const [fSize, setFSize] = useState('');
   const [fQty, setFQty] = useState('1');
   const [fNotes, setFNotes] = useState('');
-  const [fComps, setFComps] = useState<any[]>([]);
+  const [fComps, setFComps] = useState<ProductComponent[]>([]);
   // Adjust qty
   const [adjustExtra, setAdjustExtra] = useState<Extra | null>(null);
   const [adjustMode, setAdjustMode] = useState<'add' | 'remove'>('add');
@@ -57,10 +65,10 @@ export default function InventoryExtras() {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   // Matches
   const [matchExtra, setMatchExtra] = useState<Extra | null>(null);
-  const [matches, setMatches] = useState<MatchItem[]>([]);
+  const [matches, setMatches] = useState<InventoryItemMatch[]>([]);
   const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
   // Complete confirm
-  const [completeItem, setCompleteItem] = useState<{ extra: Extra; item: MatchItem } | null>(null);
+  const [completeItem, setCompleteItem] = useState<{ extra: Extra; item: InventoryItemMatch } | null>(null);
 
   const fetchExtras = useCallback(async () => {
     const { data } = await supabase.from('inventory_extras').select('*').order('updated_at', { ascending: false }).limit(1000);
@@ -70,7 +78,8 @@ export default function InventoryExtras() {
     const { data: unsorted } = await supabase.from('inventory_items').select('id, serial_number, size, product_id').eq('status', 'unsorted');
     const { data: allComps } = await supabase.from('item_components').select('inventory_item_id, component_id, status');
     const missingMap: Record<string, Set<string>> = {};
-    (allComps || []).forEach((ic: any) => { if (ic.status === 'missing' || ic.status === 'damaged') { if (!missingMap[ic.inventory_item_id]) missingMap[ic.inventory_item_id] = new Set(); missingMap[ic.inventory_item_id].add(ic.component_id); } });
+    type ItemCompsRow = Pick<ItemComponent, 'inventory_item_id' | 'component_id' | 'status'>;
+    (allComps as ItemCompsRow[] | null || []).forEach((ic) => { if (ic.status === 'missing' || ic.status === 'damaged') { if (!missingMap[ic.inventory_item_id]) missingMap[ic.inventory_item_id] = new Set(); missingMap[ic.inventory_item_id].add(ic.component_id); } });
     for (const ex of (data || [])) {
       counts[ex.id] = (unsorted || []).filter(it =>
         it.serial_number === ex.sku && it.product_id === ex.product_id &&
@@ -103,7 +112,7 @@ export default function InventoryExtras() {
   const searchSkus = useCallback(async (q: string) => {
     if (q.length < 2) { setFSkuSuggestions([]); return; }
     const { data } = await supabase.from('inventory_items').select('serial_number').ilike('serial_number', `%${q.replace(/[%_]/g, '\\$&')}%`).limit(10);
-    const unique = [...new Set((data || []).map((r: any) => r.serial_number).filter(Boolean))];
+    const unique = [...new Set((data || []).map((r) => r.serial_number).filter((s): s is string => !!s))];
     setFSkuSuggestions(unique);
     setShowSkuDrop(unique.length > 0);
   }, []);
@@ -134,8 +143,9 @@ export default function InventoryExtras() {
     const { data: candidates } = await q;
     // Filter to only items missing this specific component
     const { data: comps } = await supabase.from('item_components').select('inventory_item_id, component_id, status').in('inventory_item_id', (candidates || []).map(c => c.id));
-    const hasMissing = new Set((comps || []).filter((c: any) => (c.status === 'missing' || c.status === 'damaged') && c.component_id === ex.component_id).map((c: any) => c.inventory_item_id));
-    setMatches((candidates || []).filter(c => hasMissing.has(c.id)));
+    type ItemCompsRow = Pick<ItemComponent, 'inventory_item_id' | 'component_id' | 'status'>;
+    const hasMissing = new Set((comps as ItemCompsRow[] | null || []).filter((c) => (c.status === 'missing' || c.status === 'damaged') && c.component_id === ex.component_id).map((c) => c.inventory_item_id));
+    setMatches(((candidates as InventoryItemMatch[] | null) || []).filter(c => hasMissing.has(c.id)));
     setMatchExtra(ex);
   };
 
@@ -218,10 +228,11 @@ export default function InventoryExtras() {
       related_inventory_item_id: item.id, user_id: user?.id,
     });
     // 5. Activity log
-    await supabase.from('activity_logs').insert({
-      user_id: user?.id, action: 'complete-via-extra', entity_type: 'inventory_item',
+    const logEntry: ActivityLogInsert = {
+      user_id: user?.id ?? null, action: 'complete-via-extra', entity_type: 'inventory_item',
       entity_id: item.id, description: `Completed using extra ${extra.component_name} (SKU: ${extra.sku})`,
-    });
+    };
+    await supabase.from('activity_logs').insert(logEntry);
     setSaving(false); setCompleteItem(null); setMatchExtra(null); fetchExtras();
   };
 
