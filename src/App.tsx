@@ -574,7 +574,7 @@ const Dashboard = () => {
     setRevTrend(Object.entries(revByDay).map(([date, amount]) => ({ date, amount: Math.round(amount) })));
   }, []);
 
-  const fetchTasks = () => { supabase.from('tasks').select('*').order('created_at', { ascending: false }).then(({ data }) => setTasks(data || [])); };
+  const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(100).then(({ data }) => setTasks(data || [])); };
 
   useEffect(() => {
     fetchAll(); fetchTasks();
@@ -779,7 +779,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
 
   const fetchData = () => {
     supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).limit(invLimit).then(({ data }) => { setItems(data || []); setInvTruncated((data || []).length >= invLimit); });
-    supabase.from('products').select('*').eq('is_active', true).then(({ data }) => setProducts(data || []));
+    supabase.from('products').select('id, name, sku, total_components, category').eq('is_active', true).then(({ data }) => setProducts(data || []));
     supabase.from('locations').select('*').order('name').then(({ data }) => setLocations(data || []));
     supabase.from('tags').select('*').order('name').then(({ data }) => setTags(data || []));
     supabase.from('item_tags').select('*, tags(id, name, color)').then(({ data }) => {
