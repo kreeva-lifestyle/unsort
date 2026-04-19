@@ -176,6 +176,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const [sessionCount, setSessionCount] = useState(0);
   const [recentScans, setRecentScans] = useState<ScanEntry[]>([]);
   const [flash, setFlash] = useState<'success' | 'error' | null>(null);
+  const [confirmChangeSetup, setConfirmChangeSetup] = useState(false);
+  const [sessionListOpen, setSessionListOpen] = useState(true);
   const [duplicateAwb, setDuplicateAwb] = useState('');
   const [showComplete, setShowComplete] = useState(false);
   const [pendingWrites, setPendingWrites] = useState(0);
@@ -776,10 +778,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <div onClick={() => setSearchOpen(p => !p)} style={{ padding: '5px 8px', borderRadius: 6, background: searchOpen ? 'rgba(99,102,241,.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${searchOpen ? T.ac + '33' : T.bd2}`, color: searchOpen ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>
             <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
           </div>
-          {sessionCount === 0
-            ? <div onClick={() => { stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setVerifyResult(null); }} style={{ padding: '5px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd2}`, color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Change</div>
-            : <div style={{ padding: '5px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, color: T.tx3, fontSize: 10, fontWeight: 500, opacity: 0.4, cursor: 'not-allowed' }} title="Complete session first">Change</div>
-          }
+          {/* Change — always active; mid-session warns before discarding state (audit P1) */}
+          <div onClick={() => {
+            if (sessionCount > 0) {
+              setConfirmChangeSetup(true);
+            } else {
+              stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setVerifyResult(null);
+            }
+          }} style={{ padding: '5px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd2}`, color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Change</div>
         </div>
       </div>
 
@@ -893,13 +899,19 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         <div style={{ marginTop: 4, fontSize: 9, color: T.tx3, letterSpacing: 0.3 }}>Scan barcode with camera or type AWB and press Enter</div>
       </div>
 
-      {/* Recent Scans */}
+      {/* Recent Scans — collapsible, with CSV export (audit P1: session summary without leaving screen) */}
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-        <div style={{ padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Recent Scans</span>
-          <span style={{ fontSize: 9, color: T.tx3 }}>{recentScans.length} entries</span>
+        <div style={{ padding: '8px 12px', borderBottom: sessionListOpen ? `1px solid ${T.bd}` : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setSessionListOpen(o => !o)}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: T.tx, fontFamily: T.sora, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', transform: sessionListOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform .15s' }}>▶</span>
+            Session Scans
+          </span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 9, color: T.tx3 }}>{recentScans.length} entries</span>
+            {recentScans.filter(s => s.success).length > 0 && <button onClick={e => { e.stopPropagation(); const successScans = recentScans.filter(s => s.success); const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n'); const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `PackTime_${courier}_CAM${camera}_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url); }} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, fontWeight: 500, cursor: 'pointer' }}>Export CSV</button>}
+          </div>
         </div>
-        <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+        {sessionListOpen && <div style={{ maxHeight: 280, overflowY: 'auto' }}>
           {recentScans.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans yet. Start scanning AWB barcodes.</div>}
           {recentScans.map((s, i) => (
             <div key={`${s.awb}-${s.time}`} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .15s ease' : undefined }}>
@@ -915,7 +927,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               </button>}
             </div>
           ))}
-        </div>
+        </div>}
       </div>
 
       {/* Complete Session */}
@@ -953,6 +965,21 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setShowComplete(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Continue</button>
               <button onClick={() => { stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setShowComplete(false); setVerifyResult(null); setLastScanned(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}cc, ${T.gr}88)`, color: '#fff', cursor: 'pointer' }}>End Session</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change-setup-mid-session confirm dialog (audit P1: don't trap operator in wrong courier) */}
+      {confirmChangeSetup && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 450, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(8px)', padding: 16 }}>
+          <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', textAlign: 'center', maxWidth: 360, width: '100%' }}>
+            <div style={{ fontSize: 32, marginBottom: 6 }}>⚠️</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Change setup mid-session?</div>
+            <div style={{ fontSize: 12, color: T.tx3, marginBottom: 14, lineHeight: 1.5 }}>You've scanned <strong style={{ color: T.gr }}>{sessionCount}</strong> AWB{sessionCount === 1 ? '' : 's'} so far. They've already been saved to the sheet. Changing setup resets the in-app counter but does not delete the saved scans.</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setConfirmChangeSetup(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Keep scanning</button>
+              <button onClick={() => { setConfirmChangeSetup(false); stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setVerifyResult(null); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}cc, ${T.yl}88)`, color: '#111', cursor: 'pointer' }}>Change setup</button>
             </div>
           </div>
         </div>

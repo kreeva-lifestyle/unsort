@@ -7,17 +7,24 @@ import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import InventoryExtras from '../InventoryExtras';
 
-const statusTag = (status: string) => {
-  const m: Record<string, { bg: string; color: string; bd: string }> = {
-    complete: { bg: 'rgba(34,197,94,0.10)', color: '#4ADE80', bd: 'rgba(34,197,94,0.25)' },
-    completed: { bg: 'rgba(34,197,94,0.15)', color: '#4ADE80', bd: 'rgba(34,197,94,0.30)' },
-    damaged: { bg: 'rgba(239,68,68,0.10)', color: '#FCA5A5', bd: 'rgba(239,68,68,0.25)' },
-    unsorted: { bg: 'rgba(245,158,11,0.10)', color: '#FCD34D', bd: 'rgba(245,158,11,0.25)' },
-    dry_clean: { bg: 'rgba(56,189,248,0.10)', color: '#7DD3FC', bd: 'rgba(56,189,248,0.25)' },
-  };
-  const s = m[status] || m.unsorted;
-  return { display: 'inline-flex' as const, alignItems: 'center' as const, gap: 4, padding: '2px 7px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: s.bg, color: s.color, border: `1px solid ${s.bd}`, textTransform: 'uppercase' as const, letterSpacing: '0.05em' };
+// Status indicator — dot + plain label. Previous pills-with-bg were noisy in the
+// list view per audit P2; reserve pill treatment for modals.
+const STATUS_DOT_COLOR: Record<string, string> = {
+  complete: '#4ADE80',
+  completed: '#4ADE80',
+  damaged: '#FCA5A5',
+  unsorted: '#FCD34D',
+  dry_clean: '#7DD3FC',
 };
+const statusTag = (status: string) => ({
+  display: 'inline-flex' as const,
+  alignItems: 'center' as const,
+  gap: 6,
+  padding: '2px 0',
+  fontSize: 11,
+  fontWeight: 500,
+  color: STATUS_DOT_COLOR[status] || STATUS_DOT_COLOR.unsorted,
+});
 
 
 const MARKETPLACES = ['Myntra-Fusionic', 'Ajio-Fusionic', 'Tanuka', 'Svaraa', 'Amazon'];
@@ -48,6 +55,7 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
   const [tags, setTags] = useState<any[]>([]);
   const [itemTags, setItemTags] = useState<Record<string, any[]>>({});
   const [statusFilter, setStatusFilter] = useState('all');
+  const [showFiltersPopover, setShowFiltersPopover] = useState(false);
   const [catFilter, setCatFilter] = useState('all');
   const [locFilter, setLocFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('all');
@@ -542,14 +550,32 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
         </div>
       </div>
       {showExtras ? <InventoryExtras /> : <>
+      {/* Collapsible filter bar — search + status stay visible; others collapse into a Filters popover (audit P1) */}
       <div className="filter-bar" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, SKU code, location, notes..." style={{ ...S.fInput, flex: 1, minWidth: 160, padding: '6px 9px' }} />
         <div style={{ width: 1, height: 24, background: T.bd2 }} />
         {!isCompletedView && <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Status</option><option value="unsorted">Unsorted</option><option value="damaged">Damaged</option><option value="dry_clean">Dry Clean</option><option value="complete">Complete</option></select>}
-        <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 110, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Categories</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-        <select value={locFilter} onChange={(e) => setLocFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 100, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Locations</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select>
-        <select value={mpFilter} onChange={(e) => setMpFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 110, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Marketplaces</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select>
-        {tags.length > 0 && <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} style={{ ...S.fInput, width: 'auto', minWidth: 90, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Tags</option>{tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>}
+        <div style={{ position: 'relative' }}>
+          {(() => {
+            const activeCount = [catFilter, locFilter, mpFilter, tagFilter].filter(f => f !== 'all').length;
+            return (
+              <button onClick={() => setShowFiltersPopover(v => !v)} style={{ ...S.btnGhost, padding: '6px 11px', fontSize: 11, background: activeCount > 0 ? 'rgba(99,102,241,.10)' : undefined, borderColor: activeCount > 0 ? 'rgba(99,102,241,.3)' : undefined }}>
+                Filters{activeCount > 0 ? ` · ${activeCount}` : ''} {showFiltersPopover ? '▴' : '▾'}
+              </button>
+            );
+          })()}
+          {showFiltersPopover && (
+            <>
+              <div onClick={() => setShowFiltersPopover(false)} style={{ position: 'fixed', inset: 0, zIndex: 50 }} />
+              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 51, background: 'rgba(14,18,30,0.98)', border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 10px 32px rgba(0,0,0,.55)', padding: 10, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} style={{ ...S.fInput, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Categories</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+                <select value={locFilter} onChange={(e) => setLocFilter(e.target.value)} style={{ ...S.fInput, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Locations</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select>
+                <select value={mpFilter} onChange={(e) => setMpFilter(e.target.value)} style={{ ...S.fInput, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Marketplaces</option>{MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                {tags.length > 0 && <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} style={{ ...S.fInput, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="all">All Tags</option>{tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>}
+              </div>
+            </>
+          )}
+        </div>
         {hasActiveFilters && <span onClick={clearFilters} style={{ fontSize: 10, color: T.ac, cursor: 'pointer', padding: '3px 8px', border: '1px solid rgba(99,102,241,.2)', borderRadius: 4, background: 'rgba(99,102,241,.06)' }}>Clear filters</span>}
       </div>
       <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
@@ -567,7 +593,7 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
             <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(99,102,241,.10)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 10 }}>—</span>}</div></td>
             <td style={{ ...S.tdStyle, fontSize: 11, maxWidth: 140 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 25 ? item.notes.slice(0, 25) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
 
-            <td style={S.tdStyle}><span style={statusTag(item.status)}><span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor', opacity: 0.6 }} />{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></td>
+            <td style={S.tdStyle}><span style={statusTag(item.status)}><span style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor', boxShadow: `0 0 4px currentColor`, flexShrink: 0 }} /><span style={{ textTransform: 'capitalize' }}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></span></td>
             <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(251,191,36,.08)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(248,113,113,.08)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 10 }}>{item.status === 'completed' || item.status === 'complete' ? 'All good' : '—'}</span>}</td>
             <td style={S.tdStyle}>
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>

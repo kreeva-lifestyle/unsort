@@ -125,8 +125,18 @@ export default function CashBook() {
 
   const saveOpening = async () => {
     const val = Number(openingInput) || 0;
+    if (val === openingBalance) { setEditingOpening(false); return; }
+    const { data: { user } } = await supabase.auth.getUser();
     const payload: CashBookBalanceInsert = { date: fromDate, opening_balance: val };
-    await supabase.from('cash_book_balances').upsert(payload, { onConflict: 'date' });
+    const { error } = await supabase.from('cash_book_balances').upsert(payload, { onConflict: 'date' });
+    if (error) { setFormError('Save failed: ' + error.message); return; }
+    // Audit trail — log the change (audit P1: opening balance is reconciliation anchor)
+    await supabase.from('audit_log').insert({
+      action: 'update',
+      module: 'cash_book',
+      details: `Opening balance for ${fromDate}: ₹${openingBalance.toLocaleString('en-IN')} → ₹${val.toLocaleString('en-IN')}`,
+      user_id: user?.id ?? null,
+    });
     setEditingOpening(false);
     fetchData();
   };
@@ -392,11 +402,21 @@ export default function CashBook() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 3, marginBottom: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, width: 'fit-content', border: `1px solid ${T.bd}` }}>
-        {([{ id: 'expenses', label: `Expenses (${expenses.length})` }, { id: 'sales', label: `Cash Sales (${sales.length})` }, { id: 'handovers', label: `Handovers (${handovers.length})` }] as const).map(t => (
-          <div key={t.id} onClick={() => setTab(t.id)} style={{ padding: '5px 14px', borderRadius: 4, fontSize: 10, fontWeight: tab === t.id ? 600 : 400, cursor: 'pointer', background: tab === t.id ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'transparent', color: tab === t.id ? '#fff' : T.tx3 }}>{t.label}</div>
-        ))}
+      {/* Segmented tabs (audit P2): bigger hit target + count in muted pill */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: 3, width: 'fit-content', border: `1px solid ${T.bd}`, flexWrap: 'wrap' }}>
+        {([
+          { id: 'expenses', label: 'Expenses', count: expenses.length },
+          { id: 'sales', label: 'Cash Sales', count: sales.length },
+          { id: 'handovers', label: 'Handovers', count: handovers.length },
+        ] as const).map(t => {
+          const active = tab === t.id;
+          return (
+            <div key={t.id} role="button" tabIndex={0} onClick={() => setTab(t.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setTab(t.id); }} style={{ padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: active ? 700 : 500, cursor: 'pointer', background: active ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'transparent', color: active ? '#fff' : T.tx3, display: 'flex', alignItems: 'center', gap: 8, transition: T.transition }}>
+              <span>{t.label}</span>
+              <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 10, background: active ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.04)', color: active ? '#fff' : T.tx3, fontFamily: T.mono, minWidth: 18, textAlign: 'center' as const }}>{t.count}</span>
+            </div>
+          );
+        })}
       </div>
 
       {/* Expenses Tab */}
