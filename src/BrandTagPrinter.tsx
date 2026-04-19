@@ -376,7 +376,7 @@ export default function BrandTagPrinter() {
 
   // Fetch current page from Supabase (server-side pagination)
   const fetchPage = useCallback(async () => {
-    let query = supabase.from('brand_tags').select('*', { count: 'exact' });
+    let query = supabase.from('brand_tags').select('id, brand, ean, sku, qty, mrp, size, product, color, mktd, jio_code, copies', { count: 'estimated' });
     if (search) query = query.ilike('search_text', `%${search.toLowerCase().replace(/[%_]/g, '\\$&')}%`);
     if (brandFilter) query = query.ilike('brand', `%${brandFilter.replace(/[%_]/g, '\\$&')}%`);
     if (sizeFilter) query = query.eq('size', sizeFilter);

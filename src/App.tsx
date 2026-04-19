@@ -574,7 +574,7 @@ const Dashboard = () => {
     setRevTrend(Object.entries(revByDay).map(([date, amount]) => ({ date, amount: Math.round(amount) })));
   }, []);
 
-  const fetchTasks = () => { supabase.from('tasks').select('*').order('created_at', { ascending: false }).then(({ data }) => setTasks(data || [])); };
+  const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(100).then(({ data }) => setTasks(data || [])); };
 
   useEffect(() => {
     fetchAll(); fetchTasks();
@@ -779,7 +779,7 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
 
   const fetchData = () => {
     supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).limit(invLimit).then(({ data }) => { setItems(data || []); setInvTruncated((data || []).length >= invLimit); });
-    supabase.from('products').select('*').eq('is_active', true).then(({ data }) => setProducts(data || []));
+    supabase.from('products').select('id, name, sku, total_components, category').eq('is_active', true).then(({ data }) => setProducts(data || []));
     supabase.from('locations').select('*').order('name').then(({ data }) => setLocations(data || []));
     supabase.from('tags').select('*').order('name').then(({ data }) => setTags(data || []));
     supabase.from('item_tags').select('*, tags(id, name, color)').then(({ data }) => {
@@ -896,17 +896,15 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
   };
 
   const checkForPairMatch = async (productId: string, currentItemId: string) => {
-    // Get current item details for SKU + size matching
-    const { data: currentItem } = await supabase.from('inventory_items').select('serial_number, size').eq('id', currentItemId).maybeSingle();
+    // Parallel fetch: current item + components + item_components
+    const [{ data: currentItem }, { data: allComps }, { data: currentItemComps }] = await Promise.all([
+      supabase.from('inventory_items').select('serial_number, size').eq('id', currentItemId).maybeSingle(),
+      supabase.from('components').select('id').eq('product_id', productId),
+      supabase.from('item_components').select('component_id, status').eq('inventory_item_id', currentItemId),
+    ]);
     if (!currentItem) return;
-
-    // Get all components for this category
-    const { data: allComps } = await supabase.from('components').select('id').eq('product_id', productId);
     if (!allComps || allComps.length === 0) return;
     const allCompIds = new Set(allComps.map(c => c.id));
-
-    // Get the current item's present components
-    const { data: currentItemComps } = await supabase.from('item_components').select('component_id, status').eq('inventory_item_id', currentItemId);
     if (!currentItemComps) return;
     const currentPresent = new Set(currentItemComps.filter(c => c.status === 'present').map(c => c.component_id));
     const currentMissing = new Set(currentItemComps.filter(c => c.status === 'missing').map(c => c.component_id));
@@ -923,10 +921,15 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
     const { data: otherItems } = await query;
     if (!otherItems || otherItems.length === 0) return;
 
-    // Check each other item for complementary components
+    // Batch fetch all candidate components at once (not N+1)
+    const { data: allCandidateComps } = await supabase.from('item_components').select('inventory_item_id, component_id, status').in('inventory_item_id', otherItems.map(o => o.id));
+    const compNames = Object.fromEntries((allComps || []).map(c => [c.id, '']));
+    // Get component names once
+    const { data: compNameData } = await supabase.from('components').select('id, name').eq('product_id', productId);
+    const nameMap = Object.fromEntries((compNameData || []).map(c => [c.id, c.name]));
+
     for (const other of otherItems) {
-      const { data: otherComps } = await supabase.from('item_components').select('component_id, status').eq('inventory_item_id', other.id);
-      if (!otherComps) continue;
+      const otherComps = (allCandidateComps || []).filter(c => c.inventory_item_id === other.id);
       const otherPresent = new Set(otherComps.filter(c => c.status === 'present').map(c => c.component_id));
 
       // Check if the union of present components from both items covers ALL components
@@ -934,9 +937,6 @@ const Inventory = ({ globalSearch = '', openItemId, onItemOpened, active }: { gl
       const coversAll = [...allCompIds].every(id => union.has(id));
 
       if (coversAll) {
-        // Get component names for display
-        const { data: compNames } = await supabase.from('components').select('id, name').eq('product_id', productId);
-        const nameMap = Object.fromEntries((compNames || []).map(c => [c.id, c.name]));
         const currentPresentNames = [...currentPresent].map(id => nameMap[id]).filter(Boolean);
         const otherPresentNames = [...otherPresent].map(id => nameMap[id]).filter(Boolean);
         const catName = products.find(p => p.id === productId)?.name || 'Unknown';

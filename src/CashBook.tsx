@@ -63,7 +63,7 @@ export default function CashBook() {
     setOpeningInput(String(bal?.opening_balance || 0));
 
     // Expenses in date range
-    const { data: exp } = await supabase.from('cash_expenses').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
+    const { data: exp } = await supabase.from('cash_expenses').select('id, date, amount, category, description, created_at').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
     setExpenses(exp || []);
 
     // Cash sales (challans paid in cash, created in date range)
@@ -72,7 +72,7 @@ export default function CashBook() {
     setSales(ch || []);
 
     // Handovers in date range
-    const { data: ho } = await supabase.from('cash_handovers').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
+    const { data: ho } = await supabase.from('cash_handovers').select('id, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
     setHandovers(ho || []);
   }, [fromDate, toDate]);
 

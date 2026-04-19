@@ -68,7 +68,7 @@ export default function InventoryExtras() {
   const [completeItem, setCompleteItem] = useState<{ extra: Extra; item: MatchItem } | null>(null);
 
   const fetchExtras = useCallback(async () => {
-    const { data } = await supabase.from('inventory_extras').select('*').order('updated_at', { ascending: false });
+    const { data } = await supabase.from('inventory_extras').select('*').order('updated_at', { ascending: false }).limit(1000);
     setExtras(data || []);
     // Compute match counts — check item actually has this component missing
     const counts: Record<string, number> = {};
