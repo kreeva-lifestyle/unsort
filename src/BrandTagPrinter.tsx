@@ -287,7 +287,8 @@ const BrandTagModal = ({
   onClose: () => void;
 }) => {
   const [form, setForm] = useState<BrandTagRow>({ ...initial });
-  const set = (k: keyof BrandTagRow, v: string | number) => setForm(p => ({ ...p, [k]: v }));
+  const [modalError, setModalError] = useState('');
+  const set = (k: keyof BrandTagRow, v: string | number) => { setModalError(''); setForm(p => ({ ...p, [k]: v })); };
 
   return (
     <div
@@ -360,9 +361,10 @@ const BrandTagModal = ({
               </div>
             </div>
           ))}
+          {modalError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '7px 10px', fontSize: 11, color: '#FCA5A5', marginTop: 4 }}>{modalError}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
             <button style={btnGhost} onClick={onClose}>Cancel</button>
-            <button style={btnPrimary} onClick={() => { const bad = validateRow(form); if (bad) { alert(`"${bad}" is required. Please fill all fields.`); return; } onSave(form); }}>Save</button>
+            <button style={btnPrimary} onClick={() => { const bad = validateRow(form); if (bad) { setModalError(`"${bad}" is required. Please fill all fields.`); return; } onSave(form); }}>Save</button>
           </div>
         </div>
       </div>
@@ -581,10 +583,21 @@ export default function BrandTagPrinter() {
 
   // ── Row Mutations ──
 
+  // Delete SKU — confirms via in-app modal instead of window.confirm (audit P0)
+  const [confirmDel, setConfirmDel] = useState<{ id: string; sku: string } | null>(null);
   const deleteRow = useCallback((id: string, sku: string) => {
-    if (!window.confirm(`Delete SKU: ${sku || 'this row'}?`)) return;
-    supabase.from('brand_tags').delete().eq('id', id).then(() => { btAudit('delete', `Deleted SKU: ${sku}`); fetchPage(); });
-  }, [fetchPage]);
+    setConfirmDel({ id, sku });
+  }, []);
+  const actuallyDelete = useCallback(async () => {
+    if (!confirmDel) return;
+    const { id, sku } = confirmDel;
+    setConfirmDel(null);
+    const { error } = await supabase.from('brand_tags').delete().eq('id', id);
+    if (error) { addToast(`Delete failed — ${friendlyError(error)}`, 'error'); return; }
+    btAudit('delete', `Deleted SKU: ${sku}`);
+    addToast(`Deleted ${sku}`, 'success');
+    fetchPage();
+  }, [confirmDel, addToast, fetchPage]);
 
   // ── Modal Open/Save ──
   const openAdd = useCallback(() => {
@@ -836,6 +849,21 @@ export default function BrandTagPrinter() {
           </div>
         </div>;
       })()}
+
+      {/* ── Delete confirm modal (replaces window.confirm per audit P0) ── */}
+      {confirmDel && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
+          <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', textAlign: 'center' as const, maxWidth: 340, width: '100%' }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>⚠️</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Delete this SKU?</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14, fontFamily: T.mono }}>{confirmDel.sku || '(empty SKU)'}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setConfirmDel(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={actuallyDelete} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: 'pointer' }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Add / Edit Modal ── */}
       {modalRow && (

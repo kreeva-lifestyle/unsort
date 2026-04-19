@@ -7,6 +7,7 @@ import { friendlyError } from '../lib/friendlyError';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import InventoryExtras from '../InventoryExtras';
+import Empty from '../components/ui/Empty';
 
 // Status indicator — dot + plain label. Previous pills-with-bg were noisy in the
 // list view per audit P2; reserve pill treatment for modals.
@@ -320,23 +321,23 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     // Save tags
     if (savedItemId && tagInput.trim()) {
       const { error: delTagErr } = await supabase.from('item_tags').delete().eq('inventory_item_id', savedItemId);
-      if (delTagErr) addToast('Tag update warning: ' + delTagErr.message, 'error');
+      if (delTagErr) addToast('Tag update warning — ' + friendlyError(delTagErr), 'error');
       const tagNames = tagInput.split(',').map(t => t.trim()).filter(Boolean);
       for (const name of tagNames) {
         let { data: existing } = await supabase.from('tags').select('id').eq('name', name).maybeSingle();
         if (!existing) {
           const { data: created, error: createErr } = await supabase.from('tags').insert({ name }).select('id').single();
-          if (createErr) { addToast(`Tag "${name}" failed: ${createErr.message}`, 'error'); continue; }
+          if (createErr) { addToast(`Tag "${name}" failed — ${friendlyError(createErr)}`, 'error'); continue; }
           existing = created;
         }
         if (existing) {
           const { error: linkErr } = await supabase.from('item_tags').insert({ inventory_item_id: savedItemId, tag_id: existing.id });
-          if (linkErr) addToast(`Tag "${name}" link failed: ${linkErr.message}`, 'error');
+          if (linkErr) addToast(`Tag "${name}" link failed — ${friendlyError(linkErr)}`, 'error');
         }
       }
     } else if (savedItemId && !tagInput.trim()) {
       const { error: delTagErr } = await supabase.from('item_tags').delete().eq('inventory_item_id', savedItemId);
-      if (delTagErr) addToast('Tag clear warning: ' + delTagErr.message, 'error');
+      if (delTagErr) addToast('Tag clear warning — ' + friendlyError(delTagErr), 'error');
     }
 
     const savedProductId = form.product_id;
@@ -640,7 +641,10 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
           </tr>);})}</tbody>
         </table>
         </div>
-        {filtered.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3 }}>{hasActiveFilters ? <><p style={{ fontSize: 12, marginBottom: 4 }}>No items match your filters</p><p style={{ fontSize: 10 }}>Try adjusting filters or click "Clear filters"</p></> : <><p style={{ fontSize: 13, marginBottom: 4 }}>No items yet</p><p style={{ fontSize: 10 }}>Click "+ Add Item" to register your first inventory item</p></>}</div>}
+        {filtered.length === 0 && <div style={{ padding: 14 }}>{hasActiveFilters
+          ? <Empty icon="🔎" title="No items match your filters" message="Try adjusting the filters, or click Clear filters to reset." cta="Clear filters" onCta={clearFilters} />
+          : <Empty icon="📦" title="No items yet" message="Register your first inventory item to start tracking components and pair matches." cta={canEdit ? '+ Add Item' : undefined} onCta={canEdit ? () => setShowModal(true) : undefined} />
+        }</div>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
         <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setPage(0); }} style={{ ...S.fInput, width: 'auto', padding: '3px 6px', fontSize: 10, cursor: 'pointer' }}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
