@@ -226,6 +226,148 @@ When the schema changes:
 
 ---
 
+## Cash namespace tables
+
+Tables in the `cash_*` namespace support the Cash Book and Cash Challan (invoicing) features.
+
+### `cash_book_balances` (4 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| date | NO | date |
+| opening_balance | NO | numeric |
+| created_at | YES | timestamptz |
+
+**Notes:**
+- One row per day. Stores the manually-entered opening cash balance used to compute the closing balance after sales, expenses, and handovers.
+- `date` is effectively the natural key (expected unique-on-date for upsert).
+
+---
+
+### `cash_expenses` (7 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| date | NO | date |
+| amount | NO | numeric |
+| category | NO | text |
+| description | YES | text |
+| paid_by | YES | uuid |
+| created_at | YES | timestamptz |
+
+**Notes:**
+- Records individual cash outflows (office supplies, rent, etc.) that reduce the closing balance for the day.
+- `paid_by` references `profiles.id` — who logged the expense.
+
+---
+
+### `cash_handovers` (15 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| date | NO | date |
+| amount | NO | numeric |
+| from_user_id | YES | uuid |
+| from_user_name | NO | text |
+| to_user_id | YES | uuid |
+| to_user_name | NO | text |
+| notes | YES | text |
+| status | NO | text |
+| confirmed_at | YES | timestamptz |
+| created_at | YES | timestamptz |
+| period_from | YES | date |
+| period_to | YES | date |
+| breakdown | YES | jsonb |
+| reason | YES | text |
+
+**Notes:**
+- `status` values: `pending` | `confirmed` | `expired`.
+- Immutable once created — only `status` and `confirmed_at` flip on PIN sign-off; there is no `updated_at` column.
+- `from_user_name` / `to_user_name` are denormalised snapshots; the corresponding `*_user_id` FKs may be null if the profile was deleted.
+- `breakdown` is jsonb — the app stores a snapshot of the cash-flow calculation (opening, sales, returns, expenses, previous handovers, available) at handover time. Typed as `Record<string, unknown> | null`; consumers cast to a local view type.
+- `reason` is required (by app logic) only when the handed amount differs from the computed available cash.
+
+---
+
+### `cash_challans` (25 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| challan_number | NO | integer |
+| customer_id | YES | uuid |
+| customer_name | NO | text |
+| status | NO | text |
+| subtotal | NO | numeric |
+| discount_type | YES | text |
+| discount_value | YES | numeric |
+| discount_amount | YES | numeric |
+| round_off | YES | numeric |
+| total | NO | numeric |
+| amount_paid | YES | numeric |
+| payment_mode | YES | text |
+| payment_date | YES | date |
+| notes | YES | text |
+| tags | YES | ARRAY (text[]) |
+| created_by | YES | uuid |
+| modified_by | YES | uuid |
+| voided_by | YES | uuid |
+| voided_at | YES | timestamptz |
+| created_at | YES | timestamptz |
+| updated_at | YES | timestamptz |
+| shipping_charges | YES | numeric |
+| is_return | YES | boolean |
+| source_challan_id | YES | uuid |
+
+**Notes:**
+- `status` values: `paid` | `partial` | `pending` | `void`.
+- `payment_mode` is free text today (Cash/UPI/etc.); enum not yet fixed — typed as `string | null` with a TODO.
+- `tags` is a Postgres `text[]` — typed as `string[] | null` in TS.
+- `source_challan_id` is a self-reference back to the original challan for returns (`is_return = true`).
+- `customer_id` references `cash_challan_customers.id`; `customer_name` is denormalised at save time.
+
+---
+
+### `cash_challan_items` (11 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| challan_id | YES | uuid |
+| sku | YES | text |
+| description | NO | text |
+| quantity | NO | integer |
+| price | NO | numeric |
+| total | NO | numeric |
+| sort_order | YES | integer |
+| discount_type | YES | text |
+| discount_value | YES | numeric |
+| discount_amount | YES | numeric |
+
+**Notes:**
+- Line items belonging to a `cash_challans` row (1-N). `challan_id` is nullable to allow orphan recovery but the app always sets it.
+- `discount_type` allowed values are not yet fixed (likely `percent` / `flat`) — typed as `string | null` with a TODO.
+
+---
+
+### `cash_challan_customers` (5 columns)
+
+| Column | Nullable | Type |
+|---|---|---|
+| id | NO | uuid |
+| name | NO | text |
+| phone | YES | text |
+| address | YES | text |
+| created_at | YES | timestamptz |
+
+**Notes:**
+- Lightweight customer directory used by the invoicing module. Uniqueness on `name` (case-insensitive) is enforced by app-level checks.
+
+---
+
 ## Known drift from `UNSORT-CLAUDE-CODE-CONTEXT.md`
 
 The old context doc is stale. Highlights:
