@@ -142,6 +142,7 @@ const parseOrderSheet = (data: any[], masterRows: BrandTagRow[]): OrderRow[] => 
 };
 
 // ── Print function: renders labels into a new window for clean printing ───────
+const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
 const printLabelsInWindow = (labels: BrandTagRow[]) => {
   const win = window.open('', '_blank', 'width=300,height=500');
   if (!win) { alert('Popup blocked. Allow popups for this site.'); return; }
@@ -153,18 +154,18 @@ const printLabelsInWindow = (labels: BrandTagRow[]) => {
     const mrp = '\u20B9' + r.mrp.toLocaleString('en-IN');
     return `<div class="label">
   <div class="main">
-    <div class="row b">BRAND NAME: ${brand}</div>
-    <div class="row b">SKU: ${r.sku}</div>
-    <div class="row">PRODUCT DESC: ${product}</div>
-    <div class="row">${qty}</div>
-    <div class="row">SIZE: ${r.size}</div>
-    <div class="row">COLOR: ${r.color}</div>
-    <div class="row b">MRP: ${mrp}</div>
-    <div class="row sm">MKTD &amp; DIST. BY: ${r.mktd}</div>
-    <div class="row">JIO CODE: ${r.jioCode}</div>
-    <div class="barcode"><svg id="bc-${r.id}"></svg></div>
+    <div class="row b">BRAND NAME: ${esc(brand)}</div>
+    <div class="row b">SKU: ${esc(r.sku)}</div>
+    <div class="row">PRODUCT DESC: ${esc(product)}</div>
+    <div class="row">${esc(qty)}</div>
+    <div class="row">SIZE: ${esc(r.size)}</div>
+    <div class="row">COLOR: ${esc(r.color)}</div>
+    <div class="row b">MRP: ${esc(mrp)}</div>
+    <div class="row sm">MKTD &amp; DIST. BY: ${esc(r.mktd)}</div>
+    <div class="row">JIO CODE: ${esc(r.jioCode)}</div>
+    <div class="barcode"><svg id="bc-${esc(r.id)}"></svg></div>
   </div>
-  <div class="ean"><span>EAN: ${r.sku}</span></div>
+  <div class="ean"><span>EAN: ${esc(r.sku)}</span></div>
 </div>`;
   }).join('');
 

@@ -427,7 +427,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   // ── Export customer ledger PDF ─────────────────────────────────────────────
-  const escHtml = (s: string) => s.replace(/[<>"&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', '&': '&amp;' }[c] || c));
+  const escHtml = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
   const exportLedgerPDF = (customerName: string) => {
     if (ledgerChallans.length === 0) return;
     const safeName = escHtml(customerName);
@@ -441,18 +441,18 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       const isRet = c.is_return;
       const sign = isRet ? -1 : 1;
       return `<tr>
-        <td>#${c.challan_number}</td>
+        <td>#${escHtml(c.challan_number)}</td>
         <td>${new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
         <td>${isRet ? '<span style="color:#e53e3e">Return</span>' : 'Sale'}</td>
         <td style="text-align:right">${isRet ? '−' : ''}₹${Number(c.total).toLocaleString('en-IN')}</td>
         <td style="text-align:right">₹${(sign * Number(c.amount_paid || 0)).toLocaleString('en-IN')}</td>
         <td style="text-align:right">₹${(sign * (Number(c.total) - Number(c.amount_paid || 0))).toLocaleString('en-IN')}</td>
-        <td><span style="padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;background:${c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : '#f8d7da'};color:${c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : '#721c24'}">${c.status}</span></td>
+        <td><span style="padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;background:${c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : '#f8d7da'};color:${c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : '#721c24'}">${escHtml(c.status)}</span></td>
       </tr>`;
     }).join('');
     const w = window.open('', '_blank', 'width=800,height=600');
     if (!w) return;
-    w.document.write(`<!DOCTYPE html><html><head><title>Ledger - ${customerName}</title>
+    w.document.write(`<!DOCTYPE html><html><head><title>Ledger - ${safeName}</title>
       <style>
         body{font-family:'Inter',sans-serif;padding:24px;color:#1a202c;font-size:12px}
         h2{margin:0 0 4px;font-size:18px} .sub{color:#718096;font-size:11px;margin-bottom:16px}
@@ -526,11 +526,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const { data: citems } = await supabase.from('cash_challan_items').select('*').eq('challan_id', c.id).order('sort_order');
     const w = window.open('', '_blank');
     if (!w) return;
-    w.document.write(`<html><head><title>Cash Challan #${c.challan_number}</title><style>body{font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:auto}table{width:100%;border-collapse:collapse;margin:12px 0}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f5f5;font-weight:600}.right{text-align:right}.header{text-align:center;margin-bottom:16px}.status{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}</style></head><body>`);
-    w.document.write(`<div class="header"><h2 style="margin:0">Arya Designs</h2><p style="color:#666;font-size:11px;margin:4px 0">${c.is_return ? 'Return Challan' : 'Cash Challan'} #${c.challan_number} | ${new Date(c.created_at).toLocaleDateString('en-IN')}</p></div>`);
-    w.document.write(`<p><strong>Customer:</strong> ${c.customer_name}</p>`);
+    w.document.write(`<html><head><title>Cash Challan #${escHtml(c.challan_number)}</title><style>body{font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:auto}table{width:100%;border-collapse:collapse;margin:12px 0}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f5f5;font-weight:600}.right{text-align:right}.header{text-align:center;margin-bottom:16px}.status{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}</style></head><body>`);
+    w.document.write(`<div class="header"><h2 style="margin:0">Arya Designs</h2><p style="color:#666;font-size:11px;margin:4px 0">${c.is_return ? 'Return Challan' : 'Cash Challan'} #${escHtml(c.challan_number)} | ${new Date(c.created_at).toLocaleDateString('en-IN')}</p></div>`);
+    w.document.write(`<p><strong>Customer:</strong> ${escHtml(c.customer_name)}</p>`);
     w.document.write(`<table><thead><tr><th>#</th><th>SKU</th><th class="right">Qty</th><th class="right">Price</th><th class="right">Disc.</th><th class="right">Total</th></tr></thead><tbody>`);
-    (citems || []).forEach((it, i) => { const da = Number(it.discount_amount || 0); w.document.write(`<tr><td>${i + 1}</td><td>${it.sku || '-'}</td><td class="right">${it.quantity}</td><td class="right">${Number(it.price).toFixed(2)}</td><td class="right">${da > 0 ? '-' + da.toFixed(2) : '-'}</td><td class="right">${Number(it.total).toFixed(2)}</td></tr>`); });
+    (citems || []).forEach((it, i) => { const da = Number(it.discount_amount || 0); w.document.write(`<tr><td>${i + 1}</td><td>${escHtml(it.sku || '-')}</td><td class="right">${Number(it.quantity)}</td><td class="right">${Number(it.price).toFixed(2)}</td><td class="right">${da > 0 ? '-' + da.toFixed(2) : '-'}</td><td class="right">${Number(it.total).toFixed(2)}</td></tr>`); });
     w.document.write(`</tbody></table>`);
     w.document.write(`<div style="text-align:right;font-size:12px"><p>Subtotal: <strong>${Number(c.subtotal).toFixed(2)}</strong></p>`);
     if (Number(c.discount_amount) > 0) w.document.write(`<p>Discount: -${Number(c.discount_amount).toFixed(2)}</p>`);
@@ -540,11 +540,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const statusLabel = c.is_return ? (c.status === 'paid' ? 'Refunded' : 'Pending Refund') : c.status.charAt(0).toUpperCase() + c.status.slice(1);
     const statusColor = c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : c.status === 'draft' ? '#0c5460' : '#721c24';
     const statusBg = c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : c.status === 'draft' ? '#d1ecf1' : '#f8d7da';
-    w.document.write(`<div style="margin:12px 0;padding:10px 14px;border-radius:6px;background:${statusBg};display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;color:${statusColor};font-size:13px">Status: ${statusLabel}</span>`);
-    if (Number(c.amount_paid) > 0) w.document.write(`<span style="font-size:12px;color:${statusColor}">${c.is_return ? 'Refunded' : 'Paid'}: ₹${Number(c.amount_paid).toFixed(2)}${c.payment_mode ? ' (' + c.payment_mode + ')' : ''}</span>`);
+    w.document.write(`<div style="margin:12px 0;padding:10px 14px;border-radius:6px;background:${statusBg};display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;color:${statusColor};font-size:13px">Status: ${escHtml(statusLabel)}</span>`);
+    if (Number(c.amount_paid) > 0) w.document.write(`<span style="font-size:12px;color:${statusColor}">${c.is_return ? 'Refunded' : 'Paid'}: ₹${Number(c.amount_paid).toFixed(2)}${c.payment_mode ? ' (' + escHtml(c.payment_mode) + ')' : ''}</span>`);
     if (c.status !== 'paid' && c.status !== 'draft' && !c.is_return) { const due = Number(c.total) - Number(c.amount_paid || 0); w.document.write(`<span style="font-size:12px;color:#721c24;font-weight:600">Due: ₹${due.toFixed(2)}</span>`); }
     w.document.write(`</div>`);
-    if (c.notes) w.document.write(`<p style="font-size:11px;color:#666;margin-top:12px"><strong>Notes:</strong> ${c.notes}</p>`);
+    if (c.notes) w.document.write(`<p style="font-size:11px;color:#666;margin-top:12px"><strong>Notes:</strong> ${escHtml(c.notes)}</p>`);
     w.document.write(`<hr><p style="text-align:center;font-size:10px;color:#999">Powered by DailyOffice</p></body></html>`);
     w.document.close();
     w.print();
