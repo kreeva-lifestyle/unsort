@@ -725,6 +725,17 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         </div>
       )}
 
+      {/* Write-queue stall warning — sync is lagging (audit P2). Non-blocking so operator keeps going. */}
+      {(pendingWrites > 5 || dbFails > 0) && (
+        <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 16 }}>⏳</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: T.yl, textTransform: 'uppercase', letterSpacing: 1 }}>Sync lagging — keep scanning</div>
+            <div style={{ fontSize: 11, color: T.tx2, marginTop: 2 }}>{pendingWrites} scan{pendingWrites === 1 ? '' : 's'} waiting to sync{dbFails > 0 ? `, ${dbFails} failed` : ''}. Retrying in the background.</div>
+          </div>
+        </div>
+      )}
+
       {/* Top bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <div>

@@ -118,18 +118,49 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         <p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3 }}>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</p>
       </div>
 
-      {/* Row 1: Today's Pulse */}
-      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
+      {/* Row 1a: Today's Revenue — hero card (audit P1: the one number that matters) */}
+      <div
+        role={navigateTo ? 'button' : undefined}
+        tabIndex={navigateTo ? 0 : undefined}
+        onClick={() => navigateTo?.('challan')}
+        onKeyDown={e => { if (navigateTo && (e.key === 'Enter' || e.key === ' ')) navigateTo('challan'); }}
+        title="Net cash received today (sales − returns)"
+        className="stat-hero"
+        style={{ background: `linear-gradient(135deg, rgba(34,197,94,.08), rgba(34,197,94,.02))`, border: `1px solid rgba(34,197,94,.18)`, borderRadius: 12, padding: '18px 22px', marginBottom: 10, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, cursor: navigateTo ? 'pointer' : 'default', transition: T.transition, position: 'relative', overflow: 'hidden' }}
+        onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(34,197,94,.35)')}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(34,197,94,.18)')}
+      >
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.gr}cc, ${T.gr}22)` }} />
+        <div>
+          <p style={{ fontSize: 10, color: T.gr, letterSpacing: 1.2, marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Today's Revenue</p>
+          <p style={{ fontFamily: T.sora, fontSize: 44, fontWeight: 800, color: T.gr, margin: 0, lineHeight: 1, letterSpacing: -1.5 }}>₹{pulse.revenue.toLocaleString('en-IN')}</p>
+        </div>
+        <div style={{ textAlign: 'right' as const, fontSize: 11, color: T.tx3 }}>
+          Net of returns<br /><span style={{ color: T.tx2 }}>Tap to open Challan</span>
+        </div>
+      </div>
+
+      {/* Row 1b: Secondary stats — demoted to 3-up strip */}
+      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
         {([
-          { label: "Today's Scans", value: pulse.scans, color: T.ac, prefix: '', tip: 'Total barcodes scanned today in PackStation' },
-          { label: "Today's Revenue", value: pulse.revenue, color: T.gr, prefix: '₹', tip: 'Net cash received today (sales - returns)' },
-          { label: 'Unsorted Items', value: pulse.unsorted, color: T.yl, prefix: '', tip: 'Items awaiting sorting in Inventory' },
-          { label: 'Cash in Hand', value: pulse.cashInHand, color: T.bl, prefix: '₹', tip: 'Opening balance + sales - expenses - handovers' },
+          { label: "Today's Scans", value: pulse.scans, color: T.ac, prefix: '', tip: 'Total barcodes scanned today in PackStation', target: 'packtime' },
+          { label: 'Unsorted Items', value: pulse.unsorted, color: T.yl, prefix: '', tip: 'Items awaiting sorting in Inventory', target: 'inventory' },
+          { label: 'Cash in Hand', value: pulse.cashInHand, color: T.bl, prefix: '₹', tip: 'Opening balance + sales - expenses - handovers', target: 'challan' },
         ] as const).map((c, i) => (
-          <div key={i} title={c.tip} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px', position: 'relative', overflow: 'hidden', cursor: 'default' }}>
+          <div
+            key={i}
+            role={navigateTo ? 'button' : undefined}
+            tabIndex={navigateTo ? 0 : undefined}
+            onClick={() => navigateTo?.(c.target)}
+            onKeyDown={e => { if (navigateTo && (e.key === 'Enter' || e.key === ' ')) navigateTo(c.target); }}
+            title={c.tip}
+            style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', position: 'relative', overflow: 'hidden', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition }}
+            onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = T.bd2)}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = T.bd)}
+          >
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${c.color}cc, ${c.color}33)` }} />
-            <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, marginBottom: 4, fontWeight: 600, textTransform: 'uppercase' }}>{c.label}</p>
-            <p style={{ fontFamily: T.sora, fontSize: 20, fontWeight: 700, color: c.color, margin: 0 }}>{c.prefix}{c.value.toLocaleString('en-IN')}</p>
+            <p style={{ fontSize: 9, color: T.tx3, letterSpacing: 0.8, marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' }}>{c.label}</p>
+            <p style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: c.color, margin: 0 }}>{c.prefix}{c.value.toLocaleString('en-IN')}</p>
           </div>
         ))}
       </div>
@@ -195,14 +226,23 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
             );
           })}
         </div>
-        {/* Top 5 Customers Outstanding */}
+        {/* Top 5 Customers Outstanding — rows deep-link to Challan filtered by customer */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
-          <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Top Outstanding</p>
-          {topCustomers.length === 0 && <p style={{ fontSize: 10, color: T.tx3 }}>No outstanding dues</p>}
+          <p style={{ fontSize: 9, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Top Outstanding</p>
+          {topCustomers.length === 0 && <p style={{ fontSize: 11, color: T.tx3 }}>No outstanding dues</p>}
           {topCustomers.map((c, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: `1px solid ${T.bd}` }}>
-              <span style={{ fontSize: 10, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{c.name}</span>
-              <span style={{ fontSize: 10, fontFamily: T.mono, color: T.re, fontWeight: 600, flexShrink: 0 }}>₹{c.outstanding.toLocaleString('en-IN')}</span>
+            <div
+              key={i}
+              role={navigateTo ? 'button' : undefined}
+              tabIndex={navigateTo ? 0 : undefined}
+              onClick={() => navigateTo?.('challan')}
+              onKeyDown={e => { if (navigateTo && (e.key === 'Enter' || e.key === ' ')) navigateTo('challan'); }}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 4px', borderBottom: `1px solid ${T.bd}`, cursor: navigateTo ? 'pointer' : 'default', borderRadius: 4, transition: 'background .15s' }}
+              onMouseEnter={e => navigateTo && (e.currentTarget.style.background = 'rgba(99,102,241,.06)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <span style={{ fontSize: 11, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{c.name}</span>
+              <span style={{ fontSize: 11, fontFamily: T.mono, color: T.re, fontWeight: 600, flexShrink: 0 }}>₹{c.outstanding.toLocaleString('en-IN')}</span>
             </div>
           ))}
         </div>
