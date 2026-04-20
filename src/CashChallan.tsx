@@ -600,11 +600,6 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   // ── WhatsApp share ─────────────────────────────────────────────────────────
-  const shareChallan = (c: Challan) => {
-    const text = `*Cash Challan #${c.challan_number}*\nCustomer: ${c.customer_name}\nDate: ${new Date(c.created_at).toLocaleDateString('en-IN')}\nTotal: ₹${Number(c.total).toFixed(2)}\nStatus: ${c.status.toUpperCase()}\n${(c.amount_paid ?? 0) > 0 ? `Paid: ₹${Number(c.amount_paid).toFixed(2)}` : ''}\n\n_Powered by DailyOffice_`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-  };
-
   const totalPages = Math.ceil(totalCount / pageSize);
   const allTags = [...new Set(challans.flatMap(c => c.tags || []))];
 
@@ -757,9 +752,6 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
               <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                 <button onClick={e => { e.stopPropagation(); printChallan(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.5 }}>
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.tx2, strokeWidth: 2 }}><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
-                </button>
-                <button onClick={e => { e.stopPropagation(); shareChallan(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.5 }} title="Share">
-                  <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.gr, strokeWidth: 2 }}><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></svg>
                 </button>
                 {(c.status === 'unpaid' || c.status === 'partial') && <button onClick={e => { e.stopPropagation(); sendReminder(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.6 }} title="Send WhatsApp reminder">
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.yl, strokeWidth: 2 }}><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
