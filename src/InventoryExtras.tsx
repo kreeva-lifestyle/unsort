@@ -51,7 +51,7 @@ export default function InventoryExtras() {
   const [completeItem, setCompleteItem] = useState<{ extra: InventoryExtra; item: InventoryItemMatch } | null>(null);
 
   const fetchExtras = useCallback(async () => {
-    const { data } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, quantity, notes, created_by, created_at, updated_at').order('updated_at', { ascending: false }).limit(1000);
+    const { data } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, quantity, notes, created_by, created_at, updated_at').gt('quantity', 0).order('updated_at', { ascending: false }).limit(1000);
     setExtras(data || []);
     // Compute match counts — check item actually has this component missing
     const counts: Record<string, number> = {};
@@ -163,20 +163,17 @@ export default function InventoryExtras() {
     if (qty < 1) return;
     const newQty = adjustMode === 'add' ? adjustExtra.quantity + qty : adjustExtra.quantity - qty;
     if (newQty < 0) { setError('Cannot go below 0'); return; }
-    const { data: { user } } = await supabase.auth.getUser();
-    // Optimistic concurrency check: fail if another user changed the quantity
-    const { data: updated, error: upErr } = await supabase.from('inventory_extras')
-      .update({ quantity: newQty, updated_at: new Date().toISOString() })
-      .eq('id', adjustExtra.id)
-      .eq('quantity', adjustExtra.quantity)
-      .select().single();
-    if (upErr || !updated) { setError('Another user just updated this extra. Close and reopen to retry.'); return; }
-    const { error: histErr } = await supabase.from('inventory_extras_history').insert({
-      extra_id: adjustExtra.id, action: adjustMode === 'add' ? 'added' : 'removed',
-      quantity_change: adjustMode === 'add' ? qty : -qty, quantity_after: newQty,
-      reason: adjustReason.trim() || null, user_id: user?.id,
-    });
-    if (histErr) setError('Quantity updated but history log failed — ' + friendlyError(histErr));
+    if (newQty <= 0) {
+      // Qty reached zero — delete the row entirely
+      await supabase.from('inventory_extras').delete().eq('id', adjustExtra.id);
+    } else {
+      const { data: updated, error: upErr } = await supabase.from('inventory_extras')
+        .update({ quantity: newQty, updated_at: new Date().toISOString() })
+        .eq('id', adjustExtra.id)
+        .eq('quantity', adjustExtra.quantity)
+        .select().single();
+      if (upErr || !updated) { setError('Another user just updated this extra. Close and reopen to retry.'); return; }
+    }
     setAdjustExtra(null); setAdjustQty('1'); setAdjustReason(''); fetchExtras();
   };
 
