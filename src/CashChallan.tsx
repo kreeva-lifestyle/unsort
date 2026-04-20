@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import CashBook from './CashBook';
 import { supabase } from './lib/supabase';
 import { useNotifications } from './hooks/useNotifications';
@@ -75,7 +75,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [paymentMode, setPaymentMode] = useState('');
   const [paymentDate, setPaymentDate] = useState('');
   const [amountPaid, setAmountPaid] = useState(0);
-  const [challanStatus, setChallanStatus] = useState('draft');
+  const [challanStatus, setChallanStatus] = useState('unpaid');
   const [customerPhone, setCustomerPhone] = useState('');
   const [isReturn, setIsReturn] = useState(false);
   const [returnSource, setReturnSource] = useState<Challan | null>(null);
@@ -87,6 +87,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // Analytics
   const [showErpReminder, setShowErpReminder] = useState(false);
+  // Ledger PDF preview — rendered in an in-app iframe (audit: no popup).
+  const [ledgerPdfHtml, setLedgerPdfHtml] = useState<string | null>(null);
+  const [ledgerPdfTitle, setLedgerPdfTitle] = useState('');
+  const ledgerPdfIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [userName, setUserName] = useState('there');
   const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number } | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -499,11 +503,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         <td><span style="padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;background:${c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : '#f8d7da'};color:${c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : '#721c24'}">${escHtml(c.status)}</span></td>
       </tr>`;
     }).join('');
-    const w = window.open('', '_blank', 'width=800,height=600');
-    if (!w) return;
-    w.document.write(`<!DOCTYPE html><html><head><title>Ledger - ${safeName}</title>
+    const html = `<!DOCTYPE html><html><head><title>Ledger - ${safeName}</title>
       <style>
-        body{font-family:'Inter',sans-serif;padding:24px;color:#1a202c;font-size:12px}
+        body{font-family:'Inter',sans-serif;padding:24px;color:#1a202c;font-size:12px;margin:0}
         h2{margin:0 0 4px;font-size:18px} .sub{color:#718096;font-size:11px;margin-bottom:16px}
         .stats{display:flex;gap:12px;margin-bottom:16px}
         .stat{flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:10px;text-align:center}
@@ -534,9 +536,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         <div class="final"><span>Outstanding</span><span>₹${outstanding.toLocaleString('en-IN')}</span></div>
       </div>
       <div class="footer">DailyOffice — Your Workspace, Simplified</div>
-    </body></html>`);
-    w.document.close();
-    setTimeout(() => w.print(), 300);
+    </body></html>`;
+    setLedgerPdfTitle(customerName);
+    setLedgerPdfHtml(html);
   };
 
   // ── Open edit ──────────────────────────────────────────────────────────────
@@ -566,7 +568,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setShowModal(false); setEditing(null); setCustomerName(''); setSelectedCustomerId(null); setCustomerPhone(''); setIsReturn(false); setReturnSource(null); setReturnSearchQ(''); setReturnResults([]);
     setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
     setShippingCharges(0); setNotes(''); setTags('');
-    setPaymentMode(''); setPaymentDate(''); setAmountPaid(0); setChallanStatus('draft');
+    setPaymentMode(''); setPaymentDate(''); setAmountPaid(0); setChallanStatus('unpaid');
     setCustomerSuggestions([]);
   };
 
@@ -810,6 +812,25 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
               <button onClick={() => setReminderChallan(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', fontSize: 11, fontWeight: 500, background: 'rgba(99,102,241,0.06)', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
               <button onClick={saveReminderPhone} disabled={!reminderPhone.trim()} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: reminderPhone.trim() ? `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)` : 'rgba(255,255,255,.05)', color: '#fff', cursor: reminderPhone.trim() ? 'pointer' : 'not-allowed' }}>Send</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ledger PDF preview — in-app iframe, avoids popup blockers */}
+      {ledgerPdfHtml && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setLedgerPdfHtml(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: 'min(900px, 100%)', maxHeight: '92vh', display: 'flex', flexDirection: 'column' as const, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,.6)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#111', fontFamily: T.sora }}>Ledger — {ledgerPdfTitle}</div>
+                <div style={{ fontSize: 11, color: '#6B7890' }}>Preview. Click Print to save as PDF.</div>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => { ledgerPdfIframeRef.current?.contentWindow?.print(); }} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', boxShadow: '0 2px 10px rgba(99,102,241,.3)' }}>Print / Save as PDF</button>
+                <button onClick={() => setLedgerPdfHtml(null)} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Close</button>
+              </div>
+            </div>
+            <iframe ref={ledgerPdfIframeRef} title="Ledger PDF preview" srcDoc={ledgerPdfHtml} style={{ flex: 1, width: '100%', minHeight: 460, border: 'none', background: '#fff' }} />
           </div>
         </div>
       )}
