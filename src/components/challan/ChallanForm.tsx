@@ -37,6 +37,7 @@ export type ChallanFormProps = {
   // Items + charges
   items: ChallanItem[];
   setItems: (v: ChallanItem[]) => void;
+  itemValidationError: (it: ChallanItem) => string | null;
   shippingCharges: number;
   setShippingCharges: (v: number) => void;
   tags: string;
@@ -155,37 +156,57 @@ export default function ChallanForm(p: ChallanFormProps) {
               <span title="Per-item discount: ₹ flat or % of line total" style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, textAlign: 'right' as const, cursor: 'help' }}>Discount</span>
               <span></span>
             </div>
-            {p.items.map((it, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 90px 24px', gap: 4, padding: '5px 8px', borderBottom: `1px solid ${T.bd}`, alignItems: 'center' }}>
-                <input data-sku value={it.sku} onChange={e => { const n = [...p.items]; n[i].sku = e.target.value; p.setItems(n); }} placeholder="SKU / Item name" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
-                <input type="number" value={it.quantity || ''} onChange={e => { const n = [...p.items]; n[i].quantity = Number(e.target.value); p.setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'center' as const }} />
-                <input type="number" value={it.price || ''} onChange={e => { const n = [...p.items]; n[i].price = Number(e.target.value); p.setItems(n); }} placeholder="0" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
-                <div style={{ display: 'flex', gap: 2, alignItems: 'center', opacity: p.isReturn && p.returnSource ? 0.6 : 1 }}>
-                  <select value={it.discount_type || 'flat'} onChange={e => { const n = [...p.items]; n[i].discount_type = e.target.value; p.setItems(n); }} disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx3, fontSize: 9, padding: '5px 2px', outline: 'none', width: 32 }}>
-                    <option value="flat">₹</option><option value="percentage">%</option>
-                  </select>
-                  <input
-                    type="number"
-                    value={it.discount_value || ''}
-                    onChange={e => { const n = [...p.items]; n[i].discount_value = Number(e.target.value); p.setItems(n); }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && i === p.items.length - 1 && !(p.isReturn && p.returnSource)) {
-                        e.preventDefault();
-                        p.setItems([...p.items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
-                        setTimeout(() => {
-                          const inputs = (e.currentTarget.closest('[data-items]') as HTMLElement | null)?.querySelectorAll<HTMLInputElement>('input[data-sku]');
-                          inputs?.[inputs.length - 1]?.focus();
-                        }, 0);
-                      }
-                    }}
-                    placeholder="0"
-                    disabled={!!(p.isReturn && p.returnSource)}
-                    style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, flex: 1, minWidth: 0 }}
-                  />
+            {p.items.map((it, i) => {
+              // Per-row validation (mirror of saveChallan's check) for inline
+              // red-border feedback while typing. Humans should see the error
+              // immediately, not after clicking Save.
+              const err = p.itemValidationError(it);
+              const q = Number(it.quantity) || 0;
+              const pr = Number(it.price) || 0;
+              const d = Number(it.discount_value) || 0;
+              const qtyBad = q < 0;
+              const priceBad = pr < 0;
+              const discBad =
+                d < 0 ||
+                (it.discount_type === 'percentage' && d > 100) ||
+                (it.discount_type !== 'percentage' && q > 0 && pr > 0 && d > q * pr);
+              const errBorder = `1px solid ${T.re}aa`;
+              const okBorder = `1px solid ${T.bd}`;
+              return (
+              <div key={i}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 90px 24px', gap: 4, padding: '5px 8px', borderBottom: err ? 'none' : `1px solid ${T.bd}`, alignItems: 'center' }}>
+                  <input data-sku value={it.sku} onChange={e => { const n = [...p.items]; n[i].sku = e.target.value; p.setItems(n); }} placeholder="SKU / Item name" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
+                  <input type="number" value={it.quantity || ''} onChange={e => { const n = [...p.items]; n[i].quantity = Number(e.target.value); p.setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: qtyBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'center' as const }} />
+                  <input type="number" value={it.price || ''} onChange={e => { const n = [...p.items]; n[i].price = Number(e.target.value); p.setItems(n); }} placeholder="0" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: priceBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
+                  <div style={{ display: 'flex', gap: 2, alignItems: 'center', opacity: p.isReturn && p.returnSource ? 0.6 : 1 }}>
+                    <select value={it.discount_type || 'flat'} onChange={e => { const n = [...p.items]; n[i].discount_type = e.target.value; p.setItems(n); }} disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx3, fontSize: 9, padding: '5px 2px', outline: 'none', width: 32 }}>
+                      <option value="flat">₹</option><option value="percentage">%</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={it.discount_value || ''}
+                      onChange={e => { const n = [...p.items]; n[i].discount_value = Number(e.target.value); p.setItems(n); }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && i === p.items.length - 1 && !(p.isReturn && p.returnSource)) {
+                          e.preventDefault();
+                          p.setItems([...p.items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
+                          setTimeout(() => {
+                            const inputs = (e.currentTarget.closest('[data-items]') as HTMLElement | null)?.querySelectorAll<HTMLInputElement>('input[data-sku]');
+                            inputs?.[inputs.length - 1]?.focus();
+                          }, 0);
+                        }
+                      }}
+                      placeholder="0"
+                      disabled={!!(p.isReturn && p.returnSource)}
+                      style={{ background: 'rgba(255,255,255,0.04)', border: discBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, flex: 1, minWidth: 0 }}
+                    />
+                  </div>
+                  <button onClick={() => { if (p.items.length > 1) p.setItems(p.items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }}>×</button>
                 </div>
-                <button onClick={() => { if (p.items.length > 1) p.setItems(p.items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }}>×</button>
+                {err && <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.re, borderBottom: `1px solid ${T.bd}`, background: 'rgba(239,68,68,.04)', display: 'flex', alignItems: 'center', gap: 5 }}>⚠ {err}</div>}
               </div>
-            ))}
+              );
+            })}
             {!(p.isReturn && p.returnSource) && <button onClick={() => p.setItems([...p.items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item (or press Enter on last row)</button>}
           </div>
 
@@ -193,7 +214,8 @@ export default function ChallanForm(p: ChallanFormProps) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
             <div>
               <label style={lbl}>Shipping/Porter</label>
-              <input type="number" value={p.shippingCharges || ''} onChange={e => p.setShippingCharges(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
+              <input type="number" value={p.shippingCharges || ''} onChange={e => p.setShippingCharges(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11, border: p.shippingCharges < 0 ? `1px solid ${T.re}aa` : `1px solid ${T.bd}` }} />
+              {p.shippingCharges < 0 && <div style={{ fontSize: 10, color: T.re, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>⚠ Cannot be negative</div>}
             </div>
             <div>
               <label style={lbl}>Tags <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0, fontSize: 7 }}>comma separated</span></label>
