@@ -50,7 +50,8 @@ const MainApp = () => {
   // Central navigate — updates URL + state
   const setTab = (t: string) => {
     if (!VALID_TABS.includes(t)) t = 'dashboard';
-    if (t === 'settings' && profile?.role !== 'admin' && profile?.role !== 'manager') t = 'dashboard';
+    // Settings is open to everyone — My Profile tab (Phone + Cash PIN) is required for operators too.
+    if (t === 'settings' && !profile) t = 'dashboard';
     const newHash = `#/${t}`;
     if (window.location.hash !== newHash) window.history.pushState(null, '', newHash);
     setTabState(t);
