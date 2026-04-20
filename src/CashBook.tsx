@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from './lib/supabase';
 import { friendlyError } from './lib/friendlyError';
 
@@ -338,11 +338,40 @@ export default function CashBook() {
     fetchData();
   };
 
+  // Expenses that fall inside a CONFIRMED cash handover's period are locked —
+  // deleting them would silently change the numbers that a signed handover
+  // was based on. We hide the delete button for these rows and refuse at
+  // the handler level as a second line of defense.
+  const lockedExpenseIds = useMemo(() => {
+    const locked = new Set<string>();
+    const confirmed = handovers.filter(h => h.status === 'confirmed');
+    if (confirmed.length === 0) return locked;
+    for (const e of expenses) {
+      const eDate = e.date; // 'YYYY-MM-DD'
+      for (const h of confirmed) {
+        const hFrom = h.period_from || h.date;
+        const hTo = h.period_to || h.date;
+        if (eDate && hFrom && hTo && eDate >= hFrom && eDate <= hTo) { locked.add(e.id); break; }
+      }
+    }
+    return locked;
+  }, [expenses, handovers]);
+
   const deleteExpense = async (id: string) => {
+    if (lockedExpenseIds.has(id)) {
+      setConfirmDelete(null);
+      setFormError('This expense is locked — it was included in a confirmed cash handover and cannot be deleted.');
+      return;
+    }
     setConfirmDelete(null);
     setExpenses(prev => prev.filter(e => e.id !== id));
     if (pendingExpDel) clearTimeout(pendingExpDel.timer);
-    const timer = window.setTimeout(async () => { await supabase.from('cash_expenses').delete().eq('id', id); setPendingExpDel(null); fetchData(); }, 5000);
+    const timer = window.setTimeout(async () => {
+      const { error } = await supabase.from('cash_expenses').delete().eq('id', id);
+      if (error) setFormError('Delete failed — ' + friendlyError(error));
+      setPendingExpDel(null);
+      fetchData();
+    }, 5000);
     setPendingExpDel({ id, timer });
   };
   const undoExpDel = () => { if (pendingExpDel) { clearTimeout(pendingExpDel.timer); setPendingExpDel(null); fetchData(); } };
@@ -435,9 +464,15 @@ export default function CashBook() {
                 {e.description && <div style={{ fontSize: 10, color: T.tx3 }}>{e.description}</div>}
               </div>
               <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.re }}>−₹{Number(e.amount).toLocaleString('en-IN')}</div>
-              <button onClick={() => setConfirmDelete(e.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4 }}>
-                <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
-              </button>
+              {lockedExpenseIds.has(e.id) ? (
+                <span title="Included in a confirmed cash handover — cannot be deleted" style={{ display: 'inline-flex', alignItems: 'center', padding: 0, opacity: 0.5, color: T.tx3 }}>
+                  <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+                </span>
+              ) : (
+                <button onClick={() => setConfirmDelete(e.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4 }}>
+                  <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                </button>
+              )}
             </div>
           ))}
         </div>
