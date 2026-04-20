@@ -350,7 +350,7 @@ export default function CashBook() {
 
   const exportCSV = async () => {
     // Export expenses for selected date range
-    const { data } = await supabase.from('cash_expenses').select('*').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false });
+    const { data } = await supabase.from('cash_expenses').select('id, date, amount, category, description, paid_by, created_at').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false });
     const rows = (data || []).map(e => `${e.date},${e.amount},${e.category},"${(e.description || '').replace(/"/g, '""')}"`);
     const csv = 'Date,Amount,Category,Description\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });

@@ -537,7 +537,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     let page = 0;
     const ps = 5000;
     while (true) {
-      let q = supabase.from('packtime_scans').select('*');
+      let q = supabase.from('packtime_scans').select('id, session_id, awb, courier, camera, brand, scanned_at');
       if (historySearch) q = q.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
       if (historyFilterCourier) q = q.eq('courier', historyFilterCourier);
       if (historyFilterBrand) q = q.eq('brand', historyFilterBrand);
