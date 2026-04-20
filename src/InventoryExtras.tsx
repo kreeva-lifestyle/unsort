@@ -10,7 +10,6 @@ import type {
   InventoryItem,
   ItemComponent,
   InventoryExtra,
-  InventoryExtraHistory,
 } from './types/database';
 
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', 'Semi-Stitched'];
@@ -44,9 +43,6 @@ export default function InventoryExtras() {
   const [adjustMode, setAdjustMode] = useState<'add' | 'remove'>('add');
   const [adjustQty, setAdjustQty] = useState('1');
   const [adjustReason, setAdjustReason] = useState('');
-  // History
-  const [historyExtra, setHistoryExtra] = useState<InventoryExtra | null>(null);
-  const [history, setHistory] = useState<InventoryExtraHistory[]>([]);
   // Matches
   const [matchExtra, setMatchExtra] = useState<InventoryExtra | null>(null);
   const [matches, setMatches] = useState<InventoryItemMatch[]>([]);
@@ -85,12 +81,9 @@ export default function InventoryExtras() {
   useEffect(() => {
     const ch = supabase.channel('extras-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_extras' }, () => fetchExtras())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_extras_history' }, () => {
-        if (historyExtra) loadHistory(historyExtra.id);
-      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [fetchExtras, historyExtra]);
+  }, [fetchExtras]);
 
   // SKU autocomplete
   const searchSkus = useCallback(async (q: string) => {
@@ -114,11 +107,6 @@ export default function InventoryExtras() {
     if (comp && isDupatta(comp.name)) setFSize('N/A');
     else if (fSize === 'N/A') setFSize('');
   }, [fComponentId, fComps, fSize]);
-
-  const loadHistory = async (extraId: string) => {
-    const { data } = await supabase.from('inventory_extras_history').select('id, extra_id, action, quantity_change, quantity_after, reason, related_inventory_item_id, user_id, created_at').eq('extra_id', extraId).order('created_at', { ascending: false });
-    setHistory(data || []);
-  };
 
   const loadMatches = async (ex: InventoryExtra) => {
     let q = supabase.from('inventory_items').select('id, batch_number, serial_number, size, location, status')
@@ -198,13 +186,18 @@ export default function InventoryExtras() {
     if (extra.quantity < 1) { setError('No quantity available'); return; }
     setSaving(true);
     // Atomic RPC: decrements extra, verifies item, marks complete, fills
-    // component, and writes history + activity log — all in one transaction.
+    // component, and writes activity log — all in one transaction.
     const { error } = await supabase.rpc('complete_item_with_extra', {
       p_extra_id: extra.id,
       p_item_id: item.id,
       p_reason: null,
     });
     if (error) { setError(friendlyError(error)); setSaving(false); return; }
+    // Once matched, the extra served its purpose. Delete the row when
+    // qty reaches 0 — no need to keep spent extras in the database.
+    if (extra.quantity <= 1) {
+      await supabase.from('inventory_extras').delete().eq('id', extra.id);
+    }
     setSaving(false); setCompleteItem(null); setMatchExtra(null); fetchExtras();
   };
 
@@ -280,8 +273,7 @@ export default function InventoryExtras() {
                 </td>
                 <td style={{ ...td, whiteSpace: 'nowrap' }}>
                   <span onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...btnGhost, padding: '5px 10px', fontSize: 10, cursor: 'pointer', color: T.gr, borderColor: 'rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Add</span>{' '}
-                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...btnGhost, padding: '5px 10px', fontSize: 10, cursor: 'pointer', color: T.re, borderColor: 'rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Remove</span>{' '}
-                  <span onClick={() => { setHistoryExtra(ex); loadHistory(ex.id); }} style={{ ...btnGhost, padding: '5px 10px', fontSize: 10, cursor: 'pointer' }}>History</span>
+                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...btnGhost, padding: '5px 10px', fontSize: 10, cursor: 'pointer', color: T.re, borderColor: 'rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Remove</span>
                 </td>
               </tr>
             ))}
@@ -369,39 +361,6 @@ export default function InventoryExtras() {
         </div>
       </div>, document.body)}
 
-      {/* History Modal */}
-      {historyExtra && createPortal(<div style={overlay} onClick={() => setHistoryExtra(null)}>
-        <div className="modal-inner" style={{ ...modal, width: 540 }} onClick={e => e.stopPropagation()}>
-          <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>History: {historyExtra.component_name} ({historyExtra.sku})</span>
-            <span onClick={() => setHistoryExtra(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16 }}>&times;</span>
-          </div>
-          <div style={{ padding: 12, maxHeight: 400, overflowY: 'auto' }}>
-            {history.length === 0 && <div style={{ color: T.tx3, fontSize: 11, textAlign: 'center', padding: 20 }}>No history</div>}
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              {history.length > 0 && <thead><tr>
-                <th style={th}>Action</th><th style={th}>Change</th><th style={th}>Balance</th><th style={th}>Reason</th><th style={th}>Time</th>
-              </tr></thead>}
-              <tbody>
-                {history.map(h => (
-                  <tr key={h.id}>
-                    <td style={td}><span style={{
-                      fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-                      background: h.action === 'created' ? 'rgba(99,102,241,.12)' : h.action === 'added' ? 'rgba(34,197,94,.12)' : h.action === 'used' ? 'rgba(245,158,11,.12)' : 'rgba(239,68,68,.12)',
-                      color: h.action === 'created' ? T.ac2 : h.action === 'added' ? T.gr : h.action === 'used' ? T.yl : T.re,
-                    }}>{h.action.toUpperCase()}</span></td>
-                    <td style={{ ...td, fontFamily: T.mono, color: h.quantity_change > 0 ? T.gr : T.re }}>{h.quantity_change > 0 ? '+' : ''}{h.quantity_change}</td>
-                    <td style={{ ...td, fontWeight: 600 }}>{h.quantity_after}</td>
-                    <td style={{ ...td, fontSize: 10, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.reason || '--'}</td>
-                    <td style={{ ...td, fontSize: 10, whiteSpace: 'nowrap' }}>{h.created_at ? new Date(h.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '--'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>, document.body)}
-
       {/* Matches Modal */}
       {matchExtra && createPortal(<div style={overlay} onClick={() => setMatchExtra(null)}>
         <div className="modal-inner" style={{ ...modal, width: 520 }} onClick={e => e.stopPropagation()}>
@@ -449,8 +408,7 @@ export default function InventoryExtras() {
             Use 1 x <b style={{ color: T.tx }}>{completeItem.extra.component_name}</b> to complete
             batch <b style={{ color: T.tx }}>#{completeItem.item.batch_number || 'N/A'}</b>
             (SKU: {completeItem.item.serial_number}, Size: {completeItem.item.size})?
-            <br/><br/>
-            Extra quantity will reduce from <b style={{ color: T.gr }}>{completeItem.extra.quantity}</b> to <b style={{ color: T.yl }}>{completeItem.extra.quantity - 1}</b>.
+            {completeItem.extra.quantity <= 1 && <><br/><br/><span style={{ color: T.yl, fontSize: 11 }}>This is the last piece — the extra row will be removed after use.</span></>}
           </div>
           {error && <div style={{ padding: '0 18px 10px', color: T.re, fontSize: 11 }}>{error}</div>}
           <div style={{ padding: '0 18px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
