@@ -605,28 +605,46 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const totalPages = Math.ceil(totalCount / pageSize);
   const allTags = [...new Set(challans.flatMap(c => c.tags || []))];
 
+  // Ledger PDF modal — must be ABOVE all early returns so it renders
+  // when showLedger is true. It's position:fixed so it overlays any view.
+  const pdfModal = ledgerPdfHtml ? (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setLedgerPdfHtml(null)}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: 'min(900px, 100%)', maxHeight: '92vh', display: 'flex', flexDirection: 'column' as const, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,.6)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#111', fontFamily: T.sora }}>Ledger — {ledgerPdfTitle}</div>
+            <div style={{ fontSize: 11, color: '#6B7890' }}>Preview. Click Print to save as PDF.</div>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => { ledgerPdfIframeRef.current?.contentWindow?.print(); }} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', boxShadow: '0 2px 10px rgba(99,102,241,.3)' }}>Print / Save as PDF</button>
+            <button onClick={() => setLedgerPdfHtml(null)} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Close</button>
+          </div>
+        </div>
+        <iframe ref={ledgerPdfIframeRef} title="Ledger PDF preview" srcDoc={ledgerPdfHtml} style={{ flex: 1, width: '100%', minHeight: 460, border: 'none', background: '#fff' }} />
+      </div>
+    </div>
+  ) : null;
+
   // ── Cash Book Screen ───────────────────────────────────────────────────────
   if (showCashBook) return (
-    <div>
-      <CashBook />
-    </div>
+    <div>{pdfModal}<CashBook /></div>
   );
 
   // ── Analytics Screen ───────────────────────────────────────────────────────
   if (showAnalytics) return (
-    <ChallanAnalytics
+    <>{pdfModal}<ChallanAnalytics
       analytics={analytics}
       from={analyticsFrom}
       to={analyticsTo}
       onFromChange={setAnalyticsFrom}
       onToChange={setAnalyticsTo}
       onApply={fetchAnalytics}
-    />
+    /></>
   );
 
   // ── Ledger (list + detail) — extracted to components/challan/ChallanLedger.tsx ──
   if (showLedger) return (
-    <ChallanLedger
+    <>{pdfModal}<ChallanLedger
       detailName={ledgerDetail}
       customers={ledgerCustomers}
       detailChallans={ledgerChallans as any}
@@ -638,7 +656,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       onExportPdf={exportLedgerPDF}
       onLoadMore={() => { const newLimit = ledgerFetchLimit + 500; setLedgerFetchLimit(newLimit); fetchLedger(newLimit); }}
       statusColors={STATUS_COLORS}
-    />
+    /></>
   );
 
   // ── Create/Edit Modal — extracted to components/challan/ChallanForm.tsx ──
@@ -812,25 +830,6 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
               <button onClick={() => setReminderChallan(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', fontSize: 11, fontWeight: 500, background: 'rgba(99,102,241,0.06)', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
               <button onClick={saveReminderPhone} disabled={!reminderPhone.trim()} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: reminderPhone.trim() ? `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)` : 'rgba(255,255,255,.05)', color: '#fff', cursor: reminderPhone.trim() ? 'pointer' : 'not-allowed' }}>Send</button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Ledger PDF preview — in-app iframe, avoids popup blockers */}
-      {ledgerPdfHtml && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setLedgerPdfHtml(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: 'min(900px, 100%)', maxHeight: '92vh', display: 'flex', flexDirection: 'column' as const, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,.6)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#111', fontFamily: T.sora }}>Ledger — {ledgerPdfTitle}</div>
-                <div style={{ fontSize: 11, color: '#6B7890' }}>Preview. Click Print to save as PDF.</div>
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => { ledgerPdfIframeRef.current?.contentWindow?.print(); }} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', boxShadow: '0 2px 10px rgba(99,102,241,.3)' }}>Print / Save as PDF</button>
-                <button onClick={() => setLedgerPdfHtml(null)} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Close</button>
-              </div>
-            </div>
-            <iframe ref={ledgerPdfIframeRef} title="Ledger PDF preview" srcDoc={ledgerPdfHtml} style={{ flex: 1, width: '100%', minHeight: 460, border: 'none', background: '#fff' }} />
           </div>
         </div>
       )}
