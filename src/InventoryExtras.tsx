@@ -12,7 +12,7 @@ import type {
   InventoryExtra,
 } from './types/database';
 
-const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', 'Semi-Stitched'];
+const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
 const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
 const isLehenga = (name: string) => /lehenga|lehnga|ghaghra/i.test(name);
 const isBottomType = (name: string) => /bottom|pant|trouser|skirt|salwar|churidar|palazzo/i.test(name);
@@ -130,8 +130,8 @@ export default function InventoryExtras() {
     const compIsBottom = comp && isBottomType(comp.name);
     if (compIsDupatta && fSize !== 'N/A') { setError('Dupatta must have size "N/A"'); return; }
     if (!compIsDupatta && fSize === 'N/A') { setError('N/A is only allowed for Dupatta/Orhni/Chunni/Stole'); return; }
-    if (fSize === 'Free Size' && !compIsLehenga) { setError('Free Size is only allowed for Lehenga'); return; }
-    if (compIsBottom && (fSize === 'N/A' || fSize === 'Free Size')) { setError('Bottom/Pant requires a specific size (not N/A or Free Size)'); return; }
+    if (fSize === 'Semi-Stitched' && !compIsLehenga) { setError('Semi-Stitched is only allowed for Lehenga'); return; }
+    if (compIsBottom && (fSize === 'N/A' || fSize === 'Semi-Stitched')) { setError('Bottom/Pant requires a specific size (not N/A or Semi-Stitched)'); return; }
     const qty = parseInt(fQty) || 0;
     if (qty < 1) { setError('Initial quantity must be at least 1 (cannot be zero)'); return; }
     setSaving(true);
