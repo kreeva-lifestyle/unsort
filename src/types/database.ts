@@ -351,6 +351,7 @@ export type CashExpenseInsert = {
 
 export interface CashHandover {
   id: string;
+  handover_number: number;
   date: string;
   amount: number;
   from_user_id: string | null;
@@ -373,6 +374,7 @@ export interface CashHandover {
 
 export type CashHandoverInsert = {
   id?: string;
+  // handover_number omitted — DB default supplies it via sequence
   date: string;
   amount: number;
   from_user_id?: string | null;
