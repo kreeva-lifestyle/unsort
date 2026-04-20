@@ -233,14 +233,14 @@ export default function ChallanForm(p: ChallanFormProps) {
               <label style={lbl}>Status</label>
               <select value={p.challanStatus} onChange={e => p.setChallanStatus(e.target.value)} style={{ ...inp, fontSize: 11 }}>
                 {p.isReturn ? (<>
-                  {(!p.editing || p.editing.status === 'draft') && <option value="draft">Draft</option>}
                   <option value="unpaid">Pending Refund</option>
                   <option value="paid">Refunded</option>
-                </>) : (<>
                   {(!p.editing || p.editing.status === 'draft') && <option value="draft">Draft</option>}
+                </>) : (<>
                   <option value="unpaid">Unpaid</option>
                   <option value="paid">Paid</option>
                   <option value="partial">Partial</option>
+                  {(!p.editing || p.editing.status === 'draft') && <option value="draft">Draft</option>}
                 </>)}
               </select>
             </div>
