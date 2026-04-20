@@ -105,12 +105,19 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
 
   // ── Computed values (per-item discount) ─────────────────────────────────
+  // Honest math throughout — no silent clamping. If the user enters an
+  // over-discount, the totals card shows the real numbers (e.g. Subtotal
+  // ₹2,000, Discount -₹3,000, Total -₹1,000) so they can see and correct
+  // the mistake. Save is blocked downstream by itemValidationError +
+  // grandTotal < 0 checks before anything hits the DB.
+  const computeItemLineTotal = (it: ChallanItem) => Math.round((it.quantity * it.price) * 100) / 100;
+  const computeItemDiscount = (it: ChallanItem) => {
+    const d = it.discount_value || 0;
+    const raw = it.discount_type === 'percentage' ? (it.quantity * it.price * d / 100) : d;
+    return Math.round(raw * 100) / 100;
+  };
   const computeItemTotal = (it: ChallanItem) => {
-    const lineTotal = it.quantity * it.price;
-    const disc = it.discount_type === 'percentage'
-      ? Math.min(lineTotal * (it.discount_value || 0) / 100, lineTotal)
-      : Math.min(it.discount_value || 0, lineTotal);
-    return Math.round((lineTotal - Math.max(0, disc)) * 100) / 100;
+    return Math.round((computeItemLineTotal(it) - computeItemDiscount(it)) * 100) / 100;
   };
 
   // Human-readable validation for a single line item. Returns null when OK,
@@ -132,12 +139,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     }
     return null;
   };
-  const subtotal = Math.round(items.reduce((s, i) => s + computeItemTotal(i), 0) * 100) / 100;
-  const totalDiscount = Math.round(items.reduce((s, i) => s + (i.quantity * i.price - computeItemTotal(i)), 0) * 100) / 100;
+  // Subtotal = raw line totals (pre-discount). Discount = raw sum as entered.
+  // Total = subtotal - discount + shipping (can go negative while editing).
+  const subtotal = Math.round(items.reduce((s, i) => s + computeItemLineTotal(i), 0) * 100) / 100;
+  const totalDiscount = Math.round(items.reduce((s, i) => s + computeItemDiscount(i), 0) * 100) / 100;
   const clampedShipping = Math.max(0, shippingCharges);
-  const afterDiscount = Math.round((subtotal + clampedShipping) * 100) / 100;
-  const roundOff = Math.round((Math.round(afterDiscount) - afterDiscount) * 100) / 100;
-  const grandTotal = Math.round(afterDiscount);
+  const afterAll = Math.round((subtotal - totalDiscount + clampedShipping) * 100) / 100;
+  const roundOff = Math.round((Math.round(afterAll) - afterAll) * 100) / 100;
+  const grandTotal = Math.round(afterAll);
 
   // ── Fetch challans ─────────────────────────────────────────────────────────
   const fetchChallans = useCallback(async () => {
