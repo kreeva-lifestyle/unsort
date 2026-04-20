@@ -204,7 +204,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Customer auto-suggest ──────────────────────────────────────────────────
   const searchCustomers = useCallback(async (q: string) => {
     if (q.length < 2) { setCustomerSuggestions([]); return; }
-    const { data } = await supabase.from('cash_challan_customers').select('*').ilike('name', `%${q.replace(/[%_]/g, '\\$&')}%`).limit(5);
+    const { data } = await supabase.from('cash_challan_customers').select('id, name, phone, address').ilike('name', `%${q.replace(/[%_]/g, '\\$&')}%`).limit(5);
     const rows = (data as Customer[] | null) || [];
     setCustomerSuggestions(rows);
     // Auto-fill phone if exact match found (case-insensitive)
@@ -280,7 +280,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const fetchLedgerDetail = useCallback(async (name: string) => {
     setLedgerDetail(name);
     window.history.pushState({ view: 'ledger-detail' }, '');
-    const { data } = await supabase.from('cash_challans').select('*').ilike('customer_name', name.replace(/[%_]/g, '\\$&')).neq('status', 'voided').order('created_at', { ascending: false }).limit(500);
+    const { data } = await supabase.from('cash_challans').select('id, challan_number, customer_id, customer_name, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, created_at, updated_at').ilike('customer_name', name.replace(/[%_]/g, '\\$&')).neq('status', 'voided').order('created_at', { ascending: false }).limit(500);
     setLedgerChallans((data as Challan[] | null) || []);
   }, []);
 
@@ -415,7 +415,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Audit trail for a challan ──────────────────────────────────────────────
   const loadAuditTrail = async (challanNumber: number) => {
-    const { data } = await supabase.from('audit_log').select('*').eq('module', 'cash_challan').ilike('details', `%#${challanNumber} %`).order('created_at', { ascending: false });
+    const { data } = await supabase.from('audit_log').select('id, action, module, record_id, details, user_id, user_email, created_at').eq('module', 'cash_challan').ilike('details', `%#${challanNumber} %`).order('created_at', { ascending: false });
     setAuditTrail(data || []);
   };
 

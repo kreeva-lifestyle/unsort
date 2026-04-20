@@ -55,7 +55,7 @@ export default function InventoryExtras() {
   const [completeItem, setCompleteItem] = useState<{ extra: InventoryExtra; item: InventoryItemMatch } | null>(null);
 
   const fetchExtras = useCallback(async () => {
-    const { data } = await supabase.from('inventory_extras').select('*').order('updated_at', { ascending: false }).limit(1000);
+    const { data } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, quantity, notes, created_by, created_at, updated_at').order('updated_at', { ascending: false }).limit(1000);
     setExtras(data || []);
     // Compute match counts — check item actually has this component missing
     const counts: Record<string, number> = {};
@@ -116,7 +116,7 @@ export default function InventoryExtras() {
   }, [fComponentId, fComps, fSize]);
 
   const loadHistory = async (extraId: string) => {
-    const { data } = await supabase.from('inventory_extras_history').select('*').eq('extra_id', extraId).order('created_at', { ascending: false });
+    const { data } = await supabase.from('inventory_extras_history').select('id, extra_id, action, quantity_change, quantity_after, reason, related_inventory_item_id, user_id, created_at').eq('extra_id', extraId).order('created_at', { ascending: false });
     setHistory(data || []);
   };
 
