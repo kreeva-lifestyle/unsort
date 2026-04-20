@@ -112,6 +112,26 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       : Math.min(it.discount_value || 0, lineTotal);
     return Math.round((lineTotal - Math.max(0, disc)) * 100) / 100;
   };
+
+  // Human-readable validation for a single line item. Returns null when OK,
+  // or the specific reason it's invalid. Used for inline red border while the
+  // user types AND the save block — single source of truth so the two can't
+  // drift. Empty rows (no qty/price yet) are treated as "not an error yet".
+  const itemValidationError = (it: ChallanItem): string | null => {
+    const q = Number(it.quantity) || 0;
+    const p = Number(it.price) || 0;
+    const d = Number(it.discount_value) || 0;
+    if (q < 0) return 'Quantity cannot be negative';
+    if (p < 0) return 'Price cannot be negative';
+    if (d < 0) return 'Discount cannot be negative';
+    if (it.discount_type === 'percentage' && d > 100) return 'Discount cannot exceed 100%';
+    // Only compare flat discount to line total when both qty and price are set
+    // (so partially-typed rows don't flash red prematurely).
+    if (it.discount_type !== 'percentage' && q > 0 && p > 0 && d > q * p) {
+      return `Discount ₹${d.toLocaleString('en-IN')} exceeds line total ₹${(q * p).toLocaleString('en-IN')}`;
+    }
+    return null;
+  };
   const subtotal = Math.round(items.reduce((s, i) => s + computeItemTotal(i), 0) * 100) / 100;
   const totalDiscount = Math.round(items.reduce((s, i) => s + (i.quantity * i.price - computeItemTotal(i)), 0) * 100) / 100;
   const clampedShipping = Math.max(0, shippingCharges);
@@ -298,10 +318,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (zeroQtyItem) { setFormError(`Item "${zeroQtyItem.sku}" has invalid quantity (must be > 0)`); return; }
     const zeroPriceItem = items.find(it => it.price <= 0);
     if (zeroPriceItem) { setFormError(`Item "${zeroPriceItem.sku}" has invalid price (must be > 0)`); return; }
-    const negDiscItem = items.find(it => (it.discount_value || 0) < 0);
-    if (negDiscItem) { setFormError(`Item "${negDiscItem.sku}" has negative discount`); return; }
-    const overDiscItem = items.find(it => it.discount_type === 'percentage' && (it.discount_value || 0) > 100);
-    if (overDiscItem) { setFormError(`Item "${overDiscItem.sku}" discount cannot exceed 100%`); return; }
+    // Consolidated discount/negative checks (flat discount > line total is the new case).
+    for (let i = 0; i < items.length; i++) {
+      const err = itemValidationError(items[i]);
+      if (err) { setFormError(`Row ${i + 1} (${items[i].sku || '—'}): ${err}`); return; }
+    }
+    if (shippingCharges < 0) { setFormError('Shipping/Porter charges cannot be negative'); return; }
     if (isReturn && returnSource) {
       const sourceItems = returnSource.cash_challan_items || [];
       // Check cumulative returns — fetch all previous returns for this source
@@ -637,6 +659,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       searchCustomers={searchCustomers}
       items={items}
       setItems={setItems}
+      itemValidationError={itemValidationError}
       shippingCharges={shippingCharges}
       setShippingCharges={setShippingCharges}
       tags={tags}
