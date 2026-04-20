@@ -261,13 +261,15 @@ export default function ChallanForm(p: ChallanFormProps) {
           </div>
         </div>
 
-        {/* Totals card */}
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 16px', marginBottom: 12 }}>
+        {/* Totals card — honest math. Totals go red when negative so the
+            user sees the problem and fixes it (save is also blocked). */}
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${p.grandTotal < 0 ? 'rgba(239,68,68,.35)' : T.bd}`, borderRadius: 10, padding: '12px 16px', marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, marginBottom: 4 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{p.subtotal.toFixed(2)}</span></div>
-          {p.totalDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Item Discounts</span><span style={{ fontFamily: T.mono }}>-₹{p.totalDiscount.toFixed(2)}</span></div>}
+          {p.totalDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Item Discounts{p.totalDiscount > p.subtotal ? ' ⚠' : ''}</span><span style={{ fontFamily: T.mono }}>-₹{p.totalDiscount.toFixed(2)}</span></div>}
           {p.shippingCharges > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.bl, marginBottom: 4 }}><span>Shipping/Porter</span><span style={{ fontFamily: T.mono }}>+₹{p.shippingCharges.toFixed(2)}</span></div>}
           {p.roundOff !== 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx3, marginBottom: 4 }}><span>Round Off</span><span style={{ fontFamily: T.mono }}>{p.roundOff > 0 ? '+' : ''}₹{p.roundOff.toFixed(2)}</span></div>}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}><span>Total</span><span>₹{p.grandTotal.toLocaleString('en-IN')}</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: p.grandTotal < 0 ? T.re : T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}><span>Total</span><span>{p.grandTotal < 0 ? '−' : ''}₹{Math.abs(p.grandTotal).toLocaleString('en-IN')}</span></div>
+          {p.grandTotal < 0 && <div style={{ marginTop: 6, fontSize: 10, color: T.re, display: 'flex', alignItems: 'center', gap: 4 }}>⚠ Total is negative — reduce discount or add items before saving.</div>}
         </div>
 
         {p.formError && <div style={{ background: 'rgba(239,68,68,.15)', borderLeft: `4px solid ${T.re}`, borderRadius: 6, padding: '10px 14px', fontSize: 11, color: T.tx, marginBottom: 8 }}>{p.formError}</div>}
