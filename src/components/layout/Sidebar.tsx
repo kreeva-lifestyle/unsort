@@ -3,14 +3,15 @@ import { supabase } from '../../lib/supabase';
 import { T, Icon } from '../../lib/theme';
 
 export default function Sidebar({ activeTab, setActiveTab, profile }: { activeTab: string; setActiveTab: (t: string) => void; profile: any }) {
-  const canAccessSettings = profile?.role === 'admin' || profile?.role === 'manager';
+  // Settings is visible to everyone — My Profile tab (Phone + Cash PIN) lives there
+  // and is needed even by viewers/operators. Manager+ see extra tabs inside.
   const tabs = [
     { id: 'dashboard', icon: 'grid', label: 'Dashboard' },
     { id: 'inventory', icon: 'box', label: 'Inventory' },
     { id: 'brandtag', icon: 'tag', label: 'Brand Tags' },
     { id: 'packtime', icon: 'scan', label: 'PackStation' },
     { id: 'challan', icon: 'file', label: 'Cash Challan' },
-    ...(canAccessSettings ? [{ id: 'settings', icon: 'settings', label: 'Settings' }] : []),
+    ...(profile ? [{ id: 'settings', icon: 'settings', label: 'Settings' }] : []),
   ];
 
   const handleSignOut = async () => {
