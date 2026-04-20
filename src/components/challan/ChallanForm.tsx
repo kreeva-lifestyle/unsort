@@ -231,18 +231,17 @@ export default function ChallanForm(p: ChallanFormProps) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
             <div>
               <label style={lbl}>Status</label>
-              <select value={p.challanStatus} onChange={e => p.setChallanStatus(e.target.value)} style={{ ...inp, fontSize: 11 }}>
-                {p.isReturn ? (<>
-                  <option value="unpaid">Pending Refund</option>
-                  <option value="paid">Refunded</option>
-                  {(!p.editing || p.editing.status === 'draft') && <option value="draft">Draft</option>}
-                </>) : (<>
+              {p.isReturn ? (
+                // Refunds are instant — no dropdown, always 'paid' (=Refunded).
+                <div style={{ ...inp, fontSize: 11, display: 'flex', alignItems: 'center', color: T.re, fontWeight: 600, cursor: 'default' }}>↩ Refunded</div>
+              ) : (
+                <select value={p.challanStatus} onChange={e => p.setChallanStatus(e.target.value)} style={{ ...inp, fontSize: 11 }}>
                   <option value="unpaid">Unpaid</option>
                   <option value="paid">Paid</option>
                   <option value="partial">Partial</option>
                   {(!p.editing || p.editing.status === 'draft') && <option value="draft">Draft</option>}
-                </>)}
-              </select>
+                </select>
+              )}
             </div>
             <div>
               <label style={lbl}>{p.isReturn ? 'Refund Mode' : 'Payment Mode'}</label>

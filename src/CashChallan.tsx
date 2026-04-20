@@ -375,7 +375,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (amountPaid > grandTotal) { setFormError(`Amount paid (₹${amountPaid}) cannot exceed total (₹${grandTotal})`); return; }
     if (!paymentMode && amountPaid > 0) { setFormError('Select a payment mode when amount is paid'); return; }
     if (editing && editing.status !== 'draft' && challanStatus === 'draft') { setFormError('Cannot revert to Draft once saved'); return; }
-    if (challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(`Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
+    if (challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(isReturn ? `Refund amount (₹${amountPaid}) must equal return total (₹${grandTotal})` : `Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
     if (!isReturn && challanStatus === 'partial' && (amountPaid <= 0 || amountPaid >= grandTotal)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
     if (challanStatus === 'draft' && amountPaid > 0) { setFormError('Draft challans cannot have payment. Change status first.'); return; }
     if (challanStatus === 'unpaid' && amountPaid > 0) { setFormError('Status is "Unpaid" but amount is paid. Change status to "Paid" or "Partial"'); return; }
@@ -405,7 +405,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     }
 
     const challanData = {
-      customer_id: custId, customer_name: customerName.trim(), status: challanStatus,
+      // Returns are always 'paid' (=Refunded) — refunds are instant.
+      customer_id: custId, customer_name: customerName.trim(), status: isReturn ? 'paid' : challanStatus,
       subtotal, discount_type: null, discount_value: 0,
       discount_amount: totalDiscount, shipping_charges: clampedShipping, round_off: roundOff, total: grandTotal,
       amount_paid: amountPaid, payment_mode: paymentMode || null,
@@ -571,7 +572,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setPaymentMode(c.payment_mode || '');
     setPaymentDate(c.payment_date || '');
     setAmountPaid(Number(c.amount_paid));
-    setChallanStatus(c.status);
+    // Refunds are instant — returns always render as 'paid' (=Refunded),
+    // regardless of any legacy 'unpaid' row created under the old dropdown.
+    setChallanStatus(c.is_return ? 'paid' : c.status);
     setShowModal(true);
   };
 
@@ -599,7 +602,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (Number(c.shipping_charges) > 0) w.document.write(`<p>Shipping/Porter: +${Number(c.shipping_charges).toFixed(2)}</p>`);
     if (Number(c.round_off) !== 0) w.document.write(`<p>Round Off: ${Number(c.round_off).toFixed(2)}</p>`);
     w.document.write(`<p style="font-size:16px;font-weight:700">Total: ₹${Number(c.total).toFixed(2)}</p></div>`);
-    const statusLabel = c.is_return ? (c.status === 'paid' ? 'Refunded' : 'Pending Refund') : c.status.charAt(0).toUpperCase() + c.status.slice(1);
+    const statusLabel = c.is_return ? 'Refunded' : c.status.charAt(0).toUpperCase() + c.status.slice(1);
     const statusColor = c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : c.status === 'draft' ? '#0c5460' : '#721c24';
     const statusBg = c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : c.status === 'draft' ? '#d1ecf1' : '#f8d7da';
     w.document.write(`<div style="margin:12px 0;padding:10px 14px;border-radius:6px;background:${statusBg};display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;color:${statusColor};font-size:13px">Status: ${escHtml(statusLabel)}</span>`);
@@ -686,7 +689,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     <ChallanForm
       editing={editing}
       isReturn={isReturn}
-      setIsReturn={setIsReturn}
+      setIsReturn={(v) => { setIsReturn(v); if (v) setChallanStatus('paid'); }}
       returnSource={returnSource}
       returnSearchQ={returnSearchQ}
       setReturnSearchQ={setReturnSearchQ}
@@ -807,7 +810,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
                 {(c.status === 'unpaid' || c.status === 'partial') && <button onClick={e => { e.stopPropagation(); sendReminder(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.6 }} title="Send WhatsApp reminder">
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.yl, strokeWidth: 2 }}><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
                 </button>}
-                {!isRet && c.status !== 'voided' && c.status !== 'draft' && <button onClick={e => { e.stopPropagation(); setIsReturn(true); selectReturnSource(c); setShowModal(true); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.6 }} title="Create return for this challan">
+                {!isRet && c.status !== 'voided' && c.status !== 'draft' && <button onClick={e => { e.stopPropagation(); setIsReturn(true); setChallanStatus('paid'); selectReturnSource(c); setShowModal(true); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.6 }} title="Create return for this challan">
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M9 14L4 9l5-5M4 9h11a5 5 0 015 5v0a5 5 0 01-5 5H8" /></svg>
                 </button>}
                 {c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number }); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.4 }} title="Void">
