@@ -24,6 +24,10 @@ interface Breakdown { opening: number; cashSales: number; cashReturns: number; e
 // narrowed to the local Breakdown shape for typed access.
 type Handover = Omit<CashHandover, 'breakdown'> & { breakdown: Breakdown | null };
 
+// Human-readable handover identifier used in receipts, UI badges, and WhatsApp.
+const formatHandoverNo = (n: number | null | undefined) =>
+  n == null ? '—' : `HO-${String(n).padStart(4, '0')}`;
+
 // View model: narrowed cash_expenses projection used by the expenses tab.
 type ExpenseRow = Pick<CashExpense, 'id' | 'date' | 'amount' | 'category' | 'description' | 'created_at'>;
 
@@ -95,7 +99,7 @@ export default function CashBook() {
     setSales(ch || []);
 
     // Handovers in date range
-    const { data: ho } = await supabase.from('cash_handovers').select('id, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
+    const { data: ho } = await supabase.from('cash_handovers').select('id, handover_number, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
     setHandovers((ho as Handover[] | null) || []);
   }, [fromDate, toDate]);
 
@@ -197,7 +201,7 @@ export default function CashBook() {
         if (!handAmount) setHandAmount(String(Math.max(0, b.available)));
       });
       // Load last 5 handovers
-      supabase.from('cash_handovers').select('*').order('created_at', { ascending: false }).limit(5).then(({ data }) => setRecentHandovers((data as Handover[] | null) || []));
+      supabase.from('cash_handovers').select('id, handover_number, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by').order('created_at', { ascending: false }).limit(5).then(({ data }) => setRecentHandovers((data as Handover[] | null) || []));
     }
   }, [showHandover, handPeriodFrom, handPeriodTo, computeBreakdown]);
 
@@ -232,10 +236,12 @@ export default function CashBook() {
       breakdown: handBreakdown as unknown as Record<string, unknown> | null,
       reason: amountDiffers ? handReason.trim() : null,
     };
-    await supabase.from('cash_handovers').insert(handoverPayload);
+    // Insert and return the generated handover_number for the notification
+    const { data: inserted } = await supabase.from('cash_handovers').insert(handoverPayload).select('handover_number').single();
+    const hoNo = formatHandoverNo((inserted as { handover_number?: number } | null)?.handover_number);
     // WhatsApp notification to recipient
     if (recipient.phone) {
-      const msg = encodeURIComponent(`Hi ${recipient.full_name},\n${prof?.full_name || 'Accountant'} has initiated a cash handover of ₹${amt.toLocaleString('en-IN')} for you (period ${handPeriodFrom} to ${handPeriodTo}).\nPlease open DailyOffice → Cash Book → Handovers and sign with your PIN to confirm receipt.\n— Arya Designs`);
+      const msg = encodeURIComponent(`Hi ${recipient.full_name},\n${prof?.full_name || 'Sender'} has initiated cash handover ${hoNo} of ₹${amt.toLocaleString('en-IN')} for you (period ${handPeriodFrom} to ${handPeriodTo}).\nPlease open DailyOffice → Cash Book → Handovers and sign with your PIN to confirm receipt, or reject with a reason.\n— Arya Designs`);
       window.open(`https://wa.me/91${recipient.phone.replace(/\D/g, '')}?text=${msg}`, '_blank');
     }
     setHandAmount(''); setHandToId(''); setHandNotes(''); setHandReason(''); setHandBreakdown(null); setShowHandover(false);
@@ -269,7 +275,7 @@ export default function CashBook() {
       .receipt-no{font-family:monospace;color:#666;font-size:12px}
     </style></head><body>`);
     const receiptDate = h.created_at ? new Date(h.created_at).toLocaleDateString('en-IN') : '—';
-    w.document.write(`<div class="header"><h2>Arya Designs</h2><p style="margin:6px 0;color:#666;font-size:13px">CASH HANDOVER RECEIPT</p><p class="receipt-no">Receipt #${h.id.slice(0, 8).toUpperCase()} | ${receiptDate}</p></div>`);
+    w.document.write(`<div class="header"><h2>Arya Designs</h2><p style="margin:6px 0;color:#666;font-size:13px">CASH HANDOVER RECEIPT</p><p class="receipt-no">${formatHandoverNo(h.handover_number)} | ${receiptDate}</p></div>`);
     w.document.write(`<div class="meta">
       <div><strong>From</strong>${esc(h.from_user_name)}</div>
       <div><strong>To</strong>${esc(h.to_user_name)}</div>
@@ -553,6 +559,7 @@ export default function CashBook() {
             <div key={h.id} style={{ padding: '11px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 10, fontFamily: T.mono, color: T.ac2, fontWeight: 600 }}>{formatHandoverNo(h.handover_number)}</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{h.from_user_name} → {h.to_user_name}</span>
                   <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3, fontFamily: T.mono }}>{new Date(h.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
                   <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : h.status === 'disputed' ? 'rgba(239,68,68,.12)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : h.status === 'disputed' ? T.re : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓ Signed' : h.status === 'disputed' ? '✕ Rejected' : 'Pending'}</span>
@@ -617,6 +624,7 @@ export default function CashBook() {
                 {recentHandovers.map(h => (
                   <div key={h.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: `1px solid ${T.bd}`, fontSize: 10 }}>
                     <div>
+                      <span style={{ color: T.ac2, fontFamily: T.mono, fontSize: 9, marginRight: 5 }}>{formatHandoverNo(h.handover_number)}</span>
                       <span style={{ color: T.tx2 }}>{new Date(h.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} · </span>
                       <span style={{ color: T.tx, fontWeight: 600 }}>{h.from_user_name} → {h.to_user_name}</span>
                     </div>
@@ -690,7 +698,10 @@ export default function CashBook() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
           <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 460, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Handover Details</span>
+              <div>
+                <span style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Handover Details</span>
+                <div style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2, fontWeight: 600, marginTop: 2 }}>{formatHandoverNo(viewingHandover.handover_number)}</div>
+              </div>
               <button onClick={() => setViewingHandover(null)} style={{ padding: '3px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Close</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12, fontSize: 11 }}>
@@ -729,7 +740,7 @@ export default function CashBook() {
       {confirmingHandover && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
           <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 360, width: '100%' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Sign &amp; Confirm Receipt</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Sign &amp; Confirm {formatHandoverNo(confirmingHandover.handover_number)}</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>You are confirming receipt of <strong style={{ color: T.gr, fontFamily: T.mono }}>₹{Number(confirmingHandover.amount).toLocaleString('en-IN')}</strong> from <strong style={{ color: T.tx }}>{confirmingHandover.from_user_name}</strong>. This is a permanent legal record.</div>
             <input type="password" value={confirmPin} onChange={e => setConfirmPin(e.target.value)} placeholder="Your 4-6 digit PIN" autoFocus inputMode="numeric" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 18, padding: '10px 12px', outline: 'none', boxSizing: 'border-box', textAlign: 'center', letterSpacing: 6, marginBottom: 10 }} />
             {confirmError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{confirmError}</div>}
@@ -745,7 +756,7 @@ export default function CashBook() {
       {rejectingHandover && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
           <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 400, width: '100%' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Reject Handover</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Reject {formatHandoverNo(rejectingHandover.handover_number)}</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>You are rejecting <strong style={{ color: T.re, fontFamily: T.mono }}>₹{Number(rejectingHandover.amount).toLocaleString('en-IN')}</strong> from <strong style={{ color: T.tx }}>{rejectingHandover.from_user_name}</strong>. This action is final — the sender will need to initiate a new handover.</div>
             <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Reason for rejection</label>
             <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="e.g. Amount doesn't match, missing cash, wrong period..." rows={3} autoFocus style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box', resize: 'vertical', marginBottom: 10, fontFamily: T.sans }} />
