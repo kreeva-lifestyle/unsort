@@ -14,7 +14,7 @@ import type {
   Profile,
 } from './types/database';
 
-const CATEGORIES = ['Office Supplies', 'Rent', 'Salaries', 'Travel', 'Utilities', 'Food', 'Transport', 'Misc'];
+const CATEGORIES = ['Office Supplies', 'Rent', 'Salaries', 'Travel', 'Utilities', 'Food', 'Transport', 'Misc', 'Others'];
 
 // In-memory / jsonb-embedded cash-flow snapshot. Stored in
 // cash_handovers.breakdown as jsonb, read back and cast to this shape.
