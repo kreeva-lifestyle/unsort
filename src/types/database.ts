@@ -344,8 +344,10 @@ export type CashExpenseInsert = {
   created_at?: string | null;
 };
 
-// ─── cash_handovers (15 cols) ────────────────────────────────────────────
-// Immutable once created — no updated_at column.
+// ─── cash_handovers (18 cols) ────────────────────────────────────────────
+// Immutable once confirmed — no updated_at column.
+// 'disputed' status is set by recipient via Reject flow;
+// reject_reason + rejected_at + rejected_by enforced by CHECK.
 
 export interface CashHandover {
   id: string;
@@ -364,6 +366,9 @@ export interface CashHandover {
   // jsonb — app casts to a local Breakdown view type
   breakdown: Record<string, unknown> | null;
   reason: string | null;
+  reject_reason: string | null;
+  rejected_at: string | null;
+  rejected_by: string | null;
 }
 
 export type CashHandoverInsert = {
@@ -382,6 +387,9 @@ export type CashHandoverInsert = {
   period_to?: string | null;
   breakdown?: Record<string, unknown> | null;
   reason?: string | null;
+  reject_reason?: string | null;
+  rejected_at?: string | null;
+  rejected_by?: string | null;
 };
 
 // ─── cash_challans (25 cols) ─────────────────────────────────────────────

@@ -62,9 +62,14 @@ export default function CashBook() {
   const [handError, setHandError] = useState('');
   const [viewingHandover, setViewingHandover] = useState<Handover | null>(null);
   // Users list (for recipient dropdown)
-  const [users, setUsers] = useState<{ id: string; full_name: string; email: string; has_pin: boolean; phone: string | null }[]>([]);
+  const [users, setUsers] = useState<{ id: string; full_name: string; email: string; has_pin: boolean; phone: string | null; role: string }[]>([]);
   const [recentHandovers, setRecentHandovers] = useState<Handover[]>([]);
   const [currentUserId, setCurrentUserId] = useState('');
+  const [currentUserRole, setCurrentUserRole] = useState<string>('');
+  // Reject flow
+  const [rejectingHandover, setRejectingHandover] = useState<Handover | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectError, setRejectError] = useState('');
   const [excludePaise, setExcludePaise] = useState(false);
   // Confirm handover with PIN
   const [confirmingHandover, setConfirmingHandover] = useState<Handover | null>(null);
@@ -90,7 +95,7 @@ export default function CashBook() {
     setSales(ch || []);
 
     // Handovers in date range
-    const { data: ho } = await supabase.from('cash_handovers').select('id, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
+    const { data: ho } = await supabase.from('cash_handovers').select('id, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
     setHandovers((ho as Handover[] | null) || []);
   }, [fromDate, toDate]);
 
@@ -100,10 +105,14 @@ export default function CashBook() {
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) setCurrentUserId(user.id);
-      const { data } = await supabase.from('profiles').select('id, full_name, email, phone').eq('is_active', true).order('full_name');
-      type UserRow = Pick<Profile, 'id' | 'full_name' | 'email' | 'phone'>;
-      setUsers((data as UserRow[] | null || []).map((u) => ({ id: u.id, full_name: u.full_name ?? '', email: u.email, has_pin: true, phone: u.phone })));
+      if (user) {
+        setCurrentUserId(user.id);
+        const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+        setCurrentUserRole(((me as { role?: string } | null)?.role) || '');
+      }
+      const { data } = await supabase.from('profiles').select('id, full_name, email, phone, role').eq('is_active', true).order('full_name');
+      type UserRow = Pick<Profile, 'id' | 'full_name' | 'email' | 'phone' | 'role'>;
+      setUsers((data as UserRow[] | null || []).map((u) => ({ id: u.id, full_name: u.full_name ?? '', email: u.email, has_pin: true, phone: u.phone, role: u.role ?? '' })));
     })();
   }, []);
 
@@ -194,11 +203,13 @@ export default function CashBook() {
 
   const createHandover = async () => {
     setHandError('');
+    if (currentUserRole === 'admin') { setHandError('Admins receive handovers — they do not initiate them.'); return; }
     const amt = Number(handAmount);
     if (!amt || amt <= 0) { setHandError('Amount must be greater than 0'); return; }
     if (!handToId) { setHandError('Select a recipient'); return; }
     const recipient = users.find(u => u.id === handToId);
     if (!recipient) { setHandError('Recipient not found'); return; }
+    if (recipient.role !== 'admin') { setHandError('Handovers can only be sent to an admin.'); return; }
     if (handToId === currentUserId) { setHandError('Cannot hand over cash to yourself'); return; }
     if (!recipient.has_pin) { setHandError(`${recipient.full_name} has no PIN set. They must set it in Settings → Users first.`); return; }
     if (!handBreakdown) { setHandError('Breakdown not loaded — try again'); return; }
@@ -335,6 +346,37 @@ export default function CashBook() {
       to_user_name: confirmingHandover.to_user_name || user.email || 'User',
     }).eq('id', confirmingHandover.id);
     setConfirmingHandover(null); setConfirmPin('');
+    fetchData();
+  };
+
+  // Reject a pending handover — only the intended recipient may reject,
+  // and only while status is still 'pending'. Sets status='disputed' with
+  // reject_reason + rejected_at + rejected_by (enforced by CHECK constraint).
+  const submitReject = async () => {
+    setRejectError('');
+    if (!rejectingHandover) return;
+    const reason = rejectReason.trim();
+    if (!reason) { setRejectError('Please explain why you are rejecting this handover.'); return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setRejectError('Not logged in'); return; }
+    if (rejectingHandover.to_user_id && rejectingHandover.to_user_id !== user.id) {
+      setRejectError(`Only ${rejectingHandover.to_user_name} can reject this handover.`);
+      return;
+    }
+    if (rejectingHandover.status !== 'pending') {
+      setRejectError(`This handover is already ${rejectingHandover.status} and cannot be rejected.`);
+      return;
+    }
+    // Optimistic concurrency — only reject if still pending
+    const { error, data } = await supabase.from('cash_handovers').update({
+      status: 'disputed',
+      reject_reason: reason,
+      rejected_at: new Date().toISOString(),
+      rejected_by: user.id,
+    }).eq('id', rejectingHandover.id).eq('status', 'pending').select('id');
+    if (error) { setRejectError(friendlyError(error)); return; }
+    if (!data || data.length === 0) { setRejectError('Handover state changed — please refresh.'); return; }
+    setRejectingHandover(null); setRejectReason('');
     fetchData();
   };
 
@@ -500,7 +542,11 @@ export default function CashBook() {
 
       {/* Handovers Tab */}
       {tab === 'handovers' && <>
-        <button onClick={() => setShowHandover(true)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.yl}, ${T.yl}cc)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>+ Initiate Handover</button>
+        {currentUserRole !== 'admin' ? (
+          <button onClick={() => setShowHandover(true)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.yl}, ${T.yl}cc)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>+ Initiate Handover</button>
+        ) : (
+          <div style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', color: T.tx2, fontSize: 10, marginBottom: 10 }}>Admins receive handovers — users initiate them. Review pending handovers below.</div>
+        )}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
           {handovers.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No handovers in this range.</div>}
           {handovers.map(h => (
@@ -509,15 +555,18 @@ export default function CashBook() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{h.from_user_name} → {h.to_user_name}</span>
                   <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3, fontFamily: T.mono }}>{new Date(h.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
-                  <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓ Signed' : 'Pending'}</span>
+                  <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : h.status === 'disputed' ? 'rgba(239,68,68,.12)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : h.status === 'disputed' ? T.re : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓ Signed' : h.status === 'disputed' ? '✕ Rejected' : 'Pending'}</span>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(h.amount).toLocaleString('en-IN')}</span>
               </div>
               {h.notes && <div style={{ fontSize: 10, color: T.tx3, marginBottom: 4 }}>{h.notes}</div>}
               {h.reason && <div style={{ fontSize: 10, color: T.yl, marginBottom: 4 }}>⚠ {h.reason}</div>}
+              {h.status === 'disputed' && h.reject_reason && <div style={{ fontSize: 10, color: T.re, marginBottom: 4 }}>✕ Rejected: {h.reject_reason}</div>}
               {h.status === 'confirmed' && h.confirmed_at && <div style={{ fontSize: 9, color: T.gr, fontFamily: T.mono, marginBottom: 4 }}>Signed at {new Date(h.confirmed_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
+              {h.status === 'disputed' && h.rejected_at && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono, marginBottom: 4 }}>Rejected at {new Date(h.rejected_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
               <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                {h.status === 'pending' && <button onClick={() => setConfirmingHandover(h)} style={{ padding: '4px 12px', borderRadius: 5, border: 'none', background: T.gr, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Sign &amp; Confirm</button>}
+                {h.status === 'pending' && h.to_user_id === currentUserId && <button onClick={() => setConfirmingHandover(h)} style={{ padding: '4px 12px', borderRadius: 5, border: 'none', background: T.gr, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Sign &amp; Confirm</button>}
+                {h.status === 'pending' && h.to_user_id === currentUserId && <button onClick={() => { setRejectingHandover(h); setRejectReason(''); setRejectError(''); }} style={{ padding: '4px 12px', borderRadius: 5, border: 'none', background: T.re, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Reject</button>}
                 <button onClick={() => setViewingHandover(h)} style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>View Summary</button>
                 <button onClick={() => printHandoverReceipt(h)} style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Print</button>
               </div>
@@ -583,15 +632,16 @@ export default function CashBook() {
             {/* Recipient + Amount */}
             <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 8, marginBottom: 10 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Recipient</label>
+                <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Recipient (Admin)</label>
                 <select value={handToId} onChange={e => setHandToId(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}>
-                  <option value="">Select recipient...</option>
-                  {users.filter(u => u.id !== currentUserId).map(u => {
+                  <option value="">Select admin...</option>
+                  {users.filter(u => u.id !== currentUserId && u.role === 'admin').map(u => {
                     const issues = [];
                     if (!u.has_pin) issues.push('no PIN');
                     if (!u.phone) issues.push('no phone');
                     return <option key={u.id} value={u.id}>{u.full_name}{issues.length ? ` (${issues.join(', ')})` : ''}</option>;
                   })}
+                  {users.filter(u => u.id !== currentUserId && u.role === 'admin').length === 0 && <option value="" disabled>No admin users available</option>}
                 </select>
               </div>
               <div>
@@ -686,6 +736,23 @@ export default function CashBook() {
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setConfirmingHandover(null); setConfirmPin(''); setConfirmError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', fontSize: 11, fontWeight: 500, background: 'rgba(99,102,241,0.06)', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
               <button onClick={confirmHandover} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)`, color: '#fff', cursor: 'pointer' }}>Sign &amp; Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Handover Modal — only visible to the intended recipient while status is still pending */}
+      {rejectingHandover && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
+          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 400, width: '100%' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Reject Handover</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>You are rejecting <strong style={{ color: T.re, fontFamily: T.mono }}>₹{Number(rejectingHandover.amount).toLocaleString('en-IN')}</strong> from <strong style={{ color: T.tx }}>{rejectingHandover.from_user_name}</strong>. This action is final — the sender will need to initiate a new handover.</div>
+            <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Reason for rejection</label>
+            <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="e.g. Amount doesn't match, missing cash, wrong period..." rows={3} autoFocus style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box', resize: 'vertical', marginBottom: 10, fontFamily: T.sans }} />
+            {rejectError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{rejectError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { setRejectingHandover(null); setRejectReason(''); setRejectError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', fontSize: 11, fontWeight: 500, background: 'rgba(99,102,241,0.06)', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={submitReject} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: 'pointer' }}>Confirm Reject</button>
             </div>
           </div>
         </div>
