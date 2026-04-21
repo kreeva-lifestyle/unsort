@@ -240,9 +240,17 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const isMyntra = useMemo(() => /myntra/i.test(courier), [courier]);
   useEffect(() => {
     if (!started || !isMyntra) return;
+    // Two events for two switching styles:
+    //  - visibilitychange: alt-tab between browser tabs (or minimise/restore)
+    //  - window.focus: side-by-side windows, clicking on PackStation
     const onVisible = () => { if (document.visibilityState === 'visible') focusInput(); };
+    const onFocus = () => focusInput();
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [started, isMyntra, focusInput]);
   useEffect(() => { if (started && !cameraOpen) focusInput(); }, [started, cameraOpen, focusInput]);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 400); return () => clearTimeout(t); } }, [flash]);
