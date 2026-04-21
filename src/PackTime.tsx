@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { BarcodeDetector } from 'barcode-detector/ponyfill';
 import { supabase, SUPABASE_ANON_KEY } from './lib/supabase';
 import { useNotifications } from './hooks/useNotifications';
@@ -237,6 +237,13 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── Focus ───────────────────────────────────────────────────────────────────
   const focusInput = useCallback(() => { setTimeout(() => inputRef.current?.focus(), 50); }, []);
+  const isMyntra = useMemo(() => /myntra/i.test(courier), [courier]);
+  useEffect(() => {
+    if (!started || !isMyntra) return;
+    const onVisible = () => { if (document.visibilityState === 'visible') focusInput(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [started, isMyntra, focusInput]);
   useEffect(() => { if (started && !cameraOpen) focusInput(); }, [started, cameraOpen, focusInput]);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 400); return () => clearTimeout(t); } }, [flash]);
   useEffect(() => { if (duplicateAwb) { const t = setTimeout(() => { setDuplicateAwb(''); focusInput(); }, 1500); return () => clearTimeout(t); } }, [duplicateAwb, focusInput]);
@@ -431,6 +438,12 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   useEffect(() => { submitRef.current = submitAwb; }, [submitAwb]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); const v = awbInput.trim(); if (v) submitAwb(v); } };
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (!isMyntra) return;
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text/plain').trim();
+    if (pasted) { setAwbInput(pasted); submitAwb(pasted); }
+  };
 
   // ── Undo last scan (removes from local + Google Sheet) ──────────────────────
   const undoLast = useCallback(() => {
@@ -891,7 +904,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         </div>
         <div style={{ position: 'relative' }}>
           <input ref={inputRef} type="text" inputMode="text" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
-            value={awbInput} onChange={e => setAwbInput(e.target.value)} onKeyDown={handleKeyDown}
+            value={awbInput} onChange={e => setAwbInput(e.target.value)} onKeyDown={handleKeyDown} onPaste={isMyntra ? handlePaste : undefined}
             placeholder="Scan or type AWB number..."
             style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${flash === 'success' ? T.gr : flash === 'error' ? T.re : T.ac + '55'}`, borderRadius: 10, color: T.tx, fontFamily: T.mono, fontSize: 17, padding: '14px 90px 14px 14px', outline: 'none', transition: 'border-color .15s', boxSizing: 'border-box', boxShadow: `0 0 16px ${flash === 'success' ? 'rgba(34,197,94,.15)' : flash === 'error' ? 'rgba(239,68,68,.15)' : 'rgba(99,102,241,.06)'}` }} />
           {/* Camera trigger inside input (audit P3: shave a click on the heavy-use path) */}
@@ -902,7 +915,18 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M5 12h14M12 5l7 7-7 7" /></svg>
           </button>
         </div>
-        <div style={{ marginTop: 4, fontSize: 9, color: T.tx3, letterSpacing: 0.3 }}>Scan barcode with camera or type AWB and press Enter</div>
+        <div style={{ marginTop: 4, fontSize: 9, color: T.tx3, letterSpacing: 0.3 }}>{isMyntra ? 'Paste from VMS with Ctrl+V (auto-submits) or use the button below' : 'Scan barcode with camera or type AWB and press Enter'}</div>
+        {isMyntra && (
+          <button type="button" onClick={async () => {
+            try {
+              const text = (await navigator.clipboard.readText()).trim();
+              if (text) { setAwbInput(text); submitAwb(text); }
+            } catch { inputRef.current?.focus(); }
+          }} style={{ width: '100%', marginTop: 6, padding: '10px 0', borderRadius: 8, border: '1px solid rgba(245,158,11,.25)', background: 'rgba(245,158,11,.08)', color: T.yl, fontSize: 12, fontWeight: 600, fontFamily: T.sans, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /></svg>
+            Paste from VMS
+          </button>
+        )}
       </div>
 
       {/* Recent Scans — collapsible, with CSV export (audit P1: session summary without leaving screen) */}
