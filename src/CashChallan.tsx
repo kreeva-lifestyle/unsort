@@ -16,6 +16,8 @@ import type {
   AuditLogInsert,
 } from './types/database';
 
+const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Other'];
+
 const ccAudit = (action: string, details: string) => {
   supabase.auth.getUser().then(({ data }) => {
     const entry: AuditLogInsert = { action, module: 'cash_challan', details, user_id: data.user?.id ?? null };
@@ -64,6 +66,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [tagFilter, setTagFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  // Bulk pay/unpay
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkPay, setShowBulkPay] = useState(false);
+  const [showBulkUnpay, setShowBulkUnpay] = useState(false);
+  const [bulkPayMode, setBulkPayMode] = useState('');
 
   // Modal
   const [showModal, setShowModal] = useState(false);
@@ -647,6 +655,54 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `CashChallans_${dateFrom || 'all'}_${dateTo || 'all'}_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
 
+  // ── Bulk pay / unpay ─────────────────────────────────────────────────────
+  const selectedChallans = challans.filter(c => selectedIds.has(c.id));
+  const bulkPayable = selectedChallans.filter(c => !c.is_return && (c.status === 'unpaid' || c.status === 'partial'));
+  const bulkUnpayable = selectedChallans.filter(c => !c.is_return && c.status === 'paid');
+  const bulkReturns = selectedChallans.filter(c => c.is_return);
+  const bulkSalesTotal = bulkPayable.reduce((s, c) => s + Number(c.total), 0);
+  const bulkReturnsTotal = bulkReturns.reduce((s, c) => s + Number(c.total), 0);
+  const bulkNetTotal = bulkSalesTotal - bulkReturnsTotal;
+
+  const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const selectAll = () => setSelectedIds(new Set(challans.filter(c => c.status !== 'voided' && c.status !== 'draft').map(c => c.id)));
+  const clearSelection = () => { setSelectedIds(new Set()); };
+  const exitBulkMode = () => { setBulkMode(false); clearSelection(); };
+
+  const executeBulkPay = async () => {
+    if (!bulkPayMode) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: { user } } = await supabase.auth.getUser();
+    const ids = bulkPayable.map(c => c.id);
+    if (ids.length === 0) { setShowBulkPay(false); return; }
+    for (const c of bulkPayable) {
+      await supabase.from('cash_challans').update({
+        status: 'paid', amount_paid: Number(c.total), payment_mode: bulkPayMode,
+        payment_date: today, modified_by: user?.id, updated_at: new Date().toISOString(),
+      }).eq('id', c.id).in('status', ['unpaid', 'partial']);
+    }
+    const names = [...new Set(bulkPayable.map(c => c.customer_name))].join(', ');
+    ccAudit('BULK_PAY', `Bulk paid ${ids.length} challans (${names}) — ₹${bulkNetTotal.toLocaleString('en-IN')} net via ${bulkPayMode}`);
+    setShowBulkPay(false); setBulkPayMode(''); exitBulkMode(); fetchChallans();
+    addToast(`${ids.length} challans marked as paid`, 'success');
+  };
+
+  const executeBulkUnpay = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const ids = bulkUnpayable.map(c => c.id);
+    if (ids.length === 0) { setShowBulkUnpay(false); return; }
+    for (const c of bulkUnpayable) {
+      await supabase.from('cash_challans').update({
+        status: 'unpaid', amount_paid: 0, payment_mode: null, payment_date: null,
+        modified_by: user?.id, updated_at: new Date().toISOString(),
+      }).eq('id', c.id).eq('status', 'paid');
+    }
+    const names = [...new Set(bulkUnpayable.map(c => c.customer_name))].join(', ');
+    ccAudit('BULK_UNPAY', `Bulk unpaid ${ids.length} challans (${names})`);
+    setShowBulkUnpay(false); exitBulkMode(); fetchChallans();
+    addToast(`${ids.length} challans reverted to unpaid`, 'success');
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize);
   const allTags = [...new Set(challans.flatMap(c => c.tags || []))];
 
@@ -797,7 +853,20 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
         </select>
         <button onClick={exportChallansCSV} style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.08)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Export CSV</button>
+        <button onClick={() => { if (bulkMode) exitBulkMode(); else setBulkMode(true); }} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${bulkMode ? T.ac + '44' : T.bd2}`, background: bulkMode ? 'rgba(99,102,241,.1)' : 'rgba(255,255,255,0.03)', color: bulkMode ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{bulkMode ? 'Cancel Select' : '☑ Select'}</button>
       </div>
+
+      {/* Bulk mode toolbar */}
+      {bulkMode && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', background: 'rgba(99,102,241,.04)', border: `1px solid rgba(99,102,241,.12)`, borderRadius: 6 }}>
+          <span style={{ fontSize: 10, color: T.tx2, fontWeight: 600 }}>{selectedIds.size} selected</span>
+          <button onClick={selectAll} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Select All</button>
+          <button onClick={clearSelection} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Clear</button>
+          <div style={{ flex: 1 }} />
+          {bulkPayable.length > 0 && <button onClick={() => { setBulkPayMode(''); setShowBulkPay(true); }} style={{ padding: '4px 12px', borderRadius: 5, border: 'none', background: T.gr, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Bulk Pay ({bulkPayable.length})</button>}
+          {bulkUnpayable.length > 0 && <button onClick={() => setShowBulkUnpay(true)} style={{ padding: '4px 12px', borderRadius: 5, border: '1px solid rgba(245,158,11,.3)', background: 'rgba(245,158,11,.08)', color: T.yl, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Bulk Unpay ({bulkUnpayable.length})</button>}
+        </div>
+      )}
 
       <div style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{totalCount} records</div>
 
@@ -810,8 +879,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           const skus = (c.cash_challan_items || []).map((i) => i.sku).filter(Boolean).join(', ');
           const pendingDays = (!c.is_return && (c.status === 'unpaid' || c.status === 'partial')) ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : 0;
           const isRet = !!c.is_return;
+          const isSelected = selectedIds.has(c.id);
+          const canSelect = c.status !== 'voided' && c.status !== 'draft';
+          const rowBg = isSelected ? 'rgba(99,102,241,.08)' : isRet ? 'rgba(239,68,68,.04)' : undefined;
           return (
-            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: isRet ? 'rgba(239,68,68,.04)' : undefined, transition: 'background .15s' }} onClick={() => setViewingChallan(c)} onMouseEnter={e => e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.08)' : 'rgba(255,255,255,.02)'} onMouseLeave={e => e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.04)' : ''}>
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: rowBg, transition: 'background .15s' }} onClick={() => bulkMode ? (canSelect && toggleSelect(c.id)) : setViewingChallan(c)} onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.08)' : 'rgba(255,255,255,.02)'; }} onMouseLeave={e => { e.currentTarget.style.background = (isSelected ? 'rgba(99,102,241,.08)' : isRet ? 'rgba(239,68,68,.04)' : '') }}>
+              {bulkMode && <div onClick={e => { e.stopPropagation(); if (canSelect) toggleSelect(c.id); }} style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${canSelect ? (isSelected ? T.ac : T.bd2) : T.bd}`, background: isSelected ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: canSelect ? 'pointer' : 'not-allowed', opacity: canSelect ? 1 : 0.3 }}>
+                {isSelected && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><polyline points="20 6 9 17 4 12" /></svg>}
+              </div>}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>#{c.challan_number}</span>
@@ -875,6 +950,61 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
                 <div style={{ color: T.tx2, fontSize: 11 }}>{a.details}</div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Pay Modal */}
+      {showBulkPay && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={() => setShowBulkPay(false)}>
+          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 420, width: '100%' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 12 }}>Bulk Pay</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12, fontSize: 11 }}>
+              <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 6, padding: '8px 10px' }}>
+                <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Sales ({bulkPayable.length})</div>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.mono, color: T.gr }}>₹{bulkSalesTotal.toLocaleString('en-IN')}</div>
+              </div>
+              <div style={{ background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 6, padding: '8px 10px' }}>
+                <div style={{ fontSize: 8, color: T.re, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Returns ({bulkReturns.length})</div>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.mono, color: T.re }}>₹{bulkReturnsTotal.toLocaleString('en-IN')}</div>
+              </div>
+            </div>
+            <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, textAlign: 'center' }}>
+              <div style={{ fontSize: 8, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Net Amount</div>
+              <div style={{ fontSize: 20, fontWeight: 800, fontFamily: T.sora, color: bulkNetTotal >= 0 ? T.gr : T.re }}>₹{Math.abs(bulkNetTotal).toLocaleString('en-IN')}</div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Payment Mode</label>
+              <select value={bulkPayMode} onChange={e => setBulkPayMode(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none' }}>
+                <option value="">Select...</option>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowBulkPay(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={executeBulkPay} disabled={!bulkPayMode || bulkPayable.length === 0} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: bulkPayMode ? T.gr : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: bulkPayMode ? 'pointer' : 'default', opacity: bulkPayMode ? 1 : 0.4 }}>Confirm Pay</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Unpay Modal */}
+      {showBulkUnpay && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={() => setShowBulkUnpay(false)}>
+          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 400, width: '100%' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Bulk Unpay</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>This will revert <strong style={{ color: T.yl }}>{bulkUnpayable.length}</strong> challan{bulkUnpayable.length !== 1 ? 's' : ''} to unpaid and clear their payment info. Returns cannot be unpaid.</div>
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 6, maxHeight: 160, overflowY: 'auto', marginBottom: 14 }}>
+              {bulkUnpayable.map(c => (
+                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 10 }}>
+                  <span style={{ color: T.tx }}>#{c.challan_number} · {c.customer_name}</span>
+                  <span style={{ fontFamily: T.mono, color: T.tx2 }}>₹{Number(c.total).toLocaleString('en-IN')}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowBulkUnpay(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={executeBulkUnpay} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: T.yl, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Confirm Unpay</button>
+            </div>
           </div>
         </div>
       )}

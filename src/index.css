@@ -39,26 +39,24 @@ button:focus-visible, [role="button"]:focus-visible, [onclick]:focus-visible { o
 select option { background: #0B0F19; color: #E2E8F0; padding: 8px 10px; }
 input::placeholder, textarea::placeholder { color: #6B7890; opacity: 1; }
 
-/* Date/time picker calendar icon — invert to be visible on dark theme */
+/* Date/time picker calendar icon — tinted to match accent on dark theme */
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator,
 input[type="datetime-local"]::-webkit-calendar-picker-indicator,
 input[type="month"]::-webkit-calendar-picker-indicator,
 input[type="week"]::-webkit-calendar-picker-indicator {
-  filter: invert(1) brightness(2);
-  opacity: 0.8;
+  filter: invert(0.6) sepia(1) saturate(5) hue-rotate(210deg) brightness(1.1);
+  opacity: 0.85;
   cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
+  padding: 2px;
+  border-radius: 3px;
   transition: opacity 0.15s, background 0.15s;
-  width: 16px;
-  height: 16px;
 }
 input[type="date"]::-webkit-calendar-picker-indicator:hover,
 input[type="time"]::-webkit-calendar-picker-indicator:hover,
 input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
-  background: rgba(99,102,241,0.2);
+  background: rgba(99,102,241,0.15);
 }
 /* Firefox doesn't have ::calendar-picker-indicator — color the input itself */
 input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"] {
