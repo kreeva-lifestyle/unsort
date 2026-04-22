@@ -61,6 +61,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [tagFilter, setTagFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   // Modal
   const [showModal, setShowModal] = useState(false);
@@ -166,12 +168,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     }
     if (statusFilter) query = query.eq('status', statusFilter);
     if (tagFilter) query = query.contains('tags', [tagFilter]);
+    if (dateFrom) query = query.gte('created_at', dateFrom + 'T00:00:00');
+    if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59');
     query = query.order('created_at', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
     const { data, count } = await query;
     setChallans((data as Challan[] | null) || []);
     setTotalCount(count || 0);
     setLoading(false);
-  }, [search, statusFilter, tagFilter, page, pageSize]);
+  }, [search, statusFilter, tagFilter, dateFrom, dateTo, page, pageSize]);
 
   useEffect(() => { fetchChallans(); }, [fetchChallans]);
 
@@ -615,7 +619,32 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     w.print();
   };
 
-  // ── WhatsApp share ─────────────────────────────────────────────────────────
+  // ── Export challans as CSV with item-level detail ─────────────────────────
+  const exportChallansCSV = async () => {
+    let q = supabase.from('cash_challans').select('challan_number, customer_name, status, subtotal, discount_amount, shipping_charges, round_off, total, amount_paid, payment_mode, payment_date, is_return, notes, tags, created_at, cash_challan_items(sku, description, quantity, price, discount_type, discount_value, discount_amount, total)').neq('status', 'voided');
+    if (search) { const s = search.replace(/[%_,().]/g, ''); const num = parseInt(s); if (num && !isNaN(num)) q = q.eq('challan_number', num); else if (s.trim()) q = q.ilike('customer_name', `%${s}%`); }
+    if (statusFilter) q = q.eq('status', statusFilter);
+    if (tagFilter) q = q.contains('tags', [tagFilter]);
+    if (dateFrom) q = q.gte('created_at', dateFrom + 'T00:00:00');
+    if (dateTo) q = q.lte('created_at', dateTo + 'T23:59:59');
+    q = q.order('created_at', { ascending: false }).limit(5000);
+    const { data } = await q;
+    if (!data || data.length === 0) { addToast('No challans to export', 'error'); return; }
+    const esc = (v: string) => `"${(v || '').replace(/"/g, '""')}"`;
+    const header = 'Challan #,Date,Customer,Type,Status,SKU,Description,Qty,Price,Disc Type,Disc Value,Disc Amount,Item Total,Subtotal,Total Discount,Shipping,Round Off,Grand Total,Amount Paid,Payment Mode,Payment Date,Notes,Tags';
+    const rows: string[] = [];
+    for (const c of data as any[]) {
+      const items = c.cash_challan_items || [];
+      const base = [c.challan_number, new Date(c.created_at).toLocaleDateString('en-IN'), esc(c.customer_name), c.is_return ? 'Return' : 'Sale', c.status];
+      const tail = [c.subtotal, c.discount_amount, c.shipping_charges, c.round_off, c.total, c.amount_paid, esc(c.payment_mode || ''), c.payment_date || '', esc(c.notes || ''), esc((c.tags || []).join(', '))];
+      if (items.length === 0) { rows.push([...base, '', '', '', '', '', '', '', ...tail].join(',')); }
+      else { for (const it of items) { rows.push([...base, esc(it.sku || ''), esc(it.description || ''), it.quantity, it.price, it.discount_type || '', it.discount_value || 0, it.discount_amount || 0, it.total, ...tail].join(',')); } }
+    }
+    const csv = header + '\n' + rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `CashChallans_${dateFrom || 'all'}_${dateTo || 'all'}_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize);
   const allTags = [...new Set(challans.flatMap(c => c.tags || []))];
 
@@ -751,7 +780,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       </div>
 
       {/* Search + Filters */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search name or #..." style={{ flex: 1, minWidth: 120, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '6px 10px', outline: 'none' }} />
         <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '6px 8px', outline: 'none' }}>
           <option value="">All Status</option><option value="draft">Draft</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option><option value="partial">Partial</option><option value="voided">Voided</option>
@@ -759,9 +788,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         {allTags.length > 0 && <select value={tagFilter} onChange={e => { setTagFilter(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '6px 8px', outline: 'none' }}>
           <option value="">All Tags</option>{allTags.map(t => <option key={t} value={t}>{t}</option>)}
         </select>}
+        <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }} />
+        <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }} />
+        {(dateFrom || dateTo) && <button onClick={() => { setDateFrom(''); setDateTo(''); setPage(0); }} style={{ padding: '5px 8px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Clear</button>}
         <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '6px 6px', outline: 'none', width: 50 }}>
           <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
         </select>
+        <button onClick={exportChallansCSV} style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.08)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Export CSV</button>
       </div>
 
       <div style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{totalCount} records</div>
