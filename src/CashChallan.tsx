@@ -5,6 +5,7 @@ import { useNotifications } from './hooks/useNotifications';
 import ChallanAnalytics from './components/challan/ChallanAnalytics';
 import ChallanLedger from './components/challan/ChallanLedger';
 import ChallanForm from './components/challan/ChallanForm';
+import ChallanDetail from './components/challan/ChallanDetail';
 import Empty from './components/ui/Empty';
 import { friendlyError } from './lib/friendlyError';
 import type {
@@ -95,6 +96,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const ledgerPdfIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [userName, setUserName] = useState('there');
   const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number } | null>(null);
+  const [viewingChallan, setViewingChallan] = useState<Challan | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number>; returnsCount?: number; voidedCount?: number; prevRevenue?: number; prevCount?: number }>({ totalRevenue: 0, count: 0, byMode: {} });
   const [analyticsFrom, setAnalyticsFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; });
@@ -809,7 +811,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           const pendingDays = (!c.is_return && (c.status === 'unpaid' || c.status === 'partial')) ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : 0;
           const isRet = !!c.is_return;
           return (
-            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: isRet ? 'rgba(239,68,68,.04)' : undefined, transition: 'background .15s' }} onClick={() => openEdit(c)} onMouseEnter={e => e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.08)' : 'rgba(255,255,255,.02)'} onMouseLeave={e => e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.04)' : ''}>
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: isRet ? 'rgba(239,68,68,.04)' : undefined, transition: 'background .15s' }} onClick={() => setViewingChallan(c)} onMouseEnter={e => e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.08)' : 'rgba(255,255,255,.02)'} onMouseLeave={e => e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.04)' : ''}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>#{c.challan_number}</span>
@@ -876,6 +878,17 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           </div>
         </div>
       )}
+
+      {/* Challan Detail View — read-only, opens before edit */}
+      {viewingChallan && <ChallanDetail
+        challan={viewingChallan}
+        onClose={() => setViewingChallan(null)}
+        onEdit={() => { const c = viewingChallan; setViewingChallan(null); openEdit(c); }}
+        onPrint={() => printChallan(viewingChallan)}
+        onRemind={() => { const c = viewingChallan; setViewingChallan(null); sendReminder(c); }}
+        onReturn={() => { const c = viewingChallan; setViewingChallan(null); setIsReturn(true); setChallanStatus('paid'); selectReturnSource(c); setShowModal(true); }}
+        onVoid={() => { const c = viewingChallan; setViewingChallan(null); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number }); }}
+      />}
 
       {/* WhatsApp Phone Prompt Modal */}
       {reminderChallan && (
