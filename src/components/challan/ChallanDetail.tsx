@@ -23,14 +23,14 @@ interface Props {
   onVoid: () => void;
 }
 
-type TimelineEntry = { type: 'audit' | 'payment'; time: string; action?: string; details?: string; user_name?: string; changes?: Record<string, { from: unknown; to: unknown }> | null; amount?: number; payment_mode?: string; is_reversal?: boolean; notes?: string };
+type TimelineEntry = { type: 'audit' | 'payment'; time: string; action?: string; details?: string; user_name?: string; changes?: Record<string, { from: unknown; to: unknown }> | null; amount?: number; payment_mode?: string; is_reversal?: boolean; notes?: string; batch_id?: string | null };
 
 export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid }: Props) {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   useEffect(() => {
     Promise.all([
       supabase.from('audit_log').select('action, details, user_email, changes, created_at').eq('module', 'cash_challan').eq('record_id', c.id).order('created_at'),
-      supabase.from('cash_challan_payments').select('amount, payment_mode, payment_date, paid_by, notes, is_reversal, created_at').eq('challan_id', c.id).order('created_at'),
+      supabase.from('cash_challan_payments').select('amount, payment_mode, payment_date, paid_by, notes, is_reversal, created_at, batch_id').eq('challan_id', c.id).order('created_at'),
     ]).then(async ([auditRes, payRes]) => {
       const entries: TimelineEntry[] = [];
       for (const a of (auditRes.data || [])) entries.push({ type: 'audit', time: a.created_at || '', action: a.action, details: a.details || '', user_name: a.user_email || undefined, changes: a.changes as any });
@@ -39,7 +39,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
         const userIds = [...new Set(payData.filter(p => p.paid_by).map(p => p.paid_by!))];
         const nameMap: Record<string, string> = {};
         if (userIds.length > 0) { const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', userIds); (profiles || []).forEach(p => { nameMap[p.id] = p.full_name || 'User'; }); }
-        for (const p of payData) entries.push({ type: 'payment', time: p.created_at || '', amount: Number(p.amount), payment_mode: p.payment_mode, is_reversal: p.is_reversal, user_name: p.paid_by ? nameMap[p.paid_by] || 'User' : undefined, notes: p.notes || undefined });
+        for (const p of payData) entries.push({ type: 'payment', time: p.created_at || '', amount: Number(p.amount), payment_mode: p.payment_mode, is_reversal: p.is_reversal, user_name: p.paid_by ? nameMap[p.paid_by] || 'User' : undefined, notes: p.notes || undefined, batch_id: p.batch_id });
       }
       entries.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
       setTimeline(entries);
@@ -136,6 +136,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           <span style={{ fontFamily: T.mono, fontWeight: 600, color: e.is_reversal ? T.re : T.gr }}>{e.is_reversal ? '−' : '+'}₹{Number(e.amount).toLocaleString('en-IN')}</span>
                           <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3 }}>{e.payment_mode}</span>
+                          {e.batch_id && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(99,102,241,.1)', color: T.ac2, fontFamily: T.mono, fontWeight: 600 }}>{e.batch_id}</span>}
                           {e.user_name && <span style={{ fontSize: 9, color: T.tx3 }}>by {e.user_name}</span>}
                         </div>
                         {e.notes && e.notes !== 'Backfilled from existing payment data' && <div style={{ fontSize: 9, color: T.tx3, marginTop: 2 }}>{e.notes}</div>}
