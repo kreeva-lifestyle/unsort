@@ -542,8 +542,10 @@ export type BrandTagInsert = {
   search_text?: string | null;
 };
 
-// ─── audit_log (8 cols) ──────────────────────────────────────────────────
+// ─── audit_log (9 cols) ──────────────────────────────────────────────────
 // Cross-module audit trail distinct from activity_logs.
+// `changes` stores structured before/after diffs for field-level tracking.
+// `user_email` is repurposed to store the user's display name.
 
 export interface AuditLog {
   id: string;
@@ -554,6 +556,7 @@ export interface AuditLog {
   user_id: string | null;
   user_email: string | null;
   created_at: string | null;
+  changes: Record<string, { from: unknown; to: unknown }> | null;
 }
 
 export type AuditLogInsert = {
@@ -565,6 +568,7 @@ export type AuditLogInsert = {
   user_id?: string | null;
   user_email?: string | null;
   created_at?: string | null;
+  changes?: Record<string, { from: unknown; to: unknown }> | null;
 };
 
 // ─── brands (4 cols) ─────────────────────────────────────────────────────

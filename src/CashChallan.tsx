@@ -13,16 +13,15 @@ import type {
   CashChallanItem as DbCashChallanItem,
   CashChallanCustomer,
   AuditLog,
-  AuditLogInsert,
 } from './types/database';
 
 const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Other'];
 
-const ccAudit = (action: string, details: string) => {
-  supabase.auth.getUser().then(({ data }) => {
-    const entry: AuditLogInsert = { action, module: 'cash_challan', details, user_id: data.user?.id ?? null };
-    supabase.from('audit_log').insert(entry);
-  });
+const ccAuditLog = async (action: string, recordId: string, details: string, changes?: Record<string, { from: unknown; to: unknown }>) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  let userName = user?.email || null;
+  if (user) { const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(); userName = prof?.full_name || userName; }
+  await supabase.from('audit_log').insert({ action, module: 'cash_challan', record_id: recordId, details, user_id: user?.id ?? null, user_email: userName, changes: changes || null });
 };
 
 import { T } from './lib/theme';
@@ -442,15 +441,20 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         if (insErr2) throw new Error(insErr2.message);
         const { error: upErr } = await supabase.from('cash_challans').update({ ...challanData, updated_at: new Date().toISOString() }).eq('id', editing.id);
         if (upErr) throw new Error(upErr.message);
-        // Record payment change if amount increased
+        // Record payment change
         const prevPaid = Number(editing.amount_paid || 0);
         const newPaid = amountPaid;
-        if (newPaid > prevPaid && newPaid > 0) {
-          await supabase.from('cash_challan_payments').insert({ challan_id: editing.id, amount: newPaid - prevPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || new Date().toISOString().slice(0, 10), paid_by: user?.id });
-        } else if (newPaid < prevPaid && prevPaid > 0) {
-          await supabase.from('cash_challan_payments').insert({ challan_id: editing.id, amount: prevPaid - newPaid, payment_mode: paymentMode || editing.payment_mode || 'Cash', payment_date: new Date().toISOString().slice(0, 10), paid_by: user?.id, notes: 'Payment reduced', is_reversal: true });
+        const today = new Date().toISOString().slice(0, 10);
+        if (newPaid > prevPaid) {
+          await supabase.from('cash_challan_payments').insert({ challan_id: editing.id, amount: newPaid - prevPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || today, paid_by: user?.id });
+        } else if (newPaid < prevPaid) {
+          await supabase.from('cash_challan_payments').insert({ challan_id: editing.id, amount: prevPaid - newPaid, payment_mode: editing.payment_mode || paymentMode || 'Cash', payment_date: today, paid_by: user?.id, notes: 'Payment removed/reduced', is_reversal: true });
         }
-        ccAudit('UPDATE', `Challan #${editing.challan_number} updated for ${customerName.trim()} - ₹${grandTotal}`);
+        // Structured field-level diff for audit
+        const tracked: (keyof typeof challanData)[] = ['status', 'amount_paid', 'payment_mode', 'payment_date', 'total', 'customer_name', 'shipping_charges', 'notes'];
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        for (const k of tracked) { const prev = (editing as any)[k]; const next = (challanData as any)[k]; if (String(prev ?? '') !== String(next ?? '')) changes[k] = { from: prev, to: next }; }
+        await ccAuditLog('UPDATE', editing.id, `Challan #${editing.challan_number} updated`, Object.keys(changes).length > 0 ? changes : undefined);
       } else {
         const { data: newChallan, error: crErr } = await supabase.from('cash_challans').insert({ ...challanData, created_by: user?.id, source_challan_id: isReturn && returnSource ? returnSource.id : null }).select('id, challan_number').single();
         if (crErr || !newChallan) throw new Error(crErr?.message || 'Failed to create challan');
@@ -460,7 +464,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         if (amountPaid > 0) {
           await supabase.from('cash_challan_payments').insert({ challan_id: newChallan.id, amount: amountPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || new Date().toISOString().slice(0, 10), paid_by: user?.id });
         }
-        ccAudit('CREATE', `${isReturn ? 'Return' : 'Challan'} #${newChallan.challan_number} created for ${customerName.trim()} - ₹${grandTotal}`);
+        await ccAuditLog('CREATE', newChallan.id, `${isReturn ? 'Return' : 'Challan'} #${newChallan.challan_number} created for ${customerName.trim()} — ₹${grandTotal}`);
       }
     } catch (e: any) {
       setFormError(`Save failed — ${friendlyError(e)}`);
@@ -482,13 +486,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const { data: { user } } = await supabase.auth.getUser();
     const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total').eq('id', id).maybeSingle();
     await supabase.from('cash_challans').update({ status: 'voided', voided_by: user?.id, voided_at: new Date().toISOString() }).eq('id', id);
-    if (before) ccAudit('VOID', `Challan #${before.challan_number} (${before.customer_name}) voided - was ₹${before.total}`);
+    if (before) await ccAuditLog('VOID', id, `Challan #${before.challan_number} (${before.customer_name}) voided — was ₹${before.total}`, { status: { from: 'active', to: 'voided' } });
     fetchChallans();
   };
 
   // ── Audit trail for a challan ──────────────────────────────────────────────
   const loadAuditTrail = async (challanNumber: number) => {
-    const { data } = await supabase.from('audit_log').select('id, action, module, record_id, details, user_id, user_email, created_at').eq('module', 'cash_challan').ilike('details', `%#${challanNumber} %`).order('created_at', { ascending: false });
+    const { data } = await supabase.from('audit_log').select('id, action, module, record_id, details, user_id, user_email, created_at, changes').eq('module', 'cash_challan').ilike('details', `%#${challanNumber} %`).order('created_at', { ascending: false });
     setAuditTrail(data || []);
   };
 
@@ -700,8 +704,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         });
       }
     }
-    const names = [...new Set(bulkPayable.map(c => c.customer_name))].join(', ');
-    ccAudit('BULK_PAY', `Bulk paid ${ids.length} challans (${names}) — ₹${bulkNetTotal.toLocaleString('en-IN')} net via ${bulkPayMode}`);
+    for (const c of bulkPayable) await ccAuditLog('BULK_PAY', c.id, `Bulk paid — ₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} via ${bulkPayMode}`, { status: { from: c.status, to: 'paid' }, amount_paid: { from: c.amount_paid, to: c.total } });
     setShowBulkPay(false); setBulkPayMode(''); exitBulkMode(); fetchChallans();
     addToast(`${ids.length} challans marked as paid`, 'success');
   };
@@ -721,8 +724,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         payment_date: today, paid_by: user?.id, notes: 'Bulk unpay reversal', is_reversal: true,
       });
     }
-    const names = [...new Set(bulkUnpayable.map(c => c.customer_name))].join(', ');
-    ccAudit('BULK_UNPAY', `Bulk unpaid ${ids.length} challans (${names})`);
+    for (const c of bulkUnpayable) await ccAuditLog('BULK_UNPAY', c.id, `Bulk unpaid — was ₹${Number(c.amount_paid || c.total).toLocaleString('en-IN')}`, { status: { from: 'paid', to: 'unpaid' }, amount_paid: { from: c.amount_paid, to: 0 } });
     setShowBulkUnpay(false); exitBulkMode(); fetchChallans();
     addToast(`${ids.length} challans reverted to unpaid`, 'success');
   };
