@@ -442,12 +442,24 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         if (insErr2) throw new Error(insErr2.message);
         const { error: upErr } = await supabase.from('cash_challans').update({ ...challanData, updated_at: new Date().toISOString() }).eq('id', editing.id);
         if (upErr) throw new Error(upErr.message);
+        // Record payment change if amount increased
+        const prevPaid = Number(editing.amount_paid || 0);
+        const newPaid = amountPaid;
+        if (newPaid > prevPaid && newPaid > 0) {
+          await supabase.from('cash_challan_payments').insert({ challan_id: editing.id, amount: newPaid - prevPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || new Date().toISOString().slice(0, 10), paid_by: user?.id });
+        } else if (newPaid < prevPaid && prevPaid > 0) {
+          await supabase.from('cash_challan_payments').insert({ challan_id: editing.id, amount: prevPaid - newPaid, payment_mode: paymentMode || editing.payment_mode || 'Cash', payment_date: new Date().toISOString().slice(0, 10), paid_by: user?.id, notes: 'Payment reduced', is_reversal: true });
+        }
         ccAudit('UPDATE', `Challan #${editing.challan_number} updated for ${customerName.trim()} - ₹${grandTotal}`);
       } else {
         const { data: newChallan, error: crErr } = await supabase.from('cash_challans').insert({ ...challanData, created_by: user?.id, source_challan_id: isReturn && returnSource ? returnSource.id : null }).select('id, challan_number').single();
         if (crErr || !newChallan) throw new Error(crErr?.message || 'Failed to create challan');
         const { error: itErr } = await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: newChallan.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100, sort_order: i })));
         if (itErr) { await supabase.from('cash_challans').delete().eq('id', newChallan.id); throw new Error(itErr.message); }
+        // Record initial payment for new challan
+        if (amountPaid > 0) {
+          await supabase.from('cash_challan_payments').insert({ challan_id: newChallan.id, amount: amountPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || new Date().toISOString().slice(0, 10), paid_by: user?.id });
+        }
         ccAudit('CREATE', `${isReturn ? 'Return' : 'Challan'} #${newChallan.challan_number} created for ${customerName.trim()} - ₹${grandTotal}`);
       }
     } catch (e: any) {
@@ -660,9 +672,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const bulkPayable = selectedChallans.filter(c => !c.is_return && (c.status === 'unpaid' || c.status === 'partial'));
   const bulkUnpayable = selectedChallans.filter(c => !c.is_return && c.status === 'paid');
   const bulkReturns = selectedChallans.filter(c => c.is_return);
-  const bulkSalesTotal = bulkPayable.reduce((s, c) => s + Number(c.total), 0);
+  const bulkSalesOutstanding = bulkPayable.reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0);
   const bulkReturnsTotal = bulkReturns.reduce((s, c) => s + Number(c.total), 0);
-  const bulkNetTotal = bulkSalesTotal - bulkReturnsTotal;
+  const bulkNetTotal = bulkSalesOutstanding - bulkReturnsTotal;
 
   const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const selectAll = () => setSelectedIds(new Set(challans.filter(c => c.status !== 'voided' && c.status !== 'draft').map(c => c.id)));
@@ -676,10 +688,17 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const ids = bulkPayable.map(c => c.id);
     if (ids.length === 0) { setShowBulkPay(false); return; }
     for (const c of bulkPayable) {
+      const outstanding = Number(c.total) - Number(c.amount_paid || 0);
       await supabase.from('cash_challans').update({
         status: 'paid', amount_paid: Number(c.total), payment_mode: bulkPayMode,
         payment_date: today, modified_by: user?.id, updated_at: new Date().toISOString(),
       }).eq('id', c.id).in('status', ['unpaid', 'partial']);
+      if (outstanding > 0) {
+        await supabase.from('cash_challan_payments').insert({
+          challan_id: c.id, amount: outstanding, payment_mode: bulkPayMode,
+          payment_date: today, paid_by: user?.id, notes: 'Bulk payment',
+        });
+      }
     }
     const names = [...new Set(bulkPayable.map(c => c.customer_name))].join(', ');
     ccAudit('BULK_PAY', `Bulk paid ${ids.length} challans (${names}) — ₹${bulkNetTotal.toLocaleString('en-IN')} net via ${bulkPayMode}`);
@@ -688,6 +707,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   const executeBulkUnpay = async () => {
+    const today = new Date().toISOString().slice(0, 10);
     const { data: { user } } = await supabase.auth.getUser();
     const ids = bulkUnpayable.map(c => c.id);
     if (ids.length === 0) { setShowBulkUnpay(false); return; }
@@ -696,6 +716,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         status: 'unpaid', amount_paid: 0, payment_mode: null, payment_date: null,
         modified_by: user?.id, updated_at: new Date().toISOString(),
       }).eq('id', c.id).eq('status', 'paid');
+      await supabase.from('cash_challan_payments').insert({
+        challan_id: c.id, amount: Number(c.amount_paid || c.total), payment_mode: c.payment_mode || 'Cash',
+        payment_date: today, paid_by: user?.id, notes: 'Bulk unpay reversal', is_reversal: true,
+      });
     }
     const names = [...new Set(bulkUnpayable.map(c => c.customer_name))].join(', ');
     ccAudit('BULK_UNPAY', `Bulk unpaid ${ids.length} challans (${names})`);
@@ -961,8 +985,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 12 }}>Bulk Pay</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12, fontSize: 11 }}>
               <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 6, padding: '8px 10px' }}>
-                <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Sales ({bulkPayable.length})</div>
-                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.mono, color: T.gr }}>₹{bulkSalesTotal.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Outstanding ({bulkPayable.length})</div>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.mono, color: T.gr }}>₹{bulkSalesOutstanding.toLocaleString('en-IN')}</div>
               </div>
               <div style={{ background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 6, padding: '8px 10px' }}>
                 <div style={{ fontSize: 8, color: T.re, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Returns ({bulkReturns.length})</div>

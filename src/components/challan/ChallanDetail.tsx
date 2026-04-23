@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 import { T } from '../../lib/theme';
-import type { CashChallan, CashChallanItem } from '../../types/database';
+import type { CashChallan, CashChallanItem, CashChallanPayment } from '../../types/database';
 
 type Challan = CashChallan & { cash_challan_items?: Partial<CashChallanItem>[] };
 
@@ -22,6 +24,21 @@ interface Props {
 }
 
 export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid }: Props) {
+  const [payments, setPayments] = useState<(CashChallanPayment & { paid_by_name?: string })[]>([]);
+  useEffect(() => {
+    supabase.from('cash_challan_payments').select('id, challan_id, amount, payment_mode, payment_date, paid_by, notes, is_reversal, created_at')
+      .eq('challan_id', c.id).order('created_at', { ascending: true })
+      .then(({ data }) => {
+        if (!data || data.length === 0) { setPayments([]); return; }
+        const userIds = [...new Set(data.filter(p => p.paid_by).map(p => p.paid_by!))];
+        if (userIds.length === 0) { setPayments(data); return; }
+        supabase.from('profiles').select('id, full_name').in('id', userIds).then(({ data: profiles }) => {
+          const nameMap: Record<string, string> = {};
+          (profiles || []).forEach(p => { nameMap[p.id] = p.full_name || 'User'; });
+          setPayments(data.map(p => ({ ...p, paid_by_name: p.paid_by ? nameMap[p.paid_by] || 'User' : undefined })));
+        });
+      });
+  }, [c.id]);
   const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
   const items = c.cash_challan_items || [];
   const isRet = !!c.is_return;
@@ -94,13 +111,36 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
             </div>
           </div>
 
-          {/* Payment info */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
-            <div><div style={label}>Amount Paid</div><div style={{ ...val, fontFamily: T.mono, color: Number(c.amount_paid) > 0 ? T.gr : T.tx3 }}>₹{Number(c.amount_paid || 0).toLocaleString('en-IN')}</div></div>
-            {c.payment_mode && <div><div style={label}>Payment Mode</div><div style={val}>{c.payment_mode}</div></div>}
-            {c.payment_date && <div><div style={label}>Payment Date</div><div style={val}>{new Date(c.payment_date).toLocaleDateString('en-IN')}</div></div>}
+          {/* Payment summary */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+            <div><div style={label}>Total Paid</div><div style={{ ...val, fontFamily: T.mono, color: Number(c.amount_paid) > 0 ? T.gr : T.tx3 }}>₹{Number(c.amount_paid || 0).toLocaleString('en-IN')}</div></div>
+            {due > 0 && !isRet && <div><div style={label}>Outstanding</div><div style={{ ...val, fontFamily: T.mono, color: T.re }}>₹{due.toLocaleString('en-IN')}</div></div>}
           </div>
-          {due > 0 && !isRet && <div style={{ background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 6, padding: '6px 10px', fontSize: 11, color: T.re, fontWeight: 600, marginBottom: 12 }}>Outstanding: ₹{due.toLocaleString('en-IN')}</div>}
+
+          {/* Payment history */}
+          {payments.length > 0 && (
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+              <div style={{ padding: '6px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 9, color: T.tx3, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' }}>Payment History</div>
+              {payments.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 10 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: p.is_reversal ? T.re : T.gr, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontFamily: T.mono, fontWeight: 600, color: p.is_reversal ? T.re : T.gr }}>{p.is_reversal ? '−' : '+'}₹{Number(p.amount).toLocaleString('en-IN')}</span>
+                      <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3 }}>{p.payment_mode}</span>
+                      <span style={{ fontSize: 9, color: T.tx3 }}>{new Date(p.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
+                      {p.paid_by_name && <span style={{ fontSize: 9, color: T.tx3 }}>by {p.paid_by_name}</span>}
+                    </div>
+                    {p.notes && p.notes !== 'Backfilled from existing payment data' && <div style={{ fontSize: 9, color: T.tx3, marginTop: 2 }}>{p.notes}</div>}
+                  </div>
+                  {p.created_at && <span style={{ fontSize: 8, color: T.tx3, fontFamily: T.mono, whiteSpace: 'nowrap' }}>{new Date(p.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          {payments.length === 0 && Number(c.amount_paid || 0) === 0 && !isRet && c.status !== 'draft' && c.status !== 'voided' && (
+            <div style={{ fontSize: 10, color: T.tx3, marginBottom: 12, fontStyle: 'italic' }}>No payments recorded yet.</div>
+          )}
 
           {/* Notes + Tags */}
           {c.notes && <div style={{ fontSize: 11, color: T.tx2, marginBottom: 6 }}><span style={{ color: T.tx3, fontSize: 9, fontWeight: 600 }}>NOTES: </span>{c.notes}</div>}
