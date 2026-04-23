@@ -490,9 +490,18 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Void challan ───────────────────────────────────────────────────────────
   const voidChallan = async (id: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total').eq('id', id).maybeSingle();
-    await supabase.from('cash_challans').update({ status: 'voided', voided_by: user?.id, voided_at: new Date().toISOString() }).eq('id', id);
-    if (before) await ccAuditLog('VOID', id, `Challan #${before.challan_number} (${before.customer_name}) voided — was ₹${before.total}`, { status: { from: 'active', to: 'voided' } });
+    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total, amount_paid, status, payment_mode').eq('id', id).maybeSingle();
+    if (!before) return;
+    const { error: voidErr } = await supabase.from('cash_challans').update({ status: 'voided', voided_by: user?.id, voided_at: new Date().toISOString() }).eq('id', id);
+    if (voidErr) { addToast(friendlyError(voidErr), 'error'); return; }
+    if (Number(before.amount_paid || 0) > 0) {
+      await supabase.from('cash_challan_payments').insert({
+        challan_id: id, amount: Number(before.amount_paid), payment_mode: before.payment_mode || 'Cash',
+        payment_date: new Date().toISOString().slice(0, 10), paid_by: user?.id,
+        notes: `Reversal — challan #${before.challan_number} voided`, is_reversal: true,
+      });
+    }
+    await ccAuditLog('VOID', id, `Challan #${before.challan_number} (${before.customer_name}) voided — was ₹${before.total}`, { status: { from: before.status, to: 'voided' }, amount_paid: { from: before.amount_paid, to: 0 } });
     fetchChallans();
   };
 
@@ -505,6 +514,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── WhatsApp payment reminder ──────────────────────────────────────────────
   const sendReminder = async (c: Challan) => {
     const outstanding = Number(c.total) - Number(c.amount_paid || 0);
+    if (outstanding <= 0) { addToast('Cannot remind — challan is fully paid', 'error'); return; }
     // Try to get saved phone
     const { data: cust } = await supabase.from('cash_challan_customers').select('phone').eq('name', c.customer_name).maybeSingle();
     const phone = cust?.phone;
@@ -642,7 +652,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const statusColor = c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : c.status === 'draft' ? '#0c5460' : '#721c24';
     const statusBg = c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : c.status === 'draft' ? '#d1ecf1' : '#f8d7da';
     w.document.write(`<div style="margin:12px 0;padding:10px 14px;border-radius:6px;background:${statusBg};display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;color:${statusColor};font-size:13px">Status: ${escHtml(statusLabel)}</span>`);
-    if (Number(c.amount_paid) > 0) w.document.write(`<span style="font-size:12px;color:${statusColor}">${c.is_return ? 'Refunded' : 'Paid'}: ₹${Number(c.amount_paid).toFixed(2)}${c.payment_mode ? ' (' + escHtml(c.payment_mode) + ')' : ''}</span>`);
+    if (Number(c.amount_paid) > 0) w.document.write(`<span style="font-size:12px;color:${statusColor}">${c.is_return ? 'Refunded' : 'Paid'}: ₹${Number(c.amount_paid).toFixed(2)}${c.payment_mode ? ' (' + escHtml(c.payment_mode) + ')' : ''}${c.payment_date ? ' on ' + new Date(c.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}</span>`);
     if (c.status !== 'paid' && c.status !== 'draft' && !c.is_return) { const due = Number(c.total) - Number(c.amount_paid || 0); w.document.write(`<span style="font-size:12px;color:#721c24;font-weight:600">Due: ₹${due.toFixed(2)}</span>`); }
     w.document.write(`</div>`);
     if (c.notes) w.document.write(`<p style="font-size:11px;color:#666;margin-top:12px"><strong>Notes:</strong> ${escHtml(c.notes)}</p>`);
