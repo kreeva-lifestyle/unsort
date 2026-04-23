@@ -670,6 +670,7 @@ export interface CashChallanPayment {
   notes: string | null;
   is_reversal: boolean;
   created_at: string | null;
+  batch_id: string | null;
 }
 
 // Constant arrays for dropdowns / validation
