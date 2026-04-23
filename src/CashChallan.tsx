@@ -71,6 +71,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [showBulkPay, setShowBulkPay] = useState(false);
   const [showBulkUnpay, setShowBulkUnpay] = useState(false);
   const [bulkPayMode, setBulkPayMode] = useState('');
+  const [bulkReceivedAmount, setBulkReceivedAmount] = useState('');
 
   // Modal
   const [showModal, setShowModal] = useState(false);
@@ -691,6 +692,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const { data: { user } } = await supabase.auth.getUser();
     const ids = bulkPayable.map(c => c.id);
     if (ids.length === 0) { setShowBulkPay(false); return; }
+    const received = Number(bulkReceivedAmount) || bulkNetTotal;
+    const diff = received - bulkNetTotal;
+    const receiptNote = `Bulk payment — received ₹${received.toLocaleString('en-IN')} against ₹${bulkNetTotal.toLocaleString('en-IN')} outstanding${diff > 0 ? ` (₹${diff.toLocaleString('en-IN')} excess)` : diff < 0 ? ` (₹${Math.abs(diff).toLocaleString('en-IN')} short)` : ''}`;
     for (const c of bulkPayable) {
       const outstanding = Number(c.total) - Number(c.amount_paid || 0);
       await supabase.from('cash_challans').update({
@@ -700,12 +704,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       if (outstanding > 0) {
         await supabase.from('cash_challan_payments').insert({
           challan_id: c.id, amount: outstanding, payment_mode: bulkPayMode,
-          payment_date: today, paid_by: user?.id, notes: 'Bulk payment',
+          payment_date: today, paid_by: user?.id, notes: receiptNote,
         });
       }
     }
-    for (const c of bulkPayable) await ccAuditLog('BULK_PAY', c.id, `Bulk paid — ₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} via ${bulkPayMode}`, { status: { from: c.status, to: 'paid' }, amount_paid: { from: c.amount_paid, to: c.total } });
-    setShowBulkPay(false); setBulkPayMode(''); exitBulkMode(); fetchChallans();
+    for (const c of bulkPayable) await ccAuditLog('BULK_PAY', c.id, `Bulk paid — ₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} via ${bulkPayMode}. ${receiptNote}`, { status: { from: c.status, to: 'paid' }, amount_paid: { from: c.amount_paid, to: c.total }, received_amount: { from: bulkNetTotal, to: received } });
+    setShowBulkPay(false); setBulkPayMode(''); setBulkReceivedAmount(''); exitBulkMode(); fetchChallans();
     addToast(`${ids.length} challans marked as paid`, 'success');
   };
 
@@ -889,7 +893,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           <button onClick={selectAll} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Select All</button>
           <button onClick={clearSelection} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Clear</button>
           <div style={{ flex: 1 }} />
-          {bulkPayable.length > 0 && <button onClick={() => { setBulkPayMode(''); setShowBulkPay(true); }} style={{ padding: '4px 12px', borderRadius: 5, border: 'none', background: T.gr, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Bulk Pay ({bulkPayable.length})</button>}
+          {bulkPayable.length > 0 && <button onClick={() => { setBulkPayMode(''); setBulkReceivedAmount(''); setShowBulkPay(true); }} style={{ padding: '4px 12px', borderRadius: 5, border: 'none', background: T.gr, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Bulk Pay ({bulkPayable.length})</button>}
           {bulkUnpayable.length > 0 && <button onClick={() => setShowBulkUnpay(true)} style={{ padding: '4px 12px', borderRadius: 5, border: '1px solid rgba(245,158,11,.3)', background: 'rgba(245,158,11,.08)', color: T.yl, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Bulk Unpay ({bulkUnpayable.length})</button>}
         </div>
       )}
@@ -998,6 +1002,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, textAlign: 'center' }}>
               <div style={{ fontSize: 8, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Net Amount</div>
               <div style={{ fontSize: 20, fontWeight: 800, fontFamily: T.sora, color: bulkNetTotal >= 0 ? T.gr : T.re }}>₹{Math.abs(bulkNetTotal).toLocaleString('en-IN')}</div>
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Amount Received from Customer</label>
+              <input type="number" value={bulkReceivedAmount} onChange={e => setBulkReceivedAmount(e.target.value)} placeholder={String(bulkNetTotal)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+              {(() => { const recv = Number(bulkReceivedAmount) || 0; const diff = recv - bulkNetTotal; if (!bulkReceivedAmount || diff === 0) return null; return <div style={{ marginTop: 4, fontSize: 10, color: diff > 0 ? T.yl : T.re, fontWeight: 600 }}>{diff > 0 ? `₹${diff.toLocaleString('en-IN')} excess (advance/overpayment)` : `₹${Math.abs(diff).toLocaleString('en-IN')} short of outstanding`}</div>; })()}
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Payment Mode</label>
