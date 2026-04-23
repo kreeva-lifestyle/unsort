@@ -277,15 +277,18 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const prevToDt = new Date(fromDt.getTime() - 1);
     const prevFromDt = new Date(prevToDt.getTime() - rangeMs);
     type AnalyticsRow = Pick<CashChallan, 'total' | 'payment_mode' | 'status' | 'is_return'>;
-    const [{ data }, { count: voidedCount }, { data: prevData }] = await Promise.all([
-      supabase.from('cash_challans').select('total, payment_mode, status, is_return').gte('created_at', fromDt.toISOString()).lte('created_at', toDt.toISOString()).neq('status', 'voided'),
-      supabase.from('cash_challans').select('id', { count: 'estimated', head: true }).gte('created_at', fromDt.toISOString()).lte('created_at', toDt.toISOString()).eq('status', 'voided'),
+    const fromIso = fromDt.toISOString(); const toIso = toDt.toISOString();
+    const fromDate = analyticsFrom; const toDate = analyticsTo;
+    const [{ data }, { count: voidedCount }, { data: prevData }, { data: paidInPeriod }] = await Promise.all([
+      supabase.from('cash_challans').select('total, payment_mode, status, is_return').gte('created_at', fromIso).lte('created_at', toIso).neq('status', 'voided'),
+      supabase.from('cash_challans').select('id', { count: 'estimated', head: true }).gte('created_at', fromIso).lte('created_at', toIso).eq('status', 'voided'),
       supabase.from('cash_challans').select('total, is_return').gte('created_at', prevFromDt.toISOString()).lte('created_at', prevToDt.toISOString()).neq('status', 'voided'),
+      supabase.from('cash_challans').select('total, payment_mode, is_return').gte('payment_date', fromDate).lte('payment_date', toDate).in('status', ['paid', 'partial']).neq('status', 'voided'),
     ]);
     const rows = (data as AnalyticsRow[] | null) || [];
     const totalRevenue = rows.reduce((s, r) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
     const byMode: Record<string, number> = {};
-    rows.forEach((r) => { const m = r.payment_mode || 'Unset'; byMode[m] = (byMode[m] || 0) + (r.is_return ? -1 : 1) * Number(r.total); });
+    ((paidInPeriod as AnalyticsRow[] | null) || []).forEach((r) => { const m = r.payment_mode || 'Unset'; byMode[m] = (byMode[m] || 0) + (r.is_return ? -1 : 1) * Number(r.total); });
     const salesCount = rows.filter((r) => !r.is_return).length;
     const returnsCount = rows.filter((r) => r.is_return).length;
     const prevRows = (prevData as Pick<CashChallan, 'total' | 'is_return'>[] | null) || [];

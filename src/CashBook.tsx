@@ -93,9 +93,9 @@ export default function CashBook() {
     const { data: exp } = await supabase.from('cash_expenses').select('id, date, amount, category, description, created_at').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
     setExpenses(exp || []);
 
-    // Cash sales (challans paid in cash, created in date range)
+    // Cash sales — filter by payment_date (when cash actually moved), not created_at
     const { data: ch } = await supabase.from('cash_challans').select('id, challan_number, customer_name, total, amount_paid, status, is_return, payment_mode, payment_date, created_at')
-      .eq('payment_mode', 'Cash').in('status', ['paid', 'partial']).gte('created_at', fromDate + 'T00:00:00').lte('created_at', toDate + 'T23:59:59').order('created_at', { ascending: false });
+      .eq('payment_mode', 'Cash').in('status', ['paid', 'partial']).gte('payment_date', fromDate).lte('payment_date', toDate).order('payment_date', { ascending: false });
     setSales(ch || []);
 
     // Handovers in date range
@@ -173,7 +173,7 @@ export default function CashBook() {
     const [{ data: bal }, { data: exp }, { data: ch }, { data: ho }] = await Promise.all([
       supabase.from('cash_book_balances').select('opening_balance').eq('date', from).maybeSingle(),
       supabase.from('cash_expenses').select('amount').gte('date', from).lte('date', to),
-      supabase.from('cash_challans').select('amount_paid, is_return, status').eq('payment_mode', 'Cash').in('status', ['paid', 'partial']).gte('created_at', from + 'T00:00:00').lte('created_at', to + 'T23:59:59'),
+      supabase.from('cash_challans').select('amount_paid, is_return, status').eq('payment_mode', 'Cash').in('status', ['paid', 'partial']).gte('payment_date', from).lte('payment_date', to),
       supabase.from('cash_handovers').select('amount, status, period_from, period_to, date').eq('status', 'confirmed'),
     ]);
     const opening = Number(bal?.opening_balance || 0);
