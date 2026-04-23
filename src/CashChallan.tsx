@@ -695,9 +695,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const ids = bulkPayable.map(c => c.id);
     if (ids.length === 0) { setShowBulkPay(false); return; }
     const batchId = `BP-${Date.now().toString(36).toUpperCase()}`;
-    const received = Number(bulkReceivedAmount) || bulkNetTotal;
-    const diff = received - bulkNetTotal;
-    const receiptNote = `Batch ${batchId} — received ₹${received.toLocaleString('en-IN')} against ₹${bulkNetTotal.toLocaleString('en-IN')} outstanding${diff > 0 ? ` (₹${diff.toLocaleString('en-IN')} excess)` : diff < 0 ? ` (₹${Math.abs(diff).toLocaleString('en-IN')} short)` : ''}`;
+    const isRefund = bulkNetTotal < 0;
+    const received = Number(bulkReceivedAmount) || Math.abs(bulkNetTotal);
+    const receiptNote = isRefund
+      ? `Batch ${batchId} — settled ₹${bulkSalesOutstanding.toLocaleString('en-IN')} outstanding against ₹${bulkReturnsTotal.toLocaleString('en-IN')} returns. Refunded ₹${received.toLocaleString('en-IN')} to customer via ${bulkPayMode}`
+      : `Batch ${batchId} — received ₹${received.toLocaleString('en-IN')} against ₹${bulkNetTotal.toLocaleString('en-IN')} outstanding${received !== bulkNetTotal ? ` (${received > bulkNetTotal ? 'excess' : 'short'} ₹${Math.abs(received - bulkNetTotal).toLocaleString('en-IN')})` : ''}`;
     for (const c of bulkPayable) {
       const outstanding = Number(c.total) - Number(c.amount_paid || 0);
       await supabase.from('cash_challans').update({
@@ -711,10 +713,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         });
       }
     }
-    for (const c of bulkPayable) await ccAuditLog('BULK_PAY', c.id, `Bulk paid (${batchId}) — ₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} via ${bulkPayMode}`, { status: { from: c.status, to: 'paid' }, amount_paid: { from: c.amount_paid, to: c.total }, received_amount: { from: bulkNetTotal, to: received } });
+    for (const c of bulkPayable) await ccAuditLog(isRefund ? 'SETTLE_REFUND' : 'BULK_PAY', c.id, `${isRefund ? 'Settled against returns' : 'Bulk paid'} (${batchId}) — ₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} via ${bulkPayMode}`, { status: { from: c.status, to: 'paid' }, amount_paid: { from: c.amount_paid, to: c.total }, ...(isRefund ? { refunded: { from: 0, to: received } } : { received_amount: { from: Math.abs(bulkNetTotal), to: received } }) });
     setLastBatch({ id: batchId, count: ids.length, mode: bulkPayMode });
     setShowBulkPay(false); setBulkPayMode(''); setBulkReceivedAmount(''); exitBulkMode(); fetchChallans();
-    addToast(`${ids.length} challans marked as paid (${batchId})`, 'success');
+    addToast(isRefund ? `Settled ${ids.length} challans, refunded ₹${received.toLocaleString('en-IN')} (${batchId})` : `${ids.length} challans marked as paid (${batchId})`, 'success');
   };
 
   const undoBatch = async (batchId: string) => {
@@ -1016,7 +1018,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       {showBulkPay && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={() => setShowBulkPay(false)}>
           <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 420, width: '100%' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 12 }}>Bulk Pay</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 12 }}>{bulkNetTotal < 0 ? 'Settle & Refund' : 'Bulk Pay'}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12, fontSize: 11 }}>
               <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 6, padding: '8px 10px' }}>
                 <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Outstanding ({bulkPayable.length})</div>
@@ -1027,24 +1029,25 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
                 <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.mono, color: T.re }}>₹{bulkReturnsTotal.toLocaleString('en-IN')}</div>
               </div>
             </div>
-            <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, textAlign: 'center' }}>
-              <div style={{ fontSize: 8, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Net Amount</div>
+            <div style={{ background: bulkNetTotal >= 0 ? 'rgba(99,102,241,.06)' : 'rgba(239,68,68,.06)', border: `1px solid ${bulkNetTotal >= 0 ? 'rgba(99,102,241,.15)' : 'rgba(239,68,68,.15)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 14, textAlign: 'center' }}>
+              <div style={{ fontSize: 8, color: bulkNetTotal >= 0 ? T.ac2 : T.re, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>{bulkNetTotal >= 0 ? 'Net Amount' : 'You Owe Customer'}</div>
               <div style={{ fontSize: 20, fontWeight: 800, fontFamily: T.sora, color: bulkNetTotal >= 0 ? T.gr : T.re }}>₹{Math.abs(bulkNetTotal).toLocaleString('en-IN')}</div>
+              {bulkNetTotal < 0 && <div style={{ fontSize: 9, color: T.tx3, marginTop: 4 }}>Returns exceed outstanding. Sales will be settled against returns, refund the difference.</div>}
             </div>
             <div style={{ marginBottom: 10 }}>
-              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Amount Received from Customer</label>
-              <input type="number" value={bulkReceivedAmount} onChange={e => setBulkReceivedAmount(e.target.value)} placeholder={String(bulkNetTotal)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
-              {(() => { const recv = Number(bulkReceivedAmount) || 0; const diff = recv - bulkNetTotal; if (!bulkReceivedAmount || diff === 0) return null; return <div style={{ marginTop: 4, fontSize: 10, color: diff > 0 ? T.yl : T.re, fontWeight: 600 }}>{diff > 0 ? `₹${diff.toLocaleString('en-IN')} excess (advance/overpayment)` : `₹${Math.abs(diff).toLocaleString('en-IN')} short of outstanding`}</div>; })()}
+              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>{bulkNetTotal < 0 ? 'Amount Refunded to Customer' : 'Amount Received from Customer'}</label>
+              <input type="number" value={bulkReceivedAmount} onChange={e => setBulkReceivedAmount(e.target.value)} placeholder={String(Math.abs(bulkNetTotal))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+              {(() => { const recv = Number(bulkReceivedAmount) || 0; const expected = Math.abs(bulkNetTotal); const diff = recv - expected; if (!bulkReceivedAmount || diff === 0) return null; return <div style={{ marginTop: 4, fontSize: 10, color: T.yl, fontWeight: 600 }}>₹{Math.abs(diff).toLocaleString('en-IN')} {diff > 0 ? 'more than expected' : 'less than expected'}</div>; })()}
             </div>
             <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Payment Mode</label>
+              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>{bulkNetTotal < 0 ? 'Refund Mode' : 'Payment Mode'}</label>
               <select value={bulkPayMode} onChange={e => setBulkPayMode(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none' }}>
                 <option value="">Select...</option>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setShowBulkPay(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={executeBulkPay} disabled={!bulkPayMode || bulkPayable.length === 0} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: bulkPayMode ? T.gr : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: bulkPayMode ? 'pointer' : 'default', opacity: bulkPayMode ? 1 : 0.4 }}>Confirm Pay</button>
+              <button onClick={executeBulkPay} disabled={!bulkPayMode || bulkPayable.length === 0} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: bulkPayMode ? (bulkNetTotal < 0 ? T.re : T.gr) : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: bulkPayMode ? 'pointer' : 'default', opacity: bulkPayMode ? 1 : 0.4 }}>{bulkNetTotal < 0 ? 'Settle & Refund' : 'Confirm Pay'}</button>
             </div>
           </div>
         </div>
