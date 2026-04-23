@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T } from '../../lib/theme';
-import type { CashChallan, CashChallanItem, CashChallanPayment } from '../../types/database';
+import type { CashChallan, CashChallanItem } from '../../types/database';
 
 type Challan = CashChallan & { cash_challan_items?: Partial<CashChallanItem>[] };
 
@@ -23,21 +23,27 @@ interface Props {
   onVoid: () => void;
 }
 
+type TimelineEntry = { type: 'audit' | 'payment'; time: string; action?: string; details?: string; user_name?: string; changes?: Record<string, { from: unknown; to: unknown }> | null; amount?: number; payment_mode?: string; is_reversal?: boolean; notes?: string };
+
 export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid }: Props) {
-  const [payments, setPayments] = useState<(CashChallanPayment & { paid_by_name?: string })[]>([]);
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   useEffect(() => {
-    supabase.from('cash_challan_payments').select('id, challan_id, amount, payment_mode, payment_date, paid_by, notes, is_reversal, created_at')
-      .eq('challan_id', c.id).order('created_at', { ascending: true })
-      .then(({ data }) => {
-        if (!data || data.length === 0) { setPayments([]); return; }
-        const userIds = [...new Set(data.filter(p => p.paid_by).map(p => p.paid_by!))];
-        if (userIds.length === 0) { setPayments(data); return; }
-        supabase.from('profiles').select('id, full_name').in('id', userIds).then(({ data: profiles }) => {
-          const nameMap: Record<string, string> = {};
-          (profiles || []).forEach(p => { nameMap[p.id] = p.full_name || 'User'; });
-          setPayments(data.map(p => ({ ...p, paid_by_name: p.paid_by ? nameMap[p.paid_by] || 'User' : undefined })));
-        });
-      });
+    Promise.all([
+      supabase.from('audit_log').select('action, details, user_email, changes, created_at').eq('module', 'cash_challan').eq('record_id', c.id).order('created_at'),
+      supabase.from('cash_challan_payments').select('amount, payment_mode, payment_date, paid_by, notes, is_reversal, created_at').eq('challan_id', c.id).order('created_at'),
+    ]).then(async ([auditRes, payRes]) => {
+      const entries: TimelineEntry[] = [];
+      for (const a of (auditRes.data || [])) entries.push({ type: 'audit', time: a.created_at || '', action: a.action, details: a.details || '', user_name: a.user_email || undefined, changes: a.changes as any });
+      const payData = payRes.data || [];
+      if (payData.length > 0) {
+        const userIds = [...new Set(payData.filter(p => p.paid_by).map(p => p.paid_by!))];
+        const nameMap: Record<string, string> = {};
+        if (userIds.length > 0) { const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', userIds); (profiles || []).forEach(p => { nameMap[p.id] = p.full_name || 'User'; }); }
+        for (const p of payData) entries.push({ type: 'payment', time: p.created_at || '', amount: Number(p.amount), payment_mode: p.payment_mode, is_reversal: p.is_reversal, user_name: p.paid_by ? nameMap[p.paid_by] || 'User' : undefined, notes: p.notes || undefined });
+      }
+      entries.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+      setTimeline(entries);
+    });
   }, [c.id]);
   const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
   const items = c.cash_challan_items || [];
@@ -117,29 +123,45 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
             {due > 0 && !isRet && <div><div style={label}>Outstanding</div><div style={{ ...val, fontFamily: T.mono, color: T.re }}>₹{due.toLocaleString('en-IN')}</div></div>}
           </div>
 
-          {/* Payment history */}
-          {payments.length > 0 && (
+          {/* Activity Timeline — audit trail + payments merged chronologically */}
+          {timeline.length > 0 && (
             <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
-              <div style={{ padding: '6px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 9, color: T.tx3, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' }}>Payment History</div>
-              {payments.map(p => (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 10 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: p.is_reversal ? T.re : T.gr, flexShrink: 0 }} />
+              <div style={{ padding: '6px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 9, color: T.tx3, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' }}>Activity Timeline</div>
+              {timeline.map((e, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 10 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', marginTop: 4, flexShrink: 0, background: e.type === 'payment' ? (e.is_reversal ? T.re : T.gr) : e.action === 'VOID' ? T.re : e.action === 'CREATE' ? T.ac2 : T.yl }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontFamily: T.mono, fontWeight: 600, color: p.is_reversal ? T.re : T.gr }}>{p.is_reversal ? '−' : '+'}₹{Number(p.amount).toLocaleString('en-IN')}</span>
-                      <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3 }}>{p.payment_mode}</span>
-                      <span style={{ fontSize: 9, color: T.tx3 }}>{new Date(p.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
-                      {p.paid_by_name && <span style={{ fontSize: 9, color: T.tx3 }}>by {p.paid_by_name}</span>}
-                    </div>
-                    {p.notes && p.notes !== 'Backfilled from existing payment data' && <div style={{ fontSize: 9, color: T.tx3, marginTop: 2 }}>{p.notes}</div>}
+                    {e.type === 'payment' ? (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontFamily: T.mono, fontWeight: 600, color: e.is_reversal ? T.re : T.gr }}>{e.is_reversal ? '−' : '+'}₹{Number(e.amount).toLocaleString('en-IN')}</span>
+                          <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3 }}>{e.payment_mode}</span>
+                          {e.user_name && <span style={{ fontSize: 9, color: T.tx3 }}>by {e.user_name}</span>}
+                        </div>
+                        {e.notes && e.notes !== 'Backfilled from existing payment data' && <div style={{ fontSize: 9, color: T.tx3, marginTop: 2 }}>{e.notes}</div>}
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 600, color: T.tx, fontSize: 10 }}>{e.action === 'CREATE' ? 'Created' : e.action === 'UPDATE' ? 'Updated' : e.action === 'VOID' ? 'Voided' : e.action === 'BULK_PAY' ? 'Bulk Paid' : e.action === 'BULK_UNPAY' ? 'Bulk Unpaid' : e.action || 'Changed'}</span>
+                          {e.user_name && <span style={{ fontSize: 9, color: T.tx3 }}>by {e.user_name}</span>}
+                        </div>
+                        {e.changes && Object.keys(e.changes).length > 0 && (
+                          <div style={{ marginTop: 3 }}>
+                            {Object.entries(e.changes).map(([field, { from, to }]) => (
+                              <div key={field} style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>
+                                {field}: <span style={{ color: T.re }}>{String(from ?? '—')}</span> → <span style={{ color: T.gr }}>{String(to ?? '—')}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-                  {p.created_at && <span style={{ fontSize: 8, color: T.tx3, fontFamily: T.mono, whiteSpace: 'nowrap' }}>{new Date(p.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>}
+                  {e.time && <span style={{ fontSize: 8, color: T.tx3, fontFamily: T.mono, whiteSpace: 'nowrap', marginTop: 2 }}>{new Date(e.time).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} {new Date(e.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>}
                 </div>
               ))}
             </div>
-          )}
-          {payments.length === 0 && Number(c.amount_paid || 0) === 0 && !isRet && c.status !== 'draft' && c.status !== 'voided' && (
-            <div style={{ fontSize: 10, color: T.tx3, marginBottom: 12, fontStyle: 'italic' }}>No payments recorded yet.</div>
           )}
 
           {/* Notes + Tags */}
