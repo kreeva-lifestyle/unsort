@@ -655,6 +655,19 @@ export type UserRole = NonNullable<Profile['role']>;
 export type CashChallanStatus = NonNullable<CashChallan['status']>;
 export type CashHandoverStatus = NonNullable<CashHandover['status']>;
 
+// ─── cash_challan_payments (9 cols) ─────────────────────────────────────
+export interface CashChallanPayment {
+  id: string;
+  challan_id: string;
+  amount: number;
+  payment_mode: string;
+  payment_date: string;
+  paid_by: string | null;
+  notes: string | null;
+  is_reversal: boolean;
+  created_at: string | null;
+}
+
 // Constant arrays for dropdowns / validation
 export const INVENTORY_STATUSES: InventoryStatus[] = ['unsorted', 'damaged', 'dry_clean', 'complete', 'completed'];
 export const COMPONENT_STATUSES: ComponentStatus[] = ['missing', 'present', 'damaged'];
