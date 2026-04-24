@@ -19,7 +19,7 @@ const CATEGORIES = ['Office Supplies', 'Rent', 'Salaries', 'Travel', 'Utilities'
 
 // In-memory / jsonb-embedded cash-flow snapshot. Stored in
 // cash_handovers.breakdown as jsonb, read back and cast to this shape.
-interface Breakdown { opening: number; cashSales: number; cashReturns: number; expenses: number; previousHandovers: number; available: number; periodFrom: string; periodTo: string; }
+interface Breakdown { opening: number; openingIsSet: boolean; cashSales: number; cashReturns: number; expenses: number; previousHandovers: number; available: number; periodFrom: string; periodTo: string; }
 
 // View model: central CashHandover row but with the jsonb breakdown
 // narrowed to the local Breakdown shape for typed access.
@@ -187,23 +187,25 @@ export default function CashBook() {
       supabase.from('cash_book_balances').select('opening_balance').eq('date', from).maybeSingle(),
       supabase.from('cash_expenses').select('amount').gte('date', from).lte('date', to),
       supabase.from('cash_challans').select('amount_paid, is_return, status').eq('payment_mode', 'Cash').in('status', ['paid', 'partial']).gte('payment_date', from).lte('payment_date', to),
-      supabase.from('cash_handovers').select('amount, status, period_from, period_to, date').eq('status', 'confirmed').limit(500),
+      supabase.from('cash_handovers').select('amount, status, period_from, period_to, date').in('status', ['confirmed', 'pending']).limit(500),
     ]);
     const opening = Number(bal?.opening_balance || 0);
+    const openingIsSet = bal !== null && bal !== undefined;
     type ChRow = Pick<CashChallan, 'amount_paid' | 'is_return' | 'status'>;
     type ExpRow = Pick<CashExpense, 'amount'>;
     type HoRow = Pick<CashHandover, 'amount' | 'status' | 'period_from' | 'period_to' | 'date'>;
     const cashSales = ((ch as ChRow[] | null) || []).filter((r) => !r.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
     const cashReturns = ((ch as ChRow[] | null) || []).filter((r) => r.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
     const expensesTotal = ((exp as ExpRow[] | null) || []).reduce((s, r) => s + Number(r.amount), 0);
-    // Previous handovers that overlap this range
+    // Previous handovers that overlap this range — include PENDING so a second
+    // handover can't claim cash that's already locked in a pending one
     const previousHandovers = ((ho as HoRow[] | null) || []).filter((h) => {
       const hFrom = h.period_from || h.date;
       const hTo = h.period_to || h.date;
-      return hFrom <= to && hTo >= from;
+      return hFrom && hTo && hFrom <= to && hTo >= from;
     }).reduce((s, h) => s + Number(h.amount), 0);
     const available = opening + cashSales - cashReturns - expensesTotal - previousHandovers;
-    return { opening, cashSales, cashReturns, expenses: expensesTotal, previousHandovers, available, periodFrom: from, periodTo: to };
+    return { opening, openingIsSet, cashSales, cashReturns, expenses: expensesTotal, previousHandovers, available, periodFrom: from, periodTo: to };
   }, []);
 
   // Recompute when range changes in modal + load recent handovers
@@ -237,6 +239,13 @@ export default function CashBook() {
     const todayDate = new Date().toISOString().slice(0, 10);
     const { data: existing } = await supabase.from('cash_handovers').select('id, status, amount').eq('to_user_id', recipient.id).eq('date', todayDate).neq('status', 'disputed').maybeSingle();
     if (existing) { setHandError(`A handover already exists for ${recipient.full_name} today (₹${Number(existing.amount).toLocaleString('en-IN')}, ${existing.status}). Only one handover per recipient per day.`); return; }
+    // Prevent overlapping pending/confirmed handovers (would double-claim cash)
+    const { data: overlapping } = await supabase.from('cash_handovers').select('handover_number, status, period_from, period_to').in('status', ['confirmed', 'pending']).lte('period_from', handPeriodTo).gte('period_to', handPeriodFrom);
+    if (overlapping && overlapping.length > 0) {
+      const h = overlapping[0];
+      setHandError(`HO-${String(h.handover_number).padStart(4, '0')} (${h.status}) already covers ${h.period_from} to ${h.period_to}. Resolve or reject it before creating an overlapping handover.`);
+      return;
+    }
     const { data: { user } } = await supabase.auth.getUser();
     const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user?.id).maybeSingle();
     const handoverPayload: CashHandoverInsert = {
@@ -618,6 +627,11 @@ export default function CashBook() {
             {handBreakdown && (
               <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 11 }}>
                 <div style={{ fontSize: 9, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Cash Flow Summary</div>
+                {!handBreakdown.openingIsSet && (
+                  <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 4, padding: '6px 8px', marginBottom: 6, fontSize: 9, color: T.yl }}>
+                    ⚠ No opening balance set for {handPeriodFrom}. Using ₹0. Set it in Cash Book before initiating if that's wrong.
+                  </div>
+                )}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4, fontFamily: T.mono }}>
                   <span style={{ color: T.tx2 }}>Opening Balance</span><span style={{ color: T.tx2 }}>₹{handBreakdown.opening.toFixed(2)}</span>
                   <span style={{ color: T.gr }}>+ Cash Sales</span><span style={{ color: T.gr }}>+₹{handBreakdown.cashSales.toFixed(2)}</span>
