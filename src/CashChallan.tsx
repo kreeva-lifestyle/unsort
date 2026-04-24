@@ -65,6 +65,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [tagFilter, setTagFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
   // Bulk pay/unpay
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -903,24 +904,40 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         </div>
       </div>
 
-      {/* Search + Filters */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search name or #..." style={{ flex: 1, minWidth: 120, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '6px 10px', outline: 'none' }} />
-        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '6px 8px', outline: 'none' }}>
-          <option value="">All Status</option><option value="draft">Draft</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option><option value="partial">Partial</option><option value="voided">Voided</option>
-        </select>
-        {allTags.length > 0 && <select value={tagFilter} onChange={e => { setTagFilter(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '6px 8px', outline: 'none' }}>
-          <option value="">All Tags</option>{allTags.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>}
-        <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }} />
-        <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }} />
-        {(dateFrom || dateTo) && <button onClick={() => { setDateFrom(''); setDateTo(''); setPage(0); }} style={{ padding: '5px 8px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Clear</button>}
-        <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '6px 6px', outline: 'none', width: 50 }}>
-          <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
-        </select>
-        <button onClick={exportChallansCSV} style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.08)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Export CSV</button>
-        <button onClick={() => { if (bulkMode) exitBulkMode(); else setBulkMode(true); }} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${bulkMode ? T.ac + '44' : T.bd2}`, background: bulkMode ? 'rgba(99,102,241,.1)' : 'rgba(255,255,255,0.03)', color: bulkMode ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{bulkMode ? 'Cancel Select' : '☑ Select'}</button>
+      {/* Row 1: Search + Actions */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center' }}>
+        <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search name or #..." style={{ flex: 1, minWidth: 120, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '7px 10px', outline: 'none' }} />
+        <button onClick={() => setShowFilters(f => !f)} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${showFilters || statusFilter || tagFilter || dateFrom || dateTo ? T.ac + '44' : T.bd2}`, background: showFilters ? 'rgba(99,102,241,.08)' : 'rgba(255,255,255,0.03)', color: showFilters || statusFilter || tagFilter || dateFrom || dateTo ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
+          Filters{(statusFilter || tagFilter || dateFrom || dateTo) ? ` (${[statusFilter, tagFilter, dateFrom, dateTo].filter(Boolean).length})` : ''}
+        </button>
+        <button onClick={exportChallansCSV} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Export</button>
+        <button onClick={() => { if (bulkMode) exitBulkMode(); else setBulkMode(true); }} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${bulkMode ? T.ac + '44' : T.bd2}`, background: bulkMode ? 'rgba(99,102,241,.1)' : 'rgba(255,255,255,0.03)', color: bulkMode ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{bulkMode ? 'Cancel' : '☑ Select'}</button>
       </div>
+
+      {/* Row 2: Collapsible filters */}
+      {showFilters && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center', padding: '8px 10px', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 6 }}>
+          <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }}>
+            <option value="">All Status</option><option value="draft">Draft</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option><option value="partial">Partial</option><option value="voided">Voided</option>
+          </select>
+          {allTags.length > 0 && <select value={tagFilter} onChange={e => { setTagFilter(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }}>
+            <option value="">All Tags</option>{allTags.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 9, color: T.tx3, fontWeight: 600 }}>From</span>
+            <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '4px 6px', outline: 'none' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 9, color: T.tx3, fontWeight: 600 }}>To</span>
+            <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '4px 6px', outline: 'none' }} />
+          </div>
+          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '5px 6px', outline: 'none', width: 48 }}>
+            <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
+          </select>
+          {(statusFilter || tagFilter || dateFrom || dateTo) && <button onClick={() => { setStatusFilter(''); setTagFilter(''); setDateFrom(''); setDateTo(''); setPage(0); }} style={{ padding: '4px 8px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Clear all</button>}
+        </div>
+      )}
 
       {/* Bulk mode toolbar */}
       {bulkMode && (
