@@ -174,7 +174,7 @@ export default function CashBook() {
       supabase.from('cash_book_balances').select('opening_balance').eq('date', from).maybeSingle(),
       supabase.from('cash_expenses').select('amount').gte('date', from).lte('date', to),
       supabase.from('cash_challans').select('amount_paid, is_return, status').eq('payment_mode', 'Cash').in('status', ['paid', 'partial']).gte('payment_date', from).lte('payment_date', to),
-      supabase.from('cash_handovers').select('amount, status, period_from, period_to, date').eq('status', 'confirmed'),
+      supabase.from('cash_handovers').select('amount, status, period_from, period_to, date').eq('status', 'confirmed').limit(500),
     ]);
     const opening = Number(bal?.opening_balance || 0);
     type ChRow = Pick<CashChallan, 'amount_paid' | 'is_return' | 'status'>;

@@ -219,8 +219,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   useEffect(() => {
     (async () => {
       const [{ data: c }, { data: cam }, { data: b }] = await Promise.all([
-        supabase.from('packtime_couriers').select('*').eq('is_active', true).order('name'),
-        supabase.from('packtime_cameras').select('*').eq('is_active', true).order('number'),
+        supabase.from('packtime_couriers').select('id, name, sheet_name, is_active, brand, created_at').eq('is_active', true).order('name'),
+        supabase.from('packtime_cameras').select('id, number, is_active, created_at').eq('is_active', true).order('number'),
         supabase.from('brands').select('name').eq('is_active', true).order('name'),
       ]);
       setCouriers(c || []);
