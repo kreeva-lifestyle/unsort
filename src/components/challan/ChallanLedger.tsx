@@ -119,6 +119,14 @@ export default function ChallanLedger({
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Customer Ledger</span>
+        {customers.filter(c => c.outstanding > 0).length > 0 && (
+          <button onClick={() => {
+            const due = customers.filter(c => c.outstanding > 0);
+            const csv = 'Customer,Billed,Paid,Outstanding,Challans\n' + due.map(c => `"${c.name}",${c.total},${c.paid},${c.outstanding},${c.count}`).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Outstanding_Customers_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
+          }} style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', color: T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Export Outstanding</button>
+        )}
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
         <input type="text" value={search} onChange={e => onSearchChange(e.target.value)} placeholder="Enter customer name..."
