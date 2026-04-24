@@ -112,16 +112,27 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
             {Number(c.discount_amount) > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.re, marginBottom: 3 }}><span>Item Discounts</span><span style={{ fontFamily: T.mono }}>-₹{Number(c.discount_amount).toLocaleString('en-IN')}</span></div>}
             {Number(c.shipping_charges) > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.bl, marginBottom: 3 }}><span>Shipping/Porter</span><span style={{ fontFamily: T.mono }}>+₹{Number(c.shipping_charges).toLocaleString('en-IN')}</span></div>}
             {Number(c.round_off) !== 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx3, marginBottom: 3 }}><span>Round Off</span><span style={{ fontFamily: T.mono }}>{Number(c.round_off) > 0 ? '+' : ''}₹{Number(c.round_off).toFixed(2)}</span></div>}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 6, marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: isVoided ? T.tx3 : T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 6, marginTop: 4, textDecoration: isVoided ? 'line-through' : 'none' }}>
               <span>Total</span><span>{isRet ? '−' : ''}₹{Math.abs(Number(c.total)).toLocaleString('en-IN')}</span>
             </div>
           </div>
 
-          {/* Payment summary */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
-            <div><div style={label}>Total Paid</div><div style={{ ...val, fontFamily: T.mono, color: Number(c.amount_paid) > 0 ? T.gr : T.tx3 }}>₹{Number(c.amount_paid || 0).toLocaleString('en-IN')}</div></div>
-            {due > 0 && !isRet && <div><div style={label}>Outstanding</div><div style={{ ...val, fontFamily: T.mono, color: T.re }}>₹{due.toLocaleString('en-IN')}</div></div>}
-          </div>
+          {/* Voided banner — makes the reversed-payment state unambiguous */}
+          {isVoided && (
+            <div style={{ background: 'rgba(255,255,255,.03)', border: `1px solid ${T.bd2}`, borderRadius: 6, padding: '8px 12px', marginBottom: 10, fontSize: 11, color: T.tx3 }}>
+              <span style={{ fontWeight: 600, color: T.tx2 }}>Voided</span>
+              {Number(c.amount_paid || 0) > 0 && <span> — ₹{Number(c.amount_paid).toLocaleString('en-IN')} was collected and has been reversed. Net effect: ₹0.</span>}
+              {Number(c.amount_paid || 0) === 0 && <span> — this challan is cancelled and excluded from all financial calculations.</span>}
+            </div>
+          )}
+
+          {/* Payment summary — hide for voided (handled by banner above) */}
+          {!isVoided && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+              <div><div style={label}>Total Paid</div><div style={{ ...val, fontFamily: T.mono, color: Number(c.amount_paid) > 0 ? T.gr : T.tx3 }}>₹{Number(c.amount_paid || 0).toLocaleString('en-IN')}</div></div>
+              {due > 0 && !isRet && <div><div style={label}>Outstanding</div><div style={{ ...val, fontFamily: T.mono, color: T.re }}>₹{due.toLocaleString('en-IN')}</div></div>}
+            </div>
+          )}
 
           {/* Activity Timeline — audit trail + payments merged chronologically */}
           {timeline.length > 0 && (
