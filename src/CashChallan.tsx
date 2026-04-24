@@ -645,26 +645,87 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const { data: citems } = await supabase.from('cash_challan_items').select('*').eq('challan_id', c.id).order('sort_order');
     const w = window.open('', '_blank');
     if (!w) return;
-    w.document.write(`<html><head><title>Cash Challan #${escHtml(c.challan_number)}</title><style>body{font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:auto}table{width:100%;border-collapse:collapse;margin:12px 0}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f5f5;font-weight:600}.right{text-align:right}.header{text-align:center;margin-bottom:16px}.status{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}</style></head><body>`);
-    w.document.write(`<div class="header"><h2 style="margin:0">Arya Designs</h2><p style="color:#666;font-size:11px;margin:4px 0">${c.is_return ? 'Return Challan' : 'Cash Challan'} #${escHtml(c.challan_number)} | ${new Date(c.created_at).toLocaleDateString('en-IN')}</p></div>`);
-    w.document.write(`<p><strong>Customer:</strong> ${escHtml(c.customer_name)}</p>`);
-    w.document.write(`<table><thead><tr><th>#</th><th>SKU</th><th class="right">Qty</th><th class="right">Price</th><th class="right">Disc.</th><th class="right">Total</th></tr></thead><tbody>`);
-    (citems || []).forEach((it, i) => { const da = Number(it.discount_amount || 0); w.document.write(`<tr><td>${i + 1}</td><td>${escHtml(it.sku || '-')}</td><td class="right">${Number(it.quantity)}</td><td class="right">${Number(it.price).toFixed(2)}</td><td class="right">${da > 0 ? '-' + da.toFixed(2) : '-'}</td><td class="right">${Number(it.total).toFixed(2)}</td></tr>`); });
-    w.document.write(`</tbody></table>`);
-    w.document.write(`<div style="text-align:right;font-size:12px"><p>Subtotal: <strong>${Number(c.subtotal).toFixed(2)}</strong></p>`);
-    if (Number(c.discount_amount) > 0) w.document.write(`<p>Discount: -${Number(c.discount_amount).toFixed(2)}</p>`);
-    if (Number(c.shipping_charges) > 0) w.document.write(`<p>Shipping/Porter: +${Number(c.shipping_charges).toFixed(2)}</p>`);
-    if (Number(c.round_off) !== 0) w.document.write(`<p>Round Off: ${Number(c.round_off).toFixed(2)}</p>`);
-    w.document.write(`<p style="font-size:16px;font-weight:700">Total: ₹${Number(c.total).toFixed(2)}</p></div>`);
+
+    // Build one copy's inner HTML. We render it twice — top half = Office copy
+    // (signed by customer, kept on file), bottom half = Customer copy. A
+    // dashed cut line between them lets the user tear along the middle.
     const statusLabel = c.is_return ? 'Refunded' : c.status.charAt(0).toUpperCase() + c.status.slice(1);
     const statusColor = c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : c.status === 'draft' ? '#0c5460' : '#721c24';
     const statusBg = c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : c.status === 'draft' ? '#d1ecf1' : '#f8d7da';
-    w.document.write(`<div style="margin:12px 0;padding:10px 14px;border-radius:6px;background:${statusBg};display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;color:${statusColor};font-size:13px">Status: ${escHtml(statusLabel)}</span>`);
-    if (Number(c.amount_paid) > 0) w.document.write(`<span style="font-size:12px;color:${statusColor}">${c.is_return ? 'Refunded' : 'Paid'}: ₹${Number(c.amount_paid).toFixed(2)}${c.payment_mode ? ' (' + escHtml(c.payment_mode) + ')' : ''}${c.payment_date ? ' on ' + new Date(c.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}</span>`);
-    if (c.status !== 'paid' && c.status !== 'draft' && !c.is_return) { const due = Number(c.total) - Number(c.amount_paid || 0); w.document.write(`<span style="font-size:12px;color:#721c24;font-weight:600">Due: ₹${due.toFixed(2)}</span>`); }
-    w.document.write(`</div>`);
-    if (c.notes) w.document.write(`<p style="font-size:11px;color:#666;margin-top:12px"><strong>Notes:</strong> ${escHtml(c.notes)}</p>`);
-    w.document.write(`<hr><p style="text-align:center;font-size:10px;color:#999">Powered by DailyOffice</p></body></html>`);
+    const dateStr = new Date(c.created_at).toLocaleDateString('en-IN');
+    const docType = c.is_return ? 'Return Challan' : 'Cash Challan';
+
+    const itemRows = (citems || []).map((it, i) => {
+      const da = Number(it.discount_amount || 0);
+      return `<tr><td>${i + 1}</td><td>${escHtml(it.sku || '-')}</td><td class="right">${Number(it.quantity)}</td><td class="right">${Number(it.price).toFixed(2)}</td><td class="right">${da > 0 ? '-' + da.toFixed(2) : '-'}</td><td class="right">${Number(it.total).toFixed(2)}</td></tr>`;
+    }).join('');
+
+    let paymentLine = '';
+    if (c.status === 'voided' && Number(c.amount_paid) > 0) paymentLine = `<span style="font-size:10px;color:${statusColor}">Was ₹${Number(c.amount_paid).toFixed(2)} — reversed. Net: ₹0</span>`;
+    else if (Number(c.amount_paid) > 0) paymentLine = `<span style="font-size:10px;color:${statusColor}">${c.is_return ? 'Refunded' : 'Paid'}: ₹${Number(c.amount_paid).toFixed(2)}${c.payment_mode ? ' (' + escHtml(c.payment_mode) + ')' : ''}${c.payment_date ? ' on ' + new Date(c.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}</span>`;
+    let dueLine = '';
+    if (c.status !== 'paid' && c.status !== 'draft' && !c.is_return) {
+      const due = Number(c.total) - Number(c.amount_paid || 0);
+      dueLine = `<span style="font-size:10px;color:#721c24;font-weight:600">Due: ₹${due.toFixed(2)}</span>`;
+    }
+
+    const copy = (label: string, includeSignature: boolean) => `
+      <section class="copy">
+        <div class="copy-tag">${label}</div>
+        <div class="header"><h2 style="margin:0;font-size:15px">Arya Designs</h2><p style="color:#666;font-size:10px;margin:2px 0">${docType} #${escHtml(c.challan_number)} | ${dateStr}</p></div>
+        <p style="margin:2px 0;font-size:11px"><strong>Customer:</strong> ${escHtml(c.customer_name)}</p>
+        <table>
+          <thead><tr><th>#</th><th>SKU</th><th class="right">Qty</th><th class="right">Price</th><th class="right">Disc.</th><th class="right">Total</th></tr></thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+        <div class="totals">
+          <p>Subtotal: <strong>${Number(c.subtotal).toFixed(2)}</strong></p>
+          ${Number(c.discount_amount) > 0 ? `<p>Discount: -${Number(c.discount_amount).toFixed(2)}</p>` : ''}
+          ${Number(c.shipping_charges) > 0 ? `<p>Shipping/Porter: +${Number(c.shipping_charges).toFixed(2)}</p>` : ''}
+          ${Number(c.round_off) !== 0 ? `<p>Round Off: ${Number(c.round_off).toFixed(2)}</p>` : ''}
+          <p class="grand">Total: ₹${Number(c.total).toFixed(2)}</p>
+        </div>
+        <div class="status-row" style="background:${statusBg}">
+          <span style="font-weight:700;color:${statusColor};font-size:11px">Status: ${escHtml(statusLabel)}</span>
+          ${paymentLine}
+          ${dueLine}
+        </div>
+        ${c.notes ? `<p style="font-size:10px;color:#666;margin:6px 0"><strong>Notes:</strong> ${escHtml(c.notes)}</p>` : ''}
+        ${includeSignature ? `<div class="signature"><div class="sig-box"><div class="sig-line"></div><div class="sig-label">Customer Signature</div></div><div class="sig-box"><div class="sig-line"></div><div class="sig-label">Authorised Signatory</div></div></div>` : ''}
+        <p class="footer">Powered by DailyOffice</p>
+      </section>
+    `;
+
+    w.document.write(`<!doctype html><html><head><title>${escHtml(docType)} #${escHtml(c.challan_number)}</title>
+      <style>
+        @page { size: A4; margin: 10mm; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #222; }
+        .sheet { max-width: 190mm; margin: 0 auto; }
+        .copy { padding: 0 4mm; page-break-inside: avoid; }
+        .copy-tag { display: inline-block; background: #333; color: #fff; font-size: 9px; font-weight: 700; padding: 2px 8px; letter-spacing: 1px; text-transform: uppercase; border-radius: 3px; margin-bottom: 4px; }
+        .header { text-align: center; margin-bottom: 6px; }
+        table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+        th, td { border: 1px solid #ddd; padding: 3px 5px; text-align: left; font-size: 10px; }
+        th { background: #f5f5f5; font-weight: 600; }
+        .right { text-align: right; }
+        .totals { text-align: right; font-size: 10px; }
+        .totals p { margin: 1px 0; }
+        .totals .grand { font-size: 13px; font-weight: 700; margin-top: 3px; }
+        .status-row { margin: 6px 0; padding: 5px 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
+        .signature { display: flex; justify-content: space-between; margin-top: 10px; gap: 20px; }
+        .sig-box { flex: 1; }
+        .sig-line { border-bottom: 1px solid #333; height: 20px; }
+        .sig-label { font-size: 9px; color: #666; margin-top: 2px; text-align: center; }
+        .footer { text-align: center; font-size: 8px; color: #aaa; margin: 6px 0 0; }
+        .cut-line { text-align: center; font-size: 9px; color: #999; letter-spacing: 3px; border-top: 1px dashed #aaa; margin: 8mm 0 6mm; padding-top: 2px; }
+        .cut-line::before { content: "✂"; display: inline-block; transform: translateY(-8px); background: #fff; padding: 0 6px; }
+        @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+      </style>
+    </head><body><div class="sheet">
+      ${copy('Office Copy — Customer Signed', true)}
+      <div class="cut-line"> - - - - - - - - - - - - - - Cut Here - - - - - - - - - - - - - - </div>
+      ${copy('Customer Copy', false)}
+    </div></body></html>`);
     w.document.close();
     w.print();
   };
