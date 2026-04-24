@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from './lib/supabase';
 import { friendlyError } from './lib/friendlyError';
+import { useDebouncedFetch } from './hooks/useDebouncedFetch';
 
 import { T } from './lib/theme';
 import type {
@@ -77,13 +78,17 @@ export default function InventoryExtras() {
 
   useEffect(() => { fetchExtras(); fetchProducts(); }, [fetchExtras, fetchProducts]);
 
-  // Realtime
+  // Realtime — UPDATE debounced, INSERT/DELETE immediate
+  const { debounced: debouncedFetchExtras } = useDebouncedFetch(fetchExtras, 500);
   useEffect(() => {
+    const imm = () => fetchExtras();
     const ch = supabase.channel('extras-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_extras' }, () => fetchExtras())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inventory_extras' }, imm)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'inventory_extras' }, imm)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inventory_extras' }, debouncedFetchExtras)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [fetchExtras]);
+  }, [fetchExtras, debouncedFetchExtras]);
 
   // SKU autocomplete
   const searchSkus = useCallback(async (q: string) => {

@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from './lib/supabase';
 import { friendlyError } from './lib/friendlyError';
+import { useDebouncedFetch } from './hooks/useDebouncedFetch';
 
 import { T } from './lib/theme';
 import type {
@@ -121,15 +122,27 @@ export default function CashBook() {
   }, []);
 
   // ── Realtime sync — multi-user safety ──────────────────────────────────────
+  // INSERT/DELETE fire immediately (structural changes); UPDATE debounced 500ms
+  // to coalesce rapid bursts from bulk pay/unpay operations. Stale data from
+  // the debounce window is protected against by DB-level optimistic concurrency
+  // on writes and fresh refetch when modals open.
+  const { debounced: debouncedFetch } = useDebouncedFetch(fetchData, 500);
   useEffect(() => {
+    const imm = () => fetchData();
     const channel = supabase.channel('cash_book_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_expenses' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_book_balances' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_handovers' }, () => fetchData())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cash_expenses' }, imm)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cash_expenses' }, imm)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cash_expenses' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_book_balances' }, debouncedFetch)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cash_challans' }, imm)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cash_challans' }, imm)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cash_challans' }, debouncedFetch)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cash_handovers' }, imm)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cash_handovers' }, imm)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cash_handovers' }, debouncedFetch)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchData]);
+  }, [fetchData, debouncedFetch]);
 
   const cashInSales = sales.filter(s => !s.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
   const cashOutReturns = sales.filter(s => s.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);

@@ -8,6 +8,7 @@ import ChallanForm from './components/challan/ChallanForm';
 import ChallanDetail from './components/challan/ChallanDetail';
 import Empty from './components/ui/Empty';
 import { friendlyError } from './lib/friendlyError';
+import { useDebouncedFetch } from './hooks/useDebouncedFetch';
 import type {
   CashChallan,
   CashChallanItem as DbCashChallanItem,
@@ -209,14 +210,20 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   }, [ledgerDetail, showLedger, showAnalytics, showCashBook]);
 
   // ── Realtime sync — multi-user safety ──────────────────────────────────────
+  // INSERT/DELETE instant; UPDATE debounced 500ms to coalesce bulk operations.
+  const { debounced: debouncedFetchChallans } = useDebouncedFetch(fetchChallans, 500);
   useEffect(() => {
+    const imm = () => fetchChallans();
     const channel = supabase.channel('cash_challans_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, () => fetchChallans())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challan_items' }, () => fetchChallans())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challan_customers' }, () => {})
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cash_challans' }, imm)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cash_challans' }, imm)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cash_challans' }, debouncedFetchChallans)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cash_challan_items' }, imm)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cash_challan_items' }, imm)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cash_challan_items' }, debouncedFetchChallans)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchChallans]);
+  }, [fetchChallans, debouncedFetchChallans]);
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
