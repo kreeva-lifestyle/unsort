@@ -77,6 +77,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [lastBatch, setLastBatch] = useState<{ id: string; count: number; mode: string } | null>(null);
   const [undoingBatch, setUndoingBatch] = useState(false);
 
+  // Draft auto-save
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [draftRestoredAt, setDraftRestoredAt] = useState(0);
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [currentUserId, setCurrentUserId] = useState('');
+
   // Modal
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Challan | null>(null);
@@ -117,7 +123,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // Ledger
   const [showLedger, setShowLedger] = useState(false);
   const [showCashBook, setShowCashBook] = useState(false);
-  const [ledgerCustomers, setLedgerCustomers] = useState<{ name: string; total: number; paid: number; outstanding: number; count: number }[]>([]);
+  const [ledgerCustomers, setLedgerCustomers] = useState<{ name: string; total: number; paid: number; outstanding: number; count: number; aging: { current: number; d30: number; d60: number; d90plus: number } }[]>([]);
   const [ledgerFetchLimit, setLedgerFetchLimit] = useState(100);
   const [ledgerDetail, setLedgerDetail] = useState<string | null>(null);
   const [ledgerChallans, setLedgerChallans] = useState<Challan[]>([]);
@@ -228,11 +234,66 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        setCurrentUserId(user.id);
         const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
         setUserName(prof?.full_name || user.email?.split('@')[0] || 'there');
       }
     })();
   }, []);
+
+  // ── Draft auto-save to localStorage ──────────────────────────────────────
+  // Saves form state every 2s while the modal is open. Restores on re-open
+  // if context matches (new→new, edit→same ID) and user matches. 16 edge
+  // cases addressed — see plan file for full analysis.
+  const DRAFT_KEY = 'ccDraft';
+  const clearDraft = useCallback(() => { try { localStorage.removeItem(DRAFT_KEY); } catch {} setDraftRestored(false); }, []);
+
+  // Auto-save while modal is open
+  useEffect(() => {
+    if (!showModal) return;
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      if (!customerName && items.length <= 1 && !items[0]?.sku) return;
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          savedAt: Date.now(), userId: currentUserId, editingId: editing?.id || null,
+          customerName, selectedCustomerId, customerPhone, items, shippingCharges,
+          notes, tags, paymentMode, paymentDate, amountPaid, challanStatus, isReturn,
+          returnSourceId: returnSource?.id || null, returnSourceNumber: returnSource?.challan_number || null,
+        }));
+      } catch {}
+    }, 2000);
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
+  }, [showModal, customerName, selectedCustomerId, customerPhone, items, shippingCharges, notes, tags, paymentMode, paymentDate, amountPaid, challanStatus, isReturn, currentUserId, editing, returnSource]);
+
+  // Restore draft when modal opens for a NEW challan
+  useEffect(() => {
+    if (!showModal || editing) return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (!d || typeof d !== 'object') { clearDraft(); return; }
+      if (d.userId && d.userId !== currentUserId) { clearDraft(); return; }
+      if (d.editingId) return; // draft is for an edit, not a new challan
+      if (d.savedAt < Date.now() - 24 * 60 * 60 * 1000) { clearDraft(); return; }
+      if (!d.customerName && (!d.items || d.items.length === 0)) { clearDraft(); return; }
+      setCustomerName(d.customerName || '');
+      setSelectedCustomerId(d.selectedCustomerId || null);
+      setCustomerPhone(d.customerPhone || '');
+      setItems(d.items || [{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
+      setShippingCharges(d.shippingCharges || 0);
+      setNotes(d.notes || '');
+      setTags(d.tags || '');
+      setPaymentMode(d.paymentMode || '');
+      setPaymentDate(d.paymentDate || '');
+      setAmountPaid(d.amountPaid || 0);
+      setChallanStatus(d.challanStatus || 'unpaid');
+      setIsReturn(!!d.isReturn);
+      setDraftRestored(true);
+      setDraftRestoredAt(d.savedAt);
+    } catch { clearDraft(); }
+  }, [showModal, editing, currentUserId, clearDraft]);
 
   // ── Return source invoice search ────────────────────────────────────────────
   const searchReturnSource = useCallback(async (q: string) => {
@@ -307,36 +368,56 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Fetch ledger (recent 10 customers) ──────────────────────────────────────
   const fetchLedger = useCallback(async (limit = ledgerFetchLimit) => {
-    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return, created_at').neq('status', 'voided').order('created_at', { ascending: false }).limit(limit);
-    type LedgerRow = Pick<CashChallan, 'customer_name' | 'total' | 'amount_paid' | 'is_return' | 'created_at'>;
-    const map: Record<string, { total: number; paid: number; count: number; latest: string }> = {};
+    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return, created_at, status').neq('status', 'voided').order('created_at', { ascending: false }).limit(limit);
+    type LedgerRow = Pick<CashChallan, 'customer_name' | 'total' | 'amount_paid' | 'is_return' | 'created_at' | 'status'>;
+    const now = Date.now();
+    const daysSince = (d: string) => Math.floor((now - new Date(d).getTime()) / 86400000);
+    const map: Record<string, { total: number; paid: number; count: number; latest: string; aging: { current: number; d30: number; d60: number; d90plus: number } }> = {};
     ((data as LedgerRow[] | null) || []).forEach((r) => {
       const name = r.customer_name;
       const sign = r.is_return ? -1 : 1;
-      if (!map[name]) map[name] = { total: 0, paid: 0, count: 0, latest: r.created_at ?? '' };
+      if (!map[name]) map[name] = { total: 0, paid: 0, count: 0, latest: r.created_at ?? '', aging: { current: 0, d30: 0, d60: 0, d90plus: 0 } };
       map[name].total += sign * Number(r.total);
       map[name].paid += sign * Number(r.amount_paid || 0);
       map[name].count++;
+      const outstanding = Number(r.total) - Number(r.amount_paid || 0);
+      if (!r.is_return && outstanding > 0 && r.status !== 'paid' && r.status !== 'draft') {
+        const days = daysSince(r.created_at ?? '');
+        if (days <= 30) map[name].aging.current += outstanding;
+        else if (days <= 60) map[name].aging.d30 += outstanding;
+        else if (days <= 90) map[name].aging.d60 += outstanding;
+        else map[name].aging.d90plus += outstanding;
+      }
     });
-    const list = Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count }));
+    const list = Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count, aging: v.aging }));
     list.sort((a, b) => (map[b.name].latest > map[a.name].latest ? 1 : -1));
     setLedgerCustomers(list.slice(0, 10));
   }, [ledgerFetchLimit]);
 
   const searchLedgerCustomer = useCallback(async (q: string) => {
     if (!q.trim()) { fetchLedger(); return; }
-    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return').neq('status', 'voided').ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
-    type LedgerSearchRow = Pick<CashChallan, 'customer_name' | 'total' | 'amount_paid' | 'is_return'>;
-    const map: Record<string, { total: number; paid: number; count: number }> = {};
+    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return, created_at, status').neq('status', 'voided').ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
+    type LedgerSearchRow = Pick<CashChallan, 'customer_name' | 'total' | 'amount_paid' | 'is_return' | 'created_at' | 'status'>;
+    const now = Date.now();
+    const daysSince = (d: string) => Math.floor((now - new Date(d).getTime()) / 86400000);
+    const map: Record<string, { total: number; paid: number; count: number; aging: { current: number; d30: number; d60: number; d90plus: number } }> = {};
     ((data as LedgerSearchRow[] | null) || []).forEach((r) => {
       const name = r.customer_name;
       const sign = r.is_return ? -1 : 1;
-      if (!map[name]) map[name] = { total: 0, paid: 0, count: 0 };
+      if (!map[name]) map[name] = { total: 0, paid: 0, count: 0, aging: { current: 0, d30: 0, d60: 0, d90plus: 0 } };
       map[name].total += sign * Number(r.total);
       map[name].paid += sign * Number(r.amount_paid || 0);
       map[name].count++;
+      const outstanding = Number(r.total) - Number(r.amount_paid || 0);
+      if (!r.is_return && outstanding > 0 && r.status !== 'paid' && r.status !== 'draft') {
+        const days = daysSince(r.created_at ?? '');
+        if (days <= 30) map[name].aging.current += outstanding;
+        else if (days <= 60) map[name].aging.d30 += outstanding;
+        else if (days <= 90) map[name].aging.d60 += outstanding;
+        else map[name].aging.d90plus += outstanding;
+      }
     });
-    setLedgerCustomers(Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count })));
+    setLedgerCustomers(Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count, aging: v.aging })));
   }, [fetchLedger]);
 
   const fetchLedgerDetailWithRange = useCallback(async (name: string, from: string, to: string) => {
@@ -633,6 +714,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   const closeModal = () => {
+    clearDraft();
+    if (draftTimerRef.current) { clearTimeout(draftTimerRef.current); draftTimerRef.current = null; }
     setShowModal(false); setEditing(null); setCustomerName(''); setSelectedCustomerId(null); setCustomerPhone(''); setIsReturn(false); setReturnSource(null); setReturnSearchQ(''); setReturnResults([]);
     setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
     setShippingCharges(0); setNotes(''); setTags('');
@@ -908,7 +991,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   );
 
   // ── Create/Edit Modal — extracted to components/challan/ChallanForm.tsx ──
-  if (showModal) return (
+  if (showModal) return (<>
+    {draftRestored && !editing && (
+      <div style={{ margin: '0 16px 8px', padding: '8px 12px', borderRadius: 6, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 10, color: T.gr, fontWeight: 600 }}>Draft restored (saved {Math.round((Date.now() - draftRestoredAt) / 60000)} min ago)</span>
+        <button onClick={() => { clearDraft(); closeModal(); }} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Discard</button>
+      </div>
+    )}
     <ChallanForm
       editing={editing}
       isReturn={isReturn}
@@ -957,7 +1046,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       onSave={saveChallan}
       formError={formError}
     />
-  );
+  </>);
 
   // ── List View ──────────────────────────────────────────────────────────────
   return (

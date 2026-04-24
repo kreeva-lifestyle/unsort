@@ -6,7 +6,7 @@ import type { CashChallan } from '../../types/database';
 
 type Challan = Omit<CashChallan, 'created_at' | 'updated_at'> & { created_at: string; updated_at: string };
 
-export type LedgerCustomer = { name: string; total: number; paid: number; outstanding: number; count: number };
+export type LedgerCustomer = { name: string; total: number; paid: number; outstanding: number; count: number; aging: { current: number; d30: number; d60: number; d90plus: number } };
 
 export default function ChallanLedger({
   detailName,
@@ -140,15 +140,25 @@ export default function ChallanLedger({
       </div>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         {customers.map(c => (
-          <div key={c.name} onClick={() => onOpenCustomer(c.name)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, marginBottom: 2 }}>{c.name}</div>
-              <div style={{ fontSize: 9, color: T.tx3 }}>{c.count} challans | Billed: ₹{c.total.toLocaleString('en-IN')} | Paid: ₹{c.paid.toLocaleString('en-IN')}</div>
+          <div key={c.name} onClick={() => onOpenCustomer(c.name)} style={{ padding: '10px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, marginBottom: 2 }}>{c.name}</div>
+                <div style={{ fontSize: 9, color: T.tx3 }}>{c.count} challans | Billed: ₹{c.total.toLocaleString('en-IN')} | Paid: ₹{c.paid.toLocaleString('en-IN')}</div>
+              </div>
+              <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: c.outstanding > 0 ? T.re : T.gr }}>₹{c.outstanding.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase' as const }}>{c.outstanding > 0 ? 'Due' : 'Clear'}</div>
+              </div>
             </div>
-            <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: c.outstanding > 0 ? T.re : T.gr }}>₹{c.outstanding.toLocaleString('en-IN')}</div>
-              <div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase' as const }}>{c.outstanding > 0 ? 'Due' : 'Clear'}</div>
-            </div>
+            {c.outstanding > 0 && (c.aging.current > 0 || c.aging.d30 > 0 || c.aging.d60 > 0 || c.aging.d90plus > 0) && (
+              <div style={{ display: 'flex', gap: 4, marginTop: 5, fontSize: 8, fontWeight: 600, fontFamily: T.mono }}>
+                {c.aging.current > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(34,197,94,.1)', color: T.gr }}>0-30d: ₹{c.aging.current.toLocaleString('en-IN')}</span>}
+                {c.aging.d30 > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(245,158,11,.1)', color: T.yl }}>31-60d: ₹{c.aging.d30.toLocaleString('en-IN')}</span>}
+                {c.aging.d60 > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(251,146,60,.12)', color: '#FB923C' }}>61-90d: ₹{c.aging.d60.toLocaleString('en-IN')}</span>}
+                {c.aging.d90plus > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.1)', color: T.re }}>90+d: ₹{c.aging.d90plus.toLocaleString('en-IN')}</span>}
+              </div>
+            )}
           </div>
         ))}
         {customers.length === 0 && <div style={{ padding: 24, textAlign: 'center' as const, color: T.tx3, fontSize: 12 }}>No customers found. Search by name or click "Load More" below.</div>}
