@@ -96,14 +96,14 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
   const fetchData = () => {
     supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).limit(invLimit).then(({ data }) => { setItems(data || []); setInvTruncated((data || []).length >= invLimit); });
     supabase.from('products').select('id, name, sku, total_components, category').eq('is_active', true).then(({ data }) => setProducts(data || []));
-    supabase.from('locations').select('*').order('name').then(({ data }) => setLocations(data || []));
-    supabase.from('tags').select('*').order('name').then(({ data }) => setTags(data || []));
-    supabase.from('item_tags').select('*, tags(id, name, color)').then(({ data }) => {
+    supabase.from('locations').select('id, name').order('name').then(({ data }) => setLocations(data || []));
+    supabase.from('tags').select('id, name, color').order('name').then(({ data }) => setTags(data || []));
+    supabase.from('item_tags').select('inventory_item_id, tag_id, tags(id, name, color)').limit(10000).then(({ data }) => {
       const map: Record<string, any[]> = {};
       (data || []).forEach((it: any) => { if (!map[it.inventory_item_id]) map[it.inventory_item_id] = []; map[it.inventory_item_id].push(it.tags); });
       setItemTags(map);
     });
-    supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').then(({ data }) => {
+    supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').limit(10000).then(({ data }) => {
       const missingMap: Record<string, string[]> = {};
       const damagedMap: Record<string, string[]> = {};
       const presentMap: Record<string, Set<string>> = {};

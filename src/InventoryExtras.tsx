@@ -71,7 +71,7 @@ export default function InventoryExtras() {
   }, []);
 
   const fetchProducts = useCallback(async () => {
-    const { data } = await supabase.from('products').select('*').eq('is_active', true).order('name');
+    const { data } = await supabase.from('products').select('id, name, sku, total_components, is_active, category, description, created_by, created_at, updated_at').eq('is_active', true).order('name');
     setProducts(data || []);
   }, []);
 
@@ -97,7 +97,7 @@ export default function InventoryExtras() {
   // Load components when product selected in Add form
   useEffect(() => {
     if (!fProductId) { setFComps([]); return; }
-    supabase.from('components').select('*').eq('product_id', fProductId).order('name').then(({ data }) => setFComps(data || []));
+    supabase.from('components').select('id, name, product_id, component_code, description, is_critical, created_at').eq('product_id', fProductId).order('name').then(({ data }) => setFComps(data || []));
   }, [fProductId]);
 
   // Auto-set size for dupatta components

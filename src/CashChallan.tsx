@@ -664,6 +664,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Export challans as CSV with item-level detail ─────────────────────────
   const exportChallansCSV = async () => {
+    if (!dateFrom || !dateTo) { addToast('Select a date range in Filters before exporting', 'error'); setShowFilters(true); return; }
     let q = supabase.from('cash_challans').select('challan_number, customer_name, status, subtotal, discount_amount, shipping_charges, round_off, total, amount_paid, payment_mode, payment_date, is_return, notes, tags, created_at, cash_challan_items(sku, description, quantity, price, discount_type, discount_value, discount_amount, total)').neq('status', 'voided');
     if (search) { const s = search.replace(/[%_,().]/g, ''); const num = parseInt(s); if (num && !isNaN(num)) q = q.eq('challan_number', num); else if (s.trim()) q = q.ilike('customer_name', `%${s}%`); }
     if (statusFilter) q = q.eq('status', statusFilter);
