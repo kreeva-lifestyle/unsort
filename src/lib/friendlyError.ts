@@ -13,6 +13,7 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   // Postgres constraint violations
   if (code === '23505' || l.includes('duplicate key')) return 'A record with these details already exists.';
   if (code === '23503' || l.includes('foreign key')) return 'Cannot complete — this item is still referenced elsewhere.';
+  if (l.includes('confirmed cash handover period')) return msg; // Pass through specific lock-period error
   if (code === '23514' || l.includes('check constraint')) return 'One of the values is outside the allowed range.';
   if (code === '23502' || l.includes('not null')) return 'A required field is missing.';
 
