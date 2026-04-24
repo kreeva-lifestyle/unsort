@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { T, S } from '../lib/theme';
 import { useAuth } from '../hooks/useAuth';
+import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
 
 type ChallanRow = { total: number | string; amount_paid: number | string | null; status: string; is_return: boolean; customer_name: string; created_at: string };
 type InventoryRow = { status: string; status_changed_at: string | null };
@@ -91,13 +92,16 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
 
   const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(100).then(({ data }) => setTasks((data ?? []) as TaskRow[])); };
 
+  // Dashboard shows aggregate counts — a 2s lag is imperceptible.
+  const { debounced: debouncedFetchAll } = useDebouncedFetch(fetchAll, 2000);
+  const { debounced: debouncedFetchTasks } = useDebouncedFetch(fetchTasks, 2000);
   useEffect(() => {
     fetchAll(); fetchTasks();
     const ch = supabase.channel('dash-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'packtime_scans' }, fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, fetchTasks)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, debouncedFetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, debouncedFetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'packtime_scans' }, debouncedFetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, debouncedFetchTasks)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
