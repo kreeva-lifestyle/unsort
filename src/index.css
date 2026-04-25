@@ -63,6 +63,11 @@ input[type="date"], input[type="time"], input[type="datetime-local"], input[type
   color-scheme: dark;
 }
 
+/* Subtle row hover for HTML tables — applies to Inventory, Cash Challan,
+   Brand Tags, and any other <tbody><tr> structure. Pure CSS, no JS. */
+tbody tr { transition: background 100ms ease; }
+tbody tr:hover { background: rgba(99,102,241,0.03); }
+
 /* Animations */
 @keyframes fi { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes su { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
