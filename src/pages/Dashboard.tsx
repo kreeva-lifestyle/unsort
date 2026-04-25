@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { T, S } from '../lib/theme';
 import { useAuth } from '../hooks/useAuth';
 import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
+import { useNotifications } from '../hooks/useNotifications';
+import { friendlyError } from '../lib/friendlyError';
 
 type ChallanRow = { total: number | string; amount_paid: number | string | null; status: string; is_return: boolean; customer_name: string; created_at: string };
 type InventoryRow = { status: string; status_changed_at: string | null };
@@ -16,6 +18,7 @@ type TaskRow = { id: string; title: string; is_done: boolean; created_at: string
 
 export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) => void } = {}) {
   const { profile } = useAuth();
+  const { addToast } = useNotifications();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const [pulse, setPulse] = useState({ scans: 0, revenue: 0, unsorted: 0, cashInHand: 0 });
@@ -31,14 +34,20 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
   const fetchAll = useCallback(async () => {
     const today = new Date(); today.setHours(0,0,0,0);
     const todayISO = today.toISOString();
-    const [scansRes, challansRes, itemsRes, expensesRes, handoversRes, balancesRes] = await Promise.all([
-      supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).gte('scanned_at', todayISO),
-      supabase.from('cash_challans').select('total, amount_paid, status, is_return, customer_name, created_at').neq('status', 'voided').neq('status', 'draft'),
-      supabase.from('inventory_items').select('status, status_changed_at'),
-      supabase.from('cash_expenses').select('amount').gte('date', today.toISOString().slice(0,10)),
-      supabase.from('cash_handovers').select('handover_number, amount, status, date, from_user_name, created_at'),
-      supabase.from('cash_book_balances').select('opening_balance').eq('date', today.toISOString().slice(0,10)).maybeSingle(),
-    ]);
+    let scansRes, challansRes, itemsRes, expensesRes, handoversRes, balancesRes;
+    try {
+      [scansRes, challansRes, itemsRes, expensesRes, handoversRes, balancesRes] = await Promise.all([
+        supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).gte('scanned_at', todayISO),
+        supabase.from('cash_challans').select('total, amount_paid, status, is_return, customer_name, created_at').neq('status', 'voided').neq('status', 'draft'),
+        supabase.from('inventory_items').select('status, status_changed_at'),
+        supabase.from('cash_expenses').select('amount').gte('date', today.toISOString().slice(0,10)),
+        supabase.from('cash_handovers').select('handover_number, amount, status, date, from_user_name, created_at'),
+        supabase.from('cash_book_balances').select('opening_balance').eq('date', today.toISOString().slice(0,10)).maybeSingle(),
+      ]);
+    } catch (e: any) {
+      console.error('Dashboard fetch failed:', e?.message || e);
+      return; // keep old data instead of crashing
+    }
     const challans = (challansRes.data ?? []) as ChallanRow[];
     const items = (itemsRes.data ?? []) as InventoryRow[];
     const expenses = (expensesRes.data ?? []) as ExpenseRow[];
@@ -112,9 +121,24 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const addTask = async (e: React.FormEvent) => { e.preventDefault(); if (!newTask.trim()) return; await supabase.from('tasks').insert({ title: newTask.trim(), created_by: profile?.id }); setNewTask(''); fetchTasks(); };
-  const toggleTask = async (id: string, done: boolean) => { await supabase.from('tasks').update({ is_done: !done }).eq('id', id); fetchTasks(); };
-  const deleteTask = async (id: string) => { if (!confirm('Delete this task?')) return; await supabase.from('tasks').delete().eq('id', id); fetchTasks(); };
+  const addTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTask.trim()) return;
+    const { error } = await supabase.from('tasks').insert({ title: newTask.trim(), created_by: profile?.id });
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    setNewTask(''); fetchTasks();
+  };
+  const toggleTask = async (id: string, done: boolean) => {
+    const { error } = await supabase.from('tasks').update({ is_done: !done }).eq('id', id);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    fetchTasks();
+  };
+  const deleteTask = async (id: string) => {
+    if (!confirm('Delete this task?')) return;
+    const { error } = await supabase.from('tasks').delete().eq('id', id);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    fetchTasks();
+  };
 
   const maxScan = Math.max(...scanTrend.map(s => s.count), 1);
   const statusColors: Record<string, string> = { unsorted: T.yl, damaged: T.re, dry_clean: '#06b6d4', complete: T.gr, completed: '#10b981' };

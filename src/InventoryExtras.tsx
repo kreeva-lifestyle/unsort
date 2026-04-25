@@ -117,9 +117,10 @@ export default function InventoryExtras() {
     let q = supabase.from('inventory_items').select('id, batch_number, serial_number, size, location, status')
       .eq('status', 'unsorted').eq('serial_number', ex.sku).eq('product_id', ex.product_id);
     if (ex.size && ex.size !== 'N/A') q = q.eq('size', ex.size);
-    const { data: candidates } = await q;
-    // Filter to only items missing this specific component
-    const { data: comps } = await supabase.from('item_components').select('inventory_item_id, component_id, status').in('inventory_item_id', (candidates || []).map(c => c.id));
+    const { data: candidates, error: cErr } = await q;
+    if (cErr) { setError('Failed to load matches: ' + friendlyError(cErr)); setMatches([]); return; }
+    const { data: comps, error: compErr } = await supabase.from('item_components').select('inventory_item_id, component_id, status').in('inventory_item_id', (candidates || []).map(c => c.id));
+    if (compErr) { setError('Failed to load matches: ' + friendlyError(compErr)); setMatches([]); return; }
     type ItemCompsRow = Pick<ItemComponent, 'inventory_item_id' | 'component_id' | 'status'>;
     const hasMissing = new Set((comps as ItemCompsRow[] | null || []).filter((c) => (c.status === 'missing' || c.status === 'damaged') && c.component_id === ex.component_id).map((c) => c.inventory_item_id));
     setMatches(((candidates as InventoryItemMatch[] | null) || []).filter(c => hasMissing.has(c.id)));
@@ -170,7 +171,8 @@ export default function InventoryExtras() {
     if (newQty < 0) { setError('Cannot go below 0'); return; }
     if (newQty <= 0) {
       // Qty reached zero — delete the row entirely
-      await supabase.from('inventory_extras').delete().eq('id', adjustExtra.id);
+      const { error: delErr } = await supabase.from('inventory_extras').delete().eq('id', adjustExtra.id);
+      if (delErr) { setError('Delete failed: ' + friendlyError(delErr)); return; }
     } else {
       const { data: updated, error: upErr } = await supabase.from('inventory_extras')
         .update({ quantity: newQty, updated_at: new Date().toISOString() })
@@ -198,7 +200,8 @@ export default function InventoryExtras() {
     // Once matched, the extra served its purpose. Delete the row when
     // qty reaches 0 — no need to keep spent extras in the database.
     if (extra.quantity <= 1) {
-      await supabase.from('inventory_extras').delete().eq('id', extra.id);
+      const { error: delErr } = await supabase.from('inventory_extras').delete().eq('id', extra.id);
+      if (delErr) setError('Cleanup failed (extra row not deleted): ' + friendlyError(delErr));
     }
     setSaving(false); setCompleteItem(null); setMatchExtra(null); fetchExtras();
   };

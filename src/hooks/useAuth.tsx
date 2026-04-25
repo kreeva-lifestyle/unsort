@@ -22,7 +22,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!mounted) return;
         if (refreshed?.session?.user) {
           setUser(refreshed.session.user);
-          const { data: prof } = await supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').eq('id', refreshed.session.user.id).maybeSingle();
+          const { data: prof, error: profErr } = await supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').eq('id', refreshed.session.user.id).maybeSingle();
+          if (profErr) console.error('Profile load failed:', profErr.message);
           if (mounted) setProfile(prof);
         } else {
           setUser(null); setProfile(null);
@@ -37,7 +38,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (!mounted) return;
       if (session?.user) {
         setUser(session.user);
-        supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').eq('id', session.user.id).maybeSingle().then(({ data }) => {
+        supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').eq('id', session.user.id).maybeSingle().then(({ data, error }) => {
+          if (error) console.error('Profile load failed:', error.message);
           if (mounted) { setProfile(data); setLoading(false); setReady(true); }
         });
       } else {
@@ -61,11 +63,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => { await supabase.auth.signOut(); };
 
-  // Session timeout — auto-logout after 30 min of inactivity
+  // Session timeout — auto-logout after 30 min of inactivity.
+  // Reason flag is read by Login.tsx to show "session expired" toast.
   useEffect(() => {
     if (!user) return;
     let timer: any;
-    const resetTimer = () => { clearTimeout(timer); timer = setTimeout(() => { supabase.auth.signOut(); }, 30 * 60 * 1000); };
+    const expire = () => {
+      try { localStorage.setItem('signOutReason', 'session_expired'); } catch {}
+      supabase.auth.signOut();
+    };
+    const resetTimer = () => { clearTimeout(timer); timer = setTimeout(expire, 30 * 60 * 1000); };
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
     events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }));
     resetTimer();

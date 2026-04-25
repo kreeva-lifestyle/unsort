@@ -72,6 +72,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkPay, setShowBulkPay] = useState(false);
   const [showBulkUnpay, setShowBulkUnpay] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkPayMode, setBulkPayMode] = useState('');
   const [bulkReceivedAmount, setBulkReceivedAmount] = useState('');
   const [lastBatch, setLastBatch] = useState<{ id: string; count: number; mode: string } | null>(null);
@@ -527,7 +528,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       if (editing) {
         const { data: current } = await supabase.from('cash_challans').select('updated_at').eq('id', editing.id).maybeSingle();
         if (current && editing.updated_at && current.updated_at !== editing.updated_at) {
-          setFormError('This challan was modified by another user. Please close and reopen to get latest data.');
+          const msg = 'This challan was modified by another user. Please close and reopen to get latest data.';
+          setFormError(msg);
+          addToast(msg, 'error');
           return;
         }
         const { error: delErr } = await supabase.from('cash_challan_items').delete().eq('challan_id', editing.id);
@@ -855,11 +858,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const exitBulkMode = () => { setBulkMode(false); clearSelection(); };
 
   const executeBulkPay = async () => {
-    if (!bulkPayMode) return;
+    if (!bulkPayMode || bulkBusy) return;
+    setBulkBusy(true);
     const today = new Date().toISOString().slice(0, 10);
     const { data: { user } } = await supabase.auth.getUser();
     const ids = bulkPayable.map(c => c.id);
-    if (ids.length === 0) { setShowBulkPay(false); return; }
+    if (ids.length === 0) { setShowBulkPay(false); setBulkBusy(false); return; }
     const batchId = `BP-${Date.now().toString(36).toUpperCase()}`;
     const isRefund = bulkNetTotal < 0;
     const received = Number(bulkReceivedAmount) || Math.abs(bulkNetTotal);
@@ -883,6 +887,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setLastBatch({ id: batchId, count: ids.length, mode: bulkPayMode });
     setShowBulkPay(false); setBulkPayMode(''); setBulkReceivedAmount(''); exitBulkMode(); fetchChallans();
     addToast(isRefund ? `Settled ${ids.length} challans, refunded ₹${received.toLocaleString('en-IN')} (${batchId})` : `${ids.length} challans marked as paid (${batchId})`, 'success');
+    setBulkBusy(false);
   };
 
   const undoBatch = async (batchId: string) => {
@@ -902,10 +907,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   const executeBulkUnpay = async () => {
+    if (bulkBusy) return;
+    setBulkBusy(true);
     const today = new Date().toISOString().slice(0, 10);
     const { data: { user } } = await supabase.auth.getUser();
     const ids = bulkUnpayable.map(c => c.id);
-    if (ids.length === 0) { setShowBulkUnpay(false); return; }
+    if (ids.length === 0) { setShowBulkUnpay(false); setBulkBusy(false); return; }
     const undoBatchId = `BU-${Date.now().toString(36).toUpperCase()}`;
     for (const c of bulkUnpayable) {
       await supabase.from('cash_challans').update({
@@ -918,7 +925,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       });
     }
     for (const c of bulkUnpayable) await ccAuditLog('BULK_UNPAY', c.id, `Bulk unpaid (${undoBatchId}) — was ₹${Number(c.amount_paid || c.total).toLocaleString('en-IN')}`, { status: { from: 'paid', to: 'unpaid' }, amount_paid: { from: c.amount_paid, to: 0 } });
-    setShowBulkUnpay(false); exitBulkMode(); fetchChallans();
+    setShowBulkUnpay(false); exitBulkMode(); fetchChallans(); setBulkBusy(false);
     addToast(`${ids.length} challans reverted to unpaid`, 'success');
   };
 
@@ -1235,7 +1242,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setShowBulkPay(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={executeBulkPay} disabled={!bulkPayMode || bulkPayable.length === 0} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: bulkPayMode ? (bulkNetTotal < 0 ? T.re : T.gr) : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: bulkPayMode ? 'pointer' : 'default', opacity: bulkPayMode ? 1 : 0.4 }}>{bulkNetTotal < 0 ? 'Settle & Refund' : 'Confirm Pay'}</button>
+              <button onClick={executeBulkPay} disabled={!bulkPayMode || bulkPayable.length === 0 || bulkBusy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: bulkPayMode ? (bulkNetTotal < 0 ? T.re : T.gr) : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: bulkPayMode && !bulkBusy ? 'pointer' : 'default', opacity: bulkPayMode && !bulkBusy ? 1 : 0.4 }}>{bulkBusy ? 'Processing…' : bulkNetTotal < 0 ? 'Settle & Refund' : 'Confirm Pay'}</button>
             </div>
           </div>
         </div>
@@ -1257,7 +1264,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setShowBulkUnpay(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={executeBulkUnpay} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: T.yl, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Confirm Unpay</button>
+              <button onClick={executeBulkUnpay} disabled={bulkBusy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: T.yl, color: '#fff', fontSize: 11, fontWeight: 600, cursor: bulkBusy ? 'default' : 'pointer', opacity: bulkBusy ? 0.5 : 1 }}>{bulkBusy ? 'Processing…' : 'Confirm Unpay'}</button>
             </div>
           </div>
         </div>
