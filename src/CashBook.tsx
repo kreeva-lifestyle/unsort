@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from './lib/supabase';
 import { friendlyError } from './lib/friendlyError';
 import { useDebouncedFetch } from './hooks/useDebouncedFetch';
+import { useNotifications } from './hooks/useNotifications';
 
 import { T } from './lib/theme';
 import type {
@@ -36,6 +37,7 @@ type ExpenseRow = Pick<CashExpense, 'id' | 'date' | 'amount' | 'category' | 'des
 type CashSaleRow = Pick<CashChallan, 'id' | 'challan_number' | 'customer_name' | 'total' | 'amount_paid' | 'status' | 'is_return' | 'payment_mode' | 'payment_date' | 'created_at'>;
 
 export default function CashBook() {
+  const { addToast } = useNotifications();
   const today = new Date().toISOString().slice(0, 10);
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
@@ -82,7 +84,17 @@ export default function CashBook() {
   const [confirmError, setConfirmError] = useState('');
   // PIN lockout — exponential backoff after wrong attempts (audit P1)
   const [pinAttempts, setPinAttempts] = useState(0);
-  const [pinLockUntil, setPinLockUntil] = useState<number>(0);
+  const [pinLockUntil, setPinLockUntil] = useState<number>(() => {
+    try { return Number(sessionStorage.getItem('pinLockUntil')) || 0; } catch { return 0; }
+  });
+  const [busy, setBusy] = useState(false); // disables critical handover/save buttons during async ops
+  // Persist lockout across modal close so user can't bypass rate limit
+  useEffect(() => {
+    try {
+      if (pinLockUntil > 0) sessionStorage.setItem('pinLockUntil', String(pinLockUntil));
+      else sessionStorage.removeItem('pinLockUntil');
+    } catch {}
+  }, [pinLockUntil]);
 
   const fetchData = useCallback(async () => {
     // Opening balance — uses From date
@@ -151,21 +163,23 @@ export default function CashBook() {
   const closingBalance = openingBalance + cashInSales - cashOutReturns - totalExpenses - totalHandovers;
 
   const saveOpening = async () => {
+    if (busy) return;
     const val = Number(openingInput) || 0;
     if (val === openingBalance) { setEditingOpening(false); return; }
-    const { data: { user } } = await supabase.auth.getUser();
-    const payload: CashBookBalanceInsert = { date: fromDate, opening_balance: val };
-    const { error } = await supabase.from('cash_book_balances').upsert(payload, { onConflict: 'date' });
-    if (error) { setFormError('Save failed — ' + friendlyError(error)); return; }
-    // Audit trail — log the change (audit P1: opening balance is reconciliation anchor)
-    await supabase.from('audit_log').insert({
-      action: 'update',
-      module: 'cash_book',
-      details: `Opening balance for ${fromDate}: ₹${openingBalance.toLocaleString('en-IN')} → ₹${val.toLocaleString('en-IN')}`,
-      user_id: user?.id ?? null,
-    });
-    setEditingOpening(false);
-    fetchData();
+    setBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const payload: CashBookBalanceInsert = { date: fromDate, opening_balance: val };
+      const { error } = await supabase.from('cash_book_balances').upsert(payload, { onConflict: 'date' });
+      if (error) { addToast('Save failed — ' + friendlyError(error), 'error'); return; }
+      await supabase.from('audit_log').insert({
+        action: 'update', module: 'cash_book',
+        details: `Opening balance for ${fromDate}: ₹${openingBalance.toLocaleString('en-IN')} → ₹${val.toLocaleString('en-IN')}`,
+        user_id: user?.id ?? null,
+      });
+      setEditingOpening(false);
+      fetchData();
+    } finally { setBusy(false); }
   };
 
   const addExpense = async () => {
@@ -183,12 +197,15 @@ export default function CashBook() {
 
   // Compute available cash for a date range (auto-calc for handover)
   const computeBreakdown = useCallback(async (from: string, to: string): Promise<Breakdown> => {
-    const [{ data: bal }, { data: exp }, { data: ch }, { data: ho }] = await Promise.all([
+    const [balR, expR, chR, hoR] = await Promise.all([
       supabase.from('cash_book_balances').select('opening_balance').eq('date', from).maybeSingle(),
       supabase.from('cash_expenses').select('amount').gte('date', from).lte('date', to),
       supabase.from('cash_challans').select('amount_paid, is_return, status').eq('payment_mode', 'Cash').in('status', ['paid', 'partial']).gte('payment_date', from).lte('payment_date', to),
       supabase.from('cash_handovers').select('amount, status, period_from, period_to, date').in('status', ['confirmed', 'pending']).limit(500),
     ]);
+    const fetchErr = balR.error || expR.error || chR.error || hoR.error;
+    if (fetchErr) addToast('Cash flow calculation may be incomplete: ' + friendlyError(fetchErr), 'error');
+    const bal = balR.data; const exp = expR.data; const ch = chR.data; const ho = hoR.data;
     const opening = Number(bal?.opening_balance || 0);
     const openingIsSet = bal !== null && bal !== undefined;
     type ChRow = Pick<CashChallan, 'amount_paid' | 'is_return' | 'status'>;
@@ -206,7 +223,7 @@ export default function CashBook() {
     }).reduce((s, h) => s + Number(h.amount), 0);
     const available = opening + cashSales - cashReturns - expensesTotal - previousHandovers;
     return { opening, openingIsSet, cashSales, cashReturns, expenses: expensesTotal, previousHandovers, available, periodFrom: from, periodTo: to };
-  }, []);
+  }, [addToast]);
 
   // Recompute when range changes in modal + load recent handovers
   useEffect(() => {
@@ -333,79 +350,80 @@ export default function CashBook() {
   };
 
   const confirmHandover = async () => {
+    if (busy) return;
+    setBusy(true);
     setConfirmError('');
-    if (!confirmingHandover || !confirmPin.trim()) { setConfirmError('Enter PIN'); return; }
-    // Lockout window check
-    const now = Date.now();
-    if (pinLockUntil > now) {
-      const secs = Math.ceil((pinLockUntil - now) / 1000);
-      setConfirmError(`Too many wrong attempts. Try again in ${secs}s.`);
-      return;
-    }
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setConfirmError('Not logged in'); return; }
-    // Verify the confirming user IS the intended recipient
-    if (confirmingHandover.to_user_id && confirmingHandover.to_user_id !== user.id) {
-      setConfirmError(`This handover is meant for ${confirmingHandover.to_user_name}. Only they can sign it.`);
-      return;
-    }
-    const { data: myPin } = await supabase.rpc('get_own_pin');
-    if (!myPin) { setConfirmError('You have no PIN set. Go to Settings → Users to set one.'); return; }
-    if (myPin !== confirmPin.trim()) {
-      // Exponential backoff: 5s * 2^attempts, capped at 5 min
-      const nextAttempts = pinAttempts + 1;
-      setPinAttempts(nextAttempts);
-      if (nextAttempts >= 3) {
-        const waitMs = Math.min(5000 * Math.pow(2, nextAttempts - 3), 5 * 60 * 1000);
-        setPinLockUntil(now + waitMs);
-        setConfirmError(`Incorrect PIN. Locked for ${Math.ceil(waitMs / 1000)}s (${nextAttempts} failed attempts).`);
-      } else {
-        setConfirmError(`Incorrect PIN. ${3 - nextAttempts} attempt${3 - nextAttempts === 1 ? '' : 's'} before lockout.`);
+    if (!confirmingHandover || !confirmPin.trim()) { setConfirmError('Enter PIN'); setBusy(false); return; }
+    try {
+      const now = Date.now();
+      if (pinLockUntil > now) {
+        const secs = Math.ceil((pinLockUntil - now) / 1000);
+        setConfirmError(`Too many wrong attempts. Try again in ${secs}s.`);
+        return;
       }
-      setConfirmPin('');
-      return;
-    }
-    // Success — reset counters
-    setPinAttempts(0); setPinLockUntil(0);
-    await supabase.from('cash_handovers').update({
-      status: 'confirmed',
-      confirmed_at: new Date().toISOString(),
-      to_user_id: user.id,
-      to_user_name: confirmingHandover.to_user_name || user.email || 'User',
-    }).eq('id', confirmingHandover.id);
-    setConfirmingHandover(null); setConfirmPin('');
-    fetchData();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setConfirmError('Not logged in'); return; }
+      if (confirmingHandover.to_user_id && confirmingHandover.to_user_id !== user.id) {
+        setConfirmError(`This handover is meant for ${confirmingHandover.to_user_name}. Only they can sign it.`);
+        return;
+      }
+      const { data: myPin } = await supabase.rpc('get_own_pin');
+      if (!myPin) { setConfirmError('You have no PIN set. Go to Settings → Users to set one.'); return; }
+      if (myPin !== confirmPin.trim()) {
+        const nextAttempts = pinAttempts + 1;
+        setPinAttempts(nextAttempts);
+        if (nextAttempts >= 3) {
+          const waitMs = Math.min(5000 * Math.pow(2, nextAttempts - 3), 5 * 60 * 1000);
+          setPinLockUntil(now + waitMs);
+          setConfirmError(`Incorrect PIN. Locked for ${Math.ceil(waitMs / 1000)}s (${nextAttempts} failed attempts).`);
+        } else {
+          setConfirmError(`Incorrect PIN. ${3 - nextAttempts} attempt${3 - nextAttempts === 1 ? '' : 's'} before lockout.`);
+        }
+        setConfirmPin('');
+        return;
+      }
+      setPinAttempts(0); setPinLockUntil(0);
+      const { error } = await supabase.from('cash_handovers').update({
+        status: 'confirmed',
+        confirmed_at: new Date().toISOString(),
+        to_user_id: user.id,
+        to_user_name: confirmingHandover.to_user_name || user.email || 'User',
+      }).eq('id', confirmingHandover.id);
+      if (error) { addToast('Confirm failed — ' + friendlyError(error), 'error'); return; }
+      setConfirmingHandover(null); setConfirmPin('');
+      fetchData();
+    } finally { setBusy(false); }
   };
 
   // Reject a pending handover — only the intended recipient may reject,
   // and only while status is still 'pending'. Sets status='disputed' with
   // reject_reason + rejected_at + rejected_by (enforced by CHECK constraint).
   const submitReject = async () => {
+    if (busy) return;
+    setBusy(true);
     setRejectError('');
-    if (!rejectingHandover) return;
-    const reason = rejectReason.trim();
-    if (!reason) { setRejectError('Please explain why you are rejecting this handover.'); return; }
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setRejectError('Not logged in'); return; }
-    if (rejectingHandover.to_user_id && rejectingHandover.to_user_id !== user.id) {
-      setRejectError(`Only ${rejectingHandover.to_user_name} can reject this handover.`);
-      return;
-    }
-    if (rejectingHandover.status !== 'pending') {
-      setRejectError(`This handover is already ${rejectingHandover.status} and cannot be rejected.`);
-      return;
-    }
-    // Optimistic concurrency — only reject if still pending
-    const { error, data } = await supabase.from('cash_handovers').update({
-      status: 'disputed',
-      reject_reason: reason,
-      rejected_at: new Date().toISOString(),
-      rejected_by: user.id,
-    }).eq('id', rejectingHandover.id).eq('status', 'pending').select('id');
-    if (error) { setRejectError(friendlyError(error)); return; }
-    if (!data || data.length === 0) { setRejectError('Handover state changed — please refresh.'); return; }
-    setRejectingHandover(null); setRejectReason('');
-    fetchData();
+    try {
+      if (!rejectingHandover) return;
+      const reason = rejectReason.trim();
+      if (!reason) { setRejectError('Please explain why you are rejecting this handover.'); return; }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setRejectError('Not logged in'); return; }
+      if (rejectingHandover.to_user_id && rejectingHandover.to_user_id !== user.id) {
+        setRejectError(`Only ${rejectingHandover.to_user_name} can reject this handover.`);
+        return;
+      }
+      if (rejectingHandover.status !== 'pending') {
+        setRejectError(`This handover is already ${rejectingHandover.status} and cannot be rejected.`);
+        return;
+      }
+      const { error, data } = await supabase.from('cash_handovers').update({
+        status: 'disputed', reject_reason: reason, rejected_at: new Date().toISOString(), rejected_by: user.id,
+      }).eq('id', rejectingHandover.id).eq('status', 'pending').select('id');
+      if (error) { setRejectError(friendlyError(error)); return; }
+      if (!data || data.length === 0) { setRejectError('Handover state changed — please refresh.'); return; }
+      setRejectingHandover(null); setRejectReason('');
+      fetchData();
+    } finally { setBusy(false); }
   };
 
   // Expenses that fall inside a CONFIRMED cash handover's period are locked —
@@ -430,7 +448,7 @@ export default function CashBook() {
   const deleteExpense = async (id: string) => {
     if (lockedExpenseIds.has(id)) {
       setConfirmDelete(null);
-      setFormError('This expense is locked — it was included in a confirmed cash handover and cannot be deleted.');
+      addToast('This expense is locked — it was included in a confirmed cash handover and cannot be deleted.', 'error');
       return;
     }
     setConfirmDelete(null);
@@ -438,14 +456,21 @@ export default function CashBook() {
     if (pendingExpDel) clearTimeout(pendingExpDel.timer);
     const timer = window.setTimeout(async () => {
       const { error } = await supabase.from('cash_expenses').delete().eq('id', id);
-      if (error) setFormError('Delete failed — ' + friendlyError(error));
+      if (error) addToast('Delete failed — ' + friendlyError(error), 'error');
       setPendingExpDel(null);
       fetchData();
     }, 5000);
     setPendingExpDel({ id, timer });
   };
   const undoExpDel = () => { if (pendingExpDel) { clearTimeout(pendingExpDel.timer); setPendingExpDel(null); fetchData(); } };
-  const dismissExpDel = () => { if (pendingExpDel) { clearTimeout(pendingExpDel.timer); supabase.from('cash_expenses').delete().eq('id', pendingExpDel.id).then(() => fetchData()); setPendingExpDel(null); } };
+  const dismissExpDel = async () => {
+    if (!pendingExpDel) return;
+    clearTimeout(pendingExpDel.timer);
+    const { error } = await supabase.from('cash_expenses').delete().eq('id', pendingExpDel.id);
+    if (error) addToast('Delete failed — ' + friendlyError(error), 'error');
+    setPendingExpDel(null);
+    fetchData();
+  };
 
   const exportCSV = async () => {
     // Export expenses for selected date range
@@ -479,7 +504,7 @@ export default function CashBook() {
           {editingOpening ? (
             <div style={{ display: 'flex', gap: 4 }}>
               <input type="number" value={openingInput} onChange={e => setOpeningInput(e.target.value)} style={{ width: 100, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 4, color: T.tx, fontSize: 11, padding: '3px 6px', outline: 'none', fontFamily: T.mono, textAlign: 'right' }} />
-              <button onClick={saveOpening} style={{ padding: '3px 8px', borderRadius: 4, border: 'none', background: T.ac, color: '#fff', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Save</button>
+              <button onClick={saveOpening} disabled={busy} style={{ padding: '3px 8px', borderRadius: 4, border: 'none', background: T.ac, color: '#fff', fontSize: 9, fontWeight: 600, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Saving…' : 'Save'}</button>
               <button onClick={() => { setEditingOpening(false); setOpeningInput(String(openingBalance)); }} style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid rgba(99,102,241,0.15)', background: 'rgba(99,102,241,0.06)', color: T.ac2, fontSize: 9, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
             </div>
           ) : (
@@ -773,7 +798,7 @@ export default function CashBook() {
             {confirmError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{confirmError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setConfirmingHandover(null); setConfirmPin(''); setConfirmError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', fontSize: 11, fontWeight: 500, background: 'rgba(99,102,241,0.06)', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={confirmHandover} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)`, color: '#fff', cursor: 'pointer' }}>Sign &amp; Confirm</button>
+              <button onClick={confirmHandover} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Confirming…' : 'Sign & Confirm'}</button>
             </div>
           </div>
         </div>
@@ -790,7 +815,7 @@ export default function CashBook() {
             {rejectError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{rejectError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setRejectingHandover(null); setRejectReason(''); setRejectError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', fontSize: 11, fontWeight: 500, background: 'rgba(99,102,241,0.06)', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={submitReject} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: 'pointer' }}>Confirm Reject</button>
+              <button onClick={submitReject} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Rejecting…' : 'Confirm Reject'}</button>
             </div>
           </div>
         </div>

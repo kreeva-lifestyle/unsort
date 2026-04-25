@@ -65,7 +65,8 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     }
     // Auto-confirm email + update role
     if (data.user) {
-      await supabase.rpc('confirm_user_email', { target_user_id: data.user.id });
+      const { error: confErr } = await supabase.rpc('confirm_user_email', { target_user_id: data.user.id });
+      if (confErr) addToast('User created but email auto-confirmation failed — they may need to confirm via email link first.', 'error');
       if (inviteForm.role !== 'viewer') {
         await supabase.from('profiles').update({ role: inviteForm.role }).eq('id', data.user.id);
       }

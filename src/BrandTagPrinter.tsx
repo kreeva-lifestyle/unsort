@@ -193,7 +193,7 @@ body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000}
 document.querySelectorAll('.barcode svg').forEach(function(svg){
   var id=svg.id.replace('bc-','');
   var row=${JSON.stringify(labels.map(r=>({id:r.id,jio:r.jioCode,sku:r.sku})))}.find(function(r){return r.id===id});
-  if(row&&row.jio)try{JsBarcode(svg,row.jio,{format:'CODE128',width:1.5,height:34,displayValue:true,text:row.sku,fontSize:8,font:'Arial',margin:0,textMargin:1})}catch(e){}
+  if(row&&row.jio)try{JsBarcode(svg,row.jio,{format:'CODE128',width:1.5,height:34,displayValue:true,text:row.sku,fontSize:8,font:'Arial',margin:0,textMargin:1})}catch(e){if(svg)svg.outerHTML='<div style="color:#c00;font-size:10px;border:1px dashed #c00;padding:4px;text-align:center">[Invalid barcode: '+(row.sku||row.jio||'?')+']</div>'}
 });
 <\/script></body></html>`;
 };
@@ -552,8 +552,15 @@ export default function BrandTagPrinter() {
         btAudit('import', `Imported ${toUpsert.length} rows${failed > 0 ? `, ${failed} failed` : ''}`);
         addToast(`Import complete! ${toUpsert.length} rows processed.${failed > 0 ? ` ${failed} failed.` : ''}`, failed > 0 ? 'error' : 'success');
         fetchPage();
-      } catch (_) {
-        addToast('Failed to parse Excel file. Ensure it is a valid .xlsx / .xls / .csv file.', 'error');
+      } catch (e: any) {
+        const errMsg = e?.message || '';
+        if (errMsg.toLowerCase().includes('column') || errMsg.toLowerCase().includes('header')) {
+          addToast('Invalid columns. Expected headers: SKU, JIO, Brand, Size. Check your template.', 'error');
+        } else if (errMsg.toLowerCase().includes('zip') || errMsg.toLowerCase().includes('format')) {
+          addToast('File format unsupported. Use .xlsx, .xls, or .csv (not encrypted).', 'error');
+        } else {
+          addToast('Failed to parse Excel: ' + (errMsg || 'unknown error'), 'error');
+        }
       }
     };
     reader.readAsArrayBuffer(file);
@@ -653,7 +660,7 @@ export default function BrandTagPrinter() {
         const parsed = parseOrderSheet(json, masterRows);
         setOrderRows(parsed); setOrderPage(0);
         setOrderLoading(false); setOrderLoadMsg('');
-      } catch { addToast('Failed to parse order sheet.', 'error'); setOrderLoading(false); setOrderLoadMsg(''); }
+      } catch (e: any) { addToast('Failed to parse order sheet — ' + (e?.message || 'check column format'), 'error'); setOrderLoading(false); setOrderLoadMsg(''); }
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';

@@ -1,5 +1,5 @@
 // Login screen — shown when no auth session exists
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { T } from '../lib/theme';
 import { supabase } from '../lib/supabase';
 
@@ -18,6 +18,17 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [forgotMsg, setForgotMsg] = useState('');
+  const [info, setInfo] = useState('');
+
+  useEffect(() => {
+    try {
+      const reason = localStorage.getItem('signOutReason');
+      if (reason === 'session_expired') {
+        setInfo('Session expired — please sign in again.');
+        localStorage.removeItem('signOutReason');
+      }
+    } catch {}
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,6 +77,7 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
         {/* Divider */}
         <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${T.bd2}, transparent)`, marginBottom: 24, opacity: 0, animation: 'loginFadeUp 1s .6s ease both' }} />
 
+        {info && <div style={{ background: 'rgba(56,189,248,.10)', border: '1px solid rgba(56,189,248,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.bl, marginBottom: 14 }}>{info}</div>}
         {error && <div style={{ background: 'rgba(245,87,92,.12)', border: '1px solid rgba(245,87,92,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.re, marginBottom: 14, animation: 'loginShake .4s ease' }}>{error}</div>}
         {forgotMsg && <div style={{ background: 'rgba(34,197,94,.10)', border: '1px solid rgba(34,197,94,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.gr, marginBottom: 14 }}>{forgotMsg}</div>}
         <form onSubmit={handleSubmit}>

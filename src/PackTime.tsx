@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { BarcodeDetector } from 'barcode-detector/ponyfill';
 import { supabase, SUPABASE_ANON_KEY } from './lib/supabase';
 import { useNotifications } from './hooks/useNotifications';
+import { friendlyError } from './lib/friendlyError';
 
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
 
@@ -57,6 +58,13 @@ function formatTimestamp(d: Date) {
 type QueueItem = { rows: unknown[][]; sheetName: string; retries: number; };
 const writeQueue: QueueItem[] = [];
 let flushing = false;
+// Failed batches that exceeded retries — components subscribe via the listeners
+// list and show a prominent UI alert so the operator knows scans were lost.
+const droppedBatches: { rows: unknown[][]; sheetName: string; ts: number }[] = [];
+const droppedListeners = new Set<() => void>();
+const notifyDropped = () => { droppedListeners.forEach(fn => { try { fn(); } catch {} }); };
+export function getDroppedBatches() { return droppedBatches; }
+export function clearDroppedBatches() { droppedBatches.length = 0; notifyDropped(); }
 
 async function flushQueue() {
   if (flushing || writeQueue.length === 0) return;
@@ -83,7 +91,11 @@ async function flushQueue() {
         writeQueue.unshift({ rows: batch, sheetName, retries });
         await new Promise(r => setTimeout(r, 2000));
       }
-      if (retries > 3) console.error('PackStation: dropped batch after 3 retries', batch);
+      if (retries > 3) {
+        console.error('PackStation: dropped batch after 3 retries', batch);
+        droppedBatches.push({ rows: batch, sheetName, ts: Date.now() });
+        notifyDropped();
+      }
     }
   }
   flushing = false;
@@ -100,7 +112,15 @@ if (typeof window !== 'undefined') {
       flushing = false;
       const pending = writeQueue.splice(0);
       for (const item of pending) {
-        fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body: JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName }), keepalive: true }).catch(() => {});
+        // sendBeacon is purpose-built for this — non-blocking, more reliable
+        // than fetch+keepalive, and fires even during unload. Falls back to
+        // fetch+keepalive if Beacon API unavailable.
+        const body = JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName });
+        const blob = new Blob([body], { type: 'application/json' });
+        const ok = navigator.sendBeacon ? navigator.sendBeacon(EDGE_FN, blob) : false;
+        if (!ok) {
+          fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body, keepalive: true }).catch((err) => console.error('Final flush failed:', err));
+        }
       }
       e.returnValue = '';
     }
@@ -153,6 +173,7 @@ async function callEdge(body: unknown, timeoutMs = 20000): Promise<any> {
 export default function PackTime({ active }: { active?: boolean } = {}) {
   const { addToast } = useNotifications();
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [droppedCount, setDroppedCount] = useState(0);
   // Config from Supabase
   const [couriers, setCouriers] = useState<PackTimeCourier[]>([]);
   const [cameras, setCameras] = useState<PackTimeCamera[]>([]);
@@ -244,6 +265,18 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     window.addEventListener('online', goOn);
     return () => { window.removeEventListener('offline', goOff); window.removeEventListener('online', goOn); };
   }, [addToast]);
+
+  // ── Dropped batch alerts (after 3 retries) ────────────────────────────────
+  useEffect(() => {
+    const update = () => {
+      const all = getDroppedBatches();
+      const total = all.reduce((s, b) => s + b.rows.length, 0);
+      if (total > droppedCount) addToast(`${total - droppedCount} scan(s) failed to sync after retries — check connection`, 'error');
+      setDroppedCount(total);
+    };
+    droppedListeners.add(update);
+    return () => { droppedListeners.delete(update); };
+  }, [droppedCount, addToast]);
 
   // ── Focus ───────────────────────────────────────────────────────────────────
   const focusInput = useCallback(() => { setTimeout(() => inputRef.current?.focus(), 50); }, []);
@@ -510,7 +543,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     if (historyFilterBrand) query = query.eq('brand', historyFilterBrand);
     query = query.order('scanned_at', { ascending: false }).range(historyPage * historyPageSize, (historyPage + 1) * historyPageSize - 1);
     const { data, count, error } = await query;
-    if (error) { console.error('History fetch failed:', error.message); setHistoryLoading(false); return; }
+    if (error) { addToast(friendlyError(error), 'error'); setHistoryLoading(false); return; }
     setHistoryData((data as PackTimeScan[] | null) || []);
     setHistoryTotal(count || 0);
     setHistoryLoading(false);
@@ -759,6 +792,15 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         <div style={{ margin: '0 14px 8px', padding: '8px 12px', borderRadius: 6, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', color: T.yl, fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.yl, animation: 'subtlePulse 2s ease-in-out infinite' }} />
           You're offline — scans are queued locally. They'll sync when connection returns.
+        </div>
+      )}
+
+      {/* Dropped scans alert — scans that failed all 3 retries */}
+      {droppedCount > 0 && started && (
+        <div style={{ margin: '0 14px 8px', padding: '10px 14px', borderRadius: 6, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', color: T.re, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.re, animation: 'subtlePulse 1.5s ease-in-out infinite' }} />
+          <span style={{ flex: 1 }}>⚠ {droppedCount} scan(s) failed to sync to Google Sheets after retries — these are saved locally but missing from the sheet. Check connection and re-scan or contact admin.</span>
+          <button onClick={() => { clearDroppedBatches(); setDroppedCount(0); }} style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid rgba(239,68,68,.3)', background: 'transparent', color: T.re, fontSize: 9, cursor: 'pointer' }}>Dismiss</button>
         </div>
       )}
 
