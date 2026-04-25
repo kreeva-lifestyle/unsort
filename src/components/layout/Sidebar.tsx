@@ -11,6 +11,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile }: { activeTa
     { id: 'brandtag', icon: 'tag', label: 'Brand Tags' },
     { id: 'packtime', icon: 'scan', label: 'PackStation' },
     { id: 'challan', icon: 'file', label: 'Cash Challan' },
+    { id: 'programs', icon: 'box', label: 'Programs' },
     ...(profile ? [{ id: 'settings', icon: 'settings', label: 'Settings' }] : []),
   ];
 
