@@ -1,7 +1,7 @@
 // Dashboard page — KPI cards, alerts, trends, task list
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { T, S } from '../lib/theme';
+import { T, S, Pill } from '../lib/theme';
 import { useAuth } from '../hooks/useAuth';
 import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
 import { useNotifications } from '../hooks/useNotifications';
@@ -197,25 +197,47 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         ))}
       </div>
 
-      {/* Row 2: Alerts — clickable, deep-link to filtered views */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
-        <div role="button" tabIndex={0} onClick={() => navigateTo?.('challan')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('challan'); }} style={{ background: alerts.overdue.length > 0 ? 'rgba(239,68,68,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.overdue.length > 0 ? 'rgba(239,68,68,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(239,68,68,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.overdue.length > 0 ? 'rgba(239,68,68,.15)' : T.bd)}>
-          <p style={{ fontSize: 9, color: alerts.overdue.length > 0 ? T.re : T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Overdue Payments</p>
-          <p style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: alerts.overdue.length > 0 ? T.re : T.tx3, margin: 0 }}>{alerts.overdue.length}</p>
-          {alerts.overdue.slice(0, 2).map((o, i) => <p key={i} style={{ fontSize: 10, color: T.tx3, margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}: ₹{o.amount.toLocaleString('en-IN')} ({o.days}d)</p>)}
+      {/* Today's 3 things — hero attention strip (upgraded visual; same data, same handlers) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, marginTop: 4 }}>
+        <div style={{ width: 6, height: 6, borderRadius: 3, background: T.ac, boxShadow: `0 0 12px ${T.ac}` }} />
+        <div style={{ fontFamily: T.sora, fontSize: 12, fontWeight: 600, color: T.tx, letterSpacing: -0.1 }}>Today's 3 things</div>
+        <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${T.bd} 0%, transparent 100%)` }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+        {/* Overdue payments */}
+        <div role="button" tabIndex={0} onClick={() => navigateTo?.('challan')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('challan'); }} style={{ background: alerts.overdue.length > 0 ? 'rgba(248,113,113,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.overdue.length > 0 ? 'rgba(248,113,113,.18)' : T.bd}`, borderLeft: `3px solid ${alerts.overdue.length > 0 ? T.re : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 110 }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(248,113,113,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.overdue.length > 0 ? 'rgba(248,113,113,.18)' : T.bd)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Pill tone={alerts.overdue.length > 0 ? 're' : 'neutral'} dot>Overdue Payments</Pill>
+            <span style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: alerts.overdue.length > 0 ? T.re : T.tx3, lineHeight: 1 }}>{alerts.overdue.length}</span>
+          </div>
+          <div style={{ flex: 1 }}>
+            {alerts.overdue.slice(0, 2).map((o, i) => <p key={i} style={{ fontSize: 10, color: T.tx2, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}: ₹{o.amount.toLocaleString('en-IN')} ({o.days}d)</p>)}
+            {alerts.overdue.length === 0 && <p style={{ fontSize: 10, color: T.tx3, margin: 0 }}>All caught up</p>}
+          </div>
         </div>
-        <div role="button" tabIndex={0} onClick={() => navigateTo?.('inventory')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('inventory'); }} style={{ background: alerts.dryClean.length > 0 ? 'rgba(6,182,212,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.dryClean.length > 0 ? 'rgba(6,182,212,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(6,182,212,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.dryClean.length > 0 ? 'rgba(6,182,212,.15)' : T.bd)}>
-          <p style={{ fontSize: 9, color: '#06b6d4', letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>In Dry Clean</p>
-          <p style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: '#06b6d4', margin: 0 }}>{alerts.dryClean.length}</p>
-          {alerts.dryClean.length > 0 && <p style={{ fontSize: 10, color: T.tx3, margin: '3px 0 0' }}>Avg {Math.round(alerts.dryClean.reduce((s, d) => s + d.days, 0) / alerts.dryClean.length)} days</p>}
+        {/* Dry clean stuck */}
+        <div role="button" tabIndex={0} onClick={() => navigateTo?.('inventory')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('inventory'); }} style={{ background: alerts.dryClean.length > 0 ? 'rgba(56,189,248,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.dryClean.length > 0 ? 'rgba(56,189,248,.18)' : T.bd}`, borderLeft: `3px solid ${alerts.dryClean.length > 0 ? T.bl : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 110 }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(56,189,248,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.dryClean.length > 0 ? 'rgba(56,189,248,.18)' : T.bd)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Pill tone={alerts.dryClean.length > 0 ? 'bl' : 'neutral'} dot>In Dry Clean</Pill>
+            <span style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: alerts.dryClean.length > 0 ? T.bl : T.tx3, lineHeight: 1 }}>{alerts.dryClean.length}</span>
+          </div>
+          <div style={{ flex: 1 }}>
+            {alerts.dryClean.length > 0 ? <p style={{ fontSize: 10, color: T.tx2, margin: 0 }}>Avg {Math.round(alerts.dryClean.reduce((s, d) => s + d.days, 0) / alerts.dryClean.length)} days at vendor</p> : <p style={{ fontSize: 10, color: T.tx3, margin: 0 }}>Nothing stuck</p>}
+          </div>
         </div>
-        <div role="button" tabIndex={0} onClick={() => navigateTo?.('challan')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('challan'); }} style={{ background: alerts.pendingHandovers.length > 0 ? 'rgba(245,158,11,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.pendingHandovers.length > 0 ? 'rgba(245,158,11,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(245,158,11,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.pendingHandovers.length > 0 ? 'rgba(245,158,11,.15)' : T.bd)}>
-          <p style={{ fontSize: 9, color: T.yl, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Pending Handovers</p>
-          <p style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: alerts.pendingHandovers.length > 0 ? T.yl : T.tx3, margin: 0 }}>{alerts.pendingHandovers.length}</p>
-          {alerts.pendingHandovers.slice(0, 3).map(h => (
-            <p key={h.number} style={{ fontSize: 9, color: T.tx3, margin: '3px 0 0' }}>HO-{String(h.number).padStart(4, '0')} from {h.from} — ₹{h.amount.toLocaleString('en-IN')}{h.ageDays > 0 ? `, ${h.ageDays}d ago` : ''}{h.ageDays >= 1 ? ' ⚠' : ''}</p>
-          ))}
-          {alerts.disputedCount > 0 && <p style={{ fontSize: 9, color: T.re, margin: '4px 0 0', fontWeight: 600 }}>{alerts.disputedCount} rejected — needs attention</p>}
+        {/* Pending handovers */}
+        <div role="button" tabIndex={0} onClick={() => navigateTo?.('challan')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('challan'); }} style={{ background: alerts.pendingHandovers.length > 0 ? 'rgba(251,191,36,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.pendingHandovers.length > 0 ? 'rgba(251,191,36,.18)' : T.bd}`, borderLeft: `3px solid ${alerts.pendingHandovers.length > 0 ? T.yl : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 110 }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(251,191,36,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.pendingHandovers.length > 0 ? 'rgba(251,191,36,.18)' : T.bd)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Pill tone={alerts.pendingHandovers.length > 0 ? 'yl' : 'neutral'} dot>Pending Handovers</Pill>
+            <span style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: alerts.pendingHandovers.length > 0 ? T.yl : T.tx3, lineHeight: 1 }}>{alerts.pendingHandovers.length}</span>
+          </div>
+          <div style={{ flex: 1 }}>
+            {alerts.pendingHandovers.slice(0, 2).map(h => (
+              <p key={h.number} style={{ fontSize: 9, color: T.tx2, margin: '0 0 2px' }}>HO-{String(h.number).padStart(4, '0')} from {h.from} — ₹{h.amount.toLocaleString('en-IN')}{h.ageDays > 0 ? `, ${h.ageDays}d ago` : ''}{h.ageDays >= 1 ? ' ⚠' : ''}</p>
+            ))}
+            {alerts.pendingHandovers.length === 0 && <p style={{ fontSize: 10, color: T.tx3, margin: 0 }}>None awaiting</p>}
+            {alerts.disputedCount > 0 && <p style={{ fontSize: 9, color: T.re, margin: '4px 0 0', fontWeight: 600 }}>{alerts.disputedCount} rejected — needs attention</p>}
+          </div>
         </div>
       </div>
 

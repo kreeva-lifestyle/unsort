@@ -25,17 +25,20 @@ export default function Sidebar({ activeTab, setActiveTab, profile }: { activeTa
       {/* Sidebar ambient glow */}
       <div style={{ position: 'absolute', top: -30, left: -20, width: 160, height: 160, background: `radial-gradient(circle, ${T.ac}10 0%, transparent 70%)`, pointerEvents: 'none', zIndex: 0 }} />
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <div style={{ padding: '14px 14px 11px', borderBottom: `1px solid ${T.bd}` }}>
-        <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'subtlePulse 4s ease-in-out infinite' }}>DailyOffice</div>
-        <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2.5, textTransform: 'uppercase' as const, marginTop: 2 }}>Your Workspace, Simplified</div>
+      <div style={{ padding: '14px 14px 11px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 30, height: 30, borderRadius: 8, background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.sora, fontWeight: 800, fontSize: 15, color: '#fff', boxShadow: `0 4px 14px ${T.ac}33`, flexShrink: 0 }}>D</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.3, color: T.tx }}>DailyOffice</div>
+          <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2, textTransform: 'uppercase' as const, marginTop: 1 }}>Your Workspace</div>
+        </div>
       </div>
-      <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2, textTransform: 'uppercase' as const, padding: '12px 14px 5px', fontWeight: 600 }}>Menu</div>
+      <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 2, textTransform: 'uppercase' as const, padding: '12px 14px 5px', fontWeight: 600 }}>Workspace</div>
       <nav style={{ flex: 1, padding: '2px 8px 8px' }}>
         {tabs.map((t) => (
-          <div key={t.id} onClick={() => setActiveTab(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 10px', margin: '2px 0', cursor: 'pointer', background: activeTab === t.id ? 'rgba(99,102,241,.08)' : 'transparent', color: activeTab === t.id ? T.ac2 : T.tx3, fontSize: 11, fontWeight: activeTab === t.id ? 600 : 400, fontFamily: T.sans, borderRadius: 6, transition: 'all .18s ease', position: 'relative' }}
+          <div key={t.id} onClick={() => setActiveTab(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 10px', margin: '2px 0', cursor: 'pointer', background: activeTab === t.id ? T.ac3 : 'transparent', color: activeTab === t.id ? T.ac2 : T.tx3, fontSize: 11, fontWeight: activeTab === t.id ? 600 : 400, fontFamily: T.sans, borderRadius: 6, transition: 'all .18s ease', position: 'relative' }}
             onMouseEnter={e => { if (activeTab !== t.id) { e.currentTarget.style.background = 'rgba(99,102,241,.04)'; e.currentTarget.style.color = T.tx2; } }}
             onMouseLeave={e => { if (activeTab !== t.id) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx3; } }}>
-            <span style={{ width: 28, height: 28, borderRadius: 7, background: activeTab === t.id ? 'rgba(99,102,241,.12)' : 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s ease' }}><Icon name={t.icon} size={14} /></span>
+            <span style={{ width: 28, height: 28, borderRadius: 7, background: activeTab === t.id ? T.ac3 : 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .18s ease' }}><Icon name={t.icon} size={14} /></span>
             {t.label}
             {activeTab === t.id && <span style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 3, height: 18, borderRadius: '0 3px 3px 0', background: T.ac, boxShadow: `0 0 8px ${T.ac}88`, animation: 'pulseGlow 2s ease-in-out infinite' }} />}
           </div>
