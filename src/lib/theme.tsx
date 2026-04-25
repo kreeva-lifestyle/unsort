@@ -70,10 +70,11 @@ export const S = {
   } as React.CSSProperties,
 
   fInput: {
-    width: '100%', background: 'rgba(255,255,255,0.03)',
-    border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx,
-    fontFamily: T.sans, fontSize: 13, padding: '8px 10px',
+    width: '100%', background: 'rgba(255,255,255,0.04)',
+    border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx,
+    fontFamily: T.sans, fontSize: 13, padding: '9px 12px',
     outline: 'none', transition: T.transition,
+    boxSizing: 'border-box' as const,
   } as React.CSSProperties,
 
   btnPrimary: {
