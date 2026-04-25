@@ -30,22 +30,23 @@ export const T = {
   glass2: 'rgba(255,255,255,0.04)',
 
   // Borders
-  bd:  'rgba(255,255,255,0.05)',
-  bd2: 'rgba(255,255,255,0.08)',
+  bd:  'rgba(255,255,255,0.06)',
+  bd2: 'rgba(255,255,255,0.10)',
 
   // Text
-  tx:  '#E2E8F0',
-  tx2: '#8896B0',
+  tx:  '#E8EEF7',
+  tx2: '#9AA8C2',
   tx3: '#6B7890',  // was #4A5568 — bumped for WCAG contrast (audit P1)
 
   // Accent
   ac:  '#6366F1',
   ac2: '#818CF8',
+  ac3: 'rgba(99,102,241,0.12)',  // active-state tint for nav/tabs
 
   // Semantic
-  gr:  '#22C55E',   // success / complete
-  re:  '#EF4444',   // danger / damaged
-  yl:  '#F59E0B',   // warn / unsorted
+  gr:  '#34D399',   // success / complete
+  re:  '#F87171',   // danger / damaged
+  yl:  '#FBBF24',   // warn / unsorted
   bl:  '#38BDF8',   // info / cash-in-hand
 
   // Shape
@@ -141,6 +142,28 @@ export const S = {
     padding: '10px 12px', fontSize: 13,
     borderBottom: `1px solid ${T.bd}`, color: T.tx2,
   } as React.CSSProperties,
+};
+
+// ─── Pill (status / aging / attention chip) ─────────────────────────────
+// Reusable chip used in dashboard alerts, status badges, ledger aging.
+// Existing inline status badges keep working — Pill is opt-in for new code.
+type PillTone = 'neutral' | 'gr' | 'yl' | 're' | 'bl' | 'ac';
+const PILL_TONES: Record<PillTone, { bg: string; fg: string; bd: string }> = {
+  neutral: { bg: 'rgba(255,255,255,.04)', fg: T.tx2, bd: T.bd },
+  gr:      { bg: 'rgba(52,211,153,.10)',  fg: T.gr,  bd: 'rgba(52,211,153,.25)' },
+  yl:      { bg: 'rgba(251,191,36,.10)',  fg: T.yl,  bd: 'rgba(251,191,36,.25)' },
+  re:      { bg: 'rgba(248,113,113,.10)', fg: T.re,  bd: 'rgba(248,113,113,.25)' },
+  bl:      { bg: 'rgba(56,189,248,.10)',  fg: T.bl,  bd: 'rgba(56,189,248,.25)' },
+  ac:      { bg: T.ac3,                    fg: T.ac2, bd: 'rgba(99,102,241,.25)' },
+};
+export const Pill = ({ tone = 'neutral', dot, children, style }: { tone?: PillTone; dot?: boolean; children: React.ReactNode; style?: React.CSSProperties }) => {
+  const t = PILL_TONES[tone];
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 6, background: t.bg, color: t.fg, border: `1px solid ${t.bd}`, fontSize: 11, fontWeight: 500, fontFamily: T.sans, letterSpacing: '0.01em', whiteSpace: 'nowrap' as const, ...style }}>
+      {dot && <span style={{ width: 6, height: 6, borderRadius: 3, background: t.fg, flexShrink: 0 }} />}
+      {children}
+    </span>
+  );
 };
 
 // ─── Icon (from App.tsx) ────────────────────────────────────────────────
