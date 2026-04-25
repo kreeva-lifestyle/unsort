@@ -32,16 +32,16 @@ export default function ProgramHistory({ programId, t }: Props) {
       <div style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora, marginBottom: 10 }}>{t('history')}</div>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         {entries.map(e => (
-          <div key={e.id} style={{ display: 'flex', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, fontSize: 10 }}>
-            <div style={{ width: 6, height: 6, borderRadius: 3, marginTop: 4, flexShrink: 0, background: ACTION_COLORS[e.action] || T.tx3 }} />
+          <div key={e.id} style={{ display: 'flex', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, fontSize: 10, alignItems: 'flex-start' }}>
+            <div style={{ width: 6, height: 6, borderRadius: 3, marginTop: 5, flexShrink: 0, background: ACTION_COLORS[e.action] || T.tx3, transition: T.transition }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 600, color: T.tx, textTransform: 'capitalize' }}>{e.action.replace('_', ' ')}</span>
-                {e.field_changed && <span style={{ color: T.tx3, fontFamily: T.mono }}>{e.field_changed}</span>}
+                {e.field_changed && <span style={{ color: T.tx2, fontFamily: T.mono, fontWeight: 500 }}>{e.field_changed}</span>}
                 {e.user_email && <span style={{ color: T.tx3 }}>by {e.user_email}</span>}
               </div>
               {e.old_value != null && e.new_value != null && (
-                <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, marginTop: 2 }}>
+                <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 3 }}>
                   <span style={{ color: T.re }}>{String(JSON.stringify(e.old_value))}</span>
                   {' → '}
                   <span style={{ color: T.gr }}>{String(JSON.stringify(e.new_value))}</span>

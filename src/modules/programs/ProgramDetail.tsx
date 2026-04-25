@@ -37,14 +37,14 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
 
   if (loading || !program) return <div style={{ padding: 30, textAlign: 'center', color: T.tx3 }}>{t('loading')}</div>;
 
-  const label: React.CSSProperties = { fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 };
+  const label: React.CSSProperties = { fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 };
   const val: React.CSSProperties = { fontSize: 12, color: T.tx, fontWeight: 500 };
   const imageUrl = program.dropbox_gdrive_link ? toDirectImageUrl(program.dropbox_gdrive_link) : null;
 
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', maxWidth: 800 }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingBottom: 12, borderBottom: `1px solid ${T.bd}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 15, fontWeight: 700, fontFamily: T.sora }}>{program.program_uid}</span>
           {program.selling_sku && <Pill tone="ac">{program.selling_sku}</Pill>}
@@ -95,7 +95,8 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
             padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
             fontSize: 11, fontWeight: tab === id ? 600 : 500, fontFamily: T.sans,
             background: tab === id ? 'rgba(99,102,241,.15)' : 'transparent',
-            color: tab === id ? T.ac2 : T.tx2, transition: T.transition,
+            color: tab === id ? T.ac2 : T.tx3, transition: T.transition,
+            boxShadow: tab === id ? '0 2px 6px rgba(99,102,241,0.2)' : 'none',
           }}>{id === 'price' ? t('priceBreakdown') : t('history')}</button>
         ))}
       </div>

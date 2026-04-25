@@ -38,7 +38,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
   }, [audioBlob, programId, ext, uploading, addToast, t, onUploaded, clear]);
 
   const btnBase: React.CSSProperties = {
-    width: 44, height: 44, borderRadius: 22, border: 'none', cursor: 'pointer',
+    width: 44, height: 44, borderRadius: '50%', border: 'none', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center', transition: T.transition,
   };
 
@@ -65,7 +65,9 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
       {/* Recorder controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         {!recording && !audioUrl && (
-          <button onClick={start} style={{ ...btnBase, background: T.re, color: '#fff' }} title={t('record')}>
+          <button onClick={start} style={{ ...btnBase, background: T.re, color: '#fff', boxShadow: '0 0 12px rgba(248,113,113,.3)' }} title={t('record')}
+            onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 0 20px rgba(248,113,113,.5)')}
+            onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 0 12px rgba(248,113,113,.3)')}>
             <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: '#fff' }}><circle cx="12" cy="12" r="6" /></svg>
           </button>
         )}
@@ -74,7 +76,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
             <button onClick={stop} style={{ ...btnBase, background: T.re, color: '#fff', animation: 'subtlePulse 1.5s ease-in-out infinite' }} title={t('stop')}>
               <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: '#fff' }}><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
             </button>
-            <span style={{ fontFamily: T.mono, fontSize: 14, color: T.re, fontWeight: 600, minWidth: 40 }}>{formatTime(duration)}</span>
+            <span style={{ fontFamily: T.mono, fontSize: 16, color: T.re, fontWeight: 700, minWidth: 44 }}>{formatTime(duration)}</span>
             <span style={{ fontSize: 10, color: T.re, fontWeight: 500 }}>{t('recording')}</span>
           </>
         )}
