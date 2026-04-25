@@ -306,7 +306,14 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
       }
       const { error } = await supabase.from('inventory_items').update(form).eq('id', selected.id);
       if (error) { addToast(friendlyError(error), 'error'); return; }
-      if (form.status === 'unsorted' || form.status === 'damaged' || form.status === 'dry_clean') await updateComponentStatuses(selected.id);
+      if (form.status === 'unsorted' || form.status === 'damaged' || form.status === 'dry_clean') {
+        await updateComponentStatuses(selected.id);
+      } else if (form.status === 'complete' || form.status === 'completed') {
+        // Marking item complete = all components are present. Otherwise the item
+        // shows as completed while still flagging "Missing: X" — contradiction.
+        const { error: cErr } = await supabase.from('item_components').update({ status: 'present' }).eq('inventory_item_id', selected.id);
+        if (cErr) addToast('Status saved but component reset failed: ' + friendlyError(cErr), 'error');
+      }
       savedItemId = selected.id;
       addToast('Updated!', 'success');
     } else {
