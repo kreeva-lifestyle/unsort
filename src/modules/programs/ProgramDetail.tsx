@@ -32,6 +32,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
     setLoading(false);
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [programId]);
 
   if (loading || !program) return <div style={{ padding: 30, textAlign: 'center', color: T.tx3 }}>{t('loading')}</div>;

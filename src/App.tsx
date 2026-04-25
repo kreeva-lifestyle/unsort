@@ -132,12 +132,13 @@ const MainApp = () => {
 export default function App() { return <ErrorBoundary><AuthProvider><AppContent /></AuthProvider></ErrorBoundary>; }
 
 const AppContent = () => {
-  // Public share route — no auth required
+  const auth = useAuth();
+
+  // Public share route — no auth required, rendered before login gate
   const hash = window.location.hash;
   const shareMatch = hash.match(/^#\/share\/program\/([a-f0-9]+)$/);
   if (shareMatch) return <PublicShareView shareToken={shareMatch[1]} />;
 
-  const auth = useAuth();
   if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100vh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}><div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Unsort</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase' }}>LOADING</p></div>;
   if (!auth?.user) return <Login signIn={auth.signIn} />;
   return <NotificationProvider><MainApp /></NotificationProvider>;
