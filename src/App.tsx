@@ -23,6 +23,7 @@ import Login from './pages/Login';
 import SettingsPage from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
+import ProgramsModule, { PublicShareView } from './modules/programs';
 import BarcodeScanner from './components/ui/BarcodeScanner';
 import SidebarComponent from './components/layout/Sidebar';
 import HeaderComponent from './components/layout/Header';
@@ -32,7 +33,7 @@ import { T, Icon } from './lib/theme';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { NotificationProvider, useNotifications } from './hooks/useNotifications';
 
-const VALID_TABS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'settings'];
+const VALID_TABS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'programs', 'settings'];
 const getTabFromHash = () => {
   const h = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   return VALID_TABS.includes(h) ? h : 'dashboard';
@@ -72,7 +73,7 @@ const MainApp = () => {
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', settings: 'Settings' };
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', programs: 'Programs', settings: 'Settings' };
   const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
@@ -119,6 +120,7 @@ const MainApp = () => {
         {mounted.has('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
         {mounted.has('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime active={tab === 'packtime'} /></div>}
         {mounted.has('challan') && <div style={{ display: tab === 'challan' ? 'block' : 'none' }}><CashChallan active={tab === 'challan'} /></div>}
+        {mounted.has('programs') && <div style={{ display: tab === 'programs' ? 'block' : 'none' }}><ProgramsModule /></div>}
         {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage profile={profile} addToast={addToast} /></div>}
       </main>
     </div>
@@ -130,6 +132,11 @@ const MainApp = () => {
 export default function App() { return <ErrorBoundary><AuthProvider><AppContent /></AuthProvider></ErrorBoundary>; }
 
 const AppContent = () => {
+  // Public share route — no auth required
+  const hash = window.location.hash;
+  const shareMatch = hash.match(/^#\/share\/program\/([a-f0-9]+)$/);
+  if (shareMatch) return <PublicShareView shareToken={shareMatch[1]} />;
+
   const auth = useAuth();
   if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100vh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}><div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Unsort</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase' }}>LOADING</p></div>;
   if (!auth?.user) return <Login signIn={auth.signIn} />;
