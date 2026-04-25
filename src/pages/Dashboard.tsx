@@ -8,7 +8,7 @@ import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
 type ChallanRow = { total: number | string; amount_paid: number | string | null; status: string; is_return: boolean; customer_name: string; created_at: string };
 type InventoryRow = { status: string; status_changed_at: string | null };
 type ExpenseRow = { amount: number | string };
-type HandoverRow = { amount: number | string; status: string; date: string };
+type HandoverRow = { handover_number: number; amount: number | string; status: string; date: string; from_user_name: string; created_at: string };
 type BalanceRow = { opening_balance: number | string };
 type OverdueAlert = { name: string; amount: number; days: number };
 type DryCleanAlert = { days: number };
@@ -19,7 +19,8 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const [pulse, setPulse] = useState({ scans: 0, revenue: 0, unsorted: 0, cashInHand: 0 });
-  const [alerts, setAlerts] = useState<{ overdue: OverdueAlert[]; dryClean: DryCleanAlert[]; pendingHandovers: number }>({ overdue: [], dryClean: [], pendingHandovers: 0 });
+  type PendingHandover = { number: number; from: string; amount: number; ageDays: number };
+  const [alerts, setAlerts] = useState<{ overdue: OverdueAlert[]; dryClean: DryCleanAlert[]; pendingHandovers: PendingHandover[]; disputedCount: number }>({ overdue: [], dryClean: [], pendingHandovers: [], disputedCount: 0 });
   const [invBreakdown, setInvBreakdown] = useState<Record<string, number>>({});
   const [topCustomers, setTopCustomers] = useState<{ name: string; outstanding: number }[]>([]);
   const [scanTrend, setScanTrend] = useState<{ date: string; count: number }[]>([]);
@@ -35,7 +36,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
       supabase.from('cash_challans').select('total, amount_paid, status, is_return, customer_name, created_at').neq('status', 'voided').neq('status', 'draft'),
       supabase.from('inventory_items').select('status, status_changed_at'),
       supabase.from('cash_expenses').select('amount').gte('date', today.toISOString().slice(0,10)),
-      supabase.from('cash_handovers').select('amount, status, date'),
+      supabase.from('cash_handovers').select('handover_number, amount, status, date, from_user_name, created_at'),
       supabase.from('cash_book_balances').select('opening_balance').eq('date', today.toISOString().slice(0,10)).maybeSingle(),
     ]);
     const challans = (challansRes.data ?? []) as ChallanRow[];
@@ -61,8 +62,12 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     const overdue: OverdueAlert[] = challans.filter(c => !c.is_return && (c.status === 'unpaid' || c.status === 'partial') && new Date(c.created_at).getTime() < sevenDaysAgo)
       .map(c => ({ name: c.customer_name, amount: Number(c.total) - Number(c.amount_paid || 0), days: Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) }));
     const dryClean: DryCleanAlert[] = items.filter(i => i.status === 'dry_clean').map(i => ({ days: Math.floor((Date.now() - new Date(i.status_changed_at || Date.now()).getTime()) / 86400000) }));
-    const pendHand = handovers.filter(h => h.status === 'pending').length;
-    setAlerts({ overdue, dryClean, pendingHandovers: pendHand });
+    const pendHand: PendingHandover[] = handovers.filter(h => h.status === 'pending').map(h => ({
+      number: h.handover_number, from: h.from_user_name, amount: Number(h.amount),
+      ageDays: Math.floor((Date.now() - new Date(h.created_at || Date.now()).getTime()) / 86400000),
+    }));
+    const disputedCount = handovers.filter(h => h.status === 'disputed').length;
+    setAlerts({ overdue, dryClean, pendingHandovers: pendHand, disputedCount });
 
     // Inventory breakdown
     const breakdown: Record<string, number> = {};
@@ -180,9 +185,13 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
           <p style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: '#06b6d4', margin: 0 }}>{alerts.dryClean.length}</p>
           {alerts.dryClean.length > 0 && <p style={{ fontSize: 10, color: T.tx3, margin: '3px 0 0' }}>Avg {Math.round(alerts.dryClean.reduce((s, d) => s + d.days, 0) / alerts.dryClean.length)} days</p>}
         </div>
-        <div role="button" tabIndex={0} onClick={() => navigateTo?.('challan')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('challan'); }} style={{ background: alerts.pendingHandovers > 0 ? 'rgba(245,158,11,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.pendingHandovers > 0 ? 'rgba(245,158,11,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(245,158,11,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.pendingHandovers > 0 ? 'rgba(245,158,11,.15)' : T.bd)}>
+        <div role="button" tabIndex={0} onClick={() => navigateTo?.('challan')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('challan'); }} style={{ background: alerts.pendingHandovers.length > 0 ? 'rgba(245,158,11,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.pendingHandovers.length > 0 ? 'rgba(245,158,11,.15)' : T.bd}`, borderRadius: 10, padding: '10px 12px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(245,158,11,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.pendingHandovers.length > 0 ? 'rgba(245,158,11,.15)' : T.bd)}>
           <p style={{ fontSize: 9, color: T.yl, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Pending Handovers</p>
-          <p style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: alerts.pendingHandovers > 0 ? T.yl : T.tx3, margin: 0 }}>{alerts.pendingHandovers}</p>
+          <p style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: alerts.pendingHandovers.length > 0 ? T.yl : T.tx3, margin: 0 }}>{alerts.pendingHandovers.length}</p>
+          {alerts.pendingHandovers.slice(0, 3).map(h => (
+            <p key={h.number} style={{ fontSize: 9, color: T.tx3, margin: '3px 0 0' }}>HO-{String(h.number).padStart(4, '0')} from {h.from} — ₹{h.amount.toLocaleString('en-IN')}{h.ageDays > 0 ? `, ${h.ageDays}d ago` : ''}{h.ageDays >= 1 ? ' ⚠' : ''}</p>
+          ))}
+          {alerts.disputedCount > 0 && <p style={{ fontSize: 9, color: T.re, margin: '4px 0 0', fontWeight: 600 }}>{alerts.disputedCount} rejected — needs attention</p>}
         </div>
       </div>
 

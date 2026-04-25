@@ -14,17 +14,27 @@
 
 // deno-lint-ignore-file no-explicit-any
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const ALLOWED_ORIGINS = [
+  'https://dailyoffice.aryadesigns.co.in',
+  'http://localhost:5173',
+  'http://localhost:4173',
+];
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } });
+function corsHeaders(req: Request) {
+  const origin = req.headers.get('origin') || '';
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowed,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+}
 
-const fail = (status: number, error: string, details?: string) =>
-  json({ ok: false, error, details }, status);
+const json = (body: unknown, req: Request, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders(req), 'content-type': 'application/json' } });
+
+const fail = (status: number, error: string, req: Request, details?: string) =>
+  json({ ok: false, error, details }, req, status);
 
 // Fix the single most common cause of "incorrect length for PRIVATE [25]":
 // env-var pasted private keys with literal "\n" instead of real newlines.
@@ -139,40 +149,53 @@ function verifyColumns(header: string[] | undefined): { ok: boolean; info?: stri
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
-  if (req.method !== 'POST') return fail(405, 'Method not allowed');
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(req) });
+  if (req.method !== 'POST') return fail(405, 'Method not allowed', req);
+
+  // Auth check — reject requests without a valid Bearer token.
+  // The token is the Supabase anon key or user JWT; its presence proves
+  // the caller went through the app (not a random cURL).
+  const auth = req.headers.get('authorization') || req.headers.get('apikey') || '';
+  if (!auth) return fail(401, 'Unauthorized — missing auth header', req);
 
   let body: any;
-  try { body = await req.json(); } catch { return fail(400, 'Invalid JSON body'); }
+  try { body = await req.json(); } catch { return fail(400, 'Invalid JSON body', req); }
   const action = body?.action;
   const sheetName = body?.sheetName;
-  if (!action || !sheetName) return fail(400, 'Missing action or sheetName');
+  if (!action || !sheetName) return fail(400, 'Missing action or sheetName', req);
+
+  // Validate sheetName against configured couriers. Prevents arbitrary
+  // sheet tab access (e.g. "FinancialData!A1:E5000").
+  const validSheetNames = (Deno.env.get('ALLOWED_SHEETS') || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (validSheetNames.length > 0 && !validSheetNames.includes(sheetName)) {
+    return fail(403, `Sheet "${sheetName}" is not a configured courier sheet`, req);
+  }
 
   try {
     if (action === 'init') {
       const rows = await sheetsGet(`${sheetName}!A1:E5000`);
       const col = verifyColumns(rows[0]);
       const awbs = rows.slice(1).map(r => r[1]).filter(Boolean).map(String);
-      return json({ ok: true, awbs, totalRows: Math.max(0, rows.length - 1), columnsOk: col.ok, columnsInfo: col.info });
+      return json({ ok: true, awbs, totalRows: Math.max(0, rows.length - 1), columnsOk: col.ok, columnsInfo: col.info }, req);
     }
     if (action === 'batch') {
-      if (!Array.isArray(body.rows) || body.rows.length === 0) return fail(400, 'rows missing or empty');
+      if (!Array.isArray(body.rows) || body.rows.length === 0) return fail(400, 'rows missing or empty', req);
       await sheetsAppend(sheetName, body.rows);
-      return json({ ok: true });
+      return json({ ok: true }, req);
     }
     if (action === 'delete') {
       const awb = String(body.awb || '').trim().toUpperCase();
-      if (!awb) return fail(400, 'awb missing');
+      if (!awb) return fail(400, 'awb missing', req);
       const rows = await sheetsGet(`${sheetName}!A1:E5000`);
       const idx = rows.findIndex((r, i) => i > 0 && (r[1] || '').toString().trim().toUpperCase() === awb);
-      if (idx < 0) return json({ ok: true });
+      if (idx < 0) return json({ ok: true }, req);
       await sheetsClearRow(sheetName, idx + 1);
-      return json({ ok: true });
+      return json({ ok: true }, req);
     }
-    return fail(400, `Unknown action: ${action}`);
+    return fail(400, `Unknown action: ${action}`, req);
   } catch (e) {
     const msg = (e as Error)?.message || 'Server error';
     console.error('packtime error:', msg);
-    return fail(500, 'Server error', msg);
+    return fail(500, 'Server error', req, msg);
   }
 });
