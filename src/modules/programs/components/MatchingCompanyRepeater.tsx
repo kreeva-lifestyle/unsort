@@ -24,10 +24,10 @@ export default function MatchingCompanyRepeater({ rows, onChange, t }: Props) {
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 6, marginBottom: 6 }}>
           <input value={r.company_name} onChange={e => update(i, 'company_name', e.target.value)}
             placeholder={t('companyName')}
-            style={{ ...S.fInput, fontSize: 11, padding: '6px 8px' }} />
+            style={{ ...S.fInput, fontSize: 11 }} />
           <input value={r.matching_label} onChange={e => update(i, 'matching_label', e.target.value)}
             placeholder={t('matchingLabelField')}
-            style={{ ...S.fInput, fontSize: 11, padding: '6px 8px' }} />
+            style={{ ...S.fInput, fontSize: 11 }} />
           <button type="button" onClick={() => remove(i)}
             style={{ ...S.btnDanger, ...S.btnSm, fontSize: 10, padding: '4px 8px', cursor: 'pointer', alignSelf: 'center' }}>×</button>
         </div>

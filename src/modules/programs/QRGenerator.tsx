@@ -82,10 +82,10 @@ export default function QRGenerator({ program, onClose, t }: Props) {
           <div style={{ padding: 40, color: T.tx3, fontSize: 11 }}>{t('loading')}</div>
         ) : (
           <>
-            <canvas ref={canvasRef} style={{ borderRadius: 8, border: `1px solid ${T.bd}` }} />
+            <canvas ref={canvasRef} style={{ borderRadius: 8, border: `1px solid ${T.bd2}` }} />
 
             {shareUrl && (
-              <div style={{ marginTop: 12, padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 6, wordBreak: 'break-all', fontSize: 9, color: T.tx3, fontFamily: T.mono }}>
+              <div style={{ marginTop: 12, padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 6, wordBreak: 'break-all', fontSize: 10, color: T.tx2, fontFamily: T.mono, userSelect: 'all', cursor: 'text' }}>
                 {shareUrl}
               </div>
             )}

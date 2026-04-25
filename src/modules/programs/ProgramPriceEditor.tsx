@@ -58,8 +58,8 @@ export default function ProgramPriceEditor({ programId, t }: Props) {
     addToast(t('pricesSaved'), 'success');
   };
 
-  const th: React.CSSProperties = { ...S.thStyle, padding: '6px 8px', fontSize: 8 };
-  const tdCell: React.CSSProperties = { padding: '4px 4px', borderBottom: `1px solid ${T.bd}` };
+  const th: React.CSSProperties = { ...S.thStyle, padding: '8px 10px', fontSize: 9 };
+  const tdCell: React.CSSProperties = { padding: '6px 6px', borderBottom: `1px solid ${T.bd}` };
   const numInput: React.CSSProperties = {
     width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`,
     borderRadius: 4, color: T.tx, fontFamily: T.mono, fontSize: 11, padding: '5px 6px',
@@ -106,7 +106,7 @@ export default function ProgramPriceEditor({ programId, t }: Props) {
                 <td style={tdCell}><input type="number" value={p.fabric_meter || ''} onChange={e => updatePart(i, 'fabric_meter', Number(e.target.value))} style={numInput} /></td>
                 <td style={tdCell}>
                   {parts.length > 1 && (
-                    <button onClick={() => removePart(i)} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 2 }}>×</button>
+                    <button onClick={() => removePart(i)} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(248,113,113,.1)')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>×</button>
                   )}
                 </td>
               </tr>
