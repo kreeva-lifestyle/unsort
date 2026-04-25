@@ -37,7 +37,8 @@ export default function QRGenerator({ program, onClose, t }: Props) {
   const renderQR = async (text: string) => {
     if (!canvasRef.current) return;
     try {
-      const QRCode = await import('qrcode');
+      const mod = await import('qrcode');
+      const QRCode = mod.default || mod;
       await QRCode.toCanvas(canvasRef.current, text, {
         width: 220, margin: 2, color: { dark: '#E8EEF7', light: '#060810' },
       });
