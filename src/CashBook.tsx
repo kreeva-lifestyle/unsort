@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase';
 import { friendlyError } from './lib/friendlyError';
 import { useDebouncedFetch } from './hooks/useDebouncedFetch';
 import { useNotifications } from './hooks/useNotifications';
+import Empty from './components/ui/Empty';
 
 import { T } from './lib/theme';
 import type {
@@ -548,7 +549,7 @@ export default function CashBook() {
       {tab === 'expenses' && <>
         <button onClick={() => setShowAdd(true)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>+ Add Expense</button>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-          {expenses.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No expenses in this range.</div>}
+          {expenses.length === 0 && <div style={{ padding: 14 }}><Empty icon="📋" title="No expenses" message="No expenses recorded in this date range." /></div>}
           {expenses.map(e => (
             <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ flex: 1 }}>
@@ -576,7 +577,7 @@ export default function CashBook() {
       {/* Sales Tab */}
       {tab === 'sales' && (
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-          {sales.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No cash sales in this range.</div>}
+          {sales.length === 0 && <div style={{ padding: 14 }}><Empty icon="🧾" title="No cash sales" message="No cash-paid challans in this date range." /></div>}
           {sales.map(s => (
             <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ flex: 1 }}>
@@ -601,7 +602,7 @@ export default function CashBook() {
           <div style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', color: T.tx2, fontSize: 10, marginBottom: 10 }}>Admins receive handovers — users initiate them. Review pending handovers below.</div>
         )}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-          {handovers.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No handovers in this range.</div>}
+          {handovers.length === 0 && <div style={{ padding: 14 }}><Empty icon="🤝" title="No handovers" message="No cash handovers recorded in this date range." /></div>}
           {handovers.map(h => (
             <div key={h.id} style={{ padding: '11px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>

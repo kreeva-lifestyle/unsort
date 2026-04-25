@@ -33,10 +33,11 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 2px rgba(99,102,241,0.08);
 }
 
-:focus-visible { outline: 2px solid var(--do-ac, #6366F1); outline-offset: 2px; border-radius: 4px; }
-button:focus-visible, [role="button"]:focus-visible, [onclick]:focus-visible { outline: 2px solid var(--do-ac, #6366F1); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--do-ac, #6366F1); outline-offset: 1px; border-radius: 4px; }
+button:focus-visible, [role="button"]:focus-visible, [onclick]:focus-visible { outline: 2px solid var(--do-ac, #6366F1); outline-offset: 1px; }
 
-select option { background: #0B0F19; color: #E2E8F0; padding: 8px 10px; }
+select:focus, select:focus-visible { border-color: rgba(99,102,241,0.5) !important; box-shadow: 0 0 0 2px rgba(99,102,241,0.08); outline: none; }
+select option { background: #0B0F19; color: #E8EEF7; padding: 8px 10px; }
 input::placeholder, textarea::placeholder { color: #6B7890; opacity: 1; }
 
 /* Date/time picker calendar icon — tinted to match accent on dark theme */
@@ -98,7 +99,7 @@ tbody tr:hover { background: rgba(99,102,241,0.03); }
 
 .notif-dropdown { animation: slideDown .15s ease; }
 .modal-inner { animation: modalBoxEnter .25s cubic-bezier(.16,1,.3,1) both; }
-.spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.06); border-top-color: #6366F1; border-radius: 50%; animation: btnSpin .6s linear infinite; }
+.spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.06); border-top-color: #6366F1; border-radius: 50%; animation: btnSpin .6s linear infinite; box-shadow: 0 0 8px rgba(99,102,241,0.3); }
 tr { transition: background 150ms ease; }
 body.modal-open { overflow: hidden !important; }
 
