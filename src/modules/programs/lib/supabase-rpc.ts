@@ -48,9 +48,9 @@ export async function upsertProgram(form: ProgramFormData, id?: string, expected
     p_id: id || null,
     p_selling_sku: form.selling_sku || null,
     p_manufacturing_sku: form.manufacturing_sku || null,
-    p_matching: form.matching || null,
+    p_matching: null,
     p_dropbox_gdrive_link: form.dropbox_gdrive_link || null,
-    p_matchings: JSON.stringify(form.matchings),
+    p_matchings: form.matchings,
     p_expected_updated_at: expectedUpdatedAt || null,
   });
   return { result: data as { ok: boolean; id?: string; error?: string; updated_at?: string } | null, error };
@@ -60,7 +60,7 @@ export async function upsertProgram(form: ProgramFormData, id?: string, expected
 export async function upsertProgramPrice(programId: string, parts: PricePartRow[]) {
   const { data, error } = await supabase.rpc('upsert_program_price', {
     p_program_id: programId,
-    p_parts: JSON.stringify(parts.map((p, i) => ({ ...p, sort_order: i }))),
+    p_parts: parts.map((p, i) => ({ ...p, sort_order: i })),
   });
   return { result: data as { ok: boolean; price_id?: string } | null, error };
 }

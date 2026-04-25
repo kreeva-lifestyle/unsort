@@ -42,13 +42,6 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
           </div>
           {isSkuError && <div style={{ ...S.errorBox, marginBottom: 10 }}>{t('skuRequired')}</div>}
 
-          {/* Matching */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={S.fLabel}>{t('matchingLabel')}</label>
-            <input value={form.matching} onChange={e => setField('matching', e.target.value)}
-              placeholder={t('matchingLabel')} style={{ ...S.fInput, fontSize: 11 }} />
-          </div>
-
           {/* Companies repeater */}
           <MatchingCompanyRepeater rows={form.matchings} onChange={v => setField('matchings', v)} t={t} />
 

@@ -58,10 +58,9 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       </div>
 
       {/* Info grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
         <div><div style={label}>{t('sellingSkuLabel')}</div><div style={{ ...val, fontFamily: T.mono }}>{program.selling_sku || '—'}</div></div>
         <div><div style={label}>{t('manufacturingSkuLabel')}</div><div style={{ ...val, fontFamily: T.mono }}>{program.manufacturing_sku || '—'}</div></div>
-        <div><div style={label}>{t('matchingLabel')}</div><div style={val}>{program.matching || '—'}</div></div>
       </div>
 
       {/* Image preview */}
