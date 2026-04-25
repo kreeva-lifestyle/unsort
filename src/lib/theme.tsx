@@ -130,16 +130,16 @@ export const S = {
   } as React.CSSProperties,
 
   thStyle: {
-    fontSize: 10, color: T.tx3, padding: '10px 12px',
+    fontSize: 10, color: T.tx3, padding: '11px 14px',
     textAlign: 'left' as const, fontWeight: 600,
     borderBottom: `1px solid ${T.bd}`,
     background: 'rgba(255,255,255,0.015)',
-    textTransform: 'uppercase' as const, letterSpacing: '0.08em',
+    textTransform: 'uppercase' as const, letterSpacing: '0.1em',
     whiteSpace: 'nowrap' as const,
   } as React.CSSProperties,
 
   tdStyle: {
-    padding: '10px 12px', fontSize: 13,
+    padding: '11px 14px', fontSize: 13,
     borderBottom: `1px solid ${T.bd}`, color: T.tx2,
   } as React.CSSProperties,
 };

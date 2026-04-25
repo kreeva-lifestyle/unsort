@@ -148,12 +148,12 @@ export default function ChallanForm(p: ChallanFormProps) {
           </div>
 
           {/* Line Items */}
-          <div data-items style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 8, marginBottom: 12, overflow: 'hidden' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 90px 24px', gap: 4, padding: '6px 8px', borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
-              <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>SKU</span>
-              <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, textAlign: 'center' as const }}>Qty</span>
-              <span style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, textAlign: 'right' as const }}>Price</span>
-              <span title="Per-item discount: ₹ flat or % of line total" style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, textAlign: 'right' as const, cursor: 'help' }}>Discount</span>
+          <div data-items style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 9, marginBottom: 12, overflow: 'hidden' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 56px 80px 100px 28px', gap: 6, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, background: T.glass1 }}>
+              <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600 }}>SKU</span>
+              <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600, textAlign: 'center' as const }}>Qty</span>
+              <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600, textAlign: 'right' as const }}>Price</span>
+              <span title="Per-item discount: ₹ flat or % of line total" style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600, textAlign: 'right' as const, cursor: 'help' }}>Discount</span>
               <span></span>
             </div>
             {p.items.map((it, i) => {
@@ -174,7 +174,7 @@ export default function ChallanForm(p: ChallanFormProps) {
               const okBorder = `1px solid ${T.bd}`;
               return (
               <div key={i}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 70px 90px 24px', gap: 4, padding: '5px 8px', borderBottom: err ? 'none' : `1px solid ${T.bd}`, alignItems: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 56px 80px 100px 28px', gap: 6, padding: '7px 12px', borderBottom: err ? 'none' : `1px solid ${T.bd}`, alignItems: 'center' }}>
                   <input data-sku value={it.sku} onChange={e => { const n = [...p.items]; n[i].sku = e.target.value; p.setItems(n); }} placeholder="SKU / Item name" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
                   <input type="number" value={it.quantity || ''} onChange={e => { const n = [...p.items]; n[i].quantity = Number(e.target.value); p.setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: qtyBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'center' as const }} />
                   <input type="number" value={it.price || ''} onChange={e => { const n = [...p.items]; n[i].price = Number(e.target.value); p.setItems(n); }} placeholder="0" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: priceBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
