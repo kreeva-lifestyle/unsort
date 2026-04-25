@@ -98,21 +98,22 @@ export const S = {
   } as React.CSSProperties,
 
   btnDanger: {
-    padding: '5px 11px', borderRadius: 6,
-    border: '1px solid rgba(239,68,68,0.18)',
-    cursor: 'pointer', fontSize: 11, fontWeight: 500, fontFamily: T.sans,
-    background: 'rgba(239,68,68,0.08)', color: '#FCA5A5',
+    padding: '6px 13px', borderRadius: 6,
+    border: '1px solid rgba(248,113,113,0.20)',
+    cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: T.sans,
+    background: 'rgba(248,113,113,0.08)', color: T.re,
+    display: 'inline-flex', alignItems: 'center', gap: 5,
     transition: T.transition,
     whiteSpace: 'nowrap' as const,
   } as React.CSSProperties,
 
-  btnSm: { padding: '3px 8px', fontSize: 11 } as React.CSSProperties,
+  btnSm: { padding: '4px 10px', fontSize: 10, borderRadius: 5 } as React.CSSProperties,
 
   modalOverlay: {
     position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,.80)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    zIndex: 200, backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)', padding: 8,
+    zIndex: 200, backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)', padding: 8,
   } as React.CSSProperties,
 
   modalBox: {
@@ -125,8 +126,27 @@ export const S = {
   } as React.CSSProperties,
 
   modalHead: {
-    padding: '13px 18px', borderBottom: `1px solid ${T.bd}`,
+    padding: '16px 18px', borderBottom: `1px solid ${T.bd}`,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  } as React.CSSProperties,
+
+  modalTitle: {
+    fontFamily: T.sora, fontSize: 14, fontWeight: 700, color: T.tx, margin: 0,
+  } as React.CSSProperties,
+
+  errorBox: {
+    background: 'rgba(248,113,113,.08)', border: '1px solid rgba(248,113,113,.2)',
+    borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re,
+  } as React.CSSProperties,
+
+  successBox: {
+    background: 'rgba(52,211,153,.08)', border: '1px solid rgba(52,211,153,.2)',
+    borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.gr,
+  } as React.CSSProperties,
+
+  warningBox: {
+    background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)',
+    borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl,
   } as React.CSSProperties,
 
   thStyle: {
