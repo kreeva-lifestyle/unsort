@@ -66,7 +66,6 @@ export interface ProgramUserPreference {
 export interface ProgramFormData {
   selling_sku: string;
   manufacturing_sku: string;
-  matching: string;
   dropbox_gdrive_link: string;
   matchings: { company_name: string; matching_label: string }[];
 }

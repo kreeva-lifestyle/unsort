@@ -97,7 +97,6 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
                 <th style={th}>{t('programUid')}</th>
                 <th style={th}>{t('sellingSku')}</th>
                 <th style={th}>{t('manufacturingSku')}</th>
-                <th style={th}>{t('matching')}</th>
                 <th style={th}>{t('companies')}</th>
                 <th style={th}>{t('updatedAt')}</th>
                 <th style={th}>{t('actions')}</th>
@@ -111,7 +110,6 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
                   <td style={{ ...td, fontFamily: T.mono, color: T.ac2, fontWeight: 600, cursor: 'pointer' }} onClick={() => onView(p)}>{p.program_uid}</td>
                   <td style={{ ...td, fontFamily: T.mono }}>{p.selling_sku || '—'}</td>
                   <td style={{ ...td, fontFamily: T.mono }}>{p.manufacturing_sku || '—'}</td>
-                  <td style={td}>{p.matching || '—'}</td>
                   <td style={td}>
                     {matchingCounts[p.id] ? <Pill tone="ac">{matchingCounts[p.id]}</Pill> : <span style={{ color: T.tx3 }}>—</span>}
                   </td>

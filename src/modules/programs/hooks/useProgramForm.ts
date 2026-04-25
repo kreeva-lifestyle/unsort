@@ -4,7 +4,7 @@ import { upsertProgram } from '../lib/supabase-rpc';
 import type { ProgramFormData, Program } from '../types';
 
 const EMPTY_FORM: ProgramFormData = {
-  selling_sku: '', manufacturing_sku: '', matching: '',
+  selling_sku: '', manufacturing_sku: '',
   dropbox_gdrive_link: '', matchings: [],
 };
 
@@ -20,7 +20,6 @@ export function useProgramForm(onSuccess: () => void) {
       setForm({
         selling_sku: program.selling_sku || '',
         manufacturing_sku: program.manufacturing_sku || '',
-        matching: program.matching || '',
         dropbox_gdrive_link: program.dropbox_gdrive_link || '',
         matchings: matchings || [],
       });
