@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Sidebar nav</title><link rel="stylesheet" href="_card.css"></head>
+<body style="padding:0">
+  <div style="display:flex;height:300px">
+    <!-- Sidebar -->
+    <div style="width:220px;height:100%;background:rgba(8,11,20,.85);backdrop-filter:blur(36px);border-right:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-30px;left:-20px;width:160px;height:160px;background:radial-gradient(circle,rgba(99,102,241,.10) 0%,transparent 70%);pointer-events:none"></div>
+      <div style="position:relative;padding:14px 14px 11px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="font-size:16px;font-weight:700;font-family:Sora;letter-spacing:-0.5px;background:linear-gradient(135deg,#6366F1,#818CF8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">DailyOffice</div>
+        <div style="font-size:8px;color:#4A5568;letter-spacing:2.5px;text-transform:uppercase;margin-top:2px">Your Workspace, Simplified</div>
+      </div>
+      <div style="font-size:8px;color:#4A5568;letter-spacing:2px;text-transform:uppercase;padding:12px 14px 5px;font-weight:600">Menu</div>
+      <nav style="flex:1;padding:2px 8px 8px;position:relative">
+        <!-- active -->
+        <div style="display:flex;align-items:center;gap:9px;padding:6px 10px;margin:2px 0;background:rgba(99,102,241,.08);color:#818CF8;font-size:11px;font-weight:600;font-family:Inter;border-radius:6px;position:relative">
+          <span style="position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:18px;border-radius:0 3px 3px 0;background:#6366F1;box-shadow:0 0 8px rgba(99,102,241,.55)"></span>
+          <span style="width:28px;height:28px;border-radius:7px;background:rgba(99,102,241,.12);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></span>Dashboard
+        </div>
+        <!-- inactive -->
+        <div style="display:flex;align-items:center;gap:9px;padding:6px 10px;margin:2px 0;color:#4A5568;font-size:11px;font-family:Inter;border-radius:6px"><span style="width:28px;height:28px;border-radius:7px;background:rgba(255,255,255,.03);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8zM3 8l9 5M12 22V13M21 8l-9 5"/></svg></span>Inventory</div>
+        <div style="display:flex;align-items:center;gap:9px;padding:6px 10px;margin:2px 0;color:#4A5568;font-size:11px;font-family:Inter;border-radius:6px"><span style="width:28px;height:28px;border-radius:7px;background:rgba(255,255,255,.03);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82zM7 7h.01"/></svg></span>Brand Tags</div>
+        <!-- hover -->
+        <div style="display:flex;align-items:center;gap:9px;padding:6px 10px;margin:2px 0;color:#8896B0;font-size:11px;font-family:Inter;border-radius:6px;background:rgba(99,102,241,.04)"><span style="width:28px;height:28px;border-radius:7px;background:rgba(255,255,255,.03);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M8 12h8"/></svg></span>PackStation</div>
+      </nav>
+    </div>
+    <div style="flex:1;display:flex;align-items:flex-start;justify-content:center;padding:16px;color:#4A5568;font-size:10px;text-transform:uppercase;letter-spacing:.1em">↑ active · inactive · hover</div>
+  </div>
+</body></html>

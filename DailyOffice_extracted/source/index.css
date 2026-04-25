@@ -1,0 +1,114 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { overflow-y: scroll; overflow-x: hidden; }
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background-color: #060810;
+  color: #E2E8F0;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#root { min-height: 100vh; width: 100%; overflow-x: hidden; }
+
+::selection { background: rgba(99,102,241,0.25); color: #E2E8F0; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: rgba(99,102,241,0.35) !important;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.08);
+}
+
+:focus-visible { outline: 1.5px solid rgba(99,102,241,0.50); outline-offset: 2px; border-radius: 4px; }
+
+select option { background: #0B0F19; color: #E2E8F0; padding: 8px 10px; }
+input::placeholder, textarea::placeholder { color: #4A5568; opacity: 1; }
+
+/* Date/time picker calendar icon — invert to be visible on dark theme */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="week"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.55;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  transition: opacity 0.15s, background 0.15s;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background: rgba(99,102,241,0.15);
+}
+/* Firefox doesn't have ::calendar-picker-indicator — color the input itself */
+input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"] {
+  color-scheme: dark;
+}
+
+/* Animations */
+@keyframes fi { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes su { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes loginBoxEnter { from { opacity: 0; transform: translateY(24px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes loginGlowFloat { 0% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-20px) scale(1.1); } 100% { transform: translate(-20px,30px) scale(.95); } }
+@keyframes loginGlowIn { from { opacity: 0; transform: scale(.8); } to { opacity: .12; transform: scale(1); } }
+@keyframes loginLogoShine { 0% { filter: brightness(1); } 50% { filter: brightness(1.15); } 100% { filter: brightness(1); } }
+@keyframes loginFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes loginShake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-5px); } 40%,80% { transform: translateX(5px); } }
+@keyframes btnSpin { to { transform: rotate(360deg); } }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes scanLine { 0%,100% { transform: translateY(-12px); opacity: .4; } 50% { transform: translateY(12px); opacity: 1; } }
+@keyframes modalBoxEnter { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+@keyframes pulseGlow { 0%,100% { opacity: .6; } 50% { opacity: 1; } }
+@keyframes subtlePulse { 0%,100% { filter: brightness(1) drop-shadow(0 0 0 transparent); } 50% { filter: brightness(1.08) drop-shadow(0 0 6px rgba(99,102,241,.15)); } }
+@keyframes undoProgress { from { width: 100%; } to { width: 0%; } }
+
+.undo-bar { height: 3px; background: linear-gradient(90deg, #6366F1, #818CF8); border-radius: 2px; animation: undoProgress 5s linear forwards; }
+
+.notif-dropdown { animation: slideDown .15s ease; }
+.modal-inner { animation: modalBoxEnter .25s cubic-bezier(.16,1,.3,1) both; }
+.spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.06); border-top-color: #6366F1; border-radius: 50%; animation: btnSpin .6s linear infinite; }
+tr { transition: background 150ms ease; }
+body.modal-open { overflow: hidden !important; }
+
+.drawingBuffer { display: none !important; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 768px) {
+  .sidebar { display: none !important; }
+  .main-area { margin-left: 0 !important; }
+  .mobile-hamburger { display: flex !important; }
+  .mobile-overlay { display: block !important; }
+  .mobile-drawer { display: block !important; }
+  .mobile-drawer .sidebar { display: flex !important; width: 100% !important; }
+  .page-pad { padding: 14px 12px !important; padding-bottom: 70px !important; }
+  .filter-bar { gap: 6px !important; padding: 8px 10px !important; }
+  .filter-bar select, .filter-bar input { font-size: 12px !important; padding: 6px 8px !important; min-width: 0 !important; }
+  .header-bar { padding: 8px 12px !important; }
+  .header-title { font-size: 13px !important; }
+  .header-search { max-width: none !important; }
+  .stat-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 8px !important; }
+  .cat-grid { grid-template-columns: 1fr !important; }
+  .modal-inner { width: calc(100vw - 16px) !important; max-height: 94vh !important; border-radius: 12px !important; }
+  .modal-inner form { padding: 14px !important; }
+  .two-col { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 480px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}

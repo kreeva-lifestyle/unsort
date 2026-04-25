@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DailyOffice — UI Kit</title>
+<link rel="stylesheet" href="colors_and_type.css" />
+<style>
+  html, body { background: var(--do-bg); margin: 0; }
+  body {
+    font-family: var(--do-sans);
+    color: var(--do-tx-1);
+    /* soft spotlight */
+    background:
+      radial-gradient(1100px 700px at 18% -5%, rgba(99,102,241,.09), transparent 60%),
+      radial-gradient(900px 600px at 92% 110%, rgba(56,189,248,.06), transparent 60%),
+      #060810;
+    background-attachment: fixed;
+  }
+  * { box-sizing: border-box; }
+
+  .page {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 56px 40px 120px;
+  }
+
+  /* ── Cover ── */
+  .cover {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 48px;
+    align-items: center;
+    padding: 28px 0 72px;
+    border-bottom: 1px solid var(--do-bd);
+  }
+  .cover .eyebrow {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--do-tx-3);
+    margin-bottom: 22px;
+  }
+  .cover h1 {
+    font-family: var(--do-sora);
+    font-weight: 800;
+    font-size: 68px;
+    line-height: 0.98;
+    letter-spacing: -1.8px;
+    margin: 0 0 18px;
+    color: var(--do-tx-1);
+  }
+  .cover h1 em {
+    font-style: normal;
+    background: var(--do-ac-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .cover p.lede {
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--do-tx-2);
+    max-width: 520px;
+    margin: 0 0 26px;
+  }
+  .cover .meta {
+    display: flex; gap: 28px; align-items: center;
+    color: var(--do-tx-3);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-weight: 600;
+  }
+  .cover .meta span strong {
+    display: block;
+    color: var(--do-tx-1);
+    font-family: var(--do-mono);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    margin-top: 4px;
+  }
+
+  /* Cover illustration: big brand dot + grid */
+  .cover-art {
+    position: relative;
+    aspect-ratio: 1/1;
+    max-width: 440px;
+    justify-self: end;
+    border-radius: 24px;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(99,102,241,.35), transparent 55%),
+      radial-gradient(circle at 75% 70%, rgba(56,189,248,.15), transparent 55%),
+      #080B15;
+    border: 1px solid var(--do-bd-2);
+    overflow: hidden;
+  }
+  .cover-art::before {
+    content:""; position:absolute; inset:0;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.04) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: radial-gradient(circle at 50% 50%, black 40%, transparent 78%);
+  }
+  .cover-art .dot {
+    position:absolute; top:50%; left:50%; transform: translate(-50%,-50%);
+    width: 112px; height: 112px; border-radius: 50%;
+    background: var(--do-ac-grad);
+    box-shadow:
+      0 0 0 12px rgba(99,102,241,.12),
+      0 0 0 28px rgba(99,102,241,.06),
+      0 0 80px rgba(99,102,241,.55);
+  }
+  .cover-art .ring {
+    position:absolute; top:50%; left:50%; transform: translate(-50%,-50%);
+    width: 260px; height: 260px; border-radius:50%;
+    border: 1px dashed rgba(99,102,241,.25);
+  }
+  .cover-art .tag {
+    position: absolute;
+    font-family: var(--do-mono);
+    font-size: 10px;
+    color: var(--do-tx-2);
+    background: rgba(12,16,28,.75);
+    border: 1px solid var(--do-bd-2);
+    border-radius: 4px;
+    padding: 3px 8px;
+    backdrop-filter: blur(8px);
+  }
+  .cover-art .tag.a { top: 22px; left: 28px; }
+  .cover-art .tag.b { bottom: 26px; right: 30px; }
+  .cover-art .tag.c { top: 52%; right: 18px; color: var(--do-success-2); border-color: rgba(34,197,94,.3); background: rgba(34,197,94,.10); }
+
+  /* ── Section scaffolding ── */
+  section.group {
+    padding: 72px 0 24px;
+    border-bottom: 1px solid var(--do-bd);
+  }
+  section.group:last-of-type { border-bottom: none; }
+  .group-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 40px;
+    margin-bottom: 36px;
+  }
+  .group-header .lhs { max-width: 720px; }
+  .group-header .num {
+    font-family: var(--do-mono);
+    font-size: 11px;
+    color: var(--do-tx-3);
+    letter-spacing: 0.18em;
+    display:block;
+    margin-bottom: 10px;
+  }
+  .group-header h2 {
+    font-family: var(--do-sora);
+    font-weight: 700;
+    font-size: 34px;
+    letter-spacing: -0.8px;
+    margin: 0 0 12px;
+    color: var(--do-tx-1);
+  }
+  .group-header p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--do-tx-2);
+    margin: 0;
+  }
+  .group-header .rhs {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--do-tx-3);
+    white-space: nowrap;
+    text-align: right;
+    min-width: 180px;
+  }
+  .group-header .rhs strong {
+    display:block; color: var(--do-tx-1); font-family: var(--do-mono);
+    font-size: 13px; font-weight: 500; text-transform: none; letter-spacing: 0.02em; margin-top:4px;
+  }
+
+  /* ── Grid of preview tiles ── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 18px;
+  }
+  .tile {
+    grid-column: span 12;
+    position: relative;
+    border: 1px solid var(--do-bd);
+    border-radius: 14px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.015);
+  }
+  .tile.col-6 { grid-column: span 6; }
+  .tile.col-7 { grid-column: span 7; }
+  .tile.col-5 { grid-column: span 5; }
+  .tile.col-12 { grid-column: span 12; }
+  .tile .tile-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 14px 18px 8px;
+    gap: 16px;
+  }
+  .tile .tile-head h3 {
+    font-family: var(--do-sora);
+    font-weight: 700;
+    font-size: 14px;
+    margin: 0;
+    color: var(--do-tx-1);
+    letter-spacing: -0.2px;
+  }
+  .tile .tile-head .sub {
+    font-size: 10px;
+    color: var(--do-tx-3);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 600;
+  }
+  .tile iframe {
+    display: block;
+    width: 100%;
+    border: 0;
+    background: #060810;
+    border-top: 1px solid var(--do-bd);
+  }
+
+  /* ── Principles ── */
+  .principles {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .principles .p {
+    border: 1px solid var(--do-bd);
+    border-radius: 12px;
+    padding: 18px;
+    background: rgba(255,255,255,0.015);
+    position: relative;
+    overflow: hidden;
+  }
+  .principles .p::before {
+    content:""; position:absolute; top:0; left:0; width:32px; height:2px;
+    background: var(--do-ac-grad);
+  }
+  .principles .p span.num {
+    display:block;
+    font-family: var(--do-mono);
+    font-size: 10px;
+    color: var(--do-ac-2);
+    letter-spacing: 0.18em;
+    margin-bottom: 10px;
+  }
+  .principles .p h4 {
+    font-family: var(--do-sora);
+    font-weight: 700;
+    font-size: 14px;
+    margin: 0 0 8px;
+    color: var(--do-tx-1);
+  }
+  .principles .p p {
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: var(--do-tx-2);
+    margin: 0;
+  }
+
+  /* ── Token table (usage tips) ── */
+  .usage {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  .usage .rule {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    border: 1px solid var(--do-bd);
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: rgba(255,255,255,0.015);
+  }
+  .usage .rule .idx {
+    font-family: var(--do-mono);
+    font-size: 10px;
+    color: var(--do-ac-2);
+    letter-spacing: 0.14em;
+    min-width: 38px;
+    padding-top: 2px;
+  }
+  .usage .rule h5 {
+    margin: 0 0 4px;
+    font-family: var(--do-sora);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--do-tx-1);
+  }
+  .usage .rule p {
+    margin: 0;
+    font-size: 11px;
+    color: var(--do-tx-2);
+    line-height: 1.55;
+  }
+  .usage .rule code {
+    font-family: var(--do-mono);
+    font-size: 10.5px;
+    color: var(--do-ac-2);
+    background: var(--do-ac-tint-6);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* ── Footer ── */
+  footer.foot {
+    margin-top: 60px;
+    padding-top: 28px;
+    border-top: 1px solid var(--do-bd);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: var(--do-tx-3);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  footer.foot .brand {
+    display:flex; align-items:center; gap: 10px;
+  }
+  footer.foot .brand .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--do-ac-grad);
+    box-shadow: var(--do-ac-glow);
+  }
+
+  @media (max-width: 980px) {
+    .cover { grid-template-columns: 1fr; }
+    .cover-art { justify-self: start; max-width: 320px; }
+    .cover h1 { font-size: 48px; }
+    .tile.col-6, .tile.col-7, .tile.col-5 { grid-column: span 12; }
+    .principles { grid-template-columns: repeat(2, 1fr); }
+    .usage { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- ── Cover ── -->
+    <header class="cover">
+      <div>
+        <div class="eyebrow">DailyOffice · UI Kit · v1.0</div>
+        <h1>A dense, <em>dark workspace</em> for back-of-house operators.</h1>
+        <p class="lede">DailyOffice is a unified back-office for consumer brands — inventory, PackStation, challans, vendors, petty-cash — all on one glass-dark surface. This kit is the distilled visual language behind that product: six accent colours, three typefaces, twelve hand-drawn icons, and a density-first 12 px base grid.</p>
+        <div class="meta">
+          <span>Base font size<strong>12 px</strong></span>
+          <span>Accent<strong>#6366F1 → #818CF8</strong></span>
+          <span>Surface<strong>#060810</strong></span>
+        </div>
+      </div>
+      <div class="cover-art">
+        <div class="ring"></div>
+        <div class="dot"></div>
+        <span class="tag a">UNS-180426-0042</span>
+        <span class="tag c">Complete</span>
+        <span class="tag b">#A7 · Rack B-3</span>
+      </div>
+    </header>
+
+    <!-- ── Design principles ── -->
+    <section class="group">
+      <div class="group-header">
+        <div class="lhs">
+          <span class="num">00 — PRINCIPLES</span>
+          <h2>Four rules we return to.</h2>
+          <p>Design decisions in DailyOffice are not a matter of taste; they’re a matter of fit. The app is used for eight hours a day on laptops in back-rooms and warehouses. Every token in this kit earns its keep by serving one of the four ideas below.</p>
+        </div>
+        <div class="rhs">Authored by<strong>arya.designs</strong></div>
+      </div>
+      <div class="principles">
+        <div class="p">
+          <span class="num">01</span>
+          <h4>Density first</h4>
+          <p>12 px is the base — labels go as low as 8 px with heavy tracking. Show more on one screen so operators scroll less. Whitespace is a tool, not a default.</p>
+        </div>
+        <div class="p">
+          <span class="num">02</span>
+          <h4>Dark, not decorative</h4>
+          <p>A single near-black surface (#060810) with four subtly-lifted glass panels. Indigo is the only chromatic accent the UI chases; everything else earns its colour by encoding state.</p>
+        </div>
+        <div class="p">
+          <span class="num">03</span>
+          <h4>State through colour</h4>
+          <p>Five semantic hues map 1:1 to domain states (complete, damaged, unsorted, dry-clean, info). Never invent a sixth to decorate — pick the closest state or use tertiary grey.</p>
+        </div>
+        <div class="p">
+          <span class="num">04</span>
+          <h4>Numbers are signage</h4>
+          <p>Stat numbers wear Sora 700, tabular-nums, 20 px. They carry the visual weight of a section header because operators read KPIs before prose.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Brand ── -->
+    <section class="group">
+      <div class="group-header">
+        <div class="lhs">
+          <span class="num">01 — BRAND</span>
+          <h2>The gradient dot and the word after it.</h2>
+          <p>Two marks, same DNA: a 135° indigo→periwinkle gradient with a soft glow. The standalone dot carries the app on dense headers; the wordmark takes over in ambient spaces — auth, empty-states, onboarding.</p>
+        </div>
+        <div class="rhs">Tokens<strong>--do-ac, --do-ac-grad</strong></div>
+      </div>
+      <div class="grid">
+        <div class="tile col-6">
+          <div class="tile-head"><h3>Wordmark &amp; lock-up</h3><span class="sub">SVG · 135° gradient</span></div>
+          <iframe src="preview/brand-wordmark.html" height="220" loading="lazy"></iframe>
+        </div>
+        <div class="tile col-6">
+          <div class="tile-head"><h3>Login hero</h3><span class="sub">Five orbs · grid mask</span></div>
+          <iframe src="preview/login-hero.html" height="300" loading="lazy"></iframe>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Colors ── -->
+    <section class="group">
+      <div class="group-header">
+        <div class="lhs">
+          <span class="num">02 — COLOR</span>
+          <h2>Six accents. One job each.</h2>
+          <p>Three surface lifts, three text tiers, and a semantic palette that maps directly to domain states. The gradient is reserved for brand and primary CTAs — do not reuse it for illustration, charts, or section backgrounds.</p>
+        </div>
+        <div class="rhs">Dark only<strong>#060810 base</strong></div>
+      </div>
+      <div class="grid">
+        <div class="tile col-12">
+          <div class="tile-head"><h3>Surfaces</h3><span class="sub">Background → Modal</span></div>
+          <iframe src="preview/colors-surfaces.html" height="160" loading="lazy"></iframe>
+        </div>
+        <div class="tile col-12">
+          <div class="tile-head"><h3>Brand</h3><span class="sub">Accent, gradient, tints</span></div>
+          <iframe src="preview/colors-brand.html" height="160" loading="lazy"></iframe>
+        </div>
+        <div class="tile col-12">
+          <div class="tile-head"><h3>Semantic</h3><span class="sub">Complete · Damaged · Unsorted · Dry-clean · Info</span></div>
+          <iframe src="preview/colors-semantic.html" height="160" loading="lazy"></iframe>
+        </div>
+        <div class="tile col-12">
+          <div class="tile-head"><h3>Text &amp; borders</h3><span class="sub">Three text tiers + focus ring</span></div>
+          <iframe src="preview/colors-text-borders.html" height="200" loading="lazy"></iframe>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Type ── -->
+    <section class="group">
+      <div class="group-header">
+        <div class="lhs">
+          <span class="num">03 — TYPE</span>
+          <h2>Sora for signage, Inter for sentences, Mono for machines.</h2>
+          <p>Three families with a hard split of responsibilities. Sora appears only at 700/800 for display and numeric signage; Inter covers everything else at 400–600; JetBrains Mono is used exclusively for IDs, serials, SKUs, and currency alignment in tables.</p>
+        </div>
+        <div class="rhs">Google Fonts<strong>Sora · Inter · JetBrains Mono</strong></div>
+      </div>
+      <div class="grid">
+        <div class="tile col-6">
+          <div class="tile-head"><h3>Families</h3><span class="sub">Three faces, one job each</span></div>
+          <iframe src="preview/type-families.html" height="220" loading="lazy"></iframe>
+        </div>
+        <div class="tile col-6">
+          <div class="tile-head"><h3>Scale</h3><span class="sub">8 → 28 px</span></div>
+          <iframe src="preview/type-scale.html" height="300" loading="lazy"></iframe>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Spacing, radii, elevation ── -->
+    <section class="group">
+      <div class="group-header">
+        <div class="lhs">
+          <span class="num">04 — SHAPE &amp; SPACE</span>
+          <h2>Small radii. Smaller gaps. Quiet shadows.</h2>
+          <p>Radii top out at 14 px (only the login card hits 18 px). Gaps live in the 4–20 px range. The only loud shadow is the primary-button indigo glow — modals and toasts use near-black drop shadows so the accent stays the only chromatic light source.</p>
+        </div>
+        <div class="rhs">Scale<strong>4 · 6 · 8 · 10 · 12 · 14 · 16 · 20</strong></div>
+      </div>
+      <div class="grid">
+        <div class="tile col-12">
+          <div class="tile-head"><h3>Radii</h3><span class="sub">xs → 2xl</span></div>
+          <iframe src="preview/radii.html" height="140" loading="lazy"></iframe>
+        </div>
+        <div class="tile col-7">
+          <div class="tile-head"><h3>Spacing</h3><span class="sub">Density scale</span></div>
+          <iframe src="preview/spacing.html" height="280" loading="lazy"></iframe>
+        </div>
+        <div class="tile col-5">
+          <div class="tile-head"><h3>Elevation</h3><span class="sub">Glow · modal · toast</span></div>
+          <iframe src="preview/elevation.html" height="280" loading="lazy"></iframe>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Components ── -->
+    <section class="group">
+      <div class="group-header">
+        <div class="lhs">
+          <span class="num">05 — COMPONENTS</span>
+          <h2>Every screen is built from twelve parts.</h2>
+          <p>The app is intentionally boring: sidebar, header, stat cards, tables, tags, inputs, buttons, modals, toasts. Everything you’ll see in the product is a composition of the tiles below — with status colour and copy doing the heavy lifting.</p>
+        </div>
+        <div class="rhs">Tech<strong>React + inline <code>T</code> tokens</strong></div>
+      </div>
+      <div class="grid">
+        <div class="tile col-7">
+          <div class="tile-head"><h3>Buttons</h3><span class="sub">Primary · Ghost · Danger · Neutral · Icon</span></div>
+          <iframe src="preview/components-buttons.html" height="200" loading="lazy"></iframe>
+        </div>
+        <div class="tile col-5">
+          <div class="tile-head"><h3>Status tags</h3><span class="sub">State → colour recipe</span></div>
+          <iframe src="preview/components-status-tags.html" height="200" loading="lazy"></iframe>
+        </div>
+
+        <div class="tile col-12">
+          <div class="tile-head"><h3>Stat cards</h3><span class="sub">Top-bar gradient · 20/700 Sora numeric</span></div>
+          <iframe src="preview/components-stat-cards.html" height="160" loading="lazy"></iframe>
+        </div>
+
+        <div class="tile col-6">
+          <div class="tile-head"><h3>Inputs</h3><span class="sub">Labels · field · select · search</span></div>
+          <iframe src="preview/components-inputs.html" height="240" loading="lazy"></iframe>
+        </div>
+        <div class="tile col-6">
+          <div class="tile-head"><h3>Header bar</h3><span class="sub">44 px sticky · brand dot · search</span></div>
+          <iframe src="preview/components-header.html" height="240" loading="lazy"></iframe>
+        </div>
+
+        <div class="tile col-6">
+          <div class="tile-head"><h3>Sidebar navigation</h3><span class="sub">Active · inactive · hover</span></div>
+          <iframe src="preview/components-sidebar.html" height="320" loading="lazy"></iframe>
+        </div>
+        <div class="tile col-6">
+          <div class="tile-head"><h3>Data table</h3><span class="sub">Mono IDs · status tag · right-aligned numerics</span></div>
+          <iframe src="preview/components-table.html" height="320" loading="lazy"></iframe>
+        </div>
+
+        <div class="tile col-6">
+          <div class="tile-head"><h3>Toast &amp; undo snackbar</h3><span class="sub">Success · error · undo progress</span></div>
+          <iframe src="preview/components-toast.html" height="200" loading="lazy"></iframe>
+        </div>
+        <div class="tile col-6">
+          <div class="tile-head"><h3>Modal</h3><span class="sub">Glass 96% + 24/80 black shadow</span></div>
+          <iframe src="preview/components-modal.html" height="360" loading="lazy"></iframe>
+        </div>
+
+        <div class="tile col-7">
+          <div class="tile-head"><h3>Scanner frame</h3><span class="sub">Quagga2 live stream + result states</span></div>
+          <iframe src="preview/components-scanner.html" height="300" loading="lazy"></iframe>
+        </div>
+        <div class="tile col-5">
+          <div class="tile-head"><h3>Iconography</h3><span class="sub">24 × 24 · stroke 1.8</span></div>
+          <iframe src="preview/icons.html" height="300" loading="lazy"></iframe>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Usage rules ── -->
+    <section class="group">
+      <div class="group-header">
+        <div class="lhs">
+          <span class="num">06 — USAGE RULES</span>
+          <h2>Short list. Follow it.</h2>
+          <p>Most bugs in a design system come from people re-inventing a decision that had already been made. These six lines are the invariants. Everything else is negotiable.</p>
+        </div>
+        <div class="rhs">Applies to<strong>all new screens</strong></div>
+      </div>
+
+      <div class="usage">
+        <div class="rule">
+          <span class="idx">01</span>
+          <div>
+            <h5>Gradient is brand only</h5>
+            <p>Reserve <code>--do-ac-grad</code> for the wordmark, the primary CTA, the active-nav pip, and the login hero. Never fill illustrations, backgrounds, or charts with it.</p>
+          </div>
+        </div>
+        <div class="rule">
+          <span class="idx">02</span>
+          <div>
+            <h5>State colour or grey — nothing new</h5>
+            <p>If the data isn’t Complete, Damaged, Unsorted, Dry-clean, Info or Cash-in-hand, it takes <code>--do-tx-3</code>. Don’t pick a sixth hue to “feel different”.</p>
+          </div>
+        </div>
+        <div class="rule">
+          <span class="idx">03</span>
+          <div>
+            <h5>Mono is for machines</h5>
+            <p><code>--do-mono</code> is IDs, SKUs, serials, currency columns. Labels and running copy stay Inter; display still goes to Sora.</p>
+          </div>
+        </div>
+        <div class="rule">
+          <span class="idx">04</span>
+          <div>
+            <h5>Radii cap at 14 px</h5>
+            <p>Inputs/buttons at 6 px. Cards at 8–10 px. Modals at 14 px. Only the unauthenticated login card earns 18 px.</p>
+          </div>
+        </div>
+        <div class="rule">
+          <span class="idx">05</span>
+          <div>
+            <h5>Tag recipe is fixed</h5>
+            <p><code>10% bg · 25% border · light-tint fg · 9/600 caps</code>. Don’t raise opacity to “make it pop” — raise copy clarity instead.</p>
+          </div>
+        </div>
+        <div class="rule">
+          <span class="idx">06</span>
+          <div>
+            <h5>12 px base is non-negotiable</h5>
+            <p>The whole grid is wound to 12 px HTML. Don’t set <code>font-size: 14px</code> on sections — pick a larger step from the scale (13/15/20).</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <div class="brand"><span class="dot"></span><span>DailyOffice · UI Kit · v1.0</span></div>
+      <div>Authored by arya.designs · 2026</div>
+    </footer>
+  </div>
+</body>
+</html>
