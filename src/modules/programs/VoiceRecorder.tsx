@@ -1,6 +1,7 @@
 import { T, S } from '../../lib/theme';
 import { useVoiceRecorder } from './hooks/useVoiceRecorder';
 import { uploadVoiceNote, getVoiceNoteUrl } from './lib/supabase-rpc';
+import { supabase } from '../../lib/supabase';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useState } from 'react';
 import type { TranslationKey } from './i18n/en';
@@ -44,6 +45,15 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
       {existingUrl && !audioUrl && !recording && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
           <audio controls src={existingUrl} style={{ flex: 1, height: 32 }} />
+          <button onClick={async () => {
+            if (!confirm('Remove this voice note?')) return;
+            if (existingPath) {
+              await supabase.storage.from('program-voice-notes').remove([existingPath]);
+            }
+            await supabase.from('programs').update({ voice_note_path: null, updated_at: new Date().toISOString() }).eq('id', programId);
+            onUploaded('');
+            addToast('Voice note removed', 'success');
+          }} style={{ ...S.btnDanger, ...S.btnSm, fontSize: 9, padding: '4px 8px', cursor: 'pointer', flexShrink: 0 }}>Remove</button>
         </div>
       )}
 
