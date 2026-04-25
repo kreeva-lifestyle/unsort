@@ -152,6 +152,7 @@ async function callEdge(body: unknown, timeoutMs = 20000): Promise<any> {
 // ── Component ───────────────────────────────────────────────────────────────────
 export default function PackTime({ active }: { active?: boolean } = {}) {
   const { addToast } = useNotifications();
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
   // Config from Supabase
   const [couriers, setCouriers] = useState<PackTimeCourier[]>([]);
   const [cameras, setCameras] = useState<PackTimeCamera[]>([]);
@@ -234,6 +235,15 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     });
     return () => { subscription.unsubscribe(); };
   }, []);
+
+  // ── Offline detection ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const goOff = () => setIsOffline(true);
+    const goOn = () => { setIsOffline(false); addToast('Back online — syncing...', 'success'); };
+    window.addEventListener('offline', goOff);
+    window.addEventListener('online', goOn);
+    return () => { window.removeEventListener('offline', goOff); window.removeEventListener('online', goOn); };
+  }, [addToast]);
 
   // ── Focus ───────────────────────────────────────────────────────────────────
   const focusInput = useCallback(() => { setTimeout(() => inputRef.current?.focus(), 50); }, []);
@@ -355,7 +365,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       awbSetRef.current = new Set([...sheetAwbs, ...dbAwbs]);
       rowCountRef.current = data.totalRows || 0;
       setSheetTotal(data.totalRows || 0);
-      sessionIdRef.current = crypto.randomUUID();
+      const existingSession = sessionStorage.getItem('packtime_session');
+      sessionIdRef.current = existingSession || crypto.randomUUID();
+      sessionStorage.setItem('packtime_session', sessionIdRef.current);
       writeQueue.length = 0; flushing = false;
       setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned(''); setDbFails(0);
     }
@@ -741,6 +753,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Flash */}
       {flash && <div style={{ position: 'fixed', inset: 0, zIndex: 300, pointerEvents: 'none', background: flash === 'success' ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.10)', animation: 'fi .15s ease' }} />}
+
+      {/* Offline indicator */}
+      {isOffline && started && (
+        <div style={{ margin: '0 14px 8px', padding: '8px 12px', borderRadius: 6, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', color: T.yl, fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.yl, animation: 'subtlePulse 2s ease-in-out infinite' }} />
+          You're offline — scans are queued locally. They'll sync when connection returns.
+        </div>
+      )}
 
       {/* Duplicate — non-blocking banner (audit P0: let operator keep scanning) */}
       {duplicateAwb && (
