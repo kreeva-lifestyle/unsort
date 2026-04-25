@@ -3,7 +3,7 @@ import { useVoiceRecorder } from './hooks/useVoiceRecorder';
 import { uploadVoiceNote, getVoiceNoteUrl } from './lib/supabase-rpc';
 import { supabase } from '../../lib/supabase';
 import { useNotifications } from '../../hooks/useNotifications';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { TranslationKey } from './i18n/en';
 
 interface Props {
@@ -20,17 +20,22 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
   const existingUrl = existingPath ? getVoiceNoteUrl(existingPath) : null;
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const uploadedRef = useRef(false);
 
-  const handleUpload = async () => {
-    if (!audioBlob) return;
-    setUploading(true);
-    const { path, error: upErr } = await uploadVoiceNote(programId, audioBlob, ext());
-    setUploading(false);
-    if (upErr || !path) { addToast('Upload failed', 'error'); return; }
-    addToast(t('voiceUpload'), 'success');
-    onUploaded(path);
-    clear();
-  };
+  // Auto-upload when recording stops and blob is ready
+  useEffect(() => {
+    if (!audioBlob || uploading || uploadedRef.current) return;
+    uploadedRef.current = true;
+    (async () => {
+      setUploading(true);
+      const { path, error: upErr } = await uploadVoiceNote(programId, audioBlob, ext());
+      setUploading(false);
+      if (upErr || !path) { addToast('Upload failed', 'error'); uploadedRef.current = false; return; }
+      addToast(t('voiceUpload'), 'success');
+      onUploaded(path);
+      clear();
+    })();
+  }, [audioBlob, programId, ext, uploading, addToast, t, onUploaded, clear]);
 
   const btnBase: React.CSSProperties = {
     width: 44, height: 44, borderRadius: 22, border: 'none', cursor: 'pointer',
@@ -75,12 +80,14 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
         )}
         {audioUrl && !recording && (
           <>
-            <audio controls src={audioUrl} style={{ height: 32 }} />
-            <button onClick={clear} style={{ ...S.btnGhost, ...S.btnSm, fontSize: 9, cursor: 'pointer' }}>{t('reRecord')}</button>
-            <button onClick={handleUpload} disabled={uploading}
-              style={{ ...S.btnPrimary, ...S.btnSm, fontSize: 9, cursor: uploading ? 'default' : 'pointer', opacity: uploading ? 0.5 : 1 }}>
-              {uploading ? t('saving') : t('upload')}
-            </button>
+            {uploading ? (
+              <span style={{ fontSize: 10, color: T.ac2, fontWeight: 500 }}>{t('saving')}</span>
+            ) : (
+              <>
+                <audio controls src={audioUrl} style={{ height: 32 }} />
+                <button onClick={() => { uploadedRef.current = false; clear(); }} style={{ ...S.btnGhost, ...S.btnSm, fontSize: 9, cursor: 'pointer' }}>{t('reRecord')}</button>
+              </>
+            )}
           </>
         )}
       </div>
