@@ -33,10 +33,10 @@ import { T, Icon } from './lib/theme';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { NotificationProvider, useNotifications } from './hooks/useNotifications';
 
-const VALID_TABS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'programs', 'settings'];
+import { TAB_IDS } from './lib/tabs';
 const getTabFromHash = () => {
   const h = window.location.hash.replace(/^#\/?/, '').split('/')[0];
-  return VALID_TABS.includes(h) ? h : 'dashboard';
+  return (TAB_IDS as readonly string[]).includes(h) ? h : 'dashboard';
 };
 
 const MainApp = () => {
@@ -50,7 +50,7 @@ const MainApp = () => {
 
   // Central navigate — updates URL + state
   const setTab = (t: string) => {
-    if (!VALID_TABS.includes(t)) t = 'dashboard';
+    if (!(TAB_IDS as readonly string[]).includes(t)) t = 'dashboard';
     // Settings is open to everyone — My Profile tab (Phone + Cash PIN) is required for operators too.
     if (t === 'settings' && !profile) t = 'dashboard';
     const newHash = `#/${t}`;
