@@ -28,6 +28,7 @@ export default function PublicShareView({ shareToken }: Props) {
       if (rpcErr || !result?.ok) { setError(result?.error || rpcErr?.message || t('notFoundOrExpired')); setLoading(false); return; }
       setData(result); setLoading(false);
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shareToken]);
 
   const parts = data?.prices || [];
@@ -40,7 +41,8 @@ export default function PublicShareView({ shareToken }: Props) {
       if (name && m) map[name] = (map[name] || 0) + m;
     });
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, [parts]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   if (loading) return <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.tx3 }}><div className="spinner" style={{ marginRight: 8 }} /> {t('loading')}</div>;
   if (error || !data) return <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10, color: T.tx3 }}><div style={{ fontSize: 28 }}>🔗</div><div style={{ fontSize: 13 }}>{error || t('notFound')}</div></div>;

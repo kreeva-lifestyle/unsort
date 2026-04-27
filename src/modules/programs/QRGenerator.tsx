@@ -40,7 +40,8 @@ export default function QRGenerator({ program, onClose, t }: Props) {
       setShareUrl(url);
       renderQR(url);
     })();
-  }, [program.id, program.share_token, addToast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [program.id, program.share_token]);
 
   const renderQR = async (text: string) => {
     if (!canvasRef.current) return;
