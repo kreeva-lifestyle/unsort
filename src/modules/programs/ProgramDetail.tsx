@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { T, S, Pill } from '../../lib/theme';
+import { T, S } from '../../lib/theme';
 import { fetchProgramById, fetchMatchings, fetchPriceWithParts } from './lib/supabase-rpc';
 import { toDirectImageUrl } from './lib/image-url-converters';
 import ProgramHistory from './ProgramHistory';
@@ -40,7 +40,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [programId]);
 
-  if (loading || !program) return <div style={{ padding: 30, textAlign: 'center', color: T.tx3 }}>{t('loading')}</div>;
+  if (loading || !program) return <div style={{ padding: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, color: T.tx3 }}><div className="spinner" /><span style={{ fontSize: 11 }}>{t('loading')}</span></div>;
 
   const imageUrl = program.dropbox_gdrive_link ? toDirectImageUrl(program.dropbox_gdrive_link) : null;
   const workTotal = workParts.reduce((s, p) => s + Number(p.total || 0), 0);
@@ -88,11 +88,19 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       {/* Brands */}
       {matchings.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={label}>Brands ({matchings.length})</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {matchings.map(m => (
-              <Pill key={m.id} tone="yl" dot>{m.company_name}{m.matching_label ? ` · ${m.matching_label}` : ''}</Pill>
-            ))}
+          <div style={{ ...label, marginBottom: 8 }}>Brands ({matchings.length})</div>
+          <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr><th style={th}>Brand Name</th><th style={th}>Label</th></tr></thead>
+              <tbody>
+                {matchings.map(m => (
+                  <tr key={m.id}>
+                    <td style={td}>{m.company_name}</td>
+                    <td style={{ ...td, color: T.tx3 }}>{m.matching_label || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

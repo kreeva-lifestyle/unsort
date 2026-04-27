@@ -76,11 +76,11 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
     onSave(workParts, fabricParts);
   };
 
-  const th: React.CSSProperties = { ...S.thStyle, padding: '7px 5px', fontSize: 8 };
+  const th: React.CSSProperties = { ...S.thStyle, padding: '7px 5px', fontSize: 10, color: T.ac2 };
   const td: React.CSSProperties = { padding: '3px 2px', borderBottom: `1px solid ${T.bd}` };
   const numIn: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontFamily: T.mono, fontSize: 11, padding: '5px 4px', outline: 'none', textAlign: 'right' as const, boxSizing: 'border-box' as const };
   const txtIn: React.CSSProperties = { ...numIn, textAlign: 'left' as const };
-  const calcCell: React.CSSProperties = { ...td, fontFamily: T.mono, fontSize: 11, fontWeight: 600, color: T.ac2, padding: '5px 4px', textAlign: 'right' as const };
+  const calcCell: React.CSSProperties = { ...td, fontFamily: T.mono, fontSize: 11, fontWeight: 600, color: T.ac2, padding: '5px 4px', textAlign: 'right' as const, background: 'rgba(255,255,255,0.01)' };
 
   return (
     <div className="prg-form-overlay" style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(12px)', padding: '20px 16px', overflowY: 'auto' }} onClick={onClose}>
@@ -137,7 +137,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                     <td style={td}>{workParts.length > 1 && <button onClick={() => setWorkParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 13 }}>×</button>}</td>
                   </tr>
                 ))}
-                <tr style={{ background: 'rgba(52,211,153,.04)' }}>
+                <tr style={{ background: 'rgba(52,211,153,.10)', borderTop: `2px solid ${T.gr}` }}>
                   <td colSpan={7} style={{ padding: '7px 6px', fontSize: 11, fontWeight: 700, color: T.tx, textAlign: 'right' }}>{t('grandTotal')}</td>
                   <td style={{ padding: '7px 4px', fontFamily: T.sora, fontSize: 13, fontWeight: 700, color: T.gr, textAlign: 'right' }}>₹{workGrandTotal.toFixed(0)}</td>
                   <td style={{ padding: '7px 4px', fontSize: 9, fontWeight: 600, color: T.tx3, textAlign: 'right' }}>FM</td>
@@ -164,7 +164,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                     <td style={td}>{fabricParts.length > 1 && <button onClick={() => setFabricParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 13 }}>×</button>}</td>
                   </tr>
                 ))}
-                <tr style={{ background: 'rgba(56,189,248,.04)' }}>
+                <tr style={{ background: 'rgba(56,189,248,.10)', borderTop: `2px solid ${T.bl}` }}>
                   <td style={{ padding: '7px 6px', fontSize: 11, fontWeight: 700, color: T.tx, textAlign: 'right' }}>{t('grandTotal')}</td>
                   <td style={{ padding: '7px 4px', fontFamily: T.mono, fontSize: 11, fontWeight: 700, color: T.bl, textAlign: 'right' }}>{fabricFM.toFixed(2)}</td>
                   <td></td>
