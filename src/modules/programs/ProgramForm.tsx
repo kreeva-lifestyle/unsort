@@ -138,10 +138,8 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                   </tr>
                 ))}
                 <tr style={{ background: 'rgba(52,211,153,.10)', borderTop: `2px solid ${T.gr}` }}>
-                  <td colSpan={7} style={{ padding: '7px 6px', fontSize: 11, fontWeight: 700, color: T.tx, textAlign: 'right' }}>{t('grandTotal')}</td>
+                  <td colSpan={9} style={{ padding: '7px 6px', fontSize: 11, fontWeight: 700, color: T.tx, textAlign: 'right' }}>{t('grandTotal')}</td>
                   <td style={{ padding: '7px 4px', fontFamily: T.sora, fontSize: 13, fontWeight: 700, color: T.gr, textAlign: 'right' }}>₹{workGrandTotal.toFixed(0)}</td>
-                  <td style={{ padding: '7px 4px', fontSize: 9, fontWeight: 600, color: T.tx3, textAlign: 'right' }}>FM</td>
-                  <td style={{ padding: '7px 4px', fontFamily: T.mono, fontSize: 11, fontWeight: 700, color: T.bl, textAlign: 'right' }}>{workFM.toFixed(2)}</td>
                   <td></td>
                 </tr>
               </tbody>
@@ -164,9 +162,8 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                     <td style={td}>{fabricParts.length > 1 && <button onClick={() => setFabricParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 13 }}>×</button>}</td>
                   </tr>
                 ))}
-                <tr style={{ background: 'rgba(56,189,248,.10)', borderTop: `2px solid ${T.bl}` }}>
-                  <td style={{ padding: '7px 6px', fontSize: 11, fontWeight: 700, color: T.tx, textAlign: 'right' }}>{t('grandTotal')}</td>
-                  <td style={{ padding: '7px 4px', fontFamily: T.mono, fontSize: 11, fontWeight: 700, color: T.bl, textAlign: 'right' }}>{fabricFM.toFixed(2)}</td>
+                <tr style={{ background: 'rgba(56,189,248,.06)' }}>
+                  <td colSpan={2} style={{ padding: '6px 8px', fontSize: 10, color: T.tx3, textAlign: 'center' }}>{fabricParts.length} part{fabricParts.length !== 1 ? 's' : ''}</td>
                   <td></td>
                 </tr>
               </tbody>

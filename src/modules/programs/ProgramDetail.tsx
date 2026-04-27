@@ -134,11 +134,9 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
                     <td style={{ ...td, fontFamily: T.mono, textAlign: 'right', color: T.bl }}>{Number(p.fabric_meter || 0).toFixed(2)}</td>
                   </tr>
                 ))}
-                <tr style={{ background: 'rgba(52,211,153,.04)' }}>
-                  <td colSpan={7} style={{ padding: '8px 8px', fontSize: 11, fontWeight: 700, textAlign: 'right' }}>{t('grandTotal')}</td>
+                <tr style={{ background: 'rgba(52,211,153,.08)' }}>
+                  <td colSpan={9} style={{ padding: '8px 8px', fontSize: 11, fontWeight: 700, textAlign: 'right' }}>{t('grandTotal')}</td>
                   <td style={{ padding: '8px 8px', fontFamily: T.sora, fontSize: 14, fontWeight: 700, color: T.gr, textAlign: 'right' }}>₹{workTotal.toFixed(0)}</td>
-                  <td style={{ padding: '8px 8px', fontSize: 9, fontWeight: 600, color: T.tx3, textAlign: 'right' }}>FM</td>
-                  <td style={{ padding: '8px 8px', fontFamily: T.mono, fontSize: 12, fontWeight: 700, color: T.bl, textAlign: 'right' }}>{workFM.toFixed(2)}</td>
                 </tr>
               </tbody>
             </table>
@@ -161,8 +159,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
                   </tr>
                 ))}
                 <tr style={{ background: 'rgba(56,189,248,.04)' }}>
-                  <td style={{ padding: '8px 8px', fontSize: 11, fontWeight: 700, textAlign: 'right' }}>{t('grandTotal')}</td>
-                  <td style={{ padding: '8px 8px', fontFamily: T.mono, fontSize: 12, fontWeight: 700, color: T.bl, textAlign: 'right' }}>{fabricFM.toFixed(2)}</td>
+                  <td colSpan={2} style={{ padding: '6px 8px', fontSize: 10, color: T.tx3, textAlign: 'center' }}>{fabricParts.length} part{fabricParts.length !== 1 ? 's' : ''}</td>
                 </tr>
               </tbody>
             </table>
