@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useT } from './hooks/useT';
 import { useProgramForm } from './hooks/useProgramForm';
+import { fetchPriceWithParts } from './lib/supabase-rpc';
 import ProgramsList from './ProgramsList';
 import ProgramForm from './ProgramForm';
 import ProgramDetail from './ProgramDetail';
 import QRGenerator from './QRGenerator';
 import PDFExport from './PDFExport';
 import { useNotifications } from '../../hooks/useNotifications';
-import type { Program } from './types';
+import type { Program, PricePartRow } from './types';
 
 export default function ProgramsModule() {
   const { t } = useT();
@@ -17,6 +18,8 @@ export default function ProgramsModule() {
   const [qrProgram, setQrProgram] = useState<Program | null>(null);
   const [pdfProgramId, setPdfProgramId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editWorkParts, setEditWorkParts] = useState<PricePartRow[] | undefined>();
+  const [editFabricParts, setEditFabricParts] = useState<PricePartRow[] | undefined>();
 
   // Browser back button support
   useEffect(() => {
@@ -34,18 +37,41 @@ export default function ProgramsModule() {
     setShowForm(false);
   });
 
-  const handleAdd = () => { form.open(); setShowForm(true); window.history.pushState({ view: 'program-form' }, ''); };
-  const handleEdit = (p: Program, matchings: { company_name: string; matching_label: string }[]) => {
+  const handleAdd = () => {
+    setEditWorkParts(undefined);
+    setEditFabricParts(undefined);
+    form.open();
+    setShowForm(true);
+    window.history.pushState({ view: 'program-form' }, '');
+  };
+
+  const handleEdit = async (p: Program, matchings: { company_name: string; matching_label: string }[]) => {
+    const { parts } = await fetchPriceWithParts(p.id);
+    const wk = parts.filter(pt => (pt.section || 'work') === 'work').map(pt => ({
+      id: pt.id, part_name: pt.part_name || '', stitch: Number(pt.stitch || 0),
+      one_rs: Number(pt.one_rs || 0), stitch_rate: Number(pt.stitch_rate || 0),
+      one_mp: Number(pt.one_mp || 0), meter_per_pcs: Number(pt.meter_per_pcs || 0),
+      rate: Number(pt.rate || 0), total: Number(pt.total || 0),
+      fabric_name: pt.fabric_name || '', fabric_meter: Number(pt.fabric_meter || 0),
+      section: 'work' as const, sort_order: pt.sort_order,
+    }));
+    const fb = parts.filter(pt => pt.section === 'fabric').map(pt => ({
+      id: pt.id, part_name: pt.part_name || '', stitch: 0, one_rs: 0, stitch_rate: 0,
+      one_mp: 0, meter_per_pcs: 0, rate: 0, total: 0,
+      fabric_name: pt.fabric_name || '', fabric_meter: Number(pt.fabric_meter || 0),
+      section: 'fabric' as const, sort_order: pt.sort_order,
+    }));
+    setEditWorkParts(wk.length > 0 ? wk : undefined);
+    setEditFabricParts(fb.length > 0 ? fb : undefined);
     form.open(p, matchings);
     setShowForm(true);
     window.history.pushState({ view: 'program-form' }, '');
   };
+
   const handleView = (p: Program) => { setDetailId(p.id); setView('detail'); window.history.pushState({ view: 'program-detail' }, ''); };
 
   const handleDetailEdit = async (p: Program, matchings: { company_name: string; matching_label: string }[]) => {
-    form.open(p, matchings);
-    setShowForm(true);
-    window.history.pushState({ view: 'program-form' }, '');
+    await handleEdit(p, matchings);
   };
 
   return (
@@ -77,8 +103,10 @@ export default function ProgramsModule() {
           error={form.error}
           saving={form.saving}
           onSave={(workParts, fabricParts) => form.save(workParts, fabricParts)}
-          onClose={() => { form.close(); setShowForm(false); }}
+          onClose={() => { form.close(); setShowForm(false); setEditWorkParts(undefined); setEditFabricParts(undefined); }}
           t={t}
+          initialWorkParts={editWorkParts}
+          initialFabricParts={editFabricParts}
         />
       )}
 

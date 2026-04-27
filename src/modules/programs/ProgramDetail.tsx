@@ -62,7 +62,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => onEdit(program, matchings.map(m => ({ company_name: m.company_name, matching_label: m.matching_label || '' })))}
             style={{ ...S.btnPrimary, fontSize: 10, padding: '6px 14px', cursor: 'pointer' }}>{t('edit')}</button>
-          <button onClick={onClose} style={{ ...S.btnGhost, fontSize: 10, padding: '6px 14px', cursor: 'pointer' }}>Back</button>
+          <button onClick={onClose} style={{ ...S.btnGhost, fontSize: 10, padding: '6px 14px', cursor: 'pointer' }}>{t('back')}</button>
         </div>
       </div>
 
@@ -83,7 +83,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         <div style={{ marginBottom: 16, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: 12 }}>
           <img src={imageUrl} alt="Program" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 6, objectFit: 'contain' }}
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          <a href={program.dropbox_gdrive_link || ''} target="_blank" rel="noopener" style={{ fontSize: 10, color: T.ac2, display: 'block', marginTop: 6 }}>Open original</a>
+          <a href={program.dropbox_gdrive_link || ''} target="_blank" rel="noopener" style={{ fontSize: 10, color: T.ac2, display: 'block', marginTop: 6 }}>{t('openOriginal')}</a>
         </div>
       )}
 
@@ -95,12 +95,12 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <div style={{ width: 4, height: 18, borderRadius: 2, background: T.yl }} />
-            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color: T.yl }}>Brands</span>
+            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color: T.yl }}>{t('brands')}</span>
             <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${T.bd} 0%, transparent 100%)` }} />
           </div>
           <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={th}>Brand Name</th><th style={th}>Label</th></tr></thead>
+              <thead><tr><th style={th}>{t('brandName')}</th><th style={th}>{t('brandLabel')}</th></tr></thead>
               <tbody>
                 {matchings.map(m => (
                   <tr key={m.id}>
@@ -119,7 +119,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <div style={{ width: 4, height: 18, borderRadius: 2, background: T.gr }} />
-            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color: T.gr }}>Work Program</span>
+            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color: T.gr }}>{t('workProgram')}</span>
             <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${T.bd} 0%, transparent 100%)` }} />
           </div>
           <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
@@ -155,7 +155,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <div style={{ width: 4, height: 18, borderRadius: 2, background: T.bl }} />
-            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color: T.bl }}>Fabric Program</span>
+            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color: T.bl }}>{t('fabricProgram')}</span>
             <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${T.bd} 0%, transparent 100%)` }} />
           </div>
           <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
@@ -181,12 +181,12 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       {(workParts.length > 0 || fabricParts.length > 0) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
           <div className="prg-grand-fabric" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'rgba(56,189,248,.06)', border: `1px solid rgba(56,189,248,.15)`, borderRadius: 8 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Grand Fabric Total</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>{t('grandFabricTotal')}</span>
             <span style={{ fontFamily: T.sora, fontSize: 16, fontWeight: 700, color: T.bl }}>{(workFM + fabricFM).toFixed(2)} m</span>
           </div>
           {workTotal > 0 && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'rgba(52,211,153,.06)', border: `1px solid rgba(52,211,153,.15)`, borderRadius: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Grand Work Total</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>{t('grandWorkTotal')}</span>
               <span style={{ fontFamily: T.sora, fontSize: 16, fontWeight: 700, color: T.gr }}>₹{workTotal.toLocaleString('en-IN')}</span>
             </div>
           )}

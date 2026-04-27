@@ -20,14 +20,14 @@ export default function MatchingCompanyRepeater({ rows, onChange, t, brandOption
 
   return (
     <div style={{ marginBottom: 12 }}>
-      <label style={S.fLabel}>Brands</label>
+      <label style={S.fLabel}>{t('brandsLabel')}</label>
       {rows.map((r, i) => (
         <div key={i} className="prg-matching-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 6, marginBottom: 6 }}>
           <input value={r.company_name} onChange={e => update(i, 'company_name', e.target.value)}
-            placeholder="Brand Name"
+            placeholder={t('brandName')}
             style={{ ...S.fInput, fontSize: 11 }} />
           <input list="dl-brand" value={r.matching_label} onChange={e => update(i, 'matching_label', e.target.value)}
-            placeholder="Brand"
+            placeholder={t('brandLabel')}
             style={{ ...S.fInput, fontSize: 11 }} />
           <button type="button" onClick={() => remove(i)}
             style={{ ...S.btnDanger, ...S.btnSm, fontSize: 10, padding: '4px 8px', cursor: 'pointer', alignSelf: 'center' }}>×</button>

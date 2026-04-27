@@ -12,6 +12,8 @@ export const en = {
   programUid: 'Program ID',
   sellingSku: 'Selling SKU',
   manufacturingSku: 'Manufacturing SKU',
+  fabricMeterCol: 'Fabric Meter',
+  workTotalCol: 'Work Total',
   matching: 'Matching',
   companies: 'Companies',
   createdBy: 'Created By',
@@ -35,24 +37,40 @@ export const en = {
   saveFailed: 'Save failed',
   conflictError: 'Record was modified by another user. Please refresh.',
 
-  // Matchings
+  // Brands (matching section)
+  brands: 'Brands',
+  brandsLabel: 'Brands',
+  brandName: 'Brand Name',
+  brandLabel: 'Brand',
+  addBrand: '+ Add Brand',
   companiesForMatching: 'Companies for this Matching',
   companyName: 'Company Name',
-  addCompany: '+ Add Company',
+  addCompany: '+ Add Brand',
   matchingLabelField: 'Matching Label',
+
+  // Form sections
+  programInfo: 'Program Info',
+  workProgram: 'Work Program',
+  fabricProgram: 'Fabric Program',
+  matchingProgram: 'Matching Program',
 
   // Price
   priceBreakdown: 'Price Breakdown',
   partName: 'Part Name',
   jobStitch: 'Job Stitch',
+  stitch: 'Stitch',
+  oneRs: '1 RS',
   stitchRate: 'Stitch Rate',
   oneMP: '1 M/P',
-  meterPerPcs: 'Meter/PCS',
+  meterPerPcs: 'MTR/PCS',
   rate: 'Rate',
   total: 'Total',
+  fabricName: 'Fabric Name',
   fabricMeter: 'Fabric Meter',
   addPart: '+ Add Part',
   grandTotal: 'Grand Total',
+  grandFabricTotal: 'Grand Fabric Total',
+  grandWorkTotal: 'Grand Work Total',
   savePrices: 'Save Prices',
   pricesSaved: 'Prices saved!',
 
@@ -76,6 +94,15 @@ export const en = {
   shareLink: 'Share Link',
   copyLink: 'Copy Link',
   copied: 'Link copied!',
+  back: 'Back',
+  openOriginal: 'Open original',
+  downloadPng: 'Download PNG',
+  prev: '← Prev',
+  next: 'Next →',
+  restored: 'Program restored',
+  remove: 'Remove',
+  removeVoiceConfirm: 'Remove this voice note?',
+  voiceRemoved: 'Voice note removed',
 
   // Voice
   record: 'Record',
@@ -85,6 +112,14 @@ export const en = {
   upload: 'Upload',
   recording: 'Recording...',
   noVoiceNote: 'No voice note attached.',
+  voiceHint: 'Max 1 minute (auto-stops) · Max 10MB file size',
+  voiceTooLarge: 'Voice note too large (max 10MB)',
+  invalidAudio: 'Invalid audio file',
+  uploadFailed: 'Upload failed',
+
+  // Empty state
+  noPrograms: 'No programs yet',
+  noProgramsHint: 'Create your first program to get started.',
 
   // Language
   language: 'Language',

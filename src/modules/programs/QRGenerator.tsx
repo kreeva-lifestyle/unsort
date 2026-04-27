@@ -98,7 +98,7 @@ export default function QRGenerator({ program, onClose, t }: Props) {
 
             <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
               <button onClick={handleCopy} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center', cursor: 'pointer' }}>{t('copyLink')}</button>
-              <button onClick={handleDownload} style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center', cursor: 'pointer' }}>Download PNG</button>
+              <button onClick={handleDownload} style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center', cursor: 'pointer' }}>{t('downloadPng')}</button>
             </div>
           </>
         )}

@@ -1,4 +1,5 @@
 export const gu = {
+  // પેજ
   title: 'પ્રોગ્રામ્સ',
   addProgram: '+ નવો પ્રોગ્રામ',
   searchPlaceholder: 'પ્રોગ્રામ શોધો...',
@@ -7,15 +8,19 @@ export const gu = {
   loading: 'લોડ થઈ રહ્યું છે...',
   records: 'રેકોર્ડ',
 
+  // ટેબલ હેડર
   programUid: 'પ્રોગ્રામ ID',
   sellingSku: 'વેચાણ SKU',
   manufacturingSku: 'ઉત્પાદન SKU',
+  fabricMeterCol: 'ફેબ્રિક મીટર',
+  workTotalCol: 'કામનો કુલ',
   matching: 'મેચિંગ',
   companies: 'કંપનીઓ',
   createdBy: 'બનાવનાર',
   updatedAt: 'અપડેટ',
   actions: 'ક્રિયાઓ',
 
+  // ફોર્મ
   addTitle: 'પ્રોગ્રામ ઉમેરો',
   editTitle: 'પ્રોગ્રામ સંપાદિત કરો',
   sellingSkuLabel: 'વેચાણ SKU',
@@ -32,25 +37,44 @@ export const gu = {
   saveFailed: 'સાચવવામાં નિષ્ફળ',
   conflictError: 'આ રેકોર્ડ બીજા વપરાશકર્તા દ્વારા બદલાયો છે. કૃપા કરી રિફ્રેશ કરો.',
 
+  // બ્રાન્ડ્સ (મેચિંગ વિભાગ)
+  brands: 'બ્રાન્ડ્સ',
+  brandsLabel: 'બ્રાન્ડ્સ',
+  brandName: 'બ્રાન્ડનું નામ',
+  brandLabel: 'બ્રાન્ડ',
+  addBrand: '+ બ્રાન્ડ ઉમેરો',
   companiesForMatching: 'આ મેચિંગ માટે કંપનીઓ',
   companyName: 'કંપનીનું નામ',
-  addCompany: '+ કંપની ઉમેરો',
+  addCompany: '+ બ્રાન્ડ ઉમેરો',
   matchingLabelField: 'મેચિંગ લેબલ',
 
+  // ફોર્મ વિભાગો
+  programInfo: 'પ્રોગ્રામ માહિતી',
+  workProgram: 'કામ પ્રોગ્રામ',
+  fabricProgram: 'ફેબ્રિક પ્રોગ્રામ',
+  matchingProgram: 'મેચિંગ પ્રોગ્રામ',
+
+  // ભાવ
   priceBreakdown: 'ભાવ વિગત',
   partName: 'ભાગનું નામ',
   jobStitch: 'જોબ સ્ટિચ',
+  stitch: 'સ્ટિચ',
+  oneRs: '1 RS',
   stitchRate: 'સ્ટિચ રેટ',
   oneMP: '1 M/P',
-  meterPerPcs: 'મીટર/PCS',
+  meterPerPcs: 'MTR/PCS',
   rate: 'રેટ',
   total: 'કુલ',
+  fabricName: 'ફેબ્રિક નામ',
   fabricMeter: 'ફેબ્રિક મીટર',
   addPart: '+ ભાગ ઉમેરો',
   grandTotal: 'કુલ સરવાળો',
+  grandFabricTotal: 'કુલ ફેબ્રિક',
+  grandWorkTotal: 'કુલ કામ',
   savePrices: 'ભાવ સાચવો',
   pricesSaved: 'ભાવ સાચવ્યા!',
 
+  // ઇતિહાસ
   history: 'ઇતિહાસ',
   noHistory: 'હજુ સુધી કોઈ ફેરફાર નોંધાયો નથી.',
   create: 'બનાવ્યું',
@@ -59,6 +83,7 @@ export const gu = {
   priceUpdate: 'ભાવ અપડેટ',
   voiceUpload: 'વૉઇસ નોટ અપલોડ',
 
+  // ક્રિયાઓ
   view: 'જુઓ',
   edit: 'સંપાદન',
   qr: 'QR',
@@ -69,7 +94,17 @@ export const gu = {
   shareLink: 'શેર લિંક',
   copyLink: 'લિંક કૉપી',
   copied: 'લિંક કૉપી થઈ!',
+  back: 'પાછા',
+  openOriginal: 'મૂળ ખોલો',
+  downloadPng: 'PNG ડાઉનલોડ',
+  prev: '← પાછળ',
+  next: 'આગળ →',
+  restored: 'પ્રોગ્રામ પુનઃસ્થાપિત',
+  remove: 'દૂર કરો',
+  removeVoiceConfirm: 'આ વૉઇસ નોટ દૂર કરવી?',
+  voiceRemoved: 'વૉઇસ નોટ દૂર કરી',
 
+  // વૉઇસ
   record: 'રેકોર્ડ',
   stop: 'બંધ',
   play: 'ચલાવો',
@@ -77,6 +112,15 @@ export const gu = {
   upload: 'અપલોડ',
   recording: 'રેકોર્ડિંગ...',
   noVoiceNote: 'કોઈ વૉઇસ નોટ જોડાયેલ નથી.',
+  voiceHint: 'મહત્તમ 1 મિનિટ (આપમેળે બંધ) · મહત્તમ 10MB ફાઇલ',
+  voiceTooLarge: 'વૉઇસ નોટ ખૂબ મોટી (મહત્તમ 10MB)',
+  invalidAudio: 'અમાન્ય ઑડિયો ફાઇલ',
+  uploadFailed: 'અપલોડ નિષ્ફળ',
 
+  // ખાલી સ્થિતિ
+  noPrograms: 'હજુ કોઈ પ્રોગ્રામ નથી',
+  noProgramsHint: 'શરૂ કરવા માટે તમારો પ્રથમ પ્રોગ્રામ બનાવો.',
+
+  // ભાષા
   language: 'ભાષા',
 } as const;

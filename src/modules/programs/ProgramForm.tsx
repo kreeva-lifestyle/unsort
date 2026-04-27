@@ -92,7 +92,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
 
         <div className="prg-form-body" style={{ padding: '0 20px 20px' }}>
           {/* ═══ SECTION 1: PROGRAM INFO ═══ */}
-          <SectionTitle color={T.ac2}>Program Info</SectionTitle>
+          <SectionTitle color={T.ac2}>{t('programInfo')}</SectionTitle>
           <div className="prg-sku-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
             <div>
               <label style={S.fLabel}>{t('sellingSkuLabel')}</label>
@@ -112,7 +112,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
           </div>
 
           {/* ═══ SECTION 2: WORK PROGRAM ═══ */}
-          <SectionTitle color={T.gr}>Work Program</SectionTitle>
+          <SectionTitle color={T.gr}>{t('workProgram')}</SectionTitle>
           <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 6 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
               <thead><tr>
@@ -150,7 +150,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
           <button onClick={() => setWorkParts(p => [...p, { ...EMPTY_WORK_PART, sort_order: p.length }])} style={{ ...S.btnGhost, fontSize: 9, padding: '4px 10px', cursor: 'pointer', marginBottom: 4 }}>+ Add Part</button>
 
           {/* ═══ SECTION 3: FABRIC PROGRAM ═══ */}
-          <SectionTitle color={T.bl}>Fabric Program</SectionTitle>
+          <SectionTitle color={T.bl}>{t('fabricProgram')}</SectionTitle>
           <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 6 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th style={{ ...th, width: '65%' }}>Part Name</th><th style={th}>Fabric Meter</th><th style={{ ...th, width: 24 }}></th></tr></thead>
@@ -172,12 +172,12 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
           <button onClick={() => setFabricParts(p => [...p, { ...EMPTY_FABRIC_PART, sort_order: p.length }])} style={{ ...S.btnGhost, fontSize: 9, padding: '4px 10px', cursor: 'pointer', marginBottom: 4 }}>+ Add Part</button>
 
           {/* ═══ SECTION 4: MATCHING / BRANDS ═══ */}
-          <SectionTitle color={T.yl}>Matching Program</SectionTitle>
+          <SectionTitle color={T.yl}>{t('matchingProgram')}</SectionTitle>
           <MatchingCompanyRepeater rows={form.matchings} onChange={v => setField('matchings', v)} t={t} brandOptions={brandNames} />
 
           {/* ═══ GRAND FABRIC TOTAL ═══ */}
           <div className="prg-grand-fabric" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginTop: 18, padding: '12px 16px', background: 'rgba(56,189,248,.06)', border: `1px solid rgba(56,189,248,.15)`, borderRadius: 10 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Grand Fabric Total (Work + Fabric)</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>{t('grandFabricTotal')} (Work + Fabric)</span>
             <span style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.bl }}>{(workFM + fabricFM).toFixed(2)} m</span>
           </div>
 
