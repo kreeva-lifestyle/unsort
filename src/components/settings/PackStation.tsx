@@ -1,28 +1,29 @@
-// PackStation settings — couriers + cameras CRUD
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
+import { useUndoDelete } from '../../hooks/useUndoDelete';
+import UndoBar from '../ui/UndoBar';
 
 export default function PackStation({ addToast }: { addToast: (msg: string, type?: string) => void }) {
   const [couriers, setCouriers] = useState<any[]>([]);
   const [cameras, setCameras] = useState<any[]>([]);
   const [newCourier, setNewCourier] = useState('');
   const [newSheet, setNewSheet] = useState('');
-  const [pendingDel, setPendingDel] = useState<{ id: string; type: string; timer: number } | null>(null);
   const [newCamera, setNewCamera] = useState('');
+  const [delTable, setDelTable] = useState<'packtime_couriers' | 'packtime_cameras'>('packtime_couriers');
 
-  const fetchData = () => {
+  const fetchData = useCallback(() => {
     supabase.from('packtime_couriers').select('*').order('name').then(({ data }) => setCouriers(data || []));
     supabase.from('packtime_cameras').select('*').order('number').then(({ data }) => setCameras(data || []));
-  };
-  useEffect(() => { fetchData(); }, []);
+  }, []);
+  const { pendingDel, scheduleDelete, undo, dismiss } = useUndoDelete(delTable, fetchData);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const addCourier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourier.trim() || !newSheet.trim()) return;
-    const exists = couriers.some(c => c.name.toLowerCase() === newCourier.trim().toLowerCase());
-    if (exists) { addToast('Courier already exists', 'error'); return; }
+    if (couriers.some(c => c.name.toLowerCase() === newCourier.trim().toLowerCase())) { addToast('Courier already exists', 'error'); return; }
     const { error } = await supabase.from('packtime_couriers').insert({ name: newCourier.trim(), sheet_name: newSheet.trim() });
     if (error) addToast(friendlyError(error), 'error');
     else { addToast('Courier added!', 'success'); setNewCourier(''); setNewSheet(''); fetchData(); }
@@ -40,9 +41,8 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
     const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('courier', c?.name);
     if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this courier`, 'error'); return; }
     setCouriers(prev => prev.filter(x => x.id !== id));
-    if (pendingDel) clearTimeout(pendingDel.timer);
-    const timer = window.setTimeout(async () => { await supabase.from('packtime_couriers').delete().eq('id', id); setPendingDel(null); fetchData(); }, 5000);
-    setPendingDel({ id, type: 'Courier', timer });
+    setDelTable('packtime_couriers');
+    scheduleDelete(id, 'Courier deleted');
   };
 
   const addCamera = async (e: React.FormEvent) => {
@@ -59,16 +59,12 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
     const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('camera', cam?.number);
     if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this camera`, 'error'); return; }
     setCameras(prev => prev.filter(x => x.id !== id));
-    if (pendingDel) clearTimeout(pendingDel.timer);
-    const timer = window.setTimeout(async () => { await supabase.from('packtime_cameras').delete().eq('id', id); setPendingDel(null); fetchData(); }, 5000);
-    setPendingDel({ id, type: 'Camera', timer });
+    setDelTable('packtime_cameras');
+    scheduleDelete(id, 'Camera deleted');
   };
-  const undoDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); setPendingDel(null); fetchData(); } };
-  const dismissDel = () => { if (pendingDel) { clearTimeout(pendingDel.timer); const table = pendingDel.type === 'Courier' ? 'packtime_couriers' : 'packtime_cameras'; supabase.from(table).delete().eq('id', pendingDel.id).then(() => fetchData()); setPendingDel(null); } };
 
   return (
     <div>
-      {/* Couriers */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Courier Companies</div>
         <form onSubmit={addCourier} style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
@@ -93,8 +89,6 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
           {couriers.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No couriers configured</div>}
         </div>
       </div>
-
-      {/* Cameras */}
       <div>
         <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Cameras</div>
         <form onSubmit={addCamera} style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
@@ -114,10 +108,7 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
           {cameras.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No cameras configured</div>}
         </div>
       </div>
-      {pendingDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, animation: 'su .2s ease', overflow: 'hidden', minWidth: 260 }}>
-        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: T.tx, flex: 1 }}>{pendingDel.type} deleted</span><span onClick={undoDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#000' }}>Undo</span><span onClick={dismissDel} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span></div>
-        <div className="undo-bar" key={pendingDel.id} />
-      </div>}
+      {pendingDel && <UndoBar label={pendingDel.label} id={pendingDel.id} onUndo={undo} onDismiss={dismiss} />}
     </div>
   );
 }
