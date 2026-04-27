@@ -36,7 +36,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
     const undoRestore = async () => {
       clearTimeout(undoTimer);
       await supabase.from('programs').update({ is_deleted: false, updated_at: new Date().toISOString() }).eq('id', p.id);
-      addToast('Program restored', 'success');
+      addToast(t('restored'), 'success');
       reload();
     };
     // Show undo toast (auto-dismiss after 5s)
@@ -104,8 +104,8 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
         {!loading && programs.length === 0 && (
           <div style={{ padding: 30, textAlign: 'center' }}>
             <div style={{ fontSize: 32, marginBottom: 10 }}>{search ? '🔍' : '📋'}</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 6 }}>{search ? t('noResults') : 'No programs yet'}</div>
-            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>{search ? t('noResultsHint') : 'Create your first program to get started.'}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 6 }}>{search ? t('noResults') : t('noPrograms')}</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>{search ? t('noResultsHint') : t('noProgramsHint')}</div>
             {!search && <button onClick={onAdd} style={{ ...S.btnPrimary, fontSize: 11, padding: '7px 14px', cursor: 'pointer' }}>{t('addProgram')}</button>}
           </div>
         )}
@@ -116,8 +116,8 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
                 <th style={th}>{t('programUid')}</th>
                 <th style={th}>{t('sellingSku')}</th>
                 <th style={th}>{t('manufacturingSku')}</th>
-                <th style={th}>Fabric Meter</th>
-                <th style={th}>Work Total</th>
+                <th style={th}>{t('fabricMeterCol')}</th>
+                <th style={th}>{t('workTotalCol')}</th>
                 <th style={th}>{t('updatedAt')}</th>
                 <th style={th}>{t('actions')}</th>
               </tr>
@@ -160,10 +160,10 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
       {totalPages > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 10, alignItems: 'center' }}>
           <button disabled={page === 0} onClick={() => setPage(p => Math.max(0, p - 1))}
-            style={{ ...ghostBtn, opacity: page === 0 ? 0.3 : 1 }}>← Prev</button>
+            style={{ ...ghostBtn, opacity: page === 0 ? 0.3 : 1 }}>{t('prev')}</button>
           <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
           <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}
-            style={{ ...ghostBtn, opacity: page >= totalPages - 1 ? 0.3 : 1 }}>Next →</button>
+            style={{ ...ghostBtn, opacity: page >= totalPages - 1 ? 0.3 : 1 }}>{t('next')}</button>
         </div>
       )}
     </div>

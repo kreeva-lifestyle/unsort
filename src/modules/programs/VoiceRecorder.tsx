@@ -28,14 +28,14 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
   // Auto-upload when recording stops and blob is ready
   useEffect(() => {
     if (!audioBlob || uploading || uploadedRef.current) return;
-    if (audioBlob.size > MAX_SIZE) { addToast('Voice note too large (max 10MB)', 'error'); return; }
+    if (audioBlob.size > MAX_SIZE) { addToast(t('voiceTooLarge'), 'error'); return; }
     uploadedRef.current = true;
     (async () => {
       setUploading(true);
       const { path, error: upErr } = await uploadVoiceNote(programId, audioBlob, ext());
       setUploading(false);
-      if (upErr) { addToast(upErr.message || 'Upload failed', 'error'); uploadedRef.current = false; return; }
-      if (!path) { addToast('Upload returned no path', 'error'); uploadedRef.current = false; return; }
+      if (upErr) { addToast(upErr.message || t('uploadFailed'), 'error'); uploadedRef.current = false; return; }
+      if (!path) { addToast(t('uploadFailed'), 'error'); uploadedRef.current = false; return; }
       addToast(t('voiceUpload'), 'success');
       onUploaded(path);
       clear();
@@ -57,14 +57,14 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
           <audio controls src={existingUrl} style={{ flex: 1, height: 32 }} />
           <button onClick={async () => {
-            if (!confirm('Remove this voice note?')) return;
+            if (!confirm(t('removeVoiceConfirm'))) return;
             if (existingPath) {
               await supabase.storage.from('program-voice-notes').remove([existingPath]);
             }
             await supabase.from('programs').update({ voice_note_path: null, updated_at: new Date().toISOString() }).eq('id', programId);
             onUploaded('');
-            addToast('Voice note removed', 'success');
-          }} style={{ ...S.btnDanger, ...S.btnSm, fontSize: 9, padding: '4px 8px', cursor: 'pointer', flexShrink: 0 }}>Remove</button>
+            addToast(t('voiceRemoved'), 'success');
+          }} style={{ ...S.btnDanger, ...S.btnSm, fontSize: 9, padding: '4px 8px', cursor: 'pointer', flexShrink: 0 }}>{t('remove')}</button>
         </div>
       )}
 
@@ -108,13 +108,13 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
             <input type="file" accept="audio/*" style={{ display: 'none' }} onChange={async e => {
               const file = e.target.files?.[0];
               if (!file) return;
-              if (file.size > MAX_SIZE) { addToast('File too large (max 10MB)', 'error'); return; }
-              if (!VALID_MIMES.includes(file.type) && !file.type.startsWith('audio/')) { addToast('Invalid audio file', 'error'); return; }
+              if (file.size > MAX_SIZE) { addToast(t('voiceTooLarge'), 'error'); return; }
+              if (!VALID_MIMES.includes(file.type) && !file.type.startsWith('audio/')) { addToast(t('invalidAudio'), 'error'); return; }
               setUploading(true);
               const fileExt = file.name.split('.').pop() || 'webm';
               const { path, error: upErr } = await uploadVoiceNote(programId, file, fileExt);
               setUploading(false);
-              if (upErr || !path) { addToast(upErr?.message || 'Upload failed', 'error'); return; }
+              if (upErr || !path) { addToast(upErr?.message || t('uploadFailed'), 'error'); return; }
               addToast(t('voiceUpload'), 'success');
               onUploaded(path);
             }} />
@@ -122,7 +122,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
         </div>
       )}
 
-      {recording && <div style={{ fontSize: 9, color: T.tx3, marginTop: 4 }}>Max 1 minute (auto-stops) · Max 10MB file size</div>}
+      {recording && <div style={{ fontSize: 9, color: T.tx3, marginTop: 4 }}>{t('voiceHint')}</div>}
       {error && <div style={{ ...S.errorBox, marginTop: 6 }}>{error}</div>}
       {!existingUrl && !audioUrl && !recording && <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>{t('noVoiceNote')}</div>}
     </div>
