@@ -51,9 +51,12 @@ function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: Progra
   if (!w) return;
   const esc = (s: string | null) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const imageUrl = p.dropbox_gdrive_link ? toDirectImageUrl(p.dropbox_gdrive_link) : '';
-  const typeLabel = (v: string) => v === 'meter' ? L.meter : v === 'piece' ? L.piece : '';
+  const typeLabel = (v: string) => v === 'piece' ? L.piece : L.meter;
+  const n = (v: number | null) => Number(v || 0);
+  const showNum = (v: number | null, decimals = 2) => { const x = n(v); return x ? x.toFixed(decimals) : '—'; };
+  const showRupee = (v: number | null) => { const x = n(v); return x ? '₹' + x.toFixed(2) : '—'; };
 
-  w.document.write(`<!doctype html><html><head><title>${L.programReport} ${esc(p.program_uid)}</title>
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${L.programReport} ${esc(p.program_uid)}</title>
     <style>
       @page { size: A4; margin: 12mm; }
       body { font-family: Arial, sans-serif; color: #222; margin: 0; padding: 0; font-size: 11px; }
@@ -94,14 +97,15 @@ function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: Progra
     if (workParts.length > 0) {
       w.document.write(`<h2>${esc(L.workProgram)}</h2><table><thead><tr><th>${esc(L.partName)}</th><th class="right">${esc(L.stitch)}</th><th>${esc(L.stitchType)}</th><th class="right">${esc(L.oneRs)}</th><th class="right">${esc(L.stitchRate)}</th><th class="right">${esc(L.oneMP)}</th><th class="right">${esc(L.meterPerPcs)}</th><th class="right">${esc(L.rate)}</th><th class="right">${esc(L.total)}</th><th>${esc(L.fabricName)}</th><th class="right">${esc(L.fabricMeter)}</th></tr></thead><tbody>`);
       workParts.forEach(pt => {
-        w.document.write(`<tr><td>${esc(pt.part_name)}</td><td class="right">${Number(pt.stitch || 0)}</td><td>${esc(typeLabel(pt.stitch_type))}</td><td class="right">${Number(pt.one_rs || 0).toFixed(2)}</td><td class="right">${Number(pt.stitch_rate || 0).toFixed(2)}</td><td class="right">${Number(pt.one_mp || 0)}</td><td class="right">${Number(pt.meter_per_pcs || 0).toFixed(2)}</td><td class="right">${Number(pt.rate || 0).toFixed(2)}</td><td class="right">��${Number(pt.total || 0).toFixed(2)}</td><td>${esc(pt.fabric_name)}</td><td class="right">${Number(pt.fabric_meter || 0).toFixed(2)}</td></tr>`);
+        const s = n(pt.stitch), mp = n(pt.one_mp);
+        w.document.write(`<tr><td>${esc(pt.part_name) || '—'}</td><td class="right">${s || '—'}</td><td>${esc(typeLabel(pt.stitch_type))}</td><td class="right">${showNum(pt.one_rs)}</td><td class="right">${showNum(pt.stitch_rate)}</td><td class="right">${mp || '—'}</td><td class="right">${showNum(pt.meter_per_pcs)}</td><td class="right">${showNum(pt.rate)}</td><td class="right">${showRupee(pt.total)}</td><td>${esc(pt.fabric_name) || '—'}</td><td class="right">${showNum(pt.fabric_meter)}</td></tr>`);
       });
-      w.document.write(`<tr class="total-row"><td colspan="8" style="text-align:right">${esc(L.grandTotal)}</td><td class="right">₹${grandTotal.toFixed(2)}</td><td style="text-align:right">${esc(L.totalFM)}</td><td class="right">${workParts.reduce((s, pt) => s + Number(pt.fabric_meter || 0), 0).toFixed(2)}</td></tr></tbody></table>`);
+      w.document.write(`<tr class="total-row"><td colspan="8" style="text-align:right">${esc(L.grandTotal)}</td><td class="right">${grandTotal ? '₹' + grandTotal.toFixed(2) : '—'}</td><td style="text-align:right">${esc(L.totalFM)}</td><td class="right">${workParts.reduce((s, pt) => s + Number(pt.fabric_meter || 0), 0).toFixed(2)}</td></tr></tbody></table>`);
     }
     if (fabricPartsList.length > 0) {
       const fabricTotal = fabricPartsList.reduce((s, pt) => s + Number(pt.fabric_meter || 0), 0);
       w.document.write(`<h2>${esc(L.fabricProgram)}</h2><table><thead><tr><th>${esc(L.partName)}</th><th class="right">${esc(L.fabricMeter)}</th></tr></thead><tbody>`);
-      fabricPartsList.forEach(pt => { w.document.write(`<tr><td>${esc(pt.part_name)}</td><td class="right">${Number(pt.fabric_meter || 0).toFixed(2)}</td></tr>`); });
+      fabricPartsList.forEach(pt => { w.document.write(`<tr><td>${esc(pt.part_name) || '—'}</td><td class="right">${showNum(pt.fabric_meter)}</td></tr>`); });
       w.document.write(`<tr class="total-row"><td style="text-align:right">${esc(L.grandTotal)}</td><td class="right">${fabricTotal.toFixed(2)}</td></tr></tbody></table>`);
       const grandFabric = workParts.reduce((s, pt) => s + Number(pt.fabric_meter || 0), 0) + fabricTotal;
       w.document.write(`<p style="text-align:right;font-weight:700;color:#0066cc">${esc(L.grandFabricTotal)}: ${grandFabric.toFixed(2)} m</p>`);
