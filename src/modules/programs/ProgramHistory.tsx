@@ -38,7 +38,7 @@ export default function ProgramHistory({ programId, t }: Props) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 600, color: T.tx, textTransform: 'capitalize' }}>{e.action.replace('_', ' ')}</span>
                 {e.field_changed && <span style={{ color: T.tx2, fontFamily: T.mono, fontWeight: 500 }}>{e.field_changed}</span>}
-                {e.user_email && <span style={{ color: T.tx3 }}>by {e.user_email}</span>}
+                {e.user_email && <span style={{ color: T.tx3 }}>{t('byPrefix')}{e.user_email}</span>}
               </div>
               {e.old_value != null && e.new_value != null && (
                 <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 3 }}>

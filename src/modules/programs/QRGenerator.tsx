@@ -33,7 +33,7 @@ export default function QRGenerator({ program, onClose, t }: Props) {
         setLoading(true);
         const { token: newToken, error } = await generateShareToken(program.id);
         setLoading(false);
-        if (error || !newToken) { addToast('Failed to generate QR', 'error'); return; }
+        if (error || !newToken) { addToast(t('qrFailed'), 'error'); return; }
         token = newToken;
       }
       const url = getShareUrl(token);
@@ -59,8 +59,8 @@ export default function QRGenerator({ program, onClose, t }: Props) {
         ctx.fillStyle = '#9AA8C2';
         ctx.font = '11px Inter, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('Unable to generate QR code', 110, 100);
-        ctx.fillText('Please contact support', 110, 120);
+        ctx.fillText(t('qrError'), 110, 100);
+        ctx.fillText(t('contactSupport'), 110, 120);
       }
     }
   };

@@ -49,6 +49,7 @@ export default function ProgramsModule() {
     const { parts } = await fetchPriceWithParts(p.id);
     const wk = parts.filter(pt => (pt.section || 'work') === 'work').map(pt => ({
       id: pt.id, part_name: pt.part_name || '', stitch: Number(pt.stitch || 0),
+      stitch_type: pt.stitch_type || '',
       one_rs: Number(pt.one_rs || 0), stitch_rate: Number(pt.stitch_rate || 0),
       one_mp: Number(pt.one_mp || 0), meter_per_pcs: Number(pt.meter_per_pcs || 0),
       rate: Number(pt.rate || 0), total: Number(pt.total || 0),
@@ -56,7 +57,7 @@ export default function ProgramsModule() {
       section: 'work' as const, sort_order: pt.sort_order,
     }));
     const fb = parts.filter(pt => pt.section === 'fabric').map(pt => ({
-      id: pt.id, part_name: pt.part_name || '', stitch: 0, one_rs: 0, stitch_rate: 0,
+      id: pt.id, part_name: pt.part_name || '', stitch: 0, stitch_type: '', one_rs: 0, stitch_rate: 0,
       one_mp: 0, meter_per_pcs: 0, rate: 0, total: 0,
       fabric_name: pt.fabric_name || '', fabric_meter: Number(pt.fabric_meter || 0),
       section: 'fabric' as const, sort_order: pt.sort_order,
@@ -97,6 +98,7 @@ export default function ProgramsModule() {
 
       {showForm && (
         <ProgramForm
+          key={form.editing?.id ?? 'new'}
           form={form.form}
           setField={form.setField}
           editing={form.editing}

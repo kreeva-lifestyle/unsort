@@ -37,7 +37,7 @@ export async function fetchPriceWithParts(programId: string) {
     .eq('program_id', programId).maybeSingle();
   if (!price) return { price: null, parts: [] };
   const { data: parts } = await supabase.from('program_price_parts')
-    .select('id, program_price_id, part_name, stitch, one_rs, stitch_rate, one_mp, meter_per_pcs, rate, total, fabric_name, fabric_meter, section, sort_order, created_at')
+    .select('id, program_price_id, part_name, stitch, stitch_type, one_rs, stitch_rate, one_mp, meter_per_pcs, rate, total, fabric_name, fabric_meter, section, sort_order, created_at')
     .eq('program_price_id', price.id).order('sort_order');
   return { price: price as ProgramPrice, parts: (parts as ProgramPricePart[] | null) || [] };
 }

@@ -36,8 +36,10 @@ export const gu = {
   saved: 'પ્રોગ્રામ સાચવ્યો!',
   saveFailed: 'સાચવવામાં નિષ્ફળ',
   conflictError: 'આ રેકોર્ડ બીજા વપરાશકર્તા દ્વારા બદલાયો છે. કૃપા કરી રિફ્રેશ કરો.',
+  skuPlaceholderSell: 'દા.ત. SKU-SELL-001',
+  skuPlaceholderMfg: 'દા.ત. SKU-MFG-001',
 
-  // બ્રાન્ડ્સ (મેચિંગ વિભાગ)
+  // બ્રાન્ડ્સ
   brands: 'બ્રાન્ડ્સ',
   brandsLabel: 'બ્રાન્ડ્સ',
   brandName: 'બ્રાન્ડનું નામ',
@@ -54,12 +56,15 @@ export const gu = {
   fabricProgram: 'ફેબ્રિક પ્રોગ્રામ',
   matchingProgram: 'મેચિંગ પ્રોગ્રામ',
 
-  // ભાવ
+  // ભાવ ટેબલ હેડર + ફીલ્ડ
   priceBreakdown: 'ભાવ વિગત',
   partName: 'ભાગનું નામ',
-  jobStitch: 'જોબ સ્ટિચ',
   stitch: 'સ્ટિચ',
+  stitchType: 'પ્રકાર',
+  meter: 'મીટર',
+  piece: 'પીસ',
   oneRs: '1 RS',
+  jobStitch: 'જોબ સ્ટિચ',
   stitchRate: 'સ્ટિચ રેટ',
   oneMP: '1 M/P',
   meterPerPcs: 'MTR/PCS',
@@ -67,12 +72,21 @@ export const gu = {
   total: 'કુલ',
   fabricName: 'ફેબ્રિક નામ',
   fabricMeter: 'ફેબ્રિક મીટર',
+  fm: 'FM',
+  totalFM: 'કુલ FM',
   addPart: '+ ભાગ ઉમેરો',
   grandTotal: 'કુલ સરવાળો',
   grandFabricTotal: 'કુલ ફેબ્રિક',
   grandWorkTotal: 'કુલ કામ',
+  fabricBreakdown: 'ફેબ્રિક વિગત',
   savePrices: 'ભાવ સાચવો',
   pricesSaved: 'ભાવ સાચવ્યા!',
+
+  // પ્લેસહોલ્ડર
+  partPlaceholder: 'ભાગ',
+  fabricPlaceholder: 'ફેબ્રિક',
+  partSingular: 'ભાગ',
+  partPlural: 'ભાગો',
 
   // ઇતિહાસ
   history: 'ઇતિહાસ',
@@ -82,6 +96,7 @@ export const gu = {
   delete: 'કાઢી નાખ્યું',
   priceUpdate: 'ભાવ અપડેટ',
   voiceUpload: 'વૉઇસ નોટ અપલોડ',
+  byPrefix: 'દ્વારા ',
 
   // ક્રિયાઓ
   view: 'જુઓ',
@@ -104,6 +119,12 @@ export const gu = {
   removeVoiceConfirm: 'આ વૉઇસ નોટ દૂર કરવી?',
   voiceRemoved: 'વૉઇસ નોટ દૂર કરી',
 
+  // QR ભૂલો
+  qrFailed: 'QR બનાવવામાં નિષ્ફળ',
+  qrError: 'QR કોડ બનાવવામાં અસમર્થ',
+  contactSupport: 'કૃપા કરીને સપોર્ટનો સંપર્ક કરો',
+  shareLinkFailed: 'શેર લિંક બનાવવામાં નિષ્ફળ',
+
   // વૉઇસ
   record: 'રેકોર્ડ',
   stop: 'બંધ',
@@ -120,6 +141,16 @@ export const gu = {
   // ખાલી સ્થિતિ
   noPrograms: 'હજુ કોઈ પ્રોગ્રામ નથી',
   noProgramsHint: 'શરૂ કરવા માટે તમારો પ્રથમ પ્રોગ્રામ બનાવો.',
+
+  // જાહેર શેર / PDF
+  programReport: 'પ્રોગ્રામ રિપોર્ટ',
+  sharedReport: 'શેર કરેલો પ્રોગ્રામ રિપોર્ટ',
+  generated: 'બનાવ્યું',
+  poweredBy: 'DailyOffice · Arya Designs દ્વારા સંચાલિત',
+  aryadesigns: 'Arya Designs',
+  notFound: 'મળ્યું નથી',
+  notFoundOrExpired: 'પ્રોગ્રામ મળ્યો નથી અથવા લિંક સમાપ્ત.',
+  companiesCount: 'કંપનીઓ',
 
   // ભાષા
   language: 'ભાષા',
