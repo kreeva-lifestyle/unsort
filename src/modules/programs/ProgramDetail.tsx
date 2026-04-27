@@ -142,10 +142,6 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
                     <td style={{ ...td, fontFamily: T.mono, textAlign: 'right', color: T.bl }}>{Number(p.fabric_meter || 0).toFixed(2)}</td>
                   </tr>
                 ))}
-                <tr style={{ background: 'rgba(52,211,153,.08)' }}>
-                  <td colSpan={9} style={{ padding: '8px 8px', fontSize: 11, fontWeight: 700, textAlign: 'right' }}>{t('grandTotal')}</td>
-                  <td style={{ padding: '8px 8px', fontFamily: T.sora, fontSize: 14, fontWeight: 700, color: T.gr, textAlign: 'right' }}>₹{workTotal.toFixed(0)}</td>
-                </tr>
               </tbody>
             </table>
           </div>
@@ -179,11 +175,19 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         </div>
       )}
 
-      {/* Grand Fabric Total */}
+      {/* Summary totals */}
       {(workParts.length > 0 || fabricParts.length > 0) && (
-        <div className="prg-grand-fabric" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginBottom: 16, padding: '10px 14px', background: 'rgba(56,189,248,.06)', border: `1px solid rgba(56,189,248,.15)`, borderRadius: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Grand Fabric Total</span>
-          <span style={{ fontFamily: T.sora, fontSize: 16, fontWeight: 700, color: T.bl }}>{(workFM + fabricFM).toFixed(2)} m</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          <div className="prg-grand-fabric" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'rgba(56,189,248,.06)', border: `1px solid rgba(56,189,248,.15)`, borderRadius: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Grand Fabric Total</span>
+            <span style={{ fontFamily: T.sora, fontSize: 16, fontWeight: 700, color: T.bl }}>{(workFM + fabricFM).toFixed(2)} m</span>
+          </div>
+          {workTotal > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'rgba(52,211,153,.06)', border: `1px solid rgba(52,211,153,.15)`, borderRadius: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Grand Work Total</span>
+              <span style={{ fontFamily: T.sora, fontSize: 16, fontWeight: 700, color: T.gr }}>₹{workTotal.toLocaleString('en-IN')}</span>
+            </div>
+          )}
         </div>
       )}
 
