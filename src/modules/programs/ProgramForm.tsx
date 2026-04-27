@@ -128,10 +128,10 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                     <td style={td}><input type="number" min="0" value={p.stitch || ''} onChange={e => updateWork(i, 'stitch', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
                     <td style={td}><input type="number" min="0" step="0.01" value={p.one_rs || ''} onChange={e => updateWork(i, 'one_rs', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
                     <td style={td}><input type="number" min="0" step="0.01" value={p.stitch_rate || ''} onChange={e => updateWork(i, 'stitch_rate', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
-                    <td style={calcCell}>{p.one_mp || 0}</td>
+                    <td style={calcCell}>{p.one_mp ? p.one_mp : '—'}</td>
                     <td style={td}><input type="number" min="0" step="0.01" value={p.meter_per_pcs || ''} onChange={e => updateWork(i, 'meter_per_pcs', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
                     <td style={td}><input type="number" min="0" step="0.01" value={p.rate || ''} onChange={e => updateWork(i, 'rate', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
-                    <td style={{ ...calcCell, color: T.gr }}>₹{(p.total || 0).toFixed(0)}</td>
+                    <td style={{ ...calcCell, color: T.gr }}>{p.total ? '₹' + p.total.toFixed(0) : '—'}</td>
                     <td style={td}><input list="dl-fn" value={p.fabric_name} onChange={e => updateWork(i, 'fabric_name', e.target.value)} placeholder="Fabric" style={txtIn} /></td>
                     <td style={td}><input type="number" min="0" step="0.01" value={p.fabric_meter || ''} onChange={e => updateWork(i, 'fabric_meter', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
                     <td style={td}>{workParts.length > 1 && <button onClick={() => setWorkParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 13 }}>×</button>}</td>
@@ -139,7 +139,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                 ))}
                 <tr style={{ background: 'rgba(52,211,153,.10)', borderTop: `2px solid ${T.gr}` }}>
                   <td colSpan={9} style={{ padding: '7px 6px', fontSize: 11, fontWeight: 700, color: T.tx, textAlign: 'right' }}>{t('grandTotal')}</td>
-                  <td style={{ padding: '7px 4px', fontFamily: T.sora, fontSize: 13, fontWeight: 700, color: T.gr, textAlign: 'right' }}>₹{workGrandTotal.toFixed(0)}</td>
+                  <td style={{ padding: '7px 4px', fontFamily: T.sora, fontSize: 13, fontWeight: 700, color: T.gr, textAlign: 'right' }}>{workGrandTotal ? '₹' + workGrandTotal.toLocaleString('en-IN') : '—'}</td>
                   <td></td>
                 </tr>
               </tbody>
