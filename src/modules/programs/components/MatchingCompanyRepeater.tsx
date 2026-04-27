@@ -20,11 +20,11 @@ export default function MatchingCompanyRepeater({ rows, onChange, t, brandOption
 
   return (
     <div style={{ marginBottom: 12 }}>
-      <label style={S.fLabel}>{t('companiesForMatching')}</label>
+      <label style={S.fLabel}>Brands</label>
       {rows.map((r, i) => (
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 6, marginBottom: 6 }}>
           <input value={r.company_name} onChange={e => update(i, 'company_name', e.target.value)}
-            placeholder={t('companyName')}
+            placeholder="Brand Name"
             style={{ ...S.fInput, fontSize: 11 }} />
           <input list="dl-brand" value={r.matching_label} onChange={e => update(i, 'matching_label', e.target.value)}
             placeholder="Brand"
