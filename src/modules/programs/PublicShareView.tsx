@@ -27,7 +27,6 @@ export default function PublicShareView({ shareToken }: Props) {
   const program = data.program;
   const matchings = data.matchings || [];
   const parts = data.prices || [];
-  const history = data.history || [];
   const workParts = parts.filter((p: any) => (p.section || 'work') === 'work');
   const fabricParts = parts.filter((p: any) => p.section === 'fabric');
   const imageUrl = program.dropbox_gdrive_link ? toDirectImageUrl(program.dropbox_gdrive_link) : null;
@@ -161,21 +160,7 @@ export default function PublicShareView({ shareToken }: Props) {
           </div>
         )}
 
-        {/* History */}
-        {history.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ ...label, marginBottom: 6 }}>Edit History ({history.length})</div>
-            <div style={{ border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-              {history.slice(0, 15).map((h: any, i: number) => (
-                <div key={i} style={{ padding: '6px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 9, color: T.tx3 }}>
-                  <span style={{ fontWeight: 600, color: T.tx2, textTransform: 'capitalize' }}>{(h.action || '').replace('_', ' ')}</span>
-                  {h.field_changed && <span style={{ fontFamily: T.mono }}> · {h.field_changed}</span>}
-                  {' — '}{h.user_email || 'System'} · {new Date(h.changed_at).toLocaleString('en-IN')}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* History intentionally excluded from shared report — internal audit data */}
 
         <div style={{ textAlign: 'center', fontSize: 9, color: T.tx3, opacity: 0.4, marginTop: 20, paddingBottom: 20 }}>Powered by DailyOffice · Arya Designs</div>
       </div>
