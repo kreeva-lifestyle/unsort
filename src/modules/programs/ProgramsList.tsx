@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { T, S, Pill } from '../../lib/theme';
 import { usePrograms } from './hooks/usePrograms';
 import { useT } from './hooks/useT';
+import { supabase } from '../../lib/supabase';
 import { softDeleteProgram, generateShareToken, fetchMatchings } from './lib/supabase-rpc';
 import { getShareUrl } from './lib/share-token';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -30,6 +31,23 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
     if (error) { addToast(t('saveFailed'), 'error'); return; }
     addToast(t('deleted'), 'success');
     reload();
+    // 5-second undo window
+    const undoTimer = setTimeout(() => {}, 5000);
+    const undoRestore = async () => {
+      clearTimeout(undoTimer);
+      await supabase.from('programs').update({ is_deleted: false, updated_at: new Date().toISOString() }).eq('id', p.id);
+      addToast('Program restored', 'success');
+      reload();
+    };
+    // Show undo toast (auto-dismiss after 5s)
+    addToast(`${p.program_uid} deleted. Tap to undo.`, 'info');
+    // Store undo handler for the next 5 seconds
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest?.('[data-toast]')) { undoRestore(); document.removeEventListener('click', handler); }
+    };
+    document.addEventListener('click', handler);
+    setTimeout(() => document.removeEventListener('click', handler), 5000);
   };
 
   const handleCopyLink = async (p: Program) => {
@@ -85,9 +103,10 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
         {loading && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>{t('loading')}</div>}
         {!loading && programs.length === 0 && (
           <div style={{ padding: 30, textAlign: 'center' }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>📋</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, marginBottom: 4 }}>{t('noResults')}</div>
-            <div style={{ fontSize: 10, color: T.tx3 }}>{t('noResultsHint')}</div>
+            <div style={{ fontSize: 32, marginBottom: 10 }}>{search ? '🔍' : '📋'}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 6 }}>{search ? t('noResults') : 'No programs yet'}</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>{search ? t('noResultsHint') : 'Create your first program to get started.'}</div>
+            {!search && <button onClick={onAdd} style={{ ...S.btnPrimary, fontSize: 11, padding: '7px 14px', cursor: 'pointer' }}>{t('addProgram')}</button>}
           </div>
         )}
         {!loading && programs.length > 0 && (

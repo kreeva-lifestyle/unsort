@@ -27,6 +27,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       fetchProgramById(programId),
       fetchMatchings(programId),
     ]);
+    if (p?.is_deleted) { onClose(); return; }
     setProgram(p);
     setMatchings(m);
     setLoading(false);

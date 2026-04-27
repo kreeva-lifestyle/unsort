@@ -46,7 +46,7 @@ export default function ProgramPriceEditor({ programId, t }: Props) {
   }, []);
 
   const addPart = () => setParts(p => [...p, { ...EMPTY_PART, sort_order: p.length }]);
-  const removePart = (i: number) => setParts(p => p.filter((_, j) => j !== i));
+  const removePart = (i: number) => setParts(p => p.filter((_, j) => j !== i).map((pt, j) => ({ ...pt, sort_order: j })));
 
   const grandTotal = parts.reduce((s, p) => s + Number(p.total || 0), 0);
 
@@ -96,14 +96,14 @@ export default function ProgramPriceEditor({ programId, t }: Props) {
               <tr key={i}>
                 <td style={tdCell}><input value={p.part_name} onChange={e => updatePart(i, 'part_name', e.target.value)} style={textInput} /></td>
                 <td style={tdCell}><input value={p.job_stitch} onChange={e => updatePart(i, 'job_stitch', e.target.value)} style={textInput} /></td>
-                <td style={tdCell}><input type="number" value={p.stitch_rate || ''} onChange={e => updatePart(i, 'stitch_rate', Number(e.target.value))} style={numInput} /></td>
-                <td style={tdCell}><input type="number" value={p.one_mp || ''} onChange={e => updatePart(i, 'one_mp', Number(e.target.value))} style={numInput} /></td>
-                <td style={tdCell}><input type="number" value={p.meter_per_pcs || ''} onChange={e => updatePart(i, 'meter_per_pcs', Number(e.target.value))} style={numInput} /></td>
-                <td style={tdCell}><input type="number" value={p.rate || ''} onChange={e => updatePart(i, 'rate', Number(e.target.value))} style={numInput} /></td>
+                <td style={tdCell}><input type="number" min="0" step="0.01" value={p.stitch_rate || ''} onChange={e => updatePart(i, 'stitch_rate', Math.max(0, Number(e.target.value)))} style={numInput} /></td>
+                <td style={tdCell}><input type="number" min="0" step="0.01" value={p.one_mp || ''} onChange={e => updatePart(i, 'one_mp', Math.max(0, Number(e.target.value)))} style={numInput} /></td>
+                <td style={tdCell}><input type="number" min="0" step="0.0001" value={p.meter_per_pcs || ''} onChange={e => updatePart(i, 'meter_per_pcs', Math.max(0, Number(e.target.value)))} style={numInput} /></td>
+                <td style={tdCell}><input type="number" min="0" step="0.01" value={p.rate || ''} onChange={e => updatePart(i, 'rate', Math.max(0, Number(e.target.value)))} style={numInput} /></td>
                 <td style={{ ...tdCell, fontFamily: T.mono, fontSize: 11, fontWeight: 600, color: T.gr, padding: '5px 8px', textAlign: 'right' }}>
                   ₹{Number(p.total || 0).toFixed(2)}
                 </td>
-                <td style={tdCell}><input type="number" value={p.fabric_meter || ''} onChange={e => updatePart(i, 'fabric_meter', Number(e.target.value))} style={numInput} /></td>
+                <td style={tdCell}><input type="number" min="0" step="0.0001" value={p.fabric_meter || ''} onChange={e => updatePart(i, 'fabric_meter', Math.max(0, Number(e.target.value)))} style={numInput} /></td>
                 <td style={tdCell}>
                   {parts.length > 1 && (
                     <button onClick={() => removePart(i)} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(248,113,113,.1)')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>×</button>

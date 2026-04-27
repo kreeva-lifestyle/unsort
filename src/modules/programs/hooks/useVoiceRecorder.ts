@@ -39,7 +39,12 @@ export function useVoiceRecorder() {
       setDuration(0);
       setAudioUrl(null);
       setAudioBlob(null);
-      timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
+      timerRef.current = setInterval(() => {
+        setDuration(d => {
+          if (d >= 59) { recorder.stop(); return 60; }
+          return d + 1;
+        });
+      }, 1000);
     } catch (e: any) {
       setError(e?.message || 'Microphone access denied');
     }

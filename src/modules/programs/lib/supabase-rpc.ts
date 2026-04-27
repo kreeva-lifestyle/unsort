@@ -10,7 +10,7 @@ export async function fetchPrograms(opts: { search?: string; page?: number; page
     .eq('is_deleted', false)
     .order('created_at', { ascending: false })
     .range(page * pageSize, (page + 1) * pageSize - 1);
-  if (search) q = q.textSearch('search_vector', search, { type: 'websearch', config: 'simple' });
+  if (search && search.length <= 200) q = q.textSearch('search_vector', search, { type: 'websearch', config: 'simple' });
   const { data, count, error } = await q;
   return { data: (data as Program[] | null) || [], count: count || 0, error };
 }
@@ -97,7 +97,7 @@ export function getVoiceNoteUrl(path: string) {
 export async function fetchHistory(programId: string) {
   const { data, error } = await supabase.from('program_history')
     .select('id, program_id, user_id, user_email, action, field_changed, old_value, new_value, changed_at')
-    .eq('program_id', programId).order('changed_at', { ascending: false });
+    .eq('program_id', programId).order('changed_at', { ascending: false }).limit(100);
   return { data: (data as ProgramHistoryEntry[] | null) || [], error };
 }
 
