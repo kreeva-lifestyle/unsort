@@ -22,7 +22,7 @@ export default function MatchingCompanyRepeater({ rows, onChange, t, brandOption
     <div style={{ marginBottom: 12 }}>
       <label style={S.fLabel}>Brands</label>
       {rows.map((r, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 6, marginBottom: 6 }}>
+        <div key={i} className="prg-matching-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 6, marginBottom: 6 }}>
           <input value={r.company_name} onChange={e => update(i, 'company_name', e.target.value)}
             placeholder="Brand Name"
             style={{ ...S.fInput, fontSize: 11 }} />

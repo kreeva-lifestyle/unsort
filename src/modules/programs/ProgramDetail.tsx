@@ -45,7 +45,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', maxWidth: 800 }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingBottom: 12, borderBottom: `1px solid ${T.bd}` }}>
+      <div className="prg-detail-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingBottom: 12, borderBottom: `1px solid ${T.bd}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 15, fontWeight: 700, fontFamily: T.sora }}>{program.program_uid}</span>
           {program.selling_sku && <Pill tone="ac">{program.selling_sku}</Pill>}
@@ -59,7 +59,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       </div>
 
       {/* Info grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+      <div className="prg-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
         <div><div style={label}>{t('sellingSkuLabel')}</div><div style={{ ...val, fontFamily: T.mono }}>{program.selling_sku || '—'}</div></div>
         <div><div style={label}>{t('manufacturingSkuLabel')}</div><div style={{ ...val, fontFamily: T.mono }}>{program.manufacturing_sku || '—'}</div></div>
       </div>
@@ -90,7 +90,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       <VoiceRecorder programId={programId} existingPath={program.voice_note_path} onUploaded={() => load()} t={t} />
 
       {/* Tabs: Price | History */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, padding: 3, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
+      <div className="prg-tab-bar" style={{ display: 'flex', gap: 4, marginBottom: 12, padding: 3, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
         {(['price', 'history'] as const).map(id => (
           <button key={id} onClick={() => setTab(id)} style={{
             padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',

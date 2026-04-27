@@ -22,7 +22,7 @@ interface Props {
 const SectionTitle = ({ color, children }: { color: string; children: React.ReactNode }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, marginTop: 20 }}>
     <div style={{ width: 4, height: 18, borderRadius: 2, background: color }} />
-    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color }}>{children}</span>
+    <span className="prg-section-title" style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color }}>{children}</span>
     <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${T.bd} 0%, transparent 100%)` }} />
   </div>
 );
@@ -83,17 +83,17 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
   const calcCell: React.CSSProperties = { ...td, fontFamily: T.mono, fontSize: 11, fontWeight: 600, color: T.ac2, padding: '5px 4px', textAlign: 'right' as const };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(12px)', padding: '20px 16px', overflowY: 'auto' }} onClick={onClose}>
-      <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 900, width: '100%', margin: '20px 0' }} onClick={e => e.stopPropagation()}>
-        <div style={{ ...S.modalHead, position: 'sticky', top: 0, zIndex: 2, background: 'rgba(14,18,30,.98)', borderRadius: '14px 14px 0 0' }}>
+    <div className="prg-form-overlay" style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(12px)', padding: '20px 16px', overflowY: 'auto' }} onClick={onClose}>
+      <div className="prg-form-modal modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 900, width: '100%', margin: '20px 0' }} onClick={e => e.stopPropagation()}>
+        <div className="prg-form-head" style={{ ...S.modalHead, position: 'sticky', top: 0, zIndex: 2, background: 'rgba(14,18,30,.98)', borderRadius: '14px 14px 0 0' }}>
           <span style={S.modalTitle}>{editing ? t('editTitle') : t('addTitle')}</span>
           <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18 }}>&times;</span>
         </div>
 
-        <div style={{ padding: '0 20px 20px' }}>
+        <div className="prg-form-body" style={{ padding: '0 20px 20px' }}>
           {/* ═══ SECTION 1: PROGRAM INFO ═══ */}
           <SectionTitle color={T.ac2}>Program Info</SectionTitle>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+          <div className="prg-sku-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
             <div>
               <label style={S.fLabel}>{t('sellingSkuLabel')}</label>
               <input value={form.selling_sku} onChange={e => setField('selling_sku', e.target.value)} placeholder="e.g. SKU-SELL-001"
@@ -113,7 +113,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
 
           {/* ═══ SECTION 2: WORK PROGRAM ═══ */}
           <SectionTitle color={T.gr}>Work Program</SectionTitle>
-          <div style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 6 }}>
+          <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 6 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
               <thead><tr>
                 <th style={th}>Part Name</th><th style={th}>Stitch</th><th style={th}>1 RS</th>
@@ -153,7 +153,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
 
           {/* ═══ SECTION 3: FABRIC PROGRAM ═══ */}
           <SectionTitle color={T.bl}>Fabric Program</SectionTitle>
-          <div style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 6 }}>
+          <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 6 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th style={{ ...th, width: '65%' }}>Part Name</th><th style={th}>Fabric Meter</th><th style={{ ...th, width: 24 }}></th></tr></thead>
               <tbody>
@@ -179,7 +179,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
           <MatchingCompanyRepeater rows={form.matchings} onChange={v => setField('matchings', v)} t={t} brandOptions={brandNames} />
 
           {/* ═══ GRAND FABRIC TOTAL ═══ */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginTop: 18, padding: '12px 16px', background: 'rgba(56,189,248,.06)', border: `1px solid rgba(56,189,248,.15)`, borderRadius: 10 }}>
+          <div className="prg-grand-fabric" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginTop: 18, padding: '12px 16px', background: 'rgba(56,189,248,.06)', border: `1px solid rgba(56,189,248,.15)`, borderRadius: 10 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Grand Fabric Total (Work + Fabric)</span>
             <span style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.bl }}>{(workFM + fabricFM).toFixed(2)} m</span>
           </div>
@@ -188,7 +188,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
           {error && !isSkuError && <div style={{ ...S.errorBox, marginTop: 12 }}>{error === 'conflictError' ? t('conflictError') : error}</div>}
 
           {/* ═══ ACTIONS ═══ */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 16, borderTop: `1px solid ${T.bd}`, paddingTop: 16 }}>
+          <div className="prg-actions-row" style={{ display: 'flex', gap: 8, marginTop: 16, borderTop: `1px solid ${T.bd}`, paddingTop: 16 }}>
             <button onClick={onClose} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center', cursor: 'pointer', height: 40 }}>{t('cancel')}</button>
             <button onClick={handleSave} disabled={saving}
               style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.5 : 1, height: 40 }}>

@@ -140,7 +140,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
                     {new Date(p.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                   </td>
                   <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    <div className="prg-list-actions" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       <span onClick={() => onView(p)} style={{ ...ghostBtn, color: T.ac2 }}>{t('view')}</span>
                       <span onClick={() => handleEdit(p)} style={ghostBtn}>{t('edit')}</span>
                       <span onClick={() => onQR(p)} style={ghostBtn}>{t('qr')}</span>
