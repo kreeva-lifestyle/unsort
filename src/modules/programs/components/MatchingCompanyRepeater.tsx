@@ -6,9 +6,10 @@ interface Props {
   rows: Row[];
   onChange: (rows: Row[]) => void;
   t: (key: TranslationKey) => string;
+  brandOptions?: string[];
 }
 
-export default function MatchingCompanyRepeater({ rows, onChange, t }: Props) {
+export default function MatchingCompanyRepeater({ rows, onChange, t, brandOptions = [] }: Props) {
   const update = (i: number, field: keyof Row, value: string) => {
     const next = [...rows];
     next[i] = { ...next[i], [field]: value };
@@ -25,13 +26,14 @@ export default function MatchingCompanyRepeater({ rows, onChange, t }: Props) {
           <input value={r.company_name} onChange={e => update(i, 'company_name', e.target.value)}
             placeholder={t('companyName')}
             style={{ ...S.fInput, fontSize: 11 }} />
-          <input value={r.matching_label} onChange={e => update(i, 'matching_label', e.target.value)}
-            placeholder={t('matchingLabelField')}
+          <input list="dl-brand" value={r.matching_label} onChange={e => update(i, 'matching_label', e.target.value)}
+            placeholder="Brand"
             style={{ ...S.fInput, fontSize: 11 }} />
           <button type="button" onClick={() => remove(i)}
             style={{ ...S.btnDanger, ...S.btnSm, fontSize: 10, padding: '4px 8px', cursor: 'pointer', alignSelf: 'center' }}>×</button>
         </div>
       ))}
+      <datalist id="dl-brand">{brandOptions.map(n => <option key={n} value={n} />)}</datalist>
       <button type="button" onClick={add}
         style={{ ...S.btnGhost, fontSize: 10, padding: '4px 10px', cursor: 'pointer' }}>{t('addCompany')}</button>
     </div>

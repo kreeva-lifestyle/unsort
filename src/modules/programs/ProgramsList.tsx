@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { T, S, Pill } from '../../lib/theme';
+import { T, S } from '../../lib/theme';
 import { usePrograms } from './hooks/usePrograms';
 import { useT } from './hooks/useT';
 import { supabase } from '../../lib/supabase';
@@ -18,7 +18,7 @@ interface Props {
 
 export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Props) {
   const { t, lang, toggleLang } = useT();
-  const { programs, matchingCounts, loading, search, onSearch, page, setPage, pageSize, setPageSize, totalCount, reload } = usePrograms();
+  const { programs, priceSummaries, loading, search, onSearch, page, setPage, pageSize, setPageSize, totalCount, reload } = usePrograms();
   const { addToast } = useNotifications();
   const [deleting, setDeleting] = useState<string | null>(null);
   const totalPages = Math.ceil(totalCount / pageSize);
@@ -116,7 +116,8 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
                 <th style={th}>{t('programUid')}</th>
                 <th style={th}>{t('sellingSku')}</th>
                 <th style={th}>{t('manufacturingSku')}</th>
-                <th style={th}>{t('companies')}</th>
+                <th style={th}>Fabric Meter</th>
+                <th style={th}>Work Total</th>
                 <th style={th}>{t('updatedAt')}</th>
                 <th style={th}>{t('actions')}</th>
               </tr>
@@ -129,8 +130,11 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
                   <td style={{ ...td, fontFamily: T.mono, color: T.ac2, fontWeight: 600, cursor: 'pointer' }} onClick={() => onView(p)}>{p.program_uid}</td>
                   <td style={{ ...td, fontFamily: T.mono }}>{p.selling_sku || '—'}</td>
                   <td style={{ ...td, fontFamily: T.mono }}>{p.manufacturing_sku || '—'}</td>
-                  <td style={td}>
-                    {matchingCounts[p.id] ? <Pill tone="ac">{matchingCounts[p.id]}</Pill> : <span style={{ color: T.tx3 }}>—</span>}
+                  <td style={{ ...td, fontFamily: T.mono, color: T.bl, fontWeight: 600 }}>
+                    {priceSummaries[p.id] ? priceSummaries[p.id].fabricMeter.toFixed(2) + ' m' : '—'}
+                  </td>
+                  <td style={{ ...td, fontFamily: T.mono, color: T.gr, fontWeight: 600 }}>
+                    {priceSummaries[p.id] ? '₹' + priceSummaries[p.id].workTotal.toLocaleString('en-IN') : '—'}
                   </td>
                   <td style={{ ...td, fontSize: 10, color: T.tx3 }}>
                     {new Date(p.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}

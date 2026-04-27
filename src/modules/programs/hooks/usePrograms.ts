@@ -1,12 +1,13 @@
 // Programs list + search + realtime subscription hook
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { fetchPrograms, fetchMatchingCounts } from '../lib/supabase-rpc';
+import { fetchPrograms, fetchMatchingCounts, fetchPriceSummaries } from '../lib/supabase-rpc';
 import type { Program } from '../types';
 
 export function usePrograms() {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [matchingCounts, setMatchingCounts] = useState<Record<string, number>>({});
+  const [priceSummaries, setPriceSummaries] = useState<Record<string, { workTotal: number; fabricMeter: number }>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
@@ -19,8 +20,10 @@ export function usePrograms() {
     const { data, count } = await fetchPrograms({ search: s ?? search, page, pageSize });
     setPrograms(data);
     setTotalCount(count);
-    const counts = await fetchMatchingCounts(data.map(p => p.id));
+    const ids = data.map(p => p.id);
+    const [counts, summaries] = await Promise.all([fetchMatchingCounts(ids), fetchPriceSummaries(ids)]);
     setMatchingCounts(counts);
+    setPriceSummaries(summaries);
     setLoading(false);
   }, [search, page, pageSize]);
 
@@ -47,5 +50,5 @@ export function usePrograms() {
     return () => { supabase.removeChannel(ch); };
   }, [load]);
 
-  return { programs, matchingCounts, loading, search, onSearch, page, setPage, pageSize, setPageSize, totalCount, reload: load };
+  return { programs, matchingCounts, priceSummaries, loading, search, onSearch, page, setPage, pageSize, setPageSize, totalCount, reload: load };
 }

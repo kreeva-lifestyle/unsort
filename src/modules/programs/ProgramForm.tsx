@@ -1,6 +1,9 @@
+import { useState, useEffect } from 'react';
 import { T, S } from '../../lib/theme';
 import MatchingCompanyRepeater from './components/MatchingCompanyRepeater';
-import type { ProgramFormData, Program } from './types';
+import { fetchLookup, addLookup } from './lib/supabase-rpc';
+import type { ProgramFormData, Program, PricePartRow } from './types';
+import { EMPTY_WORK_PART, EMPTY_FABRIC_PART } from './types';
 import type { TranslationKey } from './i18n/en';
 
 interface Props {
@@ -9,57 +12,186 @@ interface Props {
   editing: Program | null;
   error: string;
   saving: boolean;
-  onSave: () => void;
+  onSave: (workParts: PricePartRow[], fabricParts: PricePartRow[]) => void;
   onClose: () => void;
   t: (key: TranslationKey) => string;
+  initialWorkParts?: PricePartRow[];
+  initialFabricParts?: PricePartRow[];
 }
 
-export default function ProgramForm({ form, setField, editing, error, saving, onSave, onClose, t }: Props) {
+const SectionTitle = ({ color, children }: { color: string; children: React.ReactNode }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, marginTop: 20 }}>
+    <div style={{ width: 4, height: 18, borderRadius: 2, background: color }} />
+    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color }}>{children}</span>
+    <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${T.bd} 0%, transparent 100%)` }} />
+  </div>
+);
+
+export default function ProgramForm({ form, setField, editing, error, saving, onSave, onClose, t, initialWorkParts, initialFabricParts }: Props) {
   const isSkuError = error === 'skuRequired';
+  const [workParts, setWorkParts] = useState<PricePartRow[]>(initialWorkParts?.length ? initialWorkParts : [{ ...EMPTY_WORK_PART }]);
+  const [fabricParts, setFabricParts] = useState<PricePartRow[]>(initialFabricParts?.length ? initialFabricParts : [{ ...EMPTY_FABRIC_PART }]);
+  const [partNames, setPartNames] = useState<string[]>([]);
+  const [fabricNames, setFabricNames] = useState<string[]>([]);
+  const [brandNames, setBrandNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      fetchLookup('program_lookup_part_names'),
+      fetchLookup('program_lookup_fabric_names'),
+      fetchLookup('program_lookup_brands'),
+    ]).then(([pn, fn, bn]) => { setPartNames(pn); setFabricNames(fn); setBrandNames(bn); });
+  }, []);
+
+  const updateWork = (i: number, field: keyof PricePartRow, value: string | number) => {
+    setWorkParts(prev => {
+      const next = [...prev];
+      const row = { ...next[i], [field]: value };
+      if (field === 'one_rs' || field === 'stitch_rate') {
+        row.one_mp = Math.round(Number(row.one_rs) * Number(row.stitch_rate));
+        row.total = Math.round(row.one_mp * Number(row.meter_per_pcs) * 100) / 100;
+      }
+      if (field === 'meter_per_pcs') { row.total = Math.round(Number(row.one_mp) * Number(value) * 100) / 100; }
+      next[i] = row;
+      return next;
+    });
+  };
+  const updateFabric = (i: number, field: keyof PricePartRow, value: string | number) => {
+    setFabricParts(prev => { const next = [...prev]; next[i] = { ...next[i], [field]: value }; return next; });
+  };
+
+  const workGrandTotal = workParts.reduce((s, p) => s + Number(p.total || 0), 0);
+  const workFM = workParts.reduce((s, p) => s + Number(p.fabric_meter || 0), 0);
+  const fabricFM = fabricParts.reduce((s, p) => s + Number(p.fabric_meter || 0), 0);
+
+  const handleSave = async () => {
+    // Auto-save new lookup entries
+    for (const p of [...workParts, ...fabricParts]) {
+      if (p.part_name && !partNames.includes(p.part_name)) await addLookup('program_lookup_part_names', p.part_name);
+      if (p.fabric_name && !fabricNames.includes(p.fabric_name)) await addLookup('program_lookup_fabric_names', p.fabric_name);
+    }
+    for (const m of form.matchings) {
+      if (m.matching_label && !brandNames.includes(m.matching_label)) await addLookup('program_lookup_brands', m.matching_label);
+    }
+    onSave(workParts, fabricParts);
+  };
+
+  const th: React.CSSProperties = { ...S.thStyle, padding: '7px 5px', fontSize: 8 };
+  const td: React.CSSProperties = { padding: '3px 2px', borderBottom: `1px solid ${T.bd}` };
+  const numIn: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontFamily: T.mono, fontSize: 11, padding: '5px 4px', outline: 'none', textAlign: 'right' as const, boxSizing: 'border-box' as const };
+  const txtIn: React.CSSProperties = { ...numIn, textAlign: 'left' as const };
+  const calcCell: React.CSSProperties = { ...td, fontFamily: T.mono, fontSize: 11, fontWeight: 600, color: T.ac2, padding: '5px 4px', textAlign: 'right' as const };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(12px)', padding: 16 }} onClick={onClose}>
-      <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-        <div style={S.modalHead}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(12px)', padding: '20px 16px', overflowY: 'auto' }} onClick={onClose}>
+      <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 900, width: '100%', margin: '20px 0' }} onClick={e => e.stopPropagation()}>
+        <div style={{ ...S.modalHead, position: 'sticky', top: 0, zIndex: 2, background: 'rgba(14,18,30,.98)', borderRadius: '14px 14px 0 0' }}>
           <span style={S.modalTitle}>{editing ? t('editTitle') : t('addTitle')}</span>
           <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18 }}>&times;</span>
         </div>
-        <div style={{ padding: '16px 18px' }}>
-          {/* SKU fields */}
+
+        <div style={{ padding: '0 20px 20px' }}>
+          {/* ═══ SECTION 1: PROGRAM INFO ═══ */}
+          <SectionTitle color={T.ac2}>Program Info</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
             <div>
               <label style={S.fLabel}>{t('sellingSkuLabel')}</label>
-              <input value={form.selling_sku} onChange={e => setField('selling_sku', e.target.value)}
-                placeholder="e.g. SKU-SELL-001"
-                style={{ ...S.fInput, fontSize: 11, border: isSkuError && !form.selling_sku ? `1px solid ${T.re}` : undefined }} />
+              <input value={form.selling_sku} onChange={e => setField('selling_sku', e.target.value)} placeholder="e.g. SKU-SELL-001"
+                style={{ ...S.fInput, fontSize: 11, borderColor: isSkuError && !form.selling_sku ? T.re : undefined }} />
             </div>
             <div>
               <label style={S.fLabel}>{t('manufacturingSkuLabel')}</label>
-              <input value={form.manufacturing_sku} onChange={e => setField('manufacturing_sku', e.target.value)}
-                placeholder="e.g. SKU-MFG-001"
-                style={{ ...S.fInput, fontSize: 11, border: isSkuError && !form.manufacturing_sku ? `1px solid ${T.re}` : undefined }} />
+              <input value={form.manufacturing_sku} onChange={e => setField('manufacturing_sku', e.target.value)} placeholder="e.g. SKU-MFG-001"
+                style={{ ...S.fInput, fontSize: 11, borderColor: isSkuError && !form.manufacturing_sku ? T.re : undefined }} />
             </div>
           </div>
           {isSkuError && <div style={{ ...S.errorBox, marginBottom: 10 }}>{t('skuRequired')}</div>}
-
-          {/* Companies repeater */}
-          <MatchingCompanyRepeater rows={form.matchings} onChange={v => setField('matchings', v)} t={t} />
-
-          {/* Link */}
           <div style={{ marginBottom: 12 }}>
             <label style={S.fLabel}>{t('linkLabel')}</label>
-            <input value={form.dropbox_gdrive_link} onChange={e => setField('dropbox_gdrive_link', e.target.value)}
-              placeholder={t('linkPlaceholder')} style={{ ...S.fInput, fontSize: 11 }} />
+            <input value={form.dropbox_gdrive_link} onChange={e => setField('dropbox_gdrive_link', e.target.value)} placeholder={t('linkPlaceholder')} style={{ ...S.fInput, fontSize: 11 }} />
+          </div>
+
+          {/* ═══ SECTION 2: WORK PROGRAM ═══ */}
+          <SectionTitle color={T.gr}>Work Program</SectionTitle>
+          <div style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 6 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
+              <thead><tr>
+                <th style={th}>Part Name</th><th style={th}>Stitch</th><th style={th}>1 RS</th>
+                <th style={th}>Stitch Rate</th><th style={th}>1 M/P</th><th style={th}>MTR/PCS</th>
+                <th style={th}>Rate</th><th style={th}>Total</th><th style={th}>Fabric Name</th>
+                <th style={th}>Fabric Meter</th><th style={{ ...th, width: 24 }}></th>
+              </tr></thead>
+              <tbody>
+                {workParts.map((p, i) => (
+                  <tr key={i}>
+                    <td style={td}><input list="dl-pn" value={p.part_name} onChange={e => updateWork(i, 'part_name', e.target.value)} placeholder="Part" style={txtIn} /></td>
+                    <td style={td}><input type="number" min="0" value={p.stitch || ''} onChange={e => updateWork(i, 'stitch', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
+                    <td style={td}><input type="number" min="0" step="0.01" value={p.one_rs || ''} onChange={e => updateWork(i, 'one_rs', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
+                    <td style={td}><input type="number" min="0" step="0.01" value={p.stitch_rate || ''} onChange={e => updateWork(i, 'stitch_rate', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
+                    <td style={calcCell}>{p.one_mp || 0}</td>
+                    <td style={td}><input type="number" min="0" step="0.01" value={p.meter_per_pcs || ''} onChange={e => updateWork(i, 'meter_per_pcs', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
+                    <td style={td}><input type="number" min="0" step="0.01" value={p.rate || ''} onChange={e => updateWork(i, 'rate', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
+                    <td style={{ ...calcCell, color: T.gr }}>₹{(p.total || 0).toFixed(0)}</td>
+                    <td style={td}><input list="dl-fn" value={p.fabric_name} onChange={e => updateWork(i, 'fabric_name', e.target.value)} placeholder="Fabric" style={txtIn} /></td>
+                    <td style={td}><input type="number" min="0" step="0.01" value={p.fabric_meter || ''} onChange={e => updateWork(i, 'fabric_meter', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
+                    <td style={td}>{workParts.length > 1 && <button onClick={() => setWorkParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 13 }}>×</button>}</td>
+                  </tr>
+                ))}
+                <tr style={{ background: 'rgba(52,211,153,.04)' }}>
+                  <td colSpan={7} style={{ padding: '7px 6px', fontSize: 11, fontWeight: 700, color: T.tx, textAlign: 'right' }}>{t('grandTotal')}</td>
+                  <td style={{ padding: '7px 4px', fontFamily: T.sora, fontSize: 13, fontWeight: 700, color: T.gr, textAlign: 'right' }}>₹{workGrandTotal.toFixed(0)}</td>
+                  <td style={{ padding: '7px 4px', fontSize: 9, fontWeight: 600, color: T.tx3, textAlign: 'right' }}>FM</td>
+                  <td style={{ padding: '7px 4px', fontFamily: T.mono, fontSize: 11, fontWeight: 700, color: T.bl, textAlign: 'right' }}>{workFM.toFixed(2)}</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+            <datalist id="dl-pn">{partNames.map(n => <option key={n} value={n} />)}</datalist>
+            <datalist id="dl-fn">{fabricNames.map(n => <option key={n} value={n} />)}</datalist>
+          </div>
+          <button onClick={() => setWorkParts(p => [...p, { ...EMPTY_WORK_PART, sort_order: p.length }])} style={{ ...S.btnGhost, fontSize: 9, padding: '4px 10px', cursor: 'pointer', marginBottom: 4 }}>+ Add Part</button>
+
+          {/* ═══ SECTION 3: FABRIC PROGRAM ═══ */}
+          <SectionTitle color={T.bl}>Fabric Program</SectionTitle>
+          <div style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 6 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr><th style={{ ...th, width: '65%' }}>Part Name</th><th style={th}>Fabric Meter</th><th style={{ ...th, width: 24 }}></th></tr></thead>
+              <tbody>
+                {fabricParts.map((p, i) => (
+                  <tr key={i}>
+                    <td style={td}><input list="dl-pn" value={p.part_name} onChange={e => updateFabric(i, 'part_name', e.target.value)} placeholder="Part" style={txtIn} /></td>
+                    <td style={td}><input type="number" min="0" step="0.01" value={p.fabric_meter || ''} onChange={e => updateFabric(i, 'fabric_meter', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
+                    <td style={td}>{fabricParts.length > 1 && <button onClick={() => setFabricParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 13 }}>×</button>}</td>
+                  </tr>
+                ))}
+                <tr style={{ background: 'rgba(56,189,248,.04)' }}>
+                  <td style={{ padding: '7px 6px', fontSize: 11, fontWeight: 700, color: T.tx, textAlign: 'right' }}>{t('grandTotal')}</td>
+                  <td style={{ padding: '7px 4px', fontFamily: T.mono, fontSize: 11, fontWeight: 700, color: T.bl, textAlign: 'right' }}>{fabricFM.toFixed(2)}</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <button onClick={() => setFabricParts(p => [...p, { ...EMPTY_FABRIC_PART, sort_order: p.length }])} style={{ ...S.btnGhost, fontSize: 9, padding: '4px 10px', cursor: 'pointer', marginBottom: 4 }}>+ Add Part</button>
+
+          {/* ═══ SECTION 4: MATCHING / BRANDS ═══ */}
+          <SectionTitle color={T.yl}>Matching Program</SectionTitle>
+          <MatchingCompanyRepeater rows={form.matchings} onChange={v => setField('matchings', v)} t={t} brandOptions={brandNames} />
+
+          {/* ═══ GRAND FABRIC TOTAL ═══ */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginTop: 18, padding: '12px 16px', background: 'rgba(56,189,248,.06)', border: `1px solid rgba(56,189,248,.15)`, borderRadius: 10 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Grand Fabric Total (Work + Fabric)</span>
+            <span style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.bl }}>{(workFM + fabricFM).toFixed(2)} m</span>
           </div>
 
           {/* Errors */}
-          {error && !isSkuError && <div style={{ ...S.errorBox, marginBottom: 10 }}>{error === 'conflictError' ? t('conflictError') : error}</div>}
+          {error && !isSkuError && <div style={{ ...S.errorBox, marginTop: 12 }}>{error === 'conflictError' ? t('conflictError') : error}</div>}
 
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: 8, borderTop: `1px solid ${T.bd}`, paddingTop: 14 }}>
-            <button onClick={onClose} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center', cursor: 'pointer' }}>{t('cancel')}</button>
-            <button onClick={onSave} disabled={saving}
-              style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.5 : 1 }}>
+          {/* ═══ ACTIONS ═══ */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 16, borderTop: `1px solid ${T.bd}`, paddingTop: 16 }}>
+            <button onClick={onClose} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center', cursor: 'pointer', height: 40 }}>{t('cancel')}</button>
+            <button onClick={handleSave} disabled={saving}
+              style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.5 : 1, height: 40 }}>
               {saving ? t('saving') : t('save')}
             </button>
           </div>

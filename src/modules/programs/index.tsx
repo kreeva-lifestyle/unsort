@@ -76,7 +76,7 @@ export default function ProgramsModule() {
           editing={form.editing}
           error={form.error}
           saving={form.saving}
-          onSave={form.save}
+          onSave={(workParts, fabricParts) => form.save(workParts, fabricParts)}
           onClose={() => { form.close(); setShowForm(false); }}
           t={t}
         />
