@@ -35,7 +35,8 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
 
   useEffect(() => {
     Promise.all([fetchLookup('program_lookup_part_names'), fetchLookup('program_lookup_fabric_names'), fetchLookup('program_lookup_brands')])
-      .then(([pn, fn, bn]) => { setPartNames(pn); setFabricNames(fn); setBrandNames(bn); });
+      .then(([pn, fn, bn]) => { setPartNames(pn); setFabricNames(fn); setBrandNames(bn); })
+      .catch(() => {});
   }, []);
 
   const updateWork = useCallback((i: number, field: keyof PricePartRow, value: string | number) => {

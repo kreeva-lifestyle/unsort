@@ -3,6 +3,7 @@ import { useVoiceRecorder } from './hooks/useVoiceRecorder';
 import { uploadVoiceNote, getVoiceNoteUrl } from './lib/supabase-rpc';
 import { supabase } from '../../lib/supabase';
 import { useNotifications } from '../../hooks/useNotifications';
+import { friendlyError } from '../../lib/friendlyError';
 import { useState, useEffect, useRef } from 'react';
 import type { TranslationKey } from './i18n/en';
 
@@ -34,7 +35,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
       setUploading(true);
       const { path, error: upErr } = await uploadVoiceNote(programId, audioBlob, ext());
       setUploading(false);
-      if (upErr) { addToast(upErr.message || t('uploadFailed'), 'error'); uploadedRef.current = false; return; }
+      if (upErr) { addToast(friendlyError(upErr), 'error'); uploadedRef.current = false; return; }
       if (!path) { addToast(t('uploadFailed'), 'error'); uploadedRef.current = false; return; }
       addToast(t('voiceUpload'), 'success');
       onUploaded(path);
@@ -114,7 +115,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
               const fileExt = file.name.split('.').pop() || 'webm';
               const { path, error: upErr } = await uploadVoiceNote(programId, file, fileExt);
               setUploading(false);
-              if (upErr || !path) { addToast(upErr?.message || t('uploadFailed'), 'error'); return; }
+              if (upErr || !path) { addToast(upErr ? friendlyError(upErr) : t('uploadFailed'), 'error'); return; }
               addToast(t('voiceUpload'), 'success');
               onUploaded(path);
             }} />

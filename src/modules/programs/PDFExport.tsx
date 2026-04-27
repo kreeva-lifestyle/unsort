@@ -17,11 +17,15 @@ export default function PDFExport({ programId, onClose, t }: Props) {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [{ data: program }, { data: matchings }, { parts }] = await Promise.all([
-        fetchProgramById(programId), fetchMatchings(programId), fetchPriceWithParts(programId),
-      ]);
+      let program, matchings, parts;
+      try {
+        const [r1, r2, r3] = await Promise.all([
+          fetchProgramById(programId), fetchMatchings(programId), fetchPriceWithParts(programId),
+        ]);
+        program = r1.data; matchings = r2.data; parts = r3.parts;
+      } catch { setLoading(false); onClose(); return; }
       setLoading(false);
-      if (!program) return;
+      if (!program) { onClose(); return; }
       const L = {
         aryadesigns: t('aryadesigns'), programReport: t('programReport'), generated: t('generated'),
         sellingSku: t('sellingSkuLabel'), manufacturingSku: t('manufacturingSkuLabel'),

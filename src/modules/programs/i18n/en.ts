@@ -14,9 +14,6 @@ export const en = {
   manufacturingSku: 'Manufacturing SKU',
   fabricMeterCol: 'Fabric Meter',
   workTotalCol: 'Work Total',
-  matching: 'Matching',
-  companies: 'Companies',
-  createdBy: 'Created By',
   updatedAt: 'Updated',
   actions: 'Actions',
 
@@ -25,7 +22,6 @@ export const en = {
   editTitle: 'Edit Program',
   sellingSkuLabel: 'Selling SKU',
   manufacturingSkuLabel: 'Manufacturing SKU',
-  matchingLabel: 'Matching',
   linkLabel: 'Dropbox / Google Drive Link',
   linkPlaceholder: 'Paste image link...',
   voiceNote: 'Voice Note',
@@ -44,11 +40,7 @@ export const en = {
   brandsLabel: 'Brands',
   brandName: 'Brand Name',
   brandLabel: 'Brand',
-  addBrand: '+ Add Brand',
-  companiesForMatching: 'Companies for this Matching',
-  companyName: 'Company Name',
   addCompany: '+ Add Brand',
-  matchingLabelField: 'Matching Label',
 
   // Form sections
   programInfo: 'Program Info',
@@ -56,15 +48,13 @@ export const en = {
   fabricProgram: 'Fabric Program',
   matchingProgram: 'Matching Program',
 
-  // Price table headers + fields
-  priceBreakdown: 'Price Breakdown',
+  // Price table
   partName: 'Part Name',
   stitch: 'Stitch',
   stitchType: 'Type',
   meter: 'Meter',
   piece: 'Piece',
   oneRs: '1 RS',
-  jobStitch: 'Job Stitch',
   stitchRate: 'Stitch Rate',
   oneMP: '1 M/P',
   meterPerPcs: 'MTR/PCS',
@@ -91,12 +81,7 @@ export const en = {
   // History
   history: 'History',
   noHistory: 'No changes recorded yet.',
-  create: 'Created',
-  update: 'Updated',
-  delete: 'Deleted',
-  priceUpdate: 'Price updated',
   voiceUpload: 'Voice note uploaded',
-  voiceDelete: 'Voice note removed',
   byPrefix: 'by ',
 
   // Actions
@@ -107,7 +92,6 @@ export const en = {
   deleteAction: 'Delete',
   deleteConfirm: 'Delete this program?',
   deleted: 'Program deleted.',
-  shareLink: 'Share Link',
   copyLink: 'Copy Link',
   copied: 'Link copied!',
   back: 'Back',
@@ -129,7 +113,6 @@ export const en = {
   // Voice
   record: 'Record',
   stop: 'Stop',
-  play: 'Play',
   reRecord: 'Re-record',
   upload: 'Upload',
   recording: 'Recording...',
@@ -151,7 +134,6 @@ export const en = {
   aryadesigns: 'Arya Designs',
   notFound: 'Not found',
   notFoundOrExpired: 'Program not found or link expired.',
-  companiesCount: 'Companies',
 
   // Language
   language: 'Language',
