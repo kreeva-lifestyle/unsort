@@ -78,12 +78,12 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
     onSave(workParts, fabricParts);
   };
 
-  const th: React.CSSProperties = { ...S.thStyle, padding: '7px 5px', fontSize: 10, color: T.ac2 };
-  const td: React.CSSProperties = { padding: '3px 2px', borderBottom: `1px solid ${T.bd}` };
-  const numIn: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontFamily: T.mono, fontSize: 11, padding: '5px 4px', outline: 'none', textAlign: 'right' as const, boxSizing: 'border-box' as const };
+  const th: React.CSSProperties = { ...S.thStyle, padding: '8px 8px', fontSize: 10, color: T.ac2 };
+  const td: React.CSSProperties = { padding: '4px 4px', borderBottom: `1px solid ${T.bd}` };
+  const numIn: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 11, padding: '6px 6px', outline: 'none', textAlign: 'right' as const, boxSizing: 'border-box' as const };
   const txtIn: React.CSSProperties = { ...numIn, textAlign: 'left' as const };
-  const selIn: React.CSSProperties = { ...numIn, textAlign: 'left' as const, appearance: 'none' as const, WebkitAppearance: 'none' as const, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%236B7890'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: 14, cursor: 'pointer' };
-  const calcCell: React.CSSProperties = { ...td, fontFamily: T.mono, fontSize: 11, fontWeight: 600, color: T.ac2, padding: '5px 4px', textAlign: 'right' as const, background: 'rgba(255,255,255,0.01)' };
+  const selIn: React.CSSProperties = { ...numIn, textAlign: 'left' as const, appearance: 'none' as const, WebkitAppearance: 'none' as const, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%236B7890'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center', paddingRight: 18, cursor: 'pointer' };
+  const calcCell: React.CSSProperties = { ...td, fontFamily: T.mono, fontSize: 11, fontWeight: 600, color: T.ac2, padding: '6px 6px', textAlign: 'right' as const, background: 'rgba(255,255,255,0.02)' };
 
   return (
     <div className="prg-form-overlay" style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(12px)', padding: '20px 16px', overflowY: 'auto' }} onClick={onClose}>
@@ -103,12 +103,12 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
 
           <SectionTitle color={T.gr}>{t('workProgram')}</SectionTitle>
           <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 6 }}>
-            <table id="work-tbl" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 880 }}>
+            <table id="work-tbl" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
               <thead><tr>
-                <th style={th}>{t('partName')}</th><th style={th}>{t('stitch')}</th><th style={th}>{t('stitchType')}</th><th style={th}>{t('oneRs')}</th>
-                <th style={th}>{t('stitchRate')}</th><th style={th}>{t('oneMP')}</th><th style={th}>{t('meterPerPcs')}</th>
-                <th style={th}>{t('rate')}</th><th style={th}>{t('total')}</th><th style={th}>{t('fabricName')}</th>
-                <th style={th}>{t('fabricMeter')}</th><th style={{ ...th, width: 24 }}></th>
+                <th style={th}>{t('partName')}</th><th style={{ ...th, width: 70 }}>{t('stitch')}</th><th style={{ ...th, width: 68 }}>{t('stitchType')}</th><th style={{ ...th, width: 72 }}>{t('oneRs')}</th>
+                <th style={{ ...th, width: 78 }}>{t('stitchRate')}</th><th style={{ ...th, width: 58 }}>{t('oneMP')}</th><th style={{ ...th, width: 72 }}>{t('meterPerPcs')}</th>
+                <th style={{ ...th, width: 68 }}>{t('rate')}</th><th style={{ ...th, width: 78 }}>{t('total')}</th><th style={th}>{t('fabricName')}</th>
+                <th style={{ ...th, width: 80 }}>{t('fabricMeter')}</th><th style={{ ...th, width: 24 }}></th>
               </tr></thead>
               <tbody>
                 {workParts.map((p, i) => (

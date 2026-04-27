@@ -143,8 +143,8 @@ body.modal-open { overflow: hidden !important; }
   .prg-sku-grid { grid-template-columns: 1fr !important; }
   .prg-table-wrap { border-radius: 6px !important; }
   .prg-table-wrap table { font-size: 10px !important; }
-  .prg-table-wrap input { font-size: 10px !important; padding: 4px 3px !important; }
-  .prg-table-wrap th { padding: 5px 3px !important; font-size: 7px !important; }
+  .prg-table-wrap input, .prg-table-wrap select { font-size: 10px !important; padding: 5px 4px !important; }
+  .prg-table-wrap th { padding: 6px 4px !important; font-size: 8px !important; }
   .prg-actions-row { flex-direction: column !important; }
   .prg-actions-row button { width: 100% !important; height: 44px !important; }
   .prg-section-title { font-size: 11px !important; }
