@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { T } from '../../lib/theme';
 import { fetchProgramById, fetchMatchings, fetchPriceWithParts } from './lib/supabase-rpc';
 import { toDirectImageUrl } from './lib/image-url-converters';
-import { getVoiceNoteUrl } from './lib/supabase-rpc';
 import type { Program, ProgramMatching, ProgramPricePart } from './types';
 import type { TranslationKey } from './i18n/en';
 
@@ -26,7 +25,7 @@ export default function PDFExport({ programId, onClose, t }: Props) {
       const L = {
         aryadesigns: t('aryadesigns'), programReport: t('programReport'), generated: t('generated'),
         sellingSku: t('sellingSkuLabel'), manufacturingSku: t('manufacturingSkuLabel'),
-        brands: t('brands'), voiceNote: t('voiceNote'), workProgram: t('workProgram'),
+        brands: t('brands'), workProgram: t('workProgram'),
         partName: t('partName'), stitch: t('stitch'), stitchType: t('stitchType'),
         oneRs: t('oneRs'), stitchRate: t('stitchRate'), oneMP: t('oneMP'), meterPerPcs: t('meterPerPcs'),
         rate: t('rate'), total: t('total'), fabricName: t('fabricName'), fabricMeter: t('fabricMeter'),
@@ -48,7 +47,6 @@ function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: Progra
   if (!w) return;
   const esc = (s: string | null) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const imageUrl = p.dropbox_gdrive_link ? toDirectImageUrl(p.dropbox_gdrive_link) : '';
-  const voiceUrl = p.voice_note_path ? getVoiceNoteUrl(p.voice_note_path) : '';
   const typeLabel = (v: string) => v === 'meter' ? L.meter : v === 'piece' ? L.piece : '';
 
   w.document.write(`<!doctype html><html><head><title>${L.programReport} ${esc(p.program_uid)}</title>
@@ -83,7 +81,7 @@ function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: Progra
     matchings.forEach(m => { w.document.write(`<span class="pill">${esc(m.company_name)}${m.matching_label ? ' · ' + esc(m.matching_label) : ''}</span> `); });
     w.document.write('</div>');
   }
-  if (voiceUrl) w.document.write(`<h2>${esc(L.voiceNote)}</h2><audio controls src="${esc(voiceUrl)}" style="width:100%;height:32px"></audio>`);
+
 
   if (parts.length > 0) {
     const workParts = parts.filter(pt => (pt.section || 'work') === 'work');
