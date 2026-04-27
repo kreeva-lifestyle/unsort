@@ -207,6 +207,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // Browser back button support
   useEffect(() => {
     const onPop = () => {
+      if (showModal) { closeModal(); return; }
+      if (viewingChallan) { setViewingChallan(null); return; }
       if (ledgerDetail) { setLedgerDetail(null); return; }
       if (showLedger) { setShowLedger(false); setLedgerSearch(''); return; }
       if (showAnalytics) { setShowAnalytics(false); return; }
@@ -214,7 +216,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [ledgerDetail, showLedger, showAnalytics, showCashBook]);
+  }, [showModal, viewingChallan, ledgerDetail, showLedger, showAnalytics, showCashBook]);
 
   // ── Realtime sync — multi-user safety ──────────────────────────────────────
   // INSERT/DELETE instant; UPDATE debounced 500ms to coalesce bulk operations.
@@ -714,6 +716,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // regardless of any legacy 'unpaid' row created under the old dropdown.
     setChallanStatus(c.is_return ? 'paid' : c.status);
     setShowModal(true);
+    window.history.pushState({ view: 'challan-edit' }, '');
   };
 
   const closeModal = () => {
@@ -1065,7 +1068,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           <button onClick={() => { setShowCashBook(true); window.history.pushState({ view: 'cashbook' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.08)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Cash Book</button>
           <button onClick={() => { fetchLedger(); setShowLedger(true); window.history.pushState({ view: 'ledger' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Ledger</button>
           <button onClick={() => { fetchAnalytics(); setShowAnalytics(true); window.history.pushState({ view: 'analytics' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Analytics</button>
-          <button onClick={() => setShowModal(true)} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', boxShadow: '0 2px 8px rgba(99,102,241,.25)' }}>+ New</button>
+          <button onClick={() => { setShowModal(true); window.history.pushState({ view: 'challan-new' }, ''); }} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', boxShadow: '0 2px 8px rgba(99,102,241,.25)' }}>+ New</button>
         </div>
       </div>
 
@@ -1138,7 +1141,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           const canSelect = c.status !== 'voided' && c.status !== 'draft';
           const rowBg = isSelected ? 'rgba(99,102,241,.08)' : isRet ? 'rgba(239,68,68,.04)' : undefined;
           return (
-            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: rowBg, transition: 'background .15s' }} onClick={() => bulkMode ? (canSelect && toggleSelect(c.id)) : setViewingChallan(c)} onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.08)' : 'rgba(255,255,255,.02)'; }} onMouseLeave={e => { e.currentTarget.style.background = (isSelected ? 'rgba(99,102,241,.08)' : isRet ? 'rgba(239,68,68,.04)' : '') }}>
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: rowBg, transition: 'background .15s' }} onClick={() => { if (bulkMode) { canSelect && toggleSelect(c.id); } else { setViewingChallan(c); window.history.pushState({ view: 'challan-detail' }, ''); } }} onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.08)' : 'rgba(255,255,255,.02)'; }} onMouseLeave={e => { e.currentTarget.style.background = (isSelected ? 'rgba(99,102,241,.08)' : isRet ? 'rgba(239,68,68,.04)' : '') }}>
               {bulkMode && <div onClick={e => { e.stopPropagation(); if (canSelect) toggleSelect(c.id); }} style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${canSelect ? (isSelected ? T.ac : T.bd2) : T.bd}`, background: isSelected ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: canSelect ? 'pointer' : 'not-allowed', opacity: canSelect ? 1 : 0.3 }}>
                 {isSelected && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><polyline points="20 6 9 17 4 12" /></svg>}
               </div>}

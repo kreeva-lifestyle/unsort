@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useT } from './hooks/useT';
 import { useProgramForm } from './hooks/useProgramForm';
 import ProgramsList from './ProgramsList';
@@ -18,21 +18,34 @@ export default function ProgramsModule() {
   const [pdfProgramId, setPdfProgramId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
 
+  // Browser back button support
+  useEffect(() => {
+    const onPop = () => {
+      if (showForm) { setShowForm(false); return; }
+      if (qrProgram) { setQrProgram(null); return; }
+      if (view === 'detail') { setView('list'); setDetailId(null); return; }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [showForm, qrProgram, view]);
+
   const form = useProgramForm(() => {
     addToast(t('saved'), 'success');
     setShowForm(false);
   });
 
-  const handleAdd = () => { form.open(); setShowForm(true); };
+  const handleAdd = () => { form.open(); setShowForm(true); window.history.pushState({ view: 'program-form' }, ''); };
   const handleEdit = (p: Program, matchings: { company_name: string; matching_label: string }[]) => {
     form.open(p, matchings);
     setShowForm(true);
+    window.history.pushState({ view: 'program-form' }, '');
   };
-  const handleView = (p: Program) => { setDetailId(p.id); setView('detail'); };
+  const handleView = (p: Program) => { setDetailId(p.id); setView('detail'); window.history.pushState({ view: 'program-detail' }, ''); };
 
   const handleDetailEdit = async (p: Program, matchings: { company_name: string; matching_label: string }[]) => {
     form.open(p, matchings);
     setShowForm(true);
+    window.history.pushState({ view: 'program-form' }, '');
   };
 
   return (
