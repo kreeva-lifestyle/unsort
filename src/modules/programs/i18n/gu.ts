@@ -96,6 +96,7 @@ export const gu = {
   delete: 'કાઢી નાખ્યું',
   priceUpdate: 'ભાવ અપડેટ',
   voiceUpload: 'વૉઇસ નોટ અપલોડ',
+  voiceDelete: 'વૉઇસ નોટ દૂર કરી',
   byPrefix: 'દ્વારા ',
 
   // ક્રિયાઓ

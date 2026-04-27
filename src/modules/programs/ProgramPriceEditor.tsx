@@ -130,7 +130,7 @@ export default function ProgramPriceEditor({ programId, t }: Props) {
               <tr key={i}>
                 <td style={td}><input list="dl-Part" value={p.part_name} onChange={e => updateWork(i, 'part_name', e.target.value)} placeholder={t('partPlaceholder')} style={txtIn} /></td>
                 <td style={td}><input type="number" min="0" value={p.stitch || ''} onChange={e => updateWork(i, 'stitch', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
-                <td style={td}><select value={p.stitch_type} onChange={e => updateWork(i, 'stitch_type', e.target.value)} style={{ ...selIn, color: p.stitch_type ? T.tx : T.tx3 }}><option value="">—</option><option value="meter">{t('meter')}</option><option value="piece">{t('piece')}</option></select></td>
+                <td style={td}><select value={p.stitch_type || 'meter'} onChange={e => updateWork(i, 'stitch_type', e.target.value)} style={{ ...selIn, color: T.tx }}><option value="meter">{t('meter')}</option><option value="piece">{t('piece')}</option></select></td>
                 <td style={td}><input type="number" min="0" step="0.01" value={p.one_rs || ''} onChange={e => updateWork(i, 'one_rs', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
                 <td style={td}><input type="number" min="0" step="0.01" value={p.stitch_rate || ''} onChange={e => updateWork(i, 'stitch_rate', Math.max(0, Number(e.target.value)))} style={numIn} /></td>
                 <td style={calcCell}>{p.one_mp || 0}</td>
