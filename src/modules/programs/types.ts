@@ -92,7 +92,7 @@ export interface PricePartRow {
 }
 
 export const EMPTY_WORK_PART: PricePartRow = {
-  part_name: '', stitch: 0, stitch_type: '', one_rs: 0, stitch_rate: 0, one_mp: 0,
+  part_name: '', stitch: 0, stitch_type: 'meter', one_rs: 0, stitch_rate: 0, one_mp: 0,
   meter_per_pcs: 0, rate: 0, total: 0, fabric_name: '', fabric_meter: 0,
   section: 'work', sort_order: 0,
 };

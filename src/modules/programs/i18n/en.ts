@@ -96,6 +96,7 @@ export const en = {
   delete: 'Deleted',
   priceUpdate: 'Price updated',
   voiceUpload: 'Voice note uploaded',
+  voiceDelete: 'Voice note removed',
   byPrefix: 'by ',
 
   // Actions

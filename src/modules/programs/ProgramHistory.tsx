@@ -8,7 +8,7 @@ interface Props { programId: string; t: (key: TranslationKey) => string }
 
 const ACTION_COLORS: Record<string, string> = {
   create: T.gr, update: T.yl, delete: T.re, hard_delete: T.re,
-  price_update: T.ac2, voice_upload: T.bl,
+  price_update: T.ac2, voice_upload: T.bl, voice_delete: T.re,
 };
 
 export default function ProgramHistory({ programId, t }: Props) {
