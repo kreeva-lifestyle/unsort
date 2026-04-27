@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { T, S, Pill } from '../../lib/theme';
-import { fetchProgramById, fetchMatchings } from './lib/supabase-rpc';
+import { fetchProgramById, fetchMatchings, fetchPriceWithParts } from './lib/supabase-rpc';
 import { toDirectImageUrl } from './lib/image-url-converters';
-import ProgramPriceEditor from './ProgramPriceEditor';
 import ProgramHistory from './ProgramHistory';
 import VoiceRecorder from './VoiceRecorder';
-import type { Program, ProgramMatching } from './types';
+import type { Program, ProgramMatching, ProgramPricePart } from './types';
 import type { TranslationKey } from './i18n/en';
 
 interface Props {
@@ -18,18 +17,23 @@ interface Props {
 export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) {
   const [program, setProgram] = useState<Program | null>(null);
   const [matchings, setMatchings] = useState<ProgramMatching[]>([]);
-  const [tab, setTab] = useState<'price' | 'history'>('price');
+  const [workParts, setWorkParts] = useState<ProgramPricePart[]>([]);
+  const [fabricParts, setFabricParts] = useState<ProgramPricePart[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
 
   const load = async () => {
     setLoading(true);
-    const [{ data: p }, { data: m }] = await Promise.all([
+    const [{ data: p }, { data: m }, { parts }] = await Promise.all([
       fetchProgramById(programId),
       fetchMatchings(programId),
+      fetchPriceWithParts(programId),
     ]);
     if (p?.is_deleted) { onClose(); return; }
     setProgram(p);
     setMatchings(m);
+    setWorkParts(parts.filter(pt => (pt.section || 'work') === 'work'));
+    setFabricParts(parts.filter(pt => pt.section === 'fabric'));
     setLoading(false);
   };
 
@@ -38,49 +42,56 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
 
   if (loading || !program) return <div style={{ padding: 30, textAlign: 'center', color: T.tx3 }}>{t('loading')}</div>;
 
-  const label: React.CSSProperties = { fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 };
-  const val: React.CSSProperties = { fontSize: 12, color: T.tx, fontWeight: 500 };
   const imageUrl = program.dropbox_gdrive_link ? toDirectImageUrl(program.dropbox_gdrive_link) : null;
+  const workTotal = workParts.reduce((s, p) => s + Number(p.total || 0), 0);
+  const workFM = workParts.reduce((s, p) => s + Number(p.fabric_meter || 0), 0);
+  const fabricFM = fabricParts.reduce((s, p) => s + Number(p.fabric_meter || 0), 0);
+  const label: React.CSSProperties = { fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 };
+  const th: React.CSSProperties = { ...S.thStyle, padding: '6px 8px', fontSize: 8 };
+  const td: React.CSSProperties = { ...S.tdStyle, padding: '6px 8px', fontSize: 11 };
 
   return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', maxWidth: 800 }}>
+    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', maxWidth: 860 }}>
       {/* Header */}
-      <div className="prg-detail-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingBottom: 12, borderBottom: `1px solid ${T.bd}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, fontFamily: T.sora }}>{program.program_uid}</span>
-          {program.selling_sku && <Pill tone="ac">{program.selling_sku}</Pill>}
-          {program.manufacturing_sku && <Pill tone="bl">{program.manufacturing_sku}</Pill>}
+      <div className="prg-detail-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${T.bd}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora }}>{program.program_uid}</span>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => onEdit(program, matchings.map(m => ({ company_name: m.company_name, matching_label: m.matching_label || '' })))}
-            style={{ ...S.btnPrimary, fontSize: 10, padding: '5px 12px', cursor: 'pointer' }}>{t('edit')}</button>
-          <button onClick={onClose} style={{ ...S.btnGhost, fontSize: 10, padding: '5px 12px', cursor: 'pointer' }}>{t('cancel')}</button>
+            style={{ ...S.btnPrimary, fontSize: 10, padding: '6px 14px', cursor: 'pointer' }}>{t('edit')}</button>
+          <button onClick={onClose} style={{ ...S.btnGhost, fontSize: 10, padding: '6px 14px', cursor: 'pointer' }}>Back</button>
         </div>
       </div>
 
-      {/* Info grid */}
-      <div className="prg-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-        <div><div style={label}>{t('sellingSkuLabel')}</div><div style={{ ...val, fontFamily: T.mono }}>{program.selling_sku || '—'}</div></div>
-        <div><div style={label}>{t('manufacturingSkuLabel')}</div><div style={{ ...val, fontFamily: T.mono }}>{program.manufacturing_sku || '—'}</div></div>
+      {/* Info cards */}
+      <div className="prg-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '10px 14px' }}>
+          <div style={label}>{t('sellingSkuLabel')}</div>
+          <div style={{ fontFamily: T.mono, fontSize: 14, fontWeight: 600, color: T.ac2 }}>{program.selling_sku || '—'}</div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '10px 14px' }}>
+          <div style={label}>{t('manufacturingSkuLabel')}</div>
+          <div style={{ fontFamily: T.mono, fontSize: 14, fontWeight: 600, color: T.bl }}>{program.manufacturing_sku || '—'}</div>
+        </div>
       </div>
 
-      {/* Image preview */}
+      {/* Image */}
       {imageUrl && (
-        <div style={{ marginBottom: 14, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: 10 }}>
-          <div style={label}>{t('linkLabel')}</div>
-          <img src={imageUrl} alt="Program image" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 6, objectFit: 'contain' }}
+        <div style={{ marginBottom: 16, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: 12 }}>
+          <img src={imageUrl} alt="Program" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 6, objectFit: 'contain' }}
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          <a href={program.dropbox_gdrive_link || ''} target="_blank" rel="noopener" style={{ fontSize: 10, color: T.ac2, display: 'block', marginTop: 4 }}>Open original link</a>
+          <a href={program.dropbox_gdrive_link || ''} target="_blank" rel="noopener" style={{ fontSize: 10, color: T.ac2, display: 'block', marginTop: 6 }}>Open original</a>
         </div>
       )}
 
-      {/* Matchings / Companies */}
+      {/* Brands */}
       {matchings.length > 0 && (
-        <div style={{ marginBottom: 14 }}>
-          <div style={label}>{t('companiesForMatching')} ({matchings.length})</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+        <div style={{ marginBottom: 16 }}>
+          <div style={label}>Brands ({matchings.length})</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {matchings.map(m => (
-              <Pill key={m.id} tone="ac" dot>{m.company_name}{m.matching_label ? ` · ${m.matching_label}` : ''}</Pill>
+              <Pill key={m.id} tone="yl" dot>{m.company_name}{m.matching_label ? ` · ${m.matching_label}` : ''}</Pill>
             ))}
           </div>
         </div>
@@ -89,21 +100,84 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       {/* Voice note */}
       <VoiceRecorder programId={programId} existingPath={program.voice_note_path} onUploaded={() => load()} t={t} />
 
-      {/* Tabs: Price | History */}
-      <div className="prg-tab-bar" style={{ display: 'flex', gap: 4, marginBottom: 12, padding: 3, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
-        {(['price', 'history'] as const).map(id => (
-          <button key={id} onClick={() => setTab(id)} style={{
-            padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
-            fontSize: 11, fontWeight: tab === id ? 600 : 500, fontFamily: T.sans,
-            background: tab === id ? 'rgba(99,102,241,.15)' : 'transparent',
-            color: tab === id ? T.ac2 : T.tx3, transition: T.transition,
-            boxShadow: tab === id ? '0 2px 6px rgba(99,102,241,0.2)' : 'none',
-          }}>{id === 'price' ? t('priceBreakdown') : t('history')}</button>
-        ))}
-      </div>
+      {/* ═══ WORK PROGRAM (read-only) ═══ */}
+      {workParts.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ ...label, color: T.gr, fontSize: 9, marginBottom: 8 }}>Work Program</div>
+          <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+              <thead><tr>
+                <th style={th}>Part</th><th style={th}>Stitch</th><th style={th}>1 RS</th>
+                <th style={th}>Stitch Rate</th><th style={th}>1 M/P</th><th style={th}>MTR/PCS</th>
+                <th style={th}>Rate</th><th style={th}>Total</th><th style={th}>Fabric</th><th style={th}>FM</th>
+              </tr></thead>
+              <tbody>
+                {workParts.map(p => (
+                  <tr key={p.id}>
+                    <td style={td}>{p.part_name || '—'}</td>
+                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.stitch || 0)}</td>
+                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.one_rs || 0).toFixed(2)}</td>
+                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.stitch_rate || 0).toFixed(2)}</td>
+                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right', color: T.ac2, fontWeight: 600 }}>{Number(p.one_mp || 0)}</td>
+                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.meter_per_pcs || 0).toFixed(2)}</td>
+                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.rate || 0).toFixed(2)}</td>
+                    <td style={{ ...td, fontFamily: T.sora, textAlign: 'right', color: T.gr, fontWeight: 700 }}>₹{Number(p.total || 0).toFixed(0)}</td>
+                    <td style={td}>{p.fabric_name || '—'}</td>
+                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right', color: T.bl }}>{Number(p.fabric_meter || 0).toFixed(2)}</td>
+                  </tr>
+                ))}
+                <tr style={{ background: 'rgba(52,211,153,.04)' }}>
+                  <td colSpan={7} style={{ padding: '8px 8px', fontSize: 11, fontWeight: 700, textAlign: 'right' }}>{t('grandTotal')}</td>
+                  <td style={{ padding: '8px 8px', fontFamily: T.sora, fontSize: 14, fontWeight: 700, color: T.gr, textAlign: 'right' }}>₹{workTotal.toFixed(0)}</td>
+                  <td style={{ padding: '8px 8px', fontSize: 9, fontWeight: 600, color: T.tx3, textAlign: 'right' }}>FM</td>
+                  <td style={{ padding: '8px 8px', fontFamily: T.mono, fontSize: 12, fontWeight: 700, color: T.bl, textAlign: 'right' }}>{workFM.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-      {tab === 'price' && <ProgramPriceEditor programId={programId} t={t} />}
-      {tab === 'history' && <ProgramHistory programId={programId} t={t} />}
+      {/* ═══ FABRIC PROGRAM (read-only) ═══ */}
+      {fabricParts.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ ...label, color: T.bl, fontSize: 9, marginBottom: 8 }}>Fabric Program</div>
+          <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr><th style={{ ...th, width: '65%' }}>Part</th><th style={th}>Fabric Meter</th></tr></thead>
+              <tbody>
+                {fabricParts.map(p => (
+                  <tr key={p.id}>
+                    <td style={td}>{p.part_name || '—'}</td>
+                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right', color: T.bl, fontWeight: 600 }}>{Number(p.fabric_meter || 0).toFixed(2)}</td>
+                  </tr>
+                ))}
+                <tr style={{ background: 'rgba(56,189,248,.04)' }}>
+                  <td style={{ padding: '8px 8px', fontSize: 11, fontWeight: 700, textAlign: 'right' }}>{t('grandTotal')}</td>
+                  <td style={{ padding: '8px 8px', fontFamily: T.mono, fontSize: 12, fontWeight: 700, color: T.bl, textAlign: 'right' }}>{fabricFM.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Grand Fabric Total */}
+      {(workParts.length > 0 || fabricParts.length > 0) && (
+        <div className="prg-grand-fabric" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginBottom: 16, padding: '10px 14px', background: 'rgba(56,189,248,.06)', border: `1px solid rgba(56,189,248,.15)`, borderRadius: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Grand Fabric Total</span>
+          <span style={{ fontFamily: T.sora, fontSize: 16, fontWeight: 700, color: T.bl }}>{(workFM + fabricFM).toFixed(2)} m</span>
+        </div>
+      )}
+
+      {/* History toggle */}
+      <div style={{ borderTop: `1px solid ${T.bd}`, paddingTop: 12 }}>
+        <button onClick={() => setShowHistory(!showHistory)} style={{ ...S.btnGhost, fontSize: 10, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ display: 'inline-block', transform: showHistory ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform .15s' }}>▶</span>
+          {t('history')}
+        </button>
+        {showHistory && <ProgramHistory programId={programId} t={t} />}
+      </div>
     </div>
   );
 }
