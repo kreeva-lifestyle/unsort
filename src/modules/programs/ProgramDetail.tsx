@@ -60,7 +60,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
   const thR: React.CSSProperties = { ...th, textAlign: 'right' };
   const td: React.CSSProperties = { ...S.tdStyle, padding: '6px 8px', fontSize: 11 };
   const tdR: React.CSSProperties = { ...td, fontFamily: T.mono, textAlign: 'right' };
-  const typeLabel = (v: string) => v === 'meter' ? t('meter') : v === 'piece' ? t('piece') : '—';
+  const typeLabel = (v: string) => v === 'piece' ? t('piece') : t('meter');
 
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', maxWidth: 860 }}>
@@ -111,23 +111,25 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         <div style={{ marginBottom: 16 }}>
           <SectionTitle color={T.gr}>{t('workProgram')}</SectionTitle>
           <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 750 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 850 }}>
               <thead><tr>
                 <th style={th}>{t('partName')}</th><th style={thR}>{t('stitch')}</th><th style={th}>{t('stitchType')}</th><th style={thR}>{t('oneRs')}</th>
                 <th style={thR}>{t('stitchRate')}</th><th style={thR}>{t('oneMP')}</th><th style={thR}>{t('meterPerPcs')}</th>
                 <th style={thR}>{t('rate')}</th><th style={thR}>{t('total')}</th><th style={th}>{t('fabricName')}</th><th style={thR}>{t('fm')}</th>
               </tr></thead>
-              <tbody>{workParts.map(p => (
+              <tbody>{workParts.map(p => {
+                const s = Number(p.stitch), rs = Number(p.one_rs), sr = Number(p.stitch_rate), mp = Number(p.one_mp), mpc = Number(p.meter_per_pcs), r = Number(p.rate), tot = Number(p.total), fm = Number(p.fabric_meter);
+                return (
                 <tr key={p.id}>
-                  <td style={td}>{p.part_name || '—'}</td><td style={tdR}>{Number(p.stitch || 0)}</td>
+                  <td style={td}>{p.part_name || '—'}</td><td style={tdR}>{s || '—'}</td>
                   <td style={{ ...td, fontSize: 10 }}>{typeLabel(p.stitch_type)}</td>
-                  <td style={tdR}>{Number(p.one_rs || 0).toFixed(2)}</td><td style={tdR}>{Number(p.stitch_rate || 0).toFixed(2)}</td>
-                  <td style={{ ...tdR, color: T.ac2, fontWeight: 600 }}>{Number(p.one_mp || 0)}</td>
-                  <td style={tdR}>{Number(p.meter_per_pcs || 0).toFixed(2)}</td><td style={tdR}>{Number(p.rate || 0).toFixed(2)}</td>
-                  <td style={{ ...tdR, fontFamily: T.sora, color: T.gr, fontWeight: 700 }}>₹{Number(p.total || 0).toFixed(0)}</td>
-                  <td style={td}>{p.fabric_name || '—'}</td><td style={{ ...tdR, color: T.bl }}>{Number(p.fabric_meter || 0).toFixed(2)}</td>
-                </tr>
-              ))}</tbody>
+                  <td style={tdR}>{rs ? rs.toFixed(2) : '—'}</td><td style={tdR}>{sr ? sr.toFixed(2) : '—'}</td>
+                  <td style={{ ...tdR, color: T.ac2, fontWeight: 600 }}>{mp || '—'}</td>
+                  <td style={tdR}>{mpc ? mpc.toFixed(2) : '—'}</td><td style={tdR}>{r ? r.toFixed(2) : '—'}</td>
+                  <td style={{ ...tdR, fontFamily: T.sora, color: T.gr, fontWeight: 700 }}>{tot ? '₹' + tot.toFixed(0) : '—'}</td>
+                  <td style={td}>{p.fabric_name || '—'}</td><td style={{ ...tdR, color: T.bl }}>{fm ? fm.toFixed(2) : '—'}</td>
+                </tr>);
+              })}</tbody>
             </table>
           </div>
         </div>

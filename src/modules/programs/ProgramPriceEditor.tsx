@@ -97,12 +97,12 @@ export default function ProgramPriceEditor({ programId, t }: Props) {
     setPartNames(pn); setFabricNames(fn);
   };
 
-  const th: React.CSSProperties = { ...S.thStyle, padding: '8px 6px', fontSize: 8 };
-  const td: React.CSSProperties = { padding: '4px 3px', borderBottom: `1px solid ${T.bd}` };
-  const numIn: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 4, color: T.tx, fontFamily: T.mono, fontSize: 11, padding: '5px 4px', outline: 'none', textAlign: 'right' as const, boxSizing: 'border-box' as const };
+  const th: React.CSSProperties = { ...S.thStyle, padding: '8px 8px', fontSize: 9 };
+  const td: React.CSSProperties = { padding: '4px 4px', borderBottom: `1px solid ${T.bd}` };
+  const numIn: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 11, padding: '6px 6px', outline: 'none', textAlign: 'right' as const, boxSizing: 'border-box' as const };
   const txtIn: React.CSSProperties = { ...numIn, textAlign: 'left' as const };
-  const selIn: React.CSSProperties = { ...numIn, textAlign: 'left' as const, appearance: 'none' as const, WebkitAppearance: 'none' as const, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%236B7890'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: 14, cursor: 'pointer' };
-  const calcCell: React.CSSProperties = { ...td, fontFamily: T.mono, fontSize: 11, fontWeight: 600, color: T.ac2, padding: '5px 6px', textAlign: 'right' as const };
+  const selIn: React.CSSProperties = { ...numIn, textAlign: 'left' as const, appearance: 'none' as const, WebkitAppearance: 'none' as const, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%236B7890'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center', paddingRight: 18, cursor: 'pointer' };
+  const calcCell: React.CSSProperties = { ...td, fontFamily: T.mono, fontSize: 11, fontWeight: 600, color: T.ac2, padding: '6px 6px', textAlign: 'right' as const, background: 'rgba(255,255,255,0.02)' };
   const delBtn = (onClick: () => void) => (
     <button onClick={onClick} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, transition: T.transition }}
       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(248,113,113,.1)')}
@@ -118,7 +118,7 @@ export default function ProgramPriceEditor({ programId, t }: Props) {
         <button onClick={() => setWorkParts(p => [...p, { ...EMPTY_WORK_PART, sort_order: p.length }])} style={{ ...S.btnGhost, fontSize: 9, padding: '3px 8px', cursor: 'pointer' }}>{t('addPart')}</button>
       </div>
       <div style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, marginBottom: 16 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
           <thead><tr>
             <th style={th}>{t('partName')}</th><th style={th}>{t('stitch')}</th><th style={th}>{t('stitchType')}</th><th style={th}>{t('oneRs')}</th>
             <th style={th}>{t('stitchRate')}</th><th style={th}>{t('oneMP')}</th><th style={th}>{t('meterPerPcs')}</th>

@@ -19,7 +19,7 @@ export default function PublicShareView({ shareToken }: Props) {
   const langParam = new URLSearchParams(window.location.hash.split('?')[1] || '').get('lang');
   const translations = langParam === 'gu' ? gu : en;
   const t = (key: TranslationKey): string => translations[key] ?? en[key] ?? key;
-  const typeLabel = (v: string) => v === 'meter' ? t('meter') : v === 'piece' ? t('piece') : '';
+  const typeLabel = (v: string) => v === 'piece' ? t('piece') : t('meter');
 
   useEffect(() => {
     (async () => {
@@ -100,20 +100,22 @@ export default function PublicShareView({ shareToken }: Props) {
                   <th style={th}>{t('total')}</th><th style={th}>{t('fabricName')}</th><th style={th}>{t('fm')}</th>
                 </tr></thead>
                 <tbody>
-                  {workParts.map((p: any, i: number) => (
+                  {workParts.map((p: any, i: number) => {
+                    const s = Number(p.stitch), rs = Number(p.one_rs), r = Number(p.rate), mp = Number(p.one_mp), mpc = Number(p.meter_per_pcs), tot = Number(p.total), fmv = Number(p.fabric_meter);
+                    return (
                     <tr key={i}>
                       <td style={tdS}>{p.part_name || '—'}</td>
-                      <td style={{ ...tdS, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.stitch || 0)}</td>
+                      <td style={{ ...tdS, fontFamily: T.mono, textAlign: 'right' }}>{s || '—'}</td>
                       <td style={{ ...tdS, fontSize: 9 }}>{typeLabel(p.stitch_type || '')}</td>
-                      <td style={{ ...tdS, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.one_rs || 0).toFixed(2)}</td>
-                      <td style={{ ...tdS, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.rate || 0).toFixed(2)}</td>
-                      <td style={{ ...tdS, fontFamily: T.mono, textAlign: 'right', color: T.ac2, fontWeight: 600 }}>{Number(p.one_mp || 0)}</td>
-                      <td style={{ ...tdS, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.meter_per_pcs || 0)}</td>
-                      <td style={{ ...tdS, fontFamily: T.sora, textAlign: 'right', color: T.gr, fontWeight: 700 }}>₹{Number(p.total || 0).toFixed(0)}</td>
+                      <td style={{ ...tdS, fontFamily: T.mono, textAlign: 'right' }}>{rs ? rs.toFixed(2) : '—'}</td>
+                      <td style={{ ...tdS, fontFamily: T.mono, textAlign: 'right' }}>{r ? r.toFixed(2) : '—'}</td>
+                      <td style={{ ...tdS, fontFamily: T.mono, textAlign: 'right', color: T.ac2, fontWeight: 600 }}>{mp || '—'}</td>
+                      <td style={{ ...tdS, fontFamily: T.mono, textAlign: 'right' }}>{mpc || '—'}</td>
+                      <td style={{ ...tdS, fontFamily: T.sora, textAlign: 'right', color: T.gr, fontWeight: 700 }}>{tot ? '₹' + tot.toFixed(0) : '—'}</td>
                       <td style={tdS}>{p.fabric_name || '—'}</td>
-                      <td style={{ ...tdS, fontFamily: T.mono, textAlign: 'right', color: T.bl }}>{Number(p.fabric_meter || 0).toFixed(2)}</td>
-                    </tr>
-                  ))}
+                      <td style={{ ...tdS, fontFamily: T.mono, textAlign: 'right', color: T.bl }}>{fmv ? fmv.toFixed(2) : '—'}</td>
+                    </tr>);
+                  })}
                   <tr style={{ background: 'rgba(52,211,153,.04)' }}>
                     <td colSpan={7} style={{ padding: '8px', fontSize: 11, fontWeight: 700, textAlign: 'right' }}>{t('grandTotal')}</td>
                     <td style={{ padding: '8px', fontFamily: T.sora, fontSize: 14, fontWeight: 700, color: T.gr, textAlign: 'right' }}>₹{workTotal.toFixed(0)}</td>
