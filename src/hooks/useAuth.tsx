@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(null); setProfile(null);
       }
       if (mounted) { setLoading(false); setReady(true); clearTimeout(timeout); }
-    });
+    }).catch(() => { if (mounted) { setLoading(false); setReady(true); clearTimeout(timeout); } });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;

@@ -845,6 +845,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const csv = header + '\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `CashChallans_${dateFrom || 'all'}_${dateTo || 'all'}_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
+    addToast('Exported successfully', 'success');
   };
 
   // ── Bulk pay / unpay ─────────────────────────────────────────────────────

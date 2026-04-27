@@ -17,7 +17,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile }: { activeTa
 
   const handleSignOut = async () => {
     try { localStorage.removeItem('ccDraft'); } catch {}
-    await supabase.auth.signOut();
+    try { await supabase.auth.signOut(); } catch {}
     window.location.reload();
   };
 
