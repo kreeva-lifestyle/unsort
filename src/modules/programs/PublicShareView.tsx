@@ -67,13 +67,19 @@ export default function PublicShareView({ shareToken }: Props) {
         {/* Brands */}
         {matchings.length > 0 && (
           <div style={{ marginBottom: 16 }}>
-            <div style={label}>Brands ({matchings.length})</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-              {matchings.map((m: any, i: number) => (
-                <span key={i} style={{ padding: '4px 10px', borderRadius: 6, background: 'rgba(251,191,36,.1)', color: T.yl, fontSize: 11, fontWeight: 500, border: '1px solid rgba(251,191,36,.25)' }}>
-                  {m.company_name}{m.matching_label ? ` · ${m.matching_label}` : ''}
-                </span>
-              ))}
+            <div style={{ ...label, marginBottom: 6 }}>Brands ({matchings.length})</div>
+            <div style={{ border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                <thead><tr><th style={th}>Brand Name</th><th style={th}>Label</th></tr></thead>
+                <tbody>
+                  {matchings.map((m: any, i: number) => (
+                    <tr key={i}>
+                      <td style={tdS}>{m.company_name}</td>
+                      <td style={{ ...tdS, color: T.tx3 }}>{m.matching_label || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

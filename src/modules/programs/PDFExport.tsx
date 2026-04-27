@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { T } from '../../lib/theme';
-import { fetchProgramById, fetchMatchings, fetchPriceWithParts, fetchHistory } from './lib/supabase-rpc';
+import { fetchProgramById, fetchMatchings, fetchPriceWithParts } from './lib/supabase-rpc';
 import { toDirectImageUrl } from './lib/image-url-converters';
 import { getVoiceNoteUrl } from './lib/supabase-rpc';
-import type { Program, ProgramMatching, ProgramPricePart, ProgramHistoryEntry } from './types';
+import type { Program, ProgramMatching, ProgramPricePart } from './types';
 import type { TranslationKey } from './i18n/en';
 
 interface Props {
@@ -18,15 +18,14 @@ export default function PDFExport({ programId, onClose, t }: Props) {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [{ data: program }, { data: matchings }, { parts }, { data: history }] = await Promise.all([
+      const [{ data: program }, { data: matchings }, { parts }] = await Promise.all([
         fetchProgramById(programId),
         fetchMatchings(programId),
         fetchPriceWithParts(programId),
-        fetchHistory(programId),
       ]);
       setLoading(false);
       if (!program) return;
-      openPrintWindow(program, matchings, parts, history);
+      openPrintWindow(program, matchings, parts);
       onClose();
     })();
   }, [programId, onClose]);
@@ -39,7 +38,6 @@ function openPrintWindow(
   p: Program,
   matchings: ProgramMatching[],
   parts: ProgramPricePart[],
-  history: ProgramHistoryEntry[],
 ) {
   const w = window.open('', '_blank');
   if (!w) return;
@@ -122,13 +120,7 @@ function openPrintWindow(
     }
   }
 
-  // History
-  if (history.length > 0) {
-    w.document.write(`<h2>Edit History (${history.length})</h2>`);
-    history.slice(0, 20).forEach(h => {
-      w.document.write(`<div class="history-entry"><strong>${esc(h.action)}</strong>${h.field_changed ? ' · ' + esc(h.field_changed) : ''} — ${h.user_email || 'System'} · ${new Date(h.changed_at).toLocaleString('en-IN')}</div>`);
-    });
-  }
+  // History intentionally excluded from PDF — internal audit data, not for customer-facing reports
 
   w.document.write(`<div class="footer">Powered by DailyOffice · Arya Designs</div></body></html>`);
   w.document.close();

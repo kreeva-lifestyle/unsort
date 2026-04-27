@@ -19,6 +19,13 @@ export default function QRGenerator({ program, onClose, t }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { addToast } = useNotifications();
 
+  // Escape key to dismiss
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
   useEffect(() => {
     (async () => {
       let token = program.share_token;

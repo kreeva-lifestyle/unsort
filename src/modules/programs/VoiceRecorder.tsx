@@ -122,7 +122,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
         </div>
       )}
 
-      {recording && <div style={{ fontSize: 9, color: T.tx3, marginTop: 4 }}>Max 1 minute — auto-stops at 1:00</div>}
+      {recording && <div style={{ fontSize: 9, color: T.tx3, marginTop: 4 }}>Max 1 minute (auto-stops) · Max 10MB file size</div>}
       {error && <div style={{ ...S.errorBox, marginTop: 6 }}>{error}</div>}
       {!existingUrl && !audioUrl && !recording && <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>{t('noVoiceNote')}</div>}
     </div>
