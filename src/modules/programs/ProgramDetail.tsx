@@ -47,8 +47,10 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
   const workFM = workParts.reduce((s, p) => s + Number(p.fabric_meter || 0), 0);
   const fabricFM = fabricParts.reduce((s, p) => s + Number(p.fabric_meter || 0), 0);
   const label: React.CSSProperties = { fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 };
-  const th: React.CSSProperties = { ...S.thStyle, padding: '6px 8px', fontSize: 8 };
+  const th: React.CSSProperties = { ...S.thStyle, padding: '6px 8px', fontSize: 9 };
+  const thR: React.CSSProperties = { ...th, textAlign: 'right' };
   const td: React.CSSProperties = { ...S.tdStyle, padding: '6px 8px', fontSize: 11 };
+  const tdR: React.CSSProperties = { ...td, fontFamily: T.mono, textAlign: 'right' };
 
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', maxWidth: 860 }}>
@@ -123,23 +125,23 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
           <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
               <thead><tr>
-                <th style={th}>Part</th><th style={th}>Stitch</th><th style={th}>1 RS</th>
-                <th style={th}>Stitch Rate</th><th style={th}>1 M/P</th><th style={th}>MTR/PCS</th>
-                <th style={th}>Rate</th><th style={th}>Total</th><th style={th}>Fabric</th><th style={th}>FM</th>
+                <th style={th}>Part</th><th style={thR}>Stitch</th><th style={thR}>1 RS</th>
+                <th style={thR}>Stitch Rate</th><th style={thR}>1 M/P</th><th style={thR}>MTR/PCS</th>
+                <th style={thR}>Rate</th><th style={thR}>Total</th><th style={th}>Fabric</th><th style={thR}>FM</th>
               </tr></thead>
               <tbody>
                 {workParts.map(p => (
                   <tr key={p.id}>
                     <td style={td}>{p.part_name || '—'}</td>
-                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.stitch || 0)}</td>
-                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.one_rs || 0).toFixed(2)}</td>
-                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.stitch_rate || 0).toFixed(2)}</td>
-                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right', color: T.ac2, fontWeight: 600 }}>{Number(p.one_mp || 0)}</td>
-                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.meter_per_pcs || 0).toFixed(2)}</td>
-                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right' }}>{Number(p.rate || 0).toFixed(2)}</td>
-                    <td style={{ ...td, fontFamily: T.sora, textAlign: 'right', color: T.gr, fontWeight: 700 }}>₹{Number(p.total || 0).toFixed(0)}</td>
+                    <td style={tdR}>{Number(p.stitch || 0)}</td>
+                    <td style={tdR}>{Number(p.one_rs || 0).toFixed(2)}</td>
+                    <td style={tdR}>{Number(p.stitch_rate || 0).toFixed(2)}</td>
+                    <td style={{ ...tdR, color: T.ac2, fontWeight: 600 }}>{Number(p.one_mp || 0)}</td>
+                    <td style={tdR}>{Number(p.meter_per_pcs || 0).toFixed(2)}</td>
+                    <td style={tdR}>{Number(p.rate || 0).toFixed(2)}</td>
+                    <td style={{ ...tdR, fontFamily: T.sora, color: T.gr, fontWeight: 700 }}>₹{Number(p.total || 0).toFixed(0)}</td>
                     <td style={td}>{p.fabric_name || '—'}</td>
-                    <td style={{ ...td, fontFamily: T.mono, textAlign: 'right', color: T.bl }}>{Number(p.fabric_meter || 0).toFixed(2)}</td>
+                    <td style={{ ...tdR, color: T.bl }}>{Number(p.fabric_meter || 0).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -158,7 +160,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
           </div>
           <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={{ ...th, width: '65%' }}>Part</th><th style={th}>Fabric Meter</th></tr></thead>
+              <thead><tr><th style={{ ...th, width: '65%' }}>Part</th><th style={thR}>Fabric Meter</th></tr></thead>
               <tbody>
                 {fabricParts.map(p => (
                   <tr key={p.id}>
