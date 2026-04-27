@@ -38,11 +38,14 @@ export function useProgramForm(onSuccess: () => void) {
       setError('skuRequired');
       return false;
     }
+    // Filter out empty company names client-side before sending
+    const cleanForm = { ...form, matchings: form.matchings.filter(m => m.company_name.trim()) };
     setSaving(true);
-    const { result, error: rpcErr } = await upsertProgram(form, editing?.id, editing?.updated_at);
+    const { result, error: rpcErr } = await upsertProgram(cleanForm, editing?.id, editing?.updated_at);
     setSaving(false);
-    if (rpcErr) { setError(rpcErr.message); return false; }
-    if (result && !result.ok) { setError(result.error || 'Unknown error'); return false; }
+    if (rpcErr) { setError(rpcErr.message || 'Network error'); return false; }
+    if (!result) { setError('No response from server'); return false; }
+    if (!result.ok) { setError(result.error || 'Unknown error'); return false; }
     onSuccess();
     close();
     return true;

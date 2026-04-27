@@ -53,8 +53,8 @@ export default function QRGenerator({ program, onClose, t }: Props) {
         ctx.fillStyle = '#9AA8C2';
         ctx.font = '11px Inter, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('QR library not available', 110, 100);
-        ctx.fillText('Install: npm i qrcode', 110, 120);
+        ctx.fillText('Unable to generate QR code', 110, 100);
+        ctx.fillText('Please contact support', 110, 120);
       }
     }
   };

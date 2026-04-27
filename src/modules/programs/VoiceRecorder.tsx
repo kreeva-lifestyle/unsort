@@ -22,15 +22,20 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   const uploadedRef = useRef(false);
 
+  const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+  const VALID_MIMES = ['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/ogg', 'audio/wav'];
+
   // Auto-upload when recording stops and blob is ready
   useEffect(() => {
     if (!audioBlob || uploading || uploadedRef.current) return;
+    if (audioBlob.size > MAX_SIZE) { addToast('Voice note too large (max 10MB)', 'error'); return; }
     uploadedRef.current = true;
     (async () => {
       setUploading(true);
       const { path, error: upErr } = await uploadVoiceNote(programId, audioBlob, ext());
       setUploading(false);
-      if (upErr || !path) { addToast('Upload failed', 'error'); uploadedRef.current = false; return; }
+      if (upErr) { addToast(upErr.message || 'Upload failed', 'error'); uploadedRef.current = false; return; }
+      if (!path) { addToast('Upload returned no path', 'error'); uploadedRef.current = false; return; }
       addToast(t('voiceUpload'), 'success');
       onUploaded(path);
       clear();
@@ -102,11 +107,13 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
             <input type="file" accept="audio/*" style={{ display: 'none' }} onChange={async e => {
               const file = e.target.files?.[0];
               if (!file) return;
+              if (file.size > MAX_SIZE) { addToast('File too large (max 10MB)', 'error'); return; }
+              if (!VALID_MIMES.includes(file.type) && !file.type.startsWith('audio/')) { addToast('Invalid audio file', 'error'); return; }
               setUploading(true);
               const fileExt = file.name.split('.').pop() || 'webm';
               const { path, error: upErr } = await uploadVoiceNote(programId, file, fileExt);
               setUploading(false);
-              if (upErr || !path) { addToast('Upload failed', 'error'); return; }
+              if (upErr || !path) { addToast(upErr?.message || 'Upload failed', 'error'); return; }
               addToast(t('voiceUpload'), 'success');
               onUploaded(path);
             }} />
@@ -114,6 +121,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
         </div>
       )}
 
+      {recording && <div style={{ fontSize: 9, color: T.tx3, marginTop: 4 }}>Max 1 minute — auto-stops at 1:00</div>}
       {error && <div style={{ ...S.errorBox, marginTop: 6 }}>{error}</div>}
       {!existingUrl && !audioUrl && !recording && <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>{t('noVoiceNote')}</div>}
     </div>
