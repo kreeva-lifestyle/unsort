@@ -85,11 +85,18 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         </div>
       )}
 
-      {/* Brands */}
+      {/* Voice note */}
+      <VoiceRecorder programId={programId} existingPath={program.voice_note_path} onUploaded={() => load()} t={t} />
+
+      {/* ═══ BRANDS (read-only) ═══ */}
       {matchings.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ ...label, marginBottom: 8 }}>Brands ({matchings.length})</div>
-          <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div style={{ width: 4, height: 18, borderRadius: 2, background: T.yl }} />
+            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color: T.yl }}>Brands</span>
+            <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${T.bd} 0%, transparent 100%)` }} />
+          </div>
+          <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th style={th}>Brand Name</th><th style={th}>Label</th></tr></thead>
               <tbody>
@@ -105,13 +112,14 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         </div>
       )}
 
-      {/* Voice note */}
-      <VoiceRecorder programId={programId} existingPath={program.voice_note_path} onUploaded={() => load()} t={t} />
-
       {/* ═══ WORK PROGRAM (read-only) ═══ */}
       {workParts.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ ...label, color: T.gr, fontSize: 9, marginBottom: 8 }}>Work Program</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div style={{ width: 4, height: 18, borderRadius: 2, background: T.gr }} />
+            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color: T.gr }}>Work Program</span>
+            <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${T.bd} 0%, transparent 100%)` }} />
+          </div>
           <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
               <thead><tr>
@@ -134,10 +142,6 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
                     <td style={{ ...td, fontFamily: T.mono, textAlign: 'right', color: T.bl }}>{Number(p.fabric_meter || 0).toFixed(2)}</td>
                   </tr>
                 ))}
-                <tr style={{ background: 'rgba(52,211,153,.08)' }}>
-                  <td colSpan={9} style={{ padding: '8px 8px', fontSize: 11, fontWeight: 700, textAlign: 'right' }}>{t('grandTotal')}</td>
-                  <td style={{ padding: '8px 8px', fontFamily: T.sora, fontSize: 14, fontWeight: 700, color: T.gr, textAlign: 'right' }}>₹{workTotal.toFixed(0)}</td>
-                </tr>
               </tbody>
             </table>
           </div>
@@ -147,7 +151,11 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       {/* ═══ FABRIC PROGRAM (read-only) ═══ */}
       {fabricParts.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ ...label, color: T.bl, fontSize: 9, marginBottom: 8 }}>Fabric Program</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div style={{ width: 4, height: 18, borderRadius: 2, background: T.bl }} />
+            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color: T.bl }}>Fabric Program</span>
+            <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${T.bd} 0%, transparent 100%)` }} />
+          </div>
           <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th style={{ ...th, width: '65%' }}>Part</th><th style={th}>Fabric Meter</th></tr></thead>
@@ -167,11 +175,19 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         </div>
       )}
 
-      {/* Grand Fabric Total */}
+      {/* Summary totals */}
       {(workParts.length > 0 || fabricParts.length > 0) && (
-        <div className="prg-grand-fabric" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginBottom: 16, padding: '10px 14px', background: 'rgba(56,189,248,.06)', border: `1px solid rgba(56,189,248,.15)`, borderRadius: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Grand Fabric Total</span>
-          <span style={{ fontFamily: T.sora, fontSize: 16, fontWeight: 700, color: T.bl }}>{(workFM + fabricFM).toFixed(2)} m</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          <div className="prg-grand-fabric" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'rgba(56,189,248,.06)', border: `1px solid rgba(56,189,248,.15)`, borderRadius: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Grand Fabric Total</span>
+            <span style={{ fontFamily: T.sora, fontSize: 16, fontWeight: 700, color: T.bl }}>{(workFM + fabricFM).toFixed(2)} m</span>
+          </div>
+          {workTotal > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'rgba(52,211,153,.06)', border: `1px solid rgba(52,211,153,.15)`, borderRadius: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Grand Work Total</span>
+              <span style={{ fontFamily: T.sora, fontSize: 16, fontWeight: 700, color: T.gr }}>₹{workTotal.toLocaleString('en-IN')}</span>
+            </div>
+          )}
         </div>
       )}
 
