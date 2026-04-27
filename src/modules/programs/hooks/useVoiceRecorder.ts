@@ -1,5 +1,5 @@
 // Voice recorder hook — MediaRecorder API with iOS Safari fallback
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 export function useVoiceRecorder() {
   const [recording, setRecording] = useState(false);
@@ -65,6 +65,16 @@ export function useVoiceRecorder() {
     const mime = mediaRef.current?.mimeType || 'audio/webm';
     return mime.includes('mp4') ? 'mp4' : 'webm';
   };
+
+  useEffect(() => {
+    return () => {
+      if (mediaRef.current?.state === 'recording') {
+        mediaRef.current.stream.getTracks().forEach(t => t.stop());
+        mediaRef.current.stop();
+      }
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
   return { recording, audioUrl, audioBlob, duration, error, start, stop, clear, ext };
 }

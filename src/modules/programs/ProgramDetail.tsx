@@ -27,14 +27,15 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
 
   const load = async () => {
     setLoading(true);
-    const [{ data: p }, { data: m }, { parts }] = await Promise.all([
-      fetchProgramById(programId), fetchMatchings(programId), fetchPriceWithParts(programId),
-    ]);
-    if (p?.is_deleted) { onClose(); return; }
-    setProgram(p); setMatchings(m);
-    setWorkParts(parts.filter(pt => (pt.section || 'work') === 'work'));
-    setFabricParts(parts.filter(pt => pt.section === 'fabric'));
-    setLoading(false);
+    try {
+      const [{ data: p }, { data: m }, { parts }] = await Promise.all([
+        fetchProgramById(programId), fetchMatchings(programId), fetchPriceWithParts(programId),
+      ]);
+      if (!p || p.is_deleted) { onClose(); return; }
+      setProgram(p); setMatchings(m);
+      setWorkParts(parts.filter(pt => (pt.section || 'work') === 'work'));
+      setFabricParts(parts.filter(pt => pt.section === 'fabric'));
+    } finally { setLoading(false); }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [programId]);

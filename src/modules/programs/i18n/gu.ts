@@ -14,9 +14,6 @@ export const gu = {
   manufacturingSku: 'ઉત્પાદન SKU',
   fabricMeterCol: 'ફેબ્રિક મીટર',
   workTotalCol: 'કામનો કુલ',
-  matching: 'મેચિંગ',
-  companies: 'કંપનીઓ',
-  createdBy: 'બનાવનાર',
   updatedAt: 'અપડેટ',
   actions: 'ક્રિયાઓ',
 
@@ -25,7 +22,6 @@ export const gu = {
   editTitle: 'પ્રોગ્રામ સંપાદિત કરો',
   sellingSkuLabel: 'વેચાણ SKU',
   manufacturingSkuLabel: 'ઉત્પાદન SKU',
-  matchingLabel: 'મેચિંગ',
   linkLabel: 'Dropbox / Google Drive લિંક',
   linkPlaceholder: 'ઇમેજ લિંક પેસ્ટ કરો...',
   voiceNote: 'વૉઇસ નોટ',
@@ -44,11 +40,7 @@ export const gu = {
   brandsLabel: 'બ્રાન્ડ્સ',
   brandName: 'બ્રાન્ડનું નામ',
   brandLabel: 'બ્રાન્ડ',
-  addBrand: '+ બ્રાન્ડ ઉમેરો',
-  companiesForMatching: 'આ મેચિંગ માટે કંપનીઓ',
-  companyName: 'કંપનીનું નામ',
   addCompany: '+ બ્રાન્ડ ઉમેરો',
-  matchingLabelField: 'મેચિંગ લેબલ',
 
   // ફોર્મ વિભાગો
   programInfo: 'પ્રોગ્રામ માહિતી',
@@ -56,15 +48,13 @@ export const gu = {
   fabricProgram: 'ફેબ્રિક પ્રોગ્રામ',
   matchingProgram: 'મેચિંગ પ્રોગ્રામ',
 
-  // ભાવ ટેબલ હેડર + ફીલ્ડ
-  priceBreakdown: 'ભાવ વિગત',
+  // ભાવ ટેબલ
   partName: 'ભાગનું નામ',
   stitch: 'સ્ટિચ',
   stitchType: 'પ્રકાર',
   meter: 'મીટર',
   piece: 'પીસ',
   oneRs: '1 RS',
-  jobStitch: 'જોબ સ્ટિચ',
   stitchRate: 'સ્ટિચ રેટ',
   oneMP: '1 M/P',
   meterPerPcs: 'MTR/PCS',
@@ -91,12 +81,7 @@ export const gu = {
   // ઇતિહાસ
   history: 'ઇતિહાસ',
   noHistory: 'હજુ સુધી કોઈ ફેરફાર નોંધાયો નથી.',
-  create: 'બનાવ્યું',
-  update: 'અપડેટ કર્યું',
-  delete: 'કાઢી નાખ્યું',
-  priceUpdate: 'ભાવ અપડેટ',
   voiceUpload: 'વૉઇસ નોટ અપલોડ',
-  voiceDelete: 'વૉઇસ નોટ દૂર કરી',
   byPrefix: 'દ્વારા ',
 
   // ક્રિયાઓ
@@ -107,7 +92,6 @@ export const gu = {
   deleteAction: 'કાઢો',
   deleteConfirm: 'આ પ્રોગ્રામ કાઢી નાખવો?',
   deleted: 'પ્રોગ્રામ કાઢી નાખ્યો.',
-  shareLink: 'શેર લિંક',
   copyLink: 'લિંક કૉપી',
   copied: 'લિંક કૉપી થઈ!',
   back: 'પાછા',
@@ -129,7 +113,6 @@ export const gu = {
   // વૉઇસ
   record: 'રેકોર્ડ',
   stop: 'બંધ',
-  play: 'ચલાવો',
   reRecord: 'ફરી રેકોર્ડ',
   upload: 'અપલોડ',
   recording: 'રેકોર્ડિંગ...',
@@ -151,7 +134,6 @@ export const gu = {
   aryadesigns: 'Arya Designs',
   notFound: 'મળ્યું નથી',
   notFoundOrExpired: 'પ્રોગ્રામ મળ્યો નથી અથવા લિંક સમાપ્ત.',
-  companiesCount: 'કંપનીઓ',
 
   // ભાષા
   language: 'ભાષા',
