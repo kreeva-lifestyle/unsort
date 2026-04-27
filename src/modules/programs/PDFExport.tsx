@@ -102,12 +102,24 @@ function openPrintWindow(
 
   // Price breakdown
   if (parts.length > 0) {
-    w.document.write(`<h2>Price Breakdown</h2>
-      <table><thead><tr><th>Part</th><th>Job Stitch</th><th class="right">Stitch Rate</th><th class="right">1 M/P</th><th class="right">Meter/PCS</th><th class="right">Rate</th><th class="right">Total</th><th class="right">Fabric Meter</th></tr></thead><tbody>`);
-    parts.forEach(pt => {
-      w.document.write(`<tr><td>${esc(pt.part_name)}</td><td>${esc(pt.job_stitch)}</td><td class="right">${Number(pt.stitch_rate || 0).toFixed(2)}</td><td class="right">${Number(pt.one_mp || 0).toFixed(2)}</td><td class="right">${Number(pt.meter_per_pcs || 0).toFixed(4)}</td><td class="right">${Number(pt.rate || 0).toFixed(2)}</td><td class="right">₹${Number(pt.total || 0).toFixed(2)}</td><td class="right">${Number(pt.fabric_meter || 0).toFixed(4)}</td></tr>`);
-    });
-    w.document.write(`<tr class="total-row"><td colspan="6" style="text-align:right">Grand Total</td><td class="right">₹${grandTotal.toFixed(2)}</td><td></td></tr></tbody></table>`);
+    const workParts = parts.filter(pt => (pt.section || 'work') === 'work');
+    const fabricPartsList = parts.filter(pt => pt.section === 'fabric');
+    if (workParts.length > 0) {
+      w.document.write(`<h2>Work Program</h2>
+        <table><thead><tr><th>Part</th><th class="right">Stitch</th><th class="right">1 RS</th><th class="right">Stitch Rate</th><th class="right">1 M/P</th><th class="right">MTR/PCS</th><th class="right">Rate</th><th class="right">Total</th><th>Fabric</th><th class="right">Fabric Meter</th></tr></thead><tbody>`);
+      workParts.forEach(pt => {
+        w.document.write(`<tr><td>${esc(pt.part_name)}</td><td class="right">${Number(pt.stitch || 0)}</td><td class="right">${Number(pt.one_rs || 0).toFixed(2)}</td><td class="right">${Number(pt.stitch_rate || 0).toFixed(2)}</td><td class="right">${Number(pt.one_mp || 0)}</td><td class="right">${Number(pt.meter_per_pcs || 0).toFixed(2)}</td><td class="right">${Number(pt.rate || 0).toFixed(2)}</td><td class="right">₹${Number(pt.total || 0).toFixed(2)}</td><td>${esc(pt.fabric_name)}</td><td class="right">${Number(pt.fabric_meter || 0).toFixed(2)}</td></tr>`);
+      });
+      w.document.write(`<tr class="total-row"><td colspan="7" style="text-align:right">Grand Total</td><td class="right">₹${grandTotal.toFixed(2)}</td><td style="text-align:right">Total FM</td><td class="right">${workParts.reduce((s, p) => s + Number(p.fabric_meter || 0), 0).toFixed(2)}</td></tr></tbody></table>`);
+    }
+    if (fabricPartsList.length > 0) {
+      const fabricTotal = fabricPartsList.reduce((s, p) => s + Number(p.fabric_meter || 0), 0);
+      w.document.write(`<h2>Fabric Program</h2><table><thead><tr><th>Part</th><th class="right">Fabric Meter</th></tr></thead><tbody>`);
+      fabricPartsList.forEach(pt => { w.document.write(`<tr><td>${esc(pt.part_name)}</td><td class="right">${Number(pt.fabric_meter || 0).toFixed(2)}</td></tr>`); });
+      w.document.write(`<tr class="total-row"><td style="text-align:right">Grand Total</td><td class="right">${fabricTotal.toFixed(2)}</td></tr></tbody></table>`);
+      const grandFabric = workParts.reduce((s, p) => s + Number(p.fabric_meter || 0), 0) + fabricTotal;
+      w.document.write(`<p style="text-align:right;font-weight:700;color:#0066cc">Grand Fabric Total: ${grandFabric.toFixed(2)} m</p>`);
+    }
   }
 
   // History

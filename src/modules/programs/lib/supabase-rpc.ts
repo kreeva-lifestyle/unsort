@@ -37,7 +37,7 @@ export async function fetchPriceWithParts(programId: string) {
     .eq('program_id', programId).maybeSingle();
   if (!price) return { price: null, parts: [] };
   const { data: parts } = await supabase.from('program_price_parts')
-    .select('id, program_price_id, part_name, job_stitch, stitch_rate, one_mp, meter_per_pcs, rate, total, fabric_meter, sort_order, created_at')
+    .select('id, program_price_id, part_name, stitch, one_rs, stitch_rate, one_mp, meter_per_pcs, rate, total, fabric_name, fabric_meter, section, sort_order, created_at')
     .eq('program_price_id', price.id).order('sort_order');
   return { price: price as ProgramPrice, parts: (parts as ProgramPricePart[] | null) || [] };
 }
@@ -124,4 +124,15 @@ export async function fetchMatchingCounts(programIds: string[]) {
   const counts: Record<string, number> = {};
   (data || []).forEach(r => { counts[r.program_id] = (counts[r.program_id] || 0) + 1; });
   return counts;
+}
+
+// ── Lookup tables (dropdowns with auto-save) ─────────────────────────────
+export async function fetchLookup(table: 'program_lookup_part_names' | 'program_lookup_fabric_names' | 'program_lookup_brands') {
+  const { data } = await supabase.from(table).select('name').order('name');
+  return (data || []).map(r => r.name);
+}
+
+export async function addLookup(table: 'program_lookup_part_names' | 'program_lookup_fabric_names' | 'program_lookup_brands', name: string) {
+  if (!name.trim()) return;
+  await supabase.from(table).upsert({ name: name.trim() }, { onConflict: 'name' });
 }

@@ -34,13 +34,16 @@ export interface ProgramPricePart {
   id: string;
   program_price_id: string;
   part_name: string | null;
-  job_stitch: string | null;
+  stitch: number | null;
+  one_rs: number | null;
   stitch_rate: number | null;
   one_mp: number | null;
   meter_per_pcs: number | null;
   rate: number | null;
   total: number | null;
+  fabric_name: string | null;
   fabric_meter: number | null;
+  section: 'work' | 'fabric';
   sort_order: number;
   created_at: string;
 }
@@ -73,17 +76,27 @@ export interface ProgramFormData {
 export interface PricePartRow {
   id?: string;
   part_name: string;
-  job_stitch: string;
+  stitch: number;
+  one_rs: number;
   stitch_rate: number;
   one_mp: number;
   meter_per_pcs: number;
   rate: number;
   total: number;
+  fabric_name: string;
   fabric_meter: number;
+  section: 'work' | 'fabric';
   sort_order: number;
 }
 
-export const EMPTY_PART: PricePartRow = {
-  part_name: '', job_stitch: '', stitch_rate: 0, one_mp: 0,
-  meter_per_pcs: 0, rate: 0, total: 0, fabric_meter: 0, sort_order: 0,
+export const EMPTY_WORK_PART: PricePartRow = {
+  part_name: '', stitch: 0, one_rs: 0, stitch_rate: 0, one_mp: 0,
+  meter_per_pcs: 0, rate: 0, total: 0, fabric_name: '', fabric_meter: 0,
+  section: 'work', sort_order: 0,
+};
+
+export const EMPTY_FABRIC_PART: PricePartRow = {
+  part_name: '', stitch: 0, one_rs: 0, stitch_rate: 0, one_mp: 0,
+  meter_per_pcs: 0, rate: 0, total: 0, fabric_name: '', fabric_meter: 0,
+  section: 'fabric', sort_order: 0,
 };
