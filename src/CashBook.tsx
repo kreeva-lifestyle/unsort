@@ -192,6 +192,7 @@ export default function CashBook() {
     const payload: CashExpenseInsert = { date: entryDate, amount: amt, category, description: description.trim() || null, paid_by: user?.id ?? null };
     const { error } = await supabase.from('cash_expenses').insert(payload);
     if (error) { setFormError('Save failed — ' + friendlyError(error)); return; }
+    addToast('Expense added!', 'success');
     setAmount(''); setDescription(''); setCategory(CATEGORIES[0]); setShowAdd(false);
     fetchData();
   };
@@ -277,7 +278,9 @@ export default function CashBook() {
       reason: amountDiffers ? handReason.trim() : null,
     };
     // Insert and return the generated handover_number for the notification
-    const { data: inserted } = await supabase.from('cash_handovers').insert(handoverPayload).select('handover_number').single();
+    const { data: inserted, error: hoErr } = await supabase.from('cash_handovers').insert(handoverPayload).select('handover_number').single();
+    if (hoErr) { addToast(friendlyError(hoErr), 'error'); return; }
+    addToast('Handover created!', 'success');
     const hoNo = formatHandoverNo((inserted as { handover_number?: number } | null)?.handover_number);
     // WhatsApp notification to recipient
     if (recipient.phone) {

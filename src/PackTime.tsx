@@ -92,7 +92,7 @@ async function flushQueue() {
         await new Promise(r => setTimeout(r, 2000));
       }
       if (retries > 3) {
-        console.error('PackStation: dropped batch after 3 retries', batch);
+        // Batch dropped after 3 retries — notifyDropped() handles user feedback
         droppedBatches.push({ rows: batch, sheetName, ts: Date.now() });
         notifyDropped();
       }
@@ -119,7 +119,7 @@ if (typeof window !== 'undefined') {
         const blob = new Blob([body], { type: 'application/json' });
         const ok = navigator.sendBeacon ? navigator.sendBeacon(EDGE_FN, blob) : false;
         if (!ok) {
-          fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body, keepalive: true }).catch((err) => console.error('Final flush failed:', err));
+          fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body, keepalive: true }).catch(() => {});
         }
       }
       e.returnValue = '';
@@ -447,19 +447,19 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     supabase.from('packtime_scans').insert(scanRow).then(({ error }) => {
       if (error) {
         if (error.code === '23505') {
-          console.warn('PackStation: duplicate AWB in DB, rolling back');
+          // Duplicate AWB in DB — roll back local count
           setSessionCount(p => Math.max(0, p - 1));
           setSheetTotal(p => Math.max(0, p - 1));
           rowCountRef.current = Math.max(0, rowCountRef.current - 1);
           setRecentScans(p => p.map(s => s.awb === trimmed ? { ...s, success: false } : s));
           return;
         }
-        console.error('PackStation DB insert failed:', error.message, error.code);
+        // DB insert failed — increment dbFails counter, retry once after 2s
         setDbFails(p => p + 1);
         setTimeout(() => {
           supabase.from('packtime_scans').insert(scanRow).then(({ error: e2 }) => {
             if (!e2 || e2.code === '23505') setDbFails(p => Math.max(0, p - 1));
-            else console.error('PackStation DB retry failed:', e2.message);
+            else setDbFails(p => p + 1);
           });
         }, 2000);
         return;
@@ -492,7 +492,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     focusInput();
     // Background delete from Google Sheet + Supabase DB
     getAuthHeaders().then(headers => fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
-      .then(r => r.json()).then(d => { if (!d.ok) console.error('Sheet undo failed:', d.error); })).catch(e => console.error('Sheet undo error:', e));
+      .then(r => r.json()).then(() => {})).catch(() => {});
     supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current);
   }, [lastScanned, courierSheet, focusInput]);
 
@@ -510,7 +510,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     beep(500, 0.1);
     // Background delete from Google Sheet + Supabase DB
     getAuthHeaders().then(headers => fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
-      .then(r => r.json()).then(d => { if (!d.ok) console.error('Sheet delete failed:', d.error); })).catch(e => console.error('Sheet delete error:', e));
+      .then(r => r.json()).then(() => {})).catch(() => {});
     supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current);
   }, [recentScans, lastScanned, courierSheet]);
 
@@ -570,8 +570,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           body: JSON.stringify({ action: 'delete', awb: record.awb, sheetName: record.sheet_name }),
         });
         const result = await resp.json();
-        if (!result.ok) console.error('Sheet delete failed:', result.error);
-      } catch (e) { console.error('Sheet delete error:', e); }
+        if (!result.ok) { /* sheet delete failed — non-critical */ }
+      } catch { /* sheet delete error — non-critical */ }
     }
     await supabase.from('packtime_scans').delete().eq('id', id);
     fetchHistory();
