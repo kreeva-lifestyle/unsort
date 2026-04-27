@@ -36,8 +36,10 @@ export const en = {
   saved: 'Program saved!',
   saveFailed: 'Save failed',
   conflictError: 'Record was modified by another user. Please refresh.',
+  skuPlaceholderSell: 'e.g. SKU-SELL-001',
+  skuPlaceholderMfg: 'e.g. SKU-MFG-001',
 
-  // Brands (matching section)
+  // Brands
   brands: 'Brands',
   brandsLabel: 'Brands',
   brandName: 'Brand Name',
@@ -54,12 +56,15 @@ export const en = {
   fabricProgram: 'Fabric Program',
   matchingProgram: 'Matching Program',
 
-  // Price
+  // Price table headers + fields
   priceBreakdown: 'Price Breakdown',
   partName: 'Part Name',
-  jobStitch: 'Job Stitch',
   stitch: 'Stitch',
+  stitchType: 'Type',
+  meter: 'Meter',
+  piece: 'Piece',
   oneRs: '1 RS',
+  jobStitch: 'Job Stitch',
   stitchRate: 'Stitch Rate',
   oneMP: '1 M/P',
   meterPerPcs: 'MTR/PCS',
@@ -67,12 +72,21 @@ export const en = {
   total: 'Total',
   fabricName: 'Fabric Name',
   fabricMeter: 'Fabric Meter',
+  fm: 'FM',
+  totalFM: 'Total FM',
   addPart: '+ Add Part',
   grandTotal: 'Grand Total',
   grandFabricTotal: 'Grand Fabric Total',
   grandWorkTotal: 'Grand Work Total',
+  fabricBreakdown: 'Fabric Breakdown',
   savePrices: 'Save Prices',
   pricesSaved: 'Prices saved!',
+
+  // Placeholders
+  partPlaceholder: 'Part',
+  fabricPlaceholder: 'Fabric',
+  partSingular: 'part',
+  partPlural: 'parts',
 
   // History
   history: 'History',
@@ -82,6 +96,7 @@ export const en = {
   delete: 'Deleted',
   priceUpdate: 'Price updated',
   voiceUpload: 'Voice note uploaded',
+  byPrefix: 'by ',
 
   // Actions
   view: 'View',
@@ -104,6 +119,12 @@ export const en = {
   removeVoiceConfirm: 'Remove this voice note?',
   voiceRemoved: 'Voice note removed',
 
+  // QR errors
+  qrFailed: 'Failed to generate QR',
+  qrError: 'Unable to generate QR code',
+  contactSupport: 'Please contact support',
+  shareLinkFailed: 'Failed to generate share link',
+
   // Voice
   record: 'Record',
   stop: 'Stop',
@@ -120,6 +141,16 @@ export const en = {
   // Empty state
   noPrograms: 'No programs yet',
   noProgramsHint: 'Create your first program to get started.',
+
+  // Public share / PDF
+  programReport: 'Program Report',
+  sharedReport: 'Shared program report',
+  generated: 'Generated',
+  poweredBy: 'Powered by DailyOffice · Arya Designs',
+  aryadesigns: 'Arya Designs',
+  notFound: 'Not found',
+  notFoundOrExpired: 'Program not found or link expired.',
+  companiesCount: 'Companies',
 
   // Language
   language: 'Language',

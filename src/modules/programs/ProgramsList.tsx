@@ -54,7 +54,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
     let token = p.share_token;
     if (!token) {
       const { token: newToken, error } = await generateShareToken(p.id);
-      if (error || !newToken) { addToast('Failed to generate share link', 'error'); return; }
+      if (error || !newToken) { addToast(t('shareLinkFailed'), 'error'); return; }
       token = newToken;
     }
     const url = getShareUrl(token);
