@@ -85,11 +85,18 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         </div>
       )}
 
-      {/* Brands */}
+      {/* Voice note */}
+      <VoiceRecorder programId={programId} existingPath={program.voice_note_path} onUploaded={() => load()} t={t} />
+
+      {/* ═══ BRANDS (read-only) ═══ */}
       {matchings.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ ...label, marginBottom: 8 }}>Brands ({matchings.length})</div>
-          <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div style={{ width: 4, height: 18, borderRadius: 2, background: T.yl }} />
+            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color: T.yl }}>Brands</span>
+            <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${T.bd} 0%, transparent 100%)` }} />
+          </div>
+          <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th style={th}>Brand Name</th><th style={th}>Label</th></tr></thead>
               <tbody>
@@ -105,13 +112,14 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         </div>
       )}
 
-      {/* Voice note */}
-      <VoiceRecorder programId={programId} existingPath={program.voice_note_path} onUploaded={() => load()} t={t} />
-
       {/* ═══ WORK PROGRAM (read-only) ═══ */}
       {workParts.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ ...label, color: T.gr, fontSize: 9, marginBottom: 8 }}>Work Program</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div style={{ width: 4, height: 18, borderRadius: 2, background: T.gr }} />
+            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color: T.gr }}>Work Program</span>
+            <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${T.bd} 0%, transparent 100%)` }} />
+          </div>
           <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
               <thead><tr>
@@ -147,7 +155,11 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       {/* ═══ FABRIC PROGRAM (read-only) ═══ */}
       {fabricParts.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ ...label, color: T.bl, fontSize: 9, marginBottom: 8 }}>Fabric Program</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div style={{ width: 4, height: 18, borderRadius: 2, background: T.bl }} />
+            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, textTransform: 'uppercase', letterSpacing: 1.5, color: T.bl }}>Fabric Program</span>
+            <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${T.bd} 0%, transparent 100%)` }} />
+          </div>
           <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th style={{ ...th, width: '65%' }}>Part</th><th style={th}>Fabric Meter</th></tr></thead>
