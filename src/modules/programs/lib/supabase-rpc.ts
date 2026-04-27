@@ -126,6 +126,32 @@ export async function fetchMatchingCounts(programIds: string[]) {
   return counts;
 }
 
+// ── Price summaries for list view (total work amount + fabric meter) ──────
+export async function fetchPriceSummaries(programIds: string[]) {
+  if (programIds.length === 0) return {};
+  const { data: prices } = await supabase.from('program_prices').select('id, program_id').in('program_id', programIds);
+  if (!prices || prices.length === 0) return {};
+  const priceIds = prices.map(p => p.id);
+  const { data: parts } = await supabase.from('program_price_parts')
+    .select('program_price_id, total, fabric_meter, section')
+    .in('program_price_id', priceIds);
+  const result: Record<string, { workTotal: number; fabricMeter: number }> = {};
+  const priceToProgram: Record<string, string> = {};
+  prices.forEach(p => { priceToProgram[p.id] = p.program_id; });
+  (parts || []).forEach(pt => {
+    const pid = priceToProgram[pt.program_price_id];
+    if (!pid) return;
+    if (!result[pid]) result[pid] = { workTotal: 0, fabricMeter: 0 };
+    if ((pt.section || 'work') === 'work') {
+      result[pid].workTotal += Number(pt.total || 0);
+      result[pid].fabricMeter += Number(pt.fabric_meter || 0);
+    } else {
+      result[pid].fabricMeter += Number(pt.fabric_meter || 0);
+    }
+  });
+  return result;
+}
+
 // ── Lookup tables (dropdowns with auto-save) ─────────────────────────────
 export async function fetchLookup(table: 'program_lookup_part_names' | 'program_lookup_fabric_names' | 'program_lookup_brands') {
   const { data } = await supabase.from(table).select('name').order('name');

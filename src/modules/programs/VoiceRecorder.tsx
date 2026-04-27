@@ -40,6 +40,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
       onUploaded(path);
       clear();
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioBlob, programId, ext, uploading, addToast, t, onUploaded, clear]);
 
   const btnBase: React.CSSProperties = {
