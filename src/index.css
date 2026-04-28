@@ -124,14 +124,17 @@ body.modal-open { overflow: hidden !important; }
   .header-bar { padding: 8px 12px !important; }
   .header-title { font-size: 13px !important; }
   .header-search { max-width: none !important; }
-  .stat-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 8px !important; }
+  .header-bar button { min-width: 44px !important; min-height: 44px !important; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+  .stat-hero { flex-direction: column !important; gap: 6px !important; padding: 14px 16px !important; }
+  .stat-hero > div:last-child { text-align: left !important; }
+  .stat-hero p[style*="fontSize: 44"] { font-size: 36px !important; }
   .cat-grid { grid-template-columns: 1fr !important; }
+  .three-things { grid-template-columns: 1fr !important; }
   .modal-inner { width: calc(100vw - 16px) !important; max-height: 94vh !important; border-radius: 12px !important; }
   .modal-inner form { padding: 14px !important; }
   .two-col { grid-template-columns: 1fr !important; }
-}
-@media (max-width: 480px) {
-  .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .mobile-hamburger > div { min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-direction: column !important; gap: 3px !important; }
 }
 
 /* ── Programs module mobile ──────────────────────────────── */

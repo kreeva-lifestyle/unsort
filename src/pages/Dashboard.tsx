@@ -203,7 +203,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         <div style={{ fontFamily: T.sora, fontSize: 12, fontWeight: 600, color: T.tx, letterSpacing: -0.1 }}>Today's 3 things</div>
         <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${T.bd} 0%, transparent 100%)` }} />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+      <div className="three-things" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
         {/* Overdue payments */}
         <div role="button" tabIndex={0} onClick={() => navigateTo?.('challan')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('challan'); }} style={{ background: alerts.overdue.length > 0 ? 'rgba(248,113,113,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.overdue.length > 0 ? 'rgba(248,113,113,.18)' : T.bd}`, borderLeft: `3px solid ${alerts.overdue.length > 0 ? T.re : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 110 }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(248,113,113,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.overdue.length > 0 ? 'rgba(248,113,113,.18)' : T.bd)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
