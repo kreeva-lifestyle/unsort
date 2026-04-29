@@ -387,7 +387,7 @@ export default function BrandTagPrinter() {
   const [search, setSearch] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [sizeFilter, setSizeFilter] = useState('');
-  const [colorFilter, setColorFilter] = useState('');
+  const [colorFilter] = useState('');
   const [modalRow, setModalRow] = useState<BrandTagRow | null>(null);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -689,20 +689,23 @@ export default function BrandTagPrinter() {
         <span style={{ fontSize: 11, color: T.tx3 }}>Loading brand tags...</span>
       </div>}
       {!loading && <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Brand Tags</span>
-          <span style={{ fontSize: 10, fontWeight: 500, color: T.tx3, marginLeft: 8 }}>{totalCount} rows</span>
-          {importing && <span style={{ fontSize: 10, color: T.yl, marginLeft: 8, fontWeight: 600 }}>Importing {importProgress}...</span>}
+          <div style={{ fontSize: 20, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Brand Tags</div>
+          <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>{totalCount} master tags · 1.97 × 2.97 in label · CODE128 barcode</div>
+          {importing && <span style={{ fontSize: 10, color: T.yl, marginTop: 4, fontWeight: 600, display: 'block' }}>Importing {importProgress}...</span>}
         </div>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Primary action: Order Sheet (daily use) */}
-          <button style={{ ...btnGhost, color: T.yl, borderColor: 'rgba(251,191,36,.12)', opacity: orderLoading ? 0.5 : 1, pointerEvents: orderLoading ? 'none' : 'auto' }} onClick={() => orderFileRef.current?.click()}>Order Sheet</button>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button style={{ ...S.btnGhost, gap: 6 }} onClick={() => orderFileRef.current?.click()}>
+            <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M12 18v-6M9 15l3-3 3 3" /></svg>
+            Import order sheet
+          </button>
           <input ref={orderFileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleOrderImport} />
           {orderLoading && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: T.yl }}><span style={{ width: 10, height: 10, border: '1.5px solid rgba(251,191,36,.2)', borderTopColor: T.yl, borderRadius: '50%', animation: 'btnSpin .6s linear infinite', flexShrink: 0 }} />{orderLoadMsg}</span>}
-          {/* Secondary actions collapsed into More menu (audit P1: stops wrap on 13" screens) */}
+          <button style={S.btnGhost} onClick={openAdd}>+ Add tag</button>
           <div style={{ position: 'relative' }}>
-            <button style={btnGhost} onClick={() => setMoreMenuOpen(o => !o)}>More ▾</button>
+            <button style={S.btnGhost} onClick={() => setMoreMenuOpen(o => !o)}>More ▾</button>
             <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
             {moreMenuOpen && (
               <>
@@ -720,38 +723,53 @@ export default function BrandTagPrinter() {
               </>
             )}
           </div>
-          <button style={btnPrimary} onClick={openAdd}>+ Add SKU</button>
+          <button style={{ ...S.btnPrimary, background: `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)`, boxShadow: `0 2px 10px rgba(34,197,94,.3)` }} onClick={() => { const toPrint: BrandTagRow[] = []; rows.forEach(r => { for (let i = 0; i < (r.copies || 0); i++) toPrint.push(r); }); if (toPrint.length > 0) openLabelPrint(toPrint); else addToast('Set copies > 0 on rows to print', 'error'); }}>
+            <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
+            Print
+          </button>
         </div>
       </div>
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid ' + T.bd, borderRadius: 8, padding: '8px 10px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
-        <input type="text" placeholder="Search brand, SKU, EAN..." value={search} onChange={e => handleSearch(e.target.value)} style={{ flex: 1, minWidth: 130, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 12px', outline: 'none', boxSizing: 'border-box' as const, height: 36 }} />
-        <div style={{ width: 1, height: 20, background: T.bd2 }} />
-        <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 100, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="">All brands</option>{BRAND_OPTIONS.map(b => { const n = b.replace(/^BRAND NAME:\s*/i, ''); return <option key={b} value={n}>{n}</option>; })}</select>
-        <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 80, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="">All sizes</option>{SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
-        <select value={colorFilter} onChange={e => setColorFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 90, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="">All colors</option>{COLOR_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}</select>
+
+      {/* Filter bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
+          <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
+          <input type="text" placeholder="Search SKU, product, EAN..." value={search} onChange={e => handleSearch(e.target.value)} style={S.fSearch} />
+        </div>
+        <div style={{ display: 'flex', gap: 4, padding: 3, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
+          <button onClick={() => setBrandFilter('')} style={{ padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: !brandFilter ? 600 : 400, background: !brandFilter ? 'rgba(99,102,241,.15)' : 'transparent', color: !brandFilter ? T.ac2 : T.tx3, fontFamily: T.sans, transition: T.transition }}>All brands</button>
+          {BRAND_OPTIONS.map(b => { const n = b.replace(/^BRAND NAME:\s*/i, ''); return (
+            <button key={b} onClick={() => setBrandFilter(brandFilter === n ? '' : n)} style={{ padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: brandFilter === n ? 600 : 400, background: brandFilter === n ? 'rgba(99,102,241,.15)' : 'transparent', color: brandFilter === n ? T.ac2 : T.tx3, fontFamily: T.sans, transition: T.transition }}>{n}</button>
+          ); })}
+        </div>
+        <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 12px', outline: 'none', cursor: 'pointer', height: 36 }}><option value="">All sizes</option>{SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
       </div>
 
       {/* Table */}
       <div style={{ overflowX: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8, background: 'rgba(255,255,255,0.015)', marginBottom: 8 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead><tr>
-            {['Brand', 'EAN', 'SKU', 'Includes', 'MRP', 'Size', 'Product', 'Color', 'Jio Code', 'Actions'].map(h => (
+            {['Brand', 'SKU · Product', 'Size', 'Color', 'MRP', 'Jio Code', 'Copies', 'Actions'].map(h => (
               <th key={h} style={thS}>{h}</th>
             ))}
           </tr></thead>
           <tbody>
-            {rows.length === 0 && !loading && <tr><td colSpan={10} style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 10 }}>No rows. Import Excel or add SKUs.</td></tr>}
+            {rows.length === 0 && !loading && <tr><td colSpan={8} style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 10 }}>No rows. Import Excel or add SKUs.</td></tr>}
             {rows.map(row => (
               <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.015)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                <td style={tdS}>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</td>
-                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11 }}>{row.ean}</td>
-                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11, fontWeight: 500 }}>{row.sku}</td>
-                <td style={tdS}>{row.qty.replace(/^INCLUDES:\s*/i, '')}</td>
-                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11, whiteSpace: 'nowrap' }}>{fmtMrp(row.mrp)}</td>
+                <td style={tdS}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: 'rgba(99,102,241,.10)', color: T.ac2 }}>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</span></td>
+                <td style={tdS}><div style={{ fontFamily: T.mono, fontSize: 11, color: T.tx3 }}>{row.sku}</div><div style={{ fontWeight: 500, color: T.tx, marginTop: 1 }}>{row.product.replace(/^PRODUCT DESC:\s*/i, '')}</div></td>
                 <td style={tdS}>{row.size}</td>
-                <td style={tdS}>{row.product.replace(/^PRODUCT DESC:\s*/i, '')}</td>
                 <td style={tdS}>{row.color}</td>
-                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11 }}>{row.jioCode}</td>
+                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 12, whiteSpace: 'nowrap', fontWeight: 600 }}>{fmtMrp(row.mrp)}</td>
+                <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11, color: T.tx3 }}>{row.jioCode}</td>
+                <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                    <button onClick={() => { const v = Math.max(0, (row.copies || 0) - 1); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(() => fetchPage()); }} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                    <span style={{ width: 32, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: row.copies > 0 ? T.ac2 : T.tx3, background: row.copies > 0 ? 'rgba(99,102,241,.06)' : 'transparent' }}>{row.copies || 0}</span>
+                    <button onClick={() => { const v = (row.copies || 0) + 1; supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(() => fetchPage()); }} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                  </div>
+                </td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', gap: 3 }}>
                     <button style={btnSm} onClick={() => openEdit(row)}>Edit</button>
