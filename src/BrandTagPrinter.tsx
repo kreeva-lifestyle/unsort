@@ -37,7 +37,7 @@ const thS: React.CSSProperties = {
   fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)',
   whiteSpace: 'nowrap', fontFamily: T.sans, textTransform: 'uppercase', letterSpacing: '0.1em',
 };
-const tdS: React.CSSProperties = { padding: '11px 14px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx2, fontFamily: T.sans };
+const tdS: React.CSSProperties = { padding: '11px 14px', fontSize: 13, borderBottom: `1px solid ${T.bd}`, color: T.tx2, fontFamily: T.sans };
 const fLabel: React.CSSProperties = { display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, marginBottom: 5, letterSpacing: '0.06em', textTransform: 'uppercase' as const, fontFamily: T.sans };
 
 // ── Types ──────────────────────────────────────────────────────────────────────

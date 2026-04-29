@@ -66,8 +66,8 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
     onEdit(p, data.map(m => ({ company_name: m.company_name, matching_label: m.matching_label || '' })));
   };
 
-  const th: React.CSSProperties = { ...S.thStyle, padding: '8px 12px', fontSize: 9 };
-  const td: React.CSSProperties = { ...S.tdStyle, padding: '8px 12px', fontSize: 11 };
+  const th: React.CSSProperties = { ...S.thStyle, padding: '10px 12px', fontSize: 10 };
+  const td: React.CSSProperties = { ...S.tdStyle, padding: '10px 12px', fontSize: 12 };
   const ghostBtn: React.CSSProperties = { ...S.btnGhost, ...S.btnSm, fontSize: 9, padding: '3px 8px', cursor: 'pointer' };
 
   return (

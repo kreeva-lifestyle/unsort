@@ -54,9 +54,9 @@ export default function PublicShareView({ shareToken }: Props) {
   const workFM = workParts.reduce((s: number, p: any) => s + Number(p.fabric_meter || 0), 0);
   const fabricFM = fabricParts.reduce((s: number, p: any) => s + Number(p.fabric_meter || 0), 0);
   const workTotal = workParts.reduce((s: number, p: any) => s + Number(p.total || 0), 0);
-  const label: React.CSSProperties = { fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 };
-  const th: React.CSSProperties = { padding: '6px 8px', textAlign: 'left', color: T.tx3, fontSize: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: `1px solid ${T.bd}` };
-  const tdS: React.CSSProperties = { padding: '6px 8px', fontSize: 11, borderBottom: `1px solid ${T.bd}`, color: T.tx2 };
+  const label: React.CSSProperties = { fontSize: 9, color: T.tx3, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 };
+  const th: React.CSSProperties = { padding: '8px 10px', textAlign: 'left', color: T.tx3, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' };
+  const tdS: React.CSSProperties = { padding: '8px 10px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx2 };
 
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.tx, fontFamily: T.sans }}>

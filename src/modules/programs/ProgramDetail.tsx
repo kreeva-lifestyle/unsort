@@ -57,9 +57,9 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
 
   const imageUrl = program.dropbox_gdrive_link ? toDirectImageUrl(program.dropbox_gdrive_link) : null;
   const label: React.CSSProperties = { fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 };
-  const th: React.CSSProperties = { ...S.thStyle, padding: '6px 8px', fontSize: 9 };
+  const th: React.CSSProperties = { ...S.thStyle, padding: '8px 10px', fontSize: 10 };
   const thR: React.CSSProperties = { ...th, textAlign: 'right' };
-  const td: React.CSSProperties = { ...S.tdStyle, padding: '6px 8px', fontSize: 11 };
+  const td: React.CSSProperties = { ...S.tdStyle, padding: '8px 10px', fontSize: 12 };
   const tdR: React.CSSProperties = { ...td, fontFamily: T.mono, textAlign: 'right' };
   const typeLabel = (v: string) => v === 'piece' ? t('piece') : t('meter');
 
