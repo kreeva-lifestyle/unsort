@@ -82,8 +82,16 @@ export const S = {
     boxSizing: 'border-box' as const,
   } as React.CSSProperties,
 
+  fSearch: {
+    width: '100%', background: 'rgba(255,255,255,0.04)',
+    border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx,
+    fontFamily: T.sans, fontSize: 12, padding: '8px 12px 8px 34px',
+    outline: 'none', transition: T.transition,
+    boxSizing: 'border-box' as const, height: 36,
+  } as React.CSSProperties,
+
   btnPrimary: {
-    padding: '6px 13px', borderRadius: 6, border: 'none', cursor: 'pointer',
+    padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
     fontSize: 12, fontWeight: 600, fontFamily: T.sans,
     background: 'linear-gradient(135deg, rgba(99,102,241,.87), rgba(129,140,248,.80))',
     color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -94,7 +102,7 @@ export const S = {
   } as React.CSSProperties,
 
   btnGhost: {
-    padding: '6px 13px', borderRadius: 6,
+    padding: '7px 14px', borderRadius: 6,
     border: `1px solid rgba(99,102,241,0.15)`,
     cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: T.sans,
     background: 'rgba(99,102,241,0.06)', color: T.ac2,
@@ -104,16 +112,17 @@ export const S = {
   } as React.CSSProperties,
 
   btnDanger: {
-    padding: '6px 13px', borderRadius: 6,
-    border: '1px solid rgba(248,113,113,0.20)',
+    padding: '7px 14px', borderRadius: 6,
+    border: '1px solid rgba(239,68,68,0.20)',
     cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: T.sans,
-    background: 'rgba(248,113,113,0.08)', color: T.re,
+    background: 'rgba(239,68,68,0.08)', color: T.re,
     display: 'inline-flex', alignItems: 'center', gap: 5,
     transition: T.transition,
     whiteSpace: 'nowrap' as const,
   } as React.CSSProperties,
 
   btnSm: { padding: '4px 10px', fontSize: 10, borderRadius: 5 } as React.CSSProperties,
+  btnLg: { padding: '10px 18px', fontSize: 13, height: 40 } as React.CSSProperties,
 
   modalOverlay: {
     position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,.80)',

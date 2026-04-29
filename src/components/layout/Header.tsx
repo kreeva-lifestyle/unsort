@@ -1,6 +1,6 @@
 // App header — title, global search, scanner trigger, notification bell
 import { useState } from 'react';
-import { T, Icon } from '../../lib/theme';
+import { T, S, Icon } from '../../lib/theme';
 
 export default function Header({ title, onSearch, onNotifClick, onOpenScanner, notifications, markAsRead }: {
   title: string;
@@ -32,10 +32,10 @@ export default function Header({ title, onSearch, onNotifClick, onOpenScanner, n
         <div style={{ width: 1, height: 18, background: `linear-gradient(180deg, transparent, ${T.bd2}, transparent)`, flexShrink: 0 }} />
         {/* Search */}
         <div className="header-search" style={{ flex: 1, maxWidth: 320 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '5px 10px', transition: 'all .18s' }}>
-            <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, flexShrink: 0, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
-            <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search items, IDs, SKUs..." style={{ background: 'transparent', border: 'none', outline: 'none', color: T.tx, fontFamily: T.sans, fontSize: 11, flex: 1, minWidth: 0 }} />
-            {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14, lineHeight: 1, opacity: 0.5, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.5')}>×</span>}
+          <div style={{ position: 'relative' }}>
+            <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
+            <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search items, IDs, SKUs..." style={{ ...S.fSearch, paddingRight: globalSearch ? 30 : 12 }} />
+            {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: T.tx3, fontSize: 14, lineHeight: 1, opacity: 0.5, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.5')}>×</span>}
           </div>
         </div>
         {/* Right actions */}

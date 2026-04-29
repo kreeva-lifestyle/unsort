@@ -618,7 +618,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {/* Search + Filter */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
         <input type="text" value={historySearch} onChange={e => { setHistorySearch(e.target.value); setHistoryPage(0); }} placeholder="Search AWB..."
-          style={{ flex: '1 1 180px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 11, padding: '7px 10px', outline: 'none', boxSizing: 'border-box', minWidth: 140 }} />
+          style={{ flex: '1 1 180px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.mono, fontSize: 12, padding: '8px 12px', outline: 'none', boxSizing: 'border-box', minWidth: 140, height: 36 }} />
         <select value={historyFilterCourier} onChange={e => { setHistoryFilterCourier(e.target.value); setHistoryPage(0); }}
           style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '7px 8px', outline: 'none' }}>
           <option value="">All Couriers</option>
@@ -858,7 +858,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         <div style={{ marginBottom: 10, animation: 'fi .15s ease' }}>
           <div style={{ position: 'relative' }}>
             <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search AWB..." autoFocus
-              style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 8, color: T.tx, fontFamily: T.mono, fontSize: 13, padding: '8px 12px', outline: 'none', boxSizing: 'border-box' }} />
+              style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.mono, fontSize: 12, padding: '8px 12px', outline: 'none', boxSizing: 'border-box', height: 36 }} />
             {searchQuery.trim() && (
               <div style={{ marginTop: 4, fontSize: 11, fontFamily: T.mono, color: awbSetRef.current.has(searchQuery.trim().toUpperCase()) ? T.re : T.gr }}>
                 {awbSetRef.current.has(searchQuery.trim().toUpperCase()) ? '⚠ Already scanned (last 7 days)' : '✓ Not found — safe to scan'}

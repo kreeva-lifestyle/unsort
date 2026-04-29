@@ -88,7 +88,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
         <input
           value={search} onChange={e => onSearch(e.target.value)}
           placeholder={t('searchPlaceholder')}
-          style={{ flex: 1, ...S.fInput, fontSize: 11, padding: '7px 10px' }}
+          style={{ flex: 1, ...S.fInput, fontSize: 12, padding: '8px 12px', height: 36 }}
         />
         <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }}
           style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '6px 6px', outline: 'none', width: 50 }}>

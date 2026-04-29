@@ -590,8 +590,8 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
 
         {/* Search */}
         <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
-          <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.6 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search SKU, product, notes…" style={{ ...S.fInput, width: '100%', padding: '7px 10px 7px 30px' }} />
+          <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search SKU, product, notes…" style={S.fSearch} />
         </div>
 
         {/* Filters button with multi-select popover */}
