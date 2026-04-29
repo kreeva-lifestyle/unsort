@@ -30,27 +30,32 @@ export const T = {
   glass2: 'rgba(255,255,255,0.04)',
 
   // Borders
-  bd:  'rgba(255,255,255,0.06)',
-  bd2: 'rgba(255,255,255,0.10)',
+  bd:  'rgba(255,255,255,0.05)',
+  bd2: 'rgba(255,255,255,0.08)',
 
   // Text
-  tx:  '#E8EEF7',
-  tx2: '#9AA8C2',
-  tx3: '#6B7890',  // was #4A5568 — bumped for WCAG contrast (audit P1)
+  tx:  '#E2E8F0',
+  tx2: '#8896B0',
+  tx3: '#6B7890',
 
   // Accent
   ac:  '#6366F1',
   ac2: '#818CF8',
-  ac3: 'rgba(99,102,241,0.12)',  // active-state tint for nav/tabs
+  ac3: 'rgba(99,102,241,0.12)',
 
   // Semantic
-  gr:  '#34D399',   // success / complete
-  re:  '#F87171',   // danger / damaged
-  yl:  '#FBBF24',   // warn / unsorted
-  bl:  '#38BDF8',   // info / cash-in-hand
+  gr:  '#22C55E',
+  re:  '#EF4444',
+  yl:  '#F59E0B',
+  bl:  '#38BDF8',
 
-  // Shape
+  // Radii
   r:   8,
+  rXs: 4,
+  rSm: 6,
+  rMd: 8,
+  rLg: 10,
+  rXl: 14,
 
   // Type families
   mono: "'JetBrains Mono', monospace",
@@ -80,7 +85,7 @@ export const S = {
   btnPrimary: {
     padding: '6px 13px', borderRadius: 6, border: 'none', cursor: 'pointer',
     fontSize: 12, fontWeight: 600, fontFamily: T.sans,
-    background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`,
+    background: 'linear-gradient(135deg, rgba(99,102,241,.87), rgba(129,140,248,.80))',
     color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 5,
     boxShadow: '0 2px 10px rgba(99,102,241,0.25)',
     transition: T.transition,
@@ -171,10 +176,10 @@ export const S = {
 type PillTone = 'neutral' | 'gr' | 'yl' | 're' | 'bl' | 'ac';
 const PILL_TONES: Record<PillTone, { bg: string; fg: string; bd: string }> = {
   neutral: { bg: 'rgba(255,255,255,.04)', fg: T.tx2, bd: T.bd },
-  gr:      { bg: 'rgba(52,211,153,.10)',  fg: T.gr,  bd: 'rgba(52,211,153,.25)' },
-  yl:      { bg: 'rgba(251,191,36,.10)',  fg: T.yl,  bd: 'rgba(251,191,36,.25)' },
-  re:      { bg: 'rgba(248,113,113,.10)', fg: T.re,  bd: 'rgba(248,113,113,.25)' },
-  bl:      { bg: 'rgba(56,189,248,.10)',  fg: T.bl,  bd: 'rgba(56,189,248,.25)' },
+  gr:      { bg: 'rgba(34,197,94,.10)',   fg: '#4ADE80', bd: 'rgba(34,197,94,.25)' },
+  yl:      { bg: 'rgba(245,158,11,.10)',  fg: '#FCD34D', bd: 'rgba(245,158,11,.25)' },
+  re:      { bg: 'rgba(239,68,68,.10)',   fg: '#FCA5A5', bd: 'rgba(239,68,68,.25)' },
+  bl:      { bg: 'rgba(56,189,248,.10)',  fg: '#7DD3FC', bd: 'rgba(56,189,248,.25)' },
   ac:      { bg: T.ac3,                    fg: T.ac2, bd: 'rgba(99,102,241,.25)' },
 };
 export const Pill = ({ tone = 'neutral', dot, children, style }: { tone?: PillTone; dot?: boolean; children: React.ReactNode; style?: React.CSSProperties }) => {
