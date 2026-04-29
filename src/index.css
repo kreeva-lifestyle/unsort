@@ -22,6 +22,14 @@ body {
 
 ::selection { background: rgba(99,102,241,0.25); color: #E2E8F0; }
 
+/* Prevent iOS zoom on input focus — force 16px minimum on mobile */
+@media (max-width: 768px) {
+  select, input[type="text"], input[type="email"], input[type="password"],
+  input[type="number"], input[type="search"], textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* Hide number input spin buttons globally */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
