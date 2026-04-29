@@ -1,10 +1,8 @@
-// App header — title, global search, scanner trigger, notification bell
 import { useState } from 'react';
-import { T, S, Icon } from '../../lib/theme';
+import { T, Icon } from '../../lib/theme';
 
-export default function Header({ title, onSearch, onNotifClick, onOpenScanner, notifications, markAsRead }: {
+export default function Header({ title, onNotifClick, onOpenScanner, notifications, markAsRead }: {
   title: string;
-  onSearch?: (q: string) => void;
   onNotifClick?: (n: any) => void;
   onOpenScanner?: () => void;
   notifications: any[];
@@ -12,7 +10,6 @@ export default function Header({ title, onSearch, onNotifClick, onOpenScanner, n
 }) {
   const [show, setShow] = useState(false);
   const unread = notifications.filter((n: any) => !n.is_read).length;
-  const [globalSearch, setGlobalSearch] = useState('');
 
   const handleNotifClick = (n: any) => {
     markAsRead(n.id);
@@ -23,23 +20,12 @@ export default function Header({ title, onSearch, onNotifClick, onOpenScanner, n
   return (
     <header className="header-bar" style={{ background: 'rgba(8,11,20,0.60)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', borderBottom: `1px solid ${T.bd}`, padding: '0 16px', position: 'sticky', top: 0, zIndex: 50, height: 44, display: 'flex', alignItems: 'center' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
-        {/* Title with accent dot */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, boxShadow: `0 0 8px ${T.ac}55` }} />
           <h1 className="header-title" style={{ margin: 0, fontSize: 13, fontWeight: 700, color: T.tx, whiteSpace: 'nowrap', fontFamily: T.sora, letterSpacing: -0.2 }}>{title}</h1>
         </div>
-        {/* Separator */}
-        <div style={{ width: 1, height: 18, background: `linear-gradient(180deg, transparent, ${T.bd2}, transparent)`, flexShrink: 0 }} />
-        {/* Search */}
-        <div className="header-search" style={{ flex: 1, maxWidth: 320 }}>
-          <div style={{ position: 'relative' }}>
-            <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
-            <input value={globalSearch} onChange={(e) => { setGlobalSearch(e.target.value); onSearch?.(e.target.value); }} placeholder="Search items, IDs, SKUs..." style={{ ...S.fSearch, paddingRight: globalSearch ? 30 : 12 }} />
-            {globalSearch && <span onClick={() => { setGlobalSearch(''); onSearch?.(''); }} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: T.tx3, fontSize: 14, lineHeight: 1, opacity: 0.5, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.5')}>×</span>}
-          </div>
-        </div>
-        {/* Right actions */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ flex: 1 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button onClick={() => onOpenScanner?.()} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} title="Scan barcode" onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = T.bd2; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = T.bd; }}>
           <Icon name="scan" size={14} />
         </button>
@@ -51,7 +37,7 @@ export default function Header({ title, onSearch, onNotifClick, onOpenScanner, n
         {show && (
           <div className="notif-dropdown" style={{ position: 'absolute', right: 0, top: 38, width: 'min(290px, calc(100vw - 32px))', background: 'rgba(12,16,28,0.96)', backdropFilter: 'blur(24px)', borderRadius: 8, boxShadow: '0 10px 40px rgba(0,0,0,.55)', border: `1px solid ${T.bd}`, zIndex: 50, maxHeight: 360, overflowY: 'auto' }}>
             <div style={{ padding: '10px 14px', borderBottom: `1px solid ${T.bd}`, fontWeight: 600, fontSize: 11, color: T.tx, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>Notifications {unread > 0 && <span style={{ fontSize: 9, fontFamily: T.mono, color: T.ac, background: 'rgba(99,102,241,.10)', padding: '2px 6px', borderRadius: 4 }}>{unread} new</span>}</div>
-            {notifications.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 11 }}>🔔 No new notifications</div> : notifications.slice(0, 10).map((n: any) => (
+            {notifications.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No new notifications</div> : notifications.slice(0, 10).map((n: any) => (
               <div key={n.id} onClick={() => handleNotifClick(n)} style={{ padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: n.is_read ? 'transparent' : 'rgba(99,102,241,.04)', transition: 'background .1s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseLeave={e => e.currentTarget.style.background = n.is_read ? 'transparent' : 'rgba(99,102,241,.04)'}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                   <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: T.tx }}>{n.title}</p>

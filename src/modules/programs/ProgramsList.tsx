@@ -79,7 +79,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
           <button onClick={toggleLang} style={{ ...ghostBtn, gap: 4 }}>
             {lang === 'en' ? 'ગુ' : 'EN'}
           </button>
-          <button onClick={onAdd} style={{ ...S.btnPrimary, fontSize: 11, padding: '6px 12px' }}>{t('addProgram')}</button>
+          <button onClick={onAdd} style={S.btnPrimary}>{t('addProgram')}</button>
         </div>
       </div>
 

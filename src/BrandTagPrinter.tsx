@@ -14,19 +14,11 @@ const btAudit = (action: string, details: string) => {
 };
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
-import { T } from './lib/theme';
+import { T, S } from './lib/theme';
 
-// ── Reusable style helpers ─────────────────────────────────────────────────────
-const btnBase: React.CSSProperties = {
-  padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
-  fontSize: 11, fontWeight: 600, fontFamily: T.sans,
-  display: 'inline-flex', alignItems: 'center', gap: 5,
-  whiteSpace: 'nowrap', letterSpacing: '0.02em',
-};
-const btnPrimary: React.CSSProperties = { ...btnBase, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', boxShadow: '0 2px 10px rgba(99,102,241,0.25)' };
-const btnGhost: React.CSSProperties = { ...btnBase, fontWeight: 500, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', color: T.ac2 };
-
-const btnSm: React.CSSProperties = { padding: '3px 8px', fontSize: 10, borderRadius: 4, border: `1px solid ${T.bd2}`, cursor: 'pointer', fontFamily: T.sans, fontWeight: 500, color: T.tx2, background: 'rgba(255,255,255,0.03)', whiteSpace: 'nowrap' };
+const btnPrimary: React.CSSProperties = S.btnPrimary;
+const btnGhost: React.CSSProperties = S.btnGhost;
+const btnSm: React.CSSProperties = { ...S.btnGhost, ...S.btnSm };
 const inp: React.CSSProperties = {
   background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6,
   color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '7px 10px',

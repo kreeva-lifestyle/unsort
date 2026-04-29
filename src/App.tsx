@@ -43,7 +43,6 @@ const MainApp = () => {
   const { profile } = useAuth();
   const { addToast, notifications, markAsRead, toasts } = useNotifications();
   const [tab, setTabState] = useState(getTabFromHash);
-  const [globalSearch, setGlobalSearch] = useState('');
   const [notifItemId, setNotifItemId] = useState<string | null>(null);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [mounted, setMounted] = useState<Set<string>>(new Set([getTabFromHash()]));
@@ -74,7 +73,6 @@ const MainApp = () => {
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
   const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', programs: 'Programs', settings: 'Settings' };
-  const handleGlobalSearch = (q: string) => { setGlobalSearch(q); if (q && tab !== 'inventory') setTab('inventory'); };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
@@ -91,12 +89,12 @@ const MainApp = () => {
     {/* Ambient glows are static CSS (see .app-glows in index.css) — not React children so
         they don't re-render on tab change (audit P3 performance) */}
     <div className="app-glows" aria-hidden="true" />
-    <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} profile={profile} />
+    <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setNotifItemId(null); setMobileMenu(false); }} profile={profile} />
     {/* Mobile overlay */}
     <div className="mobile-overlay" onClick={() => setMobileMenu(false)} style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 98, opacity: mobileMenu ? 1 : 0, pointerEvents: mobileMenu ? 'auto' : 'none', transition: 'opacity .25s ease', backdropFilter: 'blur(2px)' }} />
     {/* Mobile sidebar drawer */}
     <div className="mobile-drawer" style={{ display: 'none', position: 'fixed', top: 0, left: 0, width: 260, height: '100vh', zIndex: 101, transform: mobileMenu ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform .3s cubic-bezier(.4,0,.2,1)', boxShadow: mobileMenu ? '4px 0 24px rgba(0,0,0,.4)' : 'none' }}>
-      <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setGlobalSearch(''); setNotifItemId(null); setMobileMenu(false); }} profile={profile} />
+      <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setNotifItemId(null); setMobileMenu(false); }} profile={profile} />
     </div>
     <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
       {/* Mobile bottom nav */}
@@ -112,10 +110,10 @@ const MainApp = () => {
           <span>More</span>
         </div>
       </div>
-      <HeaderComponent title={titles[tab]} onSearch={handleGlobalSearch} onNotifClick={handleNotifClick} onOpenScanner={() => { setScanError(''); setScannerOpen(true); }} notifications={notifications} markAsRead={markAsRead} />
+      <HeaderComponent title={titles[tab]} onNotifClick={handleNotifClick} onOpenScanner={() => { setScanError(''); setScannerOpen(true); }} notifications={notifications} markAsRead={markAsRead} />
       <main style={{ flex: 1, overflow: 'auto' }}>
         {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard navigateTo={setTab} /></div>}
-        {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory globalSearch={globalSearch} openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
+        {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
 
         {mounted.has('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
         {mounted.has('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime active={tab === 'packtime'} /></div>}
