@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import QRCodeLib from 'qrcode';
 import { T } from '../../lib/theme';
-import { fetchProgramById, fetchMatchings, fetchPriceWithParts } from './lib/supabase-rpc';
+import { fetchProgramById, fetchMatchings, fetchPriceWithParts, generateShareToken } from './lib/supabase-rpc';
 import { toDirectImageUrl } from './lib/image-url-converters';
+import { getShareUrl } from './lib/share-token';
 import type { Program, ProgramMatching, ProgramPricePart } from './types';
 import type { TranslationKey } from './i18n/en';
 
@@ -26,6 +28,14 @@ export default function PDFExport({ programId, onClose, t }: Props) {
       } catch { setLoading(false); onClose(); return; }
       setLoading(false);
       if (!program) { onClose(); return; }
+      let qrDataUrl = '';
+      if (program.voice_note_path) {
+        let token = program.share_token;
+        if (!token) { const r = await generateShareToken(program.id); token = r.token; }
+        if (token) {
+          try { qrDataUrl = await QRCodeLib.toDataURL(getShareUrl(token), { width: 120, margin: 1 }); } catch {}
+        }
+      }
       const L = {
         aryadesigns: t('aryadesigns'), programReport: t('programReport'), generated: t('generated'),
         sellingSku: t('sellingSkuLabel'), manufacturingSku: t('manufacturingSkuLabel'),
@@ -35,9 +45,9 @@ export default function PDFExport({ programId, onClose, t }: Props) {
         rate: t('rate'), total: t('total'), fabricName: t('fabricName'), fabricMeter: t('fabricMeter'),
         grandTotal: t('grandTotal'), totalFM: t('totalFM'), fabricProgram: t('fabricProgram'),
         grandFabricTotal: t('grandFabricTotal'), poweredBy: t('poweredBy'),
-        meter: t('meter'), piece: t('piece'),
+        meter: t('meter'), piece: t('piece'), voiceNote: t('voiceNote'),
       };
-      openPrintWindow(program, matchings, parts, L);
+      openPrintWindow(program, matchings, parts, L, qrDataUrl);
       onClose();
     })();
   }, [programId, onClose, t]);
@@ -46,7 +56,7 @@ export default function PDFExport({ programId, onClose, t }: Props) {
   return null;
 }
 
-function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: ProgramPricePart[], L: Record<string, string>) {
+function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: ProgramPricePart[], L: Record<string, string>, qrDataUrl?: string) {
   const w = window.open('', '_blank');
   if (!w) return;
   const esc = (s: string | null) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -110,6 +120,9 @@ function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: Progra
       const grandFabric = workParts.reduce((s, pt) => s + Number(pt.fabric_meter || 0), 0) + fabricTotal;
       w.document.write(`<p style="text-align:right;font-weight:700;color:#0066cc">${esc(L.grandFabricTotal)}: ${grandFabric.toFixed(2)} m</p>`);
     }
+  }
+  if (qrDataUrl) {
+    w.document.write(`<div style="margin:16px 0;text-align:center;border-top:1px solid #eee;padding-top:12px"><p style="font-size:9px;color:#888;margin:0 0 6px;text-transform:uppercase;letter-spacing:1px">${esc(L.voiceNote)} — Scan QR</p><img src="${qrDataUrl}" style="width:120px;height:120px" /></div>`);
   }
   w.document.write(`<div class="footer">${esc(L.poweredBy)}</div></body></html>`);
   w.document.close(); w.print();
