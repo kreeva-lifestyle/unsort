@@ -1,6 +1,5 @@
-// Login screen — shown when no auth session exists
 import { useState, useEffect } from 'react';
-import { T, S } from '../lib/theme';
+import { T } from '../lib/theme';
 import { supabase } from '../lib/supabase';
 
 const friendlyAuthError = (raw: string): string => {
@@ -23,23 +22,15 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
   useEffect(() => {
     try {
       const reason = localStorage.getItem('signOutReason');
-      if (reason === 'session_expired') {
-        setInfo('Session expired — please sign in again.');
-        localStorage.removeItem('signOutReason');
-      }
+      if (reason === 'session_expired') { setInfo('Session expired — please sign in again.'); localStorage.removeItem('signOutReason'); }
     } catch {}
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setForgotMsg('');
-    setLoading(true);
+    setError(''); setForgotMsg(''); setLoading(true);
     const { error } = await signIn(email, password);
-    if (error) {
-      setError(friendlyAuthError(error.message));
-      // Preserve both email AND password so the user can correct a typo rather than re-type everything (audit P1)
-    }
+    if (error) setError(friendlyAuthError(error.message));
     setLoading(false);
   };
 
@@ -51,44 +42,82 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
     setForgotMsg(`Password reset link sent to ${email.trim()}. Check your email.`);
   };
 
-  const inputStyle: React.CSSProperties = { ...S.fInput, background: 'rgba(20,25,40,.8)', marginBottom: 12 };
+  const inputStyle: React.CSSProperties = {
+    width: '100%', background: T.s2, border: `1px solid ${T.bd}`, borderRadius: 8,
+    padding: '12px 14px', color: T.tx, fontFamily: T.sans, fontSize: 14, fontWeight: 500,
+    outline: 'none', boxSizing: 'border-box', transition: T.transition,
+  };
+  const labelStyle: React.CSSProperties = {
+    display: 'block', fontSize: 10, color: T.tx3, textTransform: 'uppercase',
+    letterSpacing: '0.1em', fontWeight: 600, marginBottom: 6,
+  };
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-      {/* Glow orbs — fade out after peak so the login screen stops burning GPU cycles when idle (audit P3) */}
-      <div style={{ position: 'absolute', width: 400, height: 400, background: T.ac, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, top: -100, left: -100, animation: 'loginGlowInOut 5s .3s ease forwards' }} />
-      <div style={{ position: 'absolute', width: 350, height: 350, background: T.bl, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, bottom: -80, right: -80, animation: 'loginGlowInOut 5s .5s ease forwards' }} />
-      <div style={{ position: 'absolute', width: 250, height: 250, background: T.yl, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, top: '50%', left: '60%', animation: 'loginGlowInOut 5.5s .7s ease forwards' }} />
-      <div style={{ position: 'absolute', width: 300, height: 300, background: T.gr, borderRadius: '50%', filter: 'blur(100px)', opacity: 0, bottom: '20%', left: '15%', animation: 'loginGlowInOut 5.5s .9s ease forwards' }} />
-      <div style={{ position: 'absolute', width: 200, height: 200, background: '#E879F9', borderRadius: '50%', filter: 'blur(80px)', opacity: 0, top: '15%', right: '20%', animation: 'loginGlowInOut 5s 1.1s ease forwards' }} />
+      {/* Ambient orbs */}
+      <div style={{ position: 'absolute', width: 600, height: 600, top: -200, right: -100, background: `radial-gradient(circle, ${T.ac}40 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .3s ease forwards' }} />
+      <div style={{ position: 'absolute', width: 500, height: 500, bottom: -200, left: -100, background: `radial-gradient(circle, ${T.bl}30 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .5s ease forwards' }} />
+      <div style={{ position: 'absolute', width: 250, height: 250, top: '50%', left: '40%', background: `radial-gradient(circle, ${T.yl}20 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5.5s .7s ease forwards' }} />
+      <div style={{ position: 'absolute', width: 300, height: 300, bottom: '20%', left: '15%', background: `radial-gradient(circle, ${T.gr}20 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(100px)', opacity: 0, animation: 'loginGlowInOut 5.5s .9s ease forwards' }} />
+      <div style={{ position: 'absolute', width: 200, height: 200, top: '15%', right: '20%', background: 'radial-gradient(circle, rgba(232,121,249,.20) 0%, transparent 60%)', borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s 1.1s ease forwards' }} />
+      {/* Dot grid */}
+      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)', backgroundSize: '24px 24px', pointerEvents: 'none' }} />
 
-      {/* Dot grid overlay */}
-      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)', backgroundSize: '24px 24px', pointerEvents: 'none' }} />
-
-      {/* Login card */}
-      <div style={{ position: 'relative', zIndex: 1, background: 'rgba(14,18,30,.88)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', border: `1px solid rgba(255,255,255,.08)`, borderRadius: 18, width: 370, maxWidth: 'calc(100vw - 32px)', padding: '36px 30px', textAlign: 'center', boxShadow: '0 24px 80px rgba(0,0,0,.6), 0 0 40px rgba(99,102,241,0.06)', animation: 'loginBoxEnter 1.2s cubic-bezier(.16,1,.3,1) both' }}>
-
-        {/* Logo */}
-        <div style={{ fontSize: 28, fontWeight: 800, fontFamily: T.sora, marginBottom: 4, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', opacity: 0, animation: 'loginFadeUp 1s .3s ease both' }}>DailyOffice</div>
-
-        {/* Tagline */}
-        <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 3, textTransform: 'uppercase' as const, marginBottom: 8, opacity: 0, animation: 'loginFadeUp 1s .5s ease both' }}>Your Workspace, Simplified</div>
-
-        {/* Divider */}
-        <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${T.bd2}, transparent)`, marginBottom: 24, opacity: 0, animation: 'loginFadeUp 1s .6s ease both' }} />
-
-        {info && <div style={{ background: 'rgba(56,189,248,.10)', border: '1px solid rgba(56,189,248,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.bl, marginBottom: 14 }}>{info}</div>}
-        {error && <div style={{ background: 'rgba(245,87,92,.12)', border: '1px solid rgba(245,87,92,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.re, marginBottom: 14, animation: 'loginShake .4s ease' }}>{error}</div>}
-        {forgotMsg && <div style={{ background: 'rgba(34,197,94,.10)', border: '1px solid rgba(34,197,94,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.gr, marginBottom: 14 }}>{forgotMsg}</div>}
-        <form onSubmit={handleSubmit}>
-          <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp 1s .7s ease both' }}><label style={S.fLabel}>Email</label><input type="email" autoComplete="username" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required style={inputStyle} /></div>
-          <div style={{ textAlign: 'left', opacity: 0, animation: 'loginFadeUp 1s .85s ease both' }}><label style={S.fLabel}>Password</label><input type="password" autoComplete="current-password" placeholder="Enter password" value={password} onChange={(e) => setPassword(e.target.value)} required style={inputStyle} /></div>
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '11px 18px', borderRadius: 10, border: 'none', cursor: loading ? 'default' : 'pointer', fontSize: 13, fontWeight: 700, fontFamily: T.sans, color: '#fff', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, letterSpacing: 0.3, opacity: 0, animation: 'loginFadeUp 1s 1s ease both', position: 'relative', overflow: 'hidden', boxShadow: '0 4px 20px rgba(99,102,241,0.35)', filter: loading ? 'brightness(0.7)' : 'none' }}>{loading ? 'Please wait...' : 'Sign In'}</button>
-          <div style={{ marginTop: 12, textAlign: 'center', opacity: 0, animation: 'loginFadeUp 1s 1.1s ease both' }}>
-            <button type="button" onClick={handleForgotPassword} style={{ background: 'transparent', border: 'none', color: T.tx3, fontSize: 11, cursor: 'pointer', padding: '4px 8px', fontFamily: T.sans, textDecoration: 'underline', textDecorationColor: T.bd2, textUnderlineOffset: 3, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.color = T.tx2)} onMouseLeave={e => (e.currentTarget.style.color = T.tx3)}>Forgot password?</button>
+      {/* Split layout container */}
+      <div className="login-split" style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: '1fr 420px', gap: 60, maxWidth: 1080, width: '100%', padding: '20px 40px', alignItems: 'center', animation: 'loginBoxEnter 1.2s cubic-bezier(.16,1,.3,1) both' }}>
+        {/* Left panel — brand hero */}
+        <div className="login-hero" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.sora, fontWeight: 800, fontSize: 22, color: '#fff', boxShadow: `0 10px 30px ${T.ac}55`, flexShrink: 0 }}>D</div>
+            <div>
+              <div style={{ fontFamily: T.sora, fontSize: 22, fontWeight: 700, color: T.tx, letterSpacing: -0.4 }}>DailyOffice</div>
+              <div style={{ fontSize: 11, color: T.tx3, fontFamily: T.mono, marginTop: 2 }}>by Arya Designs</div>
+            </div>
           </div>
-        </form>
-        <p style={{ fontSize: 8, color: T.tx3, marginTop: 22, letterSpacing: 1.5, textTransform: 'uppercase' as const, opacity: 0, animation: 'loginFadeUp 1s 1.2s ease both' }}>Powered by Arya Designs</p>
+          <h1 style={{ fontFamily: T.sora, fontSize: 42, fontWeight: 700, color: T.tx, letterSpacing: -1, lineHeight: 1.05, maxWidth: 520, margin: 0 }}>
+            One app for<br /><span style={{ background: `linear-gradient(135deg, ${T.ac2}, ${T.bl})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>every counter.</span>
+          </h1>
+          <p style={{ fontSize: 14, color: T.tx2, lineHeight: 1.6, marginTop: 18, maxWidth: 480 }}>
+            Inventory, billing, packing, cash — all in one place. Built for garment businesses that move fast.
+          </p>
+          <div style={{ display: 'flex', gap: 24, marginTop: 32 }}>
+            {[{ n: '50K+', l: 'Items tracked' }, { n: '₹2Cr+', l: 'Revenue managed' }, { n: '99.9%', l: 'Uptime' }].map(s => (
+              <div key={s.l}><div style={{ fontFamily: T.sora, fontSize: 22, fontWeight: 700, color: T.ac2, letterSpacing: -0.4 }}>{s.n}</div><div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{s.l}</div></div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right panel — login card */}
+        <div style={{ background: 'rgba(14,18,30,.88)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 18, padding: 32, boxShadow: '0 30px 80px rgba(0,0,0,.5), 0 0 40px rgba(99,102,241,.06)' }}>
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, color: T.tx, letterSpacing: -0.3 }}>Welcome back</div>
+            <div style={{ fontSize: 12, color: T.tx3, marginTop: 4 }}>Sign in to your workspace</div>
+          </div>
+
+          {info && <div style={{ background: 'rgba(56,189,248,.10)', border: '1px solid rgba(56,189,248,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.bl, marginBottom: 14 }}>{info}</div>}
+          {error && <div style={{ background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.re, marginBottom: 14, animation: 'loginShake .4s ease' }}>{error}</div>}
+          {forgotMsg && <div style={{ background: 'rgba(34,197,94,.10)', border: '1px solid rgba(34,197,94,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: T.gr, marginBottom: 14 }}>{forgotMsg}</div>}
+
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Email</label>
+              <input type="email" autoComplete="username" placeholder="you@company.com" value={email} onChange={e => setEmail(e.target.value)} required style={inputStyle} />
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <label style={labelStyle}>Password</label>
+              <input type="password" autoComplete="current-password" placeholder="Enter password" value={password} onChange={e => setPassword(e.target.value)} required style={inputStyle} />
+            </div>
+            <button type="submit" disabled={loading} style={{ width: '100%', padding: 14, borderRadius: 10, border: 'none', cursor: loading ? 'default' : 'pointer', fontSize: 14, fontWeight: 600, fontFamily: T.sora, color: '#fff', background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, boxShadow: `0 10px 30px ${T.ac}55`, transition: 'all .2s', filter: loading ? 'brightness(0.7)' : 'none', letterSpacing: 0.3 }}>
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
+            <div style={{ marginTop: 14, textAlign: 'center' }}>
+              <button type="button" onClick={handleForgotPassword} style={{ background: 'transparent', border: 'none', color: T.tx3, fontSize: 11, cursor: 'pointer', padding: '4px 8px', fontFamily: T.sans, textDecoration: 'underline', textDecorationColor: T.bd2, textUnderlineOffset: 3, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.color = T.tx2)} onMouseLeave={e => (e.currentTarget.style.color = T.tx3)}>Forgot password?</button>
+            </div>
+          </form>
+          <div style={{ textAlign: 'center', marginTop: 14, fontSize: 11, color: T.tx3 }}>
+            By signing in, you agree to our <span style={{ color: T.tx2, textDecoration: 'underline', cursor: 'pointer' }}>Terms</span> &amp; <span style={{ color: T.tx2, textDecoration: 'underline', cursor: 'pointer' }}>Privacy Policy</span>
+          </div>
+        </div>
       </div>
     </div>
   );
