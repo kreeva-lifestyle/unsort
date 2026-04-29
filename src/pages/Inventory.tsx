@@ -44,7 +44,7 @@ const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
 const isLehenga = (name: string) => /lehenga|lehnga|ghaghra/i.test(name);
 const isBottomType = (name: string) => /bottom|pant|trouser|skirt|salwar|churidar|palazzo/i.test(name);
 
-export default function Inventory({ globalSearch = '', openItemId, onItemOpened, active }: { globalSearch?: string; openItemId?: string | null; onItemOpened?: () => void; active?: boolean }) {
+export default function Inventory({ openItemId, onItemOpened, active }: { openItemId?: string | null; onItemOpened?: () => void; active?: boolean }) {
   const [stage, setStage] = useState<'pending' | 'completed'>('pending');
   const instanceId = useId();
   const [items, setItems] = useState<any[]>([]);
@@ -506,7 +506,7 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
     if (filters.location.length > 0 && !filters.location.includes(i.location || '')) return false;
     if (filters.marketplace.length > 0 && !filters.marketplace.includes(i.marketplace || '')) return false;
     if (filters.tag.length > 0) { const t = itemTags[i.id] || []; if (!t.some((tg: any) => filters.tag.includes(tg?.id))) return false; }
-    const searchTerm = globalSearch || search;
+    const searchTerm = search;
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       const fields = [
@@ -522,7 +522,7 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
   });
 
   const activeFilterCount = filters.status.length + filters.category.length + filters.location.length + filters.marketplace.length + filters.tag.length;
-  const hasActiveFilters = activeFilterCount > 0 || search !== '' || globalSearch !== '';
+  const hasActiveFilters = activeFilterCount > 0 || search !== '';
   const clearFilters = () => { setFilters({ status: [], category: [], location: [], marketplace: [], tag: [] }); setPreset('all'); setSearch(''); setPage(0); };
   const toggleFilterVal = (field: keyof typeof filters, v: string) => {
     setPreset('custom');
@@ -545,7 +545,7 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
   const [perPage, setPerPage] = useState(25);
   const totalPages = Math.ceil(filtered.length / perPage);
   const paged = filtered.slice(page * perPage, (page + 1) * perPage);
-  useEffect(() => { setPage(0); }, [filters, search, globalSearch, stage]);
+  useEffect(() => { setPage(0); }, [filters, search, stage]);
 
   const scrollToPair = (pairId: string) => {
     setHighlightId(pairId);
@@ -572,9 +572,9 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
             const csv = 'Batch,SKU,Category,Size,Status,Location,Missing,Damaged\n' + filtered.map(i => `${i.batch_number || ''},${i.serial_number || ''},"${i.products?.name || ''}",${i.size || ''},${i.status},${i.location || ''},"${(itemMissing[i.id] || []).join('; ')}","${(itemDamaged[i.id] || []).join('; ')}"`).join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Inventory_${stage}_${new Date().toISOString().slice(0,10)}.csv`; a.click();
-          }} style={{ ...S.btnGhost, fontSize: 10 }}>Export CSV</div>}
-          {!showExtras && !isCompletedView && <div onClick={computeIntel} title="Find cross-size completion possibilities" style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600, fontSize: 10 }}>Smart Intel</div>}
-          {!showExtras && <div onClick={() => { setShowExtras(true); window.history.pushState({ view: 'extras' }, ''); }} style={{ ...S.btnGhost, background: 'rgba(56,189,248,.05)', border: '1px solid rgba(56,189,248,.15)', color: T.bl, fontWeight: 600, fontSize: 10 }}>Extras</div>}
+          }} style={S.btnGhost}>Export CSV</div>}
+          {!showExtras && !isCompletedView && <div onClick={computeIntel} title="Find cross-size completion possibilities" style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600 }}>Smart Intel</div>}
+          {!showExtras && <div onClick={() => { setShowExtras(true); window.history.pushState({ view: 'extras' }, ''); }} style={{ ...S.btnGhost, background: 'rgba(56,189,248,.05)', border: '1px solid rgba(56,189,248,.15)', color: T.bl, fontWeight: 600 }}>Extras</div>}
           {!showExtras && canEdit && !isCompletedView && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
         </div>
       </div>
