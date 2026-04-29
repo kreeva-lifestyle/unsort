@@ -77,7 +77,7 @@ export const S = {
   fInput: {
     width: '100%', background: 'rgba(255,255,255,0.04)',
     border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx,
-    fontFamily: T.sans, fontSize: 13, padding: '9px 12px',
+    fontFamily: T.sans, fontSize: 13, padding: '8px 12px', height: 36,
     outline: 'none', transition: T.transition,
     boxSizing: 'border-box' as const,
   } as React.CSSProperties,
@@ -91,7 +91,7 @@ export const S = {
   } as React.CSSProperties,
 
   btnPrimary: {
-    padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
+    padding: '8px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
     fontSize: 12, fontWeight: 600, fontFamily: T.sans,
     background: 'linear-gradient(135deg, rgba(99,102,241,.87), rgba(129,140,248,.80))',
     color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -102,7 +102,7 @@ export const S = {
   } as React.CSSProperties,
 
   btnGhost: {
-    padding: '7px 14px', borderRadius: 6,
+    padding: '8px 14px', borderRadius: 8,
     border: `1px solid rgba(99,102,241,0.15)`,
     cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: T.sans,
     background: 'rgba(99,102,241,0.06)', color: T.ac2,
@@ -112,7 +112,7 @@ export const S = {
   } as React.CSSProperties,
 
   btnDanger: {
-    padding: '7px 14px', borderRadius: 6,
+    padding: '8px 14px', borderRadius: 8,
     border: '1px solid rgba(239,68,68,0.20)',
     cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: T.sans,
     background: 'rgba(239,68,68,0.08)', color: T.re,
