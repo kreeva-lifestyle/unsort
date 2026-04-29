@@ -135,7 +135,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
           {comps.map((c: any, i: number) => (<div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, marginBottom: 3, background: 'transparent', border: `1px solid ${T.bd}` }}>
             <span style={{ width: 22, height: 22, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: T.tx3, fontFamily: T.mono, flexShrink: 0 }}>{i + 1}</span>
             <span style={{ fontSize: 12, color: T.tx, flex: 1 }}>{c.name}</span>
-            {canEdit && <span onClick={() => deleteComp(c.id)} style={{ ...S.btnDanger, padding: '2px 8px', fontSize: 9 }}>Delete</span>}
+            {canEdit && <span onClick={() => deleteComp(c.id)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer' }}>Delete</span>}
           </div>))}
         </div>}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 10, marginBottom: 12 }}>

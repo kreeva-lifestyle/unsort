@@ -4,7 +4,7 @@ import { supabase } from './lib/supabase';
 import { friendlyError } from './lib/friendlyError';
 import { useDebouncedFetch } from './hooks/useDebouncedFetch';
 
-import { T } from './lib/theme';
+import { T, S } from './lib/theme';
 import type {
   Product,
   ProductComponent,
@@ -220,7 +220,7 @@ export default function InventoryExtras() {
   const label: React.CSSProperties = { display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' };
   const input: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '7px 10px', outline: 'none', fontFamily: T.sans };
   const btn: React.CSSProperties = { padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontFamily: T.sans };
-  const btnGhost: React.CSSProperties = { padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', cursor: 'pointer', fontSize: 11, fontWeight: 500, background: 'rgba(99,102,241,0.06)', color: T.ac2, fontFamily: T.sans };
+  const btnGhost: React.CSSProperties = { ...S.btnGhost, cursor: 'pointer' };
   const overlay: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.80)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', padding: 8 };
   const modal: React.CSSProperties = { background: 'rgba(14,18,30,0.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, width: 480, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,.65)' };
   const th: React.CSSProperties = { fontSize: 9, color: T.tx3, padding: '8px 10px', textAlign: 'left', fontWeight: 600, borderBottom: `1px solid ${T.bd}`, textTransform: 'uppercase', letterSpacing: '0.1em', whiteSpace: 'nowrap' };

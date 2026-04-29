@@ -69,8 +69,8 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora }}>{program.program_uid}</span>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => onEdit(program, matchings.map(m => ({ company_name: m.company_name, matching_label: m.matching_label || '' })))}
-            style={{ ...S.btnPrimary, fontSize: 10, padding: '6px 14px', cursor: 'pointer' }}>{t('edit')}</button>
-          <button onClick={onClose} style={{ ...S.btnGhost, fontSize: 10, padding: '6px 14px', cursor: 'pointer' }}>{t('back')}</button>
+            style={{ ...S.btnPrimary, cursor: 'pointer' }}>{t('edit')}</button>
+          <button onClick={onClose} style={{ ...S.btnGhost, cursor: 'pointer' }}>{t('back')}</button>
         </div>
       </div>
 
@@ -173,7 +173,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       )}
 
       <div style={{ borderTop: `1px solid ${T.bd}`, paddingTop: 12 }}>
-        <button onClick={() => setShowHistory(!showHistory)} style={{ ...S.btnGhost, fontSize: 10, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={() => setShowHistory(!showHistory)} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ display: 'inline-block', transform: showHistory ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform .15s' }}>▶</span>
           {t('history')}
         </button>

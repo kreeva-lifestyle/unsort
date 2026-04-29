@@ -68,7 +68,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
 
   const th: React.CSSProperties = { ...S.thStyle, padding: '10px 12px', fontSize: 10 };
   const td: React.CSSProperties = { ...S.tdStyle, padding: '10px 12px', fontSize: 12 };
-  const ghostBtn: React.CSSProperties = { ...S.btnGhost, ...S.btnSm, fontSize: 9, padding: '3px 8px', cursor: 'pointer' };
+  const ghostBtn: React.CSSProperties = { ...S.btnGhost, ...S.btnSm, cursor: 'pointer' };
 
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
@@ -106,7 +106,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
             <div style={{ fontSize: 32, marginBottom: 10 }}>{search ? '🔍' : '📋'}</div>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 6 }}>{search ? t('noResults') : t('noPrograms')}</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>{search ? t('noResultsHint') : t('noProgramsHint')}</div>
-            {!search && <button onClick={onAdd} style={{ ...S.btnPrimary, fontSize: 11, padding: '7px 14px', cursor: 'pointer' }}>{t('addProgram')}</button>}
+            {!search && <button onClick={onAdd} style={{ ...S.btnPrimary, cursor: 'pointer' }}>{t('addProgram')}</button>}
           </div>
         )}
         {!loading && programs.length > 0 && (
@@ -146,7 +146,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
                       <span onClick={() => onQR(p)} style={ghostBtn}>{t('qr')}</span>
                       <span onClick={() => onPDF(p)} style={ghostBtn}>{t('pdf')}</span>
                       <span onClick={() => handleCopyLink(p)} style={ghostBtn}>{t('copyLink')}</span>
-                      <span onClick={() => handleDelete(p)} style={{ ...S.btnDanger, ...S.btnSm, fontSize: 9, padding: '3px 8px', cursor: 'pointer', opacity: deleting === p.id ? 0.5 : 1 }}>{t('deleteAction')}</span>
+                      <span onClick={() => handleDelete(p)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', opacity: deleting === p.id ? 0.5 : 1 }}>{t('deleteAction')}</span>
                     </div>
                   </td>
                 </tr>

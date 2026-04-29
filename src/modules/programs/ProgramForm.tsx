@@ -138,7 +138,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
             <datalist id="dl-pn">{partNames.map(n => <option key={n} value={n} />)}</datalist>
             <datalist id="dl-fn">{fabricNames.map(n => <option key={n} value={n} />)}</datalist>
           </div>
-          <button onClick={() => setWorkParts(p => [...p, { ...EMPTY_WORK_PART, sort_order: p.length }])} style={{ ...S.btnGhost, fontSize: 9, padding: '4px 10px', cursor: 'pointer', marginBottom: 4 }}>{t('addPart')}</button>
+          <button onClick={() => setWorkParts(p => [...p, { ...EMPTY_WORK_PART, sort_order: p.length }])} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', marginBottom: 4 }}>{t('addPart')}</button>
 
           <SectionTitle color={T.bl}>{t('fabricProgram')}</SectionTitle>
           <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 6 }}>
@@ -159,7 +159,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
               </tbody>
             </table>
           </div>
-          <button onClick={() => setFabricParts(p => [...p, { ...EMPTY_FABRIC_PART, sort_order: p.length }])} style={{ ...S.btnGhost, fontSize: 9, padding: '4px 10px', cursor: 'pointer', marginBottom: 4 }}>{t('addPart')}</button>
+          <button onClick={() => setFabricParts(p => [...p, { ...EMPTY_FABRIC_PART, sort_order: p.length }])} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', marginBottom: 4 }}>{t('addPart')}</button>
 
           <SectionTitle color={T.yl}>{t('matchingProgram')}</SectionTitle>
           <MatchingCompanyRepeater rows={form.matchings} onChange={v => setField('matchings', v)} t={t} brandOptions={brandNames} />
