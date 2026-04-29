@@ -130,7 +130,7 @@ export default function ChallanLedger({
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
         <input type="text" value={search} onChange={e => onSearchChange(e.target.value)} placeholder="Enter customer name..."
-          style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '7px 10px', outline: 'none', boxSizing: 'border-box' }} />
+          style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 12px', outline: 'none', boxSizing: 'border-box', height: 36 }} />
         <button onClick={() => onSearchSubmit(search)} style={{ padding: '7px 12px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Search</button>
       </div>
       <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 6 }}>{search ? 'Search Results' : 'Recent Customers'}</div>

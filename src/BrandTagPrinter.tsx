@@ -732,7 +732,7 @@ export default function BrandTagPrinter() {
         </div>
       </div>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid ' + T.bd, borderRadius: 8, padding: '8px 10px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
-        <input type="text" placeholder="Search brand, SKU, EAN..." value={search} onChange={e => handleSearch(e.target.value)} style={{ ...inp, flex: 1, minWidth: 130, padding: '6px 9px' }} />
+        <input type="text" placeholder="Search brand, SKU, EAN..." value={search} onChange={e => handleSearch(e.target.value)} style={{ flex: 1, minWidth: 130, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 12px', outline: 'none', boxSizing: 'border-box' as const, height: 36 }} />
         <div style={{ width: 1, height: 20, background: T.bd2 }} />
         <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 100, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="">All brands</option>{BRAND_OPTIONS.map(b => { const n = b.replace(/^BRAND NAME:\s*/i, ''); return <option key={b} value={n}>{n}</option>; })}</select>
         <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 80, padding: '6px 9px', cursor: 'pointer', fontSize: 11 }}><option value="">All sizes</option>{SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>

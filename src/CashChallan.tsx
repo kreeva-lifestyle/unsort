@@ -1076,7 +1076,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
       {/* Row 1: Search + Actions */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center' }}>
-        <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search name or #..." style={{ flex: 1, minWidth: 120, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '7px 10px', outline: 'none' }} />
+        <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search name or #..." style={{ flex: 1, minWidth: 120, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 12px', outline: 'none', height: 36, boxSizing: 'border-box' }} />
         <button onClick={() => setShowFilters(f => !f)} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${showFilters || statusFilter || tagFilter || dateFrom || dateTo ? T.ac + '44' : T.bd2}`, background: showFilters ? 'rgba(99,102,241,.08)' : 'rgba(255,255,255,0.03)', color: showFilters || statusFilter || tagFilter || dateFrom || dateTo ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
           <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
           Filters{(statusFilter || tagFilter || dateFrom || dateTo) ? ` (${[statusFilter, tagFilter, dateFrom, dateTo].filter(Boolean).length})` : ''}
