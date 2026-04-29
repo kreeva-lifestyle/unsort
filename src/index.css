@@ -139,6 +139,16 @@ body.modal-open { overflow: hidden !important; }
   .mobile-hamburger > div { min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-direction: column !important; gap: 3px !important; }
 }
 
+/* ── Inventory mobile ──────────────────────────────────── */
+@media (max-width: 768px) {
+  .inv-desktop { display: none !important; }
+  .inv-mobile { display: block !important; }
+  .inv-top-actions { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
+  .inv-top-actions > div { flex-wrap: wrap !important; }
+  .inv-action-btns { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
+  .inv-action-btns > div { justify-content: center !important; text-align: center !important; }
+}
+
 /* ── Programs module mobile ──────────────────────────────── */
 @media (max-width: 768px) {
   .prg-form-overlay { padding: 0 !important; align-items: stretch !important; }
