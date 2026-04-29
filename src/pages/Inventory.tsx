@@ -623,13 +623,18 @@ export default function Inventory({ globalSearch = '', openItemId, onItemOpened,
                       <span>{f.label}</span>
                       {filters[f.key].length > 0 && <span style={{ color: T.ac2, letterSpacing: 0 }}>{filters[f.key].length} selected</span>}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 2, maxHeight: 140, overflowY: 'auto' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4, maxHeight: 140, overflowY: 'auto' }}>
                       {f.options.map(opt => {
                         const on = filters[f.key].includes(opt.value);
+                        const dotColor = f.key === 'status' ? (STATUS_DOT_COLOR[opt.value] || T.tx3) : '';
                         return (
-                          <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 7px', borderRadius: 5, cursor: 'pointer', background: on ? 'rgba(99,102,241,.10)' : 'transparent', transition: 'background .1s' }} onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,.02)'; }} onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent'; }}>
-                            <input type="checkbox" checked={on} onChange={() => toggleFilterVal(f.key, opt.value)} style={{ cursor: 'pointer', flexShrink: 0 }} />
+                          <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, cursor: 'pointer', background: on ? 'rgba(99,102,241,.08)' : 'transparent', transition: 'background .08s' }} onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,.02)'; }} onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent'; }}>
+                            <div style={{ width: 14, height: 14, borderRadius: 4, border: `1.5px solid ${on ? T.ac : T.bd2}`, background: on ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .1s' }}>
+                              {on && <svg viewBox="0 0 24 24" style={{ width: 10, height: 10, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><path d="M20 6L9 17l-5-5" /></svg>}
+                            </div>
+                            <input type="checkbox" checked={on} onChange={() => toggleFilterVal(f.key, opt.value)} style={{ display: 'none' }} />
                             <span style={{ fontSize: 12, color: T.tx, textTransform: f.key === 'status' ? 'capitalize' as const : 'none' }}>{opt.label}</span>
+                            {dotColor && <span style={{ width: 6, height: 6, borderRadius: 3, background: dotColor, marginLeft: 'auto', boxShadow: `0 0 6px ${dotColor}80` }} />}
                           </label>
                         );
                       })}
