@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from './lib/supabase';
 import { useNotifications } from './hooks/useNotifications';
+import BrandTagModalNew from './components/ui/BrandTagModal';
 import { friendlyError } from './lib/friendlyError';
 import type { BrandTag, BrandTagInsert, AuditLogInsert } from './types/database';
 
@@ -30,7 +31,6 @@ const thS: React.CSSProperties = {
   whiteSpace: 'nowrap', fontFamily: T.sans, textTransform: 'uppercase', letterSpacing: '0.1em',
 };
 const tdS: React.CSSProperties = { padding: '11px 14px', fontSize: 13, borderBottom: `1px solid ${T.bd}`, color: T.tx2, fontFamily: T.sans };
-const fLabel: React.CSSProperties = { display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, marginBottom: 5, letterSpacing: '0.06em', textTransform: 'uppercase' as const, fontFamily: T.sans };
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 // UI view model: central BrandTag fields renamed for camelCase ergonomics
@@ -183,32 +183,10 @@ document.querySelectorAll('.barcode svg').forEach(function(svg){
 <\/script></body></html>`;
 };
 
-const DEFAULT_MKTD = 'Arya Designs, 16, Amba Bhuvan, Near Kasanagar Circle, Opp- Kumar Gurukul Vidhyalay Katargam, Surat-395004, Gujarat, India';
 const BRAND_OPTIONS = ['BRAND NAME: TANUKA', 'BRAND NAME: FUSIONIC', 'BRAND NAME: SVARAA'];
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
 const PRODUCT_OPTIONS = ['PRODUCT DESC: Co-ord Set', 'PRODUCT DESC: Dress', 'PRODUCT DESC: Fusion Wear', 'PRODUCT DESC: Gown', 'PRODUCT DESC: Gown Set', 'PRODUCT DESC: Jumpsuit', 'PRODUCT DESC: Kurta', 'PRODUCT DESC: Kurta Set', 'PRODUCT DESC: Kurti', 'PRODUCT DESC: Lehenga Choli', 'PRODUCT DESC: Saree', 'PRODUCT DESC: Top'];
 
-// Searchable auto-suggest input
-const SearchableSelect = ({ value, options, placeholder, stripPrefix, onChange }: { value: string; options: string[]; placeholder: string; stripPrefix?: RegExp; onChange: (v: string) => void }) => {
-  const [text, setText] = useState(value ? (stripPrefix ? value.replace(stripPrefix, '') : value) : '');
-  const [open, setOpen] = useState(false);
-  const display = (o: string) => stripPrefix ? o.replace(stripPrefix, '') : o;
-  const q = text.toLowerCase();
-  const filtered = options.filter(o => display(o).toLowerCase().includes(q));
-  useEffect(() => { setText(value ? (stripPrefix ? value.replace(stripPrefix, '') : value) : ''); }, [value]);
-  return (
-    <div style={{ position: 'relative' }}>
-      <input value={text} placeholder={placeholder} style={{ ...inp, width: '100%' }}
-        onChange={e => { setText(e.target.value); setOpen(true); onChange(''); }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-      />
-      {open && filtered.length > 0 && <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 2, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 6, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 6px 20px rgba(0,0,0,.4)' }}>
-        {filtered.slice(0, 15).map(o => <div key={o} onMouseDown={() => { onChange(o); setText(display(o)); setOpen(false); }} style={{ padding: '6px 10px', fontSize: 12, color: T.tx, cursor: 'pointer', borderBottom: `1px solid ${T.bd}` }} onMouseEnter={e => e.currentTarget.style.background = T.s2} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{display(o)}</div>)}
-      </div>}
-    </div>
-  );
-};
 
 const COLOR_OPTIONS = ['Aqua', 'Beige', 'Black', 'Blue', 'Bronze', 'Brown', 'Burgundy', 'Coral', 'Cream', 'Fuchsia', 'Gold', 'Green', 'Grey', 'Lavender', 'Lime', 'Magenta', 'Maroon', 'Mauve', 'Multi', 'Mustard', 'Navy Blue', 'Nude', 'Off White', 'Olive', 'Orange', 'Peach', 'Pink', 'Pistachio', 'Purple', 'Rama', 'Red', 'Rose Gold', 'Rust', 'Sea Green', 'Silver', 'Tan', 'Taupe', 'Teal', 'Turquoise', 'Violet', 'White', 'Wine', 'Yellow'];
 
@@ -236,126 +214,7 @@ const QTY_OPTIONS = [
   'INCLUDES: 1 U Lehenga, 1 U Choli, 1 U Jacket', 'INCLUDES: 1 U Lehenga, 1 U Blouse, 2 U Dupatta',
 ];
 
-// ── Add / Edit Modal ───────────────────────────────────────────────────────────
-type ModalField = { key: keyof BrandTagRow; label: string; type?: string; multiline?: boolean; options?: string[]; searchable?: boolean; defaultVal?: string };
-
-// Grouped into Identity / Description / Commercial per audit P2
-const MODAL_FIELD_GROUPS: { title: string; fields: ModalField[] }[] = [
-  { title: 'Identity', fields: [
-    { key: 'brand', label: 'Brand Name', options: BRAND_OPTIONS },
-    { key: 'sku', label: 'SKU' },
-    { key: 'ean', label: 'EAN' },
-    { key: 'jioCode', label: 'Jio Code' },
-  ]},
-  { title: 'Description', fields: [
-    { key: 'product', label: 'Product', options: PRODUCT_OPTIONS },
-    { key: 'qty', label: 'Includes', options: QTY_OPTIONS, searchable: true },
-    { key: 'size', label: 'Size', options: SIZE_OPTIONS },
-    { key: 'color', label: 'Color', options: COLOR_OPTIONS, searchable: true },
-  ]},
-  { title: 'Commercial', fields: [
-    { key: 'mrp', label: 'MRP', type: 'number' },
-    { key: 'mktd', label: 'MKTD & DIST. BY', multiline: true, defaultVal: DEFAULT_MKTD },
-  ]},
-];
-
-
-const BrandTagModal = ({
-  title,
-  initial,
-  onSave,
-  onClose,
-}: {
-  title: string;
-  initial: BrandTagRow;
-  onSave: (row: BrandTagRow) => void;
-  onClose: () => void;
-}) => {
-  const [form, setForm] = useState<BrandTagRow>({ ...initial });
-  const [modalError, setModalError] = useState('');
-  const set = (k: keyof BrandTagRow, v: string | number) => { setModalError(''); setForm(p => ({ ...p, [k]: v })); };
-
-  return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 200, backdropFilter: 'blur(8px)', padding: 8,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: 'rgba(14,18,30,0.96)', border: `1px solid ${T.bd2}`,
-          borderRadius: 14, width: 480, maxWidth: '100%', maxHeight: '90vh',
-          overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,.65)',
-          backdropFilter: 'blur(32px)',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div style={{
-          padding: '11px 14px', borderBottom: `1px solid ${T.bd}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <span style={{ color: T.tx, fontSize: 13, fontWeight: 600 }}>{title}</span>
-        </div>
-        {/* Fields */}
-        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {MODAL_FIELD_GROUPS.map(group => (
-            <div key={group.title}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' as const, marginBottom: 8, paddingBottom: 4, borderBottom: `1px solid ${T.bd}` }}>{group.title}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: group.fields.length > 1 ? '1fr 1fr' : '1fr', gap: 10 }}>
-                {group.fields.map(f => (
-                  <div key={f.key} style={{ position: 'relative', gridColumn: f.multiline ? '1 / -1' : undefined }}>
-                    <label style={fLabel}>{f.label}</label>
-                    {f.searchable && f.options ? (
-                      <SearchableSelect
-                        value={String(form[f.key])}
-                        options={f.options}
-                        placeholder={`Type to search ${f.label.toLowerCase()}...`}
-                        stripPrefix={f.key === 'qty' ? /^INCLUDES:\s*/i : undefined}
-                        onChange={v => set(f.key, v)}
-                      />
-                    ) : f.options ? (
-                      <select
-                        style={{ ...inp, width: '100%', cursor: 'pointer' }}
-                        value={String(form[f.key])}
-                        onChange={e => set(f.key, e.target.value)}
-                      >
-                        <option value="">Select {f.label.toLowerCase()}</option>
-                        {f.options.map(o => <option key={o} value={o}>{o.replace(/^BRAND NAME:\s*/i, '').replace(/^PRODUCT DESC:\s*/i, '').replace(/^INCLUDES:\s*/i, '')}</option>)}
-                      </select>
-                    ) : f.multiline ? (
-                      <textarea
-                        rows={2}
-                        style={{ ...inp, width: '100%', resize: 'vertical' }}
-                        value={String(form[f.key])}
-                        onChange={e => set(f.key, f.type === 'number' ? Number(e.target.value) : e.target.value)}
-                      />
-                    ) : (
-                      <input
-                        type={f.type || 'text'}
-                        style={{ ...inp, width: '100%' }}
-                        value={String(form[f.key])}
-                        onChange={e => set(f.key, f.type === 'number' ? Number(e.target.value) : e.target.value)}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-          {modalError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '7px 10px', fontSize: 11, color: '#FCA5A5', marginTop: 4 }}>{modalError}</div>}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-            <button style={btnGhost} onClick={onClose}>Cancel</button>
-            <button style={btnPrimary} onClick={() => { const bad = validateRow(form); if (bad) { setModalError(`"${bad}" is required. Please fill all fields.`); return; } onSave(form); }}>Save</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+// Add/Edit modal moved to src/components/ui/BrandTagModal.tsx
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function BrandTagPrinter() {
@@ -873,11 +732,17 @@ export default function BrandTagPrinter() {
 
       {/* ── Add / Edit Modal ── */}
       {modalRow && (
-        <BrandTagModal
-          title={modalMode === 'add' ? 'Add New SKU' : `Edit: ${modalRow.sku || 'SKU'}`}
+        <BrandTagModalNew
+          mode={modalMode as 'add' | 'edit'}
           initial={modalRow}
           onSave={handleModalSave}
           onClose={() => setModalRow(null)}
+          brandOptions={BRAND_OPTIONS}
+          productOptions={PRODUCT_OPTIONS}
+          sizeOptions={SIZE_OPTIONS}
+          colorOptions={COLOR_OPTIONS}
+          qtyOptions={QTY_OPTIONS}
+          validateRow={validateRow}
         />
       )}
 
