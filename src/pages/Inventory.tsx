@@ -48,6 +48,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const [stage, setStage] = useState<'pending' | 'completed'>('pending');
   const instanceId = useId();
   const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showCompModal, setShowCompModal] = useState(false);
@@ -94,7 +95,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   useEffect(() => { if (active) setShowExtras(false); }, [active]);
 
   const fetchData = () => {
-    supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).limit(invLimit).then(({ data }) => { setItems(data || []); setInvTruncated((data || []).length >= invLimit); });
+    setLoading(true);
+    const p1 = supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).limit(invLimit).then(({ data }) => { setItems(data || []); setInvTruncated((data || []).length >= invLimit); });
     supabase.from('products').select('id, name, sku, total_components, category').eq('is_active', true).then(({ data }) => setProducts(data || []));
     supabase.from('locations').select('id, name').order('name').then(({ data }) => setLocations(data || []));
     supabase.from('tags').select('id, name, color').order('name').then(({ data }) => setTags(data || []));
@@ -103,7 +105,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       (data || []).forEach((it: any) => { if (!map[it.inventory_item_id]) map[it.inventory_item_id] = []; map[it.inventory_item_id].push(it.tags); });
       setItemTags(map);
     });
-    supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').limit(10000).then(({ data }) => {
+    const p2 = supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').limit(10000).then(({ data }) => {
       const missingMap: Record<string, string[]> = {};
       const damagedMap: Record<string, string[]> = {};
       const presentMap: Record<string, Set<string>> = {};
@@ -124,36 +126,41 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       setItemMissing(missingMap); setItemDamaged(damagedMap);
       setItemPresent(presentMap);
     });
+    Promise.all([p1, p2]).then(() => setLoading(false));
   };
 
   // Compute all completable pairs: must match category + SKU + size
   useEffect(() => {
-    if (items.length === 0) return;
-    const unsorted = items.filter(i => i.status === 'unsorted');
-    const pairs: Record<string, string[]> = {};
-    for (const a of unsorted) {
-      const aPresent = itemPresent[a.id];
-      const aMissing = itemMissing[a.id];
-      if (!aMissing || aMissing.length === 0 || !aPresent) continue;
-      const totalComps = a.products?.total_components || 0;
-      if (totalComps === 0) continue;
-      for (const b of unsorted) {
-        if (a.id === b.id) continue;
-        // Must match: same category, same SKU, same size
-        if (a.product_id !== b.product_id) continue;
-        if ((a.serial_number || '') !== (b.serial_number || '')) continue;
-        const sA = a.size || 'N/A', sB = b.size || 'N/A';
-        if (sA !== sB && sA !== 'N/A' && sB !== 'N/A') continue;
-        const bPresent = itemPresent[b.id];
-        if (!bPresent) continue;
-        const union = new Set([...aPresent, ...bPresent]);
-        if (union.size >= totalComps) {
-          if (!pairs[a.id]) pairs[a.id] = [];
-          if (!pairs[a.id].includes(b.id)) pairs[a.id].push(b.id);
+    if (items.length === 0 || Object.keys(itemPresent).length === 0) return;
+    const compute = () => {
+      const unsorted = items.filter(i => i.status === 'unsorted');
+      if (unsorted.length > 300) { setCompletablePairs({}); return; }
+      const pairs: Record<string, string[]> = {};
+      for (const a of unsorted) {
+        const aPresent = itemPresent[a.id];
+        const aMissing = itemMissing[a.id];
+        if (!aMissing || aMissing.length === 0 || !aPresent) continue;
+        const totalComps = a.products?.total_components || 0;
+        if (totalComps === 0) continue;
+        for (const b of unsorted) {
+          if (a.id === b.id) continue;
+          if (a.product_id !== b.product_id) continue;
+          if ((a.serial_number || '') !== (b.serial_number || '')) continue;
+          const sA = a.size || 'N/A', sB = b.size || 'N/A';
+          if (sA !== sB && sA !== 'N/A' && sB !== 'N/A') continue;
+          const bPresent = itemPresent[b.id];
+          if (!bPresent) continue;
+          const union = new Set([...aPresent, ...bPresent]);
+          if (union.size >= totalComps) {
+            if (!pairs[a.id]) pairs[a.id] = [];
+            if (!pairs[a.id].includes(b.id)) pairs[a.id].push(b.id);
+          }
         }
       }
-    }
-    setCompletablePairs(pairs);
+      setCompletablePairs(pairs);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(compute);
+    else setTimeout(compute, 100);
   }, [items, itemMissing, itemPresent]);
   useEffect(() => {
     fetchData();
@@ -678,7 +685,12 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           </div>
         );
       })()}
-      <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+      {loading && items.length === 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 40, color: T.tx3 }}>
+          <div className="spinner" /><span style={{ fontSize: 12 }}>Loading inventory...</span>
+        </div>
+      )}
+      <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden', display: loading && items.length === 0 ? 'none' : undefined }}>
         {/* Desktop table */}
         <div className="inv-desktop">
         <div className="table-wrap">
@@ -740,7 +752,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         </div>
         </div>
         {/* Mobile card view */}
-        <div className="inv-mobile" style={{ display: 'none' }}>
+        <div className="inv-mobile">
           {paged.map(item => {
             const missing = itemMissing[item.id] || [];
             const damaged = itemDamaged[item.id] || [];
