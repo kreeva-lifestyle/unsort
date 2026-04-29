@@ -52,14 +52,13 @@ interface BrandTagRow {
 
 const uid = (): string => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
-/* Sample row kept for reference — used by test-print
 const sampleRow = (): BrandTagRow => ({
   id: uid(), brand: 'BRAND NAME: TANUKA', ean: '8905738880431', sku: 'TNDRS177-S',
   qty: 'INCLUDES: 1 U Top, 1 U Bottom, 1 U Dupatta', mrp: 6800, size: 'S',
   product: 'PRODUCT DESC: Co-ord Set', color: 'Pink',
   mktd: 'Arya Designs, 16, Amba Bhuvan, Nr. Kasanagar Circle, Opp. Kumar Gurukul Vidhyalaya Katargam, Surat-395004',
   jioCode: '702342013006', copies: 0,
-}); */
+});
 
 const _DEFAULT_MKTD = 'Arya Designs, 16, Amba Bhuvan, Near Kasanagar Circle, Opp- Kumar Gurukul Vidhyalay Katargam, Surat-395004, Gujarat, India';
 const blankRow = (): BrandTagRow => ({
@@ -664,7 +663,9 @@ export default function BrandTagPrinter() {
     openLabelPrint(labels);
   };
 
-  // printTestLabel removed — available via Print button
+  const printTestLabel = useCallback(() => {
+    openLabelPrint([rows[0] || sampleRow()]);
+  }, [rows]);
 
 
   // ── Select All / Set All Copies ──
@@ -702,6 +703,7 @@ export default function BrandTagPrinter() {
                     { label: 'Import order sheet', action: () => orderFileRef.current?.click() },
                     { label: 'Import from Excel', action: () => fileRef.current?.click() },
                     { label: 'Export to Excel', action: handleExport },
+                    { label: 'Test print', action: printTestLabel },
                   ].map((opt, i) => (
                     <div key={i} onClick={() => { setMoreMenuOpen(false); opt.action(); }} style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, color: T.tx2, borderRadius: 5, transition: 'all .12s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,.08)'; e.currentTarget.style.color = T.tx; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx2; }}>{opt.label}</div>
                   ))}
