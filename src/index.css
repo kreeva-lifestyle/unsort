@@ -139,6 +139,7 @@ body.modal-open { overflow: hidden !important; }
   .mobile-hamburger > div { min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-direction: column !important; gap: 3px !important; }
 }
 
+.inv-mobile { display: none; }
 /* ── Inventory mobile ──────────────────────────────────── */
 @media (max-width: 768px) {
   .inv-desktop { display: none !important; }
