@@ -36,6 +36,12 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
   const mrpStr = '₹' + (form.mrp || 0).toLocaleString('en-IN');
 
   React.useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  React.useEffect(() => {
     if (!barcodeRef.current || !form.jioCode) return;
     try {
       JsBarcode(barcodeRef.current, form.jioCode, { format: 'CODE128', width: 1.5, height: 32, displayValue: false, margin: 0 });
@@ -79,6 +85,7 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
             </div>
             <div><label style={fLabel}>MRP (₹) *</label><input type="number" value={form.mrp || ''} onChange={e => set('mrp', Number(e.target.value))} style={{ ...fInput, fontFamily: T.mono }} placeholder="6800" /></div>
             <div><label style={fLabel}>Includes</label><input value={form.qty.replace(/^INCLUDES:\s*/i, '')} onChange={e => set('qty', e.target.value ? 'INCLUDES: ' + e.target.value : '')} list="dl-qty" style={fInput} placeholder="1 U Top, 1 U Bottom, 1 U Dupatta" /><datalist id="dl-qty">{qtyOptions.map(o => <option key={o} value={o.replace(/^INCLUDES:\s*/i, '')} />)}</datalist></div>
+            <div><label style={fLabel}>Mktd &amp; Dist. By</label><textarea value={form.mktd} onChange={e => set('mktd', e.target.value)} rows={2} style={{ ...fInput, height: 'auto', resize: 'vertical' }} /></div>
           </div>
 
           {/* Live preview */}
