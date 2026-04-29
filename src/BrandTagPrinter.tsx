@@ -381,7 +381,6 @@ export default function BrandTagPrinter() {
   const [search, setSearch] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [sizeFilter, setSizeFilter] = useState('');
-  const [colorFilter] = useState('');
   const [modalRow, setModalRow] = useState<BrandTagRow | null>(null);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -398,16 +397,15 @@ export default function BrandTagPrinter() {
   const fetchPage = useCallback(async () => {
     let query = supabase.from('brand_tags').select('id, brand, ean, sku, qty, mrp, size, product, color, mktd, jio_code, copies', { count: 'estimated' });
     if (search) query = query.ilike('search_text', `%${search.toLowerCase().replace(/[%_]/g, '\\$&')}%`);
-    if (brandFilter) query = query.ilike('brand', `%${brandFilter.replace(/[%_]/g, '\\$&')}%`);
+    if (brandFilter) query = query.ilike('brand', `%: ${brandFilter.replace(/[%_]/g, '\\$&')}`);
     if (sizeFilter) query = query.eq('size', sizeFilter);
-    if (colorFilter) query = query.eq('color', colorFilter);
     const from = btPage * btPerPage;
     const { data, count } = await query.order('created_at', { ascending: false }).range(from, from + btPerPage - 1);
     type BrandTagFetchRow = Pick<BrandTag, 'id' | 'brand' | 'ean' | 'sku' | 'qty' | 'mrp' | 'size' | 'product' | 'color' | 'mktd' | 'jio_code' | 'copies'>;
     if (data) setRows((data as BrandTagFetchRow[]).map((d): BrandTagRow => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies })));
     if (count !== null) setTotalCount(count);
     setLoading(false);
-  }, [btPage, btPerPage, search, brandFilter, sizeFilter, colorFilter]);
+  }, [btPage, btPerPage, search, brandFilter, sizeFilter]);
 
   useEffect(() => { fetchPage(); }, [fetchPage]);
 
@@ -447,13 +445,13 @@ export default function BrandTagPrinter() {
   };
 
   // Reset page on filter change
-  useEffect(() => { setBtPage(0); }, [brandFilter, sizeFilter, colorFilter]);
+  useEffect(() => { setBtPage(0); }, [brandFilter, sizeFilter]);
 
   // Filter options are now preset constants (BRAND_OPTIONS, SIZE_OPTIONS, COLOR_OPTIONS)
   // Filtering happens server-side in fetchPage()
   const totalPages = Math.ceil(totalCount / btPerPage);
 
-  // ── Import Excel ──
+  // ── Import Excel (addToast in deps for fresh closure) ──
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -551,7 +549,7 @@ export default function BrandTagPrinter() {
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
-  }, []);
+  }, [addToast]);
 
   // ── Export Excel ──
   const handleExport = useCallback(() => {
@@ -650,7 +648,7 @@ export default function BrandTagPrinter() {
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
-  }, []);
+  }, [addToast]);
 
   const updateOrderCopies = (sku: string, brand: string, copies: number) => {
     setOrderRows(prev => prev ? prev.map(r => (r.sku === sku && r.brand === brand) ? { ...r, copies: Math.max(0, copies) } : r) : null);
@@ -754,9 +752,9 @@ export default function BrandTagPrinter() {
                 <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11, color: T.tx3 }}>{row.jioCode}</td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-                    <button onClick={() => { const v = Math.max(0, (row.copies || 0) - 1); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(() => fetchPage()); }} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                    <button onClick={() => { const v = Math.max(0, (row.copies || 0) - 1); setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id); }} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                     <span style={{ width: 32, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: row.copies > 0 ? T.ac2 : T.tx3, background: row.copies > 0 ? 'rgba(99,102,241,.06)' : 'transparent' }}>{row.copies || 0}</span>
-                    <button onClick={() => { const v = (row.copies || 0) + 1; supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(() => fetchPage()); }} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                    <button onClick={() => { const v = (row.copies || 0) + 1; setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id); }} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                   </div>
                 </td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
