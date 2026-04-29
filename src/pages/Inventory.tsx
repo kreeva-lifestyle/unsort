@@ -681,7 +681,6 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
                 <span style={{ width: 15, height: 15, borderRadius: 3, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.06)', fontSize: 11, lineHeight: 1 }}>×</span>
               </button>
             ))}
-            <button onClick={clearFilters} style={{ background: 'transparent', border: 'none', color: T.tx3, fontSize: 10, cursor: 'pointer', textDecoration: 'underline', fontFamily: T.sans, marginLeft: 2 }}>Clear all</button>
           </div>
         );
       })()}
