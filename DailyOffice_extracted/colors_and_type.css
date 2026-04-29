@@ -1,0 +1,228 @@
+/* ============================================================
+   DailyOffice / Unsort — Colors & Typography tokens
+   Source of truth: src/App.tsx `T` object + `src/index.css`
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ── Surfaces (dark workspace; near-black with blue undertone) ── */
+  --do-bg:        #060810;   /* app background */
+  --do-s1:        #0B0F19;   /* raised surface 1 (cards, tables) */
+  --do-s2:        #0F1420;   /* raised surface 2 (inputs, menus) */
+  --do-s3:        #141B2B;   /* raised surface 3 (modals) */
+  --do-glass-1:   rgba(255,255,255,0.02);  /* resting card */
+  --do-glass-2:   rgba(255,255,255,0.04);  /* hover card */
+  --do-modal-bg:  rgba(14,18,30,0.96);     /* modal backdrop-blur panel */
+  --do-sidebar:   rgba(8,11,20,0.85);      /* sidebar / header (with blur) */
+
+  /* ── Borders (hairline whites over dark) ── */
+  --do-bd:        rgba(255,255,255,0.05);
+  --do-bd-2:      rgba(255,255,255,0.08);
+  --do-bd-focus:  rgba(99,102,241,0.35);
+  --do-focus-ring: 0 0 0 2px rgba(99,102,241,0.08);
+
+  /* ── Text ── */
+  --do-tx-1:      #E2E8F0;   /* primary */
+  --do-tx-2:      #8896B0;   /* secondary */
+  --do-tx-3:      #4A5568;   /* tertiary / labels */
+
+  /* ── Brand / accent (indigo) ── */
+  --do-ac:        #6366F1;   /* primary accent */
+  --do-ac-2:      #818CF8;   /* lighter accent / gradient end */
+  --do-ac-grad:   linear-gradient(135deg, #6366F1, #818CF8);
+  --do-ac-grad-btn: linear-gradient(135deg, rgba(99,102,241,.87), rgba(129,140,248,.80));
+  --do-ac-tint-6:  rgba(99,102,241,0.06);
+  --do-ac-tint-8:  rgba(99,102,241,0.08);
+  --do-ac-tint-12: rgba(99,102,241,0.12);
+  --do-ac-glow:    0 0 8px rgba(99,102,241,.55);
+  --do-ac-shadow:  0 2px 10px rgba(99,102,241,.25);
+
+  /* ── Semantic status colors ── */
+  --do-success:    #22C55E;  /* "complete" */
+  --do-success-2:  #4ADE80;  /* lighter for text on tinted bg */
+  --do-danger:     #EF4444;  /* "damaged" */
+  --do-danger-2:   #FCA5A5;
+  --do-warn:       #F59E0B;  /* "unsorted" */
+  --do-warn-2:     #FCD34D;
+  --do-info:       #38BDF8;  /* info / cash in hand */
+  --do-info-2:     #7DD3FC;
+  --do-cyan:       #06B6D4;  /* "dry_clean" */
+  --do-magenta:    #E879F9;  /* login orb accent only */
+
+  /* Status tag recipe (bg / border / fg) — per state */
+  --tag-success-bg:  rgba(34,197,94,0.10);
+  --tag-success-bd:  rgba(34,197,94,0.25);
+  --tag-success-fg:  #4ADE80;
+  --tag-danger-bg:   rgba(239,68,68,0.10);
+  --tag-danger-bd:   rgba(239,68,68,0.25);
+  --tag-danger-fg:   #FCA5A5;
+  --tag-warn-bg:     rgba(245,158,11,0.10);
+  --tag-warn-bd:     rgba(245,158,11,0.25);
+  --tag-warn-fg:     #FCD34D;
+  --tag-info-bg:     rgba(56,189,248,0.10);
+  --tag-info-bd:     rgba(56,189,248,0.25);
+  --tag-info-fg:     #7DD3FC;
+
+  /* ── Type families ── */
+  --do-sans:  'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --do-sora:  'Sora', 'Inter', sans-serif;   /* display / numbers / brand */
+  --do-mono:  'JetBrains Mono', ui-monospace, Menlo, monospace;
+
+  /* ── Type scale (base 12 — dense professional tool) ──
+     The app commits to a *small* base size; labels go as low as 7–9px
+     with heavy letter-spacing. Numerics use Sora for display weight. */
+  --fs-eyebrow: 8px;    /* uppercase section labels */
+  --fs-micro:   9px;    /* table headers, meta */
+  --fs-small:   10px;   /* captions, chips */
+  --fs-body:    11px;   /* default UI text */
+  --fs-input:   12px;   /* body input, tdStyle */
+  --fs-h3:      13px;   /* section title */
+  --fs-h2:      15px;   /* page title */
+  --fs-h1:      20px;   /* large stat number */
+  --fs-display: 28px;   /* login hero */
+
+  /* ── Radii ── */
+  --r-xs: 4px;   /* chips, inner toggles */
+  --r-sm: 6px;   /* buttons, inputs */
+  --r-md: 8px;   /* cards */
+  --r-lg: 10px;  /* stat cards, media */
+  --r-xl: 14px;  /* modals */
+  --r-2xl: 18px; /* login hero card */
+
+  /* ── Spacing (used loosely; density-first) ── */
+  --sp-1: 4px;
+  --sp-2: 6px;
+  --sp-3: 8px;
+  --sp-4: 10px;
+  --sp-5: 12px;
+  --sp-6: 14px;
+  --sp-7: 16px;
+  --sp-8: 20px;
+
+  /* ── Shadows & glow ── */
+  --shadow-sm:    0 2px 10px rgba(0,0,0,.25);
+  --shadow-md:    0 4px 20px rgba(0,0,0,.50);
+  --shadow-lg:    0 10px 40px rgba(0,0,0,.55);
+  --shadow-xl:    0 24px 80px rgba(0,0,0,.65);
+  --shadow-toast: 0 4px 20px rgba(0,0,0,.50);
+  --shadow-accent: 0 4px 20px rgba(99,102,241,.35);
+
+  /* ── Motion ── */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(.16, 1, .3, 1);
+  --dur-fast:    150ms;
+  --dur-base:    180ms;
+  --dur-slow:    250ms;
+  --tx-all: all var(--dur-base) var(--ease-standard);
+}
+
+/* ── Semantic typography roles ─────────────────────────────── */
+html { font-size: 12px; line-height: 1.5; }
+
+body {
+  background: var(--do-bg);
+  color: var(--do-tx-1);
+  font-family: var(--do-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.do-display {   /* 28/800 Sora — login hero */
+  font-family: var(--do-sora);
+  font-size: var(--fs-display);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.do-h1 {        /* 20/700 Sora — large stat numbers */
+  font-family: var(--do-sora);
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  margin: 0;
+}
+
+.do-h2 {        /* 15/700 Sora — page greeting / title */
+  font-family: var(--do-sora);
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--do-tx-1);
+  margin: 0;
+}
+
+.do-h3 {        /* 13/700 Sora — header bar title */
+  font-family: var(--do-sora);
+  font-size: var(--fs-h3);
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  margin: 0;
+}
+
+.do-body {      /* 11/400 Inter */
+  font-family: var(--do-sans);
+  font-size: var(--fs-body);
+  font-weight: 400;
+  color: var(--do-tx-1);
+}
+
+.do-body-2 {    /* 11/400 Inter, secondary */
+  font-family: var(--do-sans);
+  font-size: var(--fs-body);
+  color: var(--do-tx-2);
+}
+
+.do-label {     /* 9/600 Inter, ALL CAPS, letter-spaced — the signature label */
+  font-family: var(--do-sans);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  color: var(--do-tx-3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.do-eyebrow {   /* 8/600 Inter, ALL CAPS, extra tracked — stat-card eyebrows */
+  font-family: var(--do-sans);
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  color: var(--do-tx-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.do-caption {   /* 10/500 Inter — chip / meta */
+  font-family: var(--do-sans);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  color: var(--do-tx-3);
+}
+
+.do-mono {      /* 11/500 JetBrains Mono — IDs, serials */
+  font-family: var(--do-mono);
+  font-size: var(--fs-body);
+  font-weight: 500;
+}
+
+.do-numeric {   /* 20/700 Sora — stat value, uses status color inline */
+  font-family: var(--do-sora);
+  font-weight: 700;
+  font-size: var(--fs-h1);
+  font-variant-numeric: tabular-nums;
+}
+
+.do-brand {     /* gradient brand text — "DailyOffice" wordmark */
+  font-family: var(--do-sora);
+  font-weight: 700;
+  background: var(--do-ac-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ── Focus ring matches app ── */
+:focus-visible {
+  outline: 1.5px solid rgba(99,102,241,0.50);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

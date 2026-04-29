@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Barcode scanner frame</title><link rel="stylesheet" href="_card.css"></head>
+<body>
+  <style>@keyframes scanLine{0%,100%{transform:translateY(-24px);opacity:.4}50%{transform:translateY(24px);opacity:1}}</style>
+  <div class="eyebrow" style="margin-bottom:10px">Barcode scanner frame — Quagga2 live stream</div>
+  <div class="row" style="gap:14px">
+    <div style="position:relative;width:340px;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:4/3;flex-shrink:0">
+      <!-- fake camera feed -->
+      <div style="position:absolute;inset:0;background:
+        linear-gradient(135deg,#11182a 0%,#1a2238 40%,#0b1120 100%)"></div>
+      <!-- fake barcode glyph -->
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;gap:2px;opacity:.7">
+        <span style="width:2px;height:50px;background:#fff"></span><span style="width:4px;height:50px;background:#fff"></span><span style="width:2px;height:50px;background:#fff"></span><span style="width:1px;height:50px;background:#fff"></span><span style="width:3px;height:50px;background:#fff"></span><span style="width:2px;height:50px;background:#fff"></span><span style="width:1px;height:50px;background:#fff"></span><span style="width:4px;height:50px;background:#fff"></span><span style="width:2px;height:50px;background:#fff"></span><span style="width:1px;height:50px;background:#fff"></span><span style="width:3px;height:50px;background:#fff"></span><span style="width:2px;height:50px;background:#fff"></span>
+      </div>
+      <!-- frame -->
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+        <div style="width:75%;height:60px;border:2px solid #6366F1;border-radius:8px;position:relative">
+          <div style="position:absolute;top:50%;left:10%;right:10%;height:2px;background:#EF4444;box-shadow:0 0 10px #EF4444;animation:scanLine 2s ease-in-out infinite"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="gap:8px;flex:1">
+      <div class="eyebrow">Result states</div>
+      <div style="border-radius:8px;padding:8px 12px;font-size:12px;text-align:center;font-family:JetBrains Mono;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);color:#22C55E">Detected: UNS-180426-0042</div>
+      <div style="border-radius:8px;padding:8px 12px;font-size:12px;text-align:center;font-family:JetBrains Mono;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:#EF4444">ID not found</div>
+      <div class="eyebrow" style="margin-top:6px">Mode toggle</div>
+      <div style="display:flex;background:#0F1420;border-radius:6px;padding:3px">
+        <div style="flex:1;padding:6px 0;border-radius:4px;text-align:center;font-size:11px;font-weight:600;background:#6366F1;color:#fff">Barcode</div>
+        <div style="flex:1;padding:6px 0;border-radius:4px;text-align:center;font-size:11px;font-weight:600;color:#4A5568">Text (OCR)</div>
+      </div>
+    </div>
+  </div>
+</body></html>
