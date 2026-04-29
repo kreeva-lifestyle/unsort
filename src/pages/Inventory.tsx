@@ -561,7 +561,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {!showExtras && <><div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, border: `1px solid ${T.bd}` }}>
             {(['pending', 'completed'] as const).map(s => (
-              <div key={s} onClick={() => { setStage(s); setPage(0); }} style={{ padding: '4px 14px', borderRadius: 4, fontSize: 10, fontWeight: stage === s ? 600 : 400, cursor: 'pointer', background: stage === s ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'transparent', color: stage === s ? '#fff' : T.tx3, transition: 'all .15s', textTransform: 'capitalize' }}>{s}</div>
+              <div key={s} onClick={() => { setStage(s); setPage(0); }} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 11, fontWeight: stage === s ? 600 : 400, cursor: 'pointer', background: stage === s ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'transparent', color: stage === s ? '#fff' : T.tx3, transition: 'all .15s', textTransform: 'capitalize' }}>{s}</div>
             ))}
           </div>
           <span style={{ fontSize: 10, fontWeight: 500, color: T.tx3 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length !== 1 ? 's' : ''}</span></>}
@@ -584,7 +584,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         {/* Preset strip */}
         <div style={{ display: 'flex', gap: 4, padding: 3, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, flexWrap: 'wrap' }}>
           {PRESETS.filter(p => isCompletedView ? p.id === 'all' : true).map(p => (
-            <button key={p.id} onClick={() => applyPreset(p)} style={{ padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: preset === p.id ? 600 : 500, background: preset === p.id ? 'rgba(99,102,241,.15)' : 'transparent', color: preset === p.id ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition }}>{p.label}</button>
+            <button key={p.id} onClick={() => applyPreset(p)} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: preset === p.id ? 600 : 500, background: preset === p.id ? 'rgba(99,102,241,.15)' : 'transparent', color: preset === p.id ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition }}>{p.label}</button>
           ))}
         </div>
 
@@ -644,7 +644,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
               </div>
               <div style={{ padding: '10px 16px', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
                 <span style={{ fontSize: 10, color: T.tx3 }}>{activeFilterCount > 0 ? `Showing ${filtered.length} of ${items.length}` : 'No filters applied'}</span>
-                <button onClick={() => setShowFiltersPopover(false)} style={{ ...S.btnPrimary, padding: '6px 14px', fontSize: 11 }}>Done</button>
+                <button onClick={() => setShowFiltersPopover(false)} style={S.btnPrimary}>Done</button>
               </div>
             </div>
           </>)}

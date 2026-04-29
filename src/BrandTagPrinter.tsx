@@ -768,9 +768,9 @@ export default function BrandTagPrinter() {
         <select value={btPerPage} onChange={e => { setBtPerPage(Number(e.target.value)); setBtPage(0); }} style={{ ...inp, width: 'auto', padding: '3px 6px', fontSize: 10, cursor: 'pointer' }}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
         <span style={{ color: T.tx3 }}>rows</span>
         {totalPages > 1 && <>
-          <span onClick={() => setBtPage(Math.max(0, btPage - 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage === 0 ? 0.3 : 1, pointerEvents: btPage === 0 ? 'none' : 'auto' }}>Prev</span>
+          <span onClick={() => setBtPage(Math.max(0, btPage - 1))} style={{ ...btnSm, opacity: btPage === 0 ? 0.3 : 1, pointerEvents: btPage === 0 ? 'none' : 'auto' }}>Prev</span>
           <span style={{ color: T.tx3 }}>{btPage + 1} / {totalPages}</span>
-          <span onClick={() => setBtPage(Math.min(totalPages - 1, btPage + 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: btPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= totalPages - 1 ? 'none' : 'auto' }}>Next</span>
+          <span onClick={() => setBtPage(Math.min(totalPages - 1, btPage + 1))} style={{ ...btnSm, opacity: btPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= totalPages - 1 ? 'none' : 'auto' }}>Next</span>
         </>}
       </div>
 
@@ -840,9 +840,9 @@ export default function BrandTagPrinter() {
               <select value={orderPerPage} onChange={e => { setOrderPerPage(Number(e.target.value)); setOrderPage(0); }} style={{ ...inp, width: 'auto', padding: '3px 6px', fontSize: 10, cursor: 'pointer' }}><option value={25}>25</option><option value={50}>50</option><option value={75}>75</option><option value={100}>100</option></select>
               <span style={{ color: T.tx3 }}>rows</span>
               {otp > 1 && <>
-                <span onClick={() => setOrderPage(Math.max(0, orderPage - 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: orderPage === 0 ? 0.3 : 1 }}>Prev</span>
+                <span onClick={() => setOrderPage(Math.max(0, orderPage - 1))} style={{ ...btnSm, opacity: orderPage === 0 ? 0.3 : 1 }}>Prev</span>
                 <span style={{ color: T.tx3 }}>{orderPage + 1} / {otp}</span>
-                <span onClick={() => setOrderPage(Math.min(otp - 1, orderPage + 1))} style={{ ...btnGhost, padding: '3px 8px', fontSize: 10, opacity: orderPage >= otp - 1 ? 0.3 : 1 }}>Next</span>
+                <span onClick={() => setOrderPage(Math.min(otp - 1, orderPage + 1))} style={{ ...btnSm, opacity: orderPage >= otp - 1 ? 0.3 : 1 }}>Next</span>
               </>}
             </div>
           </div>
@@ -857,8 +857,8 @@ export default function BrandTagPrinter() {
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Delete this SKU?</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14, fontFamily: T.mono }}>{confirmDel.sku || '(empty SKU)'}</div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setConfirmDel(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={actuallyDelete} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: 'pointer' }}>Delete</button>
+              <button onClick={() => setConfirmDel(null)} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Cancel</button>
+              <button onClick={actuallyDelete} style={{ ...S.btnDanger, flex: 1, justifyContent: 'center', background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', border: 'none' }}>Delete</button>
             </div>
           </div>
         </div>
@@ -884,8 +884,8 @@ export default function BrandTagPrinter() {
                 <div style={{ fontSize: 11, color: '#6B7890' }}>{printCount} label{printCount === 1 ? '' : 's'} ready to print</div>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => { printIframeRef.current?.contentWindow?.print(); }} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', boxShadow: '0 2px 10px rgba(99,102,241,.3)' }}>Print</button>
-                <button onClick={() => setPrintHtml(null)} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Close</button>
+                <button onClick={() => { printIframeRef.current?.contentWindow?.print(); }} style={S.btnPrimary}>Print</button>
+                <button onClick={() => setPrintHtml(null)} style={S.btnGhost}>Close</button>
               </div>
             </div>
             <iframe

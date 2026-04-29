@@ -65,7 +65,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
             await supabase.from('programs').update({ voice_note_path: null, updated_at: new Date().toISOString() }).eq('id', programId);
             onUploaded('');
             addToast(t('voiceRemoved'), 'success');
-          }} style={{ ...S.btnDanger, ...S.btnSm, fontSize: 9, padding: '4px 8px', cursor: 'pointer', flexShrink: 0 }}>{t('remove')}</button>
+          }} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', flexShrink: 0 }}>{t('remove')}</button>
         </div>
       )}
 
@@ -94,7 +94,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
             ) : (
               <>
                 <audio controls src={audioUrl} style={{ height: 32 }} />
-                <button onClick={() => { uploadedRef.current = false; clear(); }} style={{ ...S.btnGhost, ...S.btnSm, fontSize: 9, cursor: 'pointer' }}>{t('reRecord')}</button>
+                <button onClick={() => { uploadedRef.current = false; clear(); }} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer' }}>{t('reRecord')}</button>
               </>
             )}
           </>
