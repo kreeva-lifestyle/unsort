@@ -557,7 +557,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       {/* Stage toggle */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+      <div className="inv-top-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {!showExtras && <><div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, border: `1px solid ${T.bd}` }}>
             {(['pending', 'completed'] as const).map(s => (
@@ -566,7 +566,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           </div>
           <span style={{ fontSize: 10, fontWeight: 500, color: T.tx3 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length !== 1 ? 's' : ''}</span></>}
         </div>
-        <div style={{ display: 'flex', gap: 5 }}>
+        <div className="inv-action-btns" style={{ display: 'flex', gap: 5 }}>
           {!showExtras && <div title="Download filtered inventory as CSV" onClick={() => {
             if (filtered.length === 0) return;
             const csv = 'Batch,SKU,Category,Size,Status,Location,Missing,Damaged\n' + filtered.map(i => `${i.batch_number || ''},${i.serial_number || ''},"${i.products?.name || ''}",${i.size || ''},${i.status},${i.location || ''},"${(itemMissing[i.id] || []).join('; ')}","${(itemDamaged[i.id] || []).join('; ')}"`).join('\n');
@@ -679,6 +679,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         );
       })()}
       <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+        {/* Desktop table */}
+        <div className="inv-desktop">
         <div className="table-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 880 }}>
           <thead><tr>
@@ -735,6 +737,32 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             </td>
           </tr>);})}</tbody>
         </table>
+        </div>
+        </div>
+        {/* Mobile card view */}
+        <div className="inv-mobile" style={{ display: 'none' }}>
+          {paged.map(item => {
+            const missing = itemMissing[item.id] || [];
+            const damaged = itemDamaged[item.id] || [];
+            return (
+              <div key={item.id} style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: T.mono, fontSize: 11, color: T.ac2, fontWeight: 600 }}>{item.serial_number || '—'}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: T.tx, marginTop: 2 }}>{item.products?.name || '—'}</div>
+                    <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{item.size || '—'} · {item.location || '—'}</div>
+                  </div>
+                  <span style={statusTag(item.status)}><span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', boxShadow: '0 0 4px currentColor', flexShrink: 0 }} /><span style={{ textTransform: 'capitalize', fontSize: 10 }}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></span>
+                </div>
+                {(missing.length > 0 || damaged.length > 0) && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(251,191,36,.08)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(248,113,113,.08)', color: T.re }}>Damaged: {name}</span>)}</div>}
+                <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+                  <span onClick={() => openComps(item)} style={{ ...S.btnPrimary, ...S.btnSm }}>View</span>
+                  {canEdit && <span onClick={() => openEdit(item)} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>}
+                  {canEdit && <span onClick={() => handleDelete(item.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Del</span>}
+                </div>
+              </div>
+            );
+          })}
         </div>
         {filtered.length === 0 && <div style={{ padding: 14 }}>{hasActiveFilters
           ? <Empty icon="🔎" title="No items match your filters" message="Try adjusting the filters, or click Clear filters to reset." cta="Clear filters" onCta={clearFilters} />
