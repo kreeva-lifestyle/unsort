@@ -7,7 +7,7 @@ import { friendlyError } from './lib/friendlyError';
 
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
 
-import { T } from './lib/theme';
+import { T, S } from './lib/theme';
 import type {
   Brand,
   PackTimeCourier,
@@ -227,6 +227,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const awbSetRef = useRef<Set<string>>(new Set());
   const rowCountRef = useRef(0);
   const sessionIdRef = useRef('');
+  const sessionStartRef = useRef(Date.now());
   const userIdRef = useRef<string | null>(null);
   const [dbFails, setDbFails] = useState(0);
 
@@ -496,23 +497,6 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current);
   }, [lastScanned, courierSheet, focusInput]);
 
-  // ── Delete a specific scan (removes from local + Google Sheet) ─────────────
-  const deleteScan = useCallback((awb: string) => {
-    awbSetRef.current.delete(awb.toUpperCase());
-    setRecentScans(p => p.filter(s => s.awb !== awb));
-    const wasSuccess = recentScans.find(s => s.awb === awb)?.success;
-    if (wasSuccess) {
-      setSessionCount(p => Math.max(0, p - 1));
-      setSheetTotal(p => Math.max(0, p - 1));
-      rowCountRef.current = Math.max(0, rowCountRef.current - 1);
-    }
-    if (lastScanned === awb) setLastScanned('');
-    beep(500, 0.1);
-    // Background delete from Google Sheet + Supabase DB
-    getAuthHeaders().then(headers => fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
-      .then(r => r.json()).then(() => {})).catch(() => {});
-    supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current);
-  }, [recentScans, lastScanned, courierSheet]);
 
   // ── Fetch today's summary across all couriers ──────────────────────────────
   const fetchTodaySummary = useCallback(async () => {
@@ -706,6 +690,22 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     </div>
   );
 
+  // ── Desktop: block scanning, show history only ─────────────────────────────
+  const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768;
+  if (isDesktop && !showHistory && !started) return (
+    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>PackStation</span>
+        <button onClick={() => { setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={S.btnGhost}>History</button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12 }}>
+        <svg viewBox="0 0 24 24" style={{ width: 48, height: 48, fill: 'none', stroke: T.tx3, strokeWidth: 1.2, marginBottom: 16, opacity: 0.5 }}><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M12 18h.01" /></svg>
+        <div style={{ fontSize: 14, fontWeight: 600, color: T.tx, fontFamily: T.sora, marginBottom: 6 }}>Use your phone to scan</div>
+        <div style={{ fontSize: 12, color: T.tx3, textAlign: 'center', maxWidth: 320, lineHeight: 1.5 }}>PackStation scanning is optimised for mobile devices. Open this page on your iPhone to start scanning AWB barcodes.</div>
+      </div>
+    </div>
+  );
+
   // ── Setup Screen ────────────────────────────────────────────────────────────
   if (!started) return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80 }}>
@@ -828,28 +828,33 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         </div>
       )}
 
-      {/* Top bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div>
-          <div style={{ fontSize: 10, color: T.tx3, marginBottom: 2 }}>{dateStr}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>{courier}</span>
-            <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: 'rgba(34,197,94,.10)', color: T.gr, fontWeight: 600 }}>{courierBrand}</span>
-            <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: 'rgba(99,102,241,.10)', color: T.ac2, fontWeight: 600, fontFamily: T.mono }}>CAM {camera}</span>
+      {/* Top bar — matches Figma: date eyebrow, bold "Scan" title, courier·brand info strip */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600 }}>{dateStr}</div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 6 }}>Scan</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.gr, boxShadow: `0 0 6px ${T.gr}80` }} />
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{courier} · {courierBrand}</div>
+              <div style={{ fontSize: 9, color: T.tx3, marginTop: 1 }}>Cam-{camera} · started {Math.round((Date.now() - sessionStartRef.current) / 60000)}m ago</div>
+            </div>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <div onClick={() => setSearchOpen(p => !p)} style={{ padding: '5px 8px', borderRadius: 6, background: searchOpen ? 'rgba(99,102,241,.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${searchOpen ? T.ac + '33' : T.bd2}`, color: searchOpen ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>
-            <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 20, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>{sessionCount}</div>
+              <div style={{ fontSize: 7, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 600 }}>Scanned</div>
+            </div>
+            <div onClick={() => setSearchOpen(p => !p)} style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid ${searchOpen ? T.ac + '33' : T.bd}`, background: searchOpen ? 'rgba(99,102,241,.10)' : 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: searchOpen ? T.ac2 : T.tx3 }}>
+              <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+            </div>
+            <div onClick={() => {
+              if (sessionCount > 0) { setConfirmChangeSetup(true); }
+              else { stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setVerifyResult(null); }
+            }} style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.tx3 }}>
+              <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </div>
           </div>
-          {/* Change — always active; mid-session warns before discarding state (audit P1) */}
-          <div onClick={() => {
-            if (sessionCount > 0) {
-              setConfirmChangeSetup(true);
-            } else {
-              stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setVerifyResult(null);
-            }
-          }} style={{ padding: '5px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd2}`, color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Change</div>
         </div>
       </div>
 
@@ -921,10 +926,10 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         </div>
       )}
 
-      {/* Camera */}
+      {/* Camera viewport */}
       {cameraOpen && (
-        <div style={{ marginBottom: 12, borderRadius: 10, overflow: 'hidden', border: `1px solid ${T.ac}44`, position: 'relative', background: '#000' }}>
-          <div ref={cameraRef} style={{ width: '100%', aspectRatio: '4/3' }}>
+        <div style={{ marginBottom: 12, borderRadius: 12, overflow: 'hidden', border: `1px solid ${T.ac}33`, position: 'relative', background: '#0a0e18' }}>
+          <div ref={cameraRef} style={{ width: '100%', aspectRatio: '16/9' }}>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 2 }}>
               <div style={{ width: '75%', height: 50, border: `2px solid ${T.ac}`, borderRadius: 8, position: 'relative' }}>
                 <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', height: 2, background: T.re, boxShadow: `0 0 10px ${T.re}`, animation: 'scanLine 2s ease-in-out infinite' }} />
@@ -939,23 +944,26 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         </div>
       )}
 
-      {/* AWB Input */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-          <label style={{ fontSize: 10, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Scan AWB Barcode</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {pendingWrites > 0 && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.18)', color: T.yl, fontWeight: 600 }}>Syncing {pendingWrites}</span>}
-            {!cameraOpen && <div onClick={() => setCameraOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 4, background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.12)', color: T.ac2, fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>
-              <svg viewBox="0 0 24 24" style={{ width: 11, height: 11, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" /></svg>
-              Camera
-            </div>}
+      {/* Camera placeholder (when off) */}
+      {!cameraOpen && (
+        <div style={{ marginBottom: 12, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <svg viewBox="0 0 24 24" style={{ width: 32, height: 32, fill: 'none', stroke: T.tx3, strokeWidth: 1.5, opacity: 0.4 }}><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M8 12h8" /></svg>
+          <div style={{ fontSize: 11, color: T.tx3 }}>Camera off · type or scan AWB</div>
+          <div onClick={() => setCameraOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, color: T.gr, cursor: 'pointer' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: T.re }} />
+            Turn on
           </div>
         </div>
+      )}
+
+      {/* AWB Input */}
+      <div style={{ marginBottom: 12 }}>
+        {pendingWrites > 0 && <div style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.18)', color: T.yl, fontWeight: 600, display: 'inline-block', marginBottom: 6 }}>Syncing {pendingWrites}</div>}
         <div style={{ position: 'relative' }}>
           <input ref={inputRef} type="text" inputMode="text" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
             value={awbInput} onChange={e => setAwbInput(e.target.value)} onKeyDown={handleKeyDown}
-            placeholder="Scan or type AWB number..."
-            style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${flash === 'success' ? T.gr : flash === 'error' ? T.re : T.ac + '55'}`, borderRadius: 10, color: T.tx, fontFamily: T.mono, fontSize: 17, padding: '14px 90px 14px 14px', outline: 'none', transition: 'border-color .15s', boxSizing: 'border-box', boxShadow: `0 0 16px ${flash === 'success' ? 'rgba(34,197,94,.15)' : flash === 'error' ? 'rgba(239,68,68,.15)' : 'rgba(99,102,241,.06)'}` }} />
+            placeholder="Type or scan AWB..."
+            style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `2px solid ${flash === 'success' ? T.gr : flash === 'error' ? T.re : T.ac + '44'}`, borderRadius: 12, color: T.tx, fontFamily: T.mono, fontSize: 16, padding: '14px 50px 14px 16px', outline: 'none', transition: 'border-color .15s', boxSizing: 'border-box', boxShadow: `0 0 12px ${flash === 'success' ? 'rgba(34,197,94,.12)' : flash === 'error' ? 'rgba(239,68,68,.12)' : 'rgba(99,102,241,.04)'}` }} />
           {/* Camera trigger inside input (audit P3: shave a click on the heavy-use path) */}
           {!cameraOpen && <button type="button" onClick={() => setCameraOpen(true)} title="Scan barcode with camera" style={{ position: 'absolute', right: 48, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: 7, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" /></svg>
@@ -969,30 +977,30 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Recent Scans — collapsible, with CSV export (audit P1: session summary without leaving screen) */}
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-        <div style={{ padding: '8px 12px', borderBottom: sessionListOpen ? `1px solid ${T.bd}` : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setSessionListOpen(o => !o)}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: T.tx, fontFamily: T.sora, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ display: 'inline-block', transform: sessionListOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform .15s' }}>▶</span>
-            Session Scans
-          </span>
+        <div style={{ padding: '10px 12px', borderBottom: sessionListOpen ? `1px solid ${T.bd}` : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setSessionListOpen(o => !o)}>
+          <span style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' }}>Recent Scans</span>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 9, color: T.tx3 }}>{recentScans.length} entries</span>
+            <span style={{ fontSize: 9, color: T.tx3 }}>{recentScans.length} this session</span>
             {recentScans.filter(s => s.success).length > 0 && <button onClick={e => { e.stopPropagation(); const successScans = recentScans.filter(s => s.success); const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n'); const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `PackTime_${courier}_CAM${camera}_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url); }} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, fontWeight: 500, cursor: 'pointer' }}>Export CSV</button>}
           </div>
         </div>
         {sessionListOpen && <div style={{ maxHeight: 280, overflowY: 'auto' }}>
           {recentScans.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans yet. Start scanning AWB barcodes.</div>}
           {recentScans.map((s, i) => (
-            <div key={`${s.awb}-${s.time}`} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .15s ease' : undefined }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: s.success ? T.gr : T.re, flexShrink: 0, boxShadow: `0 0 5px ${s.success ? T.gr : T.re}55`, opacity: s.pending ? 0.5 : 1 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, fontFamily: T.mono, color: T.tx, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.awb}</div>
+            <div key={`${s.awb}-${s.time}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .15s ease' : undefined, background: !s.success ? 'rgba(239,68,68,.04)' : 'transparent' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: s.success ? 'rgba(34,197,94,.12)' : 'rgba(239,68,68,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {s.success ? <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.gr, strokeWidth: 2.5 }}><path d="M20 6L9 17l-5-5" /></svg>
+                : <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2.5 }}><path d="M18 6L6 18M6 6l12 12" /></svg>}
               </div>
-              <div style={{ fontSize: 8, color: T.tx3, fontFamily: T.mono, flexShrink: 0 }}>{s.time}</div>
-              {!s.success && <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 600 }}>DUP</span>}
-              {s.success && s.pending && <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: 'rgba(245,158,11,.10)', color: T.yl, fontWeight: 600 }}>SYNC</span>}
-              {s.success && !s.pending && <button type="button" onClick={(e) => { e.stopPropagation(); deleteScan(s.awb); }} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', opacity: 0.4 }}>
-                <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.tx3, strokeWidth: 2 }}><path d="M18 6L6 18M6 6l12 12" /></svg>
-              </button>}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontFamily: T.mono, color: T.tx, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.awb}</div>
+                <div style={{ fontSize: 9, color: T.tx3, marginTop: 1 }}>
+                  {s.time}
+                  {!s.success && <span style={{ color: T.re, fontWeight: 700, marginLeft: 6 }}>· DUPLICATE</span>}
+                  {s.success && s.pending && <span style={{ color: T.yl, fontWeight: 600, marginLeft: 6 }}>· syncing</span>}
+                </div>
+              </div>
+              {s.success && !s.pending && i === 0 && <button type="button" onClick={(e) => { e.stopPropagation(); undoLast(); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>↩ Undo</button>}
             </div>
           ))}
         </div>}
