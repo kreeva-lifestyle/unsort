@@ -592,80 +592,100 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   // ── History Screen ─────────────────────────────────────────────────────────
   if (showHistory) return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Scan History</span>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => { setExporting(true); exportHistory().finally(() => setExporting(false)); }} disabled={exporting} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: exporting ? 'default' : 'pointer', fontFamily: T.sans, opacity: exporting ? 0.5 : 1 }}>{exporting ? 'Exporting...' : 'Export CSV'}</button>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Scan History</div>
+          <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>{historyTotal} records · last 7 days</div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button onClick={() => { setShowHistory(false); window.history.back(); }} style={S.btnGhost}>← Back</button>
+          <button onClick={() => { setExporting(true); exportHistory().finally(() => setExporting(false)); }} disabled={exporting} style={{ ...S.btnGhost, opacity: exporting ? 0.5 : 1 }}>{exporting ? 'Exporting...' : 'Export CSV'}</button>
         </div>
       </div>
 
-      {/* Search + Filter */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-        <input type="text" value={historySearch} onChange={e => { setHistorySearch(e.target.value); setHistoryPage(0); }} placeholder="Search AWB..."
-          style={{ flex: '1 1 180px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.mono, fontSize: 12, padding: '8px 12px', outline: 'none', boxSizing: 'border-box', minWidth: 140, height: 36 }} />
-        <select value={historyFilterCourier} onChange={e => { setHistoryFilterCourier(e.target.value); setHistoryPage(0); }}
-          style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '7px 8px', outline: 'none' }}>
-          <option value="">All Couriers</option>
-          {couriers.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-        </select>
+      {/* Stat strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.ac}cc, ${T.ac}22)` }} />
+          <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Total Scans</div>
+          <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.ac2 }}>{historyTotal}</div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.gr}cc, ${T.gr}22)` }} />
+          <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Today</div>
+          <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.gr }}>{historyData.filter(r => r.scanned_at && new Date(r.scanned_at).toDateString() === new Date().toDateString()).length}</div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.yl}cc, ${T.yl}22)` }} />
+          <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Couriers</div>
+          <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.yl }}>{new Set(historyData.map(r => r.courier)).size}</div>
+        </div>
+      </div>
+
+      {/* Filter bar */}
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 180, position: 'relative' }}>
+          <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
+          <input type="text" value={historySearch} onChange={e => { setHistorySearch(e.target.value); setHistoryPage(0); }} placeholder="Search AWB..."
+            style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button onClick={() => { setHistoryFilterCourier(''); setHistoryPage(0); }} style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${!historyFilterCourier ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: !historyFilterCourier ? 'rgba(99,102,241,.08)' : 'transparent', color: !historyFilterCourier ? T.ac2 : T.tx2, fontFamily: T.sans }}>All</button>
+          {couriers.map(c => (
+            <button key={c.id} onClick={() => { setHistoryFilterCourier(historyFilterCourier === c.name ? '' : c.name); setHistoryPage(0); }} style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${historyFilterCourier === c.name ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: historyFilterCourier === c.name ? 'rgba(99,102,241,.08)' : 'transparent', color: historyFilterCourier === c.name ? T.ac2 : T.tx2, fontFamily: T.sans }}>{c.name}</button>
+          ))}
+        </div>
         <select value={historyFilterBrand} onChange={e => { setHistoryFilterBrand(e.target.value); setHistoryPage(0); }}
-          style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '7px 8px', outline: 'none' }}>
+          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '5px 10px', outline: 'none', cursor: 'pointer' }}>
           <option value="">All Brands</option>
           {brands.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
         <select value={historyPageSize} onChange={e => { setHistoryPageSize(Number(e.target.value)); setHistoryPage(0); }}
-          style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '7px 6px', outline: 'none', width: 55 }}>
+          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '5px 6px', outline: 'none', width: 50 }}>
           <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
         </select>
       </div>
 
-      {/* Count */}
-      <div style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{historyTotal} records found</div>
-
-      {/* Table — horizontal scroll on mobile */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-        <div className="table-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth', touchAction: 'pan-x pan-y' }}>
-          <div style={{ minWidth: 580 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '150px 90px 50px 80px 1fr 44px', gap: 0, fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, borderBottom: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.015)' }}>
-              <div style={{ padding: '8px 10px' }}>AWB</div>
-              <div style={{ padding: '8px 10px' }}>Courier</div>
-              <div style={{ padding: '8px 10px' }}>Cam</div>
-              <div style={{ padding: '8px 10px' }}>Brand</div>
-              <div style={{ padding: '8px 10px' }}>Time</div>
-              <div style={{ padding: '8px 4px' }}></div>
-            </div>
-            {historyLoading && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div>}
-            {!historyLoading && historyData.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No records found.</div>}
-            <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+      {/* Table */}
+      <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+        <div className="table-wrap" style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 580 }}>
+            <thead><tr>
+              {['AWB', 'Courier', 'Cam', 'Brand', 'Time', ''].map(h => <th key={h} style={S.thStyle}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {historyLoading && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</td></tr>}
+              {!historyLoading && historyData.length === 0 && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No records found.</td></tr>}
               {historyData.map(r => (
-                <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '150px 90px 50px 80px 1fr 44px', gap: 0, borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
-                  <div style={{ padding: '7px 10px', fontFamily: T.mono, color: T.tx, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.awb}</div>
-                  <div style={{ padding: '7px 10px', color: T.tx2, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.courier}</div>
-                  <div style={{ padding: '7px 10px', color: T.tx3, fontFamily: T.mono, fontSize: 10 }}>{r.camera}</div>
-                  <div style={{ padding: '7px 10px', color: T.gr, fontSize: 10, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.brand || '—'}</div>
-                  <div style={{ padding: '7px 10px', color: T.tx3, fontFamily: T.mono, fontSize: 10, whiteSpace: 'nowrap' }}>{r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</div>
-                  <div style={{ padding: '7px 4px' }}>
-                    <button type="button" onClick={() => setConfirmDeleteId(r.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4 }}>
-                      <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                <tr key={r.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.015)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600, fontSize: 12 }}>{r.awb}</td>
+                  <td style={{ ...S.tdStyle, fontSize: 12 }}>{r.courier}</td>
+                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 11, color: T.tx3 }}>{r.camera}</td>
+                  <td style={{ ...S.tdStyle, color: T.gr, fontSize: 11, fontWeight: 600 }}>{r.brand || '—'}</td>
+                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 10, color: T.tx3 }}>{r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</td>
+                  <td style={{ ...S.tdStyle, width: 40 }}>
+                    <button type="button" onClick={() => setConfirmDeleteId(r.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4, transition: 'opacity .15s' }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')}>
+                      <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 1.8 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
                     </button>
-                  </div>
-                </div>
+                  </td>
+                </tr>
               ))}
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
       </div>
 
       {/* Delete confirmation modal */}
       {confirmDeleteId && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
-          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', textAlign: 'center', maxWidth: 340, width: '100%' }}>
+        <div style={S.modalOverlay}>
+          <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', textAlign: 'center', maxWidth: 340, width: '100%' }}>
             <div style={{ fontSize: 28, marginBottom: 6 }}>⚠️</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Delete Scan?</div>
+            <div style={{ ...S.modalTitle, marginBottom: 4 }}>Delete Scan?</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This will permanently remove the scan from the database and Google Sheet.</div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setConfirmDeleteId(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', fontSize: 11, fontWeight: 500, background: 'rgba(99,102,241,0.06)', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={() => { deleteHistoryScan(confirmDeleteId); setConfirmDeleteId(null); }} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: 'pointer' }}>Delete</button>
+              <button onClick={() => setConfirmDeleteId(null)} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Cancel</button>
+              <button onClick={() => { deleteHistoryScan(confirmDeleteId); setConfirmDeleteId(null); }} style={{ ...S.btnDanger, flex: 1, justifyContent: 'center', background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', border: 'none' }}>Delete</button>
             </div>
           </div>
         </div>
@@ -674,9 +694,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {/* Pagination */}
       {totalPages > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 10 }}>
-          <button onClick={() => setHistoryPage(p => Math.max(0, p - 1))} disabled={historyPage === 0} style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: historyPage === 0 ? T.tx3 : T.tx, fontSize: 10, cursor: historyPage === 0 ? 'default' : 'pointer', opacity: historyPage === 0 ? 0.4 : 1 }}>Prev</button>
+          <span onClick={() => setHistoryPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage === 0 ? 0.3 : 1, pointerEvents: historyPage === 0 ? 'none' : 'auto' }}>Prev</span>
           <span style={{ fontSize: 10, color: T.tx3 }}>{historyPage + 1} / {totalPages}</span>
-          <button onClick={() => setHistoryPage(p => Math.min(totalPages - 1, p + 1))} disabled={historyPage >= totalPages - 1} style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: historyPage >= totalPages - 1 ? T.tx3 : T.tx, fontSize: 10, cursor: historyPage >= totalPages - 1 ? 'default' : 'pointer', opacity: historyPage >= totalPages - 1 ? 0.4 : 1 }}>Next</button>
+          <span onClick={() => setHistoryPage(p => Math.min(totalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: historyPage >= totalPages - 1 ? 'none' : 'auto' }}>Next</span>
         </div>
       )}
     </div>
