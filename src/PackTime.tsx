@@ -423,7 +423,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     if (awbSetRef.current.has(key)) {
       setDuplicateAwb(trimmed); beepErr(); setFlash('error');
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-      setRecentScans(p => [{ awb: trimmed, time: new Date().toLocaleTimeString('en-IN'), success: false }, ...p].slice(0, 30));
+      // Don't add to recentScans — duplicate banner already provides feedback.
+      // Adding causes undoLast to remove both the original and the duplicate entry.
       focusInput();
       return;
     }
@@ -448,11 +449,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     supabase.from('packtime_scans').insert(scanRow).then(({ error }) => {
       if (error) {
         if (error.code === '23505') {
-          // Duplicate AWB in DB — roll back local count
+          // Duplicate AWB in DB — roll back local count and remove from recent scans
           setSessionCount(p => Math.max(0, p - 1));
           setSheetTotal(p => Math.max(0, p - 1));
           rowCountRef.current = Math.max(0, rowCountRef.current - 1);
-          setRecentScans(p => p.map(s => s.awb === trimmed ? { ...s, success: false } : s));
+          setRecentScans(p => p.filter(s => s.awb !== trimmed));
+          setDuplicateAwb(trimmed); beepErr(); setFlash('error');
+          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+          if (lastScanned === trimmed) setLastScanned('');
           return;
         }
         // DB insert failed — increment dbFails counter, retry once after 2s
@@ -500,21 +504,16 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── Fetch today's summary across all couriers ──────────────────────────────
   const fetchTodaySummary = useCallback(async () => {
-    const results: { courier: string; count: number }[] = [];
-    const headers = await getAuthHeaders();
-    for (const c of couriers) {
-      try {
-        const resp = await fetch(EDGE_FN, {
-          method: 'POST', headers,
-          body: JSON.stringify({ action: 'init', sheetName: c.sheet_name }),
-        });
-        const data = await resp.json();
-        if (data.ok) {
-          // Count AWBs from today only (awbs are already filtered to 7 days by server)
-          results.push({ courier: c.name, count: data.totalRows || 0 });
-        }
-      } catch {}
-    }
+    // Use Supabase directly — much faster than N sequential edge function calls.
+    // Counts today's scans per courier from the DB (single query with group by).
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const { data } = await supabase.from('packtime_scans')
+      .select('courier')
+      .gte('scanned_at', todayStart.toISOString())
+      .limit(10000);
+    const counts: Record<string, number> = {};
+    (data || []).forEach((r: any) => { counts[r.courier] = (counts[r.courier] || 0) + 1; });
+    const results = couriers.map(c => ({ courier: c.name, count: counts[c.name] || 0 }));
     setTodaySummary(results);
   }, [couriers]);
 
@@ -899,14 +898,15 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Session</div>
           <div style={{ fontSize: 28, fontWeight: 800, fontFamily: T.sora, color: T.gr, lineHeight: 1 }}>{sessionCount}</div>
         </div>
-        <div style={{ flex: 1, background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.12)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 8, color: T.ac2, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Sheet Total</div>
+        <div style={{ flex: 1, background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.12)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }} title="Total scans in this Google Sheet over the last 7 days">
+          <div style={{ fontSize: 8, color: T.ac2, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>7-Day Total</div>
           <div style={{ fontSize: 28, fontWeight: 800, fontFamily: T.sora, color: T.ac2, lineHeight: 1 }}>{sheetTotal}</div>
         </div>
-        <div onClick={() => { setTodaySummaryOpen(true); fetchTodaySummary(); }} style={{ flex: 1, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.12)', borderRadius: 10, padding: '10px 12px', textAlign: 'center', cursor: 'pointer' }}>
-          <div style={{ fontSize: 8, color: T.yl, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Today</div>
-          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.yl, lineHeight: 1 }}>
-            <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.yl, strokeWidth: 2, verticalAlign: 'middle' }}><path d="M3 12h18M3 6h18M3 18h18" /></svg>
+        <div onClick={() => { setTodaySummaryOpen(true); fetchTodaySummary(); }} style={{ flex: 1, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.12)', borderRadius: 10, padding: '10px 12px', textAlign: 'center', cursor: 'pointer' }} title="Tap to see today's breakdown by courier">
+          <div style={{ fontSize: 8, color: T.yl, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>All Couriers</div>
+          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.yl, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.yl, strokeWidth: 2 }}><path d="M3 12h18M3 6h18M3 18h18" /></svg>
+            Today
           </div>
         </div>
       </div>
