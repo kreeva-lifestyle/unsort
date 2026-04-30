@@ -128,7 +128,12 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
                   onMouseLeave={e => (e.currentTarget.style.background = '')}>
                   <td style={{ ...td, fontFamily: T.mono, color: T.ac2, fontWeight: 600, cursor: 'pointer' }} onClick={() => onView(p)}>{p.program_uid}</td>
-                  <td style={{ ...td, fontFamily: T.mono }}>{p.selling_sku || '—'}</td>
+                  <td style={{ ...td, fontFamily: T.mono }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                      {p.selling_sku || '—'}
+                      {p.voice_note_path && <span title="Voice note attached"><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.bl, strokeWidth: 2, flexShrink: 0 }}><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" /></svg></span>}
+                    </span>
+                  </td>
                   <td style={{ ...td, fontFamily: T.mono }}>{p.manufacturing_sku || '—'}</td>
                   <td style={{ ...td, fontFamily: T.mono, color: T.bl, fontWeight: 600 }}>
                     {priceSummaries[p.id] ? priceSummaries[p.id].fabricMeter.toFixed(2) + ' m' : '—'}
@@ -140,13 +145,12 @@ export default function ProgramsList({ onAdd, onEdit, onView, onQR, onPDF }: Pro
                     {new Date(p.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                   </td>
                   <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                    <div className="prg-list-actions" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      <span onClick={() => onView(p)} style={{ ...ghostBtn, color: T.ac2 }}>{t('view')}</span>
+                    <div className="prg-list-actions" style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
                       <span onClick={() => handleEdit(p)} style={ghostBtn}>{t('edit')}</span>
-                      <span onClick={() => onQR(p)} style={ghostBtn}>{t('qr')}</span>
-                      <span onClick={() => onPDF(p)} style={ghostBtn}>{t('pdf')}</span>
-                      <span onClick={() => handleCopyLink(p)} style={ghostBtn}>{t('copyLink')}</span>
-                      <span onClick={() => handleDelete(p)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', opacity: deleting === p.id ? 0.5 : 1 }}>{t('deleteAction')}</span>
+                      <span onClick={() => onQR(p)} style={{ ...ghostBtn, padding: '4px 6px' }} title="QR"><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="3" height="3" /><path d="M21 14h-3v3h3v4h-4v-4" /></svg></span>
+                      <span onClick={() => onPDF(p)} style={{ ...ghostBtn, padding: '4px 6px' }} title="PDF"><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6" /></svg></span>
+                      <span onClick={() => handleCopyLink(p)} style={{ ...ghostBtn, padding: '4px 6px' }} title="Copy Link"><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg></span>
+                      <span onClick={() => handleDelete(p)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', padding: '4px 6px', opacity: deleting === p.id ? 0.5 : 1 }} title="Delete"><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /></svg></span>
                     </div>
                   </td>
                 </tr>
