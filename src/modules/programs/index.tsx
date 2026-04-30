@@ -82,7 +82,6 @@ export default function ProgramsModule() {
           onAdd={handleAdd}
           onEdit={handleEdit}
           onView={handleView}
-          onQR={p => setQrProgram(p)}
           onPDF={p => setPdfProgramId(p.id)}
         />
       )}

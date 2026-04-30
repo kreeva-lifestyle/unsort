@@ -70,7 +70,6 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => onEdit(program, matchings.map(m => ({ company_name: m.company_name, matching_label: m.matching_label || '' })))}
             style={{ ...S.btnPrimary, cursor: 'pointer' }}>{t('edit')}</button>
-          <button onClick={onClose} style={{ ...S.btnGhost, cursor: 'pointer' }}>{t('back')}</button>
         </div>
       </div>
 
