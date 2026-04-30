@@ -219,6 +219,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const [historySearch, setHistorySearch] = useState('');
   const [historyFilterCourier, setHistoryFilterCourier] = useState('');
   const [historyFilterBrand, setHistoryFilterBrand] = useState('');
+  const [historyDateFrom, setHistoryDateFrom] = useState('');
+  const [historyDateTo, setHistoryDateTo] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -519,8 +521,11 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── Fetch history from Supabase ────────────────────────────────────────────
   const fetchHistory = useCallback(async () => {
+    if (!historyDateFrom || !historyDateTo) return;
     setHistoryLoading(true);
-    let query = supabase.from('packtime_scans').select('*', { count: 'estimated' });
+    let query = supabase.from('packtime_scans').select('*', { count: 'estimated' })
+      .gte('scanned_at', historyDateFrom + 'T00:00:00.000Z')
+      .lte('scanned_at', historyDateTo + 'T23:59:59.999Z');
     if (historySearch) query = query.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
     if (historyFilterCourier) query = query.eq('courier', historyFilterCourier);
     if (historyFilterBrand) query = query.eq('brand', historyFilterBrand);
@@ -530,9 +535,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setHistoryData((data as PackTimeScan[] | null) || []);
     setHistoryTotal(count || 0);
     setHistoryLoading(false);
-  }, [historySearch, historyFilterCourier, historyFilterBrand, historyPage, historyPageSize]);
+  }, [historySearch, historyFilterCourier, historyFilterBrand, historyPage, historyPageSize, historyDateFrom, historyDateTo, addToast]);
 
-  useEffect(() => { if (showHistory) fetchHistory(); }, [showHistory, fetchHistory]);
+  useEffect(() => { if (showHistory && historyDateFrom && historyDateTo) fetchHistory(); }, [showHistory, fetchHistory, historyDateFrom, historyDateTo]);
 
   useEffect(() => { if (active) setShowHistory(false); }, [active]);
 
@@ -561,11 +566,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   };
 
   const exportHistory = async () => {
+    if (!historyDateFrom || !historyDateTo) { addToast('Select a date range first', 'error'); return; }
     const allData: PackTimeScan[] = [];
     let page = 0;
     const ps = 5000;
     while (true) {
-      let q = supabase.from('packtime_scans').select('id, session_id, awb, courier, camera, brand, scanned_at');
+      let q = supabase.from('packtime_scans').select('id, session_id, awb, courier, camera, brand, scanned_at')
+        .gte('scanned_at', historyDateFrom + 'T00:00:00.000Z')
+        .lte('scanned_at', historyDateTo + 'T23:59:59.999Z');
       if (historySearch) q = q.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
       if (historyFilterCourier) q = q.eq('courier', historyFilterCourier);
       if (historyFilterBrand) q = q.eq('brand', historyFilterBrand);
@@ -595,12 +603,32 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Scan History</div>
-          <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>{historyTotal} records · last 7 days</div>
+          <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>{historyDateFrom && historyDateTo ? `${historyTotal} records · ${historyDateFrom} to ${historyDateTo}` : 'Pick a date range to view scans'}</div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button onClick={() => { setShowHistory(false); window.history.back(); }} style={S.btnGhost}>← Back</button>
-          <button onClick={() => { setExporting(true); exportHistory().finally(() => setExporting(false)); }} disabled={exporting} style={{ ...S.btnGhost, opacity: exporting ? 0.5 : 1 }}>{exporting ? 'Exporting...' : 'Export CSV'}</button>
+          <button onClick={() => { setExporting(true); exportHistory().finally(() => setExporting(false)); }} disabled={exporting || !historyDateFrom || !historyDateTo} title={!historyDateFrom || !historyDateTo ? 'Select a date range first' : 'Export filtered records to CSV'} style={{ ...S.btnGhost, opacity: exporting || !historyDateFrom || !historyDateTo ? 0.4 : 1, cursor: exporting || !historyDateFrom || !historyDateTo ? 'not-allowed' : 'pointer', pointerEvents: exporting || !historyDateFrom || !historyDateTo ? 'none' : 'auto' }}>{exporting ? 'Exporting...' : 'Export CSV'}</button>
         </div>
+      </div>
+
+      {/* Date range filter */}
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px', marginBottom: 12, display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>From</div>
+          <input type="date" value={historyDateFrom} max={historyDateTo || undefined} onChange={e => { setHistoryDateFrom(e.target.value); setHistoryPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 12px', outline: 'none', height: 36, colorScheme: 'dark' as any }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>To</div>
+          <input type="date" value={historyDateTo} min={historyDateFrom || undefined} max={new Date().toISOString().slice(0, 10)} onChange={e => { setHistoryDateTo(e.target.value); setHistoryPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 12px', outline: 'none', height: 36, colorScheme: 'dark' as any }} />
+        </div>
+        {[
+          { label: 'Today', from: 0 },
+          { label: '7 days', from: 6 },
+          { label: '30 days', from: 29 },
+        ].map(p => (
+          <button key={p.label} onClick={() => { const d = new Date(); const to = d.toISOString().slice(0,10); d.setDate(d.getDate() - p.from); const from = d.toISOString().slice(0,10); setHistoryDateFrom(from); setHistoryDateTo(to); setHistoryPage(0); }} style={{ ...S.btnGhost, ...S.btnSm }}>{p.label}</button>
+        ))}
+        {(historyDateFrom || historyDateTo) && <button onClick={() => { setHistoryDateFrom(''); setHistoryDateTo(''); setHistoryData([]); setHistoryTotal(0); setHistoryPage(0); }} style={{ ...S.btnGhost, ...S.btnSm, color: T.tx3 }}>Clear</button>}
       </div>
 
       {/* Stat strip */}
@@ -654,8 +682,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               {['AWB', 'Courier', 'Cam', 'Brand', 'Time', ''].map(h => <th key={h} style={S.thStyle}>{h}</th>)}
             </tr></thead>
             <tbody>
-              {historyLoading && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</td></tr>}
-              {!historyLoading && historyData.length === 0 && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No records found.</td></tr>}
+              {(!historyDateFrom || !historyDateTo) && <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Select a date range above to view scans.</td></tr>}
+              {historyDateFrom && historyDateTo && historyLoading && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</td></tr>}
+              {historyDateFrom && historyDateTo && !historyLoading && historyData.length === 0 && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans found in this date range.</td></tr>}
               {historyData.map(r => (
                 <tr key={r.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.015)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600, fontSize: 12 }}>{r.awb}</td>
