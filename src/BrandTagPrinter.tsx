@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from './lib/supabase';
 import { useNotifications } from './hooks/useNotifications';
 import BrandTagModalNew from './components/ui/BrandTagModal';
+import ConfirmModal, { useConfirm } from './components/ui/ConfirmModal';
 import { friendlyError } from './lib/friendlyError';
 import type { BrandTag, BrandTagInsert, AuditLogInsert } from './types/database';
 
@@ -219,6 +220,7 @@ const QTY_OPTIONS = [
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function BrandTagPrinter() {
   const { addToast } = useNotifications();
+  const { ask, modalProps: confirmModalProps } = useConfirm();
   // Server-side pagination + filtering
   const [rows, setRows] = useState<BrandTagRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -818,7 +820,7 @@ export default function BrandTagPrinter() {
               <div style={{ display: 'flex', gap: 5 }}>
                 {missing.length === 0
                   ? <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={() => printOrderLabels(ready)}>Print All ({totalCopies})</button>
-                  : <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={() => { if (confirm(`Print the ${ready.length} ready label${ready.length === 1 ? '' : 's'} (${totalCopies} copies)? ${missing.length} missing SKU${missing.length === 1 ? '' : 's'} will be skipped — resolve ${missing.length === 1 ? 'it' : 'them'} later and re-run.`)) printOrderLabels(ready); }}>Print Ready ({totalCopies}) · Skip {missing.length}</button>
+                  : <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={async () => { if (await ask({ title: `Print ${ready.length} ready label${ready.length === 1 ? '' : 's'}?`, message: `${totalCopies} cop${totalCopies === 1 ? 'y' : 'ies'} will print. ${missing.length} missing SKU${missing.length === 1 ? '' : 's'} will be skipped — resolve ${missing.length === 1 ? 'it' : 'them'} later and re-run.`, confirmLabel: 'Print' })) printOrderLabels(ready); }}>Print Ready ({totalCopies}) · Skip {missing.length}</button>
                 }
                 <button style={btnGhost} onClick={() => {
                   const exportData = (orderRows || []).map(r => ({
@@ -928,6 +930,7 @@ export default function BrandTagPrinter() {
         </div>
       )}
       </>}
+      <ConfirmModal {...confirmModalProps} />
     </div>
   );
 }
