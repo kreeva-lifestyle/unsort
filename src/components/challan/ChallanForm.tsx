@@ -87,7 +87,7 @@ export default function ChallanForm(p: ChallanFormProps) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>{p.editing ? `Edit #${p.editing.challan_number}` : (p.isReturn ? 'New Return' : 'New Cash Challan')}</span>
-            {!p.editing && nextNum && <span style={{ fontFamily: T.mono, fontSize: 12, color: T.ac2, fontWeight: 600, padding: '3px 8px', background: 'rgba(99,102,241,.10)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 6 }}>#{nextNum}</span>}
+            {!p.editing && nextNum && <span title="Approximate — final number assigned on save" style={{ fontFamily: T.mono, fontSize: 11, color: T.tx3, fontWeight: 500, padding: '2px 7px', background: 'rgba(255,255,255,.03)', border: `1px solid ${T.bd}`, borderRadius: 6 }}>~#{nextNum}</span>}
             {p.editing && <button onClick={() => p.loadAuditTrail(p.editing!.challan_number)} style={{ padding: '3px 8px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>View History</button>}
           </div>
           <button onClick={p.onClose} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', background: 'rgba(99,102,241,0.06)', color: T.ac2, fontSize: 10, cursor: 'pointer' }}>Cancel</button>
