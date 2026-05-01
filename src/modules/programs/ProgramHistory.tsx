@@ -51,7 +51,7 @@ export default function ProgramHistory({ programId, t }: Props) {
                 <div style={{ fontSize: 9, color: T.tx3, marginTop: 2 }}>{JSON.stringify(e.new_value) as string}</div>
               )}
             </div>
-            <span style={{ fontSize: 8, color: T.tx3, fontFamily: T.mono, whiteSpace: 'nowrap', marginTop: 2 }}>
+            <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, whiteSpace: 'nowrap', marginTop: 2 }}>
               {new Date(e.changed_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
               {' '}
               {new Date(e.changed_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}

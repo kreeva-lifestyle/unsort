@@ -101,7 +101,37 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
             {!search && <button onClick={onAdd} style={S.btnPrimary}>{t('addProgram')}</button>}
           </div>
         )}
+        {/* Mobile card view */}
         {!loading && programs.length > 0 && (
+          <div className="prg-list-mobile" style={{ display: 'none' }}>
+            {programs.map(p => (
+              <div key={p.id} onClick={() => onView(p)} style={{ padding: '14px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontFamily: T.mono, fontSize: 12, color: T.ac2, fontWeight: 600 }}>{p.program_uid}</span>
+                    {p.voice_note_path && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.yl, strokeWidth: 2 }}><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" /></svg>}
+                  </div>
+                  <span style={{ fontSize: 10, color: T.tx3 }}>{relTime(p.updated_at)}</span>
+                </div>
+                <div style={{ fontFamily: T.mono, fontSize: 12, color: T.tx, fontWeight: 500 }}>{p.selling_sku || '—'}</div>
+                <div style={{ fontFamily: T.mono, fontSize: 10, color: T.tx3, marginTop: 1 }}>{p.manufacturing_sku || '—'}</div>
+                <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                  <span style={{ fontSize: 11, color: T.bl, fontFamily: T.mono, fontWeight: 600 }}>{priceSummaries[p.id] ? priceSummaries[p.id].fabricMeter.toFixed(2) + ' m' : '—'}</span>
+                  <span style={{ fontSize: 11, color: T.gr, fontFamily: T.mono, fontWeight: 600 }}>{priceSummaries[p.id] ? '₹' + priceSummaries[p.id].workTotal.toLocaleString('en-IN') : '—'}</span>
+                </div>
+                <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <button onClick={() => handleEdit(p)} style={{ ...S.btnGhost, ...S.btnSm }}>{t('edit')}</button>
+                  <button onClick={() => onPDF(p)} style={{ ...S.btnGhost, ...S.btnSm }}>PDF</button>
+                  <button onClick={() => handleCopyLink(p)} style={{ ...S.btnGhost, ...S.btnSm }}>Link</button>
+                  <button onClick={() => handleDelete(p)} style={{ ...S.btnDanger, ...S.btnSm, opacity: deleting === p.id ? 0.5 : 1 }}>Del</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {/* Desktop table */}
+        {!loading && programs.length > 0 && (
+          <div className="prg-list-desktop">
           <div className="table-wrap" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
             <thead><tr>
@@ -149,6 +179,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
               ))}
             </tbody>
           </table>
+          </div>
           </div>
         )}
       </div>

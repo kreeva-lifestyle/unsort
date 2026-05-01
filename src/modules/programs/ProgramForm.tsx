@@ -104,7 +104,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
 
           <SectionTitle color={T.gr}>{t('workProgram')}</SectionTitle>
           <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 6 }}>
-            <table id="work-tbl" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
+            <table id="work-tbl" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
               <thead><tr>
                 <th style={th}>{t('partName')}</th><th style={{ ...th, width: 70 }}>{t('stitch')}</th><th style={{ ...th, width: 68 }}>{t('stitchType')}</th><th style={{ ...th, width: 72 }}>{t('oneRs')}</th>
                 <th style={{ ...th, width: 78 }}>{t('stitchRate')}</th><th style={{ ...th, width: 58 }}>{t('oneMP')}</th><th style={{ ...th, width: 72 }}>{t('meterPerPcs')}</th>

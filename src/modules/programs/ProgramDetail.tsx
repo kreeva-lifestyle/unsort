@@ -61,7 +61,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
   const tdR: React.CSSProperties = { ...tdS, textAlign: 'right' };
 
   return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '24px 28px', maxWidth: 1180 }}>
+    <div className="prg-detail" style={{ fontFamily: T.sans, color: T.tx, padding: '24px 28px', maxWidth: 1180 }}>
       {/* Breadcrumb + header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, paddingBottom: 16, borderBottom: `1px solid ${T.bd}` }}>
         <div>
@@ -88,11 +88,11 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       <div className="prg-detail-grid" style={{ display: 'grid', gridTemplateColumns: imageUrl ? '1fr 1fr 280px' : '1fr 1fr', gap: 12, marginBottom: 18 }}>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '14px 16px' }}>
           <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1.6, fontWeight: 600, marginBottom: 4 }}>{t('sellingSkuLabel')}</div>
-          <div style={{ fontFamily: T.mono, fontSize: 18, fontWeight: 700, color: T.ac2, letterSpacing: -0.3 }}>{program.selling_sku || '—'}</div>
+          <div style={{ fontFamily: T.mono, fontSize: 18, fontWeight: 700, color: T.ac2, letterSpacing: -0.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{program.selling_sku || '—'}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '14px 16px' }}>
           <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1.6, fontWeight: 600, marginBottom: 4 }}>{t('manufacturingSkuLabel')}</div>
-          <div style={{ fontFamily: T.mono, fontSize: 18, fontWeight: 700, color: T.bl, letterSpacing: -0.3 }}>{program.manufacturing_sku || '—'}</div>
+          <div style={{ fontFamily: T.mono, fontSize: 18, fontWeight: 700, color: T.bl, letterSpacing: -0.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{program.manufacturing_sku || '—'}</div>
         </div>
         {imageUrl && (
           <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>

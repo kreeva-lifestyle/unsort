@@ -165,6 +165,7 @@ body.modal-open { overflow: hidden !important; }
 
 /* ── Programs module mobile ──────────────────────────────── */
 @media (max-width: 768px) {
+  /* Form modal — full screen */
   .prg-form-overlay { padding: 0 !important; align-items: stretch !important; }
   .prg-form-modal { max-width: 100% !important; border-radius: 0 !important; margin: 0 !important; max-height: 100vh !important; min-height: 100vh !important; }
   .prg-form-head { border-radius: 0 !important; }
@@ -172,14 +173,17 @@ body.modal-open { overflow: hidden !important; }
   .prg-sku-grid { grid-template-columns: 1fr !important; }
   .prg-table-wrap { border-radius: 6px !important; }
   .prg-table-wrap table { font-size: 10px !important; }
-  .prg-table-wrap input, .prg-table-wrap select { font-size: 10px !important; padding: 5px 4px !important; }
-  .prg-table-wrap th { padding: 6px 4px !important; font-size: 8px !important; }
+  .prg-table-wrap input, .prg-table-wrap select { font-size: 16px !important; padding: 5px 4px !important; }
+  .prg-table-wrap th { padding: 6px 4px !important; font-size: 9px !important; }
   .prg-actions-row { flex-direction: column !important; }
   .prg-actions-row button { width: 100% !important; height: 44px !important; }
   .prg-section-title { font-size: 11px !important; }
   .prg-grand-fabric { flex-direction: column !important; gap: 4px !important; text-align: center !important; padding: 10px !important; }
-  .prg-list-actions { flex-wrap: wrap !important; gap: 3px !important; }
-  .prg-list-actions span, .prg-list-actions button { font-size: 8px !important; padding: 3px 6px !important; }
+  /* List — desktop table hidden, mobile cards shown */
+  .prg-list-desktop { display: none !important; }
+  .prg-list-mobile { display: block !important; }
+  /* Detail — reduce padding, bottom clearance */
+  .prg-detail { padding: 14px 12px 80px !important; }
   .prg-detail-grid { grid-template-columns: 1fr !important; }
   .prg-detail-header { flex-direction: column !important; gap: 8px !important; align-items: flex-start !important; }
   .prg-matching-grid { grid-template-columns: 1fr !important; }
