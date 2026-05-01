@@ -79,7 +79,7 @@ export const gu = {
   partPlural: 'ભાગો',
 
   // ઇતિહાસ
-  history: 'ઇતિહાસ',
+  history: 'લોગ્સ',
   noHistory: 'હજુ સુધી કોઈ ફેરફાર નોંધાયો નથી.',
   voiceUpload: 'વૉઇસ નોટ અપલોડ',
   byPrefix: 'દ્વારા ',

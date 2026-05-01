@@ -79,7 +79,7 @@ export const en = {
   partPlural: 'parts',
 
   // History
-  history: 'History',
+  history: 'Logs',
   noHistory: 'No changes recorded yet.',
   voiceUpload: 'Voice note uploaded',
   byPrefix: 'by ',

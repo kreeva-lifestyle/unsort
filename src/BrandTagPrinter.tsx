@@ -604,7 +604,7 @@ export default function BrandTagPrinter() {
           {/* History Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Brand Tags History</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Brand Tags Logs</div>
               <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>{datesPicked ? `${historyTotal} entries · ${historyFrom} to ${historyTo}` : 'Pick a date range to load activity'}</div>
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -718,9 +718,9 @@ export default function BrandTagPrinter() {
               </>
             )}
           </div>
-          <button style={S.btnGhost} onClick={() => { setShowHistory(true); window.history.pushState({ view: 'bt-history' }, ''); }}>
+          <button style={S.btnGhost} onClick={() => { setShowHistory(true); window.history.pushState({ view: 'bt-logs' }, ''); }}>
             <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-            History
+            Logs
           </button>
           <button style={S.btnGhost} onClick={openAdd}>+ Add tag</button>
           <button style={{ ...S.btnPrimary, background: `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)`, boxShadow: `0 2px 10px rgba(34,197,94,.3)` }} onClick={() => { const toPrint: BrandTagRow[] = []; rows.forEach(r => { for (let i = 0; i < (r.copies || 0); i++) toPrint.push(r); }); if (toPrint.length > 0) openLabelPrint(toPrint); else addToast('Set copies > 0 on rows to print', 'error'); }}>
