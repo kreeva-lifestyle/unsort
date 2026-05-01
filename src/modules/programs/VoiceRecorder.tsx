@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { useNotifications } from '../../hooks/useNotifications';
 import { friendlyError } from '../../lib/friendlyError';
 import { useState, useEffect, useRef } from 'react';
+import ConfirmModal, { useConfirm } from '../../components/ui/ConfirmModal';
 import type { TranslationKey } from './i18n/en';
 
 interface Props {
@@ -18,6 +19,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
   const { recording, audioUrl, audioBlob, duration, error, start, stop, clear, ext } = useVoiceRecorder();
   const { addToast } = useNotifications();
   const [uploading, setUploading] = useState(false);
+  const { ask, modalProps } = useConfirm();
   const existingUrl = existingPath ? getVoiceNoteUrl(existingPath) : null;
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -58,7 +60,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
           <audio controls src={existingUrl} style={{ flex: 1, height: 32 }} />
           <button onClick={async () => {
-            if (!confirm(t('removeVoiceConfirm'))) return;
+            if (!await ask({ title: t('removeVoiceConfirm'), confirmLabel: t('remove'), danger: true })) return;
             if (existingPath) {
               await supabase.storage.from('program-voice-notes').remove([existingPath]);
             }
@@ -126,6 +128,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
       {recording && <div style={{ fontSize: 9, color: T.tx3, marginTop: 4 }}>{t('voiceHint')}</div>}
       {error && <div style={{ ...S.errorBox, marginTop: 6 }}>{error}</div>}
       {!existingUrl && !audioUrl && !recording && <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>{t('noVoiceNote')}</div>}
+      <ConfirmModal {...modalProps} />
     </div>
   );
 }

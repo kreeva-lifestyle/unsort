@@ -4,12 +4,14 @@ import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { useUndoDelete } from '../../hooks/useUndoDelete';
 import UndoBar from '../ui/UndoBar';
+import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
 export default function Locations({ addToast, canEdit }: { addToast: (msg: string, type?: string) => void; canEdit: boolean }) {
   const [locations, setLocations] = useState<any[]>([]);
   const [newLoc, setNewLoc] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const { ask, modalProps } = useConfirm();
   const fetchLocations = useCallback(() => { supabase.from('locations').select('*').order('name').then(({ data }) => setLocations(data || [])); }, []);
   const { pendingDel, scheduleDelete, undo, dismiss } = useUndoDelete('locations', fetchLocations);
 
@@ -36,7 +38,7 @@ export default function Locations({ addToast, canEdit }: { addToast: (msg: strin
   };
 
   const deleteLocation = async (id: string) => {
-    if (!confirm('Delete this location?')) return;
+    if (!await ask({ title: 'Delete location?', message: 'This location will be removed.', confirmLabel: 'Delete', danger: true })) return;
     const loc = locations.find(l => l.id === id);
     const { count } = await supabase.from('inventory_items').select('id', { count: 'exact', head: true }).eq('location', loc?.name);
     if ((count || 0) > 0) { addToast(`Cannot delete — ${count} item(s) use this location`, 'error'); return; }
@@ -79,6 +81,7 @@ export default function Locations({ addToast, canEdit }: { addToast: (msg: strin
         {locations.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No locations yet. Add your first location above.</div>}
       </div>
       {pendingDel && <UndoBar label={pendingDel.label} id={pendingDel.id} onUndo={undo} onDismiss={dismiss} />}
+      <ConfirmModal {...modalProps} />
     </div>
   );
 }

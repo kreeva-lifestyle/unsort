@@ -5,8 +5,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
+import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
 export default function MyProfile({ addToast, profile }: { addToast: (msg: string, type?: string) => void; profile: any }) {
+  const { ask, modalProps } = useConfirm();
   const [pinExists, setPinExists] = useState(false);
   const [editingPin, setEditingPin] = useState(false);
   const [newPin, setNewPin] = useState('');
@@ -55,7 +57,7 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
   };
 
   const removePin = async () => {
-    if (!confirm('Remove your Cash PIN? You will not be able to confirm cash handovers without it.')) return;
+    if (!await ask({ title: 'Remove Cash PIN?', message: 'You will not be able to confirm cash handovers without it.', confirmLabel: 'Remove', danger: true })) return;
     const { error } = await supabase.from('profiles').update({ cash_pin: null }).eq('id', profile.id);
     if (error) { addToast('Remove failed — ' + friendlyError(error), 'error'); return; }
     await loadPin();
@@ -142,6 +144,7 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
           </div>
         )}
       </div>
+      <ConfirmModal {...modalProps} />
     </div>
   );
 }

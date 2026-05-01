@@ -6,7 +6,8 @@ import ChallanAnalytics from './components/challan/ChallanAnalytics';
 import ChallanLedger from './components/challan/ChallanLedger';
 import ChallanForm from './components/challan/ChallanForm';
 import ChallanDetail from './components/challan/ChallanDetail';
-import Empty from './components/ui/Empty';
+import ChallanList from './components/challan/ChallanList';
+import ChallanBulkActions from './components/challan/ChallanBulkActions';
 import { friendlyError } from './lib/friendlyError';
 import { useDebouncedFetch } from './hooks/useDebouncedFetch';
 import type {
@@ -15,8 +16,6 @@ import type {
   CashChallanCustomer,
   AuditLog,
 } from './types/database';
-
-const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Other'];
 
 const ccAuditLog = async (action: string, recordId: string, details: string, changes?: Record<string, { from: unknown; to: unknown }>) => {
   const { data: { user } } = await supabase.auth.getUser();
@@ -1074,123 +1073,70 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         </div>
       </div>
 
-      {/* Row 1: Search + Actions */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center' }}>
-        <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search name or #..." style={{ flex: 1, minWidth: 120, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 12px', outline: 'none', height: 36, boxSizing: 'border-box' }} />
-        <button onClick={() => setShowFilters(f => !f)} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${showFilters || statusFilter || tagFilter || dateFrom || dateTo ? T.ac + '44' : T.bd2}`, background: showFilters ? 'rgba(99,102,241,.08)' : 'rgba(255,255,255,0.03)', color: showFilters || statusFilter || tagFilter || dateFrom || dateTo ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
-          Filters{(statusFilter || tagFilter || dateFrom || dateTo) ? ` (${[statusFilter, tagFilter, dateFrom, dateTo].filter(Boolean).length})` : ''}
-        </button>
-        <button onClick={exportChallansCSV} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Export</button>
-        <button onClick={() => { if (bulkMode) exitBulkMode(); else setBulkMode(true); }} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${bulkMode ? T.ac + '44' : T.bd2}`, background: bulkMode ? 'rgba(99,102,241,.1)' : 'rgba(255,255,255,0.03)', color: bulkMode ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{bulkMode ? 'Cancel' : '☑ Select'}</button>
-      </div>
+      <ChallanList
+        challans={challans}
+        loading={loading}
+        totalCount={totalCount}
+        statusColors={STATUS_COLORS}
+        search={search}
+        onSearchChange={setSearch}
+        showFilters={showFilters}
+        onToggleFilters={() => setShowFilters(f => !f)}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        tagFilter={tagFilter}
+        onTagFilterChange={setTagFilter}
+        allTags={allTags}
+        dateFrom={dateFrom}
+        onDateFromChange={setDateFrom}
+        dateTo={dateTo}
+        onDateToChange={setDateTo}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+        onClearFilters={() => { setStatusFilter(''); setTagFilter(''); setDateFrom(''); setDateTo(''); setPage(0); }}
+        onExport={exportChallansCSV}
+        onResetPage={() => setPage(0)}
+        bulkMode={bulkMode}
+        onToggleBulkMode={() => { if (bulkMode) exitBulkMode(); else setBulkMode(true); }}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelect}
+        onOpenEmpty={() => setShowModal(true)}
+        onOpenDetail={(c) => { setViewingChallan(c); window.history.pushState({ view: 'challan-detail' }, ''); }}
+        onPrint={printChallan}
+        onRemind={sendReminder}
+        onCreateReturn={(c) => { setIsReturn(true); setChallanStatus('paid'); selectReturnSource(c); setShowModal(true); }}
+        onVoid={(c) => setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number })}
+      />
 
-      {/* Row 2: Collapsible filters */}
-      {showFilters && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center', padding: '8px 10px', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 6 }}>
-          <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }}>
-            <option value="">All Status</option><option value="draft">Draft</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option><option value="partial">Partial</option><option value="voided">Voided</option>
-          </select>
-          {allTags.length > 0 && <select value={tagFilter} onChange={e => { setTagFilter(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }}>
-            <option value="">All Tags</option>{allTags.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 9, color: T.tx3, fontWeight: 600 }}>From</span>
-            <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '4px 6px', outline: 'none' }} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 9, color: T.tx3, fontWeight: 600 }}>To</span>
-            <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '4px 6px', outline: 'none' }} />
-          </div>
-          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '5px 6px', outline: 'none', width: 48 }}>
-            <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
-          </select>
-          {(statusFilter || tagFilter || dateFrom || dateTo) && <button onClick={() => { setStatusFilter(''); setTagFilter(''); setDateFrom(''); setDateTo(''); setPage(0); }} style={{ padding: '4px 8px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Clear all</button>}
-        </div>
-      )}
-
-      {/* Bulk mode toolbar */}
-      {bulkMode && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', background: 'rgba(99,102,241,.04)', border: `1px solid rgba(99,102,241,.12)`, borderRadius: 6 }}>
-          <span style={{ fontSize: 10, color: T.tx2, fontWeight: 600 }}>{selectedIds.size} selected</span>
-          <button onClick={selectAll} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Select All</button>
-          <button onClick={clearSelection} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Clear</button>
-          <div style={{ flex: 1 }} />
-          {bulkPayable.length > 0 && <button onClick={() => { setBulkPayMode(''); setBulkReceivedAmount(''); setShowBulkPay(true); }} style={{ padding: '4px 12px', borderRadius: 5, border: 'none', background: T.gr, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Bulk Pay ({bulkPayable.length})</button>}
-          {bulkUnpayable.length > 0 && <button onClick={() => setShowBulkUnpay(true)} style={{ padding: '4px 12px', borderRadius: 5, border: '1px solid rgba(245,158,11,.3)', background: 'rgba(245,158,11,.08)', color: T.yl, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Bulk Unpay ({bulkUnpayable.length})</button>}
-        </div>
-      )}
-
-      {lastBatch && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', marginBottom: 8, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 6 }}>
-          <span style={{ fontSize: 10, color: T.gr, fontWeight: 600, flex: 1 }}>{lastBatch.id}: {lastBatch.count} challans paid via {lastBatch.mode}</span>
-          <button disabled={undoingBatch} onClick={async () => { setUndoingBatch(true); await undoBatch(lastBatch.id); setUndoingBatch(false); }} style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{undoingBatch ? 'Undoing...' : 'Undo Batch'}</button>
-          <span onClick={() => setLastBatch(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>&times;</span>
-        </div>
-      )}
-      <div style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{totalCount} records</div>
-
-      {/* Table */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-        {loading && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div>}
-        {!loading && challans.length === 0 && <div style={{ padding: 14 }}><Empty icon="🧾" title="No challans yet" message="Create your first challan — invoice customers, record payments, and track outstanding amounts all from one place." cta="+ New Challan" onCta={() => setShowModal(true)} /></div>}
-        {challans.map(c => {
-          const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
-          const skus = (c.cash_challan_items || []).map((i) => i.sku).filter(Boolean).join(', ');
-          const pendingDays = (!c.is_return && (c.status === 'unpaid' || c.status === 'partial')) ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : 0;
-          const isRet = !!c.is_return;
-          const isSelected = selectedIds.has(c.id);
-          const canSelect = c.status !== 'voided' && c.status !== 'draft';
-          const rowBg = isSelected ? 'rgba(99,102,241,.08)' : isRet ? 'rgba(239,68,68,.04)' : undefined;
-          return (
-            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: rowBg, transition: 'background .15s' }} onClick={() => { if (bulkMode) { if (canSelect) toggleSelect(c.id); } else { setViewingChallan(c); window.history.pushState({ view: 'challan-detail' }, ''); } }} onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.08)' : 'rgba(255,255,255,.02)'; }} onMouseLeave={e => { e.currentTarget.style.background = (isSelected ? 'rgba(99,102,241,.08)' : isRet ? 'rgba(239,68,68,.04)' : '') }}>
-              {bulkMode && <div onClick={e => { e.stopPropagation(); if (canSelect) toggleSelect(c.id); }} style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${canSelect ? (isSelected ? T.ac : T.bd2) : T.bd}`, background: isSelected ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: canSelect ? 'pointer' : 'not-allowed', opacity: canSelect ? 1 : 0.3 }}>
-                {isSelected && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><polyline points="20 6 9 17 4 12" /></svg>}
-              </div>}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                  <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>#{c.challan_number}</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.customer_name}</span>
-                  {isRet && <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>↩ Return</span>}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 9, color: T.tx3 }}>{new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
-                  <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: sc.bg, color: sc.color, fontWeight: 600, textTransform: 'uppercase' }}>{c.status}</span>
-                  {pendingDays > 0 && <span style={{ fontSize: 8, color: T.re, fontWeight: 600 }}>({pendingDays}d pending)</span>}
-                  {(c.tags || []).map(t => <span key={t} style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: 'rgba(99,102,241,.08)', color: T.ac2 }}>{t}</span>)}
-                </div>
-                {skus && <div style={{ fontSize: 9, fontFamily: T.mono, color: T.tx3, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{skus}</div>}
-              </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: isRet ? T.re : T.tx }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
-                {(c.status === 'paid' || c.status === 'partial') && Number(c.amount_paid || 0) > 0 && (() => {
-                  const paid = Number(c.amount_paid);
-                  const due = Math.max(0, Number(c.total) - paid);
-                  return (
-                    <div style={{ fontSize: 9, fontFamily: T.mono, marginTop: 2, color: c.status === 'paid' ? T.gr : T.yl }}>
-                      ₹{paid.toLocaleString('en-IN')} paid{c.status === 'partial' && due > 0 ? ` · ₹${due.toLocaleString('en-IN')} due` : ''}
-                    </div>
-                  );
-                })()}
-              </div>
-              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                <button onClick={e => { e.stopPropagation(); printChallan(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.5 }}>
-                  <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.tx2, strokeWidth: 2 }}><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
-                </button>
-                {(c.status === 'unpaid' || c.status === 'partial') && <button onClick={e => { e.stopPropagation(); sendReminder(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.6 }} title="Send WhatsApp reminder">
-                  <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.yl, strokeWidth: 2 }}><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
-                </button>}
-                {!isRet && c.status !== 'voided' && c.status !== 'draft' && <button onClick={e => { e.stopPropagation(); setIsReturn(true); setChallanStatus('paid'); selectReturnSource(c); setShowModal(true); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.6 }} title="Create return for this challan">
-                  <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M9 14L4 9l5-5M4 9h11a5 5 0 015 5v0a5 5 0 01-5 5H8" /></svg>
-                </button>}
-                {c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number }); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.4 }} title="Void">
-                  <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M18 6L6 18M6 6l12 12" /></svg>
-                </button>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <ChallanBulkActions
+        bulkMode={bulkMode}
+        selectedCount={selectedIds.size}
+        payable={bulkPayable as Challan[]}
+        unpayable={bulkUnpayable as Challan[]}
+        returns={bulkReturns as Challan[]}
+        outstanding={bulkSalesOutstanding}
+        returnsTotal={bulkReturnsTotal}
+        netTotal={bulkNetTotal}
+        bulkBusy={bulkBusy}
+        onSelectAll={selectAll}
+        onClearSelection={clearSelection}
+        lastBatch={lastBatch}
+        undoingBatch={undoingBatch}
+        onUndoBatch={async () => { if (!lastBatch) return; setUndoingBatch(true); await undoBatch(lastBatch.id); setUndoingBatch(false); }}
+        onDismissBatch={() => setLastBatch(null)}
+        showBulkPay={showBulkPay}
+        onOpenBulkPay={() => { setBulkPayMode(''); setBulkReceivedAmount(''); setShowBulkPay(true); }}
+        onCloseBulkPay={() => setShowBulkPay(false)}
+        bulkPayMode={bulkPayMode}
+        setBulkPayMode={setBulkPayMode}
+        bulkReceivedAmount={bulkReceivedAmount}
+        setBulkReceivedAmount={setBulkReceivedAmount}
+        onConfirmBulkPay={executeBulkPay}
+        showBulkUnpay={showBulkUnpay}
+        onOpenBulkUnpay={() => setShowBulkUnpay(true)}
+        onCloseBulkUnpay={() => setShowBulkUnpay(false)}
+        onConfirmBulkUnpay={executeBulkUnpay}
+      />
 
       {/* Audit Trail Modal */}
       {auditTrail && (
@@ -1210,67 +1156,6 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
                 <div style={{ color: T.tx2, fontSize: 11 }}>{a.details}</div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Bulk Pay Modal */}
-      {showBulkPay && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={() => setShowBulkPay(false)}>
-          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 420, width: '100%' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 12 }}>{bulkNetTotal < 0 ? 'Settle & Refund' : 'Bulk Pay'}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12, fontSize: 11 }}>
-              <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 6, padding: '8px 10px' }}>
-                <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Outstanding ({bulkPayable.length})</div>
-                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.mono, color: T.gr }}>₹{bulkSalesOutstanding.toLocaleString('en-IN')}</div>
-              </div>
-              <div style={{ background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 6, padding: '8px 10px' }}>
-                <div style={{ fontSize: 8, color: T.re, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Returns ({bulkReturns.length})</div>
-                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.mono, color: T.re }}>₹{bulkReturnsTotal.toLocaleString('en-IN')}</div>
-              </div>
-            </div>
-            <div style={{ background: bulkNetTotal >= 0 ? 'rgba(99,102,241,.06)' : 'rgba(239,68,68,.06)', border: `1px solid ${bulkNetTotal >= 0 ? 'rgba(99,102,241,.15)' : 'rgba(239,68,68,.15)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 14, textAlign: 'center' }}>
-              <div style={{ fontSize: 8, color: bulkNetTotal >= 0 ? T.ac2 : T.re, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>{bulkNetTotal >= 0 ? 'Net Amount' : 'You Owe Customer'}</div>
-              <div style={{ fontSize: 20, fontWeight: 800, fontFamily: T.sora, color: bulkNetTotal >= 0 ? T.gr : T.re }}>₹{Math.abs(bulkNetTotal).toLocaleString('en-IN')}</div>
-              {bulkNetTotal < 0 && <div style={{ fontSize: 9, color: T.tx3, marginTop: 4 }}>Returns exceed outstanding. Sales will be settled against returns, refund the difference.</div>}
-            </div>
-            <div style={{ marginBottom: 10 }}>
-              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>{bulkNetTotal < 0 ? 'Amount Refunded to Customer' : 'Amount Received from Customer'}</label>
-              <input type="number" value={bulkReceivedAmount} onChange={e => setBulkReceivedAmount(e.target.value)} placeholder={String(Math.abs(bulkNetTotal))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
-              {(() => { const recv = Number(bulkReceivedAmount) || 0; const expected = Math.abs(bulkNetTotal); const diff = recv - expected; if (!bulkReceivedAmount || diff === 0) return null; return <div style={{ marginTop: 4, fontSize: 10, color: T.yl, fontWeight: 600 }}>₹{Math.abs(diff).toLocaleString('en-IN')} {diff > 0 ? 'more than expected' : 'less than expected'}</div>; })()}
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>{bulkNetTotal < 0 ? 'Refund Mode' : 'Payment Mode'}</label>
-              <select value={bulkPayMode} onChange={e => setBulkPayMode(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none' }}>
-                <option value="">Select...</option>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setShowBulkPay(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={executeBulkPay} disabled={!bulkPayMode || bulkPayable.length === 0 || bulkBusy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: bulkPayMode ? (bulkNetTotal < 0 ? T.re : T.gr) : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: bulkPayMode && !bulkBusy ? 'pointer' : 'default', opacity: bulkPayMode && !bulkBusy ? 1 : 0.4 }}>{bulkBusy ? 'Processing…' : bulkNetTotal < 0 ? 'Settle & Refund' : 'Confirm Pay'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bulk Unpay Modal */}
-      {showBulkUnpay && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={() => setShowBulkUnpay(false)}>
-          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 400, width: '100%' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Bulk Unpay</div>
-            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>This will revert <strong style={{ color: T.yl }}>{bulkUnpayable.length}</strong> challan{bulkUnpayable.length !== 1 ? 's' : ''} to unpaid and clear their payment info. Returns cannot be unpaid.</div>
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 6, maxHeight: 160, overflowY: 'auto', marginBottom: 14 }}>
-              {bulkUnpayable.map(c => (
-                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 10 }}>
-                  <span style={{ color: T.tx }}>#{c.challan_number} · {c.customer_name}</span>
-                  <span style={{ fontFamily: T.mono, color: T.tx2 }}>₹{Number(c.total).toLocaleString('en-IN')}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setShowBulkUnpay(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={executeBulkUnpay} disabled={bulkBusy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: T.yl, color: '#fff', fontSize: 11, fontWeight: 600, cursor: bulkBusy ? 'default' : 'pointer', opacity: bulkBusy ? 0.5 : 1 }}>{bulkBusy ? 'Processing…' : 'Confirm Unpay'}</button>
-            </div>
           </div>
         </div>
       )}
