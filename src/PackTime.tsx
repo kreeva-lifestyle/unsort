@@ -750,7 +750,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>PackStation</span>
-        <button onClick={() => { setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={S.btnGhost}>History</button>
+        <button onClick={() => { const d = new Date(); setHistoryDateTo(d.toISOString().slice(0,10)); d.setDate(d.getDate()-6); setHistoryDateFrom(d.toISOString().slice(0,10)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={S.btnGhost}>History</button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12 }}>
         <svg viewBox="0 0 24 24" style={{ width: 48, height: 48, fill: 'none', stroke: T.tx3, strokeWidth: 1.2, marginBottom: 16, opacity: 0.5 }}><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M12 18h.01" /></svg>
@@ -767,7 +767,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>PackStation</span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {dbFails > 0 && <span style={{ fontSize: 9, color: T.re, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)' }}>{dbFails} DB save failed</span>}
-          <button onClick={() => { setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
+          <button onClick={() => { const d = new Date(); setHistoryDateTo(d.toISOString().slice(0,10)); d.setDate(d.getDate()-6); setHistoryDateFrom(d.toISOString().slice(0,10)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
         </div>
       </div>
 

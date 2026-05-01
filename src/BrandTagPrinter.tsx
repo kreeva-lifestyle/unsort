@@ -367,8 +367,14 @@ export default function BrandTagPrinter() {
   // Reset page on filter change
   useEffect(() => { setBtPage(0); }, [brandFilter, sizeFilter]);
 
-  // Filter options are now preset constants (BRAND_OPTIONS, SIZE_OPTIONS, COLOR_OPTIONS)
-  // Filtering happens server-side in fetchPage()
+  const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
+  useEffect(() => {
+    supabase.from('brand_tags').select('brand').then(({ data }) => {
+      const unique = [...new Set((data || []).map((r: any) => r.brand as string))].sort();
+      setDynamicBrands(unique);
+    });
+  }, []);
+  const brandOptions = dynamicBrands.length > 0 ? dynamicBrands : BRAND_OPTIONS;
   const totalPages = Math.ceil(totalCount / btPerPage);
 
   // ── Import Excel (addToast in deps for fresh closure) ──
@@ -738,7 +744,7 @@ export default function BrandTagPrinter() {
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button onClick={() => setBrandFilter('')} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${!brandFilter ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: !brandFilter ? 'rgba(99,102,241,.08)' : 'transparent', color: !brandFilter ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition }}>All brands</button>
-          {BRAND_OPTIONS.map(b => { const n = b.replace(/^BRAND NAME:\s*/i, ''); return (
+          {brandOptions.map(b => { const n = b.replace(/^BRAND NAME:\s*/i, ''); return (
             <button key={b} onClick={() => setBrandFilter(brandFilter === n ? '' : n)} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${brandFilter === n ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: brandFilter === n ? 'rgba(99,102,241,.08)' : 'transparent', color: brandFilter === n ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition }}>{n}</button>
           ); })}
           <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', outline: 'none', cursor: 'pointer' }}><option value="">All sizes</option>{SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
@@ -889,7 +895,7 @@ export default function BrandTagPrinter() {
           initial={modalRow}
           onSave={handleModalSave}
           onClose={() => setModalRow(null)}
-          brandOptions={BRAND_OPTIONS}
+          brandOptions={brandOptions}
           productOptions={PRODUCT_OPTIONS}
           sizeOptions={SIZE_OPTIONS}
           colorOptions={COLOR_OPTIONS}
