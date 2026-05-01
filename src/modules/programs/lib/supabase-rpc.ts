@@ -67,8 +67,12 @@ export async function upsertProgramPrice(programId: string, parts: PricePartRow[
 
 // ── Soft delete ──────────────────────────────────────────────────────────
 export async function softDeleteProgram(id: string) {
+  const { data: prog } = await supabase.from('programs').select('voice_note_path').eq('id', id).maybeSingle();
+  if (prog?.voice_note_path) {
+    await supabase.storage.from('program-voice-notes').remove([prog.voice_note_path]);
+  }
   const { error } = await supabase.from('programs')
-    .update({ is_deleted: true, updated_at: new Date().toISOString() })
+    .update({ is_deleted: true, voice_note_path: null, updated_at: new Date().toISOString() })
     .eq('id', id);
   return { error };
 }

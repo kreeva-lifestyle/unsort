@@ -5,7 +5,6 @@ import { fetchPriceWithParts } from './lib/supabase-rpc';
 import ProgramsList from './ProgramsList';
 import ProgramForm from './ProgramForm';
 import ProgramDetail from './ProgramDetail';
-import QRGenerator from './QRGenerator';
 import PDFExport from './PDFExport';
 import { useNotifications } from '../../hooks/useNotifications';
 import type { Program, PricePartRow } from './types';
@@ -15,7 +14,6 @@ export default function ProgramsModule() {
   const { addToast } = useNotifications();
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [qrProgram, setQrProgram] = useState<Program | null>(null);
   const [pdfProgramId, setPdfProgramId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editWorkParts, setEditWorkParts] = useState<PricePartRow[] | undefined>();
@@ -25,12 +23,11 @@ export default function ProgramsModule() {
   useEffect(() => {
     const onPop = () => {
       if (showForm) { setShowForm(false); return; }
-      if (qrProgram) { setQrProgram(null); return; }
       if (view === 'detail') { setView('list'); setDetailId(null); return; }
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [showForm, qrProgram, view]);
+  }, [showForm, view]);
 
   const form = useProgramForm(() => {
     addToast(t('saved'), 'success');
@@ -111,7 +108,6 @@ export default function ProgramsModule() {
         />
       )}
 
-      {qrProgram && <QRGenerator program={qrProgram} onClose={() => setQrProgram(null)} t={t} />}
       {pdfProgramId && <PDFExport programId={pdfProgramId} onClose={() => setPdfProgramId(null)} t={t} />}
     </>
   );
