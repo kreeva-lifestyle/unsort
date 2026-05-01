@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
 import { useNotifications } from '../hooks/useNotifications';
 import { friendlyError } from '../lib/friendlyError';
+import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 
 type ChallanRow = { total: number | string; amount_paid: number | string | null; status: string; is_return: boolean; customer_name: string; created_at: string };
 type InventoryRow = { status: string; status_changed_at: string | null };
@@ -30,6 +31,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
   const [revTrend, setRevTrend] = useState<{ date: string; amount: number }[]>([]);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [newTask, setNewTask] = useState('');
+  const { ask, modalProps } = useConfirm();
 
   const fetchAll = useCallback(async () => {
     const today = new Date(); today.setHours(0,0,0,0);
@@ -134,7 +136,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     fetchTasks();
   };
   const deleteTask = async (id: string) => {
-    if (!confirm('Delete this task?')) return;
+    if (!await ask({ title: 'Delete task?', confirmLabel: 'Delete', danger: true })) return;
     const { error } = await supabase.from('tasks').delete().eq('id', id);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     fetchTasks();
@@ -355,6 +357,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
           {tasks.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: T.tx3, fontSize: 10 }}>No tasks yet</div>}
         </div>
       </div>
+      <ConfirmModal {...modalProps} />
     </div>
   );
 }

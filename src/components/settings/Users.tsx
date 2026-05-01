@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
+import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
 export default function Users({ addToast, profile }: { addToast: (msg: string, type?: string) => void; profile: any }) {
   const [users, setUsers] = useState<any[]>([]);
@@ -12,6 +13,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
   const [inviting, setInviting] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', password: '', role: 'viewer' });
   const [inviteResult, setInviteResult] = useState<{ email: string; password: string } | null>(null);
+  const { ask, modalProps } = useConfirm();
 
   const fetchUsers = () => { supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').order('created_at', { ascending: false }).then(({ data }) => setUsers(data || [])); };
   useEffect(() => {
@@ -22,7 +24,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
 
   const updateRole = async (id: string, role: string) => {
     const u = users.find(x => x.id === id);
-    if (!confirm(`Change ${u?.full_name || 'user'} role to "${role}"?`)) { fetchUsers(); return; }
+    if (!await ask({ title: 'Change role?', message: `Change ${u?.full_name || 'user'} role to "${role}".`, confirmLabel: 'Change' })) { fetchUsers(); return; }
     if (u?.role === 'admin' && role !== 'admin') {
       const adminCount = users.filter(x => x.role === 'admin' && x.is_active && x.id !== id).length;
       if (adminCount < 1) { addToast('Cannot demote — at least 1 admin must remain', 'error'); fetchUsers(); return; }
@@ -148,6 +150,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
           </form>
         )}
       </div></div>)}
+      <ConfirmModal {...modalProps} />
     </div>
   );
 }

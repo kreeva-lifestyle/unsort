@@ -4,10 +4,12 @@ import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { useUndoDelete } from '../../hooks/useUndoDelete';
 import UndoBar from '../ui/UndoBar';
+import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
 export default function Brands({ addToast }: { addToast: (msg: string, type?: string) => void }) {
   const [brands, setBrands] = useState<any[]>([]);
   const [newBrand, setNewBrand] = useState('');
+  const { ask, modalProps } = useConfirm();
   const fetchBrands = useCallback(() => { supabase.from('brands').select('*').order('name').then(({ data }) => setBrands(data || [])); }, []);
   const { pendingDel, scheduleDelete, undo, dismiss } = useUndoDelete('brands', fetchBrands);
   useEffect(() => { fetchBrands(); }, [fetchBrands]);
@@ -22,7 +24,7 @@ export default function Brands({ addToast }: { addToast: (msg: string, type?: st
   };
   const toggleBrand = async (id: string, active: boolean) => { const { error } = await supabase.from('brands').update({ is_active: !active }).eq('id', id); if (error) addToast(friendlyError(error), 'error'); else fetchBrands(); };
   const deleteBrand = async (id: string) => {
-    if (!confirm('Delete this brand?')) return;
+    if (!await ask({ title: 'Delete brand?', message: 'This brand will be removed.', confirmLabel: 'Delete', danger: true })) return;
     const b = brands.find(x => x.id === id);
     const { count } = await supabase.from('packtime_couriers').select('id', { count: 'exact', head: true }).eq('brand', b?.name);
     if ((count || 0) > 0) { addToast(`Cannot delete — ${count} courier(s) use this brand`, 'error'); return; }
@@ -51,6 +53,7 @@ export default function Brands({ addToast }: { addToast: (msg: string, type?: st
       ))}
       {brands.length === 0 && <div style={{ fontSize: 11, color: T.tx3, padding: 10 }}>No brands. Add one above.</div>}
       {pendingDel && <UndoBar label={pendingDel.label} id={pendingDel.id} onUndo={undo} onDismiss={dismiss} />}
+      <ConfirmModal {...modalProps} />
     </div>
   );
 }

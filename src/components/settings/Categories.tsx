@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
+import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
 export default function Categories({ addToast, profile }: { addToast: (msg: string, type?: string) => void; profile: any }) {
   const [categories, setCategories] = useState<any[]>([]);
@@ -12,6 +13,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
   const [comps, setComps] = useState<any[]>([]);
   const [form, setForm] = useState({ sku: '', name: '', description: '', category: '' });
   const [newComps, setNewComps] = useState<string[]>(['']);
+  const { ask, modalProps } = useConfirm();
 
   const fetchCategories = () => { supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }).then(({ data }) => setCategories(data || [])); };
   useEffect(() => {
@@ -36,7 +38,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
     if (selected) {
       if (selected.name !== form.name) {
         const { count } = await supabase.from('inventory_items').select('id', { count: 'exact', head: true }).eq('product_id', selected.id);
-        if ((count || 0) > 0 && !confirm(`${count} item(s) use this category. Renaming will affect all. Continue?`)) return;
+        if ((count || 0) > 0 && !await ask({ title: 'Rename category?', message: `${count} item(s) use this category. Renaming will affect all of them.`, confirmLabel: 'Rename' })) return;
       }
       const { error } = await supabase.from('products').update({ name: form.name, description: form.description, category: form.category }).eq('id', selected.id);
       if (error) { addToast(friendlyError(error), 'error'); return; }
@@ -154,6 +156,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
         {comps.map((c, i) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', border: `1px solid ${T.bd}`, borderRadius: 6, marginBottom: 5, background: 'rgba(255,255,255,0.02)' }}><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 20, height: 20, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 600, color: T.tx3, fontFamily: T.mono }}>{i + 1}</span><span style={{ fontSize: 12, color: T.tx, fontWeight: 500 }}>{c.name}</span></div>{canEdit && <span onClick={() => deleteComp(c.id)} style={S.btnDanger}>Delete</span>}</div>))}
         {comps.length === 0 && <div style={{ textAlign: 'center', padding: 16, color: T.tx3 }}><p style={{ fontSize: 11 }}>No components yet</p></div>}
       </div></div></div>)}
+      <ConfirmModal {...modalProps} />
     </div>
   );
 }

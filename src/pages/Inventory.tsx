@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import InventoryExtras from '../InventoryExtras';
 import Empty from '../components/ui/Empty';
+import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 
 // Status indicator — dot + plain label. Previous pills-with-bg were noisy in the
 // list view per audit P2; reserve pill treatment for modals.
@@ -47,6 +48,7 @@ const isBottomType = (name: string) => /bottom|pant|trouser|skirt|salwar|churida
 export default function Inventory({ openItemId, onItemOpened, active }: { openItemId?: string | null; onItemOpened?: () => void; active?: boolean }) {
   const [stage, setStage] = useState<'pending' | 'completed'>('pending');
   const instanceId = useId();
+  const { ask, modalProps: confirmModalProps } = useConfirm();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<any[]>([]);
@@ -741,7 +743,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                 <span onClick={() => openComps(item)} style={{ ...S.btnPrimary, ...S.btnSm }}>View</span>
                 {!isCompletedView && item.status !== 'dry_clean' && completablePairs[item.id]?.length > 0 && <span onClick={() => setShowCompleteModal({ itemId: item.id })} style={{ ...S.btnSm, padding: '3px 8px', borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 600, fontFamily: T.sans, background: 'rgba(16,185,129,.12)', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' as const }}>Complete ({completablePairs[item.id].length})</span>}
-                {isCompletedView && canEdit && <span onClick={() => { if (confirm(item.paired_with ? 'This will revert BOTH paired items back to Inventory. Continue?' : 'Revert this item back to Inventory?')) handleCancelCompletion(item.id); }} style={{ ...S.btnSm, padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(251,191,36,.15)', cursor: 'pointer', fontSize: 9, fontWeight: 600, fontFamily: T.sans, background: 'rgba(251,191,36,.05)', color: T.yl, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' as const }}>Revert{item.paired_with ? ' Both' : ''}</span>}
+                {isCompletedView && canEdit && <span onClick={async () => { if (await ask({ title: item.paired_with ? 'Revert paired items?' : 'Revert this item?', message: item.paired_with ? 'This will revert BOTH paired items back to Inventory.' : 'This item will return to Inventory.', confirmLabel: 'Revert', danger: true })) handleCancelCompletion(item.id); }} style={{ ...S.btnSm, padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(251,191,36,.15)', cursor: 'pointer', fontSize: 9, fontWeight: 600, fontFamily: T.sans, background: 'rgba(251,191,36,.05)', color: T.yl, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' as const }}>Revert{item.paired_with ? ' Both' : ''}</span>}
                 {canEdit && <span onClick={() => openEdit(item)} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>}
                 {canEdit && <span onClick={() => handleDelete(item.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Del</span>}
               </div>
@@ -802,7 +804,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             onChange={async e => {
               const newStatus = e.target.value;
               if (!newStatus) return;
-              if (!confirm(`Change status of ${selectedIds.size} item${selectedIds.size === 1 ? '' : 's'} to "${newStatus}"?`)) { e.target.value = ''; return; }
+              if (!await ask({ title: 'Change status?', message: `Change status of ${selectedIds.size} item${selectedIds.size === 1 ? '' : 's'} to "${newStatus}".`, confirmLabel: 'Change' })) { e.target.value = ''; return; }
               setBulkBusy(true);
               const ids = Array.from(selectedIds);
               const { error } = await supabase.from('inventory_items').update({ status: newStatus }).in('id', ids);
@@ -822,7 +824,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           <button
             disabled={bulkBusy}
             onClick={async () => {
-              if (!confirm(`Delete ${selectedIds.size} item${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return;
+              if (!await ask({ title: `Delete ${selectedIds.size} item${selectedIds.size === 1 ? '' : 's'}?`, message: 'This cannot be undone.', confirmLabel: 'Delete', danger: true })) return;
               setBulkBusy(true);
               const ids = Array.from(selectedIds);
               let failed = 0;
@@ -1043,6 +1045,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         </div>
       </div></div>)}
       </>}
+      <ConfirmModal {...confirmModalProps} />
     </div>
   );
 }

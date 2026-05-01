@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { softDeleteProgram, generateShareToken, fetchMatchings } from './lib/supabase-rpc';
 import { getShareUrl } from './lib/share-token';
 import { useNotifications } from '../../hooks/useNotifications';
+import ConfirmModal, { useConfirm } from '../../components/ui/ConfirmModal';
 import type { Program } from './types';
 
 interface Props {
@@ -20,10 +21,11 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
   const { programs, priceSummaries, loading, search, onSearch, page, setPage, pageSize, setPageSize, totalCount, reload } = usePrograms();
   const { addToast } = useNotifications();
   const [deleting, setDeleting] = useState<string | null>(null);
+  const { ask, modalProps } = useConfirm();
   const totalPages = Math.ceil(totalCount / pageSize);
 
   const handleDelete = async (p: Program) => {
-    if (!confirm(t('deleteConfirm'))) return;
+    if (!await ask({ title: t('deleteConfirm'), confirmLabel: t('deleteAction'), danger: true })) return;
     setDeleting(p.id);
     const { error } = await softDeleteProgram(p.id);
     setDeleting(null);
@@ -192,6 +194,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
           <span onClick={() => setPage(p => p + 1)} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }}>{t('next')}</span>
         </div>
       )}
+      <ConfirmModal {...modalProps} />
     </div>
   );
 }

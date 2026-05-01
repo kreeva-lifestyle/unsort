@@ -4,6 +4,7 @@ import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { useUndoDelete } from '../../hooks/useUndoDelete';
 import UndoBar from '../ui/UndoBar';
+import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
 export default function PackStation({ addToast }: { addToast: (msg: string, type?: string) => void }) {
   const [couriers, setCouriers] = useState<any[]>([]);
@@ -12,6 +13,7 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
   const [newSheet, setNewSheet] = useState('');
   const [newCamera, setNewCamera] = useState('');
   const [delTable, setDelTable] = useState<'packtime_couriers' | 'packtime_cameras'>('packtime_couriers');
+  const { ask, modalProps } = useConfirm();
 
   const fetchData = useCallback(() => {
     supabase.from('packtime_couriers').select('*').order('name').then(({ data }) => setCouriers(data || []));
@@ -36,7 +38,7 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
   };
 
   const deleteCourier = async (id: string) => {
-    if (!confirm('Delete this courier?')) return;
+    if (!await ask({ title: 'Delete courier?', message: 'This courier will be removed.', confirmLabel: 'Delete', danger: true })) return;
     const c = couriers.find(x => x.id === id);
     const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('courier', c?.name);
     if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this courier`, 'error'); return; }
@@ -54,7 +56,7 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
   };
 
   const deleteCamera = async (id: string) => {
-    if (!confirm('Delete this camera?')) return;
+    if (!await ask({ title: 'Delete camera?', message: 'This camera will be removed.', confirmLabel: 'Delete', danger: true })) return;
     const cam = cameras.find(x => x.id === id);
     const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('camera', cam?.number);
     if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this camera`, 'error'); return; }
@@ -109,6 +111,7 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
         </div>
       </div>
       {pendingDel && <UndoBar label={pendingDel.label} id={pendingDel.id} onUndo={undo} onDismiss={dismiss} />}
+      <ConfirmModal {...modalProps} />
     </div>
   );
 }
