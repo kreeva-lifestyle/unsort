@@ -318,6 +318,12 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     }
   }, []);
 
+  const endSession = useCallback(() => {
+    const count = sessionCount;
+    stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setVerifyResult(null); setLastScanned(''); setShowComplete(false);
+    if (count > 0) addToast(`Session ended · ${count} AWB${count !== 1 ? 's' : ''} scanned · synced`, 'success');
+  }, [sessionCount, stopCam, addToast]);
+
   const startCam = useCallback(() => {
     if (!cameraRef.current) return;
     setCameraError(''); scanLockRef.current = false;
@@ -898,7 +904,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             </div>
             <div onClick={() => {
               if (sessionCount > 0) { setConfirmChangeSetup(true); }
-              else { stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setVerifyResult(null); }
+              else { endSession(); }
             }} style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.tx3 }}>
               <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M18 6L6 18M6 6l12 12" /></svg>
             </div>
@@ -932,11 +938,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <div style={{ fontSize: 28, fontWeight: 800, fontFamily: T.sora, color: T.ac2, lineHeight: 1 }}>{sheetTotal}</div>
         </div>
         <div onClick={() => { setTodaySummaryOpen(true); fetchTodaySummary(); }} style={{ flex: 1, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.12)', borderRadius: 10, padding: '10px 12px', textAlign: 'center', cursor: 'pointer' }} title="Tap to see today's breakdown by courier">
-          <div style={{ fontSize: 8, color: T.yl, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>All Couriers</div>
-          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.yl, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-            <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.yl, strokeWidth: 2 }}><path d="M3 12h18M3 6h18M3 18h18" /></svg>
-            Today
-          </div>
+          <div style={{ fontSize: 8, color: T.yl, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Today Total</div>
+          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.yl, lineHeight: 1 }}>Tap to view</div>
         </div>
       </div>
 
@@ -1089,7 +1092,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             }} style={{ width: '100%', padding: '7px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 10, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx2, cursor: 'pointer', marginBottom: 10, fontFamily: T.sans }}>Export Session CSV</button>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setShowComplete(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Continue</button>
-              <button onClick={() => { stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setShowComplete(false); setVerifyResult(null); setLastScanned(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}cc, ${T.gr}88)`, color: '#fff', cursor: 'pointer' }}>End Session</button>
+              <button onClick={() => { endSession(); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}cc, ${T.gr}88)`, color: '#fff', cursor: 'pointer' }}>End Session</button>
             </div>
           </div>
         </div>
@@ -1104,7 +1107,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             <div style={{ fontSize: 12, color: T.tx3, marginBottom: 14, lineHeight: 1.5 }}>You've scanned <strong style={{ color: T.gr }}>{sessionCount}</strong> AWB{sessionCount === 1 ? '' : 's'} so far. They've already been saved to the sheet. Changing setup resets the in-app counter but does not delete the saved scans.</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmChangeSetup(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Keep scanning</button>
-              <button onClick={() => { setConfirmChangeSetup(false); stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setVerifyResult(null); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}cc, ${T.yl}88)`, color: '#111', cursor: 'pointer' }}>Change setup</button>
+              <button onClick={() => { setConfirmChangeSetup(false); endSession(); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}cc, ${T.yl}88)`, color: '#111', cursor: 'pointer' }}>Change setup</button>
             </div>
           </div>
         </div>
