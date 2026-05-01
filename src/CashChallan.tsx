@@ -24,7 +24,7 @@ const ccAuditLog = async (action: string, recordId: string, details: string, cha
   await supabase.from('audit_log').insert({ action, module: 'cash_challan', record_id: recordId, details, user_id: user?.id ?? null, user_email: userName, changes: changes || null });
 };
 
-import { T } from './lib/theme';
+import { T, S } from './lib/theme';
 
 // View model: form-state representation of a cash_challan_items row.
 // Differs from DB row: `id` optional (unsaved items), no challan_id/sort_order
@@ -108,6 +108,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // Analytics
   const [showErpReminder, setShowErpReminder] = useState(false);
+  const [whatsAppShare, setWhatsAppShare] = useState<{ phone: string; url: string } | null>(null);
   // Ledger PDF preview — rendered in an in-app iframe (audit: no popup).
   const [ledgerPdfHtml, setLedgerPdfHtml] = useState<string | null>(null);
   const [ledgerPdfTitle, setLedgerPdfTitle] = useState('');
@@ -571,10 +572,18 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       return;
     }
     const wasNew = !editing;
+    const savedName = customerName.trim();
+    const savedTotal = grandTotal;
+    const savedPhone = customerPhone.trim();
+    const savedItemCount = items.length;
     closeModal();
     fetchChallans();
-    // Show ERP reminder unless user suppressed it this week
     if (wasNew) {
+      addToast('Challan created!', 'success');
+      if (savedPhone) {
+        const msg = encodeURIComponent(`Hi ${savedName},\nYour invoice of ₹${savedTotal.toLocaleString('en-IN')} (${savedItemCount} item${savedItemCount !== 1 ? 's' : ''}) has been generated.\n— Arya Designs`);
+        setWhatsAppShare({ phone: savedPhone, url: `https://wa.me/91${savedPhone.replace(/\D/g, '')}?text=${msg}` });
+      }
       const suppressed = localStorage.getItem('ccErpReminderHidden');
       const aWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
       if (!suppressed || Number(suppressed) < aWeekAgo) setShowErpReminder(true);
@@ -1183,6 +1192,16 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
               <button onClick={saveReminderPhone} disabled={!reminderPhone.trim()} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: reminderPhone.trim() ? `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)` : 'rgba(255,255,255,.05)', color: '#fff', cursor: reminderPhone.trim() ? 'pointer' : 'not-allowed' }}>Send</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* WhatsApp Share Bar */}
+      {whatsAppShare && (
+        <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 300, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '10px 14px', boxShadow: '0 8px 30px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 12, animation: 'su .2s ease', minWidth: 280 }}>
+          <span style={{ fontSize: 20 }}>📱</span>
+          <span style={{ flex: 1, fontSize: 12, color: T.tx }}>Share on WhatsApp?</span>
+          <button onClick={() => { window.open(whatsAppShare.url, '_blank'); setWhatsAppShare(null); }} style={{ ...S.btnPrimary, background: '#25D366', boxShadow: 'none', gap: 4, fontSize: 11 }}>Send</button>
+          <span onClick={() => setWhatsAppShare(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span>
         </div>
       )}
 
