@@ -1,8 +1,9 @@
 // Challan create / edit form — extracted from CashChallan.tsx for god-component split (audit P0).
 // Parent owns all state and the submit logic; this component is just render + event routing.
 // Wide prop surface is intentional — keeps state in one place without introducing a context.
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { T } from '../../lib/theme';
+import { supabase } from '../../lib/supabase';
 import type { CashChallan, CashChallanCustomer, AuditLog } from '../../types/database';
 
 type Challan = Omit<CashChallan, 'created_at' | 'updated_at'> & { created_at: string; updated_at: string };
@@ -70,6 +71,13 @@ export type ChallanFormProps = {
 
 export default function ChallanForm(p: ChallanFormProps) {
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const [nextNum, setNextNum] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!p.editing) {
+      supabase.rpc('get_next_challan_number').then(({ data }) => { if (data) setNextNum(data); });
+    }
+  }, [p.editing]);
   const lbl: React.CSSProperties = { display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 };
   const inp: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' };
 
@@ -79,6 +87,7 @@ export default function ChallanForm(p: ChallanFormProps) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>{p.editing ? `Edit #${p.editing.challan_number}` : (p.isReturn ? 'New Return' : 'New Cash Challan')}</span>
+            {!p.editing && nextNum && <span style={{ fontFamily: T.mono, fontSize: 12, color: T.ac2, fontWeight: 600, padding: '3px 8px', background: 'rgba(99,102,241,.10)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 6 }}>#{nextNum}</span>}
             {p.editing && <button onClick={() => p.loadAuditTrail(p.editing!.challan_number)} style={{ padding: '3px 8px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>View History</button>}
           </div>
           <button onClick={p.onClose} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', background: 'rgba(99,102,241,0.06)', color: T.ac2, fontSize: 10, cursor: 'pointer' }}>Cancel</button>
