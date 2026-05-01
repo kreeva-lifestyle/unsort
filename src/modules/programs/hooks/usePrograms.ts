@@ -20,11 +20,15 @@ export function usePrograms() {
     const { data, count } = await fetchPrograms({ search: s ?? search, page, pageSize });
     setPrograms(data);
     setTotalCount(count);
-    const ids = data.map(p => p.id);
-    const [counts, summaries] = await Promise.all([fetchMatchingCounts(ids), fetchPriceSummaries(ids)]);
-    setMatchingCounts(counts);
-    setPriceSummaries(summaries);
     setLoading(false);
+    // Load summaries in background — table shows immediately
+    const ids = data.map(p => p.id);
+    if (ids.length > 0) {
+      Promise.all([fetchMatchingCounts(ids), fetchPriceSummaries(ids)]).then(([counts, summaries]) => {
+        setMatchingCounts(counts);
+        setPriceSummaries(summaries);
+      });
+    }
   }, [search, page, pageSize]);
 
   useEffect(() => { load(); }, [load]);
