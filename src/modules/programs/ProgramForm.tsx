@@ -5,6 +5,7 @@ import FabricBreakdown from './components/FabricBreakdown';
 import MatchingCompanyRepeater from './components/MatchingCompanyRepeater';
 import { fetchLookup, addLookup } from './lib/supabase-rpc';
 import { useTableNav } from './hooks/useTableNav';
+import WorkPartCard from './components/WorkPartCard';
 import type { ProgramFormData, Program, PricePartRow } from './types';
 import { EMPTY_WORK_PART, EMPTY_FABRIC_PART } from './types';
 import type { TranslationKey } from './i18n/en';
@@ -103,7 +104,8 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
           <div style={{ marginBottom: 12 }}><label style={S.fLabel}>{t('linkLabel')}</label><input value={form.dropbox_gdrive_link} onChange={e => setField('dropbox_gdrive_link', e.target.value)} placeholder={t('linkPlaceholder')} style={{ ...S.fInput, fontSize: 11 }} /></div>
 
           <SectionTitle color={T.gr}>{t('workProgram')}</SectionTitle>
-          <div className="prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 6 }}>
+          {/* Desktop table */}
+          <div className="prg-work-desktop prg-table-wrap" style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 6 }}>
             <table id="work-tbl" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
               <thead><tr>
                 <th style={th}>{t('partName')}</th><th style={{ ...th, width: 70 }}>{t('stitch')}</th><th style={{ ...th, width: 68 }}>{t('stitchType')}</th><th style={{ ...th, width: 72 }}>{t('oneRs')}</th>
@@ -135,6 +137,13 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                 </tr>
               </tbody>
             </table>
+            <datalist id="dl-pn">{partNames.map(n => <option key={n} value={n} />)}</datalist>
+            <datalist id="dl-fn">{fabricNames.map(n => <option key={n} value={n} />)}</datalist>
+          </div>
+          {/* Mobile card view for work parts */}
+          <div className="prg-work-mobile" style={{ display: 'none' }}>
+            {workParts.map((p, i) => <WorkPartCard key={i} p={p} i={i} canDelete={workParts.length > 1} numIn={numIn} txtIn={txtIn} selIn={selIn} onUpdate={updateWork} onDelete={j => setWorkParts(prev => prev.filter((_, k) => k !== j))} t={t} />)}
+            {workGT > 0 && <div style={{ padding: '8px 12px', background: 'rgba(52,211,153,.08)', borderRadius: 8, display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><span style={{ fontSize: 11, fontWeight: 600, color: T.tx }}>{t('grandTotal')}</span><span style={{ fontFamily: T.sora, fontSize: 14, fontWeight: 700, color: T.gr }}>₹{workGT.toLocaleString('en-IN')}</span></div>}
             <datalist id="dl-pn">{partNames.map(n => <option key={n} value={n} />)}</datalist>
             <datalist id="dl-fn">{fabricNames.map(n => <option key={n} value={n} />)}</datalist>
           </div>
