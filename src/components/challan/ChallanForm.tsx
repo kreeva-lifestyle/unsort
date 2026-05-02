@@ -95,7 +95,7 @@ export default function ChallanForm(p: ChallanFormProps) {
 
         {/* Sale / Return Toggle */}
         <div style={{ display: 'flex', gap: 3, marginBottom: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, width: 'fit-content', border: `1px solid ${T.bd}` }}>
-          {([{ v: false, label: 'Sale', color: T.gr }, { v: true, label: '↩ Return', color: T.re }] as const).map(opt => (
+          {([{ v: false, label: 'Sale', color: T.gr }, { v: true, label: 'Return', color: T.re }] as const).map(opt => (
             <div key={String(opt.v)} onClick={() => !p.editing && p.setIsReturn(opt.v)} style={{ padding: '5px 14px', borderRadius: 4, fontSize: 10, fontWeight: p.isReturn === opt.v ? 600 : 400, cursor: p.editing ? 'not-allowed' : 'pointer', opacity: p.editing ? 0.6 : 1, background: p.isReturn === opt.v ? opt.color + '33' : 'transparent', color: p.isReturn === opt.v ? opt.color : T.tx3, border: p.isReturn === opt.v ? `1px solid ${opt.color}44` : 'none' }}>{opt.label}</div>
           ))}
         </div>
@@ -132,7 +132,7 @@ export default function ChallanForm(p: ChallanFormProps) {
 
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
           {/* Customer */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 12 }}>
+          <div className="challan-form-grid-2" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 12 }}>
             <div style={{ position: 'relative' }}>
               <label style={lbl}>Customer Name *</label>
               <input type="text" value={p.customerName} onChange={e => {
@@ -165,7 +165,7 @@ export default function ChallanForm(p: ChallanFormProps) {
               <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600 }}>SKU</span>
               <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600, textAlign: 'center' as const }}>Qty</span>
               <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600, textAlign: 'right' as const }}>Price</span>
-              <span title="Per-item discount: ₹ flat or % of line total" style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600, textAlign: 'right' as const, cursor: 'help' }}>Discount</span>
+              <span className="challan-disc-col" title="Per-item discount: ₹ flat or % of line total" style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600, textAlign: 'right' as const, cursor: 'help' }}>Discount</span>
               <span></span>
             </div>
             {p.items.map((it, i) => {
@@ -190,7 +190,7 @@ export default function ChallanForm(p: ChallanFormProps) {
                   <input data-sku value={it.sku} onChange={e => { const n = [...p.items]; n[i].sku = e.target.value; p.setItems(n); }} placeholder="SKU / Item name" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
                   <input type="number" value={it.quantity || ''} onChange={e => { const n = [...p.items]; n[i].quantity = Number(e.target.value); p.setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: qtyBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'center' as const }} />
                   <input type="number" value={it.price || ''} onChange={e => { const n = [...p.items]; n[i].price = Number(e.target.value); p.setItems(n); }} placeholder="0" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: priceBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 11, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
-                  <div style={{ display: 'flex', gap: 2, alignItems: 'center', opacity: p.isReturn && p.returnSource ? 0.6 : 1 }}>
+                  <div className="challan-disc-col" style={{ display: 'flex', gap: 2, alignItems: 'center', opacity: p.isReturn && p.returnSource ? 0.6 : 1 }}>
                     <select value={it.discount_type || 'flat'} onChange={e => { const n = [...p.items]; n[i].discount_type = e.target.value; p.setItems(n); }} disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx3, fontSize: 9, padding: '5px 2px', outline: 'none', width: 32 }}>
                       <option value="flat">₹</option><option value="percentage">%</option>
                     </select>
@@ -245,7 +245,7 @@ export default function ChallanForm(p: ChallanFormProps) {
               <label style={lbl}>Status</label>
               {p.isReturn ? (
                 // Refunds are instant — no dropdown, always 'paid' (=Refunded).
-                <div style={{ ...inp, fontSize: 11, display: 'flex', alignItems: 'center', color: T.re, fontWeight: 600, cursor: 'default' }}>↩ Refunded</div>
+                <div style={{ ...inp, fontSize: 11, display: 'flex', alignItems: 'center', color: T.re, fontWeight: 600, cursor: 'default' }}>Refunded</div>
               ) : (
                 <select value={p.challanStatus} onChange={e => p.setChallanStatus(e.target.value)} style={{ ...inp, fontSize: 11 }}>
                   <option value="unpaid">Unpaid</option>
