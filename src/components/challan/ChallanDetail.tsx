@@ -221,7 +221,7 @@ ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outs
 
           {/* ── Action buttons ── */}
           <div className="challan-detail-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: `1px solid ${T.bd}`, paddingTop: 14 }}>
-            {!isVoided && <button onClick={onEdit} style={{ ...btnBase, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, border: 'none', color: '#fff' }}>Edit</button>}
+            {!isVoided && c.status !== 'paid' && <button onClick={onEdit} style={{ ...btnBase, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, border: 'none', color: '#fff' }}>Edit</button>}
             <button onClick={onPrint} style={btnBase}>Print</button>
             <button onClick={shareChallan} style={{ ...btnBase, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', color: T.gr }}>Share</button>
             {canRemind && <button onClick={onRemind} style={{ ...btnBase, border: '1px solid rgba(34,197,94,.15)', background: 'rgba(34,197,94,.04)', color: T.gr }}>Remind</button>}
