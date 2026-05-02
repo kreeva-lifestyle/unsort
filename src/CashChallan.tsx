@@ -623,7 +623,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const phone = cust?.phone;
     if (phone) {
       const msg = encodeURIComponent(`Hi ${c.customer_name},\nGentle reminder — your Cash Challan #${c.challan_number} dated ${new Date(c.created_at).toLocaleDateString('en-IN')} for ₹${Number(c.total).toLocaleString('en-IN')} is pending.\nOutstanding: ₹${outstanding.toLocaleString('en-IN')}\nPlease arrange payment at your earliest convenience.\n— Arya Designs`);
-      window.open(`https://wa.me/91${phone.replace(/\D/g, '')}?text=${msg}`, '_blank');
+      window.location.href = `https://wa.me/91${phone.replace(/\D/g, '')}?text=${msg}`;
     } else {
       setReminderChallan(c);
       setReminderPhone('');
@@ -636,7 +636,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const c = reminderChallan;
     const outstanding = Number(c.total) - Number(c.amount_paid || 0);
     const msg = encodeURIComponent(`Hi ${c.customer_name},\nGentle reminder — your Cash Challan #${c.challan_number} dated ${new Date(c.created_at).toLocaleDateString('en-IN')} for ₹${Number(c.total).toLocaleString('en-IN')} is pending.\nOutstanding: ₹${outstanding.toLocaleString('en-IN')}\nPlease arrange payment at your earliest convenience.\n— Arya Designs`);
-    window.open(`https://wa.me/91${reminderPhone.trim().replace(/\D/g, '')}?text=${msg}`, '_blank');
+    window.location.href = `https://wa.me/91${reminderPhone.trim().replace(/\D/g, '')}?text=${msg}`;
     setReminderChallan(null);
   };
 
@@ -1200,7 +1200,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 300, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '10px 14px', boxShadow: '0 8px 30px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 12, animation: 'su .2s ease', minWidth: 280 }}>
           <span style={{ fontSize: 20 }}>📱</span>
           <span style={{ flex: 1, fontSize: 12, color: T.tx }}>Share on WhatsApp?</span>
-          <button onClick={() => { window.open(whatsAppShare.url, '_blank'); setWhatsAppShare(null); }} style={{ ...S.btnPrimary, background: '#25D366', boxShadow: 'none', gap: 4, fontSize: 11 }}>Send</button>
+          <button onClick={() => { window.location.href = whatsAppShare.url; setWhatsAppShare(null); }} style={{ ...S.btnPrimary, background: '#25D366', boxShadow: 'none', gap: 4, fontSize: 11 }}>Send</button>
           <span onClick={() => setWhatsAppShare(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span>
         </div>
       )}
