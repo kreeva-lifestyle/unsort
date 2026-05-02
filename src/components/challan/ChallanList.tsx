@@ -125,7 +125,7 @@ export default function ChallanList(p: Props) {
           const swipeActions = [
             { label: 'Print', color: '#3B82F6', onClick: () => p.onPrint(c) },
             ...((c.status === 'unpaid' || c.status === 'partial') ? [{ label: 'Remind', color: '#22C55E', onClick: () => p.onRemind(c) }] : []),
-            ...(c.status !== 'voided' ? [{ label: 'Void', color: '#EF4444', onClick: () => p.onVoid(c) }] : []),
+            ...(c.status !== 'voided' && c.status !== 'paid' ? [{ label: 'Void', color: '#EF4444', onClick: () => p.onVoid(c) }] : []),
           ];
           return (
             <SwipeRow key={c.id} actions={swipeActions} hint={i === 0} hintKey="challan">
@@ -169,7 +169,7 @@ export default function ChallanList(p: Props) {
                 {!isRet && c.status !== 'voided' && c.status !== 'draft' && <button onClick={e => { e.stopPropagation(); p.onCreateReturn(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.6 }} title="Create return for this challan">
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M9 14L4 9l5-5M4 9h11a5 5 0 015 5v0a5 5 0 01-5 5H8" /></svg>
                 </button>}
-                {c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); p.onVoid(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.4 }} title="Void">
+                {c.status !== 'voided' && c.status !== 'paid' && <button onClick={e => { e.stopPropagation(); p.onVoid(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.4 }} title="Void">
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M18 6L6 18M6 6l12 12" /></svg>
                 </button>}
               </div>

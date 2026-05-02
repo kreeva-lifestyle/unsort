@@ -597,6 +597,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const { data: { user } } = await supabase.auth.getUser();
     const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total, amount_paid, status, payment_mode').eq('id', id).maybeSingle();
     if (!before) return;
+    if (before.status === 'paid') { addToast('Cannot void a fully paid challan', 'error'); return; }
     const { error: voidErr } = await supabase.from('cash_challans').update({ status: 'voided', voided_by: user?.id, voided_at: new Date().toISOString() }).eq('id', id);
     if (voidErr) { addToast(friendlyError(voidErr), 'error'); return; }
     if (Number(before.amount_paid || 0) > 0) {
@@ -707,6 +708,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Open edit ──────────────────────────────────────────────────────────────
   const openEdit = async (c: Challan) => {
     if (c.status === 'voided') { addToast('Cannot edit a voided challan', 'error'); return; }
+    if (c.status === 'paid') { addToast('Cannot edit a paid challan. Change status to unpaid first.', 'error'); return; }
     const [{ data: citems }, { data: cust }] = await Promise.all([
       supabase.from('cash_challan_items').select('sku, description, quantity, price, total, discount_type, discount_value, discount_amount').eq('challan_id', c.id).order('sort_order'),
       c.customer_id ? supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle() : Promise.resolve({ data: null }),
