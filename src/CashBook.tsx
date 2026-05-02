@@ -1,6 +1,8 @@
 /* eslint-disable */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from './lib/supabase';
+
+const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
 import { friendlyError } from './lib/friendlyError';
 import { useDebouncedFetch } from './hooks/useDebouncedFetch';
 import { useNotifications } from './hooks/useNotifications';
@@ -285,7 +287,7 @@ export default function CashBook() {
     // WhatsApp notification to recipient
     if (recipient.phone) {
       const msg = encodeURIComponent(`Hi ${recipient.full_name},\n${prof?.full_name || 'Sender'} has initiated cash handover ${hoNo} of ₹${amt.toLocaleString('en-IN')} for you (period ${handPeriodFrom} to ${handPeriodTo}).\nPlease open DailyOffice → Cash Book → Handovers and sign with your PIN to confirm receipt, or reject with a reason.\n— Arya Designs`);
-      window.location.href = `https://wa.me/91${recipient.phone.replace(/\D/g, '')}?text=${msg}`;
+      window.location.href = `https://wa.me/${waPhone(recipient.phone)}?text=${msg}`;
     }
     setHandAmount(''); setHandToId(''); setHandNotes(''); setHandReason(''); setHandBreakdown(null); setShowHandover(false);
     fetchData();
