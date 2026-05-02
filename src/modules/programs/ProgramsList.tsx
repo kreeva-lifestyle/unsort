@@ -87,7 +87,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
           <input value={search} onChange={e => onSearch(e.target.value)} placeholder="Search UID, SKU, brand, label…" style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
         </div>
-        <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }} style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '5px 6px', outline: 'none', width: 48 }}>
+        <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }} style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '4px 8px', outline: 'none', width: 48, height: 28 }}>
           <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
         </select>
       </div>

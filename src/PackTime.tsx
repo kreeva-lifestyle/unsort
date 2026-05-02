@@ -670,12 +670,12 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           ))}
         </div>
         <select value={historyFilterBrand} onChange={e => { setHistoryFilterBrand(e.target.value); setHistoryPage(0); }}
-          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '5px 10px', outline: 'none', cursor: 'pointer' }}>
+          style={{ ...S.fDate, background: 'transparent', cursor: 'pointer', fontFamily: T.sans }}>
           <option value="">All Brands</option>
           {brands.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
         <select value={historyPageSize} onChange={e => { setHistoryPageSize(Number(e.target.value)); setHistoryPage(0); }}
-          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '5px 6px', outline: 'none', width: 50 }}>
+          style={{ ...S.fDate, background: 'transparent', fontFamily: T.sans, width: 50 }}>
           <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
         </select>
       </div>
@@ -777,7 +777,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           {/* Brand */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5 }}>Brand Name</label>
-            <select value={selectedBrand} onChange={e => setSelectedBrand(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 14, padding: '11px 12px', outline: 'none', cursor: 'pointer' }}>
+            <select value={selectedBrand} onChange={e => setSelectedBrand(e.target.value)} style={{ ...S.fInput, cursor: 'pointer' }}>
               <option value="">Select brand...</option>
               {brands.map(b => <option key={b} value={b}>{b}</option>)}
             </select>
@@ -786,7 +786,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           {/* Courier */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5 }}>Courier Company</label>
-            <select value={courier} onChange={e => setCourier(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 14, padding: '11px 12px', outline: 'none', cursor: 'pointer' }}>
+            <select value={courier} onChange={e => setCourier(e.target.value)} style={{ ...S.fInput, cursor: 'pointer' }}>
               <option value="">Select courier...</option>
               {couriers.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>

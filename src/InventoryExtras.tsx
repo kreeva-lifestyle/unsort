@@ -326,7 +326,7 @@ export default function InventoryExtras() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div>
                 <label style={label}>Initial Quantity</label>
-                <input type="number" min="1" value={fQty} onChange={e => setFQty(e.target.value)} style={input} />
+                <input type="number" min="1" value={fQty} onChange={e => setFQty(e.target.value)} placeholder="0" style={input} />
               </div>
               <div>
                 <label style={label}>Notes</label>
@@ -355,7 +355,7 @@ export default function InventoryExtras() {
               <br/>Current: <span style={{ color: T.gr, fontWeight: 600 }}>{adjustExtra.quantity}</span>
             </div>
             <div><label style={label}>How many to {adjustMode}?</label>
-              <input type="number" min="1" value={adjustQty} onChange={e => setAdjustQty(e.target.value)} style={input} /></div>
+              <input type="number" min="1" value={adjustQty} onChange={e => setAdjustQty(e.target.value)} placeholder="0" style={input} /></div>
             <div><label style={label}>Reason (optional)</label>
               <input value={adjustReason} onChange={e => setAdjustReason(e.target.value)} placeholder="e.g. Found more stock" style={input} /></div>
             {error && <div style={{ color: T.re, fontSize: 11 }}>{error}</div>}
