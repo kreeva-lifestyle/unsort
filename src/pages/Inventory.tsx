@@ -606,7 +606,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
 
         {/* Filters button with multi-select popover */}
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setShowFiltersPopover(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 34, padding: '0 12px', background: showFiltersPopover || activeFilterCount > 0 ? 'rgba(99,102,241,.10)' : 'rgba(255,255,255,0.03)', border: `1px solid ${showFiltersPopover || activeFilterCount > 0 ? 'rgba(99,102,241,.35)' : T.bd}`, borderRadius: 8, color: activeFilterCount > 0 ? T.ac2 : T.tx, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>
+          <button onClick={() => setShowFiltersPopover(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 36, padding: '0 12px', background: showFiltersPopover || activeFilterCount > 0 ? 'rgba(99,102,241,.10)' : 'rgba(255,255,255,0.03)', border: `1px solid ${showFiltersPopover || activeFilterCount > 0 ? 'rgba(99,102,241,.35)' : T.bd}`, borderRadius: 8, color: activeFilterCount > 0 ? T.ac2 : T.tx, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>
             <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" /></svg>
             Filters
             {activeFilterCount > 0 && <span style={{ background: T.ac, color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 10, fontFamily: T.mono, fontWeight: 600, minWidth: 18, textAlign: 'center' as const }}>{activeFilterCount}</span>}

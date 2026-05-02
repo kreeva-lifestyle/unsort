@@ -66,8 +66,8 @@ export default function ChallanLedger({
             <label style={{ fontSize: 8, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase' }}>To</label>
             <input type="date" value={dateTo} onChange={e => onDateToChange(e.target.value)} style={S.fDate} />
           </div>
-          <button onClick={() => onDateApply()} style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', height: 30 }}>Apply</button>
-          {(dateFrom || dateTo) && <button onClick={() => { onDateFromChange(''); onDateToChange(''); onDateApply('', ''); }} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer', height: 30 }}>Clear</button>}
+          <button onClick={() => onDateApply()} style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', height: 36 }}>Apply</button>
+          {(dateFrom || dateTo) && <button onClick={() => { onDateFromChange(''); onDateToChange(''); onDateApply('', ''); }} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 12, cursor: 'pointer', height: 36 }}>Clear</button>}
         </div>
         {cust && (
           <div className="challan-ledger-kpis" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>

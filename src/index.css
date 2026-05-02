@@ -181,9 +181,10 @@ body.modal-open { overflow: hidden !important; }
   /* ChallanForm — keep grid, scroll item rows horizontally (matches Figma) */
   .challan-form { padding: 12px 12px 80px !important; }
   .challan-form input, .challan-form select, .challan-form textarea { font-size: 16px !important; }
-  .challan-item-grid-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important; }
-  .challan-item-grid-wrap::-webkit-scrollbar { display: none !important; }
-  .challan-item-grid-wrap > div { min-width: 480px !important; }
+  .challan-item-grid-wrap { overflow-x: hidden !important; }
+  .challan-item-grid-wrap > div { min-width: 0 !important; grid-template-columns: 1fr 50px 70px 28px !important; }
+  .challan-item-grid-wrap .challan-disc-col { display: none !important; }
+  .challan-form-grid-2 { grid-template-columns: 1fr !important; }
   .challan-form-grid-3 { grid-template-columns: 1fr !important; }
   .challan-form-grid-4 { grid-template-columns: 1fr 1fr !important; }
   .challan-form-actions { flex-direction: column !important; gap: 8px !important; }
