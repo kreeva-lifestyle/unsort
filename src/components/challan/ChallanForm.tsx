@@ -137,11 +137,12 @@ export default function ChallanForm(p: ChallanFormProps) {
             <div style={{ position: 'relative' }}>
               <label style={lbl}>Customer Name *</label>
               <input type="text" value={p.customerName} onChange={e => {
+                if (p.editing) return;
                 p.setCustomerName(e.target.value); p.setSelectedCustomerId(null);
                 clearTimeout(searchTimeout.current);
                 searchTimeout.current = setTimeout(() => p.searchCustomers(e.target.value), 300);
               }}
-                placeholder="Type customer name..." style={inp} />
+                placeholder="Type customer name..." style={{ ...inp, opacity: p.editing ? 0.6 : 1 }} disabled={!!p.editing} />
               {p.customerSuggestions.length > 0 && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'rgba(14,18,30,.98)', border: `1px solid ${T.bd2}`, borderRadius: 6, maxHeight: 120, overflowY: 'auto' }}>
                   {p.customerSuggestions.map(c => (
