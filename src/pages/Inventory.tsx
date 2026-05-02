@@ -764,7 +764,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
               ...(canEdit ? [{ label: 'Del', color: '#EF4444', onClick: () => handleDelete(item.id) }] : []),
             ];
             return (
-              <SwipeRow key={item.id} actions={swipeActions} hint={idx === 0}>
+              <SwipeRow key={item.id} actions={swipeActions} hint={idx === 0} hintKey="inventory">
               <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>

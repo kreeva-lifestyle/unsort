@@ -108,7 +108,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
         {!loading && programs.length > 0 && (
           <div className="prg-list-mobile" style={{ display: 'none' }}>
             {programs.map((p, idx) => (
-              <SwipeRow key={p.id} hint={idx === 0} actions={[
+              <SwipeRow key={p.id} hint={idx === 0} hintKey="programs" actions={[
                 { label: 'Edit', color: '#3B82F6', onClick: () => handleEdit(p) },
                 { label: 'PDF', color: '#6366F1', onClick: () => onPDF(p) },
                 { label: 'Del', color: '#EF4444', onClick: () => handleDelete(p) },
