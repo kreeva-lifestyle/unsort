@@ -58,7 +58,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={onClose}>
-      <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 560, width: '100%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+      <div className="modal-inner challan-detail-modal" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 560, width: '100%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div style={{ padding: '14px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -181,12 +181,12 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
           {c.tags && c.tags.length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>{c.tags.map(t => <span key={t} style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: 'rgba(99,102,241,.08)', color: T.ac2, fontWeight: 500 }}>{t}</span>)}</div>}
 
           {/* Action buttons */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', borderTop: `1px solid ${T.bd}`, paddingTop: 12 }}>
-            {!isVoided && <button onClick={onEdit} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Edit</button>}
-            <button onClick={onPrint} style={{ padding: '7px 12px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Print</button>
-            {canRemind && <button onClick={onRemind} style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.08)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>WhatsApp</button>}
-            {canReturn && <button onClick={onReturn} style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', color: T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>↩ Return</button>}
-            {!isVoided && <button onClick={onVoid} style={{ padding: '7px 12px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Void</button>}
+          <div className="challan-detail-actions" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', borderTop: `1px solid ${T.bd}`, paddingTop: 12 }}>
+            {!isVoided && <button onClick={onEdit} style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Edit</button>}
+            <button onClick={onPrint} style={{ padding: '9px 14px', borderRadius: 8, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>Print</button>
+            {canRemind && <button onClick={onRemind} style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.08)', color: T.gr, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>WhatsApp</button>}
+            {canReturn && <button onClick={onReturn} style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', color: T.re, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>↩ Return</button>}
+            {!isVoided && <button onClick={onVoid} style={{ padding: '9px 14px', borderRadius: 8, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>Void</button>}
           </div>
         </div>
       </div>
