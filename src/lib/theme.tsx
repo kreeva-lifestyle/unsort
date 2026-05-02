@@ -134,14 +134,14 @@ export const S = {
     position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,.80)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: 200, backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)', padding: 8,
+    WebkitBackdropFilter: 'blur(12px)', padding: 16,
   } as React.CSSProperties,
 
   modalBox: {
     background: 'rgba(14,18,30,0.96)',
     backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
     border: `1px solid ${T.bd2}`, borderRadius: 14,
-    width: 480, maxWidth: '100%', maxHeight: '90vh',
+    width: 480, maxWidth: 'calc(100vw - 32px)', maxHeight: '90vh',
     overflowY: 'auto' as const,
     boxShadow: '0 24px 80px rgba(0,0,0,.65)', padding: 0,
   } as React.CSSProperties,

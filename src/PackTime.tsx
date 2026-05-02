@@ -713,7 +713,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {/* Delete confirmation modal */}
       {confirmDeleteId && (
         <div style={S.modalOverlay}>
-          <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', textAlign: 'center', maxWidth: 340, width: '100%' }}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }}>
             <div style={{ fontSize: 28, marginBottom: 6 }}>⚠️</div>
             <div style={{ ...S.modalTitle, marginBottom: 4 }}>Delete Scan?</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This will permanently remove the scan from the database and Google Sheet.</div>
@@ -945,8 +945,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Today Summary Modal */}
       {todaySummaryOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={() => setTodaySummaryOpen(false)}>
-          <div className="modal-inner" onClick={e => e.stopPropagation()} style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '18px 16px', maxWidth: 340, width: '100%' }}>
+        <div style={{ ...S.modalOverlay }} onClick={() => setTodaySummaryOpen(false)}>
+          <div className="modal-inner" onClick={e => e.stopPropagation()} style={{ ...S.modalBox, maxWidth: 340, padding: '18px 16px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4, textAlign: 'center' }}>Today's Summary</div>
             <div style={{ fontSize: 9, color: T.tx3, textAlign: 'center', marginBottom: 10 }}>As of {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} · {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</div>
             {todaySummary.length === 0 && <div style={{ textAlign: 'center', color: T.tx3, fontSize: 11, padding: 16 }}>Loading...</div>}
@@ -1068,8 +1068,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Complete modal */}
       {showComplete && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
-          <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', textAlign: 'center', maxWidth: 360, width: '100%' }}>
+        <div style={{ ...S.modalOverlay }}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px', textAlign: 'center' }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Session Complete</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>End scanning for {courier}?</div>
             <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: 12, marginBottom: 14, textAlign: 'left' }}>
@@ -1100,8 +1100,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Change-setup-mid-session confirm dialog (audit P1: don't trap operator in wrong courier) */}
       {confirmChangeSetup && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 450, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(8px)', padding: 16 }}>
-          <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', textAlign: 'center', maxWidth: 360, width: '100%' }}>
+        <div style={{ ...S.modalOverlay, zIndex: 250 }}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px', textAlign: 'center' }}>
             <div style={{ fontSize: 32, marginBottom: 6 }}>⚠️</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Change setup mid-session?</div>
             <div style={{ fontSize: 12, color: T.tx3, marginBottom: 14, lineHeight: 1.5 }}>You've scanned <strong style={{ color: T.gr }}>{sessionCount}</strong> AWB{sessionCount === 1 ? '' : 's'} so far. They've already been saved to the sheet. Changing setup resets the in-app counter but does not delete the saved scans.</div>
