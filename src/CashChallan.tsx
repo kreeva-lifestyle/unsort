@@ -706,7 +706,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const openEdit = async (c: Challan) => {
     if (c.status === 'voided') { addToast('Cannot edit a voided challan', 'error'); return; }
     const [{ data: citems }, { data: cust }] = await Promise.all([
-      supabase.from('cash_challan_items').select('*').eq('challan_id', c.id).order('sort_order'),
+      supabase.from('cash_challan_items').select('sku, description, quantity, price, total, discount_type, discount_value, discount_amount').eq('challan_id', c.id).order('sort_order'),
       c.customer_id ? supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle() : Promise.resolve({ data: null }),
     ]);
     setEditing(c);
@@ -740,7 +740,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Print ──────────────────────────────────────────────────────────────────
   const printChallan = async (c: Challan) => {
-    const { data: citems } = await supabase.from('cash_challan_items').select('*').eq('challan_id', c.id).order('sort_order');
+    const { data: citems } = await supabase.from('cash_challan_items').select('sku, quantity, price, total, discount_amount').eq('challan_id', c.id).order('sort_order');
     const w = window.open('', '_blank');
     if (!w) return;
 

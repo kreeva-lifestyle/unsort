@@ -24,7 +24,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
 
   const fetchNotifications = async () => {
     if (!user) return;
-    const { data, error } = await supabase.from('notifications').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50);
+    const { data, error } = await supabase.from('notifications').select('id, user_id, title, message, type, entity_id, is_read, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50);
     if (!error) setNotifications(data || []);
   };
 

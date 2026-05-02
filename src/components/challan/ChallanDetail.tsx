@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { T } from '../../lib/theme';
+import { T, S } from '../../lib/theme';
 import type { CashChallan, CashChallanItem } from '../../types/database';
 
 type Challan = CashChallan & { cash_challan_items?: Partial<CashChallanItem>[] };
@@ -61,8 +61,8 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
   const btnBase: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx2, transition: 'all .15s' };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(12px)', padding: 16 }} onClick={onClose}>
-      <div ref={scrollRef} className="modal-inner challan-detail-modal" style={{ background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 520, width: '100%', maxHeight: '88vh', overflow: 'auto', WebkitOverflowScrolling: 'touch' }} onClick={e => e.stopPropagation()}>
+    <div style={{ ...S.modalOverlay, zIndex: 400, overflowY: 'auto' }} onClick={onClose}>
+      <div ref={scrollRef} className="modal-inner challan-detail-modal" style={{ ...S.modalBox, maxWidth: 520, margin: 'auto' }} onClick={e => e.stopPropagation()}>
 
         {/* ── Header ── */}
         <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'sticky', top: 0, background: T.s, zIndex: 2 }}>

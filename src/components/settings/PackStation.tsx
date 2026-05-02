@@ -16,8 +16,8 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
   const { ask, modalProps } = useConfirm();
 
   const fetchData = useCallback(() => {
-    supabase.from('packtime_couriers').select('*').order('name').then(({ data }) => setCouriers(data || []));
-    supabase.from('packtime_cameras').select('*').order('number').then(({ data }) => setCameras(data || []));
+    supabase.from('packtime_couriers').select('id, name, sheet_name, is_active').order('name').then(({ data }) => setCouriers(data || []));
+    supabase.from('packtime_cameras').select('id, number, is_active').order('number').then(({ data }) => setCameras(data || []));
   }, []);
   const { pendingDel, scheduleDelete, undo, dismiss } = useUndoDelete(delTable, fetchData);
   useEffect(() => { fetchData(); }, [fetchData]);
