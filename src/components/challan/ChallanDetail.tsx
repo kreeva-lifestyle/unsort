@@ -79,11 +79,14 @@ th,td{border:1px solid #ddd;padding:4px 6px;font-size:11px}th{background:#f5f5f5
 ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outstanding: ₹${due.toLocaleString('en-IN')}</p>` : ''}
 <p style="font-size:10px;color:#888;margin-top:16px">Powered by DailyOffice</p>
 </body></html>`;
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
-    w.print();
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
+    document.body.appendChild(iframe);
+    const iw = iframe.contentWindow;
+    if (!iw) { iframe.remove(); return; }
+    iw.document.write(html);
+    iw.document.close();
+    setTimeout(() => { iw.print(); setTimeout(() => iframe.remove(), 1000); }, 300);
   };
 
   return (
