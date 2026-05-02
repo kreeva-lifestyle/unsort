@@ -70,7 +70,6 @@ export default function BarcodeScanner({ onScan, onClose, scanError }: { onScan:
         }).catch(() => setCameraError('Camera not available.'));
       })
       .catch(() => setCameraError('Camera not available.'));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, onScan]);
 
   // OCR mode - start camera

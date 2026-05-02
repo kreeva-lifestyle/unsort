@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { T, Icon } from '../../lib/theme';
 import type { Command } from './types';
 
@@ -22,7 +22,7 @@ export default function CommandPalette({ open, onClose, commands }: Props) {
     navigate: filtered.filter(c => c.category === 'navigate'),
   };
 
-  const flatList = [...grouped.action, ...grouped.navigate];
+  const flatList = useMemo(() => [...grouped.action, ...grouped.navigate], [grouped.action, grouped.navigate]);
 
   useEffect(() => { if (open) { setQuery(''); setSelected(0); setTimeout(() => inputRef.current?.focus(), 50); } }, [open]);
 
