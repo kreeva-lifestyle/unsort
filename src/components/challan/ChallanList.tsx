@@ -52,14 +52,16 @@ export default function ChallanList(p: Props) {
   const filterActive = p.statusFilter || p.tagFilter || p.dateFrom || p.dateTo;
   return (
     <>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center' }}>
+      <div className="challan-filters" style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <input type="text" value={p.search} onChange={e => { p.onSearchChange(e.target.value); p.onResetPage(); }} placeholder="Search name or #..." style={{ flex: 1, minWidth: 120, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 12px', outline: 'none', height: 36, boxSizing: 'border-box' }} />
-        <button onClick={p.onToggleFilters} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${p.showFilters || filterActive ? T.ac + '44' : T.bd2}`, background: p.showFilters ? 'rgba(99,102,241,.08)' : 'rgba(255,255,255,0.03)', color: p.showFilters || filterActive ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
-          Filters{filterActive ? ` (${[p.statusFilter, p.tagFilter, p.dateFrom, p.dateTo].filter(Boolean).length})` : ''}
-        </button>
-        <button onClick={p.onExport} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Export</button>
-        <button onClick={p.onToggleBulkMode} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${p.bulkMode ? T.ac + '44' : T.bd2}`, background: p.bulkMode ? 'rgba(99,102,241,.1)' : 'rgba(255,255,255,0.03)', color: p.bulkMode ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{p.bulkMode ? 'Cancel' : '☑ Select'}</button>
+        <div className="challan-filter-btns" style={{ display: 'flex', gap: 6 }}>
+          <button onClick={p.onToggleFilters} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${p.showFilters || filterActive ? T.ac + '44' : T.bd2}`, background: p.showFilters ? 'rgba(99,102,241,.08)' : 'rgba(255,255,255,0.03)', color: p.showFilters || filterActive ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
+            Filters{filterActive ? ` (${[p.statusFilter, p.tagFilter, p.dateFrom, p.dateTo].filter(Boolean).length})` : ''}
+          </button>
+          <button onClick={p.onExport} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Export</button>
+          <button onClick={p.onToggleBulkMode} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${p.bulkMode ? T.ac + '44' : T.bd2}`, background: p.bulkMode ? 'rgba(99,102,241,.1)' : 'rgba(255,255,255,0.03)', color: p.bulkMode ? T.ac2 : T.tx3, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{p.bulkMode ? 'Cancel' : '☑ Select'}</button>
+        </div>
       </div>
 
       {p.showFilters && (
