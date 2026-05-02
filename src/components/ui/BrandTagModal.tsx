@@ -55,8 +55,8 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(8px)', padding: 8 }} onClick={onClose}>
-      <div className="modal-inner" style={{ background: 'rgba(14,18,30,0.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, width: 720, maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,.65)', backdropFilter: 'blur(32px)' }} onClick={e => e.stopPropagation()}>
+    <div style={S.modalOverlay} onClick={onClose}>
+      <div className="modal-inner" style={{ ...S.modalBox, width: 720 }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>

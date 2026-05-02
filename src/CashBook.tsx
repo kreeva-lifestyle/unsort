@@ -637,8 +637,8 @@ export default function CashBook() {
 
       {/* Initiate Handover Modal */}
       {showHandover && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
-          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 460, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ ...S.modalOverlay }}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 460, padding: '20px 18px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Initiate Cash Handover</div>
             <div style={{ fontSize: 10, color: T.tx3, marginBottom: 12 }}>Auto-calculated from sales, expenses, and previous handovers</div>
 
@@ -753,8 +753,8 @@ export default function CashBook() {
 
       {/* View Handover Details Modal */}
       {viewingHandover && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
-          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 460, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ ...S.modalOverlay }}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 460, padding: '20px 18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <div>
                 <span style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Handover Details</span>
@@ -796,8 +796,8 @@ export default function CashBook() {
 
       {/* Confirm Handover (Sign with PIN) Modal */}
       {confirmingHandover && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
-          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 360, width: '100%' }}>
+        <div style={{ ...S.modalOverlay }}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Sign &amp; Confirm {formatHandoverNo(confirmingHandover.handover_number)}</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>You are confirming receipt of <strong style={{ color: T.gr, fontFamily: T.mono }}>₹{Number(confirmingHandover.amount).toLocaleString('en-IN')}</strong> from <strong style={{ color: T.tx }}>{confirmingHandover.from_user_name}</strong>. This is a permanent legal record.</div>
             <input type="password" value={confirmPin} onChange={e => setConfirmPin(e.target.value)} placeholder="Your 4-6 digit PIN" autoFocus inputMode="numeric" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 18, padding: '10px 12px', outline: 'none', boxSizing: 'border-box', textAlign: 'center', letterSpacing: 6, marginBottom: 10 }} />
@@ -812,8 +812,8 @@ export default function CashBook() {
 
       {/* Reject Handover Modal — only visible to the intended recipient while status is still pending */}
       {rejectingHandover && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
-          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 400, width: '100%' }}>
+        <div style={{ ...S.modalOverlay }}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 400, padding: '20px 18px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Reject {formatHandoverNo(rejectingHandover.handover_number)}</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>You are rejecting <strong style={{ color: T.re, fontFamily: T.mono }}>₹{Number(rejectingHandover.amount).toLocaleString('en-IN')}</strong> from <strong style={{ color: T.tx }}>{rejectingHandover.from_user_name}</strong>. This action is final — the sender will need to initiate a new handover.</div>
             <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Reason for rejection</label>
@@ -829,8 +829,8 @@ export default function CashBook() {
 
       {/* Add Expense Modal */}
       {showAdd && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
-          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 380, width: '100%' }}>
+        <div style={{ ...S.modalOverlay }}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380, padding: '20px 18px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 14 }}>Add Expense</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <div>
@@ -863,8 +863,8 @@ export default function CashBook() {
 
       {/* Delete confirmation */}
       {confirmDelete && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
-          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', textAlign: 'center', maxWidth: 340, width: '100%' }}>
+        <div style={{ ...S.modalOverlay }}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }}>
             <div style={{ fontSize: 28, marginBottom: 6 }}>⚠️</div>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Delete Expense?</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This will permanently remove the expense.</div>
