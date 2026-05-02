@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { T, Icon } from '../../lib/theme';
 
-export default function Header({ title, onNotifClick, onOpenScanner, notifications, markAsRead }: {
+export default function Header({ title, onNotifClick, onOpenScanner, onOpenCommandPalette, notifications, markAsRead }: {
   title: string;
   onNotifClick?: (n: any) => void;
   onOpenScanner?: () => void;
+  onOpenCommandPalette?: () => void;
   notifications: any[];
   markAsRead: (id: string) => void;
 }) {
@@ -26,6 +27,9 @@ export default function Header({ title, onNotifClick, onOpenScanner, notificatio
         </div>
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <button onClick={() => onOpenCommandPalette?.()} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} title="Search (⌘K)" onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = T.bd2; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = T.bd; }}>
+          <Icon name="search" size={14} />
+        </button>
         <button onClick={() => onOpenScanner?.()} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} title="Scan barcode" onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = T.bd2; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = T.bd; }}>
           <Icon name="scan" size={14} />
         </button>

@@ -120,7 +120,7 @@ const MainApp = () => {
           <span>More</span>
         </div>
       </div>
-      <HeaderComponent title={titles[tab]} onNotifClick={handleNotifClick} onOpenScanner={() => { setScanError(''); setScannerOpen(true); }} notifications={notifications} markAsRead={markAsRead} />
+      <HeaderComponent title={titles[tab]} onNotifClick={handleNotifClick} onOpenScanner={() => { setScanError(''); setScannerOpen(true); }} onOpenCommandPalette={() => setCmdOpen(true)} notifications={notifications} markAsRead={markAsRead} />
       <main style={{ flex: 1, overflow: 'auto' }}>
         {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard navigateTo={setTab} /></div>}
         {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
