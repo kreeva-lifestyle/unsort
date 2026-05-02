@@ -26,7 +26,7 @@ export function useUndoDelete(table: string, onRefresh: () => void) {
   const dismiss = useCallback(() => {
     if (!pendingDel) return;
     clearTimeout(pendingDel.timer);
-    supabase.from(table).delete().eq('id', pendingDel.id).then(() => onRefresh());
+    supabase.from(table).delete().eq('id', pendingDel.id).then(({ error }) => { if (error) console.error('Delete failed:', error); onRefresh(); });
     setPendingDel(null);
   }, [pendingDel, table, onRefresh]);
 

@@ -562,7 +562,7 @@ export default function BrandTagPrinter() {
         const allMaster: BrandTag[] = [];
         let from = 0; let more = true;
         while (more) {
-          const { data } = await supabase.from('brand_tags').select('*').range(from, from + 999);
+          const { data } = await supabase.from('brand_tags').select('id, brand, ean, sku, qty, mrp, size, product, color, mktd, jio_code, copies').range(from, from + 999);
           if (data && data.length > 0) { allMaster.push(...(data as BrandTag[])); from += 1000; }
           if (!data || data.length < 1000) more = false;
           setOrderLoadMsg(`${json.length} rows parsed. Master data: ${allMaster.length} loaded...`);

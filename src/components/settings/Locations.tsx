@@ -12,7 +12,7 @@ export default function Locations({ addToast, canEdit }: { addToast: (msg: strin
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const { ask, modalProps } = useConfirm();
-  const fetchLocations = useCallback(() => { supabase.from('locations').select('*').order('name').then(({ data }) => setLocations(data || [])); }, []);
+  const fetchLocations = useCallback(() => { supabase.from('locations').select('id, name').order('name').then(({ data }) => setLocations(data || [])); }, []);
   const { pendingDel, scheduleDelete, undo, dismiss } = useUndoDelete('locations', fetchLocations);
 
   useEffect(() => {

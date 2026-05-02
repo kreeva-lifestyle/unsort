@@ -15,7 +15,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
   const [newComps, setNewComps] = useState<string[]>(['']);
   const { ask, modalProps } = useConfirm();
 
-  const fetchCategories = () => { supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }).then(({ data }) => setCategories(data || [])); };
+  const fetchCategories = () => { supabase.from('products').select('id, name, sku, description, total_components').eq('is_active', true).order('created_at', { ascending: false }).then(({ data }) => setCategories(data || [])); };
   useEffect(() => {
     fetchCategories();
     const ch = supabase.channel('cat-sync')
@@ -24,7 +24,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, []);
-  const fetchComps = async (id: string) => { const { data } = await supabase.from('components').select('*').eq('product_id', id).order('created_at', { ascending: true }); setComps(data || []); };
+  const fetchComps = async (id: string) => { const { data } = await supabase.from('components').select('id, name').eq('product_id', id).order('created_at', { ascending: true }); setComps(data || []); };
 
   const generateSku = (name: string) => {
     const base = name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);

@@ -10,7 +10,7 @@ export default function Brands({ addToast }: { addToast: (msg: string, type?: st
   const [brands, setBrands] = useState<any[]>([]);
   const [newBrand, setNewBrand] = useState('');
   const { ask, modalProps } = useConfirm();
-  const fetchBrands = useCallback(() => { supabase.from('brands').select('*').order('name').then(({ data }) => setBrands(data || [])); }, []);
+  const fetchBrands = useCallback(() => { supabase.from('brands').select('id, name, is_active').order('name').then(({ data }) => setBrands(data || [])); }, []);
   const { pendingDel, scheduleDelete, undo, dismiss } = useUndoDelete('brands', fetchBrands);
   useEffect(() => { fetchBrands(); }, [fetchBrands]);
 

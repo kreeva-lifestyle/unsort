@@ -10,7 +10,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: an
       <div style={{ position: 'relative', zIndex: 1, background: 'rgba(14,18,30,.90)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 14, padding: '28px 32px', textAlign: 'center' as const, maxWidth: 380, boxShadow: '0 16px 48px rgba(0,0,0,.4)' }}>
         <p style={{ color: '#E2E8F0', fontSize: 14, fontWeight: 600, fontFamily: "'Sora', sans-serif", marginBottom: 6 }}>Something went wrong</p>
         <p style={{ color: '#4A5568', fontSize: 11, marginBottom: 16, lineHeight: 1.5 }}>{String(this.state.error?.message || this.state.error)}</p>
-        <button onClick={() => window.location.reload()} style={{ padding: '7px 18px', borderRadius: 6, border: 'none', background: 'linear-gradient(135deg, #6366F1dd, #818CF8cc)', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 600, boxShadow: '0 2px 10px rgba(99,102,241,.25)', transition: 'all .18s' }}>Reload</button>
+        <button onClick={() => window.location.reload()} style={{ padding: '7px 18px', borderRadius: 6, border: 'none', background: 'linear-gradient(135deg, rgba(99,102,241,.87), rgba(129,140,248,.80))', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 600, boxShadow: '0 2px 10px rgba(99,102,241,.25)', transition: 'all .18s' }}>Reload</button>
       </div>
     </div>;
     return this.props.children;
@@ -84,7 +84,7 @@ const MainApp = () => {
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
-  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflow: 'hidden', position: 'relative' }}>
+  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflowX: 'clip', position: 'relative' }}>
     {/* Ambient glows are static CSS (see .app-glows in index.css) — not React children so
         they don't re-render on tab change (audit P3 performance) */}
     <div className="app-glows" aria-hidden="true" />
@@ -95,7 +95,7 @@ const MainApp = () => {
     <div className="mobile-drawer" style={{ display: 'none', position: 'fixed', top: 0, left: 0, width: 260, height: 'calc(100vh - 60px)', zIndex: 101, transform: mobileMenu ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform .3s cubic-bezier(.4,0,.2,1)', boxShadow: mobileMenu ? '4px 0 24px rgba(0,0,0,.4)' : 'none' }}>
       <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setNotifItemId(null); setMobileMenu(false); }} profile={profile} />
     </div>
-    <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
+    <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', height: '100vh', maxWidth: '100vw' }}>
       {/* Mobile bottom nav */}
       <div className="mobile-hamburger" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 102, background: T.s, borderTop: `1px solid ${T.bd}`, padding: '8px 0', paddingBottom: 'max(8px, env(safe-area-inset-bottom))', justifyContent: 'space-around' }}>
         {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Inventory' }, { id: 'packtime', icon: 'scan', label: 'PackStation' }, { id: 'challan', icon: 'file', label: 'Challan' }].map(t => (
