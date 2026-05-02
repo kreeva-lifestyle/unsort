@@ -743,9 +743,6 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Print ──────────────────────────────────────────────────────────────────
   const printChallan = async (c: Challan) => {
     const { data: citems } = await supabase.from('cash_challan_items').select('sku, quantity, price, total, discount_amount').eq('challan_id', c.id).order('sort_order');
-    const w = window.open('', '_blank');
-    if (!w) return;
-
     // Build one copy's inner HTML. We render it twice — top half = Office copy
     // (signed by customer, kept on file), bottom half = Customer copy. A
     // dashed cut line between them lets the user tear along the middle.
@@ -796,7 +793,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       </section>
     `;
 
-    w.document.write(`<!doctype html><html><head><title>${escHtml(docType)} #${escHtml(c.challan_number)}</title>
+    const htmlContent = `<!doctype html><html><head><meta charset="utf-8"><title>${escHtml(docType)} #${escHtml(c.challan_number)}</title>
       <style>
         @page { size: A4; margin: 10mm; }
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #222; }
@@ -825,9 +822,15 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       ${copy('Office Copy — Customer Signed', true)}
       <div class="cut-line"> - - - - - - - - - - - - - - Cut Here - - - - - - - - - - - - - - </div>
       ${copy('Customer Copy', false)}
-    </div></body></html>`);
-    w.document.close();
-    w.print();
+    </div></body></html>`;
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
+    document.body.appendChild(iframe);
+    const iw = iframe.contentWindow;
+    if (!iw) { iframe.remove(); return; }
+    iw.document.write(htmlContent);
+    iw.document.close();
+    setTimeout(() => { iw.print(); setTimeout(() => iframe.remove(), 1000); }, 300);
   };
 
   // ── Export challans as CSV with item-level detail ─────────────────────────
