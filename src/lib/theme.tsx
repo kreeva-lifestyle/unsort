@@ -126,8 +126,8 @@ export const S = {
 
   fDate: {
     background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`,
-    borderRadius: 6, color: T.tx, fontSize: 12, padding: '6px 10px',
-    outline: 'none', height: 32, boxSizing: 'border-box' as const,
+    borderRadius: 8, color: T.tx, fontSize: 13, padding: '8px 12px',
+    outline: 'none', height: 36, boxSizing: 'border-box' as const,
   } as React.CSSProperties,
 
   modalOverlay: {
