@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T } from '../../lib/theme';
 import type { CashChallan, CashChallanItem } from '../../types/database';
@@ -91,9 +92,9 @@ ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outs
 
   const mobile = typeof window !== 'undefined' && window.innerWidth <= 768;
 
-  return (
+  const content = (
     <div className="challan-detail-overlay" style={mobile
-      ? { position: 'fixed', inset: 0, zIndex: 400, background: '#060810' }
+      ? { position: 'fixed', inset: 0, zIndex: 9999, background: '#060810' }
       : { position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.80)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', padding: 16 }
     } onClick={mobile ? undefined : onClose}>
       <div ref={scrollRef} className="challan-detail-modal" style={mobile
@@ -240,4 +241,6 @@ ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outs
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }
