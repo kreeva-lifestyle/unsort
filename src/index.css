@@ -222,7 +222,8 @@ body.modal-open { overflow: hidden !important; }
 /* ── Challan detail mobile ──────────────────────────────── */
 @media (max-width: 768px) {
   .challan-detail-overlay { padding: 0 !important; background: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-  .challan-detail-modal { max-width: 100% !important; max-height: 100% !important; height: 100% !important; border-radius: 0 !important; border: none !important; animation: slideUp .2s ease both !important; background: #060810 !important; }
+  .challan-detail-modal { max-width: 100% !important; max-height: 100% !important; height: 100% !important; border-radius: 0 !important; border: none !important; animation: slideUp .2s ease both !important; background: #060810 !important; overflow-y: scroll !important; scrollbar-width: none !important; -webkit-overflow-scrolling: touch !important; }
+  .challan-detail-modal::-webkit-scrollbar { display: none !important; }
   .challan-detail-modal table { font-size: 12px !important; }
   .challan-detail-modal th { font-size: 10px !important; padding: 8px 8px !important; }
   .challan-detail-modal td { padding: 8px 8px !important; font-size: 12px !important; }
