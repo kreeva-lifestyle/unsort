@@ -597,6 +597,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const { data: { user } } = await supabase.auth.getUser();
     const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total, amount_paid, status, payment_mode').eq('id', id).maybeSingle();
     if (!before) return;
+    if (before.status === 'paid') { addToast('Cannot void a fully paid challan', 'error'); return; }
     const { error: voidErr } = await supabase.from('cash_challans').update({ status: 'voided', voided_by: user?.id, voided_at: new Date().toISOString() }).eq('id', id);
     if (voidErr) { addToast(friendlyError(voidErr), 'error'); return; }
     if (Number(before.amount_paid || 0) > 0) {

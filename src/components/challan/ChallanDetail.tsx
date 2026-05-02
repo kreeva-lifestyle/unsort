@@ -226,7 +226,7 @@ ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outs
             <button onClick={shareChallan} style={{ ...btnBase, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', color: T.gr }}>Share</button>
             {canRemind && <button onClick={onRemind} style={{ ...btnBase, border: '1px solid rgba(34,197,94,.15)', background: 'rgba(34,197,94,.04)', color: T.gr }}>Remind</button>}
             {canReturn && <button onClick={onReturn} style={{ ...btnBase, border: '1px solid rgba(239,68,68,.15)', background: 'rgba(239,68,68,.04)', color: T.re }}>Return</button>}
-            {!isVoided && <button onClick={onVoid} style={btnBase}>Void</button>}
+            {!isVoided && c.status !== 'paid' && <button onClick={onVoid} style={btnBase}>Void</button>}
           </div>
         </div>
       </div>
