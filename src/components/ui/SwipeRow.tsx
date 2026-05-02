@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react';
 
 interface Action { label: string; color: string; onClick: () => void }
-interface Props { children: React.ReactNode; actions: Action[]; hint?: boolean }
+interface Props { children: React.ReactNode; actions: Action[]; hint?: boolean; hintKey?: string }
 
 const ACTION_W = 56;
 const THRESHOLD = 50;
@@ -9,7 +9,7 @@ const isMobile = () => 'ontouchstart' in window && window.innerWidth <= 768;
 
 const openRows = new Set<() => void>();
 
-export default function SwipeRow({ children, actions, hint }: Props) {
+export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
   const contentRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
   const startY = useRef(0);
@@ -89,7 +89,7 @@ export default function SwipeRow({ children, actions, hint }: Props) {
 
   useEffect(() => {
     if (!hint || !isMobile()) return;
-    const key = 'swipe-hint-shown';
+    const key = `swipe-hint-${hintKey || 'default'}`;
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, '1');
     const t = setTimeout(() => {
