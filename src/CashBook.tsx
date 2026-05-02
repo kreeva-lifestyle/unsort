@@ -109,7 +109,7 @@ export default function CashBook() {
 
     // Cash sales — filter by payment_date (when cash actually moved), not created_at
     const { data: ch } = await supabase.from('cash_challans').select('id, challan_number, customer_name, total, amount_paid, status, is_return, payment_mode, payment_date, created_at')
-      .eq('payment_mode', 'Cash').in('status', ['paid', 'partial']).gte('payment_date', fromDate).lte('payment_date', toDate).order('payment_date', { ascending: false });
+      .in('status', ['paid', 'partial']).gte('payment_date', fromDate).lte('payment_date', toDate).order('payment_date', { ascending: false });
     setSales(ch || []);
 
     // Handovers in date range
@@ -202,7 +202,7 @@ export default function CashBook() {
     const [balR, expR, chR, hoR] = await Promise.all([
       supabase.from('cash_book_balances').select('opening_balance').eq('date', from).maybeSingle(),
       supabase.from('cash_expenses').select('amount').gte('date', from).lte('date', to),
-      supabase.from('cash_challans').select('amount_paid, is_return, status').eq('payment_mode', 'Cash').in('status', ['paid', 'partial']).gte('payment_date', from).lte('payment_date', to),
+      supabase.from('cash_challans').select('amount_paid, is_return, status').in('status', ['paid', 'partial']).gte('payment_date', from).lte('payment_date', to),
       supabase.from('cash_handovers').select('amount, status, period_from, period_to, date').in('status', ['confirmed', 'pending']).limit(500),
     ]);
     const fetchErr = balR.error || expR.error || chR.error || hoR.error;
