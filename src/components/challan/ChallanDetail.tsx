@@ -60,6 +60,16 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
 
   const btnBase: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx2, transition: 'all .15s' };
 
+  const shareChallan = async () => {
+    const itemLines = items.map(it => `${it.sku || '-'} × ${it.quantity ?? 0} = ₹${Number(it.total || 0).toLocaleString('en-IN')}`).join('\n');
+    const text = `Cash Challan #${c.challan_number}\nCustomer: ${c.customer_name}\nDate: ${c.created_at ? new Date(c.created_at).toLocaleDateString('en-IN') : '-'}\n\n${itemLines}\n\nTotal: ₹${Math.abs(Number(c.total)).toLocaleString('en-IN')}\nStatus: ${isRet ? 'Refunded' : c.status}${due > 0 && !isRet ? `\nOutstanding: ₹${due.toLocaleString('en-IN')}` : ''}\n\n— Arya Designs`;
+    if (navigator.share) {
+      try { await navigator.share({ title: `Challan #${c.challan_number}`, text }); } catch {}
+    } else {
+      await navigator.clipboard.writeText(text);
+    }
+  };
+
   return (
     <div style={{ ...S.modalOverlay, zIndex: 400, overflowY: 'auto' }} onClick={onClose}>
       <div ref={scrollRef} className="modal-inner challan-detail-modal" style={{ ...S.modalBox, maxWidth: 520, margin: 'auto' }} onClick={e => e.stopPropagation()}>
@@ -194,7 +204,8 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
           <div className="challan-detail-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: `1px solid ${T.bd}`, paddingTop: 14 }}>
             {!isVoided && <button onClick={onEdit} style={{ ...btnBase, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, border: 'none', color: '#fff' }}>Edit</button>}
             <button onClick={onPrint} style={btnBase}>Print</button>
-            {canRemind && <button onClick={onRemind} style={{ ...btnBase, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', color: T.gr }}>WhatsApp</button>}
+            <button onClick={shareChallan} style={{ ...btnBase, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', color: T.gr }}>Share</button>
+            {canRemind && <button onClick={onRemind} style={{ ...btnBase, border: '1px solid rgba(34,197,94,.15)', background: 'rgba(34,197,94,.04)', color: T.gr }}>Remind</button>}
             {canReturn && <button onClick={onReturn} style={{ ...btnBase, border: '1px solid rgba(239,68,68,.15)', background: 'rgba(239,68,68,.04)', color: T.re }}>↩ Return</button>}
             {!isVoided && <button onClick={onVoid} style={btnBase}>Void</button>}
           </div>
