@@ -97,11 +97,11 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
         <div className="prg-form-body" style={{ padding: '0 20px 20px' }}>
           <SectionTitle color={T.ac2}>{t('programInfo')}</SectionTitle>
           <div className="prg-sku-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-            <div><label style={S.fLabel}>{t('sellingSkuLabel')}</label><input value={form.selling_sku} onChange={e => setField('selling_sku', e.target.value)} placeholder={t('skuPlaceholderSell')} style={{ ...S.fInput, fontSize: 11, borderColor: isSkuError && !form.selling_sku ? T.re : undefined }} /></div>
-            <div><label style={S.fLabel}>{t('manufacturingSkuLabel')}</label><input value={form.manufacturing_sku} onChange={e => setField('manufacturing_sku', e.target.value)} placeholder={t('skuPlaceholderMfg')} style={{ ...S.fInput, fontSize: 11, borderColor: isSkuError && !form.manufacturing_sku ? T.re : undefined }} /></div>
+            <div><label style={S.fLabel}>{t('sellingSkuLabel')}</label><input value={form.selling_sku} onChange={e => setField('selling_sku', e.target.value)} placeholder={t('skuPlaceholderSell')} style={{ ...S.fInput, fontFamily: T.mono, borderColor: isSkuError && !form.selling_sku ? T.re : undefined }} /></div>
+            <div><label style={S.fLabel}>{t('manufacturingSkuLabel')}</label><input value={form.manufacturing_sku} onChange={e => setField('manufacturing_sku', e.target.value)} placeholder={t('skuPlaceholderMfg')} style={{ ...S.fInput, fontFamily: T.mono, borderColor: isSkuError && !form.manufacturing_sku ? T.re : undefined }} /></div>
           </div>
           {isSkuError && <div style={{ ...S.errorBox, marginBottom: 10 }}>{t('skuRequired')}</div>}
-          <div style={{ marginBottom: 12 }}><label style={S.fLabel}>{t('linkLabel')}</label><input value={form.dropbox_gdrive_link} onChange={e => setField('dropbox_gdrive_link', e.target.value)} placeholder={t('linkPlaceholder')} style={{ ...S.fInput, fontSize: 11 }} /></div>
+          <div style={{ marginBottom: 12 }}><label style={S.fLabel}>{t('linkLabel')}</label><input value={form.dropbox_gdrive_link} onChange={e => setField('dropbox_gdrive_link', e.target.value)} placeholder={t('linkPlaceholder')} style={S.fInput} /></div>
 
           <SectionTitle color={T.gr}>{t('workProgram')}</SectionTitle>
           {/* Desktop table */}
@@ -127,7 +127,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                     <td style={{ ...calcCell, color: T.gr }}>{p.total ? '₹' + p.total.toFixed(0) : '—'}</td>
                     <td style={td}><input list="dl-fn" value={p.fabric_name} onChange={e => updateWork(i, 'fabric_name', e.target.value)} placeholder={t('fabricPlaceholder')} style={txtIn} data-row={i} data-col={9} onKeyDown={workNav} /></td>
                     <td style={td}><input type="number" min="0" step="0.01" value={p.fabric_meter || ''} onChange={e => updateWork(i, 'fabric_meter', Math.max(0, Number(e.target.value)))} style={numIn} data-row={i} data-col={10} onKeyDown={workNav} /></td>
-                    <td style={td}>{workParts.length > 1 && <button onClick={() => setWorkParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 13 }}>×</button>}</td>
+                    <td style={td}>{workParts.length > 1 && <button onClick={() => setWorkParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 16, minWidth: 44, minHeight: 44 }}>×</button>}</td>
                   </tr>
                 ))}
                 <tr style={{ background: 'rgba(52,211,153,.10)', borderTop: `2px solid ${T.gr}` }}>
@@ -158,7 +158,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                   <tr key={i}>
                     <td style={td}><input list="dl-pn" value={p.part_name} onChange={e => updateFabric(i, 'part_name', e.target.value)} placeholder={t('partPlaceholder')} style={txtIn} data-row={i} data-col={0} onKeyDown={fabricNav} /></td>
                     <td style={td}><input type="number" min="0" step="0.01" value={p.fabric_meter || ''} onChange={e => updateFabric(i, 'fabric_meter', Math.max(0, Number(e.target.value)))} style={numIn} data-row={i} data-col={1} onKeyDown={fabricNav} /></td>
-                    <td style={td}>{fabricParts.length > 1 && <button onClick={() => setFabricParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 13 }}>×</button>}</td>
+                    <td style={td}>{fabricParts.length > 1 && <button onClick={() => setFabricParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 16, minWidth: 44, minHeight: 44 }}>×</button>}</td>
                   </tr>
                 ))}
                 <tr style={{ background: 'rgba(56,189,248,.06)' }}>

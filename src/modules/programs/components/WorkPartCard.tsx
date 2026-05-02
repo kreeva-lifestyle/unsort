@@ -14,14 +14,14 @@ interface Props {
   t: (key: TranslationKey) => string;
 }
 
-const lbl: React.CSSProperties = { fontSize: 8, color: '#6B7890', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 };
+const lbl: React.CSSProperties = { fontSize: 10, color: '#6B7890', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3, fontWeight: 600 };
 
 export default function WorkPartCard({ p, i, canDelete, numIn, txtIn, selIn, onUpdate, onDelete, t }: Props) {
   return (
     <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid rgba(255,255,255,0.05)`, borderRadius: 8, padding: 12, marginBottom: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <input list="dl-pn" value={p.part_name} onChange={e => onUpdate(i, 'part_name', e.target.value)} placeholder={t('partPlaceholder')} style={{ ...txtIn, flex: 1, fontWeight: 600, fontSize: 14 }} />
-        {canDelete && <button onClick={() => onDelete(i)} style={{ border: 'none', background: 'none', color: '#EF4444', cursor: 'pointer', fontSize: 18, marginLeft: 8, minWidth: 32, minHeight: 32 }}>×</button>}
+        {canDelete && <button onClick={() => onDelete(i)} style={{ border: 'none', background: 'none', color: '#EF4444', cursor: 'pointer', fontSize: 18, marginLeft: 8, minWidth: 44, minHeight: 44 }}>×</button>}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
         <div><div style={lbl}>{t('stitch')}</div><input type="number" min="0" value={p.stitch || ''} onChange={e => onUpdate(i, 'stitch', Math.max(0, Number(e.target.value)))} placeholder="0" style={numIn} /></div>
