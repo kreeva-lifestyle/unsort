@@ -102,7 +102,7 @@ ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outs
       } onClick={e => e.stopPropagation()}>
 
         {/* ── Header ── */}
-        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'sticky', top: 0, background: T.s, zIndex: 2 }}>
+        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', ...(mobile ? {} : { position: 'sticky' as const, top: 0, background: T.s, zIndex: 2 }) }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>#{c.challan_number}</span>
@@ -118,7 +118,7 @@ ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outs
           <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.bd}`, borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.tx3, fontSize: 16, lineHeight: 1, flexShrink: 0 }}>&times;</button>
         </div>
 
-        <div style={{ padding: '16px 20px' }}>
+        <div style={{ padding: '16px 20px', paddingBottom: mobile ? 80 : 16 }}>
 
           {/* ── Items table ── */}
           {items.length > 0 && (
