@@ -14,3 +14,11 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
+
+// Haptic feedback on button taps (native feel)
+document.addEventListener('touchstart', (e) => {
+  const t = e.target as HTMLElement;
+  if (t.closest('button, [role="button"]')) {
+    try { navigator.vibrate?.(8); } catch {}
+  }
+}, { passive: true });
