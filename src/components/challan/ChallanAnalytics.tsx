@@ -1,6 +1,6 @@
 // Analytics panel extracted from CashChallan.tsx (audit P0 — split 1100-line god-component).
 // Consumes state from the parent so date range stays in sync with the URL/app state.
-import { T } from '../../lib/theme';
+import { T, S } from '../../lib/theme';
 
 export type AnalyticsData = {
   totalRevenue: number;
@@ -38,9 +38,9 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Analytics</span>
       </div>
       <div className="challan-analytics-dates" style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12 }}>
-        <input type="date" value={from} onChange={e => onFromChange(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }} />
+        <input type="date" value={from} onChange={e => onFromChange(e.target.value)} style={S.fDate} />
         <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
-        <input type="date" value={to} onChange={e => onToChange(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }} />
+        <input type="date" value={to} onChange={e => onToChange(e.target.value)} style={S.fDate} />
         <button onClick={onApply} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
       </div>
       <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
