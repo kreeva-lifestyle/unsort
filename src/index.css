@@ -221,12 +221,12 @@ body.modal-open { overflow: hidden !important; }
 
 /* ── Challan detail mobile ──────────────────────────────── */
 @media (max-width: 768px) {
-  .challan-detail-modal { position: fixed !important; bottom: 0 !important; top: auto !important; left: 0 !important; right: 0 !important; max-width: 100% !important; max-height: 92vh !important; border-radius: 16px 16px 0 0 !important; animation: slideUp .25s ease both !important; }
+  .challan-detail-modal { position: fixed !important; bottom: 0 !important; top: auto !important; left: 0 !important; right: 0 !important; max-width: 100% !important; max-height: 92vh !important; border-radius: 16px 16px 0 0 !important; margin: 0 !important; animation: slideUp .25s ease both !important; }
   .challan-detail-modal table { font-size: 12px !important; }
   .challan-detail-modal th { font-size: 10px !important; padding: 8px 8px !important; }
   .challan-detail-modal td { padding: 8px 8px !important; font-size: 12px !important; }
-  .challan-detail-actions { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
-  .challan-detail-actions button { width: 100% !important; height: 44px !important; font-size: 13px !important; justify-content: center !important; display: flex !important; align-items: center !important; }
+  .challan-detail-actions { display: grid !important; grid-template-columns: 1fr 1fr 1fr !important; gap: 6px !important; }
+  .challan-detail-actions button { width: 100% !important; height: 38px !important; font-size: 12px !important; justify-content: center !important; display: flex !important; align-items: center !important; padding: 6px 8px !important; }
 }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
