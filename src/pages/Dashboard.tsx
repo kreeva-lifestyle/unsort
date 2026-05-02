@@ -176,7 +176,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
       </div>
 
       {/* Row 1b: Secondary stats — demoted to 3-up strip */}
-      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 14 }}>
+      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
         {([
           { label: "Today's Scans", value: pulse.scans, color: T.ac, prefix: '', tip: 'Total barcodes scanned today in PackStation', target: 'packtime' },
           { label: 'Unsorted Items', value: pulse.unsorted, color: T.yl, prefix: '', tip: 'Items awaiting sorting in Inventory', target: 'inventory' },
