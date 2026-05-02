@@ -625,11 +625,11 @@ export default function BrandTagPrinter() {
           <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px', marginBottom: 12, display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>From</div>
-              <input type="date" value={historyFrom} max={historyTo || undefined} onChange={e => { setHistoryFrom(e.target.value); setHistoryPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 12px', outline: 'none', height: 36, colorScheme: 'dark' as any }} />
+              <input type="date" value={historyFrom} max={historyTo || undefined} onChange={e => { setHistoryFrom(e.target.value); setHistoryPage(0); }} style={S.fDate} />
             </div>
             <div>
               <div style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>To</div>
-              <input type="date" value={historyTo} min={historyFrom || undefined} max={new Date().toISOString().slice(0, 10)} onChange={e => { setHistoryTo(e.target.value); setHistoryPage(0); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 12px', outline: 'none', height: 36, colorScheme: 'dark' as any }} />
+              <input type="date" value={historyTo} min={historyFrom || undefined} max={new Date().toISOString().slice(0, 10)} onChange={e => { setHistoryTo(e.target.value); setHistoryPage(0); }} style={S.fDate} />
             </div>
             {[
               { label: 'Today', from: 0, to: 0 },

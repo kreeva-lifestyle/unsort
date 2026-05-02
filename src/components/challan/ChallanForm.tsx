@@ -267,7 +267,7 @@ export default function ChallanForm(p: ChallanFormProps) {
             </div>
             <div>
               <label style={lbl}>{p.isReturn ? 'Refund Date' : 'Payment Date'}</label>
-              <input type="date" value={p.paymentDate} onChange={e => p.setPaymentDate(e.target.value)} style={{ ...inp, fontSize: 11 }} />
+              <input type="date" value={p.paymentDate} onChange={e => p.setPaymentDate(e.target.value)} style={inp} />
             </div>
           </div>
         </div>

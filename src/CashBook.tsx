@@ -8,7 +8,7 @@ import { useDebouncedFetch } from './hooks/useDebouncedFetch';
 import { useNotifications } from './hooks/useNotifications';
 import Empty from './components/ui/Empty';
 
-import { T } from './lib/theme';
+import { T, S } from './lib/theme';
 import type {
   CashExpense,
   CashExpenseInsert,
@@ -493,9 +493,9 @@ export default function CashBook() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>Cash Book</span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '5px 8px', outline: 'none' }} />
+          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={S.fDate} />
           <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
-          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '5px 8px', outline: 'none' }} />
+          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={S.fDate} />
           <button onClick={exportCSV} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>Export CSV</button>
         </div>
       </div>
@@ -646,11 +646,11 @@ export default function CashBook() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Period From</label>
-                <input type="date" value={handPeriodFrom} onChange={e => { setHandPeriodFrom(e.target.value); setHandAmount(''); }} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '7px 10px', outline: 'none', boxSizing: 'border-box' }} />
+                <input type="date" value={handPeriodFrom} onChange={e => { setHandPeriodFrom(e.target.value); setHandAmount(''); }} style={{ ...S.fDate, width: '100%' }} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Period To</label>
-                <input type="date" value={handPeriodTo} onChange={e => { setHandPeriodTo(e.target.value); setHandAmount(''); }} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '7px 10px', outline: 'none', boxSizing: 'border-box' }} />
+                <input type="date" value={handPeriodTo} onChange={e => { setHandPeriodTo(e.target.value); setHandAmount(''); }} style={{ ...S.fDate, width: '100%' }} />
               </div>
             </div>
 
@@ -835,7 +835,7 @@ export default function CashBook() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Date</label>
-                <input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+                <input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} style={{ ...S.fDate, width: '100%' }} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Amount (₹)</label>

@@ -124,6 +124,12 @@ export const S = {
   btnSm: { padding: '4px 10px', fontSize: 10, borderRadius: 5 } as React.CSSProperties,
   btnLg: { padding: '10px 18px', fontSize: 13, height: 40 } as React.CSSProperties,
 
+  fDate: {
+    background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`,
+    borderRadius: 6, color: T.tx, fontSize: 12, padding: '6px 10px',
+    outline: 'none', height: 32, boxSizing: 'border-box' as const,
+  } as React.CSSProperties,
+
   modalOverlay: {
     position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,.80)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',

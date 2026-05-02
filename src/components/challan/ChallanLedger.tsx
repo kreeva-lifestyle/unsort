@@ -1,7 +1,7 @@
 // Customer ledger list + detail — extracted from CashChallan.tsx for
 // god-component split (audit P0). Parent owns the data fetch; this
 // component just renders.
-import { T } from '../../lib/theme';
+import { T, S } from '../../lib/theme';
 import type { CashChallan } from '../../types/database';
 
 type Challan = Omit<CashChallan, 'created_at' | 'updated_at'> & { created_at: string; updated_at: string };
@@ -60,11 +60,11 @@ export default function ChallanLedger({
         <div className="challan-ledger-dates" style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <label style={{ fontSize: 8, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase' }}>From</label>
-            <input type="date" value={dateFrom} onChange={e => onDateFromChange(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '6px 8px', outline: 'none' }} />
+            <input type="date" value={dateFrom} onChange={e => onDateFromChange(e.target.value)} style={S.fDate} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <label style={{ fontSize: 8, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase' }}>To</label>
-            <input type="date" value={dateTo} onChange={e => onDateToChange(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '6px 8px', outline: 'none' }} />
+            <input type="date" value={dateTo} onChange={e => onDateToChange(e.target.value)} style={S.fDate} />
           </div>
           <button onClick={() => onDateApply()} style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', height: 30 }}>Apply</button>
           {(dateFrom || dateTo) && <button onClick={() => { onDateFromChange(''); onDateToChange(''); onDateApply('', ''); }} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer', height: 30 }}>Clear</button>}
