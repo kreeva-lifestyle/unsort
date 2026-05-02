@@ -137,6 +137,8 @@ body.modal-open { overflow: hidden !important; }
   .desktop-only { display: none !important; }
   .challan-row-actions { display: none !important; }
   .bt-actions-col { display: none !important; }
+  .inv-action-btns { justify-content: flex-end !important; }
+  .challan-filter-btns { flex: 0 !important; }
   .mobile-drawer .sidebar { display: flex !important; width: 100% !important; height: calc(100vh - 60px) !important; padding-bottom: 0 !important; }
   .page-pad { padding: 14px 12px !important; padding-bottom: 70px !important; }
   .filter-bar { gap: 6px !important; padding: 8px 10px !important; }

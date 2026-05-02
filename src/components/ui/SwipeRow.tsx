@@ -7,11 +7,15 @@ const ACTION_W = 56;
 const THRESHOLD = 50;
 const isMobile = () => 'ontouchstart' in window && window.innerWidth <= 768;
 
+const openRows = new Set<() => void>();
+
 export default function SwipeRow({ children, actions, hint }: Props) {
   const contentRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
+  const startY = useRef(0);
   const currentX = useRef(0);
   const open = useRef(false);
+  const locked = useRef<'h' | 'v' | null>(null);
   const maxReveal = actions.length * ACTION_W;
 
   const setTranslate = useCallback((x: number, animate = false) => {
@@ -22,24 +26,51 @@ export default function SwipeRow({ children, actions, hint }: Props) {
     currentX.current = x;
   }, []);
 
+  const closeThis = useCallback(() => {
+    setTranslate(0, true);
+    open.current = false;
+  }, [setTranslate]);
+
   const snap = useCallback((toOpen: boolean) => {
+    if (toOpen) {
+      openRows.forEach(fn => { if (fn !== closeThis) fn(); });
+      openRows.clear();
+      openRows.add(closeThis);
+    } else {
+      openRows.delete(closeThis);
+    }
     setTranslate(toOpen ? -maxReveal : 0, true);
     open.current = toOpen;
-  }, [maxReveal, setTranslate]);
+  }, [maxReveal, setTranslate, closeThis]);
 
   useEffect(() => {
     if (!isMobile()) return;
     const el = contentRef.current;
     if (!el) return;
 
-    const onStart = (e: TouchEvent) => { startX.current = e.touches[0].clientX; };
+    const onStart = (e: TouchEvent) => {
+      startX.current = e.touches[0].clientX;
+      startY.current = e.touches[0].clientY;
+      locked.current = null;
+    };
     const onMove = (e: TouchEvent) => {
       const dx = e.touches[0].clientX - startX.current;
+      const dy = e.touches[0].clientY - startY.current;
+      if (!locked.current) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        locked.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+        if (locked.current === 'h') {
+          openRows.forEach(fn => { if (fn !== closeThis) fn(); });
+          openRows.clear();
+        }
+      }
+      if (locked.current !== 'h') return;
       const base = open.current ? -maxReveal : 0;
       const next = Math.max(-maxReveal, Math.min(0, base + dx));
       setTranslate(next);
     };
     const onEnd = () => {
+      if (locked.current !== 'h') return;
       const moved = Math.abs(currentX.current - (open.current ? -maxReveal : 0));
       if (moved > THRESHOLD) snap(!open.current);
       else snap(open.current);
@@ -48,8 +79,13 @@ export default function SwipeRow({ children, actions, hint }: Props) {
     el.addEventListener('touchstart', onStart, { passive: true });
     el.addEventListener('touchmove', onMove, { passive: true });
     el.addEventListener('touchend', onEnd);
-    return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchmove', onMove); el.removeEventListener('touchend', onEnd); };
-  }, [maxReveal, setTranslate, snap]);
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      openRows.delete(closeThis);
+    };
+  }, [maxReveal, setTranslate, snap, closeThis]);
 
   useEffect(() => {
     if (!hint || !isMobile()) return;
