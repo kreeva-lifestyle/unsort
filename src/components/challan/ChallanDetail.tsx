@@ -60,14 +60,30 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
 
   const btnBase: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx2, transition: 'all .15s' };
 
-  const shareChallan = async () => {
-    const itemLines = items.map(it => `${it.sku || '-'} × ${it.quantity ?? 0} = ₹${Number(it.total || 0).toLocaleString('en-IN')}`).join('\n');
-    const text = `Cash Challan #${c.challan_number}\nCustomer: ${c.customer_name}\nDate: ${c.created_at ? new Date(c.created_at).toLocaleDateString('en-IN') : '-'}\n\n${itemLines}\n\nTotal: ₹${Math.abs(Number(c.total)).toLocaleString('en-IN')}\nStatus: ${isRet ? 'Refunded' : c.status}${due > 0 && !isRet ? `\nOutstanding: ₹${due.toLocaleString('en-IN')}` : ''}\n\n— Arya Designs`;
-    if (navigator.share) {
-      try { await navigator.share({ title: `Challan #${c.challan_number}`, text }); } catch {}
-    } else {
-      await navigator.clipboard.writeText(text);
-    }
+  const shareChallan = () => {
+    const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[ch] || ch));
+    const dateStr = c.created_at ? new Date(c.created_at).toLocaleDateString('en-IN') : '-';
+    const itemRows = items.map((it, i) => `<tr><td>${i + 1}</td><td>${esc(it.sku || '-')}</td><td style="text-align:right">${it.quantity ?? 0}</td><td style="text-align:right">₹${Number(it.price || 0).toLocaleString('en-IN')}</td><td style="text-align:right">${Number(it.discount_amount || 0) > 0 ? '-₹' + Number(it.discount_amount).toLocaleString('en-IN') : '-'}</td><td style="text-align:right">₹${Number(it.total || 0).toLocaleString('en-IN')}</td></tr>`).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Challan #${esc(c.challan_number)}</title>
+<style>body{font-family:Arial,sans-serif;margin:20px;color:#222;max-width:600px}
+h2{margin:0;font-size:16px}table{width:100%;border-collapse:collapse;margin:10px 0}
+th,td{border:1px solid #ddd;padding:4px 6px;font-size:11px}th{background:#f5f5f5;font-weight:600}
+.total{text-align:right;font-size:15px;font-weight:700;margin:8px 0}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700}
+@media print{@page{margin:10mm}}</style></head><body>
+<h2>Arya Designs</h2>
+<p style="color:#666;font-size:11px;margin:2px 0">Cash Challan #${esc(c.challan_number)} | ${dateStr}</p>
+<p style="font-size:12px;margin:4px 0"><strong>Customer:</strong> ${esc(c.customer_name)}</p>
+<table><thead><tr><th>#</th><th>SKU</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Disc</th><th style="text-align:right">Total</th></tr></thead><tbody>${itemRows}</tbody></table>
+<p class="total">Total: ₹${Math.abs(Number(c.total)).toLocaleString('en-IN')}</p>
+${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outstanding: ₹${due.toLocaleString('en-IN')}</p>` : ''}
+<p style="font-size:10px;color:#888;margin-top:16px">Powered by DailyOffice</p>
+</body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.print();
   };
 
   return (
