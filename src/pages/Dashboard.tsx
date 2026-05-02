@@ -59,7 +59,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
 
     // Pulse
     const todayChallans = challans.filter(c => new Date(c.created_at) >= today);
-    const todayRev = todayChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
+    const todayRev = todayChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total || 0), 0);
     const unsortedCount = items.filter(i => i.status === 'unsorted').length;
     const opening = Number(balances?.opening_balance || 0);
     const cashSales = todayChallans.filter(c => !c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
