@@ -296,10 +296,8 @@ export default function CashBook() {
   // Print receipt for a handover
   const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
   const printHandoverReceipt = (h: Handover) => {
-    const w = window.open('', '_blank');
-    if (!w) return;
     const b = h.breakdown;
-    w.document.write(`<html><head><title>Cash Handover Receipt</title><style>
+    let html = `<html><head><meta charset="utf-8"><title>Cash Handover Receipt</title><style>
       body{font-family:Arial,sans-serif;padding:24px;max-width:600px;margin:auto;color:#222}
       h2{margin:0;text-align:center}
       .header{text-align:center;margin-bottom:20px;border-bottom:2px solid #333;padding-bottom:14px}
@@ -318,17 +316,18 @@ export default function CashBook() {
       .signature{margin-top:30px;display:grid;grid-template-columns:1fr 1fr;gap:30px}
       .sig-box{border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#666}
       .receipt-no{font-family:monospace;color:#666;font-size:12px}
-    </style></head><body>`);
+      @media print{@page{margin:10mm}}
+    </style></head><body>`;
     const receiptDate = h.created_at ? new Date(h.created_at).toLocaleDateString('en-IN') : '—';
-    w.document.write(`<div class="header"><h2>Arya Designs</h2><p style="margin:6px 0;color:#666;font-size:13px">CASH HANDOVER RECEIPT</p><p class="receipt-no">${formatHandoverNo(h.handover_number)} | ${receiptDate}</p></div>`);
-    w.document.write(`<div class="meta">
+    html += `<div class="header"><h2>Arya Designs</h2><p style="margin:6px 0;color:#666;font-size:13px">CASH HANDOVER RECEIPT</p><p class="receipt-no">${formatHandoverNo(h.handover_number)} | ${receiptDate}</p></div>`;
+    html += `<div class="meta">
       <div><strong>From</strong>${esc(h.from_user_name)}</div>
       <div><strong>To</strong>${esc(h.to_user_name)}</div>
       <div><strong>Period Covered</strong>${h.period_from ? new Date(h.period_from).toLocaleDateString('en-IN') : '-'} to ${h.period_to ? new Date(h.period_to).toLocaleDateString('en-IN') : '-'}</div>
       <div><strong>Status</strong><span class="status ${h.status === 'confirmed' ? 'signed' : 'pending'}">${h.status === 'confirmed' ? '✓ Signed' : 'Pending'}</span></div>
-    </div>`);
+    </div>`;
     if (b) {
-      w.document.write(`<table><thead><tr><th>Cash Flow</th><th class="right">Amount (₹)</th></tr></thead><tbody>
+      html += `<table><thead><tr><th>Cash Flow</th><th class="right">Amount (₹)</th></tr></thead><tbody>
         <tr><td>Opening Balance</td><td class="right">${b.opening.toFixed(2)}</td></tr>
         <tr><td>+ Cash Sales</td><td class="right">+${b.cashSales.toFixed(2)}</td></tr>
         <tr><td>− Cash Returns</td><td class="right">−${b.cashReturns.toFixed(2)}</td></tr>
@@ -336,23 +335,29 @@ export default function CashBook() {
         <tr><td>− Previous Handovers</td><td class="right">−${b.previousHandovers.toFixed(2)}</td></tr>
         <tr class="total-row"><td>= Available Cash</td><td class="right">${b.available.toFixed(2)}</td></tr>
         <tr class="total-row"><td>HANDED OVER</td><td class="right">${Number(h.amount).toFixed(2)}</td></tr>
-      </tbody></table>`);
+      </tbody></table>`;
     } else {
-      w.document.write(`<p style="text-align:center;font-size:18px;font-weight:700;padding:14px;background:#fffbe6;border-radius:6px">Amount Handed: ₹${Number(h.amount).toFixed(2)}</p>`);
+      html += `<p style="text-align:center;font-size:18px;font-weight:700;padding:14px;background:#fffbe6;border-radius:6px">Amount Handed: ₹${Number(h.amount).toFixed(2)}</p>`;
     }
-    if (h.reason) w.document.write(`<div class="reason"><strong>Reason for amount difference:</strong><br/>${esc(h.reason)}</div>`);
-    if (h.notes) w.document.write(`<p style="font-size:12px;color:#555"><strong>Notes:</strong> ${esc(h.notes)}</p>`);
+    if (h.reason) html += `<div class="reason"><strong>Reason for amount difference:</strong><br/>${esc(h.reason)}</div>`;
+    if (h.notes) html += `<p style="font-size:12px;color:#555"><strong>Notes:</strong> ${esc(h.notes)}</p>`;
     if (h.status === 'confirmed' && h.confirmed_at) {
-      w.document.write(`<p style="text-align:center;color:#155724;font-size:12px;margin-top:20px">✓ Digitally signed by ${esc(h.to_user_name)} on ${new Date(h.confirmed_at).toLocaleString('en-IN')}</p>`);
+      html += `<p style="text-align:center;color:#155724;font-size:12px;margin-top:20px">✓ Digitally signed by ${esc(h.to_user_name)} on ${new Date(h.confirmed_at).toLocaleString('en-IN')}</p>`;
     }
-    w.document.write(`<div class="signature">
+    html += `<div class="signature">
       <div class="sig-box">${esc(h.from_user_name)}<br/><span style="font-size:10px">Sender Signature</span></div>
       <div class="sig-box">${esc(h.to_user_name)}<br/><span style="font-size:10px">Recipient Signature${h.status === 'confirmed' ? ' (Digitally Signed)' : ''}</span></div>
-    </div>`);
-    w.document.write(`<p style="text-align:center;color:#999;font-size:9px;margin-top:30px">Generated by DailyOffice · ${new Date().toLocaleString('en-IN')}</p>`);
-    w.document.write(`</body></html>`);
-    w.document.close();
-    setTimeout(() => w.print(), 400);
+    </div>`;
+    html += `<p style="text-align:center;color:#999;font-size:9px;margin-top:30px">Generated by DailyOffice · ${new Date().toLocaleString('en-IN')}</p>`;
+    html += `</body></html>`;
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
+    document.body.appendChild(iframe);
+    const iw = iframe.contentWindow;
+    if (!iw) { iframe.remove(); return; }
+    iw.document.write(html);
+    iw.document.close();
+    setTimeout(() => { iw.print(); setTimeout(() => iframe.remove(), 1000); }, 300);
   };
 
   const confirmHandover = async () => {

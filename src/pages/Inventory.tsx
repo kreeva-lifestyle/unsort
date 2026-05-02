@@ -388,10 +388,15 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const printBarcode = (uniqueId: string) => {
     const canvas = document.createElement('canvas');
     try { JsBarcode(canvas, uniqueId, { format: 'CODE128', width: 2, height: 60, displayValue: true, fontSize: 14, font: 'IBM Plex Mono', margin: 10 }); } catch { return; }
-    const win = window.open('', '_blank', 'width=400,height=250');
-    if (!win) return;
-    win.document.write(`<html><head><title>${uniqueId}</title><style>body{font-family:'IBM Plex Sans',sans-serif;text-align:center;padding:20px}@media print{.no-print{display:none}}</style></head><body><img src="${canvas.toDataURL()}" /><br><button class="no-print" onclick="window.print()" style="margin-top:16px;padding:8px 24px;font-size:14px;cursor:pointer">Print</button></body></html>`);
-    win.document.close();
+    const html = `<html><head><title>${uniqueId}</title><style>body{font-family:'IBM Plex Sans',sans-serif;text-align:center;padding:20px}@media print{@page{margin:10mm}}</style></head><body><img src="${canvas.toDataURL()}" /></body></html>`;
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
+    document.body.appendChild(iframe);
+    const iw = iframe.contentWindow;
+    if (!iw) { iframe.remove(); return; }
+    iw.document.write(html);
+    iw.document.close();
+    setTimeout(() => { iw.print(); setTimeout(() => iframe.remove(), 1000); }, 300);
   };
   const openComps = async (item: any) => {
     setSelected(item); await fetchComps(item.id);
