@@ -90,7 +90,7 @@ ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outs
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.80)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', padding: 16 }} onClick={onClose}>
+    <div className="challan-detail-overlay" style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.80)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', padding: 16 }} onClick={onClose}>
       <div ref={scrollRef} className="modal-inner challan-detail-modal" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,.65)' }} onClick={e => e.stopPropagation()}>
 
         {/* ── Header ── */}
