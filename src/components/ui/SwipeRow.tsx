@@ -63,12 +63,14 @@ export default function SwipeRow({ children, actions, hint }: Props) {
     return () => clearTimeout(t);
   }, [hint, setTranslate]);
 
+  if (!isMobile()) return <>{children}</>;
+
   return (
-    <div className="swipe-row" style={{ position: 'relative', overflow: 'hidden' }}>
-      <div ref={contentRef} className="swipe-row-content" style={{ position: 'relative', zIndex: 1, background: 'inherit' }}>
+    <div style={{ position: 'relative', overflow: 'hidden' }}>
+      <div ref={contentRef} style={{ position: 'relative', zIndex: 1, background: '#060810' }}>
         {children}
       </div>
-      <div className="swipe-row-actions" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, display: 'flex' }}>
+      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, display: 'flex' }}>
         {actions.map((a, i) => (
           <div key={i} onClick={a.onClick} style={{ width: ACTION_W, display: 'flex', alignItems: 'center', justifyContent: 'center', background: a.color, color: '#fff', fontSize: 9, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3 }}>
             {a.label}

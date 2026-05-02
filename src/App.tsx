@@ -32,7 +32,6 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { NotificationProvider, useNotifications } from './hooks/useNotifications';
 
 import { TAB_IDS } from './lib/tabs';
-import { usePullToRefresh } from './hooks/usePullToRefresh';
 import { CommandPalette, useCommands } from './components/command-palette';
 const getTabFromHash = () => {
   const h = window.location.hash.replace(/^#\/?/, '').split('/')[0];
@@ -65,8 +64,6 @@ const MainApp = () => {
     return () => window.removeEventListener('keydown', h);
   }, []);
   const commands = useCommands(setTab, {});
-
-  usePullToRefresh(() => { addToast('Refreshed', 'success'); setTimeout(() => window.location.reload(), 300); });
 
   // Browser back/forward support
   useEffect(() => {
