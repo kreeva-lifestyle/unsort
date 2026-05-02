@@ -80,8 +80,8 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
 
           {/* Items table */}
           {items.length > 0 && (
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+            <div className="table-wrap" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, marginBottom: 12 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, minWidth: 360 }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${T.bd}` }}>
                     <th style={{ padding: '6px 10px', textAlign: 'left', color: T.tx3, fontSize: 9, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' }}>SKU</th>

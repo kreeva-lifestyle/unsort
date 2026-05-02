@@ -65,7 +65,7 @@ export default function ChallanList(p: Props) {
       </div>
 
       {p.showFilters && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center', padding: '8px 10px', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 6 }}>
+        <div className="challan-filter-row" style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center', padding: '8px 10px', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 6 }}>
           <select value={p.statusFilter} onChange={e => { p.onStatusFilterChange(e.target.value); p.onResetPage(); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }}>
             <option value="">All Status</option><option value="draft">Draft</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option><option value="partial">Partial</option><option value="voided">Voided</option>
           </select>
@@ -131,7 +131,7 @@ export default function ChallanList(p: Props) {
                   );
                 })()}
               </div>
-              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+              <div className="challan-row-actions" style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                 <button onClick={e => { e.stopPropagation(); p.onPrint(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.5 }}>
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.tx2, strokeWidth: 2 }}><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
                 </button>

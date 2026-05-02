@@ -178,6 +178,52 @@ body.modal-open { overflow: hidden !important; }
   .challan-filters input { width: 100% !important; min-width: 0 !important; }
   .challan-filter-btns { display: flex !important; gap: 6px !important; overflow-x: auto !important; scrollbar-width: none !important; }
   .challan-filter-btns::-webkit-scrollbar { display: none !important; }
+
+  /* Collapsible filter chips row */
+  .challan-filter-row { gap: 6px !important; flex-wrap: wrap !important; }
+  .challan-filter-row select, .challan-filter-row input { font-size: 12px !important; padding: 8px 10px !important; min-width: 0 !important; flex: 1 1 calc(50% - 3px) !important; min-height: 36px !important; }
+
+  /* Per-row action icons (print/remind/return/void) */
+  .challan-row-actions { gap: 2px !important; }
+  .challan-row-actions button { min-width: 36px !important; min-height: 36px !important; padding: 8px !important; opacity: 0.85 !important; }
+  .challan-row-actions button svg { width: 16px !important; height: 16px !important; }
+
+  /* ChallanForm — keep grid, scroll item rows horizontally (matches Figma) */
+  .challan-form { padding: 12px 12px 80px !important; }
+  .challan-form input, .challan-form select, .challan-form textarea { font-size: 16px !important; }
+  .challan-item-grid-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important; }
+  .challan-item-grid-wrap::-webkit-scrollbar { display: none !important; }
+  .challan-item-grid-wrap > div { min-width: 480px !important; }
+  .challan-form-grid-3 { grid-template-columns: 1fr !important; }
+  .challan-form-grid-4 { grid-template-columns: 1fr 1fr !important; }
+  .challan-form-actions { flex-direction: column !important; gap: 8px !important; }
+  .challan-form-actions button { width: 100% !important; min-height: 44px !important; }
+
+  /* Bulk toolbar */
+  .challan-bulk-toolbar { flex-direction: column !important; align-items: stretch !important; gap: 6px !important; }
+  .challan-bulk-toolbar > button { width: 100% !important; min-height: 36px !important; }
+
+  /* ChallanKPIs (Outstanding / Returns / Net) */
+  .challan-kpi-grid { grid-template-columns: 1fr !important; }
+
+  /* Ledger detail */
+  .challan-ledger-kpis { grid-template-columns: 1fr !important; gap: 6px !important; }
+  .challan-ledger-dates { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
+  .challan-ledger-dates > div { width: 100% !important; }
+  .challan-ledger-dates input { width: 100% !important; min-height: 36px !important; }
+  .challan-aging-pills { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; flex-wrap: nowrap !important; scrollbar-width: none !important; }
+  .challan-aging-pills::-webkit-scrollbar { display: none !important; }
+  .challan-aging-pills > span { flex-shrink: 0 !important; }
+
+  /* Analytics date row */
+  .challan-analytics-dates { flex-wrap: wrap !important; gap: 6px !important; }
+  .challan-analytics-dates input { flex: 1 1 calc(50% - 3px) !important; min-height: 36px !important; font-size: 14px !important; }
+  .challan-analytics-dates button { width: 100% !important; min-height: 36px !important; }
+
+  /* Pagination */
+  .challan-pagination { flex-wrap: wrap !important; gap: 4px !important; justify-content: center !important; }
+  .challan-pagination button { min-width: 36px !important; min-height: 36px !important; padding: 6px 10px !important; }
+  .challan-pagination > span { width: 100% !important; text-align: center !important; }
 }
 
 /* ── Challan detail mobile ──────────────────────────────── */
