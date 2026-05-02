@@ -24,7 +24,6 @@ import SettingsPage from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import ProgramsModule, { PublicShareView } from './modules/programs';
-import BarcodeScanner from './components/ui/BarcodeScanner';
 import SidebarComponent from './components/layout/Sidebar';
 import HeaderComponent from './components/layout/Header';
 import ToastContainerComponent from './components/layout/ToastContainer';
@@ -86,15 +85,6 @@ const MainApp = () => {
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [scanError, setScanError] = useState('');
-  const handleScan = async (code: string): Promise<boolean> => {
-    setScanError('');
-    const { data } = await supabase.from('inventory_items').select('id').eq('batch_number', code).maybeSingle();
-    if (data) { setScannerOpen(false); setTab('inventory'); setNotifItemId(data.id); return true; }
-    setScanError(`No item found for: ${code}`);
-    return false;
-  };
   return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflow: 'hidden', position: 'relative' }}>
     {/* Ambient glows are static CSS (see .app-glows in index.css) — not React children so
         they don't re-render on tab change (audit P3 performance) */}
@@ -120,7 +110,7 @@ const MainApp = () => {
           <span>More</span>
         </div>
       </div>
-      <HeaderComponent title={titles[tab]} onNotifClick={handleNotifClick} onOpenScanner={() => { setScanError(''); setScannerOpen(true); }} onOpenCommandPalette={() => setCmdOpen(true)} notifications={notifications} markAsRead={markAsRead} />
+      <HeaderComponent title={titles[tab]} onNotifClick={handleNotifClick} onOpenCommandPalette={() => setCmdOpen(true)} notifications={notifications} markAsRead={markAsRead} />
       <main style={{ flex: 1, overflow: 'auto' }}>
         {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard navigateTo={setTab} /></div>}
         {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
@@ -133,7 +123,6 @@ const MainApp = () => {
       </main>
     </div>
     <ToastContainerComponent toasts={toasts} />
-    {scannerOpen && <BarcodeScanner onScan={handleScan} onClose={() => setScannerOpen(false)} scanError={scanError} />}
     <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} commands={commands} />
   </div>);
 };
