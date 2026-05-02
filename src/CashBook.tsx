@@ -389,13 +389,12 @@ export default function CashBook() {
         return;
       }
       setPinAttempts(0); setPinLockUntil(0);
-      const { error } = await supabase.from('cash_handovers').update({
+      const { data: updated, error } = await supabase.from('cash_handovers').update({
         status: 'confirmed',
         confirmed_at: new Date().toISOString(),
-        to_user_id: user.id,
-        to_user_name: confirmingHandover.to_user_name || user.email || 'User',
-      }).eq('id', confirmingHandover.id);
+      }).eq('id', confirmingHandover.id).eq('status', 'pending').select('id');
       if (error) { addToast('Confirm failed — ' + friendlyError(error), 'error'); return; }
+      if (!updated || updated.length === 0) { addToast('This handover is no longer pending. It may have been rejected or already confirmed.', 'error'); setConfirmingHandover(null); setConfirmPin(''); fetchData(); return; }
       setConfirmingHandover(null); setConfirmPin('');
       fetchData();
     } finally { setBusy(false); }
