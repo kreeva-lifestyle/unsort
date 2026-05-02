@@ -66,6 +66,7 @@ export type ChallanFormProps = {
   // Submit + close
   onClose: () => void;
   onSave: () => void;
+  saving?: boolean;
   formError: string;
 };
 
@@ -136,11 +137,12 @@ export default function ChallanForm(p: ChallanFormProps) {
             <div style={{ position: 'relative' }}>
               <label style={lbl}>Customer Name *</label>
               <input type="text" value={p.customerName} onChange={e => {
+                if (p.editing) return;
                 p.setCustomerName(e.target.value); p.setSelectedCustomerId(null);
                 clearTimeout(searchTimeout.current);
                 searchTimeout.current = setTimeout(() => p.searchCustomers(e.target.value), 300);
               }}
-                placeholder="Type customer name..." style={inp} />
+                placeholder="Type customer name..." style={{ ...inp, opacity: p.editing ? 0.6 : 1 }} disabled={!!p.editing} />
               {p.customerSuggestions.length > 0 && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'rgba(14,18,30,.98)', border: `1px solid ${T.bd2}`, borderRadius: 6, maxHeight: 120, overflowY: 'auto' }}>
                   {p.customerSuggestions.map(c => (
@@ -284,7 +286,7 @@ export default function ChallanForm(p: ChallanFormProps) {
         </div>
 
         {p.formError && <div style={{ background: 'rgba(239,68,68,.15)', borderLeft: `4px solid ${T.re}`, borderRadius: 6, padding: '10px 14px', fontSize: 11, color: T.tx, marginBottom: 8 }}>{p.formError}</div>}
-        <button onClick={p.onSave} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,.3)' }}>{p.editing ? (p.isReturn ? 'Update Return' : 'Update Challan') : (p.isReturn ? 'Create Return' : 'Create Challan')}</button>
+        <button onClick={p.onSave} disabled={p.saving} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: p.saving ? 'not-allowed' : 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,.3)', opacity: p.saving ? 0.6 : 1 }}>{p.saving ? 'Saving...' : p.editing ? (p.isReturn ? 'Update Return' : 'Update Challan') : (p.isReturn ? 'Create Return' : 'Create Challan')}</button>
       </div>
 
       {/* Audit Trail Modal */}

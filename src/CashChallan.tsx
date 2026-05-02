@@ -105,6 +105,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [returnSearchQ, setReturnSearchQ] = useState('');
   const [returnResults, setReturnResults] = useState<Challan[]>([]);
   const [auditTrail, setAuditTrail] = useState<AuditLog[] | null>(null);
+  const [saving, setSaving] = useState(false);
   const [reminderChallan, setReminderChallan] = useState<Challan | null>(null);
   const [reminderPhone, setReminderPhone] = useState('');
 
@@ -445,8 +446,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Save challan ───────────────────────────────────────────────────────────
   const [formError, setFormError] = useState('');
   const saveChallan = async () => {
+    if (saving) return;
     setFormError('');
-    if (editing && editing.status === 'voided') { setFormError('Cannot edit a voided challan'); return; }
+    if (editing && (editing.status === 'voided' || editing.status === 'paid')) { setFormError('Cannot edit a paid or voided challan'); return; }
     if (isReturn && !editing && !returnSource) { setFormError('Select the original invoice for this return'); return; }
     if (!customerName.trim()) { setFormError('Customer name is required'); return; }
     if (items.length === 0) { setFormError('Add at least one item'); return; }
@@ -493,6 +495,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (!isReturn && challanStatus === 'partial' && (amountPaid <= 0 || amountPaid >= grandTotal)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
     if (challanStatus === 'draft' && amountPaid > 0) { setFormError('Draft challans cannot have payment. Change status first.'); return; }
     if (challanStatus === 'unpaid' && amountPaid > 0) { setFormError('Status is "Unpaid" but amount is paid. Change status to "Paid" or "Partial"'); return; }
+    setSaving(true);
+    try {
     const { data: { user } } = await supabase.auth.getUser();
 
     // Upsert customer (case-insensitive match, save phone too)
@@ -590,6 +594,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       const aWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
       if (!suppressed || Number(suppressed) < aWeekAgo) setShowErpReminder(true);
     }
+    } finally { setSaving(false); }
   };
 
   // ── Void challan ───────────────────────────────────────────────────────────
@@ -1071,6 +1076,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       loadAuditTrail={loadAuditTrail}
       onClose={closeModal}
       onSave={saveChallan}
+      saving={saving}
       formError={formError}
     />
   </>);
