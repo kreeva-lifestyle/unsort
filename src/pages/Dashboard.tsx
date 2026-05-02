@@ -22,7 +22,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
   const { addToast } = useNotifications();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const [pulse, setPulse] = useState({ scans: 0, revenue: 0, unsorted: 0, cashInHand: 0 });
+  const [pulse, setPulse] = useState({ scans: 0, revenue: 0, unsorted: 0, cashInHand: 0, handoverTotal: 0 });
   type PendingHandover = { number: number; from: string; amount: number; ageDays: number };
   const [alerts, setAlerts] = useState<{ overdue: OverdueAlert[]; dryClean: DryCleanAlert[]; pendingHandovers: PendingHandover[]; disputedCount: number }>({ overdue: [], dryClean: [], pendingHandovers: [], disputedCount: 0 });
   const [invBreakdown, setInvBreakdown] = useState<Record<string, number>>({});
@@ -66,7 +66,8 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     const cashReturns = todayChallans.filter(c => c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
     const totalExp = expenses.reduce((s, e) => s + Number(e.amount), 0);
     const confirmedHand = handovers.filter(h => h.status === 'confirmed' && h.date === today.toISOString().slice(0,10)).reduce((s, h) => s + Number(h.amount), 0);
-    setPulse({ scans: scanCount, revenue: Math.round(todayRev), unsorted: unsortedCount, cashInHand: Math.round(opening + cashSales - cashReturns - totalExp - confirmedHand) });
+    const handoverTotal = handovers.filter(h => h.status === 'confirmed').reduce((s, h) => s + Number(h.amount), 0);
+    setPulse({ scans: scanCount, revenue: Math.round(todayRev), unsorted: unsortedCount, cashInHand: Math.round(opening + cashSales - cashReturns - totalExp - confirmedHand), handoverTotal: Math.round(handoverTotal) });
 
     // Alerts
     const sevenDaysAgo = Date.now() - 7 * 86400000;
@@ -175,11 +176,12 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
       </div>
 
       {/* Row 1b: Secondary stats — demoted to 3-up strip */}
-      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
+      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 14 }}>
         {([
           { label: "Today's Scans", value: pulse.scans, color: T.ac, prefix: '', tip: 'Total barcodes scanned today in PackStation', target: 'packtime' },
           { label: 'Unsorted Items', value: pulse.unsorted, color: T.yl, prefix: '', tip: 'Items awaiting sorting in Inventory', target: 'inventory' },
           { label: 'Cash in Hand', value: pulse.cashInHand, color: T.bl, prefix: '₹', tip: 'Opening balance + sales - expenses - handovers', target: 'challan' },
+          { label: 'Total Handovers', value: pulse.handoverTotal, color: T.gr, prefix: '₹', tip: 'Total confirmed handovers', target: 'challan' },
         ] as const).map((c, i) => (
           <div
             key={i}
