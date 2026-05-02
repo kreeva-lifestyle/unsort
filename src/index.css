@@ -2,7 +2,7 @@
 @import './design-tokens.css';
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { overflow-y: scroll; overflow-x: hidden; overscroll-behavior-y: contain; }
+html { overflow-y: scroll; overflow-x: hidden; }
 
 body {
   font-family: 'Inter', -apple-system, sans-serif;
@@ -16,33 +16,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
   font-size: 13px;
   line-height: 1.55;
-  -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
-  overscroll-behavior: contain;
 }
 
-#root { min-height: 100vh; width: 100%; overflow-x: hidden; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
-
-/* ── Native app feel ──────────────────────────────────── */
-/* Disable text selection on UI chrome (keep on data fields) */
-button, [role="button"], label, nav, header, .sidebar, .mobile-hamburger,
-.stat-grid, .stat-hero, .three-things, .filter-bar { -webkit-user-select: none; user-select: none; }
-input, textarea, td, .do-mono, [contenteditable] { -webkit-user-select: text; user-select: text; }
-
-/* Smooth momentum scroll on all scroll containers */
-[style*="overflow"], .table-wrap, .prg-table-wrap, .inv-mobile, .prg-list-mobile { -webkit-overflow-scrolling: touch; }
-
-/* Touch ripple effect on interactive elements */
-button, [role="button"], .sidebar div[onClick], span[onClick] {
-  position: relative; overflow: hidden;
-}
-button:active, [role="button"]:active, span[onClick]:active {
-  transform: scale(0.97); transition: transform 60ms ease;
-}
-
-/* Page transitions */
-.page-pad, main > div > div { animation: pageIn 180ms ease both; }
-@keyframes pageIn { from { opacity: 0.92; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+#root { min-height: 100vh; width: 100%; overflow-x: hidden; }
 
 ::selection { background: rgba(99,102,241,0.25); color: #E2E8F0; }
 
@@ -59,8 +35,10 @@ input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; }
 
-::-webkit-scrollbar { width: 0; height: 0; display: none; }
-* { scrollbar-width: none; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }
 
 input:focus, select:focus, textarea:focus {
   outline: none;
