@@ -37,7 +37,7 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Analytics</span>
       </div>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12 }}>
+      <div className="challan-analytics-dates" style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12 }}>
         <input type="date" value={from} onChange={e => onFromChange(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }} />
         <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
         <input type="date" value={to} onChange={e => onToChange(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }} />

@@ -82,7 +82,7 @@ export default function ChallanForm(p: ChallanFormProps) {
   const inp: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' };
 
   return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', display: 'flex', justifyContent: 'center' }}>
+    <div className="challan-form" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', display: 'flex', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: 520 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -157,7 +157,7 @@ export default function ChallanForm(p: ChallanFormProps) {
           </div>
 
           {/* Line Items */}
-          <div data-items style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 9, marginBottom: 12, overflow: 'hidden' }}>
+          <div className="challan-item-grid-wrap" data-items style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 9, marginBottom: 12, overflow: 'hidden' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 56px 80px 100px 28px', gap: 6, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, background: T.glass1 }}>
               <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600 }}>SKU</span>
               <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600, textAlign: 'center' as const }}>Qty</span>
@@ -220,7 +220,7 @@ export default function ChallanForm(p: ChallanFormProps) {
           </div>
 
           {/* Shipping + Tags + Notes */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+          <div className="challan-form-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
             <div>
               <label style={lbl}>Shipping/Porter</label>
               <input type="number" value={p.shippingCharges || ''} onChange={e => p.setShippingCharges(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11, border: p.shippingCharges < 0 ? `1px solid ${T.re}aa` : `1px solid ${T.bd}` }} />
@@ -237,7 +237,7 @@ export default function ChallanForm(p: ChallanFormProps) {
           </div>
 
           {/* Status + Payment */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+          <div className="challan-form-grid-4" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
             <div>
               <label style={lbl}>Status</label>
               {p.isReturn ? (
@@ -287,7 +287,7 @@ export default function ChallanForm(p: ChallanFormProps) {
       {/* Audit Trail Modal */}
       {p.auditTrail && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
-          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '18px 16px', maxWidth: 420, width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
+          <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '18px 16px', maxWidth: 420, width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <span style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Audit Trail</span>
               <button onClick={() => p.setAuditTrail(null)} style={{ padding: '3px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Close</button>

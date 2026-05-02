@@ -57,7 +57,7 @@ export default function ChallanLedger({
             <button onClick={() => onExportPdf(detailName)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer', fontFamily: T.sans }}>Export PDF</button>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div className="challan-ledger-dates" style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <label style={{ fontSize: 8, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase' }}>From</label>
             <input type="date" value={dateFrom} onChange={e => onDateFromChange(e.target.value)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 11, padding: '6px 8px', outline: 'none' }} />
@@ -70,7 +70,7 @@ export default function ChallanLedger({
           {(dateFrom || dateTo) && <button onClick={() => { onDateFromChange(''); onDateToChange(''); onDateApply('', ''); }} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer', height: 30 }}>Clear</button>}
         </div>
         {cust && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+          <div className="challan-ledger-kpis" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
             <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.12)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
               <div style={{ fontSize: 7, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 2 }}>Total Billed</div>
               <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>₹{cust.total.toLocaleString('en-IN')}</div>
@@ -152,7 +152,7 @@ export default function ChallanLedger({
               </div>
             </div>
             {c.outstanding > 0 && (c.aging.current > 0 || c.aging.d30 > 0 || c.aging.d60 > 0 || c.aging.d90plus > 0) && (
-              <div style={{ display: 'flex', gap: 4, marginTop: 5, fontSize: 8, fontWeight: 600, fontFamily: T.mono }}>
+              <div className="challan-aging-pills" style={{ display: 'flex', gap: 4, marginTop: 5, fontSize: 8, fontWeight: 600, fontFamily: T.mono }}>
                 {c.aging.current > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(34,197,94,.1)', color: T.gr }}>0-30d: ₹{c.aging.current.toLocaleString('en-IN')}</span>}
                 {c.aging.d30 > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(245,158,11,.1)', color: T.yl }}>31-60d: ₹{c.aging.d30.toLocaleString('en-IN')}</span>}
                 {c.aging.d60 > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(251,146,60,.12)', color: '#FB923C' }}>61-90d: ₹{c.aging.d60.toLocaleString('en-IN')}</span>}

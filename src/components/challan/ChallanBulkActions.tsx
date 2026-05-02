@@ -45,7 +45,7 @@ export default function ChallanBulkActions(p: Props) {
   return (
     <>
       {p.bulkMode && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', background: 'rgba(99,102,241,.04)', border: `1px solid rgba(99,102,241,.12)`, borderRadius: 6 }}>
+        <div className="challan-bulk-toolbar" style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', background: 'rgba(99,102,241,.04)', border: `1px solid rgba(99,102,241,.12)`, borderRadius: 6 }}>
           <span style={{ fontSize: 10, color: T.tx2, fontWeight: 600 }}>{p.selectedCount} selected</span>
           <button onClick={p.onSelectAll} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Select All</button>
           <button onClick={p.onClearSelection} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Clear</button>
@@ -65,7 +65,7 @@ export default function ChallanBulkActions(p: Props) {
 
       {p.showBulkPay && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={p.onCloseBulkPay}>
-          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 420, width: '100%' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 420, width: '100%' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 12 }}>{p.netTotal < 0 ? 'Settle & Refund' : 'Bulk Pay'}</div>
             <ChallanKPIs payableCount={p.payable.length} outstanding={p.outstanding} returnsCount={p.returns.length} returnsTotal={p.returnsTotal} netTotal={p.netTotal} />
             <div style={{ marginBottom: 10 }}>
@@ -89,7 +89,7 @@ export default function ChallanBulkActions(p: Props) {
 
       {p.showBulkUnpay && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={p.onCloseBulkUnpay}>
-          <div style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 400, width: '100%' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 400, width: '100%' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Bulk Unpay</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>This will revert <strong style={{ color: T.yl }}>{p.unpayable.length}</strong> challan{p.unpayable.length !== 1 ? 's' : ''} to unpaid and clear their payment info. Returns cannot be unpaid.</div>
             <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 6, maxHeight: 160, overflowY: 'auto', marginBottom: 14 }}>
