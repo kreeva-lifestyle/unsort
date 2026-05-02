@@ -285,7 +285,7 @@ export default function CashBook() {
     // WhatsApp notification to recipient
     if (recipient.phone) {
       const msg = encodeURIComponent(`Hi ${recipient.full_name},\n${prof?.full_name || 'Sender'} has initiated cash handover ${hoNo} of ₹${amt.toLocaleString('en-IN')} for you (period ${handPeriodFrom} to ${handPeriodTo}).\nPlease open DailyOffice → Cash Book → Handovers and sign with your PIN to confirm receipt, or reject with a reason.\n— Arya Designs`);
-      window.open(`https://wa.me/91${recipient.phone.replace(/\D/g, '')}?text=${msg}`, '_blank');
+      window.location.href = `https://wa.me/91${recipient.phone.replace(/\D/g, '')}?text=${msg}`;
     }
     setHandAmount(''); setHandToId(''); setHandNotes(''); setHandReason(''); setHandBreakdown(null); setShowHandover(false);
     fetchData();
