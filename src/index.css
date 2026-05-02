@@ -22,6 +22,13 @@ body {
 
 ::selection { background: rgba(99,102,241,0.25); color: #E2E8F0; }
 
+/* Button press feedback */
+button:active, [role="button"]:active { transform: scale(0.97); transition: transform 60ms ease; }
+
+/* Page transitions */
+.page-pad, main > div > div { animation: pageIn 180ms ease both; }
+@keyframes pageIn { from { opacity: 0.92; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+
 /* Prevent iOS zoom on input focus — force 16px minimum on mobile */
 @media (max-width: 768px) {
   select, input[type="text"], input[type="email"], input[type="password"],
