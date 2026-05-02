@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { T, S } from '../../lib/theme';
+import SwipeRow from '../../components/ui/SwipeRow';
 import { usePrograms } from './hooks/usePrograms';
 import { useT } from './hooks/useT';
 import { supabase } from '../../lib/supabase';
@@ -106,8 +107,13 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
         {/* Mobile card view */}
         {!loading && programs.length > 0 && (
           <div className="prg-list-mobile" style={{ display: 'none' }}>
-            {programs.map(p => (
-              <div key={p.id} onClick={() => onView(p)} style={{ padding: '14px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }}>
+            {programs.map((p, idx) => (
+              <SwipeRow key={p.id} hint={idx === 0} actions={[
+                { label: 'Edit', color: '#3B82F6', onClick: () => handleEdit(p) },
+                { label: 'PDF', color: '#6366F1', onClick: () => onPDF(p) },
+                { label: 'Del', color: '#EF4444', onClick: () => handleDelete(p) },
+              ]}>
+              <div onClick={() => onView(p)} style={{ padding: '14px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontFamily: T.mono, fontSize: 12, color: T.ac2, fontWeight: 600 }}>{p.program_uid}</span>
@@ -121,13 +127,8 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
                   <span style={{ fontSize: 11, color: T.bl, fontFamily: T.mono, fontWeight: 600 }}>{priceSummaries[p.id] ? priceSummaries[p.id].fabricMeter.toFixed(2) + ' m' : '—'}</span>
                   <span style={{ fontSize: 11, color: T.gr, fontFamily: T.mono, fontWeight: 600 }}>{priceSummaries[p.id] ? '₹' + priceSummaries[p.id].workTotal.toLocaleString('en-IN') : '—'}</span>
                 </div>
-                <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                  <button onClick={() => handleEdit(p)} style={{ ...S.btnGhost, ...S.btnSm }}>{t('edit')}</button>
-                  <button onClick={() => onPDF(p)} style={{ ...S.btnGhost, ...S.btnSm }}>PDF</button>
-                  <button onClick={() => handleCopyLink(p)} style={{ ...S.btnGhost, ...S.btnSm }}>Link</button>
-                  <button onClick={() => handleDelete(p)} style={{ ...S.btnDanger, ...S.btnSm, opacity: deleting === p.id ? 0.5 : 1 }}>Del</button>
-                </div>
               </div>
+              </SwipeRow>
             ))}
           </div>
         )}

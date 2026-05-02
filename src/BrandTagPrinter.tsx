@@ -705,7 +705,7 @@ export default function BrandTagPrinter() {
           {orderLoading && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: T.yl }}><span style={{ width: 10, height: 10, border: '1.5px solid rgba(251,191,36,.2)', borderTopColor: T.yl, borderRadius: '50%', animation: 'btnSpin .6s linear infinite', flexShrink: 0 }} />{orderLoadMsg}</span>}
           <input ref={orderFileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleOrderImport} />
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} className="desktop-only">
             <button style={S.btnGhost} onClick={() => setMoreMenuOpen(o => !o)}>
               <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
               Import / Export
@@ -726,7 +726,7 @@ export default function BrandTagPrinter() {
               </>
             )}
           </div>
-          <button style={S.btnGhost} onClick={() => { setShowHistory(true); window.history.pushState({ view: 'bt-logs' }, ''); }}>
+          <button style={S.btnGhost} className="desktop-only" onClick={() => { setShowHistory(true); window.history.pushState({ view: 'bt-logs' }, ''); }}>
             <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
             Logs
           </button>
@@ -758,7 +758,7 @@ export default function BrandTagPrinter() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead><tr>
             {['Brand', 'SKU · Product', 'Size', 'Color', 'MRP', 'Jio Code', 'Copies', 'Actions'].map(h => (
-              <th key={h} style={thS}>{h}</th>
+              <th key={h} style={thS} className={h === 'Actions' ? 'bt-actions-col' : undefined}>{h}</th>
             ))}
           </tr></thead>
           <tbody>
@@ -778,7 +778,7 @@ export default function BrandTagPrinter() {
                     <button onClick={() => { const old = row.copies || 0; const v = old + 1; setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                   </div>
                 </td>
-                <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
+                <td style={{ ...tdS, whiteSpace: 'nowrap' }} className="bt-actions-col">
                   <div style={{ display: 'flex', gap: 3 }}>
                     <button style={btnSm} onClick={() => openEdit(row)}>Edit</button>
                     <button style={{ ...btnSm, color: T.bl }} onClick={() => printSingle(row)}>Print</button>
