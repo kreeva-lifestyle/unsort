@@ -64,28 +64,49 @@ export default function ChallanList(p: Props) {
         </div>
       </div>
 
-      {p.showFilters && (
-        <div className="challan-filter-row" style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center', padding: '8px 10px', background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 6 }}>
-          <select value={p.statusFilter} onChange={e => { p.onStatusFilterChange(e.target.value); p.onResetPage(); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }}>
-            <option value="">All Status</option><option value="draft">Draft</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option><option value="partial">Partial</option><option value="voided">Voided</option>
-          </select>
-          {p.allTags.length > 0 && <select value={p.tagFilter} onChange={e => { p.onTagFilterChange(e.target.value); p.onResetPage(); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '5px 8px', outline: 'none' }}>
-            <option value="">All Tags</option>{p.allTags.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 9, color: T.tx3, fontWeight: 600 }}>From</span>
-            <input type="date" value={p.dateFrom} onChange={e => { p.onDateFromChange(e.target.value); p.onResetPage(); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '4px 6px', outline: 'none' }} />
+      {p.showFilters && (() => {
+        const fLabel: React.CSSProperties = { display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: 4 };
+        const fInput: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '7px 10px', outline: 'none', boxSizing: 'border-box', height: 34 };
+        return (
+          <div className="challan-filter-row" style={{ marginBottom: 8, padding: 12, background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
+            <div className="challan-filter-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+              <div>
+                <label style={fLabel}>Status</label>
+                <select value={p.statusFilter} onChange={e => { p.onStatusFilterChange(e.target.value); p.onResetPage(); }} style={fInput}>
+                  <option value="">All</option><option value="draft">Draft</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option><option value="partial">Partial</option><option value="voided">Voided</option>
+                </select>
+              </div>
+              {p.allTags.length > 0 && (
+                <div>
+                  <label style={fLabel}>Tag</label>
+                  <select value={p.tagFilter} onChange={e => { p.onTagFilterChange(e.target.value); p.onResetPage(); }} style={fInput}>
+                    <option value="">All</option>{p.allTags.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label style={fLabel}>From</label>
+                <input type="date" value={p.dateFrom} onChange={e => { p.onDateFromChange(e.target.value); p.onResetPage(); }} style={fInput} />
+              </div>
+              <div>
+                <label style={fLabel}>To</label>
+                <input type="date" value={p.dateTo} onChange={e => { p.onDateToChange(e.target.value); p.onResetPage(); }} style={fInput} />
+              </div>
+              <div>
+                <label style={fLabel}>Per page</label>
+                <select value={p.pageSize} onChange={e => { p.onPageSizeChange(Number(e.target.value)); p.onResetPage(); }} style={fInput}>
+                  <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
+                </select>
+              </div>
+            </div>
+            {filterActive && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                <button onClick={p.onClearFilters} style={{ padding: '7px 14px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Clear filters</button>
+              </div>
+            )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 9, color: T.tx3, fontWeight: 600 }}>To</span>
-            <input type="date" value={p.dateTo} onChange={e => { p.onDateToChange(e.target.value); p.onResetPage(); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '4px 6px', outline: 'none' }} />
-          </div>
-          <select value={p.pageSize} onChange={e => { p.onPageSizeChange(Number(e.target.value)); p.onResetPage(); }} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 5, color: T.tx, fontSize: 10, padding: '5px 6px', outline: 'none', width: 48 }}>
-            <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
-          </select>
-          {filterActive && <button onClick={p.onClearFilters} style={{ padding: '4px 8px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Clear all</button>}
-        </div>
-      )}
+        );
+      })()}
 
       <div style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{p.totalCount} records</div>
 

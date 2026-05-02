@@ -179,9 +179,9 @@ body.modal-open { overflow: hidden !important; }
   .challan-filter-btns { display: flex !important; gap: 6px !important; overflow-x: auto !important; scrollbar-width: none !important; }
   .challan-filter-btns::-webkit-scrollbar { display: none !important; }
 
-  /* Collapsible filter chips row */
-  .challan-filter-row { gap: 6px !important; flex-wrap: wrap !important; }
-  .challan-filter-row select, .challan-filter-row input { font-size: 12px !important; padding: 8px 10px !important; min-width: 0 !important; flex: 1 1 calc(50% - 3px) !important; min-height: 36px !important; }
+  /* Filter grid (Status / Tag / From / To / Per page) */
+  .challan-filter-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+  .challan-filter-grid select, .challan-filter-grid input { font-size: 14px !important; min-height: 38px !important; padding: 8px 10px !important; }
 
   /* Per-row action icons (print/remind/return/void) */
   .challan-row-actions { gap: 2px !important; }

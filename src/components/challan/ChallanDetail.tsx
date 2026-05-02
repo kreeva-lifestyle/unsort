@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T } from '../../lib/theme';
 import type { CashChallan, CashChallanItem } from '../../types/database';
@@ -27,6 +27,11 @@ type TimelineEntry = { type: 'audit' | 'payment'; time: string; action?: string;
 
 export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid }: Props) {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Reset scroll position when a new challan is opened — without this the
+  // browser sometimes restores the previous scroll offset, leaving the user
+  // staring at the bottom of the content (visible bug on iOS + Chrome desktop).
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [c.id]);
   useEffect(() => {
     Promise.all([
       supabase.from('audit_log').select('action, details, user_email, changes, created_at').eq('module', 'cash_challan').eq('record_id', c.id).order('created_at'),
@@ -58,7 +63,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={onClose}>
-      <div className="modal-inner challan-detail-modal" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 560, width: '100%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+      <div ref={scrollRef} className="modal-inner challan-detail-modal" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 560, width: '100%', maxHeight: '90vh', overflow: 'auto', WebkitOverflowScrolling: 'touch' }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div style={{ padding: '14px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
