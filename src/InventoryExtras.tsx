@@ -5,6 +5,7 @@ import { friendlyError } from './lib/friendlyError';
 import { useDebouncedFetch } from './hooks/useDebouncedFetch';
 
 import { T, S } from './lib/theme';
+import SwipeRow from './components/ui/SwipeRow';
 import type {
   Product,
   ProductComponent,
@@ -253,8 +254,8 @@ export default function InventoryExtras() {
         </select>
       </div>
 
-      {/* Table */}
-      <div className="inv-extra-table" style={{ overflowX: 'auto', borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.01)' }}>
+      {/* Desktop Table */}
+      <div className="inv-extra-desktop" style={{ overflowX: 'auto', borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.01)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>
             <th style={th}>SKU</th><th style={th}>Category</th><th style={th}>Component</th>
@@ -277,8 +278,8 @@ export default function InventoryExtras() {
                   ) : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
                 </td>
                 <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...btnGhost, padding: '5px 10px', fontSize: 10, cursor: 'pointer', color: T.gr, borderColor: 'rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Add</span>{' '}
-                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...btnGhost, padding: '5px 10px', fontSize: 10, cursor: 'pointer', color: T.re, borderColor: 'rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Remove</span>
+                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Add</span>{' '}
+                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Remove</span>
                 </td>
               </tr>
             ))}
@@ -286,11 +287,36 @@ export default function InventoryExtras() {
         </table>
       </div>
 
-      {/* Add Extra Modal */}
+      {/* Mobile card view */}
+      <div className="inv-extra-mobile">
+        {filtered.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No spare parts found</div>}
+        {filtered.map((ex, idx) => (
+          <SwipeRow key={ex.id} hint={idx === 0} hintKey="spare-parts" actions={[
+            { label: 'Add', color: '#22C55E', onClick: () => { setAdjustExtra(ex); setAdjustMode('add'); } },
+            { label: 'Remove', color: '#EF4444', onClick: () => { setAdjustExtra(ex); setAdjustMode('remove'); } },
+          ]}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}` }} onClick={() => (matchCounts[ex.id] || 0) > 0 ? loadMatches(ex) : undefined}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: T.mono, fontSize: 11, color: T.ac2, fontWeight: 600 }}>{ex.sku}</div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: T.tx, marginTop: 2 }}>{ex.product_name} · {ex.component_name}</div>
+                  <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{ex.size || '—'}</div>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: ex.quantity > 0 ? T.gr : T.re }}>{ex.quantity}</div>
+                  {(matchCounts[ex.id] || 0) > 0 && <div style={{ fontSize: 10, color: T.yl, fontWeight: 600, marginTop: 2 }}>{matchCounts[ex.id]} match{matchCounts[ex.id] > 1 ? 'es' : ''}</div>}
+                </div>
+              </div>
+            </div>
+          </SwipeRow>
+        ))}
+      </div>
+
+      {/* Add Spare Part Modal */}
       {showAdd && createPortal(<div style={overlay} onClick={() => { setShowAdd(false); setError(''); }}>
         <div className="modal-inner" style={modal} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}` }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Add Extra</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Add Spare Part</span>
           </div>
           <form onSubmit={e => { e.preventDefault(); addExtra(); }} style={{ padding: 16 }}>
             <div style={{ marginBottom: 10 }}>
@@ -392,7 +418,7 @@ export default function InventoryExtras() {
                     <td style={td}>
                       {matchExtra.quantity > 0 ? (
                         <span onClick={() => setCompleteItem({ extra: matchExtra, item: m })}
-                          style={{ ...btn, padding: '3px 10px', fontSize: 10, cursor: 'pointer' }}>Use Extra</span>
+                          style={{ ...btn, padding: '3px 10px', fontSize: 10, cursor: 'pointer' }}>Use</span>
                       ) : <span style={{ fontSize: 10, color: T.re }}>No stock</span>}
                     </td>
                   </tr>
