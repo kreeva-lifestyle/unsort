@@ -132,7 +132,7 @@ ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outs
           <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.bd}`, borderRadius: 6, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1, flexShrink: 0 }}>&times;</button>
         </div>
 
-        <div style={{ padding: mobile ? '12px 16px' : '16px 20px', paddingBottom: mobile ? 80 : 16 }}>
+        <div style={{ padding: mobile ? '12px 16px' : '16px 20px', paddingBottom: mobile ? 20 : 16 }}>
 
           {/* ── Items table ── */}
           {items.length > 0 && (
