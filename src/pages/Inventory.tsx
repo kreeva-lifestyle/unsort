@@ -1,5 +1,5 @@
 // Inventory page — CRUD, pair completion, smart intel, extras integration
-import React, { useState, useEffect, useId } from 'react';
+import React, { useState, useEffect, useId, useRef } from 'react';
 import JsBarcode from 'jsbarcode';
 import { supabase } from '../lib/supabase';
 import { T, S, Icon } from '../lib/theme';
@@ -91,6 +91,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const [showCompleteModal, setShowCompleteModal] = useState<{ itemId: string; pairId?: string } | null>(null);
   const [showIntel, setShowIntel] = useState(false);
   const [showMoreFields, setShowMoreFields] = useState(false);
+  const [quickStatusItem, setQuickStatusItem] = useState<string | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
   const [intelResults, setIntelResults] = useState<any[]>([]);
   const [showExtras, setShowExtras] = useState(false);
   const [invLimit, setInvLimit] = useState(5000);
@@ -406,6 +408,13 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
 
   const [pendingDelete, setPendingDelete] = useState<{ id: string; timer: number } | null>(null);
+
+  const quickStatusChange = async (itemId: string, newStatus: string) => {
+    const { error } = await supabase.from('inventory_items').update({ status: newStatus, status_changed_at: new Date().toISOString() }).eq('id', itemId);
+    if (error) addToast(friendlyError(error), 'error');
+    else { addToast(`Status → ${newStatus}`, 'success'); fetchData(); }
+    setQuickStatusItem(null);
+  };
 
   const handleDelete = async (itemId: string) => {
     const item = items.find(i => i.id === itemId);
@@ -771,7 +780,17 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             ];
             return (
               <SwipeRow key={item.id} actions={swipeActions} hint={idx === 0} hintKey="inventory">
-              <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', gap: 6, position: 'relative' }}
+                onTouchStart={() => { if (!canEdit) return; longPressTimer.current = setTimeout(() => setQuickStatusItem(item.id), 500); }}
+                onTouchEnd={() => clearTimeout(longPressTimer.current)}
+                onTouchMove={() => clearTimeout(longPressTimer.current)}>
+                {quickStatusItem === item.id && (
+                  <div style={{ position: 'absolute', top: 4, right: 14, zIndex: 10, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.5)', overflow: 'hidden', animation: 'fi .1s ease' }}>
+                    {['unsorted', 'damaged', 'dry_clean', 'completed'].filter(s => s !== item.status).map(s => (
+                      <div key={s} onClick={e => { e.stopPropagation(); quickStatusChange(item.id, s); }} style={{ padding: '10px 16px', fontSize: 12, color: T.tx, cursor: 'pointer', borderBottom: `1px solid ${T.bd}`, whiteSpace: 'nowrap' }}>{s === 'dry_clean' ? 'Dry Clean' : s.charAt(0).toUpperCase() + s.slice(1)}</div>
+                    ))}
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: T.mono, fontSize: 11, color: T.ac2, fontWeight: 600 }}>{item.serial_number || '—'}</div>
