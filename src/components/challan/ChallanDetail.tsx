@@ -28,11 +28,13 @@ type TimelineEntry = { type: 'audit' | 'payment'; time: string; action?: string;
 
 export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid }: Props) {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [c.id]);
 
   useEffect(() => {
+    setTimelineLoading(true);
     Promise.all([
       supabase.from('audit_log').select('action, details, user_email, changes, created_at').eq('module', 'cash_challan').eq('record_id', c.id).order('created_at'),
       supabase.from('cash_challan_payments').select('amount, payment_mode, payment_date, paid_by, notes, is_reversal, created_at, batch_id').eq('challan_id', c.id).order('created_at'),
@@ -48,6 +50,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
       }
       entries.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
       setTimeline(entries);
+      setTimelineLoading(false);
     });
   }, [c.id]);
 
@@ -183,7 +186,8 @@ ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outs
           )}
 
           {/* ── Activity Timeline ── */}
-          {timeline.length > 0 && (
+          {timelineLoading && <div style={{ padding: '12px 14px', fontSize: 10, color: T.tx3, textAlign: 'center' }}>Loading timeline...</div>}
+          {!timelineLoading && timeline.length > 0 && (
             <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden', marginBottom: 14 }}>
               <div style={{ padding: '8px 14px', borderBottom: `1px solid ${T.bd}`, fontSize: 9, color: T.tx3, fontWeight: 600, letterSpacing: 0.8, textTransform: 'uppercase' }}>Activity Timeline</div>
               {timeline.map((e, i) => (
