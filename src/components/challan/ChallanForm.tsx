@@ -97,7 +97,7 @@ export default function ChallanForm(p: ChallanFormProps) {
     });
   }, [p.customerName]);
   const lbl: React.CSSProperties = { display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 };
-  const inp: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' };
+  const inp: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 13, padding: '8px 12px', height: 36, outline: 'none', boxSizing: 'border-box' };
 
   return (
     <div className="challan-form" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', display: 'flex', justifyContent: 'center' }}>
@@ -182,8 +182,8 @@ export default function ChallanForm(p: ChallanFormProps) {
             <div>
               <label style={lbl}>Phone (for WhatsApp){p.selectedCustomerId && p.customerPhone && <span style={{ marginLeft: 6, fontSize: 8, color: T.gr, textTransform: 'none' as const, letterSpacing: 0, fontWeight: 600 }}>✓ Auto-filled</span>}</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-                <span style={{ padding: '7px 10px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRight: 'none', borderRadius: '8px 0 0 8px', fontSize: 12, color: T.tx3, fontFamily: T.mono, whiteSpace: 'nowrap' }}>+91</span>
-                <input type="tel" value={p.customerPhone} onChange={e => p.setCustomerPhone(e.target.value)} placeholder="9876543210" style={{ ...inp, fontFamily: T.mono, borderRadius: '0 8px 8px 0', flex: 1 }} />
+                <span style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRight: 'none', borderRadius: '6px 0 0 6px', fontSize: 12, color: T.tx3, fontFamily: T.mono, whiteSpace: 'nowrap', lineHeight: '1.2' }}>+91</span>
+                <input type="tel" value={p.customerPhone} onChange={e => p.setCustomerPhone(e.target.value)} placeholder="9876543210" style={{ ...inp, fontFamily: T.mono, borderRadius: '0 6px 6px 0', flex: 1 }} />
               </div>
             </div>
           </div>

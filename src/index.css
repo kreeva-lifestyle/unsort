@@ -192,7 +192,8 @@ body.modal-open { overflow: hidden !important; }
   .challan-form { padding: 12px 12px 80px !important; }
   .challan-form input, .challan-form select, .challan-form textarea { font-size: 16px !important; }
   .challan-item-grid-wrap { overflow-x: hidden !important; }
-  .challan-item-grid-wrap > div { min-width: 0 !important; grid-template-columns: 1fr 50px 70px 28px !important; }
+  .challan-item-grid-wrap > div { min-width: 0 !important; grid-template-columns: 1fr 46px 66px 24px !important; }
+  .challan-item-grid-wrap input { font-size: 13px !important; padding: 6px 4px !important; }
   .challan-item-grid-wrap .challan-disc-col { display: none !important; }
   .challan-form-grid-2 { grid-template-columns: 1fr !important; }
   .challan-form-grid-3 { grid-template-columns: 1fr !important; }
