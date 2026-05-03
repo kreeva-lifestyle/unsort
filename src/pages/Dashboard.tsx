@@ -58,7 +58,8 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     const scanCount = scansRes.count ?? 0;
 
     // Pulse
-    const todayChallans = challans.filter(c => new Date(c.created_at) >= today);
+    const todayStr = today.toISOString().slice(0, 10);
+    const todayChallans = challans.filter(c => c.created_at.slice(0, 10) >= todayStr);
     const todayRev = todayChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total || 0), 0);
     const unsortedCount = items.filter(i => i.status === 'unsorted').length;
     const opening = Number(balances?.opening_balance || 0);

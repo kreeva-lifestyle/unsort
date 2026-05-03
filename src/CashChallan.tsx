@@ -896,11 +896,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       : `Batch ${batchId} — received ₹${received.toLocaleString('en-IN')} against ₹${bulkNetTotal.toLocaleString('en-IN')} outstanding${received !== bulkNetTotal ? ` (${received > bulkNetTotal ? 'excess' : 'short'} ₹${Math.abs(received - bulkNetTotal).toLocaleString('en-IN')})` : ''}`;
     for (const c of bulkPayable) {
       const outstanding = Number(c.total) - Number(c.amount_paid || 0);
-      await supabase.from('cash_challans').update({
+      const { data: updated } = await supabase.from('cash_challans').update({
         status: 'paid', amount_paid: Number(c.total), payment_mode: bulkPayMode,
         payment_date: today, modified_by: user?.id, updated_at: new Date().toISOString(),
-      }).eq('id', c.id).in('status', ['unpaid', 'partial']);
-      if (outstanding > 0) {
+      }).eq('id', c.id).in('status', ['unpaid', 'partial']).select('id');
+      if (updated && updated.length > 0 && outstanding > 0) {
         await supabase.from('cash_challan_payments').insert({
           challan_id: c.id, amount: outstanding, payment_mode: bulkPayMode,
           payment_date: today, paid_by: user?.id, notes: receiptNote, batch_id: batchId,
