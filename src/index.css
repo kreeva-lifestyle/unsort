@@ -193,11 +193,12 @@ body.modal-open { overflow: hidden !important; }
   .challan-form input, .challan-form select, .challan-form textarea { font-size: 16px !important; }
   .challan-item-grid-wrap { overflow-x: hidden !important; }
   .challan-item-grid-wrap > div { min-width: 0 !important; grid-template-columns: 1fr 46px 66px 24px !important; }
-  .challan-item-grid-wrap input { font-size: 13px !important; padding: 6px 4px !important; }
+  .challan-form .challan-item-grid-wrap input { font-size: 14px !important; padding: 6px 4px !important; }
+  .challan-form .challan-item-grid-wrap select { font-size: 12px !important; padding: 4px 2px !important; }
   .challan-item-grid-wrap .challan-disc-col { display: none !important; }
   .challan-form-grid-2 { grid-template-columns: 1fr !important; }
   .challan-form-grid-3 { grid-template-columns: 1fr !important; }
-  .challan-form-grid-4 { grid-template-columns: 1fr 1fr !important; }
+  .challan-form-grid-4 { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
   .challan-form-actions { flex-direction: column !important; gap: 8px !important; }
   .challan-form-actions button { width: 100% !important; min-height: 44px !important; }
 
