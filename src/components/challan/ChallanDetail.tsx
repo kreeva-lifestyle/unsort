@@ -64,35 +64,6 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
 
   const btnBase: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx2, transition: 'all .15s' };
 
-  const shareChallan = () => {
-    const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[ch] || ch));
-    const dateStr = c.created_at ? new Date(c.created_at).toLocaleDateString('en-IN') : '-';
-    const itemRows = items.map((it, i) => `<tr><td>${i + 1}</td><td>${esc(it.sku || '-')}</td><td style="text-align:right">${it.quantity ?? 0}</td><td style="text-align:right">₹${Number(it.price || 0).toLocaleString('en-IN')}</td><td style="text-align:right">${Number(it.discount_amount || 0) > 0 ? '-₹' + Number(it.discount_amount).toLocaleString('en-IN') : '-'}</td><td style="text-align:right">₹${Number(it.total || 0).toLocaleString('en-IN')}</td></tr>`).join('');
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Challan #${esc(c.challan_number)}</title>
-<style>body{font-family:Arial,sans-serif;margin:20px;color:#222;max-width:600px}
-h2{margin:0;font-size:16px}table{width:100%;border-collapse:collapse;margin:10px 0}
-th,td{border:1px solid #ddd;padding:4px 6px;font-size:11px}th{background:#f5f5f5;font-weight:600}
-.total{text-align:right;font-size:15px;font-weight:700;margin:8px 0}
-.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700}
-@media print{@page{margin:10mm}}</style></head><body>
-<h2>Arya Designs</h2>
-<p style="color:#666;font-size:11px;margin:2px 0">Cash Challan #${esc(c.challan_number)} | ${dateStr}</p>
-<p style="font-size:12px;margin:4px 0"><strong>Customer:</strong> ${esc(c.customer_name)}</p>
-<table><thead><tr><th>#</th><th>SKU</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Disc</th><th style="text-align:right">Total</th></tr></thead><tbody>${itemRows}</tbody></table>
-<p class="total">Total: ₹${Math.abs(Number(c.total)).toLocaleString('en-IN')}</p>
-${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outstanding: ₹${due.toLocaleString('en-IN')}</p>` : ''}
-<p style="font-size:10px;color:#888;margin-top:16px">Powered by DailyOffice</p>
-</body></html>`;
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
-    document.body.appendChild(iframe);
-    const iw = iframe.contentWindow;
-    if (!iw) { iframe.remove(); return; }
-    iw.document.write(html);
-    iw.document.close();
-    setTimeout(() => { iw.print(); setTimeout(() => iframe.remove(), 1000); }, 300);
-  };
-
   const mobile = typeof window !== 'undefined' && window.innerWidth <= 768;
   const dragStartY = useRef(0);
 
@@ -246,7 +217,6 @@ ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outs
           <div className="challan-detail-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: `1px solid ${T.bd}`, paddingTop: 14 }}>
             {!isVoided && c.status !== 'paid' && <button onClick={onEdit} style={{ ...btnBase, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, border: 'none', color: '#fff' }}>Edit</button>}
             <button onClick={onPrint} style={btnBase}>Print</button>
-            <button onClick={shareChallan} style={{ ...btnBase, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', color: T.gr }}>Share</button>
             {canRemind && <button onClick={onRemind} style={{ ...btnBase, border: '1px solid rgba(34,197,94,.15)', background: 'rgba(34,197,94,.04)', color: T.gr }}>Remind</button>}
             {canReturn && <button onClick={onReturn} style={{ ...btnBase, border: '1px solid rgba(239,68,68,.15)', background: 'rgba(239,68,68,.04)', color: T.re }}>Return</button>}
             {!isVoided && c.status !== 'paid' && <button onClick={onVoid} style={btnBase}>Void</button>}
