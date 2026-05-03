@@ -218,11 +218,11 @@ export default function InventoryExtras() {
 
   // Shared styles
   const label: React.CSSProperties = { display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' };
-  const input: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '7px 10px', outline: 'none', fontFamily: T.sans };
-  const btn: React.CSSProperties = { padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontFamily: T.sans };
+  const input: React.CSSProperties = S.fInput;
+  const btn: React.CSSProperties = S.btnPrimary;
   const btnGhost: React.CSSProperties = { ...S.btnGhost, cursor: 'pointer' };
   const overlay: React.CSSProperties = S.modalOverlay;
-  const modal: React.CSSProperties = { background: 'rgba(14,18,30,0.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, width: 480, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,.65)' };
+  const modal: React.CSSProperties = S.modalBox;
   const th: React.CSSProperties = { fontSize: 9, color: T.tx3, padding: '8px 10px', textAlign: 'left', fontWeight: 600, borderBottom: `1px solid ${T.bd}`, textTransform: 'uppercase', letterSpacing: '0.1em', whiteSpace: 'nowrap' };
   const td: React.CSSProperties = { padding: '8px 10px', fontSize: 11, borderBottom: `1px solid ${T.bd}`, color: T.tx2 };
 
@@ -243,18 +243,18 @@ export default function InventoryExtras() {
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div className="inv-extra-filters" style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <input placeholder="Search SKU, category, component..." value={search} onChange={e => setSearch(e.target.value)}
-          style={{ ...input, maxWidth: 260 }} />
+          style={{ ...input, flex: 1, minWidth: 120 }} />
         <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
-          style={{ ...input, maxWidth: 180 }}>
+          style={{ ...input, flex: 1, minWidth: 120 }}>
           <option value="all">All Categories</option>
           {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
         </select>
       </div>
 
       {/* Table */}
-      <div style={{ overflowX: 'auto', borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.01)' }}>
+      <div className="inv-extra-table" style={{ overflowX: 'auto', borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.01)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>
             <th style={th}>SKU</th><th style={th}>Category</th><th style={th}>Component</th>
@@ -307,7 +307,7 @@ export default function InventoryExtras() {
                 {fComps.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div className="inv-extra-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <div style={{ position: 'relative' }}>
                 <label style={label}>SKU *</label>
                 <input value={fSku} onChange={e => { setFSku(e.target.value); searchSkus(e.target.value); }} onFocus={() => { if (fSkuSuggestions.length > 0) setShowSkuDrop(true); }} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. SW-1234" style={{ ...input, fontFamily: T.mono }} autoComplete="off" />
@@ -323,7 +323,7 @@ export default function InventoryExtras() {
                 </select>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+            <div className="inv-extra-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div>
                 <label style={label}>Initial Quantity</label>
                 <input type="number" min="1" value={fQty} onChange={e => setFQty(e.target.value)} placeholder="0" style={input} />
