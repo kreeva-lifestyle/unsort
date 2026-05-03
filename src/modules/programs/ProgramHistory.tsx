@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { T } from '../../lib/theme';
+import { SkeletonRows } from '../../components/ui/Skeleton';
 import { fetchHistory } from './lib/supabase-rpc';
 import type { ProgramHistoryEntry } from './types';
 import type { TranslationKey } from './i18n/en';
@@ -24,7 +25,7 @@ export default function ProgramHistory({ programId, t }: Props) {
     })();
   }, [programId]);
 
-  if (loading) return <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>{t('loading')}</div>;
+  if (loading) return <SkeletonRows rows={3} />;
   if (entries.length === 0) return <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>{t('noHistory')}</div>;
 
   return (

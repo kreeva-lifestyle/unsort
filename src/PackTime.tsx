@@ -8,6 +8,7 @@ import { friendlyError } from './lib/friendlyError';
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
 
 import { T, S } from './lib/theme';
+import { SkeletonRows } from './components/ui/Skeleton';
 import type {
   Brand,
   PackTimeCourier,
@@ -689,7 +690,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             </tr></thead>
             <tbody>
               {(!historyDateFrom || !historyDateTo) && <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Select a date range above to view scans.</td></tr>}
-              {historyDateFrom && historyDateTo && historyLoading && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</td></tr>}
+              {historyDateFrom && historyDateTo && historyLoading && <tr><td colSpan={6}><SkeletonRows rows={3} /></td></tr>}
               {historyDateFrom && historyDateTo && !historyLoading && historyData.length === 0 && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans found in this date range.</td></tr>}
               {historyData.map(r => (
                 <tr key={r.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.015)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
@@ -952,7 +953,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <div className="modal-inner" onClick={e => e.stopPropagation()} style={{ ...S.modalBox, maxWidth: 340, padding: '18px 16px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4, textAlign: 'center' }}>Today's Summary</div>
             <div style={{ fontSize: 9, color: T.tx3, textAlign: 'center', marginBottom: 10 }}>As of {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} · {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</div>
-            {todaySummary.length === 0 && <div style={{ textAlign: 'center', color: T.tx3, fontSize: 11, padding: 16 }}>Loading...</div>}
+            {todaySummary.length === 0 && <SkeletonRows rows={2} />}
             {todaySummary.map((s, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: `1px solid ${T.bd}` }}>
                 <span style={{ fontSize: 12, color: T.tx, fontWeight: 500 }}>{s.courier}</span>

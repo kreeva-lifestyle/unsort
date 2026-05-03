@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T } from '../../lib/theme';
+import { SkeletonRows } from '../ui/Skeleton';
 import type { CashChallan, CashChallanItem } from '../../types/database';
 
 type Challan = CashChallan & { cash_challan_items?: Partial<CashChallanItem>[] };
@@ -167,7 +168,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
           )}
 
           {/* ── Activity Timeline ── */}
-          {timelineLoading && <div style={{ padding: '12px 14px', fontSize: 10, color: T.tx3, textAlign: 'center' }}>Loading timeline...</div>}
+          {timelineLoading && <SkeletonRows rows={2} />}
           {!timelineLoading && timeline.length > 0 && (
             <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden', marginBottom: 14 }}>
               <div style={{ padding: '8px 14px', borderBottom: `1px solid ${T.bd}`, fontSize: 9, color: T.tx3, fontWeight: 600, letterSpacing: 0.8, textTransform: 'uppercase' }}>Activity Timeline</div>
