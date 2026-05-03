@@ -118,6 +118,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const ledgerPdfIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [userName, setUserName] = useState('there');
   const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number } | null>(null);
+  const [printHtml, setPrintHtml] = useState<string | null>(null);
+  const printIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [viewingChallan, setViewingChallan] = useState<Challan | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number>; returnsCount?: number; voidedCount?: number; prevRevenue?: number; prevCount?: number }>({ totalRevenue: 0, count: 0, byMode: {} });
@@ -830,14 +832,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       <div class="cut-line"> - - - - - - - - - - - - - - Cut Here - - - - - - - - - - - - - - </div>
       ${copy('Customer Copy', false)}
     </div></body></html>`;
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
-    document.body.appendChild(iframe);
-    const iw = iframe.contentWindow;
-    if (!iw) { iframe.remove(); return; }
-    iw.document.write(htmlContent);
-    iw.document.close();
-    setTimeout(() => { iw.print(); setTimeout(() => iframe.remove(), 1000); }, 300);
+    setPrintHtml(htmlContent);
   };
 
   // ── Export challans as CSV with item-level detail ─────────────────────────
@@ -1260,6 +1255,19 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
             <span onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }}>Next</span>
           </>}
+        </div>
+      )}
+
+      {/* Print Preview Modal */}
+      {printHtml && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.75)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setPrintHtml(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 10, width: '100%', maxWidth: 600, maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <iframe ref={printIframeRef} srcDoc={printHtml} style={{ flex: 1, border: 'none', width: '100%', minHeight: 400 }} />
+            <div style={{ display: 'flex', gap: 8, padding: 12, borderTop: '1px solid #eee', justifyContent: 'flex-end' }}>
+              <button onClick={() => setPrintHtml(null)} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', color: '#333', fontSize: 13, cursor: 'pointer' }}>Close</button>
+              <button onClick={() => { printIframeRef.current?.contentWindow?.print(); }} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#6366F1', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Print</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
