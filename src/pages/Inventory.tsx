@@ -620,7 +620,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           </button>
 
           {showFiltersPopover && (<>
-            <div onClick={() => setShowFiltersPopover(false)} style={{ position: 'fixed', inset: 0, zIndex: 100 }} />
+            <div className="inv-filter-backdrop" onClick={() => setShowFiltersPopover(false)} style={{ position: 'fixed', inset: 0, zIndex: 100 }} />
             <div className="inv-filter-popover" style={{ position: 'absolute', top: 40, right: 0, width: 460, zIndex: 101, background: 'rgba(14,18,30,0.98)', border: `1px solid ${T.bd2}`, borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,.55)', overflow: 'hidden', animation: 'fi .15s ease' }}>
               <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Filter items</div>
