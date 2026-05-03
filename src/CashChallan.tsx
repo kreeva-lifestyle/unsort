@@ -805,7 +805,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
     const htmlContent = `<!doctype html><html><head><meta charset="utf-8"><title>${escHtml(docType)} #${escHtml(c.challan_number)}</title>
       <style>
-        @page { size: A4; margin: 10mm; }
+        @page { size: A4; margin: 8mm; }
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #222; }
         .sheet { max-width: 190mm; margin: 0 auto; }
         .copy { padding: 0 4mm; page-break-inside: avoid; }
