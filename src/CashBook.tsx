@@ -380,7 +380,7 @@ export default function CashBook() {
       }
       const { data: myPin } = await supabase.rpc('get_own_pin');
       if (!myPin) { setConfirmError('You have no PIN set. Go to Settings → Users to set one.'); return; }
-      if (myPin !== confirmPin.trim()) {
+      if (String(myPin).trim() !== confirmPin.trim()) {
         const nextAttempts = pinAttempts + 1;
         setPinAttempts(nextAttempts);
         if (nextAttempts >= 3) {
