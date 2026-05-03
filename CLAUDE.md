@@ -18,6 +18,47 @@
 - Keep every file under 200 lines (CashChallan.tsx is grandfathered — split further when touching it)
 - Schema reference: UNSORT-CLAUDE-CODE-CONTEXT.md (read this instead of App.tsx for DB info)
 
+## UI/UX Design Rules — MANDATORY
+**Before changing ANY visual element, read `src/lib/theme.tsx` first.**
+
+### Inputs & Form Fields
+- All text inputs/selects/textareas: use `S.fInput` (height 36px, fontSize 13, padding 8px 12px, borderRadius 8)
+- All date inputs: use `S.fDate` (same dimensions as S.fInput)
+- All search inputs: use `S.fSearch` (height 36, padding-left 34px for icon)
+- Per-page selects: padding 4px 8px, fontSize 11, height 28
+- Never use fontSize below 12 for inputs (iOS zooms on < 16px)
+
+### Buttons
+- Primary action: `S.btnPrimary` (padding 8px 14px, fontSize 12, borderRadius 8)
+- Secondary: `S.btnGhost`
+- Destructive: `S.btnDanger`
+- Small/inline: `S.btnSm` (padding 4px 10px, fontSize 10)
+- All buttons must be min 44px touch target on mobile
+- Never use padding below 4px or fontSize below 10 on buttons
+
+### Modals
+- Overlay: `S.modalOverlay` (fixed, centered, blur backdrop)
+- Box: `S.modalBox` (maxWidth calc(100vw - 32px), maxHeight 90vh, borderRadius 14)
+- Head: `S.modalHead`
+
+### Colors
+- Never hardcode hex colors — use `T.ac`, `T.ac2`, `T.gr`, `T.re`, `T.yl`, `T.bl`, `T.tx`, `T.tx2`, `T.tx3`, `T.bd`, `T.bd2`
+- SwipeRow action colors are the only exception (inline hex for colored backgrounds)
+
+### Mobile (max-width: 768px)
+- Desktop-only features: add `className="desktop-only"`
+- Bottom sheets: use `position: fixed, bottom: 0` with slideUp animation
+- Grids 3+ columns: must have CSS media query fallback to 1-2 columns
+- No `window.open()` — use hidden iframe or print preview modal
+- Toast notifications: appear at top (CSS override in index.css)
+
+### Consistency Checklist (before committing UI changes)
+1. Does the element use theme recipes (S.*) instead of inline styles?
+2. Is the height 36px for toolbar elements?
+3. Does borderRadius match (8 for inputs, 6 for compact, 14 for modals)?
+4. Is fontSize consistent with neighboring elements?
+5. On mobile, does it fit within 393px (iPhone 15 Pro)?
+
 ## Patterns to preserve
 - Every Supabase error → `addToast(friendlyError(err), 'error')`. Never surface raw `error.message`.
 - Atomic multi-table writes go through SECURITY INVOKER RPCs
