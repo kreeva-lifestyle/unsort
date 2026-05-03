@@ -103,23 +103,23 @@ ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outs
       } onClick={e => e.stopPropagation()}>
 
         {/* ── Header ── */}
-        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', ...(mobile ? {} : { position: 'sticky' as const, top: 0, background: T.s, zIndex: 2 }) }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>#{c.challan_number}</span>
+        <div style={{ padding: mobile ? 'max(12px, env(safe-area-inset-top)) 16px 12px' : '16px 20px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', ...(mobile ? {} : { position: 'sticky' as const, top: 0, background: T.s, zIndex: 2 }) }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: mobile ? 16 : 18, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>#{c.challan_number}</span>
               <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 4, background: sc.bg, color: sc.color, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{isRet ? 'Return' : c.status}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{c.customer_name}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{c.customer_name}</span>
               <span style={{ fontSize: 10, color: T.tx3 }}>
                 {c.created_at ? new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
               </span>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.bd}`, borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.tx3, fontSize: 16, lineHeight: 1, flexShrink: 0 }}>&times;</button>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.bd}`, borderRadius: 6, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1, flexShrink: 0 }}>&times;</button>
         </div>
 
-        <div style={{ padding: '16px 20px', paddingBottom: mobile ? 80 : 16 }}>
+        <div style={{ padding: mobile ? '12px 16px' : '16px 20px', paddingBottom: mobile ? 80 : 16 }}>
 
           {/* ── Items table ── */}
           {items.length > 0 && (
