@@ -791,12 +791,12 @@ export default function BrandTagPrinter() {
         </table>
       </div>
       <div className="bt-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
-        <select value={btPerPage} onChange={e => { setBtPerPage(Number(e.target.value)); setBtPage(0); }} style={{ ...inp, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
+        <select value={btPerPage} onChange={e => { setBtPerPage(Number(e.target.value)); setBtPage(0); }} style={{ ...S.fInput, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
         <span style={{ color: T.tx3 }}>rows</span>
         {totalPages > 1 && <>
-          <span onClick={() => setBtPage(Math.max(0, btPage - 1))} style={{ ...btnSm, opacity: btPage === 0 ? 0.3 : 1, pointerEvents: btPage === 0 ? 'none' : 'auto' }}>Prev</span>
-          <span style={{ color: T.tx3 }}>{btPage + 1} / {totalPages}</span>
-          <span onClick={() => setBtPage(Math.min(totalPages - 1, btPage + 1))} style={{ ...btnSm, opacity: btPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= totalPages - 1 ? 'none' : 'auto' }}>Next</span>
+          <span onClick={() => setBtPage(Math.max(0, btPage - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: btPage === 0 ? 0.3 : 1, pointerEvents: btPage === 0 ? 'none' : 'auto' }}>Prev</span>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{btPage + 1} / {totalPages}</span>
+          <span onClick={() => setBtPage(Math.min(totalPages - 1, btPage + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: btPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= totalPages - 1 ? 'none' : 'auto' }}>Next</span>
         </>}
       </div>
 

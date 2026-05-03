@@ -1253,22 +1253,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
       {/* Pagination */}
       {totalPages > 0 && (
-        <div className="challan-pagination" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
-          <span style={{ fontSize: 9, color: T.tx3 }}>Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalCount)} of {totalCount}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button onClick={() => setPage(0)} disabled={page === 0} style={{ padding: '3px 7px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: page === 0 ? 'transparent' : 'rgba(255,255,255,0.03)', color: page === 0 ? T.tx3 : T.tx, fontSize: 9, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }}>«</button>
-            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={{ padding: '3px 7px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: page === 0 ? 'transparent' : 'rgba(255,255,255,0.03)', color: page === 0 ? T.tx3 : T.tx, fontSize: 9, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }}>‹</button>
-            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-              let p: number;
-              if (totalPages <= 5) p = i;
-              else if (page < 3) p = i;
-              else if (page > totalPages - 4) p = totalPages - 5 + i;
-              else p = page - 2 + i;
-              return <button key={p} onClick={() => setPage(p)} style={{ padding: '3px 8px', borderRadius: 4, border: p === page ? `1px solid ${T.ac}44` : `1px solid ${T.bd2}`, background: p === page ? `${T.ac}22` : 'rgba(255,255,255,0.03)', color: p === page ? T.ac2 : T.tx3, fontSize: 9, fontWeight: p === page ? 700 : 400, cursor: 'pointer' }}>{p + 1}</button>;
-            })}
-            <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} style={{ padding: '3px 7px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: page >= totalPages - 1 ? 'transparent' : 'rgba(255,255,255,0.03)', color: page >= totalPages - 1 ? T.tx3 : T.tx, fontSize: 9, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }}>›</button>
-            <button onClick={() => setPage(totalPages - 1)} disabled={page >= totalPages - 1} style={{ padding: '3px 7px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: page >= totalPages - 1 ? 'transparent' : 'rgba(255,255,255,0.03)', color: page >= totalPages - 1 ? T.tx3 : T.tx, fontSize: 9, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }}>»</button>
-          </div>
+        <div className="challan-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{totalCount} records</span>
+          {totalPages > 1 && <>
+            <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }}>Prev</span>
+            <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
+            <span onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }}>Next</span>
+          </>}
         </div>
       )}
     </div>
