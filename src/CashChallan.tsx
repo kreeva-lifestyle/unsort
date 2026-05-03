@@ -1266,10 +1266,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
       {printHtml && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 12px', background: '#f5f5f5', borderBottom: '1px solid #ddd' }}>
-            <button onClick={() => setPrintHtml(null)} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#333', fontSize: 13, cursor: 'pointer' }}>Close</button>
-          </div>
           <iframe srcDoc={printHtml} style={{ flex: 1, border: 'none', width: '100%' }} />
+          <div style={{ display: 'flex', gap: 8, padding: '12px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))', background: '#f5f5f5', borderTop: '1px solid #ddd', justifyContent: 'center' }}>
+            <button onClick={() => setPrintHtml(null)} style={{ padding: '12px 24px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#333', fontSize: 14, cursor: 'pointer', fontWeight: 500 }}>Close</button>
+          </div>
         </div>,
         document.body
       )}
