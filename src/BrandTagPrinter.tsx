@@ -371,7 +371,7 @@ export default function BrandTagPrinter() {
 
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   useEffect(() => {
-    supabase.from('brand_tags').select('brand').then(({ data }) => {
+    supabase.from('brand_tags').select('brand').limit(5000).then(({ data }) => {
       const unique = [...new Set((data || []).map((r: any) => r.brand as string))].sort();
       setDynamicBrands(unique);
     });
@@ -643,7 +643,7 @@ export default function BrandTagPrinter() {
 
           {/* Stat strip */}
           {datesPicked && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
+            <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
               {[
                 { label: 'Adds', val: histStats.add, color: T.gr },
                 { label: 'Edits', val: histStats.edit, color: T.yl },
