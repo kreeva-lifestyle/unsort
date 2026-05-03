@@ -838,6 +838,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80, minHeight: '100%', position: 'relative' }} onClick={focusInput}>
 
+      {/* Scan counter badge */}
+      {recentScans.length > 0 && <div style={{ position: 'fixed', top: 52, right: 16, zIndex: 200, background: T.gr, color: '#fff', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, boxShadow: '0 2px 10px rgba(34,197,94,.4)' }}>{recentScans.filter(s => s.success).length} scanned</div>}
+
       {/* Flash */}
       {flash && <div style={{ position: 'fixed', inset: 0, zIndex: 300, pointerEvents: 'none', background: flash === 'success' ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.10)', animation: 'fi .15s ease' }} />}
 

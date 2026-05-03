@@ -73,13 +73,29 @@ export type ChallanFormProps = {
 export default function ChallanForm(p: ChallanFormProps) {
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
   const [nextNum, setNextNum] = useState<number | null>(null);
+  const [outstanding, setOutstanding] = useState(0);
+  const [recentCustomers, setRecentCustomers] = useState<{ name: string; phone?: string; id?: string }[]>([]);
 
   useEffect(() => {
     if (!p.editing) {
       supabase.rpc('get_next_challan_number').then(({ data }) => { if (data) setNextNum(data); });
+      supabase.from('cash_challans').select('customer_name, customer_id').order('created_at', { ascending: false }).limit(20).then(({ data }) => {
+        const seen = new Set<string>();
+        const recent: { name: string; id?: string }[] = [];
+        (data || []).forEach(c => { if (!seen.has(c.customer_name)) { seen.add(c.customer_name); recent.push({ name: c.customer_name, id: c.customer_id }); } });
+        setRecentCustomers(recent.slice(0, 5));
+      });
     }
     return () => { clearTimeout(searchTimeout.current); };
   }, [p.editing]);
+
+  useEffect(() => {
+    if (!p.customerName.trim()) { setOutstanding(0); return; }
+    supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', p.customerName.trim()).in('status', ['unpaid', 'partial']).eq('is_return', false).then(({ data }) => {
+      const total = (data || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0);
+      setOutstanding(Math.round(total));
+    });
+  }, [p.customerName]);
   const lbl: React.CSSProperties = { display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 };
   const inp: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' };
 
@@ -133,8 +149,18 @@ export default function ChallanForm(p: ChallanFormProps) {
         )}
 
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
+          {/* Recent customers */}
+          {!p.editing && recentCustomers.length > 0 && !p.customerName && (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+              {recentCustomers.map(c => (
+                <span key={c.name} onClick={() => { p.setCustomerName(c.name); if (c.id) { p.setSelectedCustomerId(c.id); supabase.from('cash_challan_customers').select('phone').eq('name', c.name).maybeSingle().then(({ data }) => { if (data?.phone) p.setCustomerPhone(data.phone); }); } p.setCustomerSuggestions([]); }}
+                  style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', background: 'rgba(99,102,241,.06)', border: `1px solid rgba(99,102,241,.15)`, color: T.ac2, whiteSpace: 'nowrap' }}>{c.name}</span>
+              ))}
+            </div>
+          )}
+
           {/* Customer */}
-          <div className="challan-form-grid-2" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 12 }}>
+          <div className="challan-form-grid-2" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: outstanding > 0 ? 4 : 12 }}>
             <div style={{ position: 'relative' }}>
               <label style={lbl}>Customer Name *</label>
               <input type="text" value={p.customerName} onChange={e => {
@@ -161,6 +187,7 @@ export default function ChallanForm(p: ChallanFormProps) {
               </div>
             </div>
           </div>
+          {outstanding > 0 && <div style={{ fontSize: 11, color: T.re, fontWeight: 600, marginBottom: 10, padding: '6px 10px', background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.12)', borderRadius: 6 }}>Outstanding: ₹{outstanding.toLocaleString('en-IN')}</div>}
 
           {/* Line Items */}
           <div className="challan-item-grid-wrap" data-items style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 9, marginBottom: 12, overflow: 'hidden' }}>

@@ -733,7 +733,7 @@ export default function BrandTagPrinter() {
           <button style={S.btnGhost} onClick={openAdd}>+ Add tag</button>
           <button style={{ ...S.btnPrimary, background: `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)`, boxShadow: `0 2px 10px rgba(34,197,94,.3)` }} onClick={() => { const toPrint: BrandTagRow[] = []; rows.forEach(r => { for (let i = 0; i < (r.copies || 0); i++) toPrint.push(r); }); if (toPrint.length > 0) openLabelPrint(toPrint); else addToast('Set copies > 0 on rows to print', 'error'); }}>
             <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
-            Print
+            Print{(() => { const c = rows.reduce((s, r) => s + (r.copies || 0), 0); return c > 0 ? ` (${c})` : ''; })()}
           </button>
         </div>
       </div>
