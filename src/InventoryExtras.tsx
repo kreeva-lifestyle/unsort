@@ -230,15 +230,15 @@ export default function InventoryExtras() {
     <div style={{ animation: 'fi .3s ease both' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Extras</span>
+        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Spare Parts</span>
         <div style={{ display: 'flex', gap: 6 }}>
           <div onClick={() => {
             if (filtered.length === 0) return;
             const csv = 'SKU,Category,Component,Size,Qty\n' + filtered.map(ex => `${ex.sku},"${ex.product_name}",${ex.component_name},${ex.size},${ex.quantity}`).join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Extras_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
-          }} style={btnGhost}>Export CSV</div>
-          <div onClick={() => setShowAdd(true)} style={btn}>+ Add Extra</div>
+          }} style={btnGhost} className="desktop-only">Export CSV</div>
+          <div onClick={() => setShowAdd(true)} style={btn}>+ Add</div>
         </div>
       </div>
 
@@ -261,7 +261,7 @@ export default function InventoryExtras() {
             <th style={th}>Size</th><th style={th}>Qty</th><th style={th}>Matches</th><th style={th}>Actions</th>
           </tr></thead>
           <tbody>
-            {filtered.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', padding: 30, color: T.tx3 }}>No extras found</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', padding: 30, color: T.tx3 }}>No spare parts found</td></tr>}
             {filtered.map(ex => (
               <tr key={ex.id} style={{ transition: 'background 150ms' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                 <td style={{ ...td, fontFamily: T.mono, fontSize: 11, color: T.tx }}>{ex.sku}</td>
