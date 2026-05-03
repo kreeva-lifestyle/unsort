@@ -27,6 +27,7 @@ import ProgramsModule, { PublicShareView } from './modules/programs';
 import SidebarComponent from './components/layout/Sidebar';
 import HeaderComponent from './components/layout/Header';
 import ToastContainerComponent from './components/layout/ToastContainer';
+import OfflineBar from './components/ui/OfflineBar';
 import { T, Icon } from './lib/theme';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { NotificationProvider, useNotifications } from './hooks/useNotifications';
@@ -122,6 +123,7 @@ const MainApp = () => {
       </main>
     </div>
     <ToastContainerComponent toasts={toasts} />
+    <OfflineBar />
     <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} commands={commands} />
   </div>);
 };

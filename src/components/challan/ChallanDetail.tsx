@@ -94,6 +94,13 @@ ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outs
   };
 
   const mobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+  const dragStartY = useRef(0);
+
+  const onDragStart = (e: React.TouchEvent) => { dragStartY.current = e.touches[0].clientY; };
+  const onDragEnd = (e: React.TouchEvent) => {
+    const dy = e.changedTouches[0].clientY - dragStartY.current;
+    if (dy > 80 && scrollRef.current && scrollRef.current.scrollTop <= 0) onClose();
+  };
 
   const content = (
     <div className="challan-detail-overlay" style={mobile
@@ -103,7 +110,10 @@ ${due > 0 && !isRet ? `<p style="color:#c00;font-size:12px;font-weight:600">Outs
       <div ref={scrollRef} className="challan-detail-modal" style={mobile
         ? { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#060810', borderRadius: '16px 16px 0 0', padding: 0, maxHeight: '92vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', animation: 'slideUp .25s ease both' }
         : { background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,.65)' }
-      } onClick={e => e.stopPropagation()}>
+      } onClick={e => e.stopPropagation()} onTouchStart={mobile ? onDragStart : undefined} onTouchEnd={mobile ? onDragEnd : undefined}>
+
+        {/* Drag handle — mobile only */}
+        {mobile && <div style={{ padding: '8px 0 0', display: 'flex', justifyContent: 'center' }}><div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.15)' }} /></div>}
 
         {/* ── Header ── */}
         <div style={{ padding: mobile ? '14px 16px 10px' : '16px 20px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', ...(mobile ? {} : { position: 'sticky' as const, top: 0, background: T.s, zIndex: 2 }) }}>

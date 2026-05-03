@@ -3,6 +3,7 @@
 import { T, S } from '../../lib/theme';
 import Empty from '../ui/Empty';
 import SwipeRow from '../ui/SwipeRow';
+import { SkeletonRows } from '../ui/Skeleton';
 import type { CashChallan, CashChallanItem as DbCashChallanItem } from '../../types/database';
 
 type Challan = Omit<CashChallan, 'created_at' | 'updated_at'> & {
@@ -112,7 +113,7 @@ export default function ChallanList(p: Props) {
       <div style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{p.totalCount} records</div>
 
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-        {p.loading && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div>}
+        {p.loading && <SkeletonRows rows={4} />}
         {!p.loading && p.challans.length === 0 && <div style={{ padding: 14 }}><Empty icon="🧾" title="No challans yet" message="Create your first challan — invoice customers, record payments, and track outstanding amounts all from one place." cta="+ New Challan" onCta={p.onOpenEmpty} /></div>}
         {p.challans.map((c, i) => {
           const sc = p.statusColors[c.status] || p.statusColors.unpaid;
