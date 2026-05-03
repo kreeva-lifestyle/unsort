@@ -17,6 +17,7 @@ const btAudit = (action: string, details: string) => {
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
 import { T, S } from './lib/theme';
+import { SkeletonRows } from './components/ui/Skeleton';
 
 const btnPrimary: React.CSSProperties = S.btnPrimary;
 const btnGhost: React.CSSProperties = S.btnGhost;
@@ -668,7 +669,7 @@ export default function BrandTagPrinter() {
                 </tr></thead>
                 <tbody>
                   {!datesPicked && <tr><td colSpan={4} style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Select a date range to view history.</td></tr>}
-                  {datesPicked && historyLoading && <tr><td colSpan={4} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</td></tr>}
+                  {datesPicked && historyLoading && <tr><td colSpan={4}><SkeletonRows rows={3} /></td></tr>}
                   {datesPicked && !historyLoading && historyData.length === 0 && <tr><td colSpan={4} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No activity in this date range.</td></tr>}
                   {datesPicked && !historyLoading && historyData.map(r => (
                     <tr key={r.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.015)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>

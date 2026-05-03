@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { T, S } from '../../lib/theme';
 import SwipeRow from '../../components/ui/SwipeRow';
+import { SkeletonRows } from '../../components/ui/Skeleton';
 import { usePrograms } from './hooks/usePrograms';
 import { useT } from './hooks/useT';
 import { supabase } from '../../lib/supabase';
@@ -95,7 +96,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
 
       {/* Table */}
       <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-        {loading && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>{t('loading')}</div>}
+        {loading && <SkeletonRows rows={4} />}
         {!loading && programs.length === 0 && (
           <div style={{ padding: 40, textAlign: 'center' }}>
             <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.85 }}>{search ? '🔍' : '📋'}</div>
