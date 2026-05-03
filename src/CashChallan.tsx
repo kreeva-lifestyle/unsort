@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import CashBook from './CashBook';
 import { supabase } from './lib/supabase';
 import { useNotifications } from './hooks/useNotifications';
@@ -118,6 +119,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const ledgerPdfIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [userName, setUserName] = useState('there');
   const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number } | null>(null);
+  const [printHtml, setPrintHtml] = useState<string | null>(null);
   const [viewingChallan, setViewingChallan] = useState<Challan | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number>; returnsCount?: number; voidedCount?: number; prevRevenue?: number; prevCount?: number }>({ totalRevenue: 0, count: 0, byMode: {} });
@@ -749,9 +751,6 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Print ──────────────────────────────────────────────────────────────────
   const printChallan = async (c: Challan) => {
-    const w = window.open('', '_blank');
-    if (!w) { addToast('Pop-up blocked. Allow pop-ups for this site.', 'error'); return; }
-    w.document.write('<html><body style="font-family:Arial;padding:40px;text-align:center;color:#666"><p>Loading challan...</p></body></html>');
     const { data: citems } = await supabase.from('cash_challan_items').select('sku, quantity, price, total, discount_amount').eq('challan_id', c.id).order('sort_order');
     // Build one copy's inner HTML. We render it twice — top half = Office copy
     // (signed by customer, kept on file), bottom half = Customer copy. A
@@ -833,11 +832,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       <div class="cut-line"> - - - - - - - - - - - - - - Cut Here - - - - - - - - - - - - - - </div>
       ${copy('Customer Copy', false)}
     </div></body></html>`;
-    w.document.open();
-    w.document.write(htmlContent);
-    w.document.close();
-    w.focus();
-    w.print();
+    const printableHtml = htmlContent.replace('</body>', `
+      <div class="no-print" style="position:fixed;bottom:0;left:0;right:0;padding:12px;background:#f5f5f5;display:flex;gap:8px;justify-content:center;border-top:1px solid #ddd;z-index:100">
+        <button onclick="window.print()" style="padding:10px 28px;border-radius:8px;border:none;background:#6366F1;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Print / Share</button>
+      </div>
+      <style>@media print{.no-print{display:none!important}}</style>
+    </body>`);
+    setPrintHtml(printableHtml);
   };
 
   // ── Export challans as CSV with item-level detail ─────────────────────────
@@ -1263,7 +1264,15 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         </div>
       )}
 
-      {/* Print Preview Modal */}
+      {printHtml && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 12px', background: '#f5f5f5', borderBottom: '1px solid #ddd' }}>
+            <button onClick={() => setPrintHtml(null)} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#333', fontSize: 13, cursor: 'pointer' }}>Close</button>
+          </div>
+          <iframe srcDoc={printHtml} style={{ flex: 1, border: 'none', width: '100%' }} />
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
