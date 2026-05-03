@@ -144,6 +144,11 @@ body.modal-open { overflow: hidden !important; }
   .challan-filter-btns { flex: 0 !important; }
   .toast-container { top: 12px !important; bottom: auto !important; left: 12px !important; right: 12px !important; }
   .challan-pagination, .inv-pagination, .bt-pagination, .prg-pagination { padding-bottom: 70px !important; }
+  .inv-extra-filters { flex-direction: column !important; }
+  .inv-extra-filters input, .inv-extra-filters select { max-width: none !important; width: 100% !important; }
+  .inv-extra-form-grid { grid-template-columns: 1fr !important; }
+  .inv-extra-table { -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important; }
+  .inv-extra-table::-webkit-scrollbar { display: none !important; }
   .mobile-drawer .sidebar { display: flex !important; width: 100% !important; height: calc(100vh - 60px) !important; padding-bottom: 0 !important; }
   .page-pad { padding: 14px 12px !important; padding-bottom: 70px !important; }
   .filter-bar { gap: 6px !important; padding: 8px 10px !important; }
