@@ -33,7 +33,6 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { NotificationProvider, useNotifications } from './hooks/useNotifications';
 
 import { TAB_IDS } from './lib/tabs';
-import { CommandPalette, useCommands } from './components/command-palette';
 const getTabFromHash = () => {
   const h = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   return (TAB_IDS as readonly string[]).includes(h) ? h : 'dashboard';
@@ -46,7 +45,6 @@ const MainApp = () => {
   const [notifItemId, setNotifItemId] = useState<string | null>(null);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [mounted, setMounted] = useState<Set<string>>(new Set([getTabFromHash()]));
-  const [cmdOpen, setCmdOpen] = useState(false);
 
   // Central navigate — updates URL + state
   const setTab = (t: string) => {
@@ -57,14 +55,6 @@ const MainApp = () => {
     if (window.location.hash !== newHash) window.history.pushState(null, '', newHash);
     setTabState(t);
   };
-
-  // Cmd+K command palette
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setCmdOpen(o => !o); } };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, []);
-  const commands = useCommands(setTab, {});
 
   // Browser back/forward support
   useEffect(() => {
@@ -110,7 +100,7 @@ const MainApp = () => {
           <span>More</span>
         </div>
       </div>
-      <HeaderComponent title={titles[tab]} onNotifClick={handleNotifClick} onOpenCommandPalette={() => setCmdOpen(true)} notifications={notifications} markAsRead={markAsRead} />
+      <HeaderComponent title={titles[tab]} onNotifClick={handleNotifClick} notifications={notifications} markAsRead={markAsRead} />
       <main style={{ flex: 1, overflow: 'auto' }}>
         {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard navigateTo={setTab} /></div>}
         {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
@@ -124,7 +114,6 @@ const MainApp = () => {
     </div>
     <ToastContainerComponent toasts={toasts} />
     <OfflineBar />
-    <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} commands={commands} />
   </div>);
 };
 

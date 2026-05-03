@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { T, Icon } from '../../lib/theme';
+import { T } from '../../lib/theme';
 
-export default function Header({ title, onNotifClick, onOpenCommandPalette, notifications, markAsRead }: {
+export default function Header({ title, onNotifClick, notifications, markAsRead }: {
   title: string;
   onNotifClick?: (n: any) => void;
-  onOpenCommandPalette?: () => void;
   notifications: any[];
   markAsRead: (id: string) => void;
 }) {
@@ -26,9 +25,6 @@ export default function Header({ title, onNotifClick, onOpenCommandPalette, noti
         </div>
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <button onClick={() => onOpenCommandPalette?.()} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} title="Search (⌘K)" onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = T.bd2; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = T.bd; }}>
-          <Icon name="search" size={14} />
-        </button>
         <div style={{ position: 'relative' }}>
         <button onClick={() => setShow(!show)} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', position: 'relative', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = T.bd2; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = T.bd; }}>
           <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
