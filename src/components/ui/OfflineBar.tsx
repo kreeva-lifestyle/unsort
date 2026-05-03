@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { T } from '../../lib/theme';
 
 export default function OfflineBar() {
   const [offline, setOffline] = useState(!navigator.onLine);
@@ -20,7 +21,7 @@ export default function OfflineBar() {
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 10000,
-      background: offline ? '#EF4444' : '#22C55E',
+      background: offline ? T.re : T.gr,
       color: '#fff', textAlign: 'center',
       fontSize: 11, fontWeight: 600, padding: '6px 0',
       transition: 'all .3s ease',
