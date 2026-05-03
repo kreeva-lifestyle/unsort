@@ -189,7 +189,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 10, alignItems: 'center' }}>
+        <div className="prg-pagination" style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 10, alignItems: 'center' }}>
           <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }}>{t('prev')}</span>
           <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
           <span onClick={() => setPage(p => p + 1)} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }}>{t('next')}</span>

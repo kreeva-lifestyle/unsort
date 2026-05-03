@@ -790,7 +790,7 @@ export default function BrandTagPrinter() {
           </tbody>
         </table>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
+      <div className="bt-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
         <select value={btPerPage} onChange={e => { setBtPerPage(Number(e.target.value)); setBtPage(0); }} style={{ ...inp, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
         <span style={{ color: T.tx3 }}>rows</span>
         {totalPages > 1 && <>

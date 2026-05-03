@@ -142,6 +142,7 @@ body.modal-open { overflow: hidden !important; }
   .inv-more-fields { display: block !important; }
   .inv-more-content { display: none !important; }
   .challan-filter-btns { flex: 0 !important; }
+  .challan-pagination, .inv-pagination, .bt-pagination, .prg-pagination { padding-bottom: 70px !important; }
   .mobile-drawer .sidebar { display: flex !important; width: 100% !important; height: calc(100vh - 60px) !important; padding-bottom: 0 !important; }
   .page-pad { padding: 14px 12px !important; padding-bottom: 70px !important; }
   .filter-bar { gap: 6px !important; padding: 8px 10px !important; }
