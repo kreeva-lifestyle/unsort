@@ -15,6 +15,9 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// Enable :active CSS on iOS Safari (requires touchstart listener on body)
+document.addEventListener('touchstart', () => {}, { passive: true });
+
 // Haptic feedback on button taps (native feel)
 document.addEventListener('touchstart', (e) => {
   const t = e.target as HTMLElement;
