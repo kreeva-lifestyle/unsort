@@ -120,6 +120,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [userName, setUserName] = useState('there');
   const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number } | null>(null);
   const [printHtml, setPrintHtml] = useState<string | null>(null);
+  const printIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [viewingChallan, setViewingChallan] = useState<Challan | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number>; returnsCount?: number; voidedCount?: number; prevRevenue?: number; prevCount?: number }>({ totalRevenue: 0, count: 0, byMode: {} });
@@ -833,9 +834,6 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       ${copy('Customer Copy', false)}
     </div></body></html>`;
     const printableHtml = htmlContent.replace('</body>', `
-      <div class="no-print" style="position:fixed;bottom:0;left:0;right:0;padding:12px;background:#f5f5f5;display:flex;gap:8px;justify-content:center;border-top:1px solid #ddd;z-index:100">
-        <button onclick="window.print()" style="padding:10px 28px;border-radius:8px;border:none;background:#6366F1;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Print / Share</button>
-      </div>
       <style>@media print{.no-print{display:none!important}}</style>
     </body>`);
     setPrintHtml(printableHtml);
@@ -1266,9 +1264,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
       {printHtml && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
-          <iframe srcDoc={printHtml} style={{ flex: 1, border: 'none', width: '100%' }} />
-          <div style={{ display: 'flex', gap: 8, padding: '12px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))', background: '#f5f5f5', borderTop: '1px solid #ddd', justifyContent: 'center' }}>
-            <button onClick={() => setPrintHtml(null)} style={{ padding: '12px 24px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#333', fontSize: 14, cursor: 'pointer', fontWeight: 500 }}>Close</button>
+          <iframe ref={printIframeRef} srcDoc={printHtml} style={{ flex: 1, border: 'none', width: '100%' }} />
+          <div style={{ display: 'flex', gap: 8, padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: '#f5f5f5', borderTop: '1px solid #ddd', justifyContent: 'center' }}>
+            <button onClick={() => { try { printIframeRef.current?.contentWindow?.print(); } catch { /* iOS may block — fall back silently */ } }} style={{ flex: 1, padding: '12px 0', borderRadius: 8, border: 'none', background: '#6366F1', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Print / Share</button>
+            <button onClick={() => setPrintHtml(null)} style={{ flex: 1, padding: '12px 0', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#333', fontSize: 14, cursor: 'pointer', fontWeight: 500 }}>Close</button>
           </div>
         </div>,
         document.body
