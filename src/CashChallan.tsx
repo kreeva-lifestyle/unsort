@@ -1260,7 +1260,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
       {/* Print Preview Modal */}
       {printHtml && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.75)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setPrintHtml(null)}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,.75)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setPrintHtml(null)}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 10, width: '100%', maxWidth: 600, maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <iframe ref={printIframeRef} srcDoc={printHtml} style={{ flex: 1, border: 'none', width: '100%', minHeight: 400 }} />
             <div style={{ display: 'flex', gap: 8, padding: 12, borderTop: '1px solid #eee', justifyContent: 'flex-end' }}>
