@@ -749,6 +749,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Print ──────────────────────────────────────────────────────────────────
   const printChallan = async (c: Challan) => {
+    const w = window.open('', '_blank');
+    if (!w) { addToast('Pop-up blocked. Allow pop-ups for this site.', 'error'); return; }
+    w.document.write('<html><body style="font-family:Arial;padding:40px;text-align:center;color:#666"><p>Loading challan...</p></body></html>');
     const { data: citems } = await supabase.from('cash_challan_items').select('sku, quantity, price, total, discount_amount').eq('challan_id', c.id).order('sort_order');
     // Build one copy's inner HTML. We render it twice — top half = Office copy
     // (signed by customer, kept on file), bottom half = Customer copy. A
@@ -830,8 +833,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       <div class="cut-line"> - - - - - - - - - - - - - - Cut Here - - - - - - - - - - - - - - </div>
       ${copy('Customer Copy', false)}
     </div></body></html>`;
-    const w = window.open('', '_blank');
-    if (!w) { addToast('Pop-up blocked. Allow pop-ups for this site.', 'error'); return; }
+    w.document.open();
     w.document.write(htmlContent);
     w.document.close();
     w.focus();
