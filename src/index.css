@@ -143,7 +143,7 @@ body.modal-open { overflow: hidden !important; }
   .inv-more-content { display: none !important; }
   .challan-filter-btns { flex: 0 !important; }
   .toast-container { top: 12px !important; bottom: auto !important; left: 12px !important; right: 12px !important; }
-  .challan-pagination, .inv-pagination, .bt-pagination, .prg-pagination { padding-bottom: 70px !important; }
+  .challan-pagination, .inv-pagination, .bt-pagination, .prg-pagination, .scan-pagination { padding-bottom: 70px !important; }
   .inv-extra-filters { flex-direction: column !important; }
   .inv-extra-filters input, .inv-extra-filters select { max-width: none !important; width: 100% !important; }
   .inv-extra-form-grid { grid-template-columns: 1fr !important; }

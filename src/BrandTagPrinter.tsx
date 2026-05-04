@@ -687,7 +687,7 @@ export default function BrandTagPrinter() {
 
           {/* Pagination */}
           {datesPicked && histTotalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 10 }}>
+            <div className="bt-pagination" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 10 }}>
               <span onClick={() => setHistoryPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage === 0 ? 0.3 : 1, pointerEvents: historyPage === 0 ? 'none' : 'auto' }}>Prev</span>
               <span style={{ fontSize: 10, color: T.tx3 }}>{historyPage + 1} / {histTotalPages}</span>
               <span onClick={() => setHistoryPage(p => Math.min(histTotalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage >= histTotalPages - 1 ? 0.3 : 1, pointerEvents: historyPage >= histTotalPages - 1 ? 'none' : 'auto' }}>Next</span>
