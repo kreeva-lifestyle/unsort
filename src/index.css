@@ -151,6 +151,9 @@ body.modal-open { overflow: hidden !important; }
   .inv-extra-mobile { display: block !important; }
   .scan-history-desktop { display: none !important; }
   .scan-history-mobile { display: block !important; }
+  .scan-filter-bar { flex-direction: column !important; align-items: stretch !important; }
+  .scan-courier-pills { overflow-x: auto !important; flex-wrap: nowrap !important; scrollbar-width: none !important; -webkit-overflow-scrolling: touch !important; }
+  .scan-courier-pills::-webkit-scrollbar { display: none !important; }
   .mobile-drawer .sidebar { display: flex !important; width: 100% !important; height: calc(100vh - 60px) !important; padding-bottom: 0 !important; }
   .page-pad { padding: 14px 12px !important; padding-bottom: 70px !important; }
   .filter-bar { gap: 6px !important; padding: 8px 10px !important; }

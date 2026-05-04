@@ -616,7 +616,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button onClick={() => { setShowHistory(false); window.history.back(); }} style={S.btnGhost}>← Back</button>
-          <button onClick={() => { setExporting(true); exportHistory().finally(() => setExporting(false)); }} disabled={exporting || !historyDateFrom || !historyDateTo} title={!historyDateFrom || !historyDateTo ? 'Select a date range first' : 'Export filtered records to CSV'} style={{ ...S.btnGhost, opacity: exporting || !historyDateFrom || !historyDateTo ? 0.4 : 1, cursor: exporting || !historyDateFrom || !historyDateTo ? 'not-allowed' : 'pointer', pointerEvents: exporting || !historyDateFrom || !historyDateTo ? 'none' : 'auto' }}>{exporting ? 'Exporting...' : 'Export CSV'}</button>
+          <button className="desktop-only" onClick={() => { setExporting(true); exportHistory().finally(() => setExporting(false)); }} disabled={exporting || !historyDateFrom || !historyDateTo} title={!historyDateFrom || !historyDateTo ? 'Select a date range first' : 'Export filtered records to CSV'} style={{ ...S.btnGhost, opacity: exporting || !historyDateFrom || !historyDateTo ? 0.4 : 1, cursor: exporting || !historyDateFrom || !historyDateTo ? 'not-allowed' : 'pointer', pointerEvents: exporting || !historyDateFrom || !historyDateTo ? 'none' : 'auto' }}>{exporting ? 'Exporting...' : 'Export CSV'}</button>
         </div>
       </div>
 
@@ -660,13 +660,13 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       </div>
 
       {/* Filter bar */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 180, position: 'relative' }}>
+      <div className="scan-filter-bar" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 120, position: 'relative' }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
           <input type="text" value={historySearch} onChange={e => { setHistorySearch(e.target.value); setHistoryPage(0); }} placeholder="Search AWB..."
             style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div className="scan-courier-pills" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <button onClick={() => { setHistoryFilterCourier(''); setHistoryPage(0); }} style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${!historyFilterCourier ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: !historyFilterCourier ? 'rgba(99,102,241,.08)' : 'transparent', color: !historyFilterCourier ? T.ac2 : T.tx2, fontFamily: T.sans }}>All</button>
           {couriers.map(c => (
             <button key={c.id} onClick={() => { setHistoryFilterCourier(historyFilterCourier === c.name ? '' : c.name); setHistoryPage(0); }} style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${historyFilterCourier === c.name ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: historyFilterCourier === c.name ? 'rgba(99,102,241,.08)' : 'transparent', color: historyFilterCourier === c.name ? T.ac2 : T.tx2, fontFamily: T.sans }}>{c.name}</button>
