@@ -389,6 +389,7 @@ export default function BrandTagPrinter() {
       try {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
         const wb = XLSX.read(data, { type: 'array' });
+        if (!wb.SheetNames.length) { addToast('Excel file has no sheets', 'error'); setImporting(false); return; }
         const ws = wb.Sheets[wb.SheetNames[0]];
         const json: any[] = XLSX.utils.sheet_to_json(ws);
         const imported: BrandTagRow[] = json.map(d => {
