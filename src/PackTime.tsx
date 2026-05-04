@@ -683,9 +683,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       </div>
 
       {/* Table */}
-      <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
         <div className="table-wrap" style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 580 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
             <thead><tr>
               {['AWB', 'Courier', 'Cam', 'Brand', 'Time', ''].map(h => <th key={h} style={S.thStyle}>{h}</th>)}
             </tr></thead>
@@ -695,11 +695,11 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               {historyDateFrom && historyDateTo && !historyLoading && historyData.length === 0 && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans found in this date range.</td></tr>}
               {historyData.map(r => (
                 <tr key={r.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.015)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600, fontSize: 12 }}>{r.awb}</td>
-                  <td style={{ ...S.tdStyle, fontSize: 12 }}>{r.courier}</td>
-                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 11, color: T.tx3 }}>{r.camera}</td>
-                  <td style={{ ...S.tdStyle, color: T.gr, fontSize: 11, fontWeight: 600 }}>{r.brand || '—'}</td>
-                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 10, color: T.tx3 }}>{r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</td>
+                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.awb}</td>
+                  <td style={S.tdStyle}>{r.courier}</td>
+                  <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx3 }}>{r.camera}</td>
+                  <td style={{ ...S.tdStyle, color: T.gr, fontWeight: 600 }}>{r.brand || '—'}</td>
+                  <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx3, fontSize: 11 }}>{r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                   <td style={{ ...S.tdStyle, width: 40 }}>
                     <button type="button" onClick={() => setConfirmDeleteId(r.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4, transition: 'opacity .15s' }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')}>
                       <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 1.8 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
