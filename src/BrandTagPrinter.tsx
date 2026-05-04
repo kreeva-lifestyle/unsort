@@ -11,7 +11,7 @@ import type { BrandTag, BrandTagInsert, AuditLogInsert } from './types/database'
 const btAudit = (action: string, details: string) => {
   supabase.auth.getUser().then(({ data }) => {
     const entry: AuditLogInsert = { action, module: 'brand_tags', details, user_id: data.user?.id ?? null };
-    supabase.from('audit_log').insert(entry);
+    supabase.from('audit_log').insert(entry).then(({ error }) => { if (error) console.error('Audit log failed:', error); });
   });
 };
 

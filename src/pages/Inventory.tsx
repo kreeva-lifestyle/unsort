@@ -196,7 +196,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     if (!openItemId) return;
     (async () => {
       const { data: item } = await supabase.from('inventory_items').select('*, products(name, sku, total_components)').eq('id', openItemId).maybeSingle();
-      if (item) { setSelected(item); await fetchComps(item.id); supabase.from('activity_logs').select('*, profiles:user_id(full_name)').eq('entity_id', item.id).order('created_at', { ascending: false }).limit(20).then(({ data }) => setItemLogs(data || [])); setShowCompModal(true); }
+      if (item) { setSelected(item); await fetchComps(item.id); const { data: logs } = await supabase.from('activity_logs').select('*, profiles:user_id(full_name)').eq('entity_id', item.id).order('created_at', { ascending: false }).limit(20); setItemLogs(logs || []); setShowCompModal(true); }
       onItemOpened?.();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
