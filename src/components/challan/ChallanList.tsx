@@ -97,7 +97,7 @@ export default function ChallanList(p: Props) {
               <div>
                 <label style={fLabel}>Per page</label>
                 <select value={p.pageSize} onChange={e => { p.onPageSizeChange(Number(e.target.value)); p.onResetPage(); }} style={fInput}>
-                  <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
+                  <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option>
                 </select>
               </div>
             </div>
