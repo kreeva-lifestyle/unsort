@@ -250,9 +250,9 @@ export default function BrandTagPrinter() {
   const [orderLoading, setOrderLoading] = useState(false);
   const [orderLoadMsg, setOrderLoadMsg] = useState('');
   const [orderPage, setOrderPage] = useState(0);
-  const [orderPerPage, setOrderPerPage] = useState(25);
+  const [orderPerPage, setOrderPerPage] = useState(10);
   const [btPage, setBtPage] = useState(0);
-  const [btPerPage, setBtPerPage] = useState(25);
+  const [btPerPage, setBtPerPage] = useState(10);
 
   // ── History view state ──
   const [showHistory, setShowHistory] = useState(false);
@@ -793,7 +793,7 @@ export default function BrandTagPrinter() {
         </table>
       </div>
       <div className="bt-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
-        <select value={btPerPage} onChange={e => { setBtPerPage(Number(e.target.value)); setBtPage(0); }} style={{ ...S.fInput, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
+        <select value={btPerPage} onChange={e => { setBtPerPage(Number(e.target.value)); setBtPage(0); }} style={{ ...S.fInput, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select>
         <span style={{ color: T.tx3 }}>rows</span>
         {totalPages > 1 && <>
           <span onClick={() => setBtPage(Math.max(0, btPage - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: btPage === 0 ? 0.3 : 1, pointerEvents: btPage === 0 ? 'none' : 'auto' }}>Prev</span>
@@ -865,7 +865,7 @@ export default function BrandTagPrinter() {
               </table>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '8px 0', borderTop: `1px solid ${T.bd}`, fontSize: 11 }}>
-              <select value={orderPerPage} onChange={e => { setOrderPerPage(Number(e.target.value)); setOrderPage(0); }} style={{ ...inp, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}><option value={25}>25</option><option value={50}>50</option><option value={75}>75</option><option value={100}>100</option></select>
+              <select value={orderPerPage} onChange={e => { setOrderPerPage(Number(e.target.value)); setOrderPage(0); }} style={{ ...inp, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select>
               <span style={{ color: T.tx3 }}>rows</span>
               {otp > 1 && <>
                 <span onClick={() => setOrderPage(Math.max(0, orderPage - 1))} style={{ ...btnSm, opacity: orderPage === 0 ? 0.3 : 1 }}>Prev</span>

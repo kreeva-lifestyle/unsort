@@ -11,7 +11,7 @@ export function usePrograms() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 

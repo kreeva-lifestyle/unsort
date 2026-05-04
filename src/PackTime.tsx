@@ -217,7 +217,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const [historyData, setHistoryData] = useState<PackTimeScan[]>([]);
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyPage, setHistoryPage] = useState(0);
-  const [historyPageSize, setHistoryPageSize] = useState(25);
+  const [historyPageSize, setHistoryPageSize] = useState(10);
   const [historySearch, setHistorySearch] = useState('');
   const [historyFilterCourier, setHistoryFilterCourier] = useState('');
   const [historyFilterBrand, setHistoryFilterBrand] = useState('');
@@ -680,7 +680,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           </select>
           <select value={historyPageSize} onChange={e => { setHistoryPageSize(Number(e.target.value)); setHistoryPage(0); }}
             style={{ ...S.fInput, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}>
-          <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
+          <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option>
         </select>
         </div>
       </div>
