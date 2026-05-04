@@ -64,8 +64,8 @@ let flushing = false;
 const droppedBatches: { rows: unknown[][]; sheetName: string; ts: number }[] = [];
 const droppedListeners = new Set<() => void>();
 const notifyDropped = () => { droppedListeners.forEach(fn => { try { fn(); } catch {} }); };
-export function getDroppedBatches() { return droppedBatches; }
-export function clearDroppedBatches() { droppedBatches.length = 0; notifyDropped(); }
+function getDroppedBatches() { return droppedBatches; }
+function clearDroppedBatches() { droppedBatches.length = 0; notifyDropped(); }
 
 async function flushQueue() {
   if (flushing || writeQueue.length === 0) return;
