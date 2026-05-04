@@ -190,7 +190,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (search) {
       const s = search.replace(/[%_,().]/g, '');
       const num = parseInt(s);
-      if (num && !isNaN(num)) query = query.eq('challan_number', num);
+      if (!isNaN(num)) query = query.eq('challan_number', num);
       else if (s.trim()) query = query.ilike('customer_name', `%${s}%`);
     }
     if (statusFilter) query = query.eq('status', statusFilter);
@@ -509,20 +509,20 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       const { data: existing } = await supabase.from('cash_challan_customers').select('id').ilike('name', trimmed).maybeSingle();
       if (existing) {
         custId = existing.id;
-        if (customerPhone.trim()) await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId);
+        if (customerPhone.trim()) await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId).then(({ error: e }) => { if (e) console.error('Phone update failed:', e); });
       } else {
         const { data: newCust, error: insErr } = await supabase.from('cash_challan_customers').insert({ name: trimmed, phone: customerPhone.trim() || null }).select('id').single();
         if (insErr && insErr.code === '23505') {
           // Race: another user just created this customer — fetch them
           const { data: raceCust } = await supabase.from('cash_challan_customers').select('id').ilike('name', trimmed).maybeSingle();
           custId = raceCust?.id || null;
-          if (custId && customerPhone.trim()) await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId);
+          if (custId && customerPhone.trim()) await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId).then(({ error: e }) => { if (e) console.error('Phone update failed:', e); });
         } else {
           custId = newCust?.id || null;
         }
       }
     } else if (customerPhone.trim()) {
-      await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId);
+      await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId).then(({ error: e }) => { if (e) console.error('Phone update failed:', e); });
     }
 
     const challanData = {
@@ -843,7 +843,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const exportChallansCSV = async () => {
     if (!dateFrom || !dateTo) { addToast('Select a date range in Filters before exporting', 'error'); setShowFilters(true); return; }
     let q = supabase.from('cash_challans').select('challan_number, customer_name, status, subtotal, discount_amount, shipping_charges, round_off, total, amount_paid, payment_mode, payment_date, is_return, notes, tags, created_at, cash_challan_items(sku, description, quantity, price, discount_type, discount_value, discount_amount, total)').neq('status', 'voided');
-    if (search) { const s = search.replace(/[%_,().]/g, ''); const num = parseInt(s); if (num && !isNaN(num)) q = q.eq('challan_number', num); else if (s.trim()) q = q.ilike('customer_name', `%${s}%`); }
+    if (search) { const s = search.replace(/[%_,().]/g, ''); const num = parseInt(s); if (!isNaN(num)) q = q.eq('challan_number', num); else if (s.trim()) q = q.ilike('customer_name', `%${s}%`); }
     if (statusFilter) q = q.eq('status', statusFilter);
     if (tagFilter) q = q.contains('tags', [tagFilter]);
     if (dateFrom) q = q.gte('created_at', dateFrom + 'T00:00:00');
