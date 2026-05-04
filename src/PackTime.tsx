@@ -685,18 +685,17 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {/* Table */}
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
         <div className="table-wrap" style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr>
-              {['AWB', 'Courier', 'Cam', 'Brand', 'Time', ''].map(h => <th key={h} style={S.thStyle}>{h}</th>)}
+              {['AWB · Courier', 'Cam', 'Brand', 'Time', ''].map(h => <th key={h} style={S.thStyle}>{h}</th>)}
             </tr></thead>
             <tbody>
-              {(!historyDateFrom || !historyDateTo) && <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Select a date range above to view scans.</td></tr>}
-              {historyDateFrom && historyDateTo && historyLoading && <tr><td colSpan={6}><SkeletonRows rows={3} /></td></tr>}
-              {historyDateFrom && historyDateTo && !historyLoading && historyData.length === 0 && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans found in this date range.</td></tr>}
+              {(!historyDateFrom || !historyDateTo) && <tr><td colSpan={5} style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Select a date range above to view scans.</td></tr>}
+              {historyDateFrom && historyDateTo && historyLoading && <tr><td colSpan={5}><SkeletonRows rows={3} /></td></tr>}
+              {historyDateFrom && historyDateTo && !historyLoading && historyData.length === 0 && <tr><td colSpan={5} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans found in this date range.</td></tr>}
               {historyData.map(r => (
                 <tr key={r.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.015)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.awb}</td>
-                  <td style={S.tdStyle}>{r.courier}</td>
+                  <td style={S.tdStyle}><div style={{ fontFamily: T.mono, fontWeight: 600 }}>{r.awb}</div><div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{r.courier}</div></td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx3 }}>{r.camera}</td>
                   <td style={{ ...S.tdStyle, color: T.gr, fontWeight: 600 }}>{r.brand || '—'}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx3, fontSize: 11 }}>{r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
