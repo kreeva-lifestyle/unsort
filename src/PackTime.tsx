@@ -507,7 +507,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     // Background delete from Google Sheet + Supabase DB
     getAuthHeaders().then(headers => fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
       .then(r => r.json()).then(() => {})).catch(() => {});
-    supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current);
+    supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current).then(({ error: e }) => { if (e) console.error('Scan undo failed:', e); });
   }, [lastScanned, courierSheet, focusInput]);
 
 
@@ -568,7 +568,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         if (!result.ok) { /* sheet delete failed — non-critical */ }
       } catch { /* sheet delete error — non-critical */ }
     }
-    await supabase.from('packtime_scans').delete().eq('id', id);
+    const { error: delErr } = await supabase.from('packtime_scans').delete().eq('id', id);
+    if (delErr) { addToast(friendlyError(delErr), 'error'); return; }
     fetchHistory();
   };
 

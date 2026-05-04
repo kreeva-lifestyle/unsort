@@ -44,17 +44,17 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
     setWorkParts(prev => {
       const next = [...prev]; const row = { ...next[i], [field]: value };
       if (field === 'stitch_type' || field === 'stitch') {
-        const stitch = Number(row.stitch);
+        const stitch = Number(row.stitch) || 0;
         if (row.stitch_type === 'meter') row.one_rs = Math.round((stitch * 2.5 / 1000) * 100) / 100;
         else if (row.stitch_type === 'piece') row.one_rs = Math.round((stitch / 1000) * 100) / 100;
-        row.one_mp = Math.round(Number(row.one_rs) * Number(row.stitch_rate));
-        row.total = Math.round(row.one_mp * Number(row.meter_per_pcs) * 100) / 100;
+        row.one_mp = Math.round((Number(row.one_rs) || 0) * (Number(row.stitch_rate) || 0));
+        row.total = Math.round((row.one_mp || 0) * (Number(row.meter_per_pcs) || 0) * 100) / 100;
       }
       if (field === 'one_rs' || field === 'stitch_rate') {
-        row.one_mp = Math.round(Number(row.one_rs) * Number(row.stitch_rate));
-        row.total = Math.round(row.one_mp * Number(row.meter_per_pcs) * 100) / 100;
+        row.one_mp = Math.round((Number(row.one_rs) || 0) * (Number(row.stitch_rate) || 0));
+        row.total = Math.round((row.one_mp || 0) * (Number(row.meter_per_pcs) || 0) * 100) / 100;
       }
-      if (field === 'meter_per_pcs') row.total = Math.round(Number(row.one_mp) * Number(value) * 100) / 100;
+      if (field === 'meter_per_pcs') row.total = Math.round((Number(row.one_mp) || 0) * (Number(value) || 0) * 100) / 100;
       next[i] = row; return next;
     });
   }, []);
