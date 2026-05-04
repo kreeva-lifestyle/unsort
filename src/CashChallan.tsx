@@ -282,7 +282,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
-      const d = JSON.parse(raw);
+      let d: any;
+      try { d = JSON.parse(raw); } catch { clearDraft(); return; }
       if (!d || typeof d !== 'object') { clearDraft(); return; }
       if (d.userId && d.userId !== currentUserId) { clearDraft(); return; }
       if (d.editingId) return; // draft is for an edit, not a new challan
