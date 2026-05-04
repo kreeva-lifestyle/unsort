@@ -9,6 +9,7 @@ const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime'
 
 import { T, S } from './lib/theme';
 import { SkeletonRows } from './components/ui/Skeleton';
+import SwipeRow from './components/ui/SwipeRow';
 import type {
   Brand,
   PackTimeCourier,
@@ -683,7 +684,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       </div>
 
       {/* Table */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
+      <div className="scan-history-desktop" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
         <div className="table-wrap" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr>
@@ -709,6 +710,31 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile card view */}
+      <div className="scan-history-mobile">
+        {(!historyDateFrom || !historyDateTo) && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Select a date range above to view scans.</div>}
+        {historyDateFrom && historyDateTo && historyLoading && <SkeletonRows rows={3} />}
+        {historyDateFrom && historyDateTo && !historyLoading && historyData.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans found in this date range.</div>}
+        {historyData.map((r, idx) => (
+          <SwipeRow key={r.id} hint={idx === 0} hintKey="scan-history" actions={[
+            { label: 'Delete', color: '#EF4444', onClick: () => setConfirmDeleteId(r.id) },
+          ]}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: T.mono, fontSize: 13, fontWeight: 600, color: T.tx }}>{r.awb}</div>
+                  <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{r.courier} · Cam {r.camera}</div>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: T.gr }}>{r.brand || '—'}</div>
+                  <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 2 }}>{r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</div>
+                </div>
+              </div>
+            </div>
+          </SwipeRow>
+        ))}
       </div>
 
       {/* Delete confirmation modal */}
