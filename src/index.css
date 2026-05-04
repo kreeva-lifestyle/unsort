@@ -155,7 +155,7 @@ body.modal-open { overflow: hidden !important; }
   .filter-bar select, .filter-bar input { font-size: 12px !important; padding: 6px 8px !important; min-width: 0 !important; }
   .header-bar { padding: 8px 12px !important; }
   .header-title { font-size: 13px !important; }
-  .header-search { max-width: none !important; }
+
   .header-bar button { min-width: 44px !important; min-height: 44px !important; }
   .stat-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
   .stat-hero { flex-direction: column !important; gap: 6px !important; padding: 14px 16px !important; }
@@ -199,8 +199,6 @@ body.modal-open { overflow: hidden !important; }
   .challan-form-grid-2 { grid-template-columns: 1fr !important; }
   .challan-form-grid-3 { grid-template-columns: 1fr !important; }
   .challan-form-grid-4 { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
-  .challan-form-actions { flex-direction: column !important; gap: 8px !important; }
-  .challan-form-actions button { width: 100% !important; min-height: 44px !important; }
 
   /* Bulk toolbar */
   .challan-bulk-toolbar { flex-direction: column !important; align-items: stretch !important; gap: 6px !important; }
@@ -287,8 +285,6 @@ body.modal-open { overflow: hidden !important; }
   /* Detail — reduce padding, bottom clearance */
   .prg-detail { padding: 14px 12px 80px !important; }
   .prg-detail-grid { grid-template-columns: 1fr !important; }
-  .prg-detail-header { flex-direction: column !important; gap: 8px !important; align-items: flex-start !important; }
   .prg-matching-grid { grid-template-columns: 1fr !important; }
   .prg-matching-grid > button { grid-column: 1 !important; }
-  .prg-tab-bar { overflow-x: auto !important; }
 }
