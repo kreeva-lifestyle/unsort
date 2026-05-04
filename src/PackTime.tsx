@@ -660,27 +660,29 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       </div>
 
       {/* Filter bar */}
-      <div className="scan-filter-bar" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 120, position: 'relative' }}>
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ position: 'relative' }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
           <input type="text" value={historySearch} onChange={e => { setHistorySearch(e.target.value); setHistoryPage(0); }} placeholder="Search AWB..."
             style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
         </div>
-        <div className="scan-courier-pills" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          <button onClick={() => { setHistoryFilterCourier(''); setHistoryPage(0); }} style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${!historyFilterCourier ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: !historyFilterCourier ? 'rgba(99,102,241,.08)' : 'transparent', color: !historyFilterCourier ? T.ac2 : T.tx2, fontFamily: T.sans }}>All</button>
+        <div className="scan-courier-pills" style={{ display: 'flex', gap: 4, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <button onClick={() => { setHistoryFilterCourier(''); setHistoryPage(0); }} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${!historyFilterCourier ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: !historyFilterCourier ? 'rgba(99,102,241,.08)' : 'transparent', color: !historyFilterCourier ? T.ac2 : T.tx2, fontFamily: T.sans, whiteSpace: 'nowrap', flexShrink: 0 }}>All</button>
           {couriers.map(c => (
-            <button key={c.id} onClick={() => { setHistoryFilterCourier(historyFilterCourier === c.name ? '' : c.name); setHistoryPage(0); }} style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${historyFilterCourier === c.name ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: historyFilterCourier === c.name ? 'rgba(99,102,241,.08)' : 'transparent', color: historyFilterCourier === c.name ? T.ac2 : T.tx2, fontFamily: T.sans }}>{c.name}</button>
+            <button key={c.id} onClick={() => { setHistoryFilterCourier(historyFilterCourier === c.name ? '' : c.name); setHistoryPage(0); }} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${historyFilterCourier === c.name ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: historyFilterCourier === c.name ? 'rgba(99,102,241,.08)' : 'transparent', color: historyFilterCourier === c.name ? T.ac2 : T.tx2, fontFamily: T.sans, whiteSpace: 'nowrap', flexShrink: 0 }}>{c.name}</button>
           ))}
         </div>
-        <select value={historyFilterBrand} onChange={e => { setHistoryFilterBrand(e.target.value); setHistoryPage(0); }}
-          style={{ ...S.fDate, background: 'transparent', cursor: 'pointer', fontFamily: T.sans }}>
-          <option value="">All Brands</option>
-          {brands.map(b => <option key={b} value={b}>{b}</option>)}
-        </select>
-        <select value={historyPageSize} onChange={e => { setHistoryPageSize(Number(e.target.value)); setHistoryPage(0); }}
-          style={{ ...S.fDate, background: 'transparent', fontFamily: T.sans, width: 50 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <select value={historyFilterBrand} onChange={e => { setHistoryFilterBrand(e.target.value); setHistoryPage(0); }}
+            style={{ ...S.fInput, flex: 1, cursor: 'pointer' }}>
+            <option value="">All Brands</option>
+            {brands.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+          <select value={historyPageSize} onChange={e => { setHistoryPageSize(Number(e.target.value)); setHistoryPage(0); }}
+            style={{ ...S.fInput, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}>
           <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
         </select>
+        </div>
       </div>
 
       {/* Table */}
