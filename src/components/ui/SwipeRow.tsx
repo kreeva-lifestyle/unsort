@@ -26,10 +26,9 @@ export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
     currentX.current = x;
   }, []);
 
-  const closeThis = useCallback(() => {
-    setTranslate(0, true);
-    open.current = false;
-  }, [setTranslate]);
+  const closeThisRef = useRef(() => {});
+  closeThisRef.current = () => { setTranslate(0, true); open.current = false; };
+  const closeThis = useCallback(() => closeThisRef.current(), []);
 
   const snap = useCallback((toOpen: boolean) => {
     if (toOpen) {
