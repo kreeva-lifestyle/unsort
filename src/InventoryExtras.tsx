@@ -148,10 +148,10 @@ export default function InventoryExtras() {
       product_id: fProductId, product_name: prod?.name || '', component_id: fComponentId,
       component_name: comp?.name || '', sku: fSku.trim(), size: fSize, quantity: qty,
       notes: fNotes.trim() || null, created_by: user?.id,
-    }).select().single();
-    if (err) {
-      if (err.code === '23505') setError('This exact extra (category+component+SKU+size) already exists');
-      else setError(friendlyError(err));
+    }).select().maybeSingle();
+    if (err || !data) {
+      if (err?.code === '23505') setError('This exact extra (category+component+SKU+size) already exists');
+      else setError(err ? friendlyError(err) : 'Save failed');
       setSaving(false); return;
     }
     // History entry
