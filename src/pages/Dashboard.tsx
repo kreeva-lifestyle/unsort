@@ -59,7 +59,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
 
     // Pulse
     const todayStr = today.toISOString().slice(0, 10);
-    const todayChallans = challans.filter(c => c.created_at.slice(0, 10) >= todayStr);
+    const todayChallans = challans.filter(c => c.created_at && c.created_at.slice(0, 10) >= todayStr);
     const todayRev = todayChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total || 0), 0);
     const unsortedCount = items.filter(i => i.status === 'unsorted').length;
     const opening = Number(balances?.opening_balance || 0);
@@ -104,7 +104,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     // Revenue trend (30 days)
     const revByDay: Record<string, number> = {};
     for (let d = 29; d >= 0; d--) { const dt = new Date(Date.now() - d * 86400000); revByDay[dt.toISOString().slice(0,10)] = 0; }
-    challans.forEach(c => { const d = new Date(c.created_at).toISOString().slice(0,10); if (revByDay[d] !== undefined) revByDay[d] += (c.is_return ? -1 : 1) * Number(c.amount_paid || 0); });
+    challans.forEach(c => { if (!c.created_at) return; const d = new Date(c.created_at).toISOString().slice(0,10); if (revByDay[d] !== undefined) revByDay[d] += (c.is_return ? -1 : 1) * Number(c.amount_paid || 0); });
     setRevTrend(Object.entries(revByDay).map(([date, amount]) => ({ date, amount: Math.round(amount) })));
   }, []);
 
