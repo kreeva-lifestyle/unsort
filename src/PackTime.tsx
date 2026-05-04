@@ -754,7 +754,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 10 }}>
+        <div className="scan-pagination" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 10 }}>
           <span onClick={() => setHistoryPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage === 0 ? 0.3 : 1, pointerEvents: historyPage === 0 ? 'none' : 'auto' }}>Prev</span>
           <span style={{ fontSize: 10, color: T.tx3 }}>{historyPage + 1} / {totalPages}</span>
           <span onClick={() => setHistoryPage(p => Math.min(totalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: historyPage >= totalPages - 1 ? 'none' : 'auto' }}>Next</span>
