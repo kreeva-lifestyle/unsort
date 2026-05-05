@@ -6,18 +6,11 @@ import { useNotifications } from './hooks/useNotifications';
 import BrandTagModalNew from './components/ui/BrandTagModal';
 import ConfirmModal, { useConfirm } from './components/ui/ConfirmModal';
 import { friendlyError } from './lib/friendlyError';
-import type { BrandTag, BrandTagInsert, AuditLogInsert } from './types/database';
+import type { BrandTag, BrandTagInsert } from './types/database';
 
-const btAudit = (action: string, details: string) => {
-  supabase.auth.getUser().then(({ data }) => {
-    const entry: AuditLogInsert = { action, module: 'brand_tags', details, user_id: data.user?.id ?? null };
-    supabase.from('audit_log').insert(entry).then(({ error }) => { if (error) console.error('Audit log failed:', error); });
-  });
-};
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
 import { T, S } from './lib/theme';
-import { SkeletonRows } from './components/ui/Skeleton';
 
 const btnPrimary: React.CSSProperties = S.btnPrimary;
 const btnGhost: React.CSSProperties = S.btnGhost;
@@ -254,67 +247,6 @@ export default function BrandTagPrinter() {
   const [btPage, setBtPage] = useState(0);
   const [btPerPage, setBtPerPage] = useState(10);
 
-  // ── History view state ──
-  const [showHistory, setShowHistory] = useState(false);
-  const [historyFrom, setHistoryFrom] = useState('');
-  const [historyTo, setHistoryTo] = useState('');
-  const [historyData, setHistoryData] = useState<any[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyTotal, setHistoryTotal] = useState(0);
-  const [historyPage, setHistoryPage] = useState(0);
-  const [historyExporting, setHistoryExporting] = useState(false);
-  const HIST_PAGE_SIZE = 50;
-
-  const fetchHistory = useCallback(async () => {
-    if (!historyFrom || !historyTo) return;
-    setHistoryLoading(true);
-    const fromIso = historyFrom + 'T00:00:00.000Z';
-    const toIso = historyTo + 'T23:59:59.999Z';
-    const { data, count, error } = await supabase.from('audit_log')
-      .select('id, action, details, user_email, created_at', { count: 'exact' })
-      .eq('module', 'brand_tags')
-      .gte('created_at', fromIso)
-      .lte('created_at', toIso)
-      .order('created_at', { ascending: false })
-      .range(historyPage * HIST_PAGE_SIZE, (historyPage + 1) * HIST_PAGE_SIZE - 1);
-    setHistoryLoading(false);
-    if (error) { addToast(friendlyError(error), 'error'); return; }
-    setHistoryData(data || []);
-    setHistoryTotal(count || 0);
-  }, [historyFrom, historyTo, historyPage, addToast]);
-
-  useEffect(() => { if (showHistory && historyFrom && historyTo) fetchHistory(); }, [showHistory, historyPage, fetchHistory, historyFrom, historyTo]);
-
-  const exportHistoryCsv = async () => {
-    if (!historyFrom || !historyTo) { addToast('Select a date range first', 'error'); return; }
-    setHistoryExporting(true);
-    const fromIso = historyFrom + 'T00:00:00.000Z';
-    const toIso = historyTo + 'T23:59:59.999Z';
-    const { data, error } = await supabase.from('audit_log')
-      .select('action, details, user_email, created_at')
-      .eq('module', 'brand_tags')
-      .gte('created_at', fromIso)
-      .lte('created_at', toIso)
-      .order('created_at', { ascending: false })
-      .limit(10000);
-    setHistoryExporting(false);
-    if (error) { addToast(friendlyError(error), 'error'); return; }
-    const esc = (s: any) => `"${String(s ?? '').replace(/"/g, '""')}"`;
-    const csv = 'Time,Action,Details,User\n' + (data || []).map(r => [r.created_at, r.action, esc(r.details), r.user_email || ''].join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `BrandTags_History_${historyFrom}_to_${historyTo}.csv`; a.click(); URL.revokeObjectURL(a.href);
-    addToast('Exported successfully', 'success');
-  };
-
-  const datesPicked = !!(historyFrom && historyTo);
-  const histTotalPages = Math.ceil(historyTotal / HIST_PAGE_SIZE);
-  const histStats = {
-    add: historyData.filter(r => r.action === 'add').length,
-    edit: historyData.filter(r => r.action === 'edit').length,
-    del: historyData.filter(r => r.action === 'delete').length,
-    import: historyData.filter(r => r.action === 'import').length,
-  };
-  const actionDot = (a: string) => a === 'add' ? T.gr : a === 'edit' ? T.yl : a === 'delete' ? T.re : a === 'import' ? T.bl : T.tx3;
 
   // Fetch current page from Supabase (server-side pagination)
   const fetchPage = useCallback(async () => {
@@ -463,7 +395,6 @@ export default function BrandTagPrinter() {
         window.removeEventListener('beforeunload', beforeUnload);
         setImporting(false);
         setImportProgress('');
-        btAudit('import', `Imported ${toUpsert.length} rows${failed > 0 ? `, ${failed} failed` : ''}`);
         addToast(`Import complete! ${toUpsert.length} rows processed.${failed > 0 ? ` ${failed} failed.` : ''}`, failed > 0 ? 'error' : 'success');
         fetchPage();
       } catch (e: any) {
@@ -515,7 +446,6 @@ export default function BrandTagPrinter() {
     setConfirmDel(null);
     const { error } = await supabase.from('brand_tags').delete().eq('id', id);
     if (error) { addToast(`Delete failed — ${friendlyError(error)}`, 'error'); return; }
-    btAudit('delete', `Deleted SKU: ${sku}`);
     addToast(`Deleted ${sku}`, 'success');
     fetchPage();
   }, [confirmDel, addToast, fetchPage]);
@@ -534,9 +464,9 @@ export default function BrandTagPrinter() {
   const handleModalSave = useCallback((updated: BrandTagRow) => {
     const dbRow: BrandTagInsert = { brand: updated.brand, ean: updated.ean, sku: updated.sku, qty: updated.qty, mrp: updated.mrp, size: updated.size, product: updated.product, color: updated.color, mktd: updated.mktd, jio_code: updated.jioCode, copies: updated.copies };
     if (modalMode === 'add') {
-      supabase.from('brand_tags').insert(dbRow).then(({ error }) => { if (error) addToast('Save failed — ' + friendlyError(error), 'error'); else { btAudit('add', `Added SKU: ${updated.sku}`); addToast(`SKU ${updated.sku} added`, 'success'); fetchPage(); } });
+      supabase.from('brand_tags').insert(dbRow).then(({ error }) => { if (error) addToast('Save failed — ' + friendlyError(error), 'error'); else { addToast(`SKU ${updated.sku} added`, 'success'); fetchPage(); } });
     } else {
-      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(({ error }) => { if (error) addToast('Update failed — ' + friendlyError(error), 'error'); else { btAudit('edit', `Edited SKU: ${updated.sku}`); addToast(`SKU ${updated.sku} updated`, 'success'); fetchPage(); } });
+      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(({ error }) => { if (error) addToast('Update failed — ' + friendlyError(error), 'error'); else { addToast(`SKU ${updated.sku} updated`, 'success'); fetchPage(); } });
     }
     setModalRow(null);
   }, [modalMode, fetchPage]);
@@ -609,93 +539,7 @@ export default function BrandTagPrinter() {
         <div style={{ width: 32, height: 32, border: `2px solid ${T.bd2}`, borderTopColor: T.ac, borderRadius: '50%', animation: 'btnSpin .7s linear infinite' }} />
         <span style={{ fontSize: 11, color: T.tx3 }}>Loading brand tags...</span>
       </div>}
-      {!loading && showHistory && (
-        <div>
-          {/* History Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Brand Tags Logs</div>
-              <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>{datesPicked ? `${historyTotal} entries · ${historyFrom} to ${historyTo}` : 'Pick a date range to load activity'}</div>
-            </div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <button onClick={() => setShowHistory(false)} style={S.btnGhost}>← Back</button>
-              <button onClick={exportHistoryCsv} disabled={!datesPicked || historyExporting} title={!datesPicked ? 'Select a date range first' : 'Export filtered records to CSV'} style={{ ...S.btnGhost, opacity: !datesPicked || historyExporting ? 0.4 : 1, cursor: !datesPicked || historyExporting ? 'not-allowed' : 'pointer', pointerEvents: !datesPicked || historyExporting ? 'none' : 'auto' }}>{historyExporting ? 'Exporting...' : 'Export CSV'}</button>
-            </div>
-          </div>
-
-          {/* Date range filter */}
-          <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px', marginBottom: 12, display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>From</div>
-              <input type="date" value={historyFrom} max={historyTo || undefined} onChange={e => { setHistoryFrom(e.target.value); setHistoryPage(0); }} style={S.fDate} />
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>To</div>
-              <input type="date" value={historyTo} min={historyFrom || undefined} max={new Date().toISOString().slice(0, 10)} onChange={e => { setHistoryTo(e.target.value); setHistoryPage(0); }} style={S.fDate} />
-            </div>
-            {[
-              { label: 'Today', from: 0, to: 0 },
-              { label: '7 days', from: 6, to: 0 },
-              { label: '30 days', from: 29, to: 0 },
-            ].map(p => (
-              <button key={p.label} onClick={() => { const d = new Date(); const to = d.toISOString().slice(0,10); d.setDate(d.getDate() - p.from); const from = d.toISOString().slice(0,10); setHistoryFrom(from); setHistoryTo(to); setHistoryPage(0); }} style={{ ...S.btnGhost, ...S.btnSm }}>{p.label}</button>
-            ))}
-            {datesPicked && (historyFrom || historyTo) && <button onClick={() => { setHistoryFrom(''); setHistoryTo(''); setHistoryData([]); setHistoryTotal(0); }} style={{ ...S.btnGhost, ...S.btnSm, color: T.tx3 }}>Clear</button>}
-          </div>
-
-          {/* Stat strip */}
-          {datesPicked && (
-            <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
-              {[
-                { label: 'Adds', val: histStats.add, color: T.gr },
-                { label: 'Edits', val: histStats.edit, color: T.yl },
-                { label: 'Deletes', val: histStats.del, color: T.re },
-                { label: 'Imports', val: histStats.import, color: T.bl },
-              ].map(s => (
-                <div key={s.label} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', position: 'relative', overflow: 'hidden' }}>
-                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${s.color}cc, ${s.color}22)` }} />
-                  <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>{s.label}</div>
-                  <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: s.color }}>{s.val}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Table */}
-          <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-            <div className="table-wrap" style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
-                <thead><tr>
-                  {['Time', 'Action', 'Details', 'User'].map(h => <th key={h} style={S.thStyle}>{h}</th>)}
-                </tr></thead>
-                <tbody>
-                  {!datesPicked && <tr><td colSpan={4} style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Select a date range to view history.</td></tr>}
-                  {datesPicked && historyLoading && <tr><td colSpan={4}><SkeletonRows rows={3} /></td></tr>}
-                  {datesPicked && !historyLoading && historyData.length === 0 && <tr><td colSpan={4} style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No activity in this date range.</td></tr>}
-                  {datesPicked && !historyLoading && historyData.map(r => (
-                    <tr key={r.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.015)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                      <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 11, color: T.tx3, whiteSpace: 'nowrap' }}>{new Date(r.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
-                      <td style={{ ...S.tdStyle, fontSize: 12 }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: actionDot(r.action), boxShadow: `0 0 5px ${actionDot(r.action)}55` }} /><span style={{ textTransform: 'capitalize', fontWeight: 600, color: T.tx }}>{r.action}</span></span></td>
-                      <td style={{ ...S.tdStyle, fontSize: 11 }}>{r.details || '—'}</td>
-                      <td style={{ ...S.tdStyle, fontSize: 11, color: T.tx2 }}>{r.user_email || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Pagination */}
-          {datesPicked && histTotalPages > 1 && (
-            <div className="bt-pagination" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 10 }}>
-              <span onClick={() => setHistoryPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage === 0 ? 0.3 : 1, pointerEvents: historyPage === 0 ? 'none' : 'auto' }}>Prev</span>
-              <span style={{ fontSize: 10, color: T.tx3 }}>{historyPage + 1} / {histTotalPages}</span>
-              <span onClick={() => setHistoryPage(p => Math.min(histTotalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage >= histTotalPages - 1 ? 0.3 : 1, pointerEvents: historyPage >= histTotalPages - 1 ? 'none' : 'auto' }}>Next</span>
-            </div>
-          )}
-        </div>
-      )}
-      {!loading && !showHistory && <>
+      {!loading && <>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
         <div>
@@ -728,10 +572,6 @@ export default function BrandTagPrinter() {
               </>
             )}
           </div>
-          <button style={S.btnGhost} className="desktop-only" onClick={() => { setShowHistory(true); window.history.pushState({ view: 'bt-logs' }, ''); }}>
-            <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-            Logs
-          </button>
           <button style={S.btnGhost} onClick={openAdd}>+ Add tag</button>
           <button style={{ ...S.btnPrimary, background: `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)`, boxShadow: `0 2px 10px rgba(34,197,94,.3)` }} onClick={() => { const toPrint: BrandTagRow[] = []; rows.forEach(r => { for (let i = 0; i < (r.copies || 0); i++) toPrint.push(r); }); if (toPrint.length > 0) openLabelPrint(toPrint); else addToast('Set copies > 0 on rows to print', 'error'); }}>
             <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
