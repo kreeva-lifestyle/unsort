@@ -258,6 +258,7 @@ export interface InventoryExtra {
   component_name: string;
   sku: string;
   size: string;
+  location: string;
   quantity: number;
   notes: string | null;
   created_by: string | null;

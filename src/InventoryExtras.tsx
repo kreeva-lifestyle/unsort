@@ -25,6 +25,7 @@ type InventoryItemMatch = Pick<InventoryItem, 'id' | 'batch_number' | 'serial_nu
 export default function InventoryExtras() {
   const [extras, setExtras] = useState<InventoryExtra[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
@@ -37,6 +38,7 @@ export default function InventoryExtras() {
   const [fSkuSuggestions, setFSkuSuggestions] = useState<string[]>([]);
   const [showSkuDrop, setShowSkuDrop] = useState(false);
   const [fSize, setFSize] = useState('');
+  const [fLocation, setFLocation] = useState('');
   const [fQty, setFQty] = useState('1');
   const [fNotes, setFNotes] = useState('');
   const [fComps, setFComps] = useState<ProductComponent[]>([]);
@@ -53,7 +55,7 @@ export default function InventoryExtras() {
   const [completeItem, setCompleteItem] = useState<{ extra: InventoryExtra; item: InventoryItemMatch } | null>(null);
 
   const fetchExtras = useCallback(async () => {
-    const { data } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, quantity, notes, created_by, created_at, updated_at').gt('quantity', 0).order('updated_at', { ascending: false }).limit(1000);
+    const { data } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, location, quantity, notes, created_by, created_at, updated_at').gt('quantity', 0).order('updated_at', { ascending: false }).limit(1000);
     setExtras(data || []);
     // Compute match counts — check item actually has this component missing
     const counts: Record<string, number> = {};
@@ -77,7 +79,7 @@ export default function InventoryExtras() {
     setProducts(data || []);
   }, []);
 
-  useEffect(() => { fetchExtras(); fetchProducts(); }, [fetchExtras, fetchProducts]);
+  useEffect(() => { fetchExtras(); fetchProducts(); supabase.from('locations').select('id, name').order('name').then(({ data }) => setLocations(data || [])); }, [fetchExtras, fetchProducts]);
 
   // Realtime — UPDATE debounced, INSERT/DELETE immediate
   const { debounced: debouncedFetchExtras } = useDebouncedFetch(fetchExtras, 500);
@@ -130,7 +132,7 @@ export default function InventoryExtras() {
 
   const addExtra = async () => {
     setError('');
-    if (!fProductId || !fComponentId || !fSku.trim() || !fSize) { setError('All fields required'); return; }
+    if (!fProductId || !fComponentId || !fSku.trim() || !fSize || !fLocation) { setError('All mandatory fields (*) are required'); return; }
     const comp = fComps.find(c => c.id === fComponentId);
     const compIsDupatta = comp && isDupatta(comp.name);
     const compIsLehenga = comp && isLehenga(comp.name);
@@ -146,8 +148,8 @@ export default function InventoryExtras() {
     const { data: { user } } = await supabase.auth.getUser();
     const { data, error: err } = await supabase.from('inventory_extras').insert({
       product_id: fProductId, product_name: prod?.name || '', component_id: fComponentId,
-      component_name: comp?.name || '', sku: fSku.trim(), size: fSize, quantity: qty,
-      notes: fNotes.trim() || null, created_by: user?.id,
+      component_name: comp?.name || '', sku: fSku.trim(), size: fSize, location: fLocation,
+      quantity: qty, notes: fNotes.trim() || null, created_by: user?.id,
     }).select().maybeSingle();
     if (err || !data) {
       if (err?.code === '23505') setError('This exact extra (category+component+SKU+size) already exists');
@@ -160,7 +162,7 @@ export default function InventoryExtras() {
     });
     if (histErr) setError('Extra created but history log failed — ' + friendlyError(histErr));
     setSaving(false); setShowAdd(false);
-    setFProductId(''); setFComponentId(''); setFSku(''); setFSize(''); setFQty('1'); setFNotes('');
+    setFProductId(''); setFComponentId(''); setFSku(''); setFSize(''); setFLocation(''); setFQty('1'); setFNotes('');
     fetchExtras();
   };
 
@@ -348,6 +350,13 @@ export default function InventoryExtras() {
                   {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={label}>Location *</label>
+              <select value={fLocation} onChange={e => setFLocation(e.target.value)} style={input}>
+                <option value="">Select location</option>
+                {locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
+              </select>
             </div>
             <div className="inv-extra-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div>
