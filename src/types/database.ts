@@ -119,6 +119,7 @@ export interface InventoryItem {
   paired_with: string | null;
   size: string | null;
   status_changed_at: string | null;
+  manufacturer: string;
 }
 
 export type InventoryItemInsert = {
@@ -259,6 +260,7 @@ export interface InventoryExtra {
   sku: string;
   size: string;
   location: string;
+  manufacturer: string;
   quantity: number;
   notes: string | null;
   created_by: string | null;
