@@ -29,6 +29,7 @@ export default function InventoryExtras() {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
+  const [exportHtml, setExportHtml] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   // Add form
@@ -247,6 +248,12 @@ export default function InventoryExtras() {
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Extras_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
           }} style={btnGhost} className="desktop-only">Export</div>
+          <div onClick={() => {
+            if (filtered.length === 0) return;
+            const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
+            const rows = filtered.map(ex => `<tr><td>${esc(ex.sku)}</td><td>${esc(ex.product_name)}</td><td>${esc(ex.component_name)}</td><td>${esc(ex.size)}</td><td>${esc(ex.location)}</td><td style="text-align:right;font-weight:600">${ex.quantity}</td></tr>`).join('');
+            setExportHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Spare Parts</title><style>body{font-family:Arial,sans-serif;margin:16px;color:#222;font-size:11px}h2{margin:0 0 4px;font-size:16px}.sub{color:#666;font-size:10px;margin-bottom:12px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:5px 8px;text-align:left;font-size:10px}th{background:#f5f5f5;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-size:9px}.footer{text-align:center;font-size:8px;color:#aaa;margin-top:16px}@page{size:A4;margin:8mm}</style></head><body><h2>Arya Designs — Spare Parts</h2><div class="sub">${filtered.length} items · ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div><table><thead><tr><th>SKU</th><th>Category</th><th>Component</th><th>Size</th><th>Location</th><th style="text-align:right">Qty</th></tr></thead><tbody>${rows}</tbody></table><div class="no-print" style="position:fixed;bottom:0;left:0;right:0;padding:10px;background:#f5f5f5;display:flex;gap:8px;justify-content:center;border-top:1px solid #ddd"><button onclick="window.print()" style="padding:12px 28px;border-radius:8px;border:none;background:#6366F1;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Print / Share</button></div><style>@media print{.no-print{display:none!important}}</style><div class="footer">Powered by DailyOffice</div></body></html>`);
+          }} style={btnGhost} className="mobile-only">Export</div>
           <div onClick={() => setShowAdd(true)} style={btn}>+ Add</div>
         </div>
       </div>
@@ -468,6 +475,15 @@ export default function InventoryExtras() {
           </div>
         </div>
       </div>, document.body)}
+      {exportHtml && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
+          <iframe srcDoc={exportHtml} style={{ flex: 1, border: 'none', width: '100%' }} />
+          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: '#f5f5f5', borderTop: '1px solid #ddd', display: 'flex', justifyContent: 'center' }}>
+            <button onClick={() => setExportHtml(null)} style={{ padding: '12px 32px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#333', fontSize: 14, cursor: 'pointer', fontWeight: 500 }}>Close</button>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

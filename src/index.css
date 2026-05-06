@@ -136,6 +136,7 @@ body.modal-open { overflow: hidden !important; }
   .mobile-overlay { display: block !important; }
   .mobile-drawer { display: block !important; }
   .desktop-only { display: none !important; }
+  .mobile-only { display: inline-flex !important; }
   .challan-row-actions { display: none !important; }
   .bt-actions-col { display: none !important; }
   .inv-action-btns { justify-content: flex-end !important; }
@@ -245,6 +246,7 @@ body.modal-open { overflow: hidden !important; }
 }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
+.mobile-only { display: none; }
 .inv-mobile { display: none; }
 .inv-extra-mobile { display: none; }
 .scan-history-mobile { display: none; }
