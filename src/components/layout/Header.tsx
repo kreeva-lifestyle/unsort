@@ -17,8 +17,7 @@ export default function Header({ title, onNotifClick, notifications, markAsRead 
   };
 
   return (
-    <header className="header-bar" style={{ background: 'rgba(8,11,20,0.60)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', borderBottom: `1px solid ${T.bd}`, padding: 'env(safe-area-inset-top, 0) 16px 0 16px', position: 'sticky', top: 0, zIndex: 50, minHeight: 44, display: 'flex', alignItems: 'flex-end' }}>
-      <div style={{ height: 44, display: 'flex', alignItems: 'center', width: '100%' }}>
+    <header className="header-bar" style={{ background: 'rgba(8,11,20,0.60)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', borderBottom: `1px solid ${T.bd}`, padding: '0 16px', position: 'sticky', top: 0, zIndex: 50, height: 44, display: 'flex', alignItems: 'center' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, boxShadow: `0 0 8px ${T.ac}55` }} />
@@ -46,7 +45,6 @@ export default function Header({ title, onNotifClick, notifications, markAsRead 
             ))}
           </div>
         )}
-      </div>
       </div>
       </div>
       </div>
