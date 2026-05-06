@@ -246,7 +246,7 @@ export default function InventoryExtras() {
             const csv = 'SKU,Category,Component,Size,Qty\n' + filtered.map(ex => `${ex.sku},"${ex.product_name}",${ex.component_name},${ex.size},${ex.quantity}`).join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Extras_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
-          }} style={btnGhost} className="desktop-only">Export CSV</div>
+          }} style={btnGhost} className="desktop-only">Export</div>
           <div onClick={() => setShowAdd(true)} style={btn}>+ Add</div>
         </div>
       </div>

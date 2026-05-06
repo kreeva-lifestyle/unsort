@@ -500,7 +500,7 @@ export default function CashBook() {
           <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={S.fDate} />
           <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
           <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={S.fDate} />
-          <button className="desktop-only" onClick={exportCSV} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans, height: 36 }}>Export CSV</button>
+          <button className="desktop-only" onClick={exportCSV} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans, height: 36 }}>Export</button>
         </div>
       </div>
 

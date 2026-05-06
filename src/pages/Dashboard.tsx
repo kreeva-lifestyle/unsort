@@ -181,7 +181,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         {([
           { label: "Today's Scans", value: pulse.scans, color: T.ac, prefix: '', tip: 'Total barcodes scanned today in PackStation', target: 'packtime' },
           { label: 'Unsorted Items', value: pulse.unsorted, color: T.yl, prefix: '', tip: 'Items awaiting sorting in Inventory', target: 'inventory' },
-          { label: 'Cash in Hand', value: pulse.cashInHand, color: T.bl, prefix: '₹', tip: 'Opening balance + sales - expenses - handovers', target: 'challan' },
+          { label: `Cash in Hand (${new Date().toLocaleString('en-IN', { month: 'short' })})`, value: pulse.cashInHand, color: T.bl, prefix: '₹', tip: 'Opening balance + sales - expenses - handovers', target: 'challan' },
           { label: 'Total Handovers', value: pulse.handoverTotal, color: T.gr, prefix: '₹', tip: 'Total confirmed handovers', target: 'challan' },
         ] as const).map((c, i) => (
           <div
@@ -213,7 +213,10 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         <div role="button" tabIndex={0} onClick={() => navigateTo?.('challan')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('challan'); }} style={{ background: alerts.overdue.length > 0 ? 'rgba(248,113,113,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${alerts.overdue.length > 0 ? 'rgba(248,113,113,.18)' : T.bd}`, borderLeft: `3px solid ${alerts.overdue.length > 0 ? T.re : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 110 }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(248,113,113,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.overdue.length > 0 ? 'rgba(248,113,113,.18)' : T.bd)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <Pill tone={alerts.overdue.length > 0 ? 're' : 'neutral'} dot>Overdue Payments</Pill>
-            <span style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: alerts.overdue.length > 0 ? T.re : T.tx3, lineHeight: 1 }}>{alerts.overdue.length}</span>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: alerts.overdue.length > 0 ? T.re : T.tx3, lineHeight: 1 }}>₹{alerts.overdue.reduce((s, o) => s + o.amount, 0).toLocaleString('en-IN')}</span>
+              {alerts.overdue.length > 0 && <div style={{ fontSize: 9, color: T.tx3, marginTop: 2 }}>{alerts.overdue.length} challan{alerts.overdue.length !== 1 ? 's' : ''}</div>}
+            </div>
           </div>
           <div style={{ flex: 1 }}>
             {alerts.overdue.slice(0, 2).map((o, i) => <p key={i} style={{ fontSize: 10, color: T.tx2, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}: ₹{o.amount.toLocaleString('en-IN')} ({o.days}d)</p>)}
