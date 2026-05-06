@@ -133,7 +133,7 @@ body.modal-open { overflow: hidden !important; }
   .login-split { grid-template-columns: 1fr !important; gap: 0 !important; padding: 16px !important; }
   .login-hero { display: none !important; }
   .sidebar { display: none !important; }
-  .main-area { margin-left: 0 !important; padding-top: env(safe-area-inset-top, 0) !important; }
+  .main-area { margin-left: 0 !important; }
   .mobile-hamburger { display: flex !important; }
   .mobile-overlay { display: block !important; }
   .mobile-drawer { display: block !important; }
