@@ -1,5 +1,6 @@
 // Inventory page — CRUD, pair completion, smart intel, extras integration
 import React, { useState, useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import JsBarcode from 'jsbarcode';
 import { supabase } from '../lib/supabase';
 import { T, S, Icon } from '../lib/theme';
@@ -96,6 +97,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
   const [intelResults, setIntelResults] = useState<any[]>([]);
   const [showExtras, setShowExtras] = useState(false);
+  const [exportPdfHtml, setExportPdfHtml] = useState<string | null>(null);
   const [invLimit, setInvLimit] = useState(5000);
   const [invTruncated, setInvTruncated] = useState(false);
 
@@ -391,6 +393,32 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   };
   const [itemLogs, setItemLogs] = useState<any[]>([]);
 
+  const exportPdf = () => {
+    if (filtered.length === 0) return;
+    const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
+    const rows = filtered.map(i => `<tr><td>${esc(i.serial_number || '—')}</td><td>${esc(i.products?.name || '—')}</td><td>${esc(i.size || '—')}</td><td>${esc(i.location || '—')}</td><td>${esc((i as any).manufacturer || '—')}</td><td style="text-transform:capitalize">${esc(i.status === 'dry_clean' ? 'Dry Clean' : i.status)}</td></tr>`).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Inventory Report</title><style>
+      body{font-family:Arial,sans-serif;margin:16px;color:#222;font-size:11px}
+      h2{margin:0 0 4px;font-size:16px} .sub{color:#666;font-size:10px;margin-bottom:12px}
+      table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:5px 8px;text-align:left;font-size:10px}
+      th{background:#f5f5f5;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-size:9px}
+      .footer{text-align:center;font-size:8px;color:#aaa;margin-top:16px}
+      @page{size:A4 landscape;margin:8mm}
+      @media print{body{margin:0}}
+    </style></head><body>
+    <h2>Arya Designs — Inventory Report</h2>
+    <div class="sub">${filtered.length} items · ${isCompletedView ? 'Completed' : 'Active'} · ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+    <table><thead><tr><th>SKU</th><th>Category</th><th>Size</th><th>Location</th><th>Manufacturer</th><th>Status</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="no-print" style="position:fixed;bottom:0;left:0;right:0;padding:10px;background:#f5f5f5;display:flex;gap:8px;justify-content:center;border-top:1px solid #ddd">
+      <button onclick="window.print()" style="padding:12px 28px;border-radius:8px;border:none;background:#6366F1;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Print / Share</button>
+    </div>
+    <style>@media print{.no-print{display:none!important}}</style>
+    <div class="footer">Powered by DailyOffice</div>
+    </body></html>`;
+    setExportPdfHtml(html);
+  };
+
   const printBarcode = (uniqueId: string) => {
     const canvas = document.createElement('canvas');
     try { JsBarcode(canvas, uniqueId, { format: 'CODE128', width: 2, height: 60, displayValue: true, fontSize: 14, font: 'IBM Plex Mono', margin: 10 }); } catch { return; }
@@ -604,6 +632,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Inventory_${stage}_${new Date().toISOString().slice(0,10)}.csv`; a.click();
           }} style={S.btnGhost} className="desktop-only">Export</div>}
           {!showExtras && !isCompletedView && <div onClick={computeIntel} title="Find cross-size completion possibilities" style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600 }} className="desktop-only">Find Pairs</div>}
+          {!showExtras && <div onClick={exportPdf} style={{ ...S.btnGhost, fontSize: 11 }} className="mobile-only">Export</div>}
           {!showExtras && <div onClick={() => { setShowExtras(true); window.history.pushState({ view: 'extras' }, ''); }} style={{ ...S.btnGhost, background: 'rgba(56,189,248,.05)', border: '1px solid rgba(56,189,248,.15)', color: T.bl, fontWeight: 600 }}>Spare Parts</div>}
           {!showExtras && canEdit && !isCompletedView && <div onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', manufacturer: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
         </div>
@@ -1083,6 +1112,15 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       </div></div>)}
       </>}
       <ConfirmModal {...confirmModalProps} />
+      {exportPdfHtml && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
+          <iframe srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%' }} />
+          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: '#f5f5f5', borderTop: '1px solid #ddd', display: 'flex', justifyContent: 'center' }}>
+            <button onClick={() => setExportPdfHtml(null)} style={{ padding: '12px 32px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#333', fontSize: 14, cursor: 'pointer', fontWeight: 500 }}>Close</button>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
