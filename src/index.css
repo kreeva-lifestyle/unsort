@@ -137,7 +137,7 @@ body.modal-open { overflow: hidden !important; }
   .mobile-drawer { display: block !important; }
   .desktop-only { display: none !important; }
   .mobile-only { display: inline-flex !important; }
-  input[type="date"], input[type="number"], input[type="text"], input[type="tel"], input[type="email"], input[type="search"], select, textarea { height: 44px !important; box-sizing: border-box !important; }
+  input[type="date"] { -webkit-appearance: textfield !important; appearance: textfield !important; min-height: 0 !important; }
   .challan-row-actions { display: none !important; }
   .bt-actions-col { display: none !important; }
   .inv-action-btns { justify-content: flex-end !important; }
