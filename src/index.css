@@ -88,7 +88,8 @@ input[type="date"], input[type="time"], input[type="datetime-local"], input[type
 /* Subtle row hover for HTML tables — applies to Inventory, Cash Challan,
    Brand Tags, and any other <tbody><tr> structure. Pure CSS, no JS. */
 tbody tr { transition: background 100ms ease; }
-tbody tr:hover { background: rgba(99,102,241,0.03); }
+tbody tr:nth-child(even) { background: rgba(255,255,255,0.015); }
+tbody tr:hover { background: rgba(99,102,241,0.04); }
 
 /* Animations */
 @keyframes fi { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -140,6 +141,8 @@ body.modal-open { overflow: hidden !important; }
   input[type="date"] { -webkit-appearance: textfield !important; appearance: textfield !important; min-height: 0 !important; }
   .challan-row-actions { display: none !important; }
   .bt-actions-col { display: none !important; }
+  .settings-tabs { flex-direction: column !important; width: 100% !important; }
+  .settings-tabs > div { justify-content: flex-start !important; }
   .inv-action-btns { justify-content: flex-end !important; }
   .inv-more-fields { display: block !important; }
   .inv-more-content { display: none !important; }
