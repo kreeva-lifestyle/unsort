@@ -137,6 +137,7 @@ body.modal-open { overflow: hidden !important; }
   .mobile-drawer { display: block !important; }
   .desktop-only { display: none !important; }
   .mobile-only { display: inline-flex !important; }
+  input[type="date"] { width: 100% !important; min-width: 0 !important; }
   .challan-row-actions { display: none !important; }
   .bt-actions-col { display: none !important; }
   .inv-action-btns { justify-content: flex-end !important; }
