@@ -53,7 +53,7 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
   };
 
   return (
-    <div className="login-page" style={{ position: 'fixed', inset: 0, background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 'env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0)' }}>
+    <div className="login-page" style={{ position: 'fixed', inset: 0, background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
       {/* Ambient orbs */}
       <div style={{ position: 'absolute', width: 600, height: 600, top: -200, right: -100, background: `radial-gradient(circle, ${T.ac}40 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .3s ease forwards' }} />
       <div style={{ position: 'absolute', width: 500, height: 500, bottom: -200, left: -100, background: `radial-gradient(circle, ${T.bl}30 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .5s ease forwards' }} />

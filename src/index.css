@@ -129,10 +129,11 @@ body.modal-open { overflow: hidden !important; }
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 @media (max-width: 768px) {
+  .login-page { padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0) !important; }
   .login-split { grid-template-columns: 1fr !important; gap: 0 !important; padding: 16px !important; }
   .login-hero { display: none !important; }
   .sidebar { display: none !important; }
-  .main-area { margin-left: 0 !important; }
+  .main-area { margin-left: 0 !important; padding-top: env(safe-area-inset-top, 0) !important; }
   .mobile-hamburger { display: flex !important; }
   .mobile-overlay { display: block !important; }
   .mobile-drawer { display: block !important; }
@@ -163,7 +164,7 @@ body.modal-open { overflow: hidden !important; }
   .page-pad { padding: 14px max(12px, env(safe-area-inset-right, 0)) 70px max(12px, env(safe-area-inset-left, 0)) !important; }
   .filter-bar { gap: 6px !important; padding: 8px 10px !important; }
   .filter-bar select, .filter-bar input { font-size: 12px !important; padding: 6px 8px !important; min-width: 0 !important; }
-  .header-bar { box-sizing: content-box !important; padding: env(safe-area-inset-top, 0) 12px 0 !important; }
+  .header-bar { padding: 0 12px !important; }
   .header-title { font-size: 13px !important; }
 
   .header-bar button { min-width: 44px !important; min-height: 44px !important; }
