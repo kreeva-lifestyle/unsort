@@ -32,6 +32,8 @@ export default function InventoryExtras() {
   const [exportHtml, setExportHtml] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [editingExtra, setEditingExtra] = useState<InventoryExtra | null>(null);
+  const [editForm, setEditForm] = useState({ sku: '', size: '', location: '', manufacturer: '', notes: '' });
   // Add form
   const [fProductId, setFProductId] = useState('');
   const [fComponentId, setFComponentId] = useState('');
@@ -135,6 +137,27 @@ export default function InventoryExtras() {
     const hasMissing = new Set((comps as ItemCompsRow[] | null || []).filter((c) => (c.status === 'missing' || c.status === 'damaged') && c.component_id === ex.component_id).map((c) => c.inventory_item_id));
     setMatches(((candidates as InventoryItemMatch[] | null) || []).filter(c => hasMissing.has(c.id)));
     setMatchExtra(ex);
+  };
+
+  const openEdit = (ex: InventoryExtra) => {
+    setEditingExtra(ex);
+    setEditForm({ sku: ex.sku, size: ex.size, location: ex.location, manufacturer: ex.manufacturer, notes: ex.notes || '' });
+    setError('');
+  };
+
+  const saveEdit = async () => {
+    if (!editingExtra) return;
+    if (!editForm.sku.trim() || !editForm.size || !editForm.location || !editForm.manufacturer.trim()) {
+      setError('All mandatory fields (*) are required'); return;
+    }
+    const { error: err } = await supabase.from('inventory_extras').update({
+      sku: editForm.sku.trim(), size: editForm.size, location: editForm.location,
+      manufacturer: editForm.manufacturer.trim(), notes: editForm.notes.trim() || null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', editingExtra.id);
+    if (err) { setError(friendlyError(err)); return; }
+    setError('');
+    setEditingExtra(null); fetchExtras();
   };
 
   const addExtra = async () => {
@@ -293,6 +316,7 @@ export default function InventoryExtras() {
                   ) : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
                 </td>
                 <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                  <span onClick={() => openEdit(ex)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: `1px solid rgba(99,102,241,.2)`, background: 'rgba(99,102,241,.06)' }}>Edit</span>{' '}
                   <span onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Add</span>{' '}
                   <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Remove</span>
                 </td>
@@ -307,6 +331,7 @@ export default function InventoryExtras() {
         {filtered.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No spare parts found</div>}
         {filtered.map((ex, idx) => (
           <SwipeRow key={ex.id} hint={idx === 0} hintKey="spare-parts" actions={[
+            { label: 'Edit', color: '#6366F1', onClick: () => openEdit(ex) },
             { label: 'Add', color: '#22C55E', onClick: () => { setAdjustExtra(ex); setAdjustMode('add'); } },
             { label: 'Remove', color: '#EF4444', onClick: () => { setAdjustExtra(ex); setAdjustMode('remove'); } },
           ]}>
@@ -475,6 +500,30 @@ export default function InventoryExtras() {
           </div>
         </div>
       </div>, document.body)}
+      {editingExtra && createPortal(<div style={overlay} onClick={() => setEditingExtra(null)}>
+        <div className="modal-inner" style={modal} onClick={e => e.stopPropagation()}>
+          <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Edit Spare Part</span>
+            <span onClick={() => setEditingExtra(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16 }}>&times;</span>
+          </div>
+          <div style={{ padding: 16 }}>
+            {error && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: T.re, marginBottom: 10 }}>{error}</div>}
+            <div style={{ marginBottom: 8, fontSize: 10, color: T.tx3 }}>{editingExtra.product_name} · {editingExtra.component_name}</div>
+            <div className="inv-extra-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div><label style={label}>SKU *</label><input value={editForm.sku} onChange={e => setEditForm({ ...editForm, sku: e.target.value })} style={{ ...input, fontFamily: T.mono }} /></div>
+              <div><label style={label}>Size *</label><select value={editForm.size} onChange={e => setEditForm({ ...editForm, size: e.target.value })} style={input}><option value="">Select...</option>{SIZES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+            </div>
+            <div style={{ marginBottom: 10 }}><label style={label}>Location *</label><select value={editForm.location} onChange={e => setEditForm({ ...editForm, location: e.target.value })} style={input}><option value="">Select...</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
+            <div style={{ marginBottom: 10 }}><label style={label}>Manufacturer *</label><input list="mfr-edit-list" value={editForm.manufacturer} onChange={e => setEditForm({ ...editForm, manufacturer: e.target.value })} style={input} /><datalist id="mfr-edit-list">{mfrOptions.map(m => <option key={m} value={m} />)}</datalist></div>
+            <div style={{ marginBottom: 12 }}><label style={label}>Notes</label><input value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} placeholder="Optional" style={input} /></div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <span onClick={() => setEditingExtra(null)} style={btnGhost}>Cancel</span>
+              <span onClick={saveEdit} style={btn}>Update</span>
+            </div>
+          </div>
+        </div>
+      </div>, document.body)}
+
       {exportHtml && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
           <iframe srcDoc={exportHtml} style={{ flex: 1, border: 'none', width: '100%' }} />
