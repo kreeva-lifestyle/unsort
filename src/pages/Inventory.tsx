@@ -10,6 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import InventoryExtras from '../InventoryExtras';
 import Empty from '../components/ui/Empty';
+import { SkeletonRows } from '../components/ui/Skeleton';
 import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 
 // Status indicator — dot + plain label. Previous pills-with-bg were noisy in the
@@ -737,11 +738,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           </div>
         );
       })()}
-      {loading && items.length === 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 40, color: T.tx3 }}>
-          <div className="spinner" /><span style={{ fontSize: 12 }}>Loading inventory...</span>
-        </div>
-      )}
+      {loading && items.length === 0 && <SkeletonRows rows={6} />}
       <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden', display: loading && items.length === 0 ? 'none' : undefined }}>
         {/* Desktop table */}
         <div className="inv-desktop">
