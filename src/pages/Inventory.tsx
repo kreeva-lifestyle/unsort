@@ -401,23 +401,36 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     if (filtered.length === 0) return;
     const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
     const rows = filtered.map(i => `<tr><td>${esc(i.serial_number || '—')}</td><td>${esc(i.products?.name || '—')}</td><td>${esc(i.size || '—')}</td><td>${esc(i.location || '—')}</td><td>${esc((i as any).manufacturer || '—')}</td><td style="text-transform:capitalize">${esc(i.status === 'dry_clean' ? 'Dry Clean' : i.status)}</td></tr>`).join('');
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Inventory Report</title><style>
-      body{font-family:Arial,sans-serif;margin:16px;color:#222;font-size:11px}
-      h2{margin:0 0 4px;font-size:16px} .sub{color:#666;font-size:10px;margin-bottom:12px}
-      table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:5px 8px;text-align:left;font-size:10px}
-      th{background:#f5f5f5;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-size:9px}
-      .footer{text-align:center;font-size:8px;color:#aaa;margin-top:16px}
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inventory Report</title><style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#060810;color:#E2E8F0;padding:16px;padding-bottom:80px;-webkit-text-size-adjust:100%}
+      .header{margin-bottom:16px}
+      .brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+      .logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#6366F1,#38BDF8);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff}
+      .title{font-size:15px;font-weight:700;letter-spacing:-0.3px}
+      .sub{font-size:10px;color:#6B7890;letter-spacing:0.5px}
+      .meta{display:flex;gap:12px;font-size:10px;color:#8896B0;margin-top:8px}
+      .meta span{padding:3px 8px;border-radius:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
+      table{width:100%;border-collapse:collapse;margin-top:4px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.06)}
+      th{background:rgba(255,255,255,.03);font-size:9px;font-weight:600;color:#6B7890;text-transform:uppercase;letter-spacing:0.8px;padding:10px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)}
+      td{padding:9px 10px;font-size:11px;color:#8896B0;border-bottom:1px solid rgba(255,255,255,.04)}
+      tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+      .footer{text-align:center;font-size:8px;color:#4A5568;margin-top:16px;letter-spacing:1px;text-transform:uppercase}
+      .no-print{position:fixed;bottom:0;left:0;right:0;padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));background:rgba(8,11,20,.95);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid rgba(255,255,255,.06);display:flex;gap:10px;justify-content:center;z-index:10}
+      .btn{padding:12px 28px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer}
+      .btn-primary{background:linear-gradient(135deg,#6366F1,#818CF8);color:#fff;box-shadow:0 4px 16px rgba(99,102,241,.35)}
       @page{size:A4 landscape;margin:8mm}
-      @media print{body{margin:0}}
+      @media print{body{background:#fff;color:#222;padding:8mm}.no-print{display:none!important}th{background:#f5f5f5;color:#333}td{color:#444;border-color:#eee}.footer{color:#999}.brand .logo{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
     </style></head><body>
-    <h2>Arya Designs — Inventory Report</h2>
-    <div class="sub">${filtered.length} items · ${isCompletedView ? 'Completed' : 'Active'} · ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+    <div class="header">
+      <div class="brand"><div class="logo">D</div><div><div class="title">Inventory Report</div><div class="sub">Arya Designs</div></div></div>
+      <div class="meta"><span>${filtered.length} items</span><span>${isCompletedView ? 'Completed' : 'Active'}</span><span>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
+    </div>
     <table><thead><tr><th>SKU</th><th>Category</th><th>Size</th><th>Location</th><th>Manufacturer</th><th>Status</th></tr></thead>
     <tbody>${rows}</tbody></table>
-    <div class="no-print" style="position:fixed;bottom:0;left:0;right:0;padding:10px;background:#f5f5f5;display:flex;gap:8px;justify-content:center;border-top:1px solid #ddd">
-      <button onclick="window.print()" style="padding:12px 28px;border-radius:8px;border:none;background:#6366F1;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Print / Share</button>
+    <div class="no-print">
+      <button class="btn btn-primary" onclick="window.print()">Print / Share</button>
     </div>
-    <style>@media print{.no-print{display:none!important}}</style>
     <div class="footer">Powered by DailyOffice</div>
     </body></html>`;
     setExportPdfHtml(html);
@@ -1121,10 +1134,14 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       </>}
       <ConfirmModal {...confirmModalProps} />
       {exportPdfHtml && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
-          <iframe srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%' }} />
-          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: '#f5f5f5', borderTop: '1px solid #ddd', display: 'flex', justifyContent: 'center' }}>
-            <button onClick={() => setExportPdfHtml(null)} style={{ padding: '12px 32px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#333', fontSize: 14, cursor: 'pointer', fontWeight: 500 }}>Close</button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#060810', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+          <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', fontFamily: "'Sora',sans-serif" }}>Export Preview</span>
+            <button onClick={() => setExportPdfHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
+          </div>
+          <iframe srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#fff' }} />
+          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', justifyContent: 'center' }}>
+            <button onClick={() => setExportPdfHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>Close</button>
           </div>
         </div>,
         document.body
