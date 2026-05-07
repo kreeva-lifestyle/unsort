@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { useUndoDelete } from '../../hooks/useUndoDelete';
+import Toggle from '../ui/Toggle';
 import UndoBar from '../ui/UndoBar';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
@@ -83,7 +84,7 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
                 <span style={{ fontSize: 9, fontFamily: T.mono, color: T.tx3, background: 'rgba(255,255,255,0.03)', padding: '1px 6px', borderRadius: 3 }}>{c.sheet_name}</span>
               </div>
               <div style={{ display: 'flex', gap: 4 }}>
-                <span onClick={() => toggleCourier(c.id, c.is_active)} style={{ ...S.btnGhost, ...S.btnSm, color: c.is_active ? T.yl : T.gr }}>{c.is_active ? 'Disable' : 'Enable'}</span>
+                <Toggle on={c.is_active} onToggle={() => toggleCourier(c.id, c.is_active)} size="sm" />
                 <span onClick={() => deleteCourier(c.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
               </div>
             </div>

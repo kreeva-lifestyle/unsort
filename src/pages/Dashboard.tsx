@@ -7,6 +7,8 @@ import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
 import { useNotifications } from '../hooks/useNotifications';
 import { friendlyError } from '../lib/friendlyError';
 import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
+import CountUp from '../components/ui/CountUp';
+import Skeleton from '../components/ui/Skeleton';
 
 type ChallanRow = { total: number | string; amount_paid: number | string | null; status: string; is_return: boolean; customer_name: string; created_at: string };
 type InventoryRow = { status: string; status_changed_at: string | null };
@@ -31,6 +33,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
   const [revTrend, setRevTrend] = useState<{ date: string; amount: number }[]>([]);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [newTask, setNewTask] = useState('');
+  const [loaded, setLoaded] = useState(false);
   const { ask, modalProps } = useConfirm();
 
   const fetchAll = useCallback(async () => {
@@ -106,6 +109,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     for (let d = 29; d >= 0; d--) { const dt = new Date(Date.now() - d * 86400000); revByDay[dt.toISOString().slice(0,10)] = 0; }
     challans.forEach(c => { if (!c.created_at) return; const d = new Date(c.created_at).toISOString().slice(0,10); if (revByDay[d] !== undefined) revByDay[d] += (c.is_return ? -1 : 1) * Number(c.amount_paid || 0); });
     setRevTrend(Object.entries(revByDay).map(([date, amount]) => ({ date, amount: Math.round(amount) })));
+    setLoaded(true);
   }, []);
 
   const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(100).then(({ data }) => setTasks((data ?? []) as TaskRow[])); };
@@ -169,7 +173,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.gr}cc, ${T.gr}22)` }} />
         <div>
           <p style={{ fontSize: 10, color: T.gr, letterSpacing: 1.2, marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Today's Revenue</p>
-          <p style={{ fontFamily: T.sora, fontSize: 44, fontWeight: 800, color: T.gr, margin: 0, lineHeight: 1, letterSpacing: -1.5 }}>₹{pulse.revenue.toLocaleString('en-IN')}</p>
+          <p style={{ fontFamily: T.sora, fontSize: 44, fontWeight: 800, color: T.gr, margin: 0, lineHeight: 1, letterSpacing: -1.5 }}>{loaded ? <CountUp value={pulse.revenue} prefix="₹" /> : <Skeleton width={120} height={44} borderRadius={8} />}</p>
         </div>
         <div style={{ textAlign: 'right' as const, fontSize: 11, color: T.tx3 }}>
           Net of returns<br /><span style={{ color: T.tx2 }}>Tap to open Challan</span>
@@ -197,7 +201,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
           >
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${c.color}cc, ${c.color}33)` }} />
             <p style={{ fontSize: 9, color: T.tx3, letterSpacing: 0.8, marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' }}>{c.label}</p>
-            <p style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: c.color, margin: 0 }}>{c.prefix}{c.value.toLocaleString('en-IN')}</p>
+            <p style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: c.color, margin: 0 }}>{loaded ? <CountUp value={c.value} prefix={c.prefix} /> : <Skeleton width={60} height={18} borderRadius={4} />}</p>
           </div>
         ))}
       </div>

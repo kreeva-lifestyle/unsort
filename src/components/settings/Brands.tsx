@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { useUndoDelete } from '../../hooks/useUndoDelete';
+import Toggle from '../ui/Toggle';
 import UndoBar from '../ui/UndoBar';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
@@ -46,7 +47,7 @@ export default function Brands({ addToast }: { addToast: (msg: string, type?: st
             <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{b.name}</span>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
-            <span onClick={() => toggleBrand(b.id, b.is_active)} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer' }}>{b.is_active ? 'Disable' : 'Enable'}</span>
+            <Toggle on={b.is_active} onToggle={() => toggleBrand(b.id, b.is_active)} size="sm" />
             <span onClick={() => deleteBrand(b.id)} style={{ ...S.btnDanger, cursor: 'pointer' }}>Delete</span>
           </div>
         </div>

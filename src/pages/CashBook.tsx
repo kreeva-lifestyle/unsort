@@ -1,14 +1,14 @@
 /* eslint-disable */
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from './lib/supabase';
+import { supabase } from '../lib/supabase';
 
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
-import { friendlyError } from './lib/friendlyError';
-import { useDebouncedFetch } from './hooks/useDebouncedFetch';
-import { useNotifications } from './hooks/useNotifications';
-import Empty from './components/ui/Empty';
+import { friendlyError } from '../lib/friendlyError';
+import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
+import { useNotifications } from '../hooks/useNotifications';
+import Empty from '../components/ui/Empty';
 
-import { T, S } from './lib/theme';
+import { T, S } from '../lib/theme';
 import type {
   CashExpense,
   CashExpenseInsert,
@@ -17,7 +17,7 @@ import type {
   CashBookBalanceInsert,
   CashChallan,
   Profile,
-} from './types/database';
+} from '../types/database';
 
 const CATEGORIES = ['Office Supplies', 'Rent', 'Salaries', 'Travel', 'Utilities', 'Food', 'Transport', 'Misc', 'Others'];
 

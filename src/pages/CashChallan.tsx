@@ -1,22 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import CashBook from './CashBook';
-import { supabase } from './lib/supabase';
-import { useNotifications } from './hooks/useNotifications';
-import ChallanAnalytics from './components/challan/ChallanAnalytics';
-import ChallanLedger from './components/challan/ChallanLedger';
-import ChallanForm from './components/challan/ChallanForm';
-import ChallanDetail from './components/challan/ChallanDetail';
-import ChallanList from './components/challan/ChallanList';
-import ChallanBulkActions from './components/challan/ChallanBulkActions';
-import { friendlyError } from './lib/friendlyError';
-import { useDebouncedFetch } from './hooks/useDebouncedFetch';
+import { supabase } from '../lib/supabase';
+import { useNotifications } from '../hooks/useNotifications';
+import ChallanAnalytics from '../components/challan/ChallanAnalytics';
+import ChallanLedger from '../components/challan/ChallanLedger';
+import ChallanForm from '../components/challan/ChallanForm';
+import ChallanDetail from '../components/challan/ChallanDetail';
+import ChallanList from '../components/challan/ChallanList';
+import ChallanBulkActions from '../components/challan/ChallanBulkActions';
+import { friendlyError } from '../lib/friendlyError';
+import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
 import type {
   CashChallan,
   CashChallanItem as DbCashChallanItem,
   CashChallanCustomer,
   AuditLog,
-} from './types/database';
+} from '../types/database';
 
 const ccAuditLog = async (action: string, recordId: string, details: string, changes?: Record<string, { from: unknown; to: unknown }>) => {
   const { data: { user } } = await supabase.auth.getUser();
@@ -25,7 +25,7 @@ const ccAuditLog = async (action: string, recordId: string, details: string, cha
   await supabase.from('audit_log').insert({ action, module: 'cash_challan', record_id: recordId, details, user_id: user?.id ?? null, user_email: userName, changes: changes || null });
 };
 
-import { T, S } from './lib/theme';
+import { T, S } from '../lib/theme';
 
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
 
@@ -1277,6 +1277,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         </div>,
         document.body
       )}
+      {!viewingChallan && !showLedger && !showAnalytics && !showCashBook && <button className="fab" onClick={() => { setShowModal(true); window.history.pushState({ view: 'challan-new' }, ''); }}>+</button>}
     </div>
   );
 }

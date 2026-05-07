@@ -13,10 +13,25 @@
     <title>DailyOffice — Your Workspace, Simplified</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet"></noscript>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   </head>
   <body>
+    <div id="splash" style="position:fixed;inset:0;background:#060810;display:flex;align-items:center;justify-content:center;z-index:9999;transition:opacity .4s ease">
+      <div style="text-align:center;animation:splashIn .6s cubic-bezier(.2,.9,.3,1) both">
+        <div style="width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#6366F1,#38BDF8);display:flex;align-items:center;justify-content:center;font-family:'Sora',sans-serif;font-weight:800;font-size:32px;color:#fff;margin:0 auto 16px;box-shadow:0 10px 40px rgba(99,102,241,.45)">D</div>
+        <div style="font-family:'Sora',sans-serif;font-size:18px;font-weight:700;color:#E2E8F0;letter-spacing:-0.3px">DailyOffice</div>
+        <div style="font-size:10px;color:#6B7890;margin-top:6px;letter-spacing:2px;text-transform:uppercase;font-family:'Inter',sans-serif">Loading workspace</div>
+        <div style="width:32px;height:3px;border-radius:2px;background:linear-gradient(90deg,#6366F1,#818CF8);margin:18px auto 0;animation:splashBar 1.2s ease-in-out infinite"></div>
+      </div>
+    </div>
+    <style>
+      @keyframes splashIn{from{opacity:0;transform:scale(.9) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+      @keyframes splashBar{0%,100%{transform:scaleX(1);opacity:.6}50%{transform:scaleX(2.5);opacity:1}}
+    </style>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>var _sr=false;new MutationObserver(function(m,o){if(!_sr&&document.getElementById('root').children.length){_sr=true;var s=document.getElementById('splash');if(s){s.style.opacity='0';setTimeout(function(){if(s.parentNode)s.remove()},400)}o.disconnect()}}).observe(document.getElementById('root'),{childList:true})</script>
   </body>
 </html>

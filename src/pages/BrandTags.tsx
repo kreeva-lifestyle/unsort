@@ -1,16 +1,16 @@
 /* eslint-disable */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
-import { supabase } from './lib/supabase';
-import { useNotifications } from './hooks/useNotifications';
-import BrandTagModalNew from './components/ui/BrandTagModal';
-import ConfirmModal, { useConfirm } from './components/ui/ConfirmModal';
-import { friendlyError } from './lib/friendlyError';
-import type { BrandTag, BrandTagInsert } from './types/database';
+import { supabase } from '../lib/supabase';
+import { useNotifications } from '../hooks/useNotifications';
+import BrandTagModalNew from '../components/ui/BrandTagModal';
+import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
+import { friendlyError } from '../lib/friendlyError';
+import type { BrandTag, BrandTagInsert } from '../types/database';
 
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
-import { T, S } from './lib/theme';
+import { T, S } from '../lib/theme';
 
 const btnPrimary: React.CSSProperties = S.btnPrimary;
 const btnGhost: React.CSSProperties = S.btnGhost;

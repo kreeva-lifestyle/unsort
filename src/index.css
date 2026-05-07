@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import './design-tokens.css';
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -23,12 +22,17 @@ body {
 
 ::selection { background: rgba(99,102,241,0.25); color: #E2E8F0; }
 
-/* Button press feedback */
-button:active, [role="button"]:active { transform: scale(0.97); transition: transform 60ms ease; }
+/* Momentum scroll + rubber-band overscroll */
+main { -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
 
-/* Page transitions */
-.page-pad, main > div > div { animation: pageIn 180ms ease both; }
-@keyframes pageIn { from { opacity: 0.92; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+/* Button press feedback — bump for buttons, dim for clickable areas */
+@keyframes btnBump { 0% { transform: scale(1); } 40% { transform: scale(0.93); } 70% { transform: scale(1.04); } 100% { transform: scale(1); } }
+button:active, [role="button"]:active { animation: btnBump 200ms cubic-bezier(.4,0,.2,1); }
+[style*="pointer"]:active { filter: brightness(0.8); transition: filter 80ms ease; }
+
+/* Page transitions — slide-in from right (app-like) */
+.page-pad, main > div > div { animation: pageIn 220ms cubic-bezier(.2,.9,.3,1) both; }
+@keyframes pageIn { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
 
 /* Prevent iOS zoom on input focus — force 16px minimum on mobile */
 @media (max-width: 768px) {
@@ -88,11 +92,14 @@ input[type="date"], input[type="time"], input[type="datetime-local"], input[type
 /* Subtle row hover for HTML tables — applies to Inventory, Cash Challan,
    Brand Tags, and any other <tbody><tr> structure. Pure CSS, no JS. */
 tbody tr { transition: background 100ms ease; }
-tbody tr:hover { background: rgba(99,102,241,0.03); }
+tbody tr:nth-child(even) { background: rgba(255,255,255,0.015); }
+tbody tr:hover { background: rgba(99,102,241,0.04); }
 
 /* Animations */
 @keyframes fi { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes su { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes toastInTop { from { opacity: 0; transform: translateY(-8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes loginBoxEnter { from { opacity: 0; transform: translateY(24px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes loginGlowFloat { 0% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-20px) scale(1.1); } 100% { transform: translate(-20px,30px) scale(.95); } }
 @keyframes loginGlowIn { from { opacity: 0; transform: scale(.8); } to { opacity: .12; transform: scale(1); } }
@@ -104,10 +111,11 @@ tbody tr:hover { background: rgba(99,102,241,0.03); }
 @keyframes btnSpin { to { transform: rotate(360deg); } }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes scanLine { 0%,100% { transform: translateY(-12px); opacity: .4; } 50% { transform: translateY(12px); opacity: 1; } }
-@keyframes modalBoxEnter { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes modalBoxEnter { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
 @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
 @keyframes pulseGlow { 0%,100% { opacity: .6; } 50% { opacity: 1; } }
 @keyframes subtlePulse { 0%,100% { filter: brightness(1) drop-shadow(0 0 0 transparent); } 50% { filter: brightness(1.08) drop-shadow(0 0 6px rgba(99,102,241,.15)); } }
+@keyframes tabDot { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
 @keyframes undoProgress { from { width: 100%; } to { width: 0%; } }
 
 .undo-bar { height: 3px; background: linear-gradient(90deg, #6366F1, #818CF8); border-radius: 2px; animation: undoProgress 5s linear forwards; }
@@ -128,8 +136,11 @@ body.modal-open { overflow: hidden !important; }
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 @media (max-width: 768px) {
-  .login-split { grid-template-columns: 1fr !important; gap: 0 !important; padding: 16px !important; }
+  .login-page { padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0) !important; }
+  .login-split { grid-template-columns: 1fr !important; gap: 0 !important; padding: 20px !important; }
   .login-hero { display: none !important; }
+  .login-mobile-brand { display: block !important; }
+  .login-card { border-radius: 20px !important; padding: 28px 22px 22px !important; }
   .sidebar { display: none !important; }
   .main-area { margin-left: 0 !important; }
   .mobile-hamburger { display: flex !important; }
@@ -137,14 +148,18 @@ body.modal-open { overflow: hidden !important; }
   .mobile-drawer { display: block !important; }
   .desktop-only { display: none !important; }
   .mobile-only { display: inline-flex !important; }
+  .fab { display: flex !important; position: fixed !important; bottom: calc(68px + env(safe-area-inset-bottom, 0)) !important; right: 16px !important; width: 52px !important; height: 52px !important; border-radius: 50% !important; background: linear-gradient(135deg, #6366F1, #818CF8) !important; color: #fff !important; align-items: center !important; justify-content: center !important; font-size: 24px !important; font-weight: 300 !important; box-shadow: 0 6px 24px rgba(99,102,241,.45) !important; z-index: 50 !important; cursor: pointer !important; border: none !important; animation: fi .2s ease !important; }
   input[type="date"] { -webkit-appearance: textfield !important; appearance: textfield !important; min-height: 0 !important; }
   .challan-row-actions { display: none !important; }
   .bt-actions-col { display: none !important; }
+  .settings-tabs { flex-direction: column !important; width: 100% !important; }
+  .settings-tabs > div { justify-content: flex-start !important; }
   .inv-action-btns { justify-content: flex-end !important; }
   .inv-more-fields { display: block !important; }
   .inv-more-content { display: none !important; }
   .challan-filter-btns { flex: 0 !important; }
-  .toast-container { top: 12px !important; bottom: auto !important; left: 12px !important; right: 12px !important; }
+  .toast-container { top: calc(12px + env(safe-area-inset-top, 0)) !important; bottom: auto !important; left: 12px !important; right: 12px !important; }
+  .toast-item { animation: toastInTop .25s cubic-bezier(.2,.9,.3,1) !important; }
   .challan-pagination, .inv-pagination, .bt-pagination, .prg-pagination, .scan-pagination { padding-bottom: 70px !important; }
   .inv-extra-filters { flex-direction: column !important; }
   .inv-extra-filters input, .inv-extra-filters select { max-width: none !important; width: 100% !important; }
@@ -155,11 +170,12 @@ body.modal-open { overflow: hidden !important; }
   .scan-history-mobile { display: block !important; }
   .scan-courier-pills { scrollbar-width: none !important; }
   .scan-courier-pills::-webkit-scrollbar { display: none !important; }
-  .mobile-drawer .sidebar { display: flex !important; width: 100% !important; height: calc(100vh - 60px) !important; padding-bottom: 0 !important; }
-  .page-pad { padding: 14px 12px !important; padding-bottom: 70px !important; }
+  .mobile-drawer { top: env(safe-area-inset-top, 0) !important; bottom: calc(52px + env(safe-area-inset-bottom, 0)) !important; height: auto !important; }
+  .mobile-drawer .sidebar { display: flex !important; width: 100% !important; height: 100% !important; padding-bottom: 0 !important; }
+  .page-pad { padding: 14px max(12px, env(safe-area-inset-right, 0)) 70px max(12px, env(safe-area-inset-left, 0)) !important; }
   .filter-bar { gap: 6px !important; padding: 8px 10px !important; }
   .filter-bar select, .filter-bar input { font-size: 12px !important; padding: 6px 8px !important; min-width: 0 !important; }
-  .header-bar { padding: 8px 12px !important; }
+  .header-bar { padding: 0 12px !important; }
   .header-title { font-size: 13px !important; }
 
   .header-bar button { min-width: 44px !important; min-height: 44px !important; }
@@ -169,10 +185,12 @@ body.modal-open { overflow: hidden !important; }
   .stat-hero p[style*="fontSize: 44"] { font-size: 36px !important; }
   .cat-grid { grid-template-columns: 1fr !important; }
   .three-things { grid-template-columns: 1fr !important; }
-  .modal-inner { width: calc(100vw - 16px) !important; max-height: 94vh !important; border-radius: 12px !important; }
+  .modal-inner { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; max-width: 100% !important; max-height: 85vh !important; border-radius: 14px 14px 0 0 !important; animation: slideUp .3s cubic-bezier(.2,.9,.3,1) both !important; margin: 0 !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; }
   .modal-inner form { padding: 14px !important; }
   .two-col { grid-template-columns: 1fr !important; }
   .mobile-hamburger > div { min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-direction: column !important; gap: 3px !important; }
+  .mobile-hamburger { padding-left: env(safe-area-inset-left, 0) !important; padding-right: env(safe-area-inset-right, 0) !important; }
+  .filter-bar { padding-left: max(10px, env(safe-area-inset-left, 0)) !important; padding-right: max(10px, env(safe-area-inset-right, 0)) !important; }
 }
 
 /* ── Cash Challan module mobile ──────────────────────────── */
@@ -248,6 +266,7 @@ body.modal-open { overflow: hidden !important; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
 .mobile-only { display: none; }
+.fab { display: none; }
 .inv-mobile { display: none; }
 .inv-extra-mobile { display: none; }
 .scan-history-mobile { display: none; }
