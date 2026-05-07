@@ -13,6 +13,9 @@ const ICONS: Record<string, string> = {
   Delete: 'M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2',
   Add:    'M12 5v14M5 12h14',
   Remove: 'M5 12h14',
+  Print:  'M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z',
+  Remind: 'M22 2L11 13M22 2l-7 20-4-9-9-4z',
+  Void:   'M18.36 6.64A9 9 0 015.64 19.36M5.64 4.64A9 9 0 0118.36 17.36M12 2a10 10 0 100 20 10 10 0 000-20z',
 };
 
 const renderIcon = (label: string) => {
