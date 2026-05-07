@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component } from 'react';
+import React, { useState, useEffect, Component, Suspense, lazy } from 'react';
 
 // Error boundary to prevent blank screen crashes
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: any }> {
@@ -16,14 +16,16 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: an
     return this.props.children;
   }
 }
-import BrandTagPrinter from './BrandTagPrinter';
-import PackTime from './PackTime';
-import CashChallan from './CashChallan';
+
+const BrandTagPrinter = lazy(() => import('./BrandTagPrinter'));
+const PackTime = lazy(() => import('./PackTime'));
+const CashChallan = lazy(() => import('./CashChallan'));
+const SettingsPage = lazy(() => import('./pages/Settings'));
+const Inventory = lazy(() => import('./pages/Inventory'));
+const ProgramsModule = lazy(() => import('./modules/programs'));
+const LazyPublicShareView = lazy(() => import('./modules/programs/PublicShareView'));
 import Login from './pages/Login';
-import SettingsPage from './pages/Settings';
 import Dashboard from './pages/Dashboard';
-import Inventory from './pages/Inventory';
-import ProgramsModule, { PublicShareView } from './modules/programs';
 import SidebarComponent from './components/layout/Sidebar';
 import HeaderComponent from './components/layout/Header';
 import ToastContainerComponent from './components/layout/ToastContainer';
@@ -103,14 +105,15 @@ const MainApp = () => {
       </div>
       <HeaderComponent title={titles[tab]} onNotifClick={handleNotifClick} notifications={notifications} markAsRead={markAsRead} />
       <main style={{ flex: 1, overflow: 'auto' }}>
+        <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}><div className="spinner" /></div>}>
         {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard navigateTo={setTab} /></div>}
         {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
-
         {mounted.has('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
         {mounted.has('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime active={tab === 'packtime'} /></div>}
         {mounted.has('challan') && <div style={{ display: tab === 'challan' ? 'block' : 'none' }}><CashChallan active={tab === 'challan'} /></div>}
         {mounted.has('programs') && <div style={{ display: tab === 'programs' ? 'block' : 'none' }}><ProgramsModule /></div>}
         {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage profile={profile} addToast={addToast} /></div>}
+        </Suspense>
       </main>
     </div>
     <ToastContainerComponent toasts={toasts} />
@@ -126,7 +129,7 @@ const AppContent = () => {
   // Public share route — no auth required, rendered before login gate
   const hash = window.location.hash;
   const shareMatch = hash.match(/^#\/share\/program\/([a-f0-9]+)$/);
-  if (shareMatch) return <PublicShareView shareToken={shareMatch[1]} />;
+  if (shareMatch) return <Suspense fallback={<div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyPublicShareView shareToken={shareMatch[1]} /></Suspense>;
 
   if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100vh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}><div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Unsort</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase' }}>LOADING</p></div>;
   if (!auth?.user) return <Login signIn={auth.signIn} />;
