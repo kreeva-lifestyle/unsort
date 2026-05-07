@@ -94,9 +94,8 @@ export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
       </div>
       <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, display: 'flex' }}>
         {actions.map((a, i) => (
-          <div key={i} onClick={() => { a.onClick(); snap(false); }} style={{ width: ACTION_W, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, background: a.color, cursor: 'pointer' }}>
-            {renderIcon(a.label)}
-            <span style={{ fontSize: 10, fontWeight: 600, color: '#fff', letterSpacing: 0.2 }}>{a.label}</span>
+          <div key={i} onClick={() => { a.onClick(); snap(false); }} style={{ width: ACTION_W, display: 'flex', alignItems: 'center', justifyContent: 'center', background: a.color, cursor: 'pointer' }}>
+            {renderIcon(a.label) || <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{a.label}</span>}
           </div>
         ))}
       </div>
