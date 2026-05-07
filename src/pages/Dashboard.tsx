@@ -311,8 +311,8 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         {/* Inventory Breakdown */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
           <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Inventory Breakdown</p>
-          {Object.entries(invBreakdown).map(([status, count]) => {
-            const total = Object.values(invBreakdown).reduce((a, b) => a + b, 0) || 1;
+          {Object.entries(invBreakdown).filter(([status]) => status !== 'completed').map(([status, count]) => {
+            const total = Object.values(invBreakdown).filter((_, i) => Object.keys(invBreakdown)[i] !== 'completed').reduce((a, b) => a + b, 0) || 1;
             return (
               <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <span style={{ fontSize: 9, color: T.tx2, width: 65, textTransform: 'capitalize' }}>{status.replace('_', ' ')}</span>

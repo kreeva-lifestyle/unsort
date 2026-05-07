@@ -91,7 +91,7 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
           {/* Live preview */}
           <div>
             <div style={{ fontSize: 9, fontWeight: 600, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8, textAlign: 'center' }}>Live Preview</div>
-            <div style={{ width: '100%', aspectRatio: '1.97/2.97', background: '#fff', borderRadius: 6, padding: '8px 10px 6px', display: 'flex', flexDirection: 'column', fontFamily: 'Arial, sans-serif', color: '#000', fontSize: 8, lineHeight: 1.35, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ width: '100%', maxWidth: 200, aspectRatio: '1.97/2.97', background: '#fff', borderRadius: 6, padding: '8px 10px 6px', display: 'flex', flexDirection: 'column', fontFamily: 'Arial, sans-serif', color: '#000', fontSize: 8, lineHeight: 1.35, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', margin: '0 auto' }}>
               <div style={{ fontWeight: 700, fontSize: 9 }}>BRAND: {brand || '—'}</div>
               <div style={{ fontWeight: 700, fontSize: 9 }}>SKU: {form.sku || '—'}</div>
               <div>PRODUCT: {product || '—'}</div>

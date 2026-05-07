@@ -59,6 +59,12 @@ export default function InventoryExtras() {
   // Complete confirm
   const [completeItem, setCompleteItem] = useState<{ extra: InventoryExtra; item: InventoryItemMatch } | null>(null);
 
+  useEffect(() => {
+    const hasModal = showAdd || !!adjustExtra || !!matchExtra || !!completeItem || !!editingExtra || !!exportHtml;
+    document.body.classList.toggle('modal-open', hasModal);
+    return () => { document.body.classList.remove('modal-open'); };
+  }, [showAdd, adjustExtra, matchExtra, completeItem, editingExtra, exportHtml]);
+
   const fetchExtras = useCallback(async () => {
     const { data } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, location, manufacturer, quantity, notes, created_by, created_at, updated_at').gt('quantity', 0).order('updated_at', { ascending: false }).limit(1000);
     setExtras(data || []);

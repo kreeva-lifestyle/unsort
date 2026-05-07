@@ -12,6 +12,11 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
   const [selected, setSelected] = useState<any>(null);
   const [comps, setComps] = useState<any[]>([]);
   const [form, setForm] = useState({ sku: '', name: '', description: '', category: '' });
+
+  useEffect(() => {
+    document.body.classList.toggle('modal-open', showModal || showCompModal);
+    return () => { document.body.classList.remove('modal-open'); };
+  }, [showModal, showCompModal]);
   const [newComps, setNewComps] = useState<string[]>(['']);
   const { ask, modalProps } = useConfirm();
 
