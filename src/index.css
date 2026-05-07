@@ -26,10 +26,9 @@ body {
 /* Momentum scroll + rubber-band overscroll */
 main { -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
 
-/* Button press feedback — spring bounce + ripple */
+/* Button press feedback — spring bounce */
 @keyframes btnBump { 0% { transform: scale(1); } 40% { transform: scale(0.92); } 70% { transform: scale(1.05); } 100% { transform: scale(1); } }
-@keyframes rippleOut { from { transform: scale(0); opacity: .35; } to { transform: scale(2.5); opacity: 0; } }
-button:active, [role="button"]:active, [style*="pointer"]:active { animation: btnBump 250ms cubic-bezier(.4,0,.2,1); }
+button:active, [role="button"]:active { animation: btnBump 250ms cubic-bezier(.4,0,.2,1); }
 
 /* Page transitions — slide-in from right (app-like) */
 .page-pad, main > div > div { animation: pageIn 220ms cubic-bezier(.2,.9,.3,1) both; }
@@ -99,7 +98,7 @@ tbody tr:hover { background: rgba(99,102,241,0.04); }
 /* Animations */
 @keyframes fi { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes su { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes toastIn { from { opacity: 0; transform: translateY(-14px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes loginBoxEnter { from { opacity: 0; transform: translateY(24px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes loginGlowFloat { 0% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-20px) scale(1.1); } 100% { transform: translate(-20px,30px) scale(.95); } }
 @keyframes loginGlowIn { from { opacity: 0; transform: scale(.8); } to { opacity: .12; transform: scale(1); } }
@@ -183,7 +182,6 @@ body.modal-open { overflow: hidden !important; }
   .cat-grid { grid-template-columns: 1fr !important; }
   .three-things { grid-template-columns: 1fr !important; }
   .modal-inner { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; max-width: 100% !important; max-height: 85vh !important; border-radius: 14px 14px 0 0 !important; animation: slideUp .3s cubic-bezier(.2,.9,.3,1) both !important; margin: 0 !important; }
-  .modal-inner::before { content: ''; display: block; width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.15); margin: 8px auto 4px; }
   .modal-inner form { padding: 14px !important; }
   .two-col { grid-template-columns: 1fr !important; }
   .mobile-hamburger > div { min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-direction: column !important; gap: 3px !important; }
