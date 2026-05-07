@@ -1,18 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { supabase } from './lib/supabase';
-import { friendlyError } from './lib/friendlyError';
-import { useDebouncedFetch } from './hooks/useDebouncedFetch';
+import { supabase } from '../lib/supabase';
+import { friendlyError } from '../lib/friendlyError';
+import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
 
-import { T, S } from './lib/theme';
-import SwipeRow from './components/ui/SwipeRow';
+import { T, S } from '../lib/theme';
+import SwipeRow from '../components/ui/SwipeRow';
 import type {
   Product,
   ProductComponent,
   InventoryItem,
   ItemComponent,
   InventoryExtra,
-} from './types/database';
+} from '../types/database';
 
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
 const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);

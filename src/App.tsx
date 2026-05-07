@@ -17,9 +17,9 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: an
   }
 }
 
-const BrandTagPrinter = lazy(() => import('./BrandTagPrinter'));
-const PackTime = lazy(() => import('./PackTime'));
-const CashChallan = lazy(() => import('./CashChallan'));
+const BrandTagPrinter = lazy(() => import('./pages/BrandTags'));
+const PackTime = lazy(() => import('./pages/PackTime'));
+const CashChallan = lazy(() => import('./pages/CashChallan'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const ProgramsModule = lazy(() => import('./modules/programs'));

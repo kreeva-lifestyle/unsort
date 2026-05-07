@@ -8,7 +8,7 @@ import SwipeRow from '../components/ui/SwipeRow';
 import { friendlyError } from '../lib/friendlyError';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
-import InventoryExtras from '../InventoryExtras';
+import InventoryExtras from './InventoryExtras';
 import Empty from '../components/ui/Empty';
 import { SkeletonRows } from '../components/ui/Skeleton';
 import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';

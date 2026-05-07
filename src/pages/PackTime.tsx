@@ -1,22 +1,22 @@
 /* eslint-disable */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BarcodeDetector } from 'barcode-detector/ponyfill';
-import { supabase, SUPABASE_ANON_KEY } from './lib/supabase';
-import { useNotifications } from './hooks/useNotifications';
-import { friendlyError } from './lib/friendlyError';
+import { supabase, SUPABASE_ANON_KEY } from '../lib/supabase';
+import { useNotifications } from '../hooks/useNotifications';
+import { friendlyError } from '../lib/friendlyError';
 
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
 
-import { T, S } from './lib/theme';
-import { SkeletonRows } from './components/ui/Skeleton';
-import SwipeRow from './components/ui/SwipeRow';
+import { T, S } from '../lib/theme';
+import { SkeletonRows } from '../components/ui/Skeleton';
+import SwipeRow from '../components/ui/SwipeRow';
 import type {
   Brand,
   PackTimeCourier,
   PackTimeCamera,
   PackTimeScan,
   PackTimeScanInsert,
-} from './types/database';
+} from '../types/database';
 
 // In-memory view model for the recent-scans strip. Not a DB row.
 interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; }
