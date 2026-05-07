@@ -178,7 +178,6 @@ document.querySelectorAll('.barcode svg').forEach(function(svg){
 <\/script></body></html>`;
 };
 
-const BRAND_OPTIONS = ['BRAND NAME: TANUKA', 'BRAND NAME: FUSIONIC', 'BRAND NAME: SVARAA'];
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
 const PRODUCT_OPTIONS = ['PRODUCT DESC: Co-ord Set', 'PRODUCT DESC: Dress', 'PRODUCT DESC: Fusion Wear', 'PRODUCT DESC: Gown', 'PRODUCT DESC: Gown Set', 'PRODUCT DESC: Jumpsuit', 'PRODUCT DESC: Kurta', 'PRODUCT DESC: Kurta Set', 'PRODUCT DESC: Kurti', 'PRODUCT DESC: Lehenga Choli', 'PRODUCT DESC: Saree', 'PRODUCT DESC: Top'];
 
@@ -252,7 +251,7 @@ export default function BrandTagPrinter() {
   const fetchPage = useCallback(async () => {
     let query = supabase.from('brand_tags').select('id, brand, ean, sku, qty, mrp, size, product, color, mktd, jio_code, copies', { count: 'estimated' });
     if (search) query = query.ilike('search_text', `%${search.toLowerCase().replace(/[%_]/g, '\\$&')}%`);
-    if (brandFilter) query = query.ilike('brand', `%: ${brandFilter.replace(/[%_]/g, '\\$&')}`);
+    if (brandFilter) query = query.ilike('brand', `%${brandFilter.replace(/[%_]/g, '\\$&')}%`);
     if (sizeFilter) query = query.eq('size', sizeFilter);
     const from = btPage * btPerPage;
     const { data, count } = await query.order('created_at', { ascending: false }).range(from, from + btPerPage - 1);
@@ -304,12 +303,11 @@ export default function BrandTagPrinter() {
 
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   useEffect(() => {
-    supabase.from('brand_tags').select('brand').limit(5000).then(({ data }) => {
-      const unique = [...new Set((data || []).map((r: any) => r.brand as string))].sort();
-      setDynamicBrands(unique);
+    supabase.from('brands').select('name').eq('is_active', true).order('name').then(({ data }) => {
+      setDynamicBrands((data || []).map((r: any) => r.name as string));
     });
   }, []);
-  const brandOptions = dynamicBrands.length > 0 ? dynamicBrands : BRAND_OPTIONS;
+  const brandOptions = dynamicBrands;
   const totalPages = Math.ceil(totalCount / btPerPage);
 
   // ── Import Excel (addToast in deps for fresh closure) ──
@@ -586,12 +584,12 @@ export default function BrandTagPrinter() {
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
           <input type="text" placeholder="Search SKU, product, EAN..." value={search} onChange={e => handleSearch(e.target.value)} style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button onClick={() => setBrandFilter('')} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${!brandFilter ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: !brandFilter ? 'rgba(99,102,241,.08)' : 'transparent', color: !brandFilter ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition }}>All brands</button>
-          {brandOptions.map(b => { const n = b.replace(/^BRAND NAME:\s*/i, ''); return (
-            <button key={b} onClick={() => setBrandFilter(brandFilter === n ? '' : n)} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${brandFilter === n ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: brandFilter === n ? 'rgba(99,102,241,.08)' : 'transparent', color: brandFilter === n ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition }}>{n}</button>
-          ); })}
-          <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', outline: 'none', cursor: 'pointer' }}><option value="">All sizes</option>{SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' as any, flexWrap: 'nowrap' }}>
+          <button onClick={() => setBrandFilter('')} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${!brandFilter ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: !brandFilter ? 'rgba(99,102,241,.08)' : 'transparent', color: !brandFilter ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition, whiteSpace: 'nowrap', flexShrink: 0 }}>All</button>
+          {brandOptions.map(b => (
+            <button key={b} onClick={() => setBrandFilter(brandFilter === b ? '' : b)} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${brandFilter === b ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: brandFilter === b ? 'rgba(99,102,241,.08)' : 'transparent', color: brandFilter === b ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition, whiteSpace: 'nowrap', flexShrink: 0 }}>{b}</button>
+          ))}
+          <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', outline: 'none', cursor: 'pointer', flexShrink: 0 }}><option value="">All sizes</option>{SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
         </div>
       </div>
 
