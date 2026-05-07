@@ -1088,7 +1088,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── List View ──────────────────────────────────────────────────────────────
   return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+    <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       {/* Header */}
       <div className="challan-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Cash Challan</span>
