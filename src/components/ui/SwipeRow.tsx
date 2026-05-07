@@ -1,10 +1,11 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 
 interface Action { label: string; color: string; onClick: () => void }
 interface Props { children: React.ReactNode; actions: Action[]; hint?: boolean; hintKey?: string }
 
 const ACTION_W = 56;
 const THRESHOLD = 50;
+const SPRING = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
 const isMobile = () => 'ontouchstart' in window && window.innerWidth <= 768;
 
 const ICONS: Record<string, string> = {
@@ -28,51 +29,101 @@ const renderIcon = (label: string) => {
 const openRows = new Set<() => void>();
 
 export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
+  const rowRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
   const startY = useRef(0);
   const currentX = useRef(0);
-  const open = useRef(false);
+  const [isOpen, setIsOpen] = useState(false);
   const locked = useRef<'h' | 'v' | null>(null);
   const maxReveal = actions.length * ACTION_W;
 
   const setTranslate = useCallback((x: number, animate = false) => {
     const el = contentRef.current;
     if (!el) return;
-    el.style.transition = animate ? 'transform .25s cubic-bezier(.4,0,.2,1)' : 'none';
+    el.style.transition = animate ? `transform .3s ${SPRING}` : 'none';
     el.style.transform = `translateX(${x}px)`;
     currentX.current = x;
   }, []);
 
   const closeThisRef = useRef(() => {});
-  closeThisRef.current = () => { setTranslate(0, true); open.current = false; };
+  closeThisRef.current = () => { setTranslate(0, true); setIsOpen(false); };
   const closeThis = useCallback(() => closeThisRef.current(), []);
 
   const snap = useCallback((toOpen: boolean) => {
     if (toOpen) { openRows.forEach(fn => { if (fn !== closeThis) fn(); }); openRows.clear(); openRows.add(closeThis); } else { openRows.delete(closeThis); }
     setTranslate(toOpen ? -maxReveal : 0, true);
-    open.current = toOpen;
+    setIsOpen(toOpen);
   }, [maxReveal, setTranslate, closeThis]);
 
+  // Touch handling
   useEffect(() => {
     if (!isMobile()) return;
     const el = contentRef.current;
     if (!el) return;
-    const onStart = (e: TouchEvent) => { startX.current = e.touches[0].clientX; startY.current = e.touches[0].clientY; locked.current = null; };
+
+    const onStart = (e: TouchEvent) => {
+      startX.current = e.touches[0].clientX;
+      startY.current = e.touches[0].clientY;
+      locked.current = null;
+    };
+
     const onMove = (e: TouchEvent) => {
       const dx = e.touches[0].clientX - startX.current;
       const dy = e.touches[0].clientY - startY.current;
-      if (!locked.current) { if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return; locked.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'; if (locked.current === 'h') { openRows.forEach(fn => { if (fn !== closeThis) fn(); }); openRows.clear(); } }
+      if (!locked.current) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        locked.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+        if (locked.current === 'h') { openRows.forEach(fn => { if (fn !== closeThis) fn(); }); openRows.clear(); }
+      }
       if (locked.current !== 'h') return;
-      setTranslate(Math.max(-maxReveal, Math.min(0, (open.current ? -maxReveal : 0) + dx)));
+      const base = isOpen ? -maxReveal : 0;
+      const raw = base + dx;
+      // Elastic resistance past boundaries
+      if (raw < -maxReveal) {
+        const over = -maxReveal - raw;
+        setTranslate(-maxReveal - over * 0.2);
+      } else if (raw > 0) {
+        setTranslate(raw * 0.2);
+      } else {
+        setTranslate(raw);
+      }
     };
-    const onEnd = () => { if (locked.current !== 'h') return; snap(Math.abs(currentX.current - (open.current ? -maxReveal : 0)) > THRESHOLD ? !open.current : open.current); };
+
+    const onEnd = () => {
+      if (locked.current !== 'h') return;
+      const target = isOpen ? -maxReveal : 0;
+      const moved = Math.abs(currentX.current - target);
+      snap(moved > THRESHOLD ? !isOpen : isOpen);
+    };
+
     el.addEventListener('touchstart', onStart, { passive: true });
     el.addEventListener('touchmove', onMove, { passive: true });
     el.addEventListener('touchend', onEnd);
     return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchmove', onMove); el.removeEventListener('touchend', onEnd); openRows.delete(closeThis); };
-  }, [maxReveal, setTranslate, snap, closeThis]);
+  }, [maxReveal, setTranslate, snap, closeThis, isOpen]);
 
+  // Close on tap outside
+  useEffect(() => {
+    if (!isOpen) return;
+    const onTap = (e: PointerEvent) => {
+      if (rowRef.current && !rowRef.current.contains(e.target as Node)) snap(false);
+    };
+    document.addEventListener('pointerdown', onTap, true);
+    return () => document.removeEventListener('pointerdown', onTap, true);
+  }, [isOpen, snap]);
+
+  // Close on scroll
+  useEffect(() => {
+    if (!isOpen) return;
+    const main = document.querySelector('main');
+    if (!main) return;
+    const onScroll = () => snap(false);
+    main.addEventListener('scroll', onScroll, { passive: true, capture: true });
+    return () => main.removeEventListener('scroll', onScroll, true);
+  }, [isOpen, snap]);
+
+  // Auto-hint
   useEffect(() => {
     if (!hint || !isMobile()) return;
     const key = `swipe-hint-${hintKey || 'default'}`;
@@ -85,8 +136,8 @@ export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
   if (!isMobile()) return <>{children}</>;
 
   return (
-    <div style={{ position: 'relative', overflow: 'hidden' }}>
-      <div ref={contentRef} style={{ position: 'relative', zIndex: 1, background: '#060810' }}>
+    <div ref={rowRef} style={{ position: 'relative', overflow: 'hidden' }}>
+      <div ref={contentRef} style={{ position: 'relative', zIndex: 1, background: isOpen ? '#0d1220' : '#060810', transition: isOpen ? 'background .2s ease' : undefined }}>
         {children}
       </div>
       <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', gap: 10, paddingRight: 12, paddingLeft: 8 }}>
