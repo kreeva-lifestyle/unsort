@@ -146,6 +146,7 @@ body.modal-open { overflow: hidden !important; }
   .mobile-drawer { display: block !important; }
   .desktop-only { display: none !important; }
   .mobile-only { display: inline-flex !important; }
+  .fab { display: flex !important; position: fixed !important; bottom: 76px !important; right: 16px !important; width: 52px !important; height: 52px !important; border-radius: 50% !important; background: linear-gradient(135deg, #6366F1, #818CF8) !important; color: #fff !important; align-items: center !important; justify-content: center !important; font-size: 24px !important; font-weight: 300 !important; box-shadow: 0 6px 24px rgba(99,102,241,.45) !important; z-index: 50 !important; cursor: pointer !important; border: none !important; animation: fi .2s ease !important; }
   input[type="date"] { -webkit-appearance: textfield !important; appearance: textfield !important; min-height: 0 !important; }
   .challan-row-actions { display: none !important; }
   .bt-actions-col { display: none !important; }
@@ -181,7 +182,8 @@ body.modal-open { overflow: hidden !important; }
   .stat-hero p[style*="fontSize: 44"] { font-size: 36px !important; }
   .cat-grid { grid-template-columns: 1fr !important; }
   .three-things { grid-template-columns: 1fr !important; }
-  .modal-inner { width: calc(100vw - 16px) !important; max-height: 94vh !important; border-radius: 12px !important; }
+  .modal-inner { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; max-width: 100% !important; max-height: 85vh !important; border-radius: 14px 14px 0 0 !important; animation: slideUp .3s cubic-bezier(.2,.9,.3,1) both !important; margin: 0 !important; }
+  .modal-inner::before { content: ''; display: block; width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.15); margin: 8px auto 4px; }
   .modal-inner form { padding: 14px !important; }
   .two-col { grid-template-columns: 1fr !important; }
   .mobile-hamburger > div { min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-direction: column !important; gap: 3px !important; }
@@ -262,6 +264,7 @@ body.modal-open { overflow: hidden !important; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
 .mobile-only { display: none; }
+.fab { display: none; }
 .inv-mobile { display: none; }
 .inv-extra-mobile { display: none; }
 .scan-history-mobile { display: none; }

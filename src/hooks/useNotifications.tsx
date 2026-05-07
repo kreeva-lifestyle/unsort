@@ -25,12 +25,21 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const fetchNotifications = async () => {
     if (!user) return;
     const { data, error } = await supabase.from('notifications').select('id, user_id, title, message, type, entity_id, is_read, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50);
-    if (!error) setNotifications(data || []);
+    if (!error) {
+      setNotifications(data || []);
+      try { const c = (data || []).filter((n: any) => !n.is_read).length; (navigator as any).setAppBadge?.(c || undefined); if (!c) (navigator as any).clearAppBadge?.(); } catch {}
+    }
   };
 
   const markAsRead = async (id: string) => {
     const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
-    if (!error) setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+    if (!error) {
+      setNotifications((prev) => {
+        const next = prev.map((n) => (n.id === id ? { ...n, is_read: true } : n));
+        try { const c = next.filter((n: any) => !n.is_read).length; (navigator as any).setAppBadge?.(c || undefined); if (!c) (navigator as any).clearAppBadge?.(); } catch {}
+        return next;
+      });
+    }
   };
 
   const addToast = (message: string, type = 'info') => {
