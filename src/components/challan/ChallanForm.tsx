@@ -122,7 +122,7 @@ export default function ChallanForm(p: ChallanFormProps) {
         {p.isReturn && !p.editing && !p.returnSource && (
           <div style={{ background: 'rgba(239,68,68,.04)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 10, padding: 14, marginBottom: 12 }}>
             <label style={{ ...lbl, color: T.re }}>Select Original Invoice *</label>
-            <input type="text" value={p.returnSearchQ} onChange={e => { p.setReturnSearchQ(e.target.value); p.searchReturnSource(e.target.value); }}
+            <input type="text" value={p.returnSearchQ} onChange={e => { p.setReturnSearchQ(e.target.value); clearTimeout(searchTimeout.current); searchTimeout.current = setTimeout(() => p.searchReturnSource(e.target.value), 300); }}
               placeholder="Search by challan # or customer name..." style={inp} autoFocus />
             {p.returnResults.length > 0 && <div style={{ marginTop: 6, border: `1px solid ${T.bd}`, borderRadius: 6, maxHeight: 200, overflowY: 'auto' }}>
               {p.returnResults.map(c => (
