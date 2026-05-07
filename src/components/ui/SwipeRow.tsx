@@ -3,7 +3,7 @@ import { useRef, useEffect, useCallback } from 'react';
 interface Action { label: string; color: string; onClick: () => void }
 interface Props { children: React.ReactNode; actions: Action[]; hint?: boolean; hintKey?: string }
 
-const ACTION_W = 64;
+const ACTION_W = 56;
 const THRESHOLD = 50;
 const isMobile = () => 'ontouchstart' in window && window.innerWidth <= 768;
 
@@ -19,7 +19,7 @@ const renderIcon = (label: string) => {
   const s = { width: 20, height: 20, fill: 'none' as const, stroke: '#fff', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   if (label === 'View') return <svg viewBox="0 0 24 24" style={s}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7z" /><circle cx="12" cy="12" r="3" /></svg>;
   if (ICONS[label]) return <svg viewBox="0 0 24 24" style={s}><path d={ICONS[label]} /></svg>;
-  return null;
+  return <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{label}</span>;
 };
 
 const openRows = new Set<() => void>();
@@ -46,13 +46,7 @@ export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
   const closeThis = useCallback(() => closeThisRef.current(), []);
 
   const snap = useCallback((toOpen: boolean) => {
-    if (toOpen) {
-      openRows.forEach(fn => { if (fn !== closeThis) fn(); });
-      openRows.clear();
-      openRows.add(closeThis);
-    } else {
-      openRows.delete(closeThis);
-    }
+    if (toOpen) { openRows.forEach(fn => { if (fn !== closeThis) fn(); }); openRows.clear(); openRows.add(closeThis); } else { openRows.delete(closeThis); }
     setTranslate(toOpen ? -maxReveal : 0, true);
     open.current = toOpen;
   }, [maxReveal, setTranslate, closeThis]);
@@ -69,7 +63,7 @@ export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
       if (locked.current !== 'h') return;
       setTranslate(Math.max(-maxReveal, Math.min(0, (open.current ? -maxReveal : 0) + dx)));
     };
-    const onEnd = () => { if (locked.current !== 'h') return; const moved = Math.abs(currentX.current - (open.current ? -maxReveal : 0)); snap(moved > THRESHOLD ? !open.current : open.current); };
+    const onEnd = () => { if (locked.current !== 'h') return; snap(Math.abs(currentX.current - (open.current ? -maxReveal : 0)) > THRESHOLD ? !open.current : open.current); };
     el.addEventListener('touchstart', onStart, { passive: true });
     el.addEventListener('touchmove', onMove, { passive: true });
     el.addEventListener('touchend', onEnd);
@@ -92,10 +86,10 @@ export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
       <div ref={contentRef} style={{ position: 'relative', zIndex: 1, background: '#060810' }}>
         {children}
       </div>
-      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, display: 'flex' }}>
+      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', gap: 10, paddingRight: 12, paddingLeft: 8 }}>
         {actions.map((a, i) => (
-          <div key={i} onClick={() => { a.onClick(); snap(false); }} style={{ width: ACTION_W, display: 'flex', alignItems: 'center', justifyContent: 'center', background: a.color, cursor: 'pointer' }}>
-            {renderIcon(a.label) || <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{a.label}</span>}
+          <div key={i} onClick={() => { a.onClick(); snap(false); }} style={{ width: 42, height: 42, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: a.color, cursor: 'pointer', flexShrink: 0 }}>
+            {renderIcon(a.label)}
           </div>
         ))}
       </div>
