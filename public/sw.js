@@ -1,4 +1,4 @@
-const CACHE = 'dailyoffice-v4';
+const CACHE = 'dailyoffice-v5';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
