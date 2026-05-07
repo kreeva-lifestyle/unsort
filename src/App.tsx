@@ -17,13 +17,17 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: an
   }
 }
 
-const BrandTagPrinter = lazy(() => import('./pages/BrandTags'));
-const PackTime = lazy(() => import('./pages/PackTime'));
-const CashChallan = lazy(() => import('./pages/CashChallan'));
-const SettingsPage = lazy(() => import('./pages/Settings'));
-const Inventory = lazy(() => import('./pages/Inventory'));
-const ProgramsModule = lazy(() => import('./modules/programs'));
-const LazyPublicShareView = lazy(() => import('./modules/programs/PublicShareView'));
+const retryImport = (fn: () => Promise<any>) => lazy(() =>
+  fn().catch(() => { window.location.reload(); return new Promise(() => {}); })
+);
+
+const BrandTagPrinter = retryImport(() => import('./pages/BrandTags'));
+const PackTime = retryImport(() => import('./pages/PackTime'));
+const CashChallan = retryImport(() => import('./pages/CashChallan'));
+const SettingsPage = retryImport(() => import('./pages/Settings'));
+const Inventory = retryImport(() => import('./pages/Inventory'));
+const ProgramsModule = retryImport(() => import('./modules/programs'));
+const LazyPublicShareView = retryImport(() => import('./modules/programs/PublicShareView'));
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import SidebarComponent from './components/layout/Sidebar';
