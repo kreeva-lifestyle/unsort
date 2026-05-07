@@ -801,41 +801,40 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         </div>
       </div>
 
-      {/* Unicommerce Order Stats */}
-      <div style={{ maxWidth: 420 }}>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16 }}>
+      <div style={{ maxWidth: 420, margin: '0 auto' }}>
+        <div style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '22px 20px', boxShadow: '0 4px 24px rgba(0,0,0,.2)' }}>
           {/* Brand */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5 }}>Brand Name</label>
-            <select value={selectedBrand} onChange={e => setSelectedBrand(e.target.value)} style={{ ...S.fInput, cursor: 'pointer' }}>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: T.tx2, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 7 }}>Brand Name</label>
+            <select value={selectedBrand} onChange={e => setSelectedBrand(e.target.value)} style={{ ...S.fInput, height: 44, fontSize: 14, cursor: 'pointer', border: `1px solid ${T.bd2}` }}>
               <option value="">Select brand...</option>
               {brands.map(b => <option key={b} value={b}>{b}</option>)}
             </select>
           </div>
 
           {/* Courier */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5 }}>Courier Company</label>
-            <select value={courier} onChange={e => setCourier(e.target.value)} style={{ ...S.fInput, cursor: 'pointer' }}>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: T.tx2, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 7 }}>Courier Company</label>
+            <select value={courier} onChange={e => setCourier(e.target.value)} style={{ ...S.fInput, height: 44, fontSize: 14, cursor: 'pointer', border: `1px solid ${T.bd2}` }}>
               <option value="">Select courier...</option>
               {couriers.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
-            {couriers.length === 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 4 }}>No couriers configured. Add them in Settings → PackStation.</div>}
+            {couriers.length === 0 && <div style={{ fontSize: 11, color: T.yl, marginTop: 6 }}>No couriers configured. Add in Settings → PackStation.</div>}
           </div>
 
           {/* Camera */}
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5 }}>Camera Number</label>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(cameras.length, 4)}, 1fr)`, gap: 8 }}>
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: T.tx2, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 7 }}>Camera Number</label>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(cameras.length, 4)}, 1fr)`, gap: 10 }}>
               {cameras.map(c => (
-                <div key={c.id} onClick={() => setCamera(c.number)} style={{ padding: '12px 0', borderRadius: 8, textAlign: 'center', fontSize: 16, fontWeight: 700, fontFamily: T.mono, cursor: 'pointer', transition: 'all .15s', background: camera === c.number ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'rgba(255,255,255,0.03)', color: camera === c.number ? '#fff' : T.tx3, border: `1px solid ${camera === c.number ? T.ac + '44' : T.bd}`, boxShadow: camera === c.number ? `0 4px 16px ${T.ac}33` : 'none' }}>{c.number}</div>
+                <div key={c.id} onClick={() => setCamera(c.number)} style={{ padding: '14px 0', borderRadius: 10, textAlign: 'center', fontSize: 18, fontWeight: 700, fontFamily: T.mono, cursor: 'pointer', transition: 'all .2s', background: camera === c.number ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.04)', color: camera === c.number ? '#fff' : T.tx2, border: `1px solid ${camera === c.number ? T.ac + '55' : T.bd2}`, boxShadow: camera === c.number ? `0 6px 20px ${T.ac}40` : 'none' }}>{c.number}</div>
               ))}
             </div>
-            {cameras.length === 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 4 }}>No cameras configured. Add them in Settings → PackStation.</div>}
+            {cameras.length === 0 && <div style={{ fontSize: 11, color: T.yl, marginTop: 6 }}>No cameras configured. Add in Settings → PackStation.</div>}
           </div>
 
-          <button onClick={handleStart} disabled={!selectedBrand || !courier || !camera || verifying} style={{ width: '100%', padding: '13px 0', borderRadius: 10, border: 'none', fontSize: 14, fontWeight: 700, fontFamily: T.sans, cursor: selectedBrand && courier && camera && !verifying ? 'pointer' : 'not-allowed', background: selectedBrand && courier && camera && !verifying ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.05)', color: selectedBrand && courier && camera ? '#fff' : T.tx3, boxShadow: selectedBrand && courier && camera && !verifying ? `0 4px 20px ${T.ac}40` : 'none', transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            {verifying && <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'btnSpin .6s linear infinite' }} />}
+          <button onClick={handleStart} disabled={!selectedBrand || !courier || !camera || verifying} style={{ width: '100%', padding: '16px 0', borderRadius: 12, border: 'none', fontSize: 16, fontWeight: 700, fontFamily: T.sora, cursor: selectedBrand && courier && camera && !verifying ? 'pointer' : 'not-allowed', background: selectedBrand && courier && camera && !verifying ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.06)', color: selectedBrand && courier && camera ? '#fff' : T.tx3, boxShadow: selectedBrand && courier && camera && !verifying ? `0 6px 24px ${T.ac}44` : 'none', transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: 0.3 }}>
+            {verifying && <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'btnSpin .6s linear infinite' }} />}
             {verifying ? 'Verifying Sheet...' : 'Start Scanning'}
           </button>
 
