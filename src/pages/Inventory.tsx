@@ -16,7 +16,6 @@ import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 // Status indicator — dot + plain label. Previous pills-with-bg were noisy in the
 // list view per audit P2; reserve pill treatment for modals.
 const STATUS_DOT_COLOR: Record<string, string> = {
-  complete: '#4ADE80',
   completed: '#4ADE80',
   damaged: '#FCA5A5',
   unsorted: '#FCD34D',
@@ -44,9 +43,7 @@ const canAlterSize = (a: string, b: string): boolean => {
   if (ai === -1 || bi === -1) return false;
   return Math.abs(ai - bi) === 1;
 };
-const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
-const isLehenga = (name: string) => /lehenga|lehnga|ghaghra/i.test(name);
-const isBottomType = (name: string) => /bottom|pant|trouser|skirt|salwar|churidar|palazzo/i.test(name);
+import { isDupatta, isLehenga, isBottomType } from '../lib/garmentHelpers';
 
 export default function Inventory({ openItemId, onItemOpened, active }: { openItemId?: string | null; onItemOpened?: () => void; active?: boolean }) {
   const [stage, setStage] = useState<'pending' | 'completed'>('pending');
@@ -334,7 +331,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       if (error) { addToast(friendlyError(error), 'error'); return; }
       if (form.status === 'unsorted' || form.status === 'damaged' || form.status === 'dry_clean') {
         await updateComponentStatuses(selected.id);
-      } else if (form.status === 'complete' || form.status === 'completed') {
+      } else if (form.status === 'completed') {
         // Marking item complete = all components are present. Otherwise the item
         // shows as completed while still flagging "Missing: X" — contradiction.
         const { error: cErr } = await supabase.from('item_components').update({ status: 'present' }).eq('inventory_item_id', selected.id);
@@ -791,7 +788,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             <td style={{ ...S.tdStyle, fontSize: 11, maxWidth: 140 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 25 ? item.notes.slice(0, 25) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
 
             <td style={S.tdStyle}><span style={statusTag(item.status)}><span style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor', boxShadow: `0 0 4px currentColor`, flexShrink: 0 }} /><span style={{ textTransform: 'capitalize' }}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></span></td>
-            <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(251,191,36,.08)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(248,113,113,.08)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 10 }}>{item.status === 'completed' || item.status === 'complete' ? 'All good' : '—'}</span>}</td>
+            <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(251,191,36,.08)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(248,113,113,.08)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 10 }}>{item.status === 'completed' ? 'All good' : '—'}</span>}</td>
             <td style={S.tdStyle}>
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                 <span onClick={() => openComps(item)} style={{ ...S.btnPrimary, ...S.btnSm }}>View</span>

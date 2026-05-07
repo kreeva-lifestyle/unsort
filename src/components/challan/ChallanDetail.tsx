@@ -7,13 +7,7 @@ import type { CashChallan, CashChallanItem } from '../../types/database';
 
 type Challan = CashChallan & { cash_challan_items?: Partial<CashChallanItem>[] };
 
-const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  draft: { bg: 'rgba(56,189,248,.10)', color: T.bl },
-  paid: { bg: 'rgba(34,197,94,.10)', color: T.gr },
-  unpaid: { bg: 'rgba(239,68,68,.10)', color: T.re },
-  partial: { bg: 'rgba(245,158,11,.10)', color: T.yl },
-  voided: { bg: 'rgba(255,255,255,.10)', color: T.tx3 },
-};
+import { CHALLAN_STATUS_COLORS as STATUS_COLORS } from '../../lib/theme';
 
 interface Props {
   challan: Challan;

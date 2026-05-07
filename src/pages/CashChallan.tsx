@@ -25,7 +25,7 @@ const ccAuditLog = async (action: string, recordId: string, details: string, cha
   await supabase.from('audit_log').insert({ action, module: 'cash_challan', record_id: recordId, details, user_id: user?.id ?? null, user_email: userName, changes: changes || null });
 };
 
-import { T, S } from '../lib/theme';
+import { T, S, CHALLAN_STATUS_COLORS as STATUS_COLORS } from '../lib/theme';
 
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
 
@@ -46,13 +46,6 @@ type Challan = Omit<CashChallan, 'created_at' | 'updated_at'> & {
 // Narrow customer row used by the auto-suggest dropdown.
 type Customer = Pick<CashChallanCustomer, 'id' | 'name' | 'phone' | 'address'>;
 
-const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  draft: { bg: 'rgba(56,189,248,.10)', color: T.bl },
-  paid: { bg: 'rgba(34,197,94,.10)', color: T.gr },
-  unpaid: { bg: 'rgba(239,68,68,.10)', color: T.re },
-  partial: { bg: 'rgba(245,158,11,.10)', color: T.yl },
-  voided: { bg: 'rgba(255,255,255,.10)', color: T.tx3 },
-};
 
 
 export default function CashChallan({ active }: { active?: boolean } = {}) {

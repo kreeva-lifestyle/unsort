@@ -15,9 +15,7 @@ import type {
 } from '../types/database';
 
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
-const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
-const isLehenga = (name: string) => /lehenga|lehnga|ghaghra/i.test(name);
-const isBottomType = (name: string) => /bottom|pant|trouser|skirt|salwar|churidar|palazzo/i.test(name);
+import { isDupatta, isLehenga, isBottomType } from '../lib/garmentHelpers';
 
 // View model: narrowed inventory_items row for the matching UI.
 type InventoryItemMatch = Pick<InventoryItem, 'id' | 'batch_number' | 'serial_number' | 'size' | 'location' | 'status'>;
