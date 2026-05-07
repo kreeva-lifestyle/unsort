@@ -64,6 +64,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const updateSearch = (val: string) => { setSearch(val); clearTimeout(searchTimer.current); searchTimer.current = setTimeout(() => setDebouncedSearch(val), 400); };
   const [statusFilter, setStatusFilter] = useState('');
   const [tagFilter, setTagFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -192,8 +195,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const fetchChallans = useCallback(async () => {
     setLoading(true);
     let query = supabase.from('cash_challans').select('*, cash_challan_items(sku, quantity, price, discount_amount, total)', { count: 'estimated' });
-    if (search) {
-      const s = search.replace(/[%_,().]/g, '');
+    if (debouncedSearch) {
+      const s = debouncedSearch.replace(/[%_,().]/g, '');
       const num = parseInt(s);
       if (!isNaN(num)) query = query.eq('challan_number', num);
       else if (s.trim()) query = query.ilike('customer_name', `%${s}%`);
@@ -207,7 +210,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setChallans((data as Challan[] | null) || []);
     setTotalCount(count || 0);
     setLoading(false);
-  }, [search, statusFilter, tagFilter, dateFrom, dateTo, page, pageSize]);
+  }, [debouncedSearch, statusFilter, tagFilter, dateFrom, dateTo, page, pageSize]);
 
   useEffect(() => { fetchChallans(); }, [fetchChallans]);
 
@@ -1110,7 +1113,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         totalCount={totalCount}
         statusColors={STATUS_COLORS}
         search={search}
-        onSearchChange={setSearch}
+        onSearchChange={updateSearch}
         showFilters={showFilters}
         onToggleFilters={() => setShowFilters(f => !f)}
         statusFilter={statusFilter}
