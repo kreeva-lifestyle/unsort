@@ -1,5 +1,5 @@
 // Service worker for PWA — cache-first for static assets, network-first for API
-const CACHE = 'dailyoffice-v2';
+const CACHE = 'dailyoffice-v3';
 const STATIC = ['/', '/index.html'];
 
 self.addEventListener('install', e => {
