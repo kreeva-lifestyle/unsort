@@ -62,7 +62,7 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
             <div style={{ width: 44, height: 44, borderRadius: 12, background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.sora, fontWeight: 800, fontSize: 22, color: '#fff', boxShadow: `0 10px 30px ${T.ac}55`, flexShrink: 0 }}>D</div>
             <div>
               <div style={{ fontFamily: T.sora, fontSize: 22, fontWeight: 700, color: T.tx, letterSpacing: -0.4 }}>DailyOffice</div>
-              <div style={{ fontSize: 11, color: T.tx3, fontFamily: T.mono, marginTop: 2 }}>by Arya Designs</div>
+              <div style={{ fontSize: 11, color: T.tx3, fontFamily: T.mono, marginTop: 2 }}>Your Workspace, Simplified</div>
             </div>
           </div>
           <h1 style={{ fontFamily: T.sora, fontSize: 42, fontWeight: 700, color: T.tx, letterSpacing: -1, lineHeight: 1.05, maxWidth: 520, margin: 0 }}>
@@ -79,7 +79,7 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
           <div className="login-mobile-brand" style={{ display: 'none', textAlign: 'center', marginBottom: 28 }}>
             <div style={{ width: 56, height: 56, borderRadius: 14, background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.sora, fontWeight: 800, fontSize: 28, color: '#fff', boxShadow: `0 10px 30px ${T.ac}55`, marginBottom: 14 }}>D</div>
             <div style={{ fontFamily: T.sora, fontSize: 20, fontWeight: 700, color: T.tx, letterSpacing: -0.3 }}>DailyOffice</div>
-            <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>by Arya Designs</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>Your Workspace, Simplified</div>
           </div>
 
           <div style={{ marginBottom: 24 }}>

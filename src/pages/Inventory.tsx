@@ -16,7 +16,6 @@ import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 // Status indicator — dot + plain label. Previous pills-with-bg were noisy in the
 // list view per audit P2; reserve pill treatment for modals.
 const STATUS_DOT_COLOR: Record<string, string> = {
-  complete: '#4ADE80',
   completed: '#4ADE80',
   damaged: '#FCA5A5',
   unsorted: '#FCD34D',
@@ -44,9 +43,7 @@ const canAlterSize = (a: string, b: string): boolean => {
   if (ai === -1 || bi === -1) return false;
   return Math.abs(ai - bi) === 1;
 };
-const isDupatta = (name: string) => /dup+at*a|orhni|chunni|stole/i.test(name);
-const isLehenga = (name: string) => /lehenga|lehnga|ghaghra/i.test(name);
-const isBottomType = (name: string) => /bottom|pant|trouser|skirt|salwar|churidar|palazzo/i.test(name);
+import { isDupatta, isLehenga, isBottomType } from '../lib/garmentHelpers';
 
 export default function Inventory({ openItemId, onItemOpened, active }: { openItemId?: string | null; onItemOpened?: () => void; active?: boolean }) {
   const [stage, setStage] = useState<'pending' | 'completed'>('pending');
@@ -334,7 +331,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       if (error) { addToast(friendlyError(error), 'error'); return; }
       if (form.status === 'unsorted' || form.status === 'damaged' || form.status === 'dry_clean') {
         await updateComponentStatuses(selected.id);
-      } else if (form.status === 'complete' || form.status === 'completed') {
+      } else if (form.status === 'completed') {
         // Marking item complete = all components are present. Otherwise the item
         // shows as completed while still flagging "Missing: X" — contradiction.
         const { error: cErr } = await supabase.from('item_components').update({ status: 'present' }).eq('inventory_item_id', selected.id);
@@ -404,23 +401,36 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     if (filtered.length === 0) return;
     const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
     const rows = filtered.map(i => `<tr><td>${esc(i.serial_number || '—')}</td><td>${esc(i.products?.name || '—')}</td><td>${esc(i.size || '—')}</td><td>${esc(i.location || '—')}</td><td>${esc((i as any).manufacturer || '—')}</td><td style="text-transform:capitalize">${esc(i.status === 'dry_clean' ? 'Dry Clean' : i.status)}</td></tr>`).join('');
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Inventory Report</title><style>
-      body{font-family:Arial,sans-serif;margin:16px;color:#222;font-size:11px}
-      h2{margin:0 0 4px;font-size:16px} .sub{color:#666;font-size:10px;margin-bottom:12px}
-      table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:5px 8px;text-align:left;font-size:10px}
-      th{background:#f5f5f5;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-size:9px}
-      .footer{text-align:center;font-size:8px;color:#aaa;margin-top:16px}
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inventory Report</title><style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#060810;color:#E2E8F0;padding:16px;padding-bottom:80px;-webkit-text-size-adjust:100%}
+      .header{margin-bottom:16px}
+      .brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+      .logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#6366F1,#38BDF8);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff}
+      .title{font-size:15px;font-weight:700;letter-spacing:-0.3px}
+      .sub{font-size:10px;color:#6B7890;letter-spacing:0.5px}
+      .meta{display:flex;gap:12px;font-size:10px;color:#8896B0;margin-top:8px}
+      .meta span{padding:3px 8px;border-radius:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
+      table{width:100%;border-collapse:collapse;margin-top:4px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.06)}
+      th{background:rgba(255,255,255,.03);font-size:9px;font-weight:600;color:#6B7890;text-transform:uppercase;letter-spacing:0.8px;padding:10px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)}
+      td{padding:9px 10px;font-size:11px;color:#8896B0;border-bottom:1px solid rgba(255,255,255,.04)}
+      tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+      .footer{text-align:center;font-size:8px;color:#4A5568;margin-top:16px;letter-spacing:1px;text-transform:uppercase}
+      .no-print{position:fixed;bottom:0;left:0;right:0;padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));background:rgba(8,11,20,.95);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid rgba(255,255,255,.06);display:flex;gap:10px;justify-content:center;z-index:10}
+      .btn{padding:12px 28px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer}
+      .btn-primary{background:linear-gradient(135deg,#6366F1,#818CF8);color:#fff;box-shadow:0 4px 16px rgba(99,102,241,.35)}
       @page{size:A4 landscape;margin:8mm}
-      @media print{body{margin:0}}
+      @media print{body{background:#fff;color:#222;padding:8mm}.no-print{display:none!important}th{background:#f5f5f5;color:#333}td{color:#444;border-color:#eee}.footer{color:#999}.brand .logo{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
     </style></head><body>
-    <h2>Arya Designs — Inventory Report</h2>
-    <div class="sub">${filtered.length} items · ${isCompletedView ? 'Completed' : 'Active'} · ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+    <div class="header">
+      <div class="brand"><div class="logo">D</div><div><div class="title">Inventory Report</div><div class="sub">Arya Designs</div></div></div>
+      <div class="meta"><span>${filtered.length} items</span><span>${isCompletedView ? 'Completed' : 'Active'}</span><span>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
+    </div>
     <table><thead><tr><th>SKU</th><th>Category</th><th>Size</th><th>Location</th><th>Manufacturer</th><th>Status</th></tr></thead>
     <tbody>${rows}</tbody></table>
-    <div class="no-print" style="position:fixed;bottom:0;left:0;right:0;padding:10px;background:#f5f5f5;display:flex;gap:8px;justify-content:center;border-top:1px solid #ddd">
-      <button onclick="window.print()" style="padding:12px 28px;border-radius:8px;border:none;background:#6366F1;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Print / Share</button>
+    <div class="no-print">
+      <button class="btn btn-primary" onclick="window.print()">Print / Share</button>
     </div>
-    <style>@media print{.no-print{display:none!important}}</style>
     <div class="footer">Powered by DailyOffice</div>
     </body></html>`;
     setExportPdfHtml(html);
@@ -791,7 +801,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             <td style={{ ...S.tdStyle, fontSize: 11, maxWidth: 140 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 25 ? item.notes.slice(0, 25) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
 
             <td style={S.tdStyle}><span style={statusTag(item.status)}><span style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor', boxShadow: `0 0 4px currentColor`, flexShrink: 0 }} /><span style={{ textTransform: 'capitalize' }}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></span></td>
-            <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(251,191,36,.08)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(248,113,113,.08)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 10 }}>{item.status === 'completed' || item.status === 'complete' ? 'All good' : '—'}</span>}</td>
+            <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(251,191,36,.08)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(248,113,113,.08)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 10 }}>{item.status === 'completed' ? 'All good' : '—'}</span>}</td>
             <td style={S.tdStyle}>
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                 <span onClick={() => openComps(item)} style={{ ...S.btnPrimary, ...S.btnSm }}>View</span>
@@ -1124,10 +1134,14 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       </>}
       <ConfirmModal {...confirmModalProps} />
       {exportPdfHtml && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
-          <iframe srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%' }} />
-          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: '#f5f5f5', borderTop: '1px solid #ddd', display: 'flex', justifyContent: 'center' }}>
-            <button onClick={() => setExportPdfHtml(null)} style={{ padding: '12px 32px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#333', fontSize: 14, cursor: 'pointer', fontWeight: 500 }}>Close</button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#060810', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+          <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', fontFamily: "'Sora',sans-serif" }}>Export Preview</span>
+            <button onClick={() => setExportPdfHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
+          </div>
+          <iframe srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#fff' }} />
+          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', justifyContent: 'center' }}>
+            <button onClick={() => setExportPdfHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>Close</button>
           </div>
         </div>,
         document.body
