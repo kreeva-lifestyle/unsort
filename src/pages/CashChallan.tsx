@@ -711,7 +711,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         <div><span>Total Paid</span><span style="color:#38a169">₹${totalPaid.toLocaleString('en-IN')}</span></div>
         <div class="final"><span>Outstanding</span><span>₹${outstanding.toLocaleString('en-IN')}</span></div>
       </div>
-      <div class="footer">DailyOffice — Your Workspace, Simplified</div>
+      <div class="footer">Powered by DailyOffice</div>
     </body></html>`;
     setLedgerPdfTitle(customerName);
     setLedgerPdfHtml(html);
