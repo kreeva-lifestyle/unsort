@@ -1,11 +1,20 @@
 import { useRef, useEffect, useCallback } from 'react';
 
-interface Action { label: string; color: string; onClick: () => void }
+interface Action { label: string; icon?: string; color: string; onClick: () => void }
 interface Props { children: React.ReactNode; actions: Action[]; hint?: boolean; hintKey?: string }
 
-const ACTION_W = 56;
+const ACTION_W = 68;
 const THRESHOLD = 50;
 const isMobile = () => 'ontouchstart' in window && window.innerWidth <= 768;
+
+const ICONS: Record<string, string> = {
+  View:   'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8zm11 3a3 3 0 100-6 3 3 0 000 6z',
+  Edit:   'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z',
+  Del:    'M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2',
+  Delete: 'M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2',
+  Add:    'M12 5v14M5 12h14',
+  Remove: 'M5 12h14',
+};
 
 const openRows = new Set<() => void>();
 
@@ -105,10 +114,14 @@ export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
       <div ref={contentRef} style={{ position: 'relative', zIndex: 1, background: '#060810' }}>
         {children}
       </div>
-      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, display: 'flex' }}>
+      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', gap: 6, paddingRight: 10 }}>
         {actions.map((a, i) => (
-          <div key={i} onClick={a.onClick} style={{ width: ACTION_W, display: 'flex', alignItems: 'center', justifyContent: 'center', background: a.color, color: '#fff', fontSize: 9, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3 }}>
-            {a.label}
+          <div key={i} onClick={() => { a.onClick(); snap(false); }} style={{ width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: a.color, cursor: 'pointer', boxShadow: `0 2px 8px ${a.color}44`, flexShrink: 0 }}>
+            {ICONS[a.label] ? (
+              <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: 'none', stroke: '#fff', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }}><path d={ICONS[a.label]} /></svg>
+            ) : (
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', letterSpacing: 0.3 }}>{a.label}</span>
+            )}
           </div>
         ))}
       </div>
