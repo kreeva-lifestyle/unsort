@@ -138,6 +138,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [ledgerFrom, setLedgerFrom] = useState('');
   const [ledgerTo, setLedgerTo] = useState('');
 
+  useEffect(() => {
+    const hasModal = showModal || !!viewingChallan || !!printHtml || !!confirmAction || showBulkPay || showBulkUnpay || !!ledgerPdfHtml;
+    document.body.classList.toggle('modal-open', hasModal);
+    return () => { document.body.classList.remove('modal-open'); };
+  }, [showModal, viewingChallan, printHtml, confirmAction, showBulkPay, showBulkUnpay, ledgerPdfHtml]);
 
   // ── Computed values (per-item discount) ─────────────────────────────────
   // Honest math throughout — no silent clamping. If the user enters an

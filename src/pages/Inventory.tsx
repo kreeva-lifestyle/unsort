@@ -102,6 +102,12 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const [invLimit, setInvLimit] = useState(5000);
   const [invTruncated, setInvTruncated] = useState(false);
 
+  useEffect(() => {
+    const hasModal = showModal || showCompModal || !!matchResult || !!showCompleteModal || showIntel || !!exportPdfHtml;
+    document.body.classList.toggle('modal-open', hasModal);
+    return () => { document.body.classList.remove('modal-open'); };
+  }, [showModal, showCompModal, matchResult, showCompleteModal, showIntel, exportPdfHtml]);
+
   useEffect(() => { if (active) setShowExtras(false); }, [active]);
 
   const fetchData = () => {

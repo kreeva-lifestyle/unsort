@@ -16,6 +16,11 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
   const [inviteResult, setInviteResult] = useState<{ email: string; password: string } | null>(null);
   const { ask, modalProps } = useConfirm();
 
+  useEffect(() => {
+    document.body.classList.toggle('modal-open', showInvite);
+    return () => { document.body.classList.remove('modal-open'); };
+  }, [showInvite]);
+
   const fetchUsers = () => { supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').order('created_at', { ascending: false }).then(({ data }) => setUsers(data || [])); };
   useEffect(() => {
     fetchUsers();
