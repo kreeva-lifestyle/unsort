@@ -26,13 +26,14 @@ body {
 /* Momentum scroll + rubber-band overscroll */
 main { -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
 
-/* Button press feedback — spring bounce */
-@keyframes btnBump { 0% { transform: scale(1); } 40% { transform: scale(0.92); } 70% { transform: scale(1.05); } 100% { transform: scale(1); } }
-button:active, [role="button"]:active { animation: btnBump 250ms cubic-bezier(.4,0,.2,1); }
+/* Button press feedback — bump for buttons, dim for clickable areas */
+@keyframes btnBump { 0% { transform: scale(1); } 40% { transform: scale(0.93); } 70% { transform: scale(1.04); } 100% { transform: scale(1); } }
+button:active, [role="button"]:active { animation: btnBump 200ms cubic-bezier(.4,0,.2,1); }
+[style*="pointer"]:active { filter: brightness(0.8); transition: filter 80ms ease; }
 
 /* Page transitions — slide-in from right (app-like) */
 .page-pad, main > div > div { animation: pageIn 220ms cubic-bezier(.2,.9,.3,1) both; }
-@keyframes pageIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes pageIn { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
 
 /* Prevent iOS zoom on input focus — force 16px minimum on mobile */
 @media (max-width: 768px) {
@@ -99,6 +100,7 @@ tbody tr:hover { background: rgba(99,102,241,0.04); }
 @keyframes fi { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes su { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes toastIn { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes toastInTop { from { opacity: 0; transform: translateY(-8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes loginBoxEnter { from { opacity: 0; transform: translateY(24px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes loginGlowFloat { 0% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-20px) scale(1.1); } 100% { transform: translate(-20px,30px) scale(.95); } }
 @keyframes loginGlowIn { from { opacity: 0; transform: scale(.8); } to { opacity: .12; transform: scale(1); } }
@@ -145,7 +147,7 @@ body.modal-open { overflow: hidden !important; }
   .mobile-drawer { display: block !important; }
   .desktop-only { display: none !important; }
   .mobile-only { display: inline-flex !important; }
-  .fab { display: flex !important; position: fixed !important; bottom: 76px !important; right: 16px !important; width: 52px !important; height: 52px !important; border-radius: 50% !important; background: linear-gradient(135deg, #6366F1, #818CF8) !important; color: #fff !important; align-items: center !important; justify-content: center !important; font-size: 24px !important; font-weight: 300 !important; box-shadow: 0 6px 24px rgba(99,102,241,.45) !important; z-index: 50 !important; cursor: pointer !important; border: none !important; animation: fi .2s ease !important; }
+  .fab { display: flex !important; position: fixed !important; bottom: calc(68px + env(safe-area-inset-bottom, 0)) !important; right: 16px !important; width: 52px !important; height: 52px !important; border-radius: 50% !important; background: linear-gradient(135deg, #6366F1, #818CF8) !important; color: #fff !important; align-items: center !important; justify-content: center !important; font-size: 24px !important; font-weight: 300 !important; box-shadow: 0 6px 24px rgba(99,102,241,.45) !important; z-index: 50 !important; cursor: pointer !important; border: none !important; animation: fi .2s ease !important; }
   input[type="date"] { -webkit-appearance: textfield !important; appearance: textfield !important; min-height: 0 !important; }
   .challan-row-actions { display: none !important; }
   .bt-actions-col { display: none !important; }
@@ -156,6 +158,7 @@ body.modal-open { overflow: hidden !important; }
   .inv-more-content { display: none !important; }
   .challan-filter-btns { flex: 0 !important; }
   .toast-container { top: calc(12px + env(safe-area-inset-top, 0)) !important; bottom: auto !important; left: 12px !important; right: 12px !important; }
+  .toast-item { animation: toastInTop .25s cubic-bezier(.2,.9,.3,1) !important; }
   .challan-pagination, .inv-pagination, .bt-pagination, .prg-pagination, .scan-pagination { padding-bottom: 70px !important; }
   .inv-extra-filters { flex-direction: column !important; }
   .inv-extra-filters input, .inv-extra-filters select { max-width: none !important; width: 100% !important; }
@@ -181,7 +184,7 @@ body.modal-open { overflow: hidden !important; }
   .stat-hero p[style*="fontSize: 44"] { font-size: 36px !important; }
   .cat-grid { grid-template-columns: 1fr !important; }
   .three-things { grid-template-columns: 1fr !important; }
-  .modal-inner { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; max-width: 100% !important; max-height: 85vh !important; border-radius: 14px 14px 0 0 !important; animation: slideUp .3s cubic-bezier(.2,.9,.3,1) both !important; margin: 0 !important; }
+  .modal-inner { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; max-width: 100% !important; max-height: 85vh !important; border-radius: 14px 14px 0 0 !important; animation: slideUp .3s cubic-bezier(.2,.9,.3,1) both !important; margin: 0 !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; }
   .modal-inner form { padding: 14px !important; }
   .two-col { grid-template-columns: 1fr !important; }
   .mobile-hamburger > div { min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-direction: column !important; gap: 3px !important; }
