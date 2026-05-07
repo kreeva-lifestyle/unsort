@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
-import { T } from '../../lib/theme';
+import { T, S } from '../../lib/theme';
 import { SkeletonRows } from '../ui/Skeleton';
 import type { CashChallan, CashChallanItem } from '../../types/database';
 
@@ -113,18 +113,18 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
                 <thead>
                   <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
                     {['SKU', 'Qty', 'Price', 'Disc', 'Total'].map((h, i) => (
-                      <th key={h} style={{ padding: '8px 12px', textAlign: i === 0 ? 'left' : 'right', color: T.tx3, fontSize: 9, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', borderBottom: `1px solid ${T.bd}` }}>{h}</th>
+                      <th key={h} style={{ ...S.thStyle, textAlign: i === 0 ? 'left' as const : 'right' as const }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((it, i) => (
                     <tr key={i} style={{ borderBottom: i < items.length - 1 ? `1px solid ${T.bd}` : 'none' }}>
-                      <td style={{ padding: '8px 12px', fontFamily: T.mono, color: T.tx, fontWeight: 500 }}>{it.sku || '—'}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right', color: T.tx }}>{it.quantity ?? 0}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: T.mono, color: T.tx2 }}>₹{Number(it.price || 0).toLocaleString('en-IN')}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: T.mono, color: Number(it.discount_amount || 0) > 0 ? T.re : T.tx3 }}>{Number(it.discount_amount || 0) > 0 ? `-₹${Number(it.discount_amount).toLocaleString('en-IN')}` : '—'}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: T.mono, fontWeight: 600, color: T.tx }}>₹{Number(it.total || 0).toLocaleString('en-IN')}</td>
+                      <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx, fontWeight: 500 }}>{it.sku || '—'}</td>
+                      <td style={{ ...S.tdStyle, textAlign: 'right', color: T.tx }}>{it.quantity ?? 0}</td>
+                      <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono, color: T.tx2 }}>₹{Number(it.price || 0).toLocaleString('en-IN')}</td>
+                      <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono, color: Number(it.discount_amount || 0) > 0 ? T.re : T.tx3 }}>{Number(it.discount_amount || 0) > 0 ? `-₹${Number(it.discount_amount).toLocaleString('en-IN')}` : '—'}</td>
+                      <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono, fontWeight: 600, color: T.tx }}>₹{Number(it.total || 0).toLocaleString('en-IN')}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -256,8 +256,8 @@ export default function InventoryExtras() {
   const btnGhost: React.CSSProperties = { ...S.btnGhost, cursor: 'pointer' };
   const overlay: React.CSSProperties = S.modalOverlay;
   const modal: React.CSSProperties = S.modalBox;
-  const th: React.CSSProperties = { fontSize: 9, color: T.tx3, padding: '8px 10px', textAlign: 'left', fontWeight: 600, borderBottom: `1px solid ${T.bd}`, textTransform: 'uppercase', letterSpacing: '0.1em', whiteSpace: 'nowrap' };
-  const td: React.CSSProperties = { padding: '8px 10px', fontSize: 11, borderBottom: `1px solid ${T.bd}`, color: T.tx2 };
+  const th: React.CSSProperties = S.thStyle;
+  const td: React.CSSProperties = S.tdStyle;
 
   return (
     <div style={{ animation: 'fi .3s ease both' }}>
