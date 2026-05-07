@@ -5,6 +5,7 @@ import { friendlyError } from '../lib/friendlyError';
 import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
 
 import { T, S } from '../lib/theme';
+import { useNotifications } from '../hooks/useNotifications';
 import SwipeRow from '../components/ui/SwipeRow';
 import type {
   Product,
@@ -21,6 +22,7 @@ import { isDupatta, isLehenga, isBottomType } from '../lib/garmentHelpers';
 type InventoryItemMatch = Pick<InventoryItem, 'id' | 'batch_number' | 'serial_number' | 'size' | 'location' | 'status'>;
 
 export default function InventoryExtras() {
+  const { addToast } = useNotifications();
   const [extras, setExtras] = useState<InventoryExtra[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
@@ -162,7 +164,7 @@ export default function InventoryExtras() {
     }).eq('id', editingExtra.id);
     if (err) { setError(friendlyError(err)); return; }
     setError('');
-    setEditingExtra(null); fetchExtras();
+    setEditingExtra(null); addToast('Spare part updated', 'success'); fetchExtras();
   };
 
   const addExtra = async () => {
@@ -196,7 +198,7 @@ export default function InventoryExtras() {
       extra_id: data.id, action: 'created', quantity_change: qty, quantity_after: qty, user_id: user?.id,
     });
     if (histErr) setError('Extra created but history log failed — ' + friendlyError(histErr));
-    setSaving(false); setShowAdd(false);
+    setSaving(false); setShowAdd(false); addToast('Spare part added', 'success');
     setFProductId(''); setFComponentId(''); setFSku(''); setFSize(''); setFLocation(''); setFManufacturer(''); setFQty('1'); setFNotes('');
     fetchExtras();
   };
@@ -219,7 +221,7 @@ export default function InventoryExtras() {
         .select().single();
       if (upErr || !updated) { setError('Another user just updated this extra. Close and reopen to retry.'); return; }
     }
-    setAdjustExtra(null); setAdjustQty('1'); setAdjustReason(''); fetchExtras();
+    setAdjustExtra(null); setAdjustQty('1'); setAdjustReason(''); addToast('Quantity adjusted', 'success'); fetchExtras();
   };
 
   const completeWithExtra = async () => {
@@ -241,7 +243,7 @@ export default function InventoryExtras() {
       const { error: delErr } = await supabase.from('inventory_extras').delete().eq('id', extra.id);
       if (delErr) setError('Cleanup failed (extra row not deleted): ' + friendlyError(delErr));
     }
-    setSaving(false); setCompleteItem(null); setMatchExtra(null); fetchExtras();
+    setSaving(false); setCompleteItem(null); setMatchExtra(null); addToast('Item completed', 'success'); fetchExtras();
   };
 
   // Filtered list

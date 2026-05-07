@@ -620,6 +620,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       });
     }
     await ccAuditLog('VOID', id, `Challan #${before.challan_number} (${before.customer_name}) voided — was ₹${before.total}`, { status: { from: before.status, to: 'voided' }, amount_paid: { from: before.amount_paid, to: 0 } });
+    addToast(`Challan #${before.challan_number} voided`, 'success');
     fetchChallans();
   };
 

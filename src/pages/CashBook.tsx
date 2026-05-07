@@ -181,6 +181,7 @@ export default function CashBook() {
         user_id: user?.id ?? null,
       });
       setEditingOpening(false);
+      addToast('Opening balance saved', 'success');
       fetchData();
     } finally { setBusy(false); }
   };
@@ -401,6 +402,7 @@ export default function CashBook() {
       if (error) { addToast('Confirm failed — ' + friendlyError(error), 'error'); return; }
       if (!updated || updated.length === 0) { addToast('This handover is no longer pending. It may have been rejected or already confirmed.', 'error'); setConfirmingHandover(null); setConfirmPin(''); fetchData(); return; }
       setConfirmingHandover(null); setConfirmPin('');
+      addToast('Handover confirmed', 'success');
       fetchData();
     } finally { setBusy(false); }
   };
@@ -432,6 +434,7 @@ export default function CashBook() {
       if (error) { setRejectError(friendlyError(error)); return; }
       if (!data || data.length === 0) { setRejectError('Handover state changed — please refresh.'); return; }
       setRejectingHandover(null); setRejectReason('');
+      addToast('Handover rejected', 'success');
       fetchData();
     } finally { setBusy(false); }
   };
