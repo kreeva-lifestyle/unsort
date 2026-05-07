@@ -416,9 +416,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       td{padding:9px 10px;font-size:11px;color:#8896B0;border-bottom:1px solid rgba(255,255,255,.04)}
       tr:nth-child(even) td{background:rgba(255,255,255,.015)}
       .footer{text-align:center;font-size:8px;color:#4A5568;margin-top:16px;letter-spacing:1px;text-transform:uppercase}
-      .no-print{position:fixed;bottom:0;left:0;right:0;padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));background:rgba(8,11,20,.95);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid rgba(255,255,255,.06);display:flex;gap:10px;justify-content:center;z-index:10}
-      .btn{padding:12px 28px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer}
-      .btn-primary{background:linear-gradient(135deg,#6366F1,#818CF8);color:#fff;box-shadow:0 4px 16px rgba(99,102,241,.35)}
+      .no-print{display:none}
       @page{size:A4 landscape;margin:8mm}
       @media print{body{background:#fff;color:#222;padding:8mm}.no-print{display:none!important}th{background:#f5f5f5;color:#333}td{color:#444;border-color:#eee}.footer{color:#999}.brand .logo{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
     </style></head><body>
@@ -428,9 +426,6 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     </div>
     <table><thead><tr><th>SKU</th><th>Category</th><th>Size</th><th>Location</th><th>Manufacturer</th><th>Status</th></tr></thead>
     <tbody>${rows}</tbody></table>
-    <div class="no-print">
-      <button class="btn btn-primary" onclick="window.print()">Print / Share</button>
-    </div>
     <div class="footer">Powered by DailyOffice</div>
     </body></html>`;
     setExportPdfHtml(html);
@@ -1139,9 +1134,10 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             <span style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', fontFamily: "'Sora',sans-serif" }}>Export Preview</span>
             <button onClick={() => setExportPdfHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
           </div>
-          <iframe srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#fff' }} />
-          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', justifyContent: 'center' }}>
-            <button onClick={() => setExportPdfHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>Close</button>
+          <iframe srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#060810' }} />
+          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <button onClick={() => setExportPdfHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
+            <button onClick={() => { const iframe = document.querySelector('iframe[srcdoc]') as HTMLIFrameElement; iframe?.contentWindow?.print(); }} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #6366F1, #818CF8)', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, flex: 1, maxWidth: 160, boxShadow: '0 4px 16px rgba(99,102,241,.35)' }}>Print / Share</button>
           </div>
         </div>,
         document.body
