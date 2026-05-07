@@ -98,7 +98,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
         <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Users</span>
         <div onClick={() => setShowInvite(true)} style={S.btnPrimary}>+ Invite User</div>
       </div>
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+      <div className="desktop-only" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>{['User', 'Role', 'Status', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
           <tbody>{users.map((u) => (
@@ -115,6 +115,25 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
             </tr>
           ))}</tbody>
         </table>
+      </div>
+      {/* Mobile card view */}
+      <div className="mobile-only" style={{ display: 'none', flexDirection: 'column', gap: 8 }}>
+        {users.map((u) => (
+          <div key={u.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{(u.full_name || u.email || '?')[0].toUpperCase()}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: T.tx }}>{u.full_name || 'Unnamed'}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: T.tx3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</p>
+              </div>
+              <span style={{ padding: '3px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, flexShrink: 0, ...(u.is_active ? { background: 'rgba(45,212,160,.10)', color: T.gr } : { background: 'rgba(245,87,92,.10)', color: T.re }) }}>{u.is_active ? 'Active' : 'Inactive'}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} disabled={u.id === profile?.id} style={{ ...S.fInput, width: 'auto', flex: 1, padding: '6px 10px', cursor: u.id === profile?.id ? 'not-allowed' : 'pointer', opacity: u.id === profile?.id ? 0.5 : 1, fontSize: 12 }}><option value="admin">Admin</option><option value="manager">Manager</option><option value="operator">Operator</option><option value="viewer">Viewer</option></select>
+              {u.id !== profile?.id && <Toggle on={u.is_active} onToggle={() => toggleActive(u.id, u.is_active)} size="sm" />}
+            </div>
+          </div>
+        ))}
       </div>
 
       {showInvite && (<div style={S.modalOverlay} onClick={() => { setShowInvite(false); setInviteResult(null); }}><div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
