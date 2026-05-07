@@ -25,7 +25,7 @@ body {
 
 /* Button press feedback — spring bounce */
 @keyframes btnBump { 0% { transform: scale(1); } 40% { transform: scale(0.92); } 70% { transform: scale(1.05); } 100% { transform: scale(1); } }
-button:active, [role="button"]:active { animation: btnBump 250ms cubic-bezier(.4,0,.2,1); }
+button:active, [role="button"]:active, [style*="pointer"]:active { animation: btnBump 250ms cubic-bezier(.4,0,.2,1); }
 
 /* Page transitions */
 .page-pad, main > div > div { animation: pageIn 180ms ease both; }
