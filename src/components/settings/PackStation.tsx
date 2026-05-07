@@ -35,7 +35,7 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
   const toggleCourier = async (id: string, active: boolean) => {
     if (!active) { const activeCount = couriers.filter(c => c.is_active && c.id !== id).length; if (activeCount < 1) { addToast('At least 1 courier must remain active', 'error'); return; } }
     const { error } = await supabase.from('packtime_couriers').update({ is_active: !active }).eq('id', id);
-    if (error) addToast(friendlyError(error), 'error'); else fetchData();
+    if (error) addToast(friendlyError(error), 'error'); else { addToast(active ? 'Courier disabled' : 'Courier enabled', 'success'); fetchData(); }
   };
 
   const deleteCourier = async (id: string) => {

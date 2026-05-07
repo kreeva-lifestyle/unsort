@@ -23,7 +23,7 @@ export default function Brands({ addToast }: { addToast: (msg: string, type?: st
     if (error) addToast(friendlyError(error), 'error');
     else { addToast('Brand added!', 'success'); setNewBrand(''); fetchBrands(); }
   };
-  const toggleBrand = async (id: string, active: boolean) => { const { error } = await supabase.from('brands').update({ is_active: !active }).eq('id', id); if (error) addToast(friendlyError(error), 'error'); else fetchBrands(); };
+  const toggleBrand = async (id: string, active: boolean) => { const { error } = await supabase.from('brands').update({ is_active: !active }).eq('id', id); if (error) addToast(friendlyError(error), 'error'); else { addToast(active ? 'Brand disabled' : 'Brand enabled', 'success'); fetchBrands(); } };
   const deleteBrand = async (id: string) => {
     if (!await ask({ title: 'Delete brand?', message: 'This brand will be removed.', confirmLabel: 'Delete', danger: true })) return;
     const b = brands.find(x => x.id === id);
