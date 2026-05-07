@@ -635,7 +635,6 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           {!showExtras && !isCompletedView && <div onClick={computeIntel} title="Find cross-size completion possibilities" style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600 }} className="desktop-only">Find Pairs</div>}
           {!showExtras && <div onClick={exportPdf} style={{ ...S.btnGhost, fontSize: 11 }} className="mobile-only">Export</div>}
           {!showExtras && <div onClick={() => { setShowExtras(true); window.history.pushState({ view: 'extras' }, ''); }} style={{ ...S.btnGhost, background: 'rgba(56,189,248,.05)', border: '1px solid rgba(56,189,248,.15)', color: T.bl, fontWeight: 600 }}>Spare Parts</div>}
-          {!showExtras && canEdit && !isCompletedView && <div className="desktop-only" onClick={() => { setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', manufacturer: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatSearch(''); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowModal(true); }} style={S.btnPrimary}>+ Add Item</div>}
         </div>
       </div>
       {showExtras ? <InventoryExtras /> : <>
