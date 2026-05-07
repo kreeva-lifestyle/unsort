@@ -571,6 +571,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     }
     const { error: delErr } = await supabase.from('packtime_scans').delete().eq('id', id);
     if (delErr) { addToast(friendlyError(delErr), 'error'); return; }
+    addToast('Scan deleted', 'success');
     fetchHistory();
   };
 
