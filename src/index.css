@@ -23,13 +23,17 @@ body {
 
 ::selection { background: rgba(99,102,241,0.25); color: #E2E8F0; }
 
-/* Button press feedback — spring bounce */
+/* Momentum scroll + rubber-band overscroll */
+main { -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+
+/* Button press feedback — spring bounce + ripple */
 @keyframes btnBump { 0% { transform: scale(1); } 40% { transform: scale(0.92); } 70% { transform: scale(1.05); } 100% { transform: scale(1); } }
+@keyframes rippleOut { from { transform: scale(0); opacity: .35; } to { transform: scale(2.5); opacity: 0; } }
 button:active, [role="button"]:active, [style*="pointer"]:active { animation: btnBump 250ms cubic-bezier(.4,0,.2,1); }
 
-/* Page transitions */
-.page-pad, main > div > div { animation: pageIn 180ms ease both; }
-@keyframes pageIn { from { opacity: 0.92; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+/* Page transitions — slide-in from right (app-like) */
+.page-pad, main > div > div { animation: pageIn 220ms cubic-bezier(.2,.9,.3,1) both; }
+@keyframes pageIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
 
 /* Prevent iOS zoom on input focus — force 16px minimum on mobile */
 @media (max-width: 768px) {
@@ -95,6 +99,7 @@ tbody tr:hover { background: rgba(99,102,241,0.04); }
 /* Animations */
 @keyframes fi { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes su { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(-14px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes loginBoxEnter { from { opacity: 0; transform: translateY(24px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes loginGlowFloat { 0% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-20px) scale(1.1); } 100% { transform: translate(-20px,30px) scale(.95); } }
 @keyframes loginGlowIn { from { opacity: 0; transform: scale(.8); } to { opacity: .12; transform: scale(1); } }
@@ -110,6 +115,7 @@ tbody tr:hover { background: rgba(99,102,241,0.04); }
 @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
 @keyframes pulseGlow { 0%,100% { opacity: .6; } 50% { opacity: 1; } }
 @keyframes subtlePulse { 0%,100% { filter: brightness(1) drop-shadow(0 0 0 transparent); } 50% { filter: brightness(1.08) drop-shadow(0 0 6px rgba(99,102,241,.15)); } }
+@keyframes tabDot { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
 @keyframes undoProgress { from { width: 100%; } to { width: 0%; } }
 
 .undo-bar { height: 3px; background: linear-gradient(90deg, #6366F1, #818CF8); border-radius: 2px; animation: undoProgress 5s linear forwards; }
