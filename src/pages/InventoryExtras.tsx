@@ -66,6 +66,8 @@ export default function InventoryExtras() {
     return () => { document.body.classList.remove('modal-open'); };
   }, [showAdd, adjustExtra, matchExtra, completeItem, editingExtra, exportHtml]);
 
+  useEffect(() => () => { if (skuTimer.current) clearTimeout(skuTimer.current); }, []);
+
   const fetchExtras = useCallback(async () => {
     const { data } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, location, manufacturer, quantity, notes, created_by, created_at, updated_at').gt('quantity', 0).order('updated_at', { ascending: false }).limit(1000);
     setExtras(data || []);
