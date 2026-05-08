@@ -81,7 +81,7 @@ const MainApp = () => {
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
-  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflow: 'hidden', position: 'relative' }}>
+  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflowX: 'hidden', position: 'relative' }}>
     {/* Ambient glows are static CSS (see .app-glows in index.css) — not React children so
         they don't re-render on tab change (audit P3 performance) */}
     <div className="app-glows" aria-hidden="true" />
