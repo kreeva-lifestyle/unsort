@@ -22,8 +22,8 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
 
   const loadPin = useCallback(async () => {
     if (!profile?.id) return;
-    const { data: pin } = await supabase.rpc('get_own_pin');
-    setPinExists(!!pin);
+    const { data: exists } = await supabase.rpc('check_pin_exists');
+    setPinExists(!!exists);
     const { data: prof } = await supabase.from('profiles').select('phone').eq('id', profile.id).maybeSingle();
     setMyPhone(prof?.phone || '');
   }, [profile?.id]);
@@ -48,7 +48,7 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
     if (!/^\d+$/.test(newPin)) { setPinError('PIN must be digits only'); return; }
     if (newPin !== confirmPin) { setPinError('PINs do not match'); return; }
     setPinSaving(true);
-    const { error } = await supabase.from('profiles').update({ cash_pin: newPin }).eq('id', profile.id);
+    const { error } = await supabase.rpc('set_own_pin', { pin: newPin });
     setPinSaving(false);
     if (error) { setPinError('Save failed — ' + friendlyError(error)); return; }
     setNewPin(''); setConfirmPin(''); setEditingPin(false);
