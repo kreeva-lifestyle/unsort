@@ -38,21 +38,21 @@ export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
   const locked = useRef<'h' | 'v' | null>(null);
   const maxReveal = actions.length * ACTION_W;
 
-  const setTranslate = useCallback((x: number, animate = false) => {
+  const setTranslate = useCallback((x: number, animate = false, closing = false) => {
     const el = contentRef.current;
     if (!el) return;
-    el.style.transition = animate ? `transform .3s ${SPRING}` : 'none';
+    el.style.transition = animate ? (closing ? 'transform .4s cubic-bezier(0.25, 0.1, 0.25, 1)' : `transform .3s ${SPRING}`) : 'none';
     el.style.transform = `translateX(${x}px)`;
     currentX.current = x;
   }, []);
 
   const closeThisRef = useRef(() => {});
-  closeThisRef.current = () => { setTranslate(0, true); setIsOpen(false); };
+  closeThisRef.current = () => { setTranslate(0, true, true); setIsOpen(false); };
   const closeThis = useCallback(() => closeThisRef.current(), []);
 
   const snap = useCallback((toOpen: boolean) => {
     if (toOpen) { openRows.forEach(fn => { if (fn !== closeThis) fn(); }); openRows.clear(); openRows.add(closeThis); } else { openRows.delete(closeThis); }
-    setTranslate(toOpen ? -maxReveal : 0, true);
+    setTranslate(toOpen ? -maxReveal : 0, true, !toOpen);
     setIsOpen(toOpen);
   }, [maxReveal, setTranslate, closeThis]);
 

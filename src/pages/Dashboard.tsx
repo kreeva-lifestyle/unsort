@@ -149,7 +149,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
   };
 
   const maxScan = Math.max(...scanTrend.map(s => s.count), 1);
-  const statusColors: Record<string, string> = { unsorted: T.yl, damaged: T.re, dry_clean: '#06b6d4', completed: T.gr };
+  const statusColors: Record<string, string> = { unsorted: T.yl, damaged: T.re, dry_clean: T.bl, completed: T.gr };
 
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease', paddingBottom: 80 }}>
