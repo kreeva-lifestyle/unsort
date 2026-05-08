@@ -17,6 +17,7 @@ import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 // list view per audit P2; reserve pill treatment for modals.
 const STATUS_DOT_COLOR: Record<string, string> = {
   completed: '#4ADE80',
+  complete: '#4ADE80',
   damaged: '#FCA5A5',
   unsorted: '#FCD34D',
   dry_clean: '#7DD3FC',
@@ -568,8 +569,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
 
   const filtered = items.filter((i) => {
     // Pending stage hides completed items; completed stage only shows them
-    if (!isCompletedView && i.status === 'completed') return false;
-    if (isCompletedView && i.status !== 'completed') return false;
+    if (!isCompletedView && (i.status === 'completed' || i.status === 'complete')) return false;
+    if (isCompletedView && i.status !== 'completed' && i.status !== 'complete') return false;
     if (filters.status.length > 0 && !filters.status.includes(i.status)) return false;
     if (filters.category.length > 0 && !filters.category.includes(i.product_id)) return false;
     if (filters.location.length > 0 && !filters.location.includes(i.location || '')) return false;
