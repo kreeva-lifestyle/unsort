@@ -824,7 +824,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             ];
             return (
               <SwipeRow key={item.id} actions={swipeActions} hint={idx === 0} hintKey="inventory">
-              <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', gap: 6, position: 'relative', WebkitUserSelect: 'none', userSelect: 'none' }}
+              <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}`, borderLeft: `3px solid ${STATUS_DOT_COLOR[item.status] || T.yl}`, display: 'flex', flexDirection: 'column', gap: 6, position: 'relative', WebkitUserSelect: 'none', userSelect: 'none' }}
                 onTouchStart={() => { if (!canEdit) return; longPressTimer.current = setTimeout(() => { try { navigator.vibrate?.(15); } catch {} setQuickStatusItem(item.id); }, 500); }}
                 onTouchEnd={() => clearTimeout(longPressTimer.current)}
                 onTouchMove={() => clearTimeout(longPressTimer.current)}>

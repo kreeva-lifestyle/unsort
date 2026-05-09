@@ -1189,7 +1189,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       )}
 
       {/* Challan Detail View — read-only, opens before edit */}
-      {viewingChallan && <ChallanDetail
+      {viewingChallan && (() => { const idx = challans.findIndex(ch => ch.id === viewingChallan.id); return <ChallanDetail
         challan={viewingChallan}
         onClose={() => setViewingChallan(null)}
         onEdit={() => { const c = viewingChallan; setViewingChallan(null); openEdit(c); }}
@@ -1197,7 +1197,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         onRemind={() => { const c = viewingChallan; setViewingChallan(null); sendReminder(c); }}
         onReturn={() => { const c = viewingChallan; setViewingChallan(null); setIsReturn(true); setChallanStatus('paid'); selectReturnSource(c); setShowModal(true); }}
         onVoid={() => { const c = viewingChallan; setViewingChallan(null); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number }); }}
-      />}
+        hasNext={idx < challans.length - 1}
+        hasPrev={idx > 0}
+        onNext={() => { if (idx < challans.length - 1) setViewingChallan(challans[idx + 1]); }}
+        onPrev={() => { if (idx > 0) setViewingChallan(challans[idx - 1]); }}
+      />; })()}
 
       {/* WhatsApp Phone Prompt Modal */}
       {reminderChallan && (
