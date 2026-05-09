@@ -460,7 +460,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   };
   const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
 
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; timer: number } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; timer: number; snapshot: any } | null>(null);
 
   const quickStatusChange = async (itemId: string, newStatus: string) => {
     const { error } = await supabase.from('inventory_items').update({ status: newStatus, status_changed_at: new Date().toISOString() }).eq('id', itemId);
@@ -474,21 +474,21 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     if (!item) return;
     if (item.paired_with) { addToast('Cannot delete — item is paired. Unpair first.', 'error'); return; }
     if (item.status === 'completed') { addToast('Cannot delete a completed item.', 'error'); return; }
+    const snapshot = item;
     setItems(prev => prev.filter(i => i.id !== itemId));
     const timer = window.setTimeout(async () => {
       const { error } = await supabase.rpc('delete_inventory_item_cascade', { p_item_id: itemId });
-      if (error) addToast('Delete failed — ' + friendlyError(error), 'error');
+      if (error) { addToast('Delete failed — ' + friendlyError(error), 'error'); setItems(prev => [snapshot, ...prev]); }
       setPendingDelete(null);
-      fetchData();
     }, 5000);
-    setPendingDelete({ id: itemId, timer });
+    setPendingDelete({ id: itemId, timer, snapshot });
   };
 
   const undoDelete = () => {
     if (pendingDelete) {
       clearTimeout(pendingDelete.timer);
+      setItems(prev => [pendingDelete.snapshot, ...prev]);
       setPendingDelete(null);
-      fetchData();
     }
   };
 
