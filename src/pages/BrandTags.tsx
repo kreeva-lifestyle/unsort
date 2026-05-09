@@ -382,11 +382,12 @@ export default function BrandTagPrinter() {
 
         const batchSize = 500;
         let failed = 0;
+        const failedBatches: number[] = [];
         for (let i = 0; i < toUpsert.length; i += batchSize) {
           const batch = toUpsert.slice(i, i + batchSize);
           const { error } = await supabase.from('brand_tags')
             .upsert(batch, { onConflict: 'ean,sku,size', ignoreDuplicates: false });
-          if (error) failed += batch.length;
+          if (error) { failed += batch.length; failedBatches.push(Math.floor(i / batchSize) + 1); addToast(`Batch ${Math.floor(i / batchSize) + 1} failed — ${friendlyError(error)}`, 'error'); }
           const done = Math.min(i + batchSize, toUpsert.length);
           setImportProgress(`${done} / ${toUpsert.length}`);
         }
@@ -394,7 +395,7 @@ export default function BrandTagPrinter() {
         window.removeEventListener('beforeunload', beforeUnload);
         setImporting(false);
         setImportProgress('');
-        addToast(`Import complete! ${toUpsert.length} rows processed.${failed > 0 ? ` ${failed} failed.` : ''}`, failed > 0 ? 'error' : 'success');
+        addToast(failed > 0 ? `Import done with errors: ${failed} of ${toUpsert.length} rows failed (batch${failedBatches.length > 1 ? 'es' : ''} ${failedBatches.join(', ')})` : `Import complete! ${toUpsert.length} rows processed.`, failed > 0 ? 'error' : 'success');
         fetchPage();
       } catch (e: any) {
         const errMsg = e?.message || '';

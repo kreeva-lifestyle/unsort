@@ -53,11 +53,18 @@ const MainApp = () => {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [mounted, setMounted] = useState<Set<string>>(new Set([getTabFromHash()]));
 
+  const canAccessTab = (t: string): boolean => {
+    if (!profile) return t === 'dashboard';
+    const r = profile.role;
+    if (r === 'admin' || r === 'manager') return true;
+    if (r === 'operator') return !['brandtag', 'challan', 'programs'].includes(t);
+    return ['dashboard', 'inventory', 'settings'].includes(t);
+  };
+
   // Central navigate — updates URL + state
   const setTab = (t: string) => {
     if (!(TAB_IDS as readonly string[]).includes(t)) t = 'dashboard';
-    // Settings is open to everyone — My Profile tab (Phone + Cash PIN) is required for operators too.
-    if (t === 'settings' && !profile) t = 'dashboard';
+    if (!canAccessTab(t)) t = 'dashboard';
     const newHash = `#/${t}`;
     if (window.location.hash !== newHash) window.history.pushState(null, '', newHash);
     setTabState(t);
@@ -65,7 +72,7 @@ const MainApp = () => {
 
   // Browser back/forward support
   useEffect(() => {
-    const onPop = () => setTabState(getTabFromHash());
+    const onPop = () => { const t = getTabFromHash(); setTabState(canAccessTab(t) ? t : 'dashboard'); };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
@@ -89,6 +96,9 @@ const MainApp = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Redirect to dashboard if current tab became unauthorized after profile loads
+  useEffect(() => { if (profile && !canAccessTab(tab)) setTab('dashboard'); }, [profile]);
+
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
   const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', programs: 'Programs', settings: 'Settings' };
@@ -109,7 +119,7 @@ const MainApp = () => {
     <div className="main-area" style={{ marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw' }}>
       {/* Mobile bottom nav */}
       <div className="mobile-hamburger" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 102, background: T.s, borderTop: `1px solid ${T.bd}`, padding: '8px 0', paddingBottom: 'max(8px, env(safe-area-inset-bottom))', justifyContent: 'space-around' }}>
-        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Inventory' }, { id: 'packtime', icon: 'scan', label: 'PackStation' }, { id: 'challan', icon: 'file', label: 'Challan' }].map(t => (
+        {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Inventory' }, { id: 'packtime', icon: 'scan', label: 'PackStation' }, { id: 'challan', icon: 'file', label: 'Challan' }].filter(t => canAccessTab(t.id)).map(t => (
           <div key={t.id} onClick={() => { setTab(t.id); setMobileMenu(false); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: tab === t.id ? T.ac : T.tx3, fontSize: 9, fontWeight: 500, transition: 'color .2s ease', position: 'relative' }}>
             <Icon name={t.icon} size={20} /><span>{t.label}</span>
             {tab === t.id && <span style={{ position: 'absolute', top: -8, width: 20, height: 3, borderRadius: 2, background: T.ac, boxShadow: `0 0 8px ${T.ac}66`, animation: 'tabDot .25s cubic-bezier(.2,.9,.3,1)' }} />}
@@ -126,10 +136,10 @@ const MainApp = () => {
         <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}><div className="spinner" /></div>}>
         {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard navigateTo={setTab} /></div>}
         {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
-        {mounted.has('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
-        {mounted.has('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime active={tab === 'packtime'} /></div>}
-        {mounted.has('challan') && <div style={{ display: tab === 'challan' ? 'block' : 'none' }}><CashChallan active={tab === 'challan'} /></div>}
-        {mounted.has('programs') && <div style={{ display: tab === 'programs' ? 'block' : 'none' }}><ProgramsModule /></div>}
+        {mounted.has('brandtag') && canAccessTab('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
+        {mounted.has('packtime') && canAccessTab('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime active={tab === 'packtime'} /></div>}
+        {mounted.has('challan') && canAccessTab('challan') && <div style={{ display: tab === 'challan' ? 'block' : 'none' }}><CashChallan active={tab === 'challan'} /></div>}
+        {mounted.has('programs') && canAccessTab('programs') && <div style={{ display: tab === 'programs' ? 'block' : 'none' }}><ProgramsModule /></div>}
         {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage profile={profile} addToast={addToast} /></div>}
         </Suspense>
       </main>

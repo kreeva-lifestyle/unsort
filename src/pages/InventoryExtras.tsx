@@ -95,7 +95,7 @@ export default function InventoryExtras() {
 
   useEffect(() => {
     fetchExtras(); fetchProducts();
-    supabase.from('locations').select('id, name').order('name').then(({ data }) => setLocations(data || []));
+    supabase.from('locations').select('id, name').order('name').then(({ data, error }) => { if (error) addToast('Failed to load locations — ' + friendlyError(error), 'error'); setLocations(data || []); });
     supabase.from('inventory_extras').select('manufacturer').gt('manufacturer', '').then(({ data }) => { const unique = [...new Set((data || []).map(d => d.manufacturer).filter(Boolean))].sort(); setMfrOptions(unique); });
   }, [fetchExtras, fetchProducts]);
 
@@ -123,7 +123,7 @@ export default function InventoryExtras() {
   // Load components when product selected in Add form
   useEffect(() => {
     if (!fProductId) { setFComps([]); return; }
-    supabase.from('components').select('id, name, product_id, component_code, description, is_critical, created_at').eq('product_id', fProductId).order('name').then(({ data }) => setFComps(data || []));
+    supabase.from('components').select('id, name, product_id, component_code, description, is_critical, created_at').eq('product_id', fProductId).order('name').then(({ data, error }) => { if (error) addToast('Failed to load components — ' + friendlyError(error), 'error'); setFComps(data || []); });
   }, [fProductId]);
 
   // Auto-set size for dupatta components
@@ -243,7 +243,7 @@ export default function InventoryExtras() {
     // qty reaches 0 — no need to keep spent extras in the database.
     if (extra.quantity <= 1) {
       const { error: delErr } = await supabase.from('inventory_extras').delete().eq('id', extra.id);
-      if (delErr) setError('Cleanup failed (extra row not deleted): ' + friendlyError(delErr));
+      if (delErr) addToast('Item completed but spare part row cleanup failed — ' + friendlyError(delErr), 'error');
     }
     setSaving(false); setCompleteItem(null); setMatchExtra(null); addToast('Item completed', 'success'); fetchExtras();
   };

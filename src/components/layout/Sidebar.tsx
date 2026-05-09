@@ -2,6 +2,13 @@ import { supabase } from '../../lib/supabase';
 import { T, Icon } from '../../lib/theme';
 
 export default function Sidebar({ activeTab, setActiveTab, profile }: { activeTab: string; setActiveTab: (t: string) => void; profile: any }) {
+  const role = profile?.role;
+  const canAccess = (t: string) => {
+    if (!role) return t === 'dashboard';
+    if (role === 'admin' || role === 'manager') return true;
+    if (role === 'operator') return !['brandtag', 'challan', 'programs'].includes(t);
+    return ['dashboard', 'inventory', 'settings'].includes(t);
+  };
   const tabs = [
     { id: 'dashboard', icon: 'grid', label: 'Home' },
     { id: 'inventory', icon: 'box', label: 'Inventory' },
@@ -10,7 +17,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile }: { activeTa
     { id: 'challan', icon: 'file', label: 'Cash Challan' },
     { id: 'programs', icon: 'box', label: 'Programs' },
     ...(profile ? [{ id: 'settings', icon: 'settings', label: 'Settings' }] : []),
-  ];
+  ].filter(t => canAccess(t.id));
 
   const handleSignOut = async () => {
     try { localStorage.removeItem('ccDraft'); } catch {}
