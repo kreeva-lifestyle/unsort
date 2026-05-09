@@ -17,16 +17,39 @@ interface Props {
   onRemind: () => void;
   onReturn: () => void;
   onVoid: () => void;
+  onNext?: () => void;
+  onPrev?: () => void;
+  hasNext?: boolean;
+  hasPrev?: boolean;
 }
 
 type TimelineEntry = { type: 'audit' | 'payment'; time: string; action?: string; details?: string; user_name?: string; changes?: Record<string, { from: unknown; to: unknown }> | null; amount?: number; payment_mode?: string; is_reversal?: boolean; notes?: string; batch_id?: string | null };
 
-export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid }: Props) {
+export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid, onNext, onPrev, hasNext, hasPrev }: Props) {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const swipeStartX = useRef(0);
+  const swipeLocked = useRef(false);
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [c.id]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onStart = (e: TouchEvent) => { swipeStartX.current = e.touches[0].clientX; swipeLocked.current = false; };
+    const onEnd = (e: TouchEvent) => {
+      if (swipeLocked.current) return;
+      const dx = e.changedTouches[0].clientX - swipeStartX.current;
+      if (Math.abs(dx) < 80) return;
+      swipeLocked.current = true;
+      if (dx < -80 && hasNext && onNext) onNext();
+      else if (dx > 80 && hasPrev && onPrev) onPrev();
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchend', onEnd);
+    return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchend', onEnd); };
+  }, [hasNext, hasPrev, onNext, onPrev]);
 
   useEffect(() => {
     setTimelineLoading(true);
