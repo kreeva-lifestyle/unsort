@@ -69,6 +69,19 @@ const MainApp = () => {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      const mod = e.metaKey || e.ctrlKey;
+      if (e.key === 'Escape') { document.querySelector<HTMLElement>('.modal-inner span[style*="cursor: pointer"]')?.click(); return; }
+      if (mod && e.key === 'f') { e.preventDefault(); document.querySelector<HTMLInputElement>('input[type="text"][placeholder*="earch"], input[type="search"]')?.focus(); return; }
+      if (mod && e.key === 'n') { e.preventDefault(); document.querySelector<HTMLElement>('.fab')?.click(); return; }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Ensure initial hash exists so back button has something to pop
   useEffect(() => {
     if (!window.location.hash) window.history.replaceState(null, '', `#/${tab}`);

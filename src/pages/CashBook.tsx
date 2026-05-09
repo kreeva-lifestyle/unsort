@@ -379,9 +379,10 @@ export default function CashBook() {
         setConfirmError(`This handover is meant for ${confirmingHandover.to_user_name}. Only they can sign it.`);
         return;
       }
-      const { data: myPin } = await supabase.rpc('get_own_pin');
-      if (!myPin) { setConfirmError('You have no PIN set. Go to Settings → Users to set one.'); return; }
-      if (String(myPin).trim() !== confirmPin.trim()) {
+      const { data: hasPinSet } = await supabase.rpc('check_pin_exists');
+      if (!hasPinSet) { setConfirmError('You have no PIN set. Go to Settings → My Profile to set one.'); return; }
+      const { data: pinValid } = await supabase.rpc('verify_own_pin', { pin: confirmPin.trim() });
+      if (!pinValid) {
         const nextAttempts = pinAttempts + 1;
         setPinAttempts(nextAttempts);
         if (nextAttempts >= 3) {
