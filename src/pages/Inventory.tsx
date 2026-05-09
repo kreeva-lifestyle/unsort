@@ -118,10 +118,10 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
 
   const fetchData = () => {
     setLoading(true);
-    const p1 = supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).limit(invLimit).then(({ data }) => { setItems(data || []); setInvTruncated((data || []).length >= invLimit); });
-    supabase.from('products').select('id, name, sku, total_components, category').eq('is_active', true).then(({ data }) => setProducts(data || []));
-    supabase.from('locations').select('id, name').order('name').then(({ data }) => setLocations(data || []));
-    supabase.from('tags').select('id, name, color').order('name').then(({ data }) => setTags(data || []));
+    const p1 = supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).limit(invLimit).then(({ data, error }) => { if (error) addToast('Failed to load inventory — ' + friendlyError(error), 'error'); setItems(data || []); setInvTruncated((data || []).length >= invLimit); });
+    supabase.from('products').select('id, name, sku, total_components, category').eq('is_active', true).then(({ data, error }) => { if (error) addToast('Failed to load categories — ' + friendlyError(error), 'error'); setProducts(data || []); });
+    supabase.from('locations').select('id, name').order('name').then(({ data, error }) => { if (error) addToast('Failed to load locations — ' + friendlyError(error), 'error'); setLocations(data || []); });
+    supabase.from('tags').select('id, name, color').order('name').then(({ data, error }) => { if (error) addToast('Failed to load tags — ' + friendlyError(error), 'error'); setTags(data || []); });
     supabase.from('inventory_items').select('manufacturer').gt('manufacturer', '').then(({ data }) => { const unique = [...new Set((data || []).map(d => d.manufacturer).filter(Boolean))].sort(); setManufacturers(unique); });
     supabase.from('item_tags').select('inventory_item_id, tag_id, tags(id, name, color)').limit(10000).then(({ data }) => {
       const map: Record<string, any[]> = {};
@@ -149,7 +149,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       setItemMissing(missingMap); setItemDamaged(damagedMap);
       setItemPresent(presentMap);
     });
-    Promise.all([p1, p2]).then(() => setLoading(false));
+    Promise.all([p1, p2]).then(() => setLoading(false)).catch(() => setLoading(false));
   };
 
   // Compute all completable pairs: must match category + SKU + size
@@ -361,8 +361,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     // Save tags
     if (savedItemId && tagInput.trim()) {
       const { error: delTagErr } = await supabase.from('item_tags').delete().eq('inventory_item_id', savedItemId);
-      if (delTagErr) addToast('Tag update warning — ' + friendlyError(delTagErr), 'error');
-      const tagNames = tagInput.split(',').map(t => t.trim()).filter(Boolean);
+      if (delTagErr) { addToast('Tag update failed — ' + friendlyError(delTagErr), 'error'); }
+      const tagNames = !delTagErr ? tagInput.split(',').map(t => t.trim()).filter(Boolean) : [];
       for (const name of tagNames) {
         let { data: existing } = await supabase.from('tags').select('id').eq('name', name).maybeSingle();
         if (!existing) {
@@ -460,7 +460,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   };
   const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
 
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; timer: number } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; timer: number; snapshot: any } | null>(null);
 
   const quickStatusChange = async (itemId: string, newStatus: string) => {
     const { error } = await supabase.from('inventory_items').update({ status: newStatus, status_changed_at: new Date().toISOString() }).eq('id', itemId);
@@ -474,30 +474,32 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     if (!item) return;
     if (item.paired_with) { addToast('Cannot delete — item is paired. Unpair first.', 'error'); return; }
     if (item.status === 'completed') { addToast('Cannot delete a completed item.', 'error'); return; }
+    const snapshot = item;
     setItems(prev => prev.filter(i => i.id !== itemId));
     const timer = window.setTimeout(async () => {
       const { error } = await supabase.rpc('delete_inventory_item_cascade', { p_item_id: itemId });
-      if (error) addToast('Delete failed — ' + friendlyError(error), 'error');
+      if (error) { addToast('Delete failed — ' + friendlyError(error), 'error'); setItems(prev => [snapshot, ...prev]); }
       setPendingDelete(null);
-      fetchData();
     }, 5000);
-    setPendingDelete({ id: itemId, timer });
+    setPendingDelete({ id: itemId, timer, snapshot });
   };
 
   const undoDelete = () => {
     if (pendingDelete) {
       clearTimeout(pendingDelete.timer);
+      setItems(prev => [pendingDelete.snapshot, ...prev]);
       setPendingDelete(null);
-      fetchData();
     }
   };
 
   const handleComplete = async (itemId: string, pairId: string) => {
-    const [{ data: aComps }, { data: bComps }, { data: prod }] = await Promise.all([
+    const [r1, r2, r3] = await Promise.all([
       supabase.from('item_components').select('component_id, status').eq('inventory_item_id', itemId),
       supabase.from('item_components').select('component_id, status').eq('inventory_item_id', pairId),
       supabase.from('inventory_items').select('product_id, products(total_components)').eq('id', itemId).maybeSingle(),
     ]);
+    if (r1.error || r2.error || r3.error) { addToast('Failed to load component data — ' + friendlyError(r1.error || r2.error || r3.error), 'error'); setShowCompleteModal(null); return; }
+    const aComps = r1.data; const bComps = r2.data; const prod = r3.data;
     const aP = new Set((aComps || []).filter(c => c.status === 'present').map(c => c.component_id));
     const bP = new Set((bComps || []).filter(c => c.status === 'present').map(c => c.component_id));
     const union = new Set([...aP, ...bP]);
@@ -1079,7 +1081,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 12, color: T.tx, flex: 1 }}>Item deleted</span>
           <span onClick={undoDelete} style={{ ...S.btnPrimary, padding: '4px 12px', fontSize: 11, background: T.yl, color: '#000', boxShadow: 'none' }}>Undo</span>
-          <span onClick={() => { clearTimeout(pendingDelete.timer); setPendingDelete(null); const id = pendingDelete.id; supabase.rpc('delete_inventory_item_cascade', { p_item_id: id }).then(() => fetchData()); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span>
+          <span onClick={() => { clearTimeout(pendingDelete.timer); const id = pendingDelete.id; setPendingDelete(null); supabase.rpc('delete_inventory_item_cascade', { p_item_id: id }).then(({ error }) => { if (error) addToast('Delete failed — ' + friendlyError(error), 'error'); fetchData(); }); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span>
         </div>
         <div className="undo-bar" key={pendingDelete.id} />
       </div>}

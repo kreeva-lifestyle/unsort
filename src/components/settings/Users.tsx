@@ -59,6 +59,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!profile || profile.role !== 'admin') { addToast('Only admins can invite users', 'error'); return; }
     setInviting(true);
     const password = inviteForm.password || generatePassword();
     const { data, error } = await supabase.auth.signUp({

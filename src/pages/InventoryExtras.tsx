@@ -5,6 +5,7 @@ import { friendlyError } from '../lib/friendlyError';
 import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
 
 import { T, S } from '../lib/theme';
+import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import SwipeRow from '../components/ui/SwipeRow';
 import type {
@@ -22,6 +23,8 @@ import { isDupatta, isLehenga, isBottomType } from '../lib/garmentHelpers';
 type InventoryItemMatch = Pick<InventoryItem, 'id' | 'batch_number' | 'serial_number' | 'size' | 'location' | 'status'>;
 
 export default function InventoryExtras() {
+  const { profile } = useAuth();
+  const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
   const { addToast } = useNotifications();
   const [extras, setExtras] = useState<InventoryExtra[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -95,7 +98,7 @@ export default function InventoryExtras() {
 
   useEffect(() => {
     fetchExtras(); fetchProducts();
-    supabase.from('locations').select('id, name').order('name').then(({ data }) => setLocations(data || []));
+    supabase.from('locations').select('id, name').order('name').then(({ data, error }) => { if (error) addToast('Failed to load locations — ' + friendlyError(error), 'error'); setLocations(data || []); });
     supabase.from('inventory_extras').select('manufacturer').gt('manufacturer', '').then(({ data }) => { const unique = [...new Set((data || []).map(d => d.manufacturer).filter(Boolean))].sort(); setMfrOptions(unique); });
   }, [fetchExtras, fetchProducts]);
 
@@ -123,7 +126,7 @@ export default function InventoryExtras() {
   // Load components when product selected in Add form
   useEffect(() => {
     if (!fProductId) { setFComps([]); return; }
-    supabase.from('components').select('id, name, product_id, component_code, description, is_critical, created_at').eq('product_id', fProductId).order('name').then(({ data }) => setFComps(data || []));
+    supabase.from('components').select('id, name, product_id, component_code, description, is_critical, created_at').eq('product_id', fProductId).order('name').then(({ data, error }) => { if (error) addToast('Failed to load components — ' + friendlyError(error), 'error'); setFComps(data || []); });
   }, [fProductId]);
 
   // Auto-set size for dupatta components
@@ -156,6 +159,7 @@ export default function InventoryExtras() {
 
   const saveEdit = async () => {
     if (!editingExtra) return;
+    if (!canEdit) { addToast('You do not have permission to edit spare parts', 'error'); return; }
     if (!editForm.sku.trim() || !editForm.size || !editForm.location || !editForm.manufacturer.trim()) {
       setError('All mandatory fields (*) are required'); return;
     }
@@ -171,6 +175,7 @@ export default function InventoryExtras() {
 
   const addExtra = async () => {
     setError('');
+    if (!canEdit) { addToast('You do not have permission to add spare parts', 'error'); return; }
     if (!fProductId || !fComponentId || !fSku.trim() || !fSize || !fLocation || !fManufacturer.trim()) { setError('All mandatory fields (*) are required'); return; }
     const comp = fComps.find(c => c.id === fComponentId);
     const compIsDupatta = comp && isDupatta(comp.name);
@@ -207,6 +212,7 @@ export default function InventoryExtras() {
 
   const adjustQuantity = async () => {
     if (!adjustExtra) return;
+    if (!canEdit) { addToast('You do not have permission to adjust quantities', 'error'); return; }
     const qty = parseInt(adjustQty) || 0;
     if (qty < 1) return;
     const newQty = adjustMode === 'add' ? adjustExtra.quantity + qty : adjustExtra.quantity - qty;
@@ -228,6 +234,7 @@ export default function InventoryExtras() {
 
   const completeWithExtra = async () => {
     if (!completeItem) return;
+    if (!canEdit) { addToast('You do not have permission to complete items', 'error'); return; }
     const { extra, item } = completeItem;
     if (extra.quantity < 1) { setError('No quantity available'); return; }
     setSaving(true);
@@ -243,7 +250,7 @@ export default function InventoryExtras() {
     // qty reaches 0 — no need to keep spent extras in the database.
     if (extra.quantity <= 1) {
       const { error: delErr } = await supabase.from('inventory_extras').delete().eq('id', extra.id);
-      if (delErr) setError('Cleanup failed (extra row not deleted): ' + friendlyError(delErr));
+      if (delErr) addToast('Item completed but spare part row cleanup failed — ' + friendlyError(delErr), 'error');
     }
     setSaving(false); setCompleteItem(null); setMatchExtra(null); addToast('Item completed', 'success'); fetchExtras();
   };
@@ -286,7 +293,7 @@ export default function InventoryExtras() {
             const rows = filtered.map(ex => `<tr><td>${esc(ex.sku)}</td><td>${esc(ex.product_name)}</td><td>${esc(ex.component_name)}</td><td>${esc(ex.size)}</td><td>${esc(ex.location)}</td><td style="text-align:right;font-weight:600">${ex.quantity}</td></tr>`).join('');
             setExportHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spare Parts</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#060810;color:#E2E8F0;padding:16px;padding-bottom:80px;-webkit-text-size-adjust:100%}.header{margin-bottom:16px}.brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}.logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#6366F1,#38BDF8);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff}.title{font-size:15px;font-weight:700;letter-spacing:-0.3px}.sub{font-size:10px;color:#6B7890;letter-spacing:0.5px}.meta{display:flex;gap:12px;font-size:10px;color:#8896B0;margin-top:8px}.meta span{padding:3px 8px;border-radius:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}table{width:100%;border-collapse:collapse;margin-top:4px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.06)}th{background:rgba(255,255,255,.03);font-size:9px;font-weight:600;color:#6B7890;text-transform:uppercase;letter-spacing:0.8px;padding:10px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)}td{padding:9px 10px;font-size:11px;color:#8896B0;border-bottom:1px solid rgba(255,255,255,.04)}tr:nth-child(even) td{background:rgba(255,255,255,.015)}.footer{text-align:center;font-size:8px;color:#4A5568;margin-top:16px;letter-spacing:1px;text-transform:uppercase}.no-print{display:none}@page{size:A4;margin:8mm}@media print{body{background:#fff;color:#222;padding:8mm}th{background:#f5f5f5;color:#333}td{color:#444;border-color:#eee}.footer{color:#999}}</style></head><body><div class="header"><div class="brand"><div class="logo">D</div><div><div class="title">Spare Parts Report</div><div class="sub">Arya Designs</div></div></div><div class="meta"><span>${filtered.length} items</span><span>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div></div><table><thead><tr><th>SKU</th><th>Category</th><th>Component</th><th>Size</th><th>Location</th><th style="text-align:right">Qty</th></tr></thead><tbody>${rows}</tbody></table><div class="footer">Powered by DailyOffice</div></body></html>`);
           }} style={btnGhost} className="mobile-only">Export</div>
-          <div onClick={() => setShowAdd(true)} style={btn}>+ Add</div>
+          {canEdit && <div onClick={() => setShowAdd(true)} style={btn}>+ Add</div>}
         </div>
       </div>
 
@@ -325,9 +332,9 @@ export default function InventoryExtras() {
                   ) : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
                 </td>
                 <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                  <span onClick={() => openEdit(ex)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: `1px solid rgba(99,102,241,.2)`, background: 'rgba(99,102,241,.06)' }}>Edit</span>{' '}
+                  {canEdit ? <><span onClick={() => openEdit(ex)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: `1px solid rgba(99,102,241,.2)`, background: 'rgba(99,102,241,.06)' }}>Edit</span>{' '}
                   <span onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Add</span>{' '}
-                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Remove</span>
+                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Remove</span></> : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
                 </td>
               </tr>
             ))}
@@ -339,11 +346,11 @@ export default function InventoryExtras() {
       <div className="inv-extra-mobile">
         {filtered.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No spare parts found</div>}
         {filtered.map((ex, idx) => (
-          <SwipeRow key={ex.id} hint={idx === 0} hintKey="spare-parts" actions={[
+          <SwipeRow key={ex.id} hint={idx === 0 && !!canEdit} hintKey="spare-parts" actions={canEdit ? [
             { label: 'Edit', color: '#6366F1', onClick: () => openEdit(ex) },
             { label: 'Add', color: '#22C55E', onClick: () => { setAdjustExtra(ex); setAdjustMode('add'); } },
             { label: 'Remove', color: '#EF4444', onClick: () => { setAdjustExtra(ex); setAdjustMode('remove'); } },
-          ]}>
+          ] : []}>
             <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}` }} onClick={() => (matchCounts[ex.id] || 0) > 0 ? loadMatches(ex) : undefined}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
