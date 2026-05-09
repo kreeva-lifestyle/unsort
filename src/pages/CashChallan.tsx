@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import CashBook from './CashBook';
 import { supabase } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
+import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import ChallanAnalytics from '../components/challan/ChallanAnalytics';
 import ChallanLedger from '../components/challan/ChallanLedger';
 import ChallanForm from '../components/challan/ChallanForm';
@@ -139,6 +140,16 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     document.body.classList.toggle('modal-open', hasModal);
     return () => { document.body.classList.remove('modal-open'); };
   }, [showModal, viewingChallan, printHtml, confirmAction, showBulkPay, showBulkUnpay, ledgerPdfHtml]);
+
+  const { set: setBreadcrumb } = useBreadcrumb();
+  useEffect(() => {
+    if (showCashBook) setBreadcrumb(['Cash Book']);
+    else if (showLedger) setBreadcrumb(['Ledger']);
+    else if (showAnalytics) setBreadcrumb(['Analytics']);
+    else if (viewingChallan) setBreadcrumb([`#${viewingChallan.challan_number}`]);
+    else setBreadcrumb(null);
+    return () => setBreadcrumb(null);
+  }, [showCashBook, showLedger, showAnalytics, viewingChallan, setBreadcrumb]);
 
   // ── Computed values (per-item discount) ─────────────────────────────────
   // Honest math throughout — no silent clamping. If the user enters an

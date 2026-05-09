@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { T } from '../../lib/theme';
+import { useBreadcrumb } from '../../hooks/useBreadcrumb';
 
 export default function Header({ title, onNotifClick, notifications, markAsRead }: {
   title: string;
@@ -8,6 +9,7 @@ export default function Header({ title, onNotifClick, notifications, markAsRead 
   markAsRead: (id: string) => void;
 }) {
   const [show, setShow] = useState(false);
+  const { crumbs } = useBreadcrumb();
   const unread = notifications.filter((n: any) => !n.is_read).length;
 
   const handleNotifClick = (n: any) => {
@@ -21,7 +23,7 @@ export default function Header({ title, onNotifClick, notifications, markAsRead 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, boxShadow: `0 0 8px ${T.ac}55` }} />
-          <h1 className="header-title" style={{ margin: 0, fontSize: 13, fontWeight: 700, color: T.tx, whiteSpace: 'nowrap', fontFamily: T.sora, letterSpacing: -0.2 }}>{title}</h1>
+          <h1 className="header-title" style={{ margin: 0, fontSize: 13, fontWeight: 700, color: crumbs.length > 0 ? T.tx3 : T.tx, whiteSpace: 'nowrap', fontFamily: T.sora, letterSpacing: -0.2 }}>{title}{crumbs.length > 0 && <>{crumbs.map((c, i) => <span key={i}><span style={{ color: T.tx3, margin: '0 5px', fontSize: 10 }}>/</span><span style={{ color: T.tx, fontWeight: 700 }}>{c}</span></span>)}</>}</h1>
         </div>
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
