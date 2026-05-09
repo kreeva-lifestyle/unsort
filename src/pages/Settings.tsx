@@ -1,6 +1,7 @@
 // Settings page — tab router for personal + admin sub-pages.
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { T, Icon } from '../lib/theme';
+import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import MyProfileSettings from '../components/settings/MyProfile';
 import CategoriesSettings from '../components/settings/Categories';
 import LocationsSettings from '../components/settings/Locations';
@@ -18,6 +19,9 @@ export default function Settings({ profile, addToast }: { profile: any; addToast
   if (canManage) tabs.push({ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }, { id: 'brands', label: 'Brands' });
   if (isAdmin) tabs.push({ id: 'users', label: 'Users' }, { id: 'packtime', label: 'PackStation' });
   const [tab, setTab] = useState('myprofile');
+  const { set: setBreadcrumb } = useBreadcrumb();
+  const tabLabel = tabs.find(t => t.id === tab)?.label || '';
+  useEffect(() => { setBreadcrumb([tabLabel]); return () => setBreadcrumb(null); }, [tabLabel, setBreadcrumb]);
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div className="settings-tabs" style={{ display: 'flex', gap: 4, marginBottom: 14, background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: 3, border: `1px solid ${T.bd}`, overflowX: 'auto' }}>

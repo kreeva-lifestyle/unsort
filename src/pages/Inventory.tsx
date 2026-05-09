@@ -8,6 +8,7 @@ import SwipeRow from '../components/ui/SwipeRow';
 import { friendlyError } from '../lib/friendlyError';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
+import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import InventoryExtras from './InventoryExtras';
 import Empty from '../components/ui/Empty';
 import { SkeletonRows } from '../components/ui/Skeleton';
@@ -107,6 +108,13 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   }, [showModal, showCompModal, matchResult, showCompleteModal, showIntel, exportPdfHtml]);
 
   useEffect(() => { if (active) setShowExtras(false); }, [active]);
+
+  const { set: setBreadcrumb } = useBreadcrumb();
+  useEffect(() => {
+    if (showExtras) setBreadcrumb(['Spare Parts']);
+    else setBreadcrumb(null);
+    return () => setBreadcrumb(null);
+  }, [showExtras, setBreadcrumb]);
 
   const fetchData = () => {
     setLoading(true);
