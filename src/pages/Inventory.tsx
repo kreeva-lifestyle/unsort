@@ -401,7 +401,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const exportPdf = () => {
     if (filtered.length === 0) return;
     const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
-    const rows = filtered.map(i => `<tr><td>${esc(i.serial_number || '—')}</td><td>${esc(i.products?.name || '—')}</td><td>${esc(i.size || '—')}</td><td>${esc(i.location || '—')}</td><td>${esc((i as any).manufacturer || '—')}</td><td style="text-transform:capitalize">${esc(i.status === 'dry_clean' ? 'Dry Clean' : i.status)}</td></tr>`).join('');
+    const rows = filtered.map(i => { const m = (itemMissing[i.id] || []).join(', '); const d = (itemDamaged[i.id] || []).join(', '); const issues = [m ? `Missing: ${m}` : '', d ? `Damaged: ${d}` : ''].filter(Boolean).join(' | '); return `<tr><td>${esc(i.serial_number || '—')}</td><td>${esc(i.products?.name || '—')}</td><td>${esc(i.size || '—')}</td><td>${esc(i.location || '—')}</td><td>${esc((i as any).manufacturer || '—')}</td><td style="text-transform:capitalize">${esc(i.status === 'dry_clean' ? 'Dry Clean' : i.status)}</td><td style="font-size:9px;color:${m ? '#F59E0B' : d ? '#EF4444' : '#4A5568'}">${esc(issues || '—')}</td></tr>`; }).join('');
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inventory Report</title><style>
       *{margin:0;padding:0;box-sizing:border-box}
       body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#060810;color:#E2E8F0;padding:16px;padding-bottom:80px;-webkit-text-size-adjust:100%}
@@ -425,7 +425,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       <div class="brand"><div class="logo">D</div><div><div class="title">Inventory Report</div><div class="sub">Arya Designs</div></div></div>
       <div class="meta"><span>${filtered.length} items</span><span>${isCompletedView ? 'Completed' : 'Active'}</span><span>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
     </div>
-    <table><thead><tr><th>SKU</th><th>Category</th><th>Size</th><th>Location</th><th>Manufacturer</th><th>Status</th></tr></thead>
+    <table><thead><tr><th>SKU</th><th>Category</th><th>Size</th><th>Location</th><th>Manufacturer</th><th>Status</th><th>Issues</th></tr></thead>
     <tbody>${rows}</tbody></table>
     <div class="footer">Powered by DailyOffice</div>
     </body></html>`;
