@@ -966,22 +966,22 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // Ledger PDF modal — must be ABOVE all early returns so it renders
   // when showLedger is true. It's position:fixed so it overlays any view.
-  const pdfModal = ledgerPdfHtml ? (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setLedgerPdfHtml(null)}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: 'min(900px, 100%)', maxHeight: '92vh', display: 'flex', flexDirection: 'column' as const, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,.6)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#111', fontFamily: T.sora }}>Ledger — {ledgerPdfTitle}</div>
-            <div style={{ fontSize: 11, color: '#6B7890' }}>Preview. Click Print to save as PDF.</div>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => { ledgerPdfIframeRef.current?.contentWindow?.print(); }} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', boxShadow: '0 2px 10px rgba(99,102,241,.3)' }}>Print / Save as PDF</button>
-            <button onClick={() => setLedgerPdfHtml(null)} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Close</button>
-          </div>
+  const pdfModal = ledgerPdfHtml ? createPortal(
+    <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#060810', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+      <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
+        <div>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', fontFamily: "'Sora',sans-serif" }}>Ledger — {ledgerPdfTitle}</span>
+          <div style={{ fontSize: 10, color: '#6B7890' }}>Preview</div>
         </div>
-        <iframe ref={ledgerPdfIframeRef} title="Ledger PDF preview" srcDoc={ledgerPdfHtml} style={{ flex: 1, width: '100%', minHeight: 460, border: 'none', background: '#fff' }} />
+        <button onClick={() => setLedgerPdfHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
       </div>
-    </div>
+      <iframe ref={ledgerPdfIframeRef} title="Ledger PDF preview" srcDoc={ledgerPdfHtml} style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }} />
+      <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
+        <button onClick={() => setLedgerPdfHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
+        <button onClick={() => { ledgerPdfIframeRef.current?.contentWindow?.print(); }} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #6366F1, #818CF8)', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, flex: 1, maxWidth: 160, boxShadow: '0 4px 16px rgba(99,102,241,.35)' }}>Print / Share</button>
+      </div>
+    </div>,
+    document.body
   ) : null;
 
   // ── Cash Book Screen ───────────────────────────────────────────────────────
@@ -1274,10 +1274,15 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       )}
 
       {printHtml && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
-          <iframe ref={printIframeRef} srcDoc={printHtml} style={{ flex: 1, border: 'none', width: '100%' }} />
-          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: '#f5f5f5', borderTop: '1px solid #ddd', display: 'flex', justifyContent: 'center' }}>
-            <button onClick={() => setPrintHtml(null)} style={{ padding: '12px 32px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', color: '#333', fontSize: 14, cursor: 'pointer', fontWeight: 500 }}>Close</button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#060810', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+          <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', fontFamily: "'Sora',sans-serif" }}>Print Preview</span>
+            <button onClick={() => setPrintHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
+          </div>
+          <iframe ref={printIframeRef} srcDoc={printHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#fff' }} />
+          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <button onClick={() => setPrintHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
+            <button onClick={() => { printIframeRef.current?.contentWindow?.print(); }} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #6366F1, #818CF8)', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, flex: 1, maxWidth: 160, boxShadow: '0 4px 16px rgba(99,102,241,.35)' }}>Print / Share</button>
           </div>
         </div>,
         document.body

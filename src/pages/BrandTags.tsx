@@ -1,5 +1,6 @@
 /* eslint-disable */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
@@ -747,27 +748,22 @@ export default function BrandTagPrinter() {
       )}
 
       {/* ── Label Print Preview (iframe-based; no popup required) ── */}
-      {printHtml && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setPrintHtml(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: 'min(540px, 100%)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,.6)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#111', fontFamily: T.sora }}>Label Print Preview</div>
-                <div style={{ fontSize: 11, color: '#6B7890' }}>{printCount} label{printCount === 1 ? '' : 's'} ready to print</div>
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => { printIframeRef.current?.contentWindow?.print(); }} style={S.btnPrimary}>Print</button>
-                <button onClick={() => setPrintHtml(null)} style={S.btnGhost}>Close</button>
-              </div>
+      {printHtml && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#060810', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+          <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', fontFamily: "'Sora',sans-serif" }}>Label Print Preview</span>
+              <div style={{ fontSize: 10, color: '#6B7890' }}>{printCount} label{printCount === 1 ? '' : 's'}</div>
             </div>
-            <iframe
-              ref={printIframeRef}
-              title="Label print preview"
-              srcDoc={printHtml}
-              style={{ flex: 1, width: '100%', minHeight: 420, border: 'none', background: '#fff' }}
-            />
+            <button onClick={() => setPrintHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
           </div>
-        </div>
+          <iframe ref={printIframeRef} title="Label print preview" srcDoc={printHtml} style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }} />
+          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <button onClick={() => setPrintHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
+            <button onClick={() => { printIframeRef.current?.contentWindow?.print(); }} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #6366F1, #818CF8)', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, flex: 1, maxWidth: 160, boxShadow: '0 4px 16px rgba(99,102,241,.35)' }}>Print</button>
+          </div>
+        </div>,
+        document.body
       )}
       </>}
       <ConfirmModal {...confirmModalProps} />
