@@ -247,9 +247,9 @@ export default function InventoryExtras() {
       p_reason: null,
     });
     if (error) { setError(friendlyError(error)); setSaving(false); return; }
-    // Once matched, the extra served its purpose. Delete the row when
-    // qty reaches 0 — no need to keep spent extras in the database.
-    if (extra.quantity <= 1) {
+    // Check current DB quantity (not stale client value) to decide cleanup
+    const { data: current } = await supabase.from('inventory_extras').select('quantity').eq('id', extra.id).maybeSingle();
+    if (current && current.quantity <= 0) {
       const { error: delErr } = await supabase.from('inventory_extras').delete().eq('id', extra.id);
       if (delErr) addToast('Item completed but spare part row cleanup failed — ' + friendlyError(delErr), 'error');
     }
