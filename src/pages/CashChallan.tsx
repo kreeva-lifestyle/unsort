@@ -578,18 +578,16 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         // Structured field-level diff for audit
         const tracked: (keyof typeof challanData)[] = ['status', 'amount_paid', 'payment_mode', 'payment_date', 'total', 'customer_name', 'shipping_charges', 'notes'];
         const changes: Record<string, { from: unknown; to: unknown }> = {};
-        for (const k of tracked) { const prev = (editing as any)[k]; const next = (challanData as any)[k]; if (String(prev ?? '') !== String(next ?? '')) changes[k] = { from: prev, to: next }; }
+        for (const k of tracked) { const prev = (editing as Record<string, unknown>)[k]; const next = (challanData as Record<string, unknown>)[k]; if (String(prev ?? '') !== String(next ?? '')) changes[k] = { from: prev, to: next }; }
         await ccAuditLog('UPDATE', editing.id, `Challan #${editing.challan_number} updated`, Object.keys(changes).length > 0 ? changes : undefined);
       } else {
-        const { data: newChallan, error: crErr } = await supabase.from('cash_challans').insert({ ...challanData, created_by: user?.id, source_challan_id: isReturn && returnSource ? returnSource.id : null }).select('id, challan_number').single();
+        const rpcPayload = {
+          p_challan: { ...challanData, created_by: user?.id, source_challan_id: isReturn && returnSource ? returnSource.id : null },
+          p_items: items.map((it) => ({ sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100 })),
+          p_payment: amountPaid > 0 ? { amount: amountPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || new Date().toISOString().slice(0, 10), paid_by: user?.id } : null,
+        };
+        const { data: newChallan, error: crErr } = await supabase.rpc('create_challan_with_items', rpcPayload);
         if (crErr || !newChallan) throw new Error(crErr?.message || 'Failed to create challan');
-        const { error: itErr } = await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: newChallan.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100, sort_order: i })));
-        if (itErr) { await supabase.from('cash_challans').delete().eq('id', newChallan.id); throw new Error(itErr.message); }
-        // Record initial payment for new challan
-        if (amountPaid > 0) {
-          const { error: payErr } = await supabase.from('cash_challan_payments').insert({ challan_id: newChallan.id, amount: amountPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || new Date().toISOString().slice(0, 10), paid_by: user?.id });
-          if (payErr) addToast('Payment record failed — ' + friendlyError(payErr), 'error');
-        }
         await ccAuditLog('CREATE', newChallan.id, `${isReturn ? 'Return' : 'Challan'} #${newChallan.challan_number} created for ${customerName.trim()} — ₹${grandTotal}`);
       }
     } catch (e: any) {

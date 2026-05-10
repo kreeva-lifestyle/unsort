@@ -191,9 +191,14 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     fetchData();
     let debounceTimer: any;
     const debouncedFetch = () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(fetchData, 500); };
+    const immFetch = () => fetchData();
     const ch = supabase.channel('inv-sync-' + instanceId.replace(/:/g, ''))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, debouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'item_components' }, debouncedFetch)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inventory_items' }, immFetch)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'inventory_items' }, immFetch)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inventory_items' }, debouncedFetch)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'item_components' }, immFetch)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'item_components' }, immFetch)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'item_components' }, debouncedFetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'item_tags' }, debouncedFetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, debouncedFetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, debouncedFetch)
