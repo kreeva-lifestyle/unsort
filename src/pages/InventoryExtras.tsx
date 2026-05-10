@@ -18,7 +18,7 @@ import type {
 } from '../types/database';
 
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
-import { isDupatta, isLehenga, isBottomType } from '../lib/garmentHelpers';
+import { isDupatta, isLehenga, isBottomType, mfrFromSku } from '../lib/garmentHelpers';
 
 // View model: narrowed inventory_items row for the matching UI.
 type InventoryItemMatch = Pick<InventoryItem, 'id' | 'batch_number' | 'serial_number' | 'size' | 'location' | 'status'>;
@@ -257,7 +257,9 @@ export default function InventoryExtras() {
     setSaving(false); setCompleteItem(null); setMatchExtra(null); addToast('Item completed', 'success'); fetchExtras();
   };
 
-  // Filtered list
+  // Filtered list + pagination
+  const [page, setPage] = useState(0);
+  const [perPage, setPerPage] = useState(25);
   const filtered = extras.filter(ex => {
     if (catFilter !== 'all' && ex.product_id !== catFilter) return false;
     if (search) {
@@ -266,6 +268,8 @@ export default function InventoryExtras() {
     }
     return true;
   });
+  const totalPages = Math.ceil(filtered.length / perPage);
+  const paged = filtered.slice(page * perPage, (page + 1) * perPage);
 
   // Shared styles
   const label: React.CSSProperties = { display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' };
@@ -301,9 +305,9 @@ export default function InventoryExtras() {
 
       {/* Filters */}
       <div className="inv-extra-filters" style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-        <input placeholder="Search SKU, category, component..." value={search} onChange={e => setSearch(e.target.value)}
+        <input placeholder="Search SKU, category, component..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }}
           style={{ ...input, flex: 1, minWidth: 120 }} />
-        <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
+        <select value={catFilter} onChange={e => { setCatFilter(e.target.value); setPage(0); }}
           style={{ ...input, flex: 1, minWidth: 120 }}>
           <option value="all">All Categories</option>
           {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
@@ -318,8 +322,8 @@ export default function InventoryExtras() {
             <th style={th}>Size</th><th style={th}>Qty</th><th style={th}>Matches</th><th style={th}>Actions</th>
           </tr></thead>
           <tbody>
-            {filtered.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', padding: 30, color: T.tx3 }}>No spare parts found</td></tr>}
-            {filtered.map(ex => (
+            {paged.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', padding: 30, color: T.tx3 }}>No spare parts found</td></tr>}
+            {paged.map(ex => (
               <tr key={ex.id} style={{ transition: 'background 150ms' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                 <td style={{ ...td, fontFamily: T.mono, fontSize: 11, color: T.tx }}>{ex.sku}</td>
                 <td style={td}>{ex.product_name}{(() => { const p = products.find(pr => pr.id === ex.product_id); return p?.sku ? <span style={{ marginLeft: 4, fontSize: 9, color: T.tx3, fontFamily: T.mono }}>({p.sku})</span> : null; })()}</td>
@@ -346,8 +350,8 @@ export default function InventoryExtras() {
 
       {/* Mobile card view */}
       <div className="inv-extra-mobile">
-        {filtered.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No spare parts found</div>}
-        {filtered.map((ex, idx) => (
+        {paged.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No spare parts found</div>}
+        {paged.map((ex, idx) => (
           <SwipeRow key={ex.id} hint={idx === 0 && !!canEdit} hintKey="spare-parts" actions={canEdit ? [
             { label: 'Edit', color: '#6366F1', onClick: () => openEdit(ex) },
             { label: 'Add', color: '#22C55E', onClick: () => { setAdjustExtra(ex); setAdjustMode('add'); } },
@@ -369,6 +373,21 @@ export default function InventoryExtras() {
           </SwipeRow>
         ))}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span onClick={() => setPage(Math.max(0, page - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }}>Prev</span>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
+          <span onClick={() => setPage(Math.min(totalPages - 1, page + 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }}>Next</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{filtered.length} items</span>
+          <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setPage(0); }} style={{ padding: '4px 8px', fontSize: 11, height: 28, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, outline: 'none' }}>
+            {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}/page</option>)}
+          </select>
+        </div>
+      </div>}
 
       {/* Add Spare Part Modal */}
       {showAdd && createPortal(<div style={overlay} onClick={() => { setShowAdd(false); setError(''); }}>
@@ -394,9 +413,9 @@ export default function InventoryExtras() {
             <div className="inv-extra-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <div style={{ position: 'relative' }}>
                 <label style={label}>SKU *</label>
-                <input value={fSku} onChange={e => { setFSku(e.target.value); clearTimeout(skuTimer.current); skuTimer.current = setTimeout(() => searchSkus(e.target.value), 300); }} onFocus={() => { if (fSkuSuggestions.length > 0) setShowSkuDrop(true); }} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. SW-1234" style={{ ...input, fontFamily: T.mono }} autoComplete="off" />
+                <input value={fSku} onChange={e => { const v = e.target.value; setFSku(v); const autoMfr = mfrFromSku(v); if (autoMfr && (!fManufacturer || mfrFromSku(fSku) === fManufacturer)) setFManufacturer(autoMfr); clearTimeout(skuTimer.current); skuTimer.current = setTimeout(() => searchSkus(v), 300); }} onFocus={() => { if (fSkuSuggestions.length > 0) setShowSkuDrop(true); }} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. SW-1234" style={{ ...input, fontFamily: T.mono }} autoComplete="off" />
                 {showSkuDrop && fSkuSuggestions.length > 0 && <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: 6, maxHeight: 140, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 20px rgba(0,0,0,.3)' }}>
-                  {fSkuSuggestions.map(s => <div key={s} onMouseDown={() => { setFSku(s); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}` }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>{s}</div>)}
+                  {fSkuSuggestions.map(s => <div key={s} onMouseDown={() => { setFSku(s); const autoMfr = mfrFromSku(s); if (autoMfr && (!fManufacturer || mfrFromSku(fSku) === fManufacturer)) setFManufacturer(autoMfr); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}` }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>{s}</div>)}
                 </div>}
               </div>
               <div>
