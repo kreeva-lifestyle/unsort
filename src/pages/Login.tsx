@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { T } from '../lib/theme';
+import { T, S } from '../lib/theme';
 import { supabase } from '../lib/supabase';
 
 const friendlyAuthError = (raw: string): string => {
@@ -43,9 +43,7 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
   };
 
   const inp: React.CSSProperties = {
-    width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 10,
-    padding: '14px 16px', color: T.tx, fontFamily: T.sans, fontSize: 15, fontWeight: 500,
-    outline: 'none', boxSizing: 'border-box', transition: T.transition,
+    ...S.fInput, height: 44, fontSize: 15, padding: '12px 16px', borderRadius: 10,
   };
 
   return (

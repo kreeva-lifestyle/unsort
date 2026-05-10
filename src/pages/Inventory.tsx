@@ -76,7 +76,9 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const [expandedNote, setExpandedNote] = useState<string | null>(null);
   const { profile } = useAuth();
   const { addToast } = useNotifications();
-  const [form, setForm] = useState({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', manufacturer: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' });
+  const emptyForm = { product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', manufacturer: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' };
+  const [form, setForm] = useState(emptyForm);
+  const resetForm = () => { setShowModal(false); setSelected(null); setForm(emptyForm); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); };
   const [catSearch, setCatSearch] = useState('');
   const [showCatDrop, setShowCatDrop] = useState(false);
   const [showSkuDrop, setShowSkuDrop] = useState(false);
@@ -122,7 +124,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     supabase.from('products').select('id, name, sku, total_components, category').eq('is_active', true).then(({ data, error }) => { if (error) addToast('Failed to load categories — ' + friendlyError(error), 'error'); setProducts(data || []); });
     supabase.from('locations').select('id, name').order('name').then(({ data, error }) => { if (error) addToast('Failed to load locations — ' + friendlyError(error), 'error'); setLocations(data || []); });
     supabase.from('tags').select('id, name, color').order('name').then(({ data, error }) => { if (error) addToast('Failed to load tags — ' + friendlyError(error), 'error'); setTags(data || []); });
-    supabase.from('inventory_items').select('manufacturer').gt('manufacturer', '').then(({ data }) => { const unique = [...new Set((data || []).map(d => d.manufacturer).filter(Boolean))].sort(); setManufacturers(unique); });
+    supabase.from('inventory_items').select('manufacturer').gt('manufacturer', '').limit(5000).then(({ data }) => { const unique = [...new Set((data || []).map(d => d.manufacturer).filter(Boolean))].sort(); setManufacturers(unique); });
     supabase.from('item_tags').select('inventory_item_id, tag_id, tags(id, name, color)').limit(10000).then(({ data }) => {
       const map: Record<string, any[]> = {};
       (data || []).forEach((it: any) => { if (!map[it.inventory_item_id]) map[it.inventory_item_id] = []; map[it.inventory_item_id].push(it.tags); });
@@ -233,12 +235,15 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const updateComponentStatuses = async (inventoryItemId: string) => {
     await new Promise(r => setTimeout(r, 500));
     const { data: itemComps } = await supabase.from('item_components').select('id, component_id').eq('inventory_item_id', inventoryItemId);
-    if (itemComps) {
-      for (const ic of itemComps) {
-        const status = damagedComps.has(ic.component_id) ? 'damaged' : missingComps.has(ic.component_id) ? 'missing' : 'present';
-        await supabase.from('item_components').update({ status }).eq('id', ic.id);
-      }
+    if (!itemComps || itemComps.length === 0) return;
+    const byStatus: Record<string, string[]> = { damaged: [], missing: [], present: [] };
+    for (const ic of itemComps) {
+      const status = damagedComps.has(ic.component_id) ? 'damaged' : missingComps.has(ic.component_id) ? 'missing' : 'present';
+      byStatus[status].push(ic.id);
     }
+    await Promise.all(Object.entries(byStatus).filter(([, ids]) => ids.length > 0).map(([status, ids]) =>
+      supabase.from('item_components').update({ status }).in('id', ids)
+    ));
   };
 
   const checkForPairMatch = async (productId: string, currentItemId: string) => {
@@ -383,7 +388,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     const savedProductId = form.product_id;
     const savedStatus = form.status;
     const hadMissing = missingComps.size > 0;
-    setShowModal(false); setSelected(null); setForm({ product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', manufacturer: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' }); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); fetchData();
+    resetForm(); fetchData();
 
     // Check for pair matches after save (only for unsorted items with missing components)
     if (savedStatus === 'unsorted' && hadMissing) {
@@ -394,7 +399,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const updateComp = async (id: string, status: string) => { const { error } = await supabase.from('item_components').update({ status }).eq('id', id); if (error) addToast(friendlyError(error), 'error'); else { addToast('Updated!', 'success'); fetchComps(selected.id); fetchData(); } };
 
   const openEdit = async (item: any) => {
-    setSelected(item); setForm({ product_id: item.product_id, serial_number: item.serial_number || '', size: item.size || '', status: item.status, location: item.location || '', manufacturer: (item as any).manufacturer || '', notes: item.notes || '', order_id: item.order_id || '', marketplace: item.marketplace || '', ticket_id: item.ticket_id || '', link: item.link || '' }); setCatSearch(item.products?.name || '');
+    setSelected(item); setForm({ product_id: item.product_id, serial_number: item.serial_number || '', size: item.size || '', status: item.status, location: item.location || '', manufacturer: item.manufacturer || '', notes: item.notes || '', order_id: item.order_id || '', marketplace: item.marketplace || '', ticket_id: item.ticket_id || '', link: item.link || '' }); setCatSearch(item.products?.name || '');
     const { data: cc } = await supabase.from('components').select('id, name').eq('product_id', item.product_id);
     setCatComps(cc || []);
     const { data: ic } = await supabase.from('item_components').select('component_id, status').eq('inventory_item_id', item.id);
@@ -409,7 +414,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const exportPdf = () => {
     if (filtered.length === 0) return;
     const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
-    const rows = filtered.map(i => { const m = (itemMissing[i.id] || []).join(', '); const d = (itemDamaged[i.id] || []).join(', '); const issues = [m ? `Missing: ${m}` : '', d ? `Damaged: ${d}` : ''].filter(Boolean).join(' | '); return `<tr><td>${esc(i.serial_number || '—')}</td><td>${esc(i.products?.name || '—')}</td><td>${esc(i.size || '—')}</td><td>${esc(i.location || '—')}</td><td>${esc((i as any).manufacturer || '—')}</td><td style="text-transform:capitalize">${esc(i.status === 'dry_clean' ? 'Dry Clean' : i.status)}</td><td style="font-size:9px;color:${m ? '#F59E0B' : d ? '#EF4444' : '#4A5568'}">${esc(issues || '—')}</td></tr>`; }).join('');
+    const rows = filtered.map(i => { const m = (itemMissing[i.id] || []).join(', '); const d = (itemDamaged[i.id] || []).join(', '); const issues = [m ? `Missing: ${m}` : '', d ? `Damaged: ${d}` : ''].filter(Boolean).join(' | '); return `<tr><td>${esc(i.serial_number || '—')}</td><td>${esc(i.products?.name || '—')}</td><td>${esc(i.size || '—')}</td><td>${esc(i.location || '—')}</td><td>${esc(i.manufacturer || '—')}</td><td style="text-transform:capitalize">${esc(i.status === 'dry_clean' ? 'Dry Clean' : i.status)}</td><td style="font-size:9px;color:${m ? '#F59E0B' : d ? '#EF4444' : '#4A5568'}">${esc(issues || '—')}</td></tr>`; }).join('');
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inventory Report</title><style>
       *{margin:0;padding:0;box-sizing:border-box}
       body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#060810;color:#E2E8F0;padding:16px;padding-bottom:80px;-webkit-text-size-adjust:100%}
@@ -585,7 +590,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     if (filters.category.length > 0 && !filters.category.includes(i.product_id)) return false;
     if (filters.location.length > 0 && !filters.location.includes(i.location || '')) return false;
     if (filters.marketplace.length > 0 && !filters.marketplace.includes(i.marketplace || '')) return false;
-    if (filters.manufacturer.length > 0 && !filters.manufacturer.includes((i as any).manufacturer || '')) return false;
+    if (filters.manufacturer.length > 0 && !filters.manufacturer.includes(i.manufacturer || '')) return false;
     if (filters.tag.length > 0) { const t = itemTags[i.id] || []; if (!t.some((tg: any) => filters.tag.includes(tg?.id))) return false; }
     const searchTerm = search;
     if (searchTerm) {

@@ -190,7 +190,7 @@ export default function ChallanForm(p: ChallanFormProps) {
           {outstanding > 0 && <div style={{ fontSize: 11, color: T.re, fontWeight: 600, marginBottom: 10, padding: '6px 10px', background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.12)', borderRadius: 6 }}>Outstanding: ₹{outstanding.toLocaleString('en-IN')}</div>}
 
           {/* Line Items */}
-          <div className="challan-item-grid-wrap" data-items style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 9, marginBottom: 12, overflow: 'hidden' }}>
+          <div className="challan-item-grid-wrap" data-items style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 12, overflow: 'hidden' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 56px 80px 100px 28px', gap: 6, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, background: T.glass1 }}>
               <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600 }}>SKU</span>
               <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600, textAlign: 'center' as const }}>Qty</span>
