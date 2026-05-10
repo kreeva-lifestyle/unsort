@@ -45,7 +45,7 @@ const canAlterSize = (a: string, b: string): boolean => {
   if (ai === -1 || bi === -1) return false;
   return Math.abs(ai - bi) === 1;
 };
-import { isDupatta, isLehenga, isBottomType } from '../lib/garmentHelpers';
+import { isDupatta, isLehenga, isBottomType, mfrFromSku } from '../lib/garmentHelpers';
 
 export default function Inventory({ openItemId, onItemOpened, active }: { openItemId?: string | null; onItemOpened?: () => void; active?: boolean }) {
   const [stage, setStage] = useState<'pending' | 'completed'>('pending');
@@ -77,11 +77,6 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const { profile } = useAuth();
   const { addToast } = useNotifications();
   const emptyForm = { product_id: '', serial_number: '', size: '', status: 'unsorted', location: '', manufacturer: '', notes: '', order_id: '', marketplace: '', ticket_id: '', link: '' };
-  const SKU_MANUFACTURER: [RegExp, string][] = [
-    [/^DRS/i, 'Dresstive'],
-    [/^N?KB/i, 'Kashtbanjan'],
-  ];
-  const mfrFromSku = (sku: string) => SKU_MANUFACTURER.find(([re]) => re.test(sku))?.[1] || '';
   const [form, setForm] = useState(emptyForm);
   const resetForm = () => { setShowModal(false); setSelected(null); setForm(emptyForm); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowCatDrop(false); setShowSkuDrop(false); setShowMoreFields(false); };
   const [catSearch, setCatSearch] = useState('');

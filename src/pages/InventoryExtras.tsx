@@ -18,7 +18,7 @@ import type {
 } from '../types/database';
 
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
-import { isDupatta, isLehenga, isBottomType } from '../lib/garmentHelpers';
+import { isDupatta, isLehenga, isBottomType, mfrFromSku } from '../lib/garmentHelpers';
 
 // View model: narrowed inventory_items row for the matching UI.
 type InventoryItemMatch = Pick<InventoryItem, 'id' | 'batch_number' | 'serial_number' | 'size' | 'location' | 'status'>;
@@ -394,9 +394,9 @@ export default function InventoryExtras() {
             <div className="inv-extra-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <div style={{ position: 'relative' }}>
                 <label style={label}>SKU *</label>
-                <input value={fSku} onChange={e => { setFSku(e.target.value); clearTimeout(skuTimer.current); skuTimer.current = setTimeout(() => searchSkus(e.target.value), 300); }} onFocus={() => { if (fSkuSuggestions.length > 0) setShowSkuDrop(true); }} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. SW-1234" style={{ ...input, fontFamily: T.mono }} autoComplete="off" />
+                <input value={fSku} onChange={e => { const v = e.target.value; setFSku(v); const autoMfr = mfrFromSku(v); if (autoMfr && (!fManufacturer || mfrFromSku(fSku) === fManufacturer)) setFManufacturer(autoMfr); clearTimeout(skuTimer.current); skuTimer.current = setTimeout(() => searchSkus(v), 300); }} onFocus={() => { if (fSkuSuggestions.length > 0) setShowSkuDrop(true); }} onBlur={() => setTimeout(() => setShowSkuDrop(false), 150)} placeholder="e.g. SW-1234" style={{ ...input, fontFamily: T.mono }} autoComplete="off" />
                 {showSkuDrop && fSkuSuggestions.length > 0 && <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', marginTop: 4, background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: 6, maxHeight: 140, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 20px rgba(0,0,0,.3)' }}>
-                  {fSkuSuggestions.map(s => <div key={s} onMouseDown={() => { setFSku(s); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}` }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>{s}</div>)}
+                  {fSkuSuggestions.map(s => <div key={s} onMouseDown={() => { setFSku(s); const autoMfr = mfrFromSku(s); if (autoMfr && (!fManufacturer || mfrFromSku(fSku) === fManufacturer)) setFManufacturer(autoMfr); setShowSkuDrop(false); }} style={{ padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontFamily: T.mono, color: T.ac2, borderBottom: `1px solid ${T.bd}` }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>{s}</div>)}
                 </div>}
               </div>
               <div>
