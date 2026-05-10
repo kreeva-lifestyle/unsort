@@ -90,6 +90,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
 
   const [itemMissing, setItemMissing] = useState<Record<string, string[]>>({});
   const [itemDamaged, setItemDamaged] = useState<Record<string, string[]>>({});
+  const [itemDamagedIds, setItemDamagedIds] = useState<Record<string, Set<string>>>({});
   const [itemPresent, setItemPresent] = useState<Record<string, Set<string>>>({});
   const [completablePairs, setCompletablePairs] = useState<Record<string, string[]>>({});
   const [showCompleteModal, setShowCompleteModal] = useState<{ itemId: string; pairId?: string } | null>(null);
@@ -133,6 +134,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     const p2 = supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').limit(10000).then(({ data }) => {
       const missingMap: Record<string, string[]> = {};
       const damagedMap: Record<string, string[]> = {};
+      const damagedIdMap: Record<string, Set<string>> = {};
       const presentMap: Record<string, Set<string>> = {};
       (data || []).forEach((ic: any) => {
         if (ic.status === 'missing') {
@@ -142,13 +144,15 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         if (ic.status === 'damaged') {
           if (!damagedMap[ic.inventory_item_id]) damagedMap[ic.inventory_item_id] = [];
           if (ic.components?.name) damagedMap[ic.inventory_item_id].push(ic.components.name);
+          if (!damagedIdMap[ic.inventory_item_id]) damagedIdMap[ic.inventory_item_id] = new Set();
+          damagedIdMap[ic.inventory_item_id].add(ic.component_id);
         }
         if (ic.status === 'present') {
           if (!presentMap[ic.inventory_item_id]) presentMap[ic.inventory_item_id] = new Set();
           presentMap[ic.inventory_item_id].add(ic.component_id);
         }
       });
-      setItemMissing(missingMap); setItemDamaged(damagedMap);
+      setItemMissing(missingMap); setItemDamaged(damagedMap); setItemDamagedIds(damagedIdMap);
       setItemPresent(presentMap);
     });
     Promise.all([p1, p2]).then(() => setLoading(false)).catch(() => setLoading(false));
@@ -177,6 +181,10 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           if (!bPresent) continue;
           const union = new Set([...aPresent, ...bPresent]);
           if (union.size >= totalComps) {
+            const aDmg = itemDamagedIds[a.id] || new Set();
+            const bDmg = itemDamagedIds[b.id] || new Set();
+            const hasUnresolvedDamage = [...aDmg, ...bDmg].some(id => !aPresent.has(id) && !bPresent.has(id));
+            if (hasUnresolvedDamage) continue;
             if (!pairs[a.id]) pairs[a.id] = [];
             if (!pairs[a.id].includes(b.id)) pairs[a.id].push(b.id);
           }
@@ -471,6 +479,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
 
   const [pendingDelete, setPendingDelete] = useState<{ id: string; timer: number; snapshot: any } | null>(null);
+  const deleteTimerRef = useRef<number | null>(null);
+  useEffect(() => () => { if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current); }, []);
 
   const quickStatusChange = async (itemId: string, newStatus: string) => {
     const { error } = await supabase.from('inventory_items').update({ status: newStatus, status_changed_at: new Date().toISOString() }).eq('id', itemId);
@@ -487,16 +497,19 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     const snapshot = item;
     setItems(prev => prev.filter(i => i.id !== itemId));
     const timer = window.setTimeout(async () => {
+      deleteTimerRef.current = null;
       const { error } = await supabase.rpc('delete_inventory_item_cascade', { p_item_id: itemId });
       if (error) { addToast('Delete failed — ' + friendlyError(error), 'error'); setItems(prev => [snapshot, ...prev]); }
       setPendingDelete(null);
     }, 5000);
+    deleteTimerRef.current = timer;
     setPendingDelete({ id: itemId, timer, snapshot });
   };
 
   const undoDelete = () => {
     if (pendingDelete) {
       clearTimeout(pendingDelete.timer);
+      deleteTimerRef.current = null;
       setItems(prev => [pendingDelete.snapshot, ...prev]);
       setPendingDelete(null);
     }
@@ -513,6 +526,10 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     const aP = new Set((aComps || []).filter(c => c.status === 'present').map(c => c.component_id));
     const bP = new Set((bComps || []).filter(c => c.status === 'present').map(c => c.component_id));
     const union = new Set([...aP, ...bP]);
+    const aDamaged = (aComps || []).filter(c => c.status === 'damaged').map(c => c.component_id);
+    const bDamaged = (bComps || []).filter(c => c.status === 'damaged').map(c => c.component_id);
+    const unresolvedDamage = [...aDamaged, ...bDamaged].filter(id => !aP.has(id) && !bP.has(id));
+    if (unresolvedDamage.length > 0) { addToast('Cannot complete — some components are damaged in both items and have no undamaged replacement.', 'error'); setShowCompleteModal(null); fetchData(); return; }
     type ProdJoin = { product_id: string; products: { total_components: number } | { total_components: number }[] | null };
     const prodRow = prod as ProdJoin | null;
     const prodProducts = prodRow?.products;
@@ -1091,7 +1108,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 12, color: T.tx, flex: 1 }}>Item deleted</span>
           <span onClick={undoDelete} style={{ ...S.btnPrimary, padding: '4px 12px', fontSize: 11, background: T.yl, color: '#000', boxShadow: 'none' }}>Undo</span>
-          <span onClick={() => { clearTimeout(pendingDelete.timer); const id = pendingDelete.id; setPendingDelete(null); supabase.rpc('delete_inventory_item_cascade', { p_item_id: id }).then(({ error }) => { if (error) addToast('Delete failed — ' + friendlyError(error), 'error'); fetchData(); }); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span>
+          <span onClick={() => { clearTimeout(pendingDelete.timer); deleteTimerRef.current = null; const id = pendingDelete.id; setPendingDelete(null); supabase.rpc('delete_inventory_item_cascade', { p_item_id: id }).then(({ error }) => { if (error) addToast('Delete failed — ' + friendlyError(error), 'error'); fetchData(); }); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span>
         </div>
         <div className="undo-bar" key={pendingDelete.id} />
       </div>}
