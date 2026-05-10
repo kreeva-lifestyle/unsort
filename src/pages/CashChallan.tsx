@@ -937,7 +937,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     for (const c of bulkPayable) await ccAuditLog(isRefund ? 'SETTLE_REFUND' : 'BULK_PAY', c.id, `${isRefund ? 'Settled against returns' : 'Bulk paid'} (${batchId}) — ₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} via ${bulkPayMode}`, { status: { from: c.status, to: 'paid' }, amount_paid: { from: c.amount_paid, to: c.total }, ...(isRefund ? { refunded: { from: 0, to: received } } : { received_amount: { from: Math.abs(bulkNetTotal), to: received } }) });
     setLastBatch({ id: batchId, count: ids.length, mode: bulkPayMode });
     setShowBulkPay(false); setBulkPayMode(''); setBulkReceivedAmount(''); exitBulkMode(); fetchChallans();
-    addToast(isRefund ? `Settled ${ids.length} challans, refunded ₹${received.toLocaleString('en-IN')} (${batchId})` : `${ids.length} challans marked as paid (${batchId})`, 'success');
+    if (failCount > 0) addToast(`${ids.length - failCount} of ${ids.length} challans paid — ${failCount} failed (${batchId})`, 'error');
+    else addToast(isRefund ? `Settled ${ids.length} challans, refunded ₹${received.toLocaleString('en-IN')} (${batchId})` : `${ids.length} challans marked as paid (${batchId})`, 'success');
     setBulkBusy(false);
   };
 
@@ -957,7 +958,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     }
     setLastBatch(null);
     fetchChallans();
-    addToast(`Batch ${batchId} reversed — ${batchPayments.length} challans unpaid`, 'success');
+    if (undoFails > 0) addToast(`Batch ${batchId} partially reversed — ${undoFails} failed`, 'error');
+    else addToast(`Batch ${batchId} reversed — ${batchPayments.length} challans unpaid`, 'success');
   };
 
   const executeBulkUnpay = async () => {
@@ -968,21 +970,23 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const ids = bulkUnpayable.map(c => c.id);
     if (ids.length === 0) { setShowBulkUnpay(false); setBulkBusy(false); return; }
     const undoBatchId = `BU-${Date.now().toString(36).toUpperCase()}`;
+    let unpayFails = 0;
     for (const c of bulkUnpayable) {
       const { error: upErr } = await supabase.from('cash_challans').update({
         status: 'unpaid', amount_paid: 0, payment_mode: null, payment_date: null,
         modified_by: user?.id, updated_at: new Date().toISOString(),
       }).eq('id', c.id).eq('status', 'paid');
-      if (upErr) { addToast('Unpay failed — ' + friendlyError(upErr), 'error'); continue; }
+      if (upErr) { unpayFails++; addToast('Unpay failed — ' + friendlyError(upErr), 'error'); continue; }
       const { error: revErr } = await supabase.from('cash_challan_payments').insert({
         challan_id: c.id, amount: Number(c.amount_paid || c.total), payment_mode: c.payment_mode || 'Cash',
         payment_date: today, paid_by: user?.id, notes: 'Bulk unpay reversal', is_reversal: true, batch_id: undoBatchId,
       });
-      if (revErr) addToast('Reversal record failed — ' + friendlyError(revErr), 'error');
+      if (revErr) { unpayFails++; addToast('Reversal record failed — ' + friendlyError(revErr), 'error'); }
     }
     for (const c of bulkUnpayable) await ccAuditLog('BULK_UNPAY', c.id, `Bulk unpaid (${undoBatchId}) — was ₹${Number(c.amount_paid || c.total).toLocaleString('en-IN')}`, { status: { from: 'paid', to: 'unpaid' }, amount_paid: { from: c.amount_paid, to: 0 } });
     setShowBulkUnpay(false); exitBulkMode(); fetchChallans(); setBulkBusy(false);
-    addToast(`${ids.length} challans reverted to unpaid`, 'success');
+    if (unpayFails > 0) addToast(`${ids.length - unpayFails} of ${ids.length} reverted — ${unpayFails} failed`, 'error');
+    else addToast(`${ids.length} challans reverted to unpaid`, 'success');
   };
 
   const totalPages = Math.ceil(totalCount / pageSize);

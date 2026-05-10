@@ -39,6 +39,7 @@ export default function InventoryExtras() {
   const [editingExtra, setEditingExtra] = useState<InventoryExtra | null>(null);
   const [editForm, setEditForm] = useState({ sku: '', size: '', location: '', manufacturer: '', notes: '' });
   // Add form
+  const resetAddForm = () => { setFProductId(''); setFComponentId(''); setFSku(''); setFSize(''); setFLocation(''); setFManufacturer(''); setFQty('1'); setFNotes(''); };
   const [fProductId, setFProductId] = useState('');
   const [fComponentId, setFComponentId] = useState('');
   const [fSku, setFSku] = useState('');
@@ -206,7 +207,7 @@ export default function InventoryExtras() {
     });
     if (histErr) setError('Extra created but history log failed — ' + friendlyError(histErr));
     setSaving(false); setShowAdd(false); addToast('Spare part added', 'success');
-    setFProductId(''); setFComponentId(''); setFSku(''); setFSize(''); setFLocation(''); setFManufacturer(''); setFQty('1'); setFNotes('');
+    resetAddForm();
     fetchExtras();
   };
 

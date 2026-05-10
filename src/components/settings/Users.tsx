@@ -21,7 +21,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     return () => { document.body.classList.remove('modal-open'); };
   }, [showInvite]);
 
-  const fetchUsers = () => { supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').order('created_at', { ascending: false }).then(({ data }) => setUsers(data || [])); };
+  const fetchUsers = () => { supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').order('created_at', { ascending: false }).then(({ data, error }) => { if (error) addToast('Failed to load users — ' + friendlyError(error), 'error'); setUsers(data || []); }); };
   useEffect(() => {
     fetchUsers();
     const ch = supabase.channel('usr-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fetchUsers).subscribe();
