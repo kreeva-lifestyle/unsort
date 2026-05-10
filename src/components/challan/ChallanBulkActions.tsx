@@ -1,6 +1,7 @@
 // Bulk-mode toolbar + Bulk Pay / Bulk Unpay modals + last-batch undo banner.
 // Extracted from CashChallan.tsx — parent owns the data + RPC calls.
 import { T } from '../../lib/theme';
+import { numericKeyDown } from '../../lib/numericInput';
 import ChallanKPIs from './ChallanKPIs';
 import type { CashChallan } from '../../types/database';
 
@@ -70,7 +71,7 @@ export default function ChallanBulkActions(p: Props) {
             <ChallanKPIs payableCount={p.payable.length} outstanding={p.outstanding} returnsCount={p.returns.length} returnsTotal={p.returnsTotal} netTotal={p.netTotal} />
             <div style={{ marginBottom: 10 }}>
               <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>{p.netTotal < 0 ? 'Amount Refunded to Customer' : 'Amount Received from Customer'}</label>
-              <input type="number" value={p.bulkReceivedAmount} onChange={e => p.setBulkReceivedAmount(e.target.value)} placeholder={String(Math.abs(p.netTotal))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+              <input type="number" min="0" value={p.bulkReceivedAmount} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setBulkReceivedAmount(e.target.value)} placeholder={String(Math.abs(p.netTotal))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
               {(() => { const recv = Number(p.bulkReceivedAmount) || 0; const expected = Math.abs(p.netTotal); const diff = recv - expected; if (!p.bulkReceivedAmount || diff === 0) return null; return <div style={{ marginTop: 4, fontSize: 10, color: T.yl, fontWeight: 600 }}>₹{Math.abs(diff).toLocaleString('en-IN')} {diff > 0 ? 'more than expected' : 'less than expected'}</div>; })()}
             </div>
             <div style={{ marginBottom: 14 }}>

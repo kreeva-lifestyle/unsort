@@ -3,6 +3,7 @@
 // Wide prop surface is intentional — keeps state in one place without introducing a context.
 import { useRef, useState, useEffect } from 'react';
 import { T } from '../../lib/theme';
+import { numericKeyDown } from '../../lib/numericInput';
 import { supabase } from '../../lib/supabase';
 import type { CashChallan, CashChallanCustomer, AuditLog } from '../../types/database';
 
@@ -218,17 +219,21 @@ export default function ChallanForm(p: ChallanFormProps) {
               <div key={i}>
                 <div className="challan-item-row" style={{ display: 'grid', gridTemplateColumns: '1fr 56px 80px 100px 28px', gap: 6, padding: '7px 12px', borderBottom: err ? 'none' : `1px solid ${T.bd}`, alignItems: 'center' }}>
                   <input data-sku value={it.sku} onChange={e => { const n = [...p.items]; n[i].sku = e.target.value; p.setItems(n); }} placeholder="SKU / Item name" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
-                  <input type="number" value={it.quantity || ''} onChange={e => { const n = [...p.items]; n[i].quantity = Number(e.target.value); p.setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: qtyBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'center' as const }} />
-                  <input type="number" value={it.price || ''} onChange={e => { const n = [...p.items]; n[i].price = Number(e.target.value); p.setItems(n); }} placeholder="0" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: priceBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
+                  <input type="number" min="1" step="1" value={it.quantity || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].quantity = Math.max(0, Math.round(Number(e.target.value))); p.setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: qtyBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'center' as const }} />
+                  <input type="number" min="0" step="0.01" value={it.price || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].price = Math.max(0, Number(e.target.value)); p.setItems(n); }} placeholder="0" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: priceBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
                   <div className="challan-disc-col" style={{ display: 'flex', gap: 2, alignItems: 'center', opacity: p.isReturn && p.returnSource ? 0.6 : 1 }}>
                     <select value={it.discount_type || 'flat'} onChange={e => { const n = [...p.items]; n[i].discount_type = e.target.value; p.setItems(n); }} disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx3, fontSize: 11, padding: '4px 6px', outline: 'none', width: 32 }}>
                       <option value="flat">₹</option><option value="percentage">%</option>
                     </select>
                     <input
                       type="number"
+                      min="0"
+                      max={it.discount_type === 'percentage' ? 100 : undefined}
+                      step="0.01"
                       value={it.discount_value || ''}
-                      onChange={e => { const n = [...p.items]; n[i].discount_value = Number(e.target.value); p.setItems(n); }}
+                      onChange={e => { const n = [...p.items]; const v = Math.max(0, Number(e.target.value)); n[i].discount_value = it.discount_type === 'percentage' ? Math.min(100, v) : v; p.setItems(n); }}
                       onKeyDown={e => {
+                        numericKeyDown(e);
                         if (e.key === 'Enter' && i === p.items.length - 1 && !(p.isReturn && p.returnSource)) {
                           e.preventDefault();
                           p.setItems([...p.items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
@@ -246,6 +251,7 @@ export default function ChallanForm(p: ChallanFormProps) {
                   <button onClick={() => { if (p.items.length > 1) p.setItems(p.items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }}>×</button>
                 </div>
                 {err && <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.re, borderBottom: `1px solid ${T.bd}`, background: 'rgba(239,68,68,.04)', display: 'flex', alignItems: 'center', gap: 5 }}>⚠ {err}</div>}
+                {!err && d > 0 && q > 0 && pr > 0 && (() => { const pct = it.discount_type === 'percentage' ? d : (d / (q * pr)) * 100; return pct > 10 ? <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.yl, borderBottom: `1px solid ${T.bd}`, background: 'rgba(245,158,11,.04)', display: 'flex', alignItems: 'center', gap: 5 }}>High discount: {Math.round(pct)}% off this item</div> : null; })()}
               </div>
               );
             })}
@@ -256,7 +262,7 @@ export default function ChallanForm(p: ChallanFormProps) {
           <div className="challan-form-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
             <div>
               <label style={lbl}>Shipping/Porter</label>
-              <input type="number" value={p.shippingCharges || ''} onChange={e => p.setShippingCharges(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11, border: p.shippingCharges < 0 ? `1px solid ${T.re}aa` : `1px solid ${T.bd}` }} />
+              <input type="number" min="0" value={p.shippingCharges || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setShippingCharges(Math.max(0, Number(e.target.value)))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11, border: p.shippingCharges < 0 ? `1px solid ${T.re}aa` : `1px solid ${T.bd}` }} />
               {p.shippingCharges < 0 && <div style={{ fontSize: 10, color: T.re, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>⚠ Cannot be negative</div>}
             </div>
             <div>
@@ -293,7 +299,7 @@ export default function ChallanForm(p: ChallanFormProps) {
             </div>
             <div>
               <label style={lbl}>{p.isReturn ? 'Refund Amount' : 'Amount Paid'}</label>
-              <input type="number" value={p.amountPaid || ''} onChange={e => p.setAmountPaid(Number(e.target.value))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
+              <input type="number" min="0" value={p.amountPaid || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setAmountPaid(Math.max(0, Number(e.target.value)))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
             </div>
             <div>
               <label style={lbl}>{p.isReturn ? 'Refund Date' : 'Payment Date'}</label>

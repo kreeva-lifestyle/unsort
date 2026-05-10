@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
 import { friendlyError } from '../lib/friendlyError';
+import { numericKeyDown } from '../lib/numericInput';
 import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
 import { useNotifications } from '../hooks/useNotifications';
 import Empty from '../components/ui/Empty';
@@ -517,7 +518,7 @@ export default function CashBook() {
           </div>
           {editingOpening ? (
             <div style={{ display: 'flex', gap: 4 }}>
-              <input type="number" value={openingInput} onChange={e => setOpeningInput(e.target.value)} placeholder="0" style={{ ...S.fInput, width: 100, fontFamily: T.mono, textAlign: 'right' }} />
+              <input type="number" value={openingInput} onKeyDown={e => numericKeyDown(e, true)} onChange={e => setOpeningInput(e.target.value)} placeholder="0" style={{ ...S.fInput, width: 100, fontFamily: T.mono, textAlign: 'right' }} />
               <button onClick={saveOpening} disabled={busy} style={{ ...S.btnSm, border: 'none', background: T.ac, color: '#fff', fontWeight: 600, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Saving…' : 'Save'}</button>
               <button onClick={() => { setEditingOpening(false); setOpeningInput(String(openingBalance)); }} style={{ ...S.btnSm, border: '1px solid rgba(99,102,241,0.15)', background: 'rgba(99,102,241,0.06)', color: T.ac2, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
             </div>
@@ -720,7 +721,7 @@ export default function CashBook() {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Amount (₹)</label>
-                <input type="number" value={handAmount} onChange={e => setHandAmount(e.target.value)} placeholder="0.00" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: handBreakdown && Math.abs(Number(handAmount) - handBreakdown.available) > 0.01 ? '1px solid rgba(245,158,11,.4)' : `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 13, padding: '8px 12px', outline: 'none', boxSizing: 'border-box' }} />
+                <input type="number" value={handAmount} onKeyDown={e => numericKeyDown(e)} onChange={e => setHandAmount(e.target.value)} placeholder="0.00" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: handBreakdown && Math.abs(Number(handAmount) - handBreakdown.available) > 0.01 ? '1px solid rgba(245,158,11,.4)' : `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 13, padding: '8px 12px', outline: 'none', boxSizing: 'border-box' }} />
               </div>
             </div>
 
@@ -847,7 +848,7 @@ export default function CashBook() {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Amount (₹)</label>
-                <input type="number" value={amount} onChange={e => setAmount(e.target.value)} autoFocus placeholder="0.00" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 13, padding: '8px 12px', outline: 'none', boxSizing: 'border-box' }} />
+                <input type="number" min="0.01" step="0.01" value={amount} onKeyDown={e => numericKeyDown(e)} onChange={e => setAmount(e.target.value)} autoFocus placeholder="0.00" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 13, padding: '8px 12px', outline: 'none', boxSizing: 'border-box' }} />
               </div>
             </div>
             <div style={{ marginBottom: 10 }}>

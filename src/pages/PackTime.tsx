@@ -379,10 +379,10 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             if (streamRef.current && !scanLockRef.current) scanTimerRef.current = requestAnimationFrame(loop);
           };
           scanTimerRef.current = requestAnimationFrame(loop);
-        }).catch(() => setCameraError('Cannot start video. Check camera permissions.'));
+        }).catch(() => { setCameraError('Cannot start video. Check camera permissions.'); setTimeout(() => setCameraOpen(false), 2000); });
       };
     })
-    .catch(() => setCameraError('Camera blocked. Go to browser Settings → Site Settings → Camera → Allow.'));
+    .catch(() => { setCameraError('Camera blocked. Go to browser Settings → Site Settings → Camera → Allow.'); setTimeout(() => setCameraOpen(false), 2000); });
   }, [stopCam]);
 
   useEffect(() => { if (cameraOpen) setTimeout(() => startCam(), 150); return () => stopCam(); }, [cameraOpen, startCam, stopCam]);
