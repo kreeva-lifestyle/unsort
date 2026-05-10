@@ -83,7 +83,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   ];
   const mfrFromSku = (sku: string) => SKU_MANUFACTURER.find(([re]) => re.test(sku))?.[1] || '';
   const [form, setForm] = useState(emptyForm);
-  const resetForm = () => { setShowModal(false); setSelected(null); setForm(emptyForm); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); };
+  const resetForm = () => { setShowModal(false); setSelected(null); setForm(emptyForm); setCatComps([]); setMissingComps(new Set()); setDamagedComps(new Set()); setTagInput(''); setShowCatDrop(false); setShowSkuDrop(false); setShowMoreFields(false); };
   const [catSearch, setCatSearch] = useState('');
   const [showCatDrop, setShowCatDrop] = useState(false);
   const [showSkuDrop, setShowSkuDrop] = useState(false);
@@ -870,7 +870,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             return (
               <SwipeRow key={item.id} actions={swipeActions} hint={idx === 0} hintKey="inventory">
               <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}`, borderLeft: `3px solid ${STATUS_DOT_COLOR[item.status] || T.yl}`, display: 'flex', flexDirection: 'column', gap: 6, position: 'relative', WebkitUserSelect: 'none', userSelect: 'none' }}
-                onTouchStart={() => { if (!canEdit) return; longPressTimer.current = setTimeout(() => { try { navigator.vibrate?.(15); } catch {} setQuickStatusItem(item.id); }, 500); }}
+                onTouchStart={() => { if (!canEdit || item.status === 'completed') return; longPressTimer.current = setTimeout(() => { try { navigator.vibrate?.(15); } catch {} setQuickStatusItem(item.id); }, 500); }}
                 onTouchEnd={() => clearTimeout(longPressTimer.current)}
                 onTouchMove={() => clearTimeout(longPressTimer.current)}>
                 {quickStatusItem === item.id && (<>
