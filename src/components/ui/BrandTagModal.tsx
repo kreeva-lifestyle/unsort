@@ -1,6 +1,7 @@
 import React from 'react';
 import JsBarcode from 'jsbarcode';
 import { T, S } from '../../lib/theme';
+import { numericKeyDown } from '../../lib/numericInput';
 
 interface BrandTagRow {
   id: string; brand: string; ean: string; sku: string; qty: string;
@@ -83,7 +84,7 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
               <div><label style={fLabel}>EAN-13 *</label><input value={form.ean} onChange={e => set('ean', e.target.value)} style={{ ...fInput, fontFamily: T.mono }} placeholder="8905738880431" /></div>
               <div><label style={fLabel}>Jio Tag</label><input value={form.jioCode} onChange={e => set('jioCode', e.target.value)} style={{ ...fInput, fontFamily: T.mono }} placeholder="JIO-A41" /></div>
             </div>
-            <div><label style={fLabel}>MRP (₹) *</label><input type="number" value={form.mrp || ''} onChange={e => set('mrp', Number(e.target.value))} style={{ ...fInput, fontFamily: T.mono }} placeholder="6800" /></div>
+            <div><label style={fLabel}>MRP (₹) *</label><input type="number" min="0" value={form.mrp || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => set('mrp', Math.max(0, Number(e.target.value)))} style={{ ...fInput, fontFamily: T.mono }} placeholder="6800" /></div>
             <div><label style={fLabel}>Includes</label><input value={form.qty.replace(/^INCLUDES:\s*/i, '')} onChange={e => set('qty', e.target.value ? 'INCLUDES: ' + e.target.value : '')} list="dl-qty" style={fInput} placeholder="1 U Top, 1 U Bottom, 1 U Dupatta" /><datalist id="dl-qty">{qtyOptions.map(o => <option key={o} value={o.replace(/^INCLUDES:\s*/i, '')} />)}</datalist></div>
             <div><label style={fLabel}>Mktd &amp; Dist. By</label><textarea value={form.mktd} onChange={e => set('mktd', e.target.value)} rows={2} style={{ ...fInput, height: 'auto', resize: 'vertical' }} /></div>
           </div>
