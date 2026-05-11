@@ -675,6 +675,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           <span style={{ fontSize: 10, fontWeight: 500, color: T.tx3 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length !== 1 ? 's' : ''}</span></>}
         </div>
         <div className="inv-action-btns" style={{ display: 'flex', gap: 5 }}>
+          {!showExtras && canEdit && !isCompletedView && <div onClick={() => { resetForm(); setShowModal(true); }} style={S.btnPrimary} className="desktop-only">+ Add Item</div>}
           {!showExtras && <div title="Download filtered inventory as CSV" onClick={() => {
             if (filtered.length === 0) return;
             const csv = 'Batch,SKU,Category,Size,Status,Location,Missing,Damaged\n' + filtered.map(i => `${i.batch_number || ''},${i.serial_number || ''},"${i.products?.name || ''}",${i.size || ''},${i.status},${i.location || ''},"${(itemMissing[i.id] || []).join('; ')}","${(itemDamaged[i.id] || []).join('; ')}"`).join('\n');
