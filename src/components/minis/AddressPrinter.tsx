@@ -55,6 +55,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showList, setShowList] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', phone: '', address: '', city: '', state: '', pincode: '' });
@@ -105,43 +106,56 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
 
   return (
     <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Address Printer</div>
           <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>4x6 inch courier label stickers</div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {selected.size > 0 && <div onClick={printBulk} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Print {selected.size} Label{selected.size > 1 ? 's' : ''}</div>}
+          <div onClick={() => { setShowList(true); fetchLabels(); }} style={S.btnGhost}>Saved Addresses{labels.length > 0 ? ` (${labels.length})` : ''}</div>
           <div onClick={openAdd} style={S.btnPrimary}>+ Add Address</div>
         </div>
       </div>
 
-      {/* Select All / Clear */}
-      {labels.length > 0 && <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
-        <span onClick={selected.size === labels.length ? clearSelection : selectAll} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: `1px solid rgba(99,102,241,.2)`, background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>{selected.size === labels.length ? 'Deselect All' : 'Select All'}</span>
-        {selected.size > 0 && <span style={{ fontSize: 10, color: T.tx3 }}>{selected.size} selected</span>}
-      </div>}
-
-      {/* Labels list */}
-      {loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div> :
-      labels.length === 0 ? <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No saved addresses. Click "+ Add Address" to create one.</div> :
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {labels.map(l => (
-          <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: selected.has(l.id) ? 'rgba(99,102,241,.06)' : 'rgba(255,255,255,0.01)', border: `1px solid ${selected.has(l.id) ? 'rgba(99,102,241,.25)' : T.bd}`, borderRadius: 8, cursor: 'pointer', transition: 'all .15s' }} onClick={() => toggleSelect(l.id)}>
-            <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${selected.has(l.id) ? T.ac : T.bd2}`, background: selected.has(l.id) ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>{selected.has(l.id) && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><path d="M20 6L9 17l-5-5" /></svg>}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{l.name}</div>
-              <div style={{ fontSize: 11, color: T.tx2, marginTop: 1 }}>{l.address}, {l.city}, {l.state} - {l.pincode}</div>
-              <div style={{ fontSize: 10, color: T.tx3, marginTop: 1 }}>{l.phone}</div>
-            </div>
-            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-              <span onClick={() => printSingle(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '4px 8px', fontSize: 9 }}>Print</span>
-              <span onClick={() => openEdit(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '4px 8px', fontSize: 9 }}>Edit</span>
-              <span onClick={() => deleteLabel(l.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '4px 8px', fontSize: 9 }}>Del</span>
+      {/* Saved Addresses Modal */}
+      {showList && createPortal(<div style={S.modalOverlay} onClick={() => { setShowList(false); setSelected(new Set()); }}>
+        <div className="modal-inner" style={{ ...S.modalBox, width: 560 }} onClick={e => e.stopPropagation()}>
+          <div style={S.modalHead}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Saved Addresses</span>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              {selected.size > 0 && <div onClick={printBulk} style={{ ...S.btnSm, cursor: 'pointer', color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Print {selected.size}</div>}
+              <span onClick={() => { setShowList(false); setSelected(new Set()); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
             </div>
           </div>
-        ))}
-      </div>}
+          <div style={{ padding: '8px 14px', borderBottom: `1px solid ${T.bd}`, display: 'flex', gap: 8, alignItems: 'center' }}>
+            {labels.length > 0 && <span onClick={selected.size === labels.length ? clearSelection : selectAll} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: `1px solid rgba(99,102,241,.2)`, background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>{selected.size === labels.length ? 'Deselect All' : 'Select All'}</span>}
+            {selected.size > 0 && <span style={{ fontSize: 10, color: T.tx3 }}>{selected.size} selected</span>}
+            <span style={{ flex: 1 }} />
+            <span style={{ fontSize: 10, color: T.tx3 }}>{labels.length} address{labels.length !== 1 ? 'es' : ''}</span>
+          </div>
+          <div style={{ padding: 12, maxHeight: '60vh', overflowY: 'auto' }}>
+            {loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div> :
+            labels.length === 0 ? <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No saved addresses yet.</div> :
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {labels.map(l => (
+                <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: selected.has(l.id) ? 'rgba(99,102,241,.06)' : 'rgba(255,255,255,0.01)', border: `1px solid ${selected.has(l.id) ? 'rgba(99,102,241,.25)' : T.bd}`, borderRadius: 8, cursor: 'pointer', transition: 'all .15s' }} onClick={() => toggleSelect(l.id)}>
+                  <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${selected.has(l.id) ? T.ac : T.bd2}`, background: selected.has(l.id) ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>{selected.has(l.id) && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><path d="M20 6L9 17l-5-5" /></svg>}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{l.name}</div>
+                    <div style={{ fontSize: 11, color: T.tx2, marginTop: 1 }}>{l.address}, {l.city}, {l.state} - {l.pincode}</div>
+                    <div style={{ fontSize: 10, color: T.tx3, marginTop: 1 }}>{l.phone}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                    <span onClick={() => printSingle(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '4px 8px', fontSize: 9 }}>Print</span>
+                    <span onClick={() => openEdit(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '4px 8px', fontSize: 9 }}>Edit</span>
+                    <span onClick={() => deleteLabel(l.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '4px 8px', fontSize: 9 }}>Del</span>
+                  </div>
+                </div>
+              ))}
+            </div>}
+          </div>
+        </div>
+      </div>, document.body)}
 
       {/* Add/Edit Modal */}
       {showAdd && createPortal(<div style={S.modalOverlay} onClick={() => { setShowAdd(false); setEditingId(null); }}>
