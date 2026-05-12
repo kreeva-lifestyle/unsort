@@ -684,3 +684,31 @@ export const DAMAGE_SEVERITIES: DamageSeverity[] = ['minor', 'moderate', 'severe
 export const USER_ROLES: UserRole[] = ['admin', 'manager', 'operator', 'viewer'];
 export const CASH_CHALLAN_STATUSES: CashChallanStatus[] = ['draft', 'paid', 'unpaid', 'partial', 'voided'];
 export const CASH_HANDOVER_STATUSES: CashHandoverStatus[] = ['pending', 'confirmed', 'disputed'];
+
+// ─── address_labels (10 cols) ───────────────────────────────────────────
+
+export interface AddressLabel {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export type AddressLabelInsert = {
+  id?: string;
+  name: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  created_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};

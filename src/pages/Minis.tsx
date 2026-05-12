@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../lib/theme';
 import { useNotifications } from '../hooks/useNotifications';
+import AddressPrinter from '../components/minis/AddressPrinter';
 
 const SIZE_MAP: Record<number, string> = { 34: 'XS', 36: 'S', 38: 'M', 40: 'L', 42: 'XL', 44: 'XXL' };
 
@@ -127,6 +128,9 @@ export default function Minis() {
           {rows.length > 50 && <div style={{ padding: '8px 14px', fontSize: 10, color: T.tx3, borderTop: `1px solid ${T.bd}`, textAlign: 'center' }}>Showing 50 of {rows.length} rows. Full data included in CSV export.</div>}
         </div>}
       </div>
+
+      {/* Address Printer */}
+      <AddressPrinter addToast={addToast} />
     </div>
   );
 }
