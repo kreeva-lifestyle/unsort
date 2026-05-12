@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { T, S } from '../lib/theme';
 import { useNotifications } from '../hooks/useNotifications';
 import AddressPrinter from '../components/minis/AddressPrinter';
+import CbazaarImport from '../components/minis/CbazaarImport';
 
 const SIZE_MAP: Record<number, string> = { 34: 'XS', 36: 'S', 38: 'M', 40: 'L', 42: 'XL', 44: 'XXL' };
 
@@ -10,7 +11,7 @@ interface UtsavRow { relid: string; vendorno: string; stock: number; leadtime: n
 
 export default function Minis() {
   const { addToast } = useNotifications();
-  const [view, setView] = useState<'home' | 'utsav' | 'address'>('home');
+  const [view, setView] = useState<'home' | 'utsav' | 'cbazaar' | 'address'>('home');
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<UtsavRow[]>([]);
   const [fileName, setFileName] = useState('');
@@ -54,6 +55,16 @@ export default function Minis() {
   const back = <span onClick={() => setView('home')} style={{ ...S.btnGhost, padding: '6px 10px', cursor: 'pointer' }}>
     <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
   </span>;
+
+  if (view === 'cbazaar') return (
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        {back}
+        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Cbazaar Import</span>
+      </div>
+      <CbazaarImport addToast={addToast} />
+    </div>
+  );
 
   if (view === 'address') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
@@ -121,6 +132,10 @@ export default function Minis() {
         <div onClick={() => setView('utsav')} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>Utsav Import</div>
           <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5 }}>Import vendor Excel, generate ARYA SKU column, export as XLS</div>
+        </div>
+        <div onClick={() => setView('cbazaar')} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>Cbazaar Import</div>
+          <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5 }}>Import Cbazaar vendor Excel, generate ARYA SKU column, export as CSV</div>
         </div>
         <div onClick={() => setView('address')} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>Address Printer</div>
