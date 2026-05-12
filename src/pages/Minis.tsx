@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../lib/theme';
 import { useNotifications } from '../hooks/useNotifications';
+import AddressPrinter from '../components/minis/AddressPrinter';
 
 const SIZE_MAP: Record<number, string> = { 34: 'XS', 36: 'S', 38: 'M', 40: 'L', 42: 'XL', 44: 'XXL' };
 
@@ -83,6 +84,7 @@ export default function Minis() {
           <div style={{ display: 'flex', gap: 6 }}>
             <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
             {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export XLS</div>}
+            {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Close</div>}
           </div>
         </div>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} style={{ display: 'none' }} />
@@ -127,6 +129,9 @@ export default function Minis() {
           {rows.length > 50 && <div style={{ padding: '8px 14px', fontSize: 10, color: T.tx3, borderTop: `1px solid ${T.bd}`, textAlign: 'center' }}>Showing 50 of {rows.length} rows. Full data included in CSV export.</div>}
         </div>}
       </div>
+
+      {/* Address Printer */}
+      <AddressPrinter addToast={addToast} />
     </div>
   );
 }
