@@ -224,4 +224,43 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
       )}
     </div>
   );
+
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Address Printer</div>
+          <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>4x6 inch courier label stickers</div>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <div onClick={() => { setShowList(true); fetchLabels(); }} style={S.btnGhost}>Saved Addresses{labels.length > 0 ? ` (${labels.length})` : ''}</div>
+          <div onClick={openAdd} style={S.btnPrimary}>+ Add Address</div>
+        </div>
+      </div>
+
+      {/* Add/Edit Modal (accessible from compact card too) */}
+      {showAdd && createPortal(<div style={S.modalOverlay} onClick={() => { setShowAdd(false); setEditingId(null); }}>
+        <div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
+          <div style={S.modalHead}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{editingId ? 'Edit' : 'Add'} Address</span>
+            <span onClick={() => { setShowAdd(false); setEditingId(null); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+          </div>
+          <div style={{ padding: 16 }}>
+            <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Name *</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Recipient name" style={S.fInput} /></div>
+            <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Phone *</label><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+91 99999 99999" style={S.fInput} /></div>
+            <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Address *</label><textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Street address, building, area" rows={2} style={{ ...S.fInput, height: 'auto', resize: 'vertical' }} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div><label style={S.fLabel}>City *</label><input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} placeholder="City" style={S.fInput} /></div>
+              <div><label style={S.fLabel}>State *</label><input value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} placeholder="State" style={S.fInput} /></div>
+            </div>
+            <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Pincode *</label><input value={form.pincode} onChange={e => setForm({ ...form, pincode: e.target.value })} placeholder="395006" style={{ ...S.fInput, fontFamily: T.mono }} maxLength={6} /></div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${T.bd}` }}>
+              <span onClick={() => { setShowAdd(false); setEditingId(null); }} style={S.btnGhost}>Cancel</span>
+              <span onClick={handleSave} style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving...' : editingId ? 'Update' : 'Save'}</span>
+            </div>
+          </div>
+        </div>
+      </div>, document.body)}
+    </div>
+  );
 }
