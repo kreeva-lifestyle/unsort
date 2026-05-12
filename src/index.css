@@ -286,6 +286,12 @@ body.modal-open { overflow: hidden !important; }
   .inv-filter-popover::-webkit-scrollbar { display: none !important; }
 }
 
+/* ── Minis mobile ──────────────────────────────── */
+@media (max-width: 768px) {
+  .minis-grid { grid-template-columns: 1fr !important; }
+  .addr-form-grid { grid-template-columns: 1fr !important; }
+}
+
 /* ── Programs module mobile ──────────────────────────────── */
 @media (max-width: 768px) {
   /* Form modal — full screen */

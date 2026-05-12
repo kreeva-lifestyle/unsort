@@ -62,7 +62,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const deleteLabel = async (id: string) => {
     const { error } = await supabase.from('address_labels').delete().eq('id', id);
     if (error) { addToast('Delete failed — ' + friendlyError(error), 'error'); return; }
-    addToast('Address deleted', 'success'); setSelected(prev => { const n = new Set(prev); n.delete(id); return n; }); fetchLabels();
+    addToast('Address deleted', 'success'); setSelected(prev => { const n = new Set(prev); n.delete(id); return n; }); setPage(0); fetchLabels();
   };
 
   const toggleSelect = (id: string) => setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -110,9 +110,9 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
               <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{l.phone}</div>
             </div>
             <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-              <span onClick={() => setPrintHtml(buildLabelHtml([l]))} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '5px 10px', fontSize: 10 }}>Print</span>
-              <span onClick={() => openEdit(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '5px 10px', fontSize: 10 }}>Edit</span>
-              <span onClick={() => deleteLabel(l.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '5px 10px', fontSize: 10 }}>Del</span>
+              <span onClick={() => setPrintHtml(buildLabelHtml([l]))} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '6px 12px', fontSize: 11, minHeight: 32 }}>Print</span>
+              <span onClick={() => openEdit(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '6px 12px', fontSize: 11, minHeight: 32 }}>Edit</span>
+              <span onClick={() => deleteLabel(l.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '6px 12px', fontSize: 11, minHeight: 32 }}>Del</span>
             </div>
           </div>
         ))}
@@ -140,11 +140,11 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{editingId ? 'Edit' : 'Add'} Address</span>
             <span onClick={() => { setShowAdd(false); setEditingId(null); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
           </div>
-          <div style={{ padding: 16 }}>
+          <form onSubmit={e => { e.preventDefault(); handleSave(); }} style={{ padding: 16 }}>
             <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Name *</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Recipient name" style={S.fInput} /></div>
             <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Phone *</label><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+91 99999 99999" style={S.fInput} /></div>
             <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Address *</label><textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Street address, building, area" rows={2} style={{ ...S.fInput, height: 'auto', resize: 'vertical' }} /></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div className="addr-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <div><label style={S.fLabel}>City *</label><input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} placeholder="City" style={S.fInput} /></div>
               <div><label style={S.fLabel}>State *</label><input value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} placeholder="State" style={S.fInput} /></div>
             </div>
@@ -158,9 +158,9 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${T.bd}` }}>
               <span onClick={() => { setShowAdd(false); setEditingId(null); }} style={S.btnGhost}>Cancel</span>
-              <span onClick={handleSave} style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving...' : editingId ? 'Update' : 'Save'}</span>
+              <button type="submit" style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving...' : editingId ? 'Update' : 'Save'}</button>
             </div>
-          </div>
+          </form>
         </div>
       </div>, document.body)}
 
@@ -173,8 +173,8 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
           </div>
           <iframe srcDoc={printHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#fff' }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <button onClick={() => setPrintHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
-            <button onClick={() => { const iframe = document.querySelector('iframe[srcdoc]') as HTMLIFrameElement; iframe?.contentWindow?.print(); }} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #6366F1, #818CF8)', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, flex: 1, maxWidth: 160, boxShadow: '0 4px 16px rgba(99,102,241,.35)' }}>Print</button>
+            <button onClick={() => setPrintHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 200 }}>Close</button>
+            <button onClick={() => { const iframe = document.querySelector('iframe[srcdoc]') as HTMLIFrameElement; iframe?.contentWindow?.print(); }} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #6366F1, #818CF8)', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, flex: 1, maxWidth: 200, boxShadow: '0 4px 16px rgba(99,102,241,.35)' }}>Print</button>
           </div>
         </div>,
         document.body
