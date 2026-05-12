@@ -93,7 +93,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
     addToast('Address deleted', 'success'); setSelected(prev => { const n = new Set(prev); n.delete(id); return n; }); fetchLabels();
   };
 
-  const toggleSelect = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleSelect = (id: string) => setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const selectAll = () => setSelected(new Set(labels.map(l => l.id)));
   const clearSelection = () => setSelected(new Set());
 
