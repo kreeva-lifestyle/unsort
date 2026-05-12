@@ -30,7 +30,7 @@ export default function Minis() {
           const designno = String(r.designno || r.DESIGNNO || r.DesignNo || '').trim();
           const sizeNum = Number(r.size || r.SIZE || r.Size || 0);
           const sizeName = SIZE_MAP[sizeNum] || '';
-          const aryaSku = designno && sizeNum > 0 && sizeName ? `${designno}-${sizeName}` : '';
+          const aryaSku = designno ? (sizeNum > 0 && sizeName ? `${designno}-${sizeName}` : designno) : '';
 
           parsed.push({
             relid: String(r.relid || r.RELID || ''),
