@@ -57,6 +57,8 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const [saving, setSaving] = useState(false);
   const [showList, setShowList] = useState(false);
   const [addrSearch, setAddrSearch] = useState('');
+  const [addrPage, setAddrPage] = useState(0);
+  const [addrPerPage, setAddrPerPage] = useState(25);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', phone: '', address: '', city: '', state: '', pincode: '' });
@@ -129,16 +131,18 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
       {/* Search */}
       <div style={{ position: 'relative', marginBottom: 10 }}>
         <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
-        <input value={addrSearch} onChange={e => setAddrSearch(e.target.value)} placeholder="Search name, city, pincode..." style={S.fSearch} />
+        <input value={addrSearch} onChange={e => { setAddrSearch(e.target.value); setAddrPage(0); }} placeholder="Search name, city, pincode..." style={S.fSearch} />
       </div>
 
       {(() => {
         const q = addrSearch.toLowerCase();
         const filtered = q ? labels.filter(l => l.name.toLowerCase().includes(q) || l.city.toLowerCase().includes(q) || l.pincode.includes(q) || l.phone.includes(q) || l.state.toLowerCase().includes(q)) : labels;
+        const totalPages = Math.ceil(filtered.length / addrPerPage);
+        const paged = filtered.slice(addrPage * addrPerPage, (addrPage + 1) * addrPerPage);
         return loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div> :
         filtered.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{labels.length === 0 ? 'No saved addresses yet. Click "+ Add Address" to create one.' : 'No matches found.'}</div> :
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {filtered.map(l => (
+        <><div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {paged.map(l => (
           <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: selected.has(l.id) ? 'rgba(99,102,241,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selected.has(l.id) ? 'rgba(99,102,241,.25)' : T.bd}`, borderRadius: 8, cursor: 'pointer', transition: 'all .15s' }} onClick={() => toggleSelect(l.id)}>
             <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${selected.has(l.id) ? T.ac : T.bd2}`, background: selected.has(l.id) ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>{selected.has(l.id) && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><path d="M20 6L9 17l-5-5" /></svg>}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -153,7 +157,20 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
             </div>
           </div>
         ))}
-      </div>;
+      </div>
+      {totalPages > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span onClick={() => setAddrPage(Math.max(0, addrPage - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: addrPage === 0 ? 'default' : 'pointer', opacity: addrPage === 0 ? 0.3 : 1 }}>Prev</span>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{addrPage + 1} / {totalPages}</span>
+          <span onClick={() => setAddrPage(Math.min(totalPages - 1, addrPage + 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: addrPage >= totalPages - 1 ? 'default' : 'pointer', opacity: addrPage >= totalPages - 1 ? 0.3 : 1 }}>Next</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{filtered.length} addresses</span>
+          <select value={addrPerPage} onChange={e => { setAddrPerPage(Number(e.target.value)); setAddrPage(0); }} style={{ padding: '4px 8px', fontSize: 11, height: 28, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, outline: 'none' }}>
+            {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}/page</option>)}
+          </select>
+        </div>
+      </div>}</>;
       })()}
 
       {/* Add/Edit Modal */}
@@ -205,6 +222,45 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
         </div>,
         document.body
       )}
+    </div>
+  );
+
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Address Printer</div>
+          <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>4x6 inch courier label stickers</div>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <div onClick={() => { setShowList(true); fetchLabels(); }} style={S.btnGhost}>Saved Addresses{labels.length > 0 ? ` (${labels.length})` : ''}</div>
+          <div onClick={openAdd} style={S.btnPrimary}>+ Add Address</div>
+        </div>
+      </div>
+
+      {/* Add/Edit Modal (accessible from compact card too) */}
+      {showAdd && createPortal(<div style={S.modalOverlay} onClick={() => { setShowAdd(false); setEditingId(null); }}>
+        <div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
+          <div style={S.modalHead}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{editingId ? 'Edit' : 'Add'} Address</span>
+            <span onClick={() => { setShowAdd(false); setEditingId(null); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+          </div>
+          <div style={{ padding: 16 }}>
+            <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Name *</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Recipient name" style={S.fInput} /></div>
+            <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Phone *</label><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+91 99999 99999" style={S.fInput} /></div>
+            <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Address *</label><textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Street address, building, area" rows={2} style={{ ...S.fInput, height: 'auto', resize: 'vertical' }} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div><label style={S.fLabel}>City *</label><input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} placeholder="City" style={S.fInput} /></div>
+              <div><label style={S.fLabel}>State *</label><input value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} placeholder="State" style={S.fInput} /></div>
+            </div>
+            <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Pincode *</label><input value={form.pincode} onChange={e => setForm({ ...form, pincode: e.target.value })} placeholder="395006" style={{ ...S.fInput, fontFamily: T.mono }} maxLength={6} /></div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${T.bd}` }}>
+              <span onClick={() => { setShowAdd(false); setEditingId(null); }} style={S.btnGhost}>Cancel</span>
+              <span onClick={handleSave} style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving...' : editingId ? 'Update' : 'Save'}</span>
+            </div>
+          </div>
+        </div>
+      </div>, document.body)}
     </div>
   );
 }
