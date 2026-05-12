@@ -13,41 +13,11 @@ const escHtml = (s: string) => s.replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '
 const buildLabelHtml = (labels: Label[]) => {
   const cards = labels.map(l => `
     <div class="label">
-      <div class="section from">
-        <div class="tag">FROM</div>
-        <div class="name">${escHtml(FROM.name)}</div>
-        <div class="detail">${escHtml(FROM.city)}</div>
-        <div class="detail">${escHtml(FROM.phone)}</div>
-      </div>
+      <div class="section from"><div class="tag">FROM</div><div class="name">${escHtml(FROM.name)}</div><div class="detail">${escHtml(FROM.city)}</div><div class="detail">${escHtml(FROM.phone)}</div></div>
       <div class="divider"></div>
-      <div class="section to">
-        <div class="tag">TO</div>
-        <div class="name">${escHtml(l.name)}</div>
-        <div class="detail">${escHtml(l.address)}</div>
-        <div class="detail">${escHtml(l.city)}, ${escHtml(l.state)} - ${escHtml(l.pincode)}</div>
-        <div class="phone">${escHtml(l.phone)}</div>
-      </div>
+      <div class="section to"><div class="tag">TO</div><div class="name">${escHtml(l.name)}</div><div class="detail">${escHtml(l.address)}</div><div class="detail">${escHtml(l.city)}, ${escHtml(l.state)} - ${escHtml(l.pincode)}</div><div class="phone">${escHtml(l.phone)}</div></div>
     </div>`).join('');
-
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Address Labels</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif}
-.label{width:4in;height:6in;padding:0.4in;display:flex;flex-direction:column;justify-content:space-between;page-break-after:always;border:1px solid #ccc}
-.section{flex:1;display:flex;flex-direction:column;justify-content:center}
-.from{padding-bottom:0.3in}
-.to{padding-top:0.3in}
-.divider{border-top:1.5px dashed #999;width:100%}
-.tag{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#666;margin-bottom:6px}
-.name{font-size:18px;font-weight:700;margin-bottom:4px}
-.detail{font-size:13px;color:#333;line-height:1.6}
-.phone{font-size:13px;font-weight:600;margin-top:6px;color:#000}
-@media print{
-  body{margin:0}
-  .label{border:none;page-break-after:always}
-}
-@page{size:4in 6in;margin:0}
-</style></head><body>${cards}</body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Address Labels</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif}.label{width:4in;height:6in;padding:0.4in;display:flex;flex-direction:column;justify-content:space-between;page-break-after:always;border:1px solid #ccc}.section{flex:1;display:flex;flex-direction:column;justify-content:center}.from{padding-bottom:0.3in}.to{padding-top:0.3in}.divider{border-top:1.5px dashed #999;width:100%}.tag{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#666;margin-bottom:6px}.name{font-size:18px;font-weight:700;margin-bottom:4px}.detail{font-size:13px;color:#333;line-height:1.6}.phone{font-size:13px;font-weight:600;margin-top:6px;color:#000}@media print{body{margin:0}.label{border:none;page-break-after:always}}@page{size:4in 6in;margin:0}</style></head><body>${cards}</body></html>`;
 };
 
 export default function AddressPrinter({ addToast }: { addToast: (msg: string, type?: string) => void }) {
@@ -55,15 +25,13 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showList, setShowList] = useState(false);
-  const [addrSearch, setAddrSearch] = useState('');
-  const [addrPage, setAddrPage] = useState(0);
-  const [addrPerPage, setAddrPerPage] = useState(25);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [perPage, setPerPage] = useState(25);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', phone: '', address: '', city: '', state: '', pincode: '' });
   const [printHtml, setPrintHtml] = useState<string | null>(null);
-
   const emptyForm = { name: '', phone: '', address: '', city: '', state: '', pincode: '' };
 
   const fetchLabels = useCallback(async () => {
@@ -100,22 +68,22 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const toggleSelect = (id: string) => setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const selectAll = () => setSelected(new Set(labels.map(l => l.id)));
   const clearSelection = () => setSelected(new Set());
-
-  const printSingle = (l: Label) => setPrintHtml(buildLabelHtml([l]));
   const printBulk = () => { const toPrint = labels.filter(l => selected.has(l.id)); if (toPrint.length === 0) { addToast('Select addresses to print', 'error'); return; } setPrintHtml(buildLabelHtml(toPrint)); };
-
   const openEdit = (l: Label) => { setEditingId(l.id); setForm({ name: l.name, phone: l.phone, address: l.address, city: l.city, state: l.state, pincode: l.pincode }); setShowAdd(true); };
   const openAdd = () => { setEditingId(null); setForm(emptyForm); setShowAdd(true); };
 
-  if (showList) return (
-    <div style={{ animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span onClick={() => { setShowList(false); setSelected(new Set()); }} style={{ ...S.btnGhost, padding: '6px 10px', cursor: 'pointer' }}>
-            <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
-          </span>
-          <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Saved Addresses</span>
-          <span style={{ fontSize: 10, color: T.tx3 }}>{labels.length} address{labels.length !== 1 ? 'es' : ''}</span>
+  const q = search.toLowerCase();
+  const filtered = q ? labels.filter(l => l.name.toLowerCase().includes(q) || l.city.toLowerCase().includes(q) || l.pincode.includes(q) || l.phone.includes(q) || l.state.toLowerCase().includes(q)) : labels;
+  const totalPages = Math.ceil(filtered.length / perPage);
+  const paged = filtered.slice(page * perPage, (page + 1) * perPage);
+
+  return (
+    <div>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {labels.length > 0 && <span onClick={selected.size === labels.length ? clearSelection : selectAll} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: `1px solid rgba(99,102,241,.2)`, background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>{selected.size === labels.length ? 'Deselect All' : 'Select All'}</span>}
+          {selected.size > 0 && <span style={{ fontSize: 10, color: T.tx3 }}>{selected.size} selected</span>}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {selected.size > 0 && <div onClick={printBulk} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Print {selected.size} Label{selected.size > 1 ? 's' : ''}</div>}
@@ -123,26 +91,17 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
         </div>
       </div>
 
-      {labels.length > 0 && <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
-        <span onClick={selected.size === labels.length ? clearSelection : selectAll} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: `1px solid rgba(99,102,241,.2)`, background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>{selected.size === labels.length ? 'Deselect All' : 'Select All'}</span>
-        {selected.size > 0 && <span style={{ fontSize: 10, color: T.tx3 }}>{selected.size} selected</span>}
-      </div>}
-
       {/* Search */}
       <div style={{ position: 'relative', marginBottom: 10 }}>
         <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
-        <input value={addrSearch} onChange={e => { setAddrSearch(e.target.value); setAddrPage(0); }} placeholder="Search name, city, pincode..." style={S.fSearch} />
+        <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search name, city, pincode, phone..." style={S.fSearch} />
       </div>
 
-      {(() => {
-        const q = addrSearch.toLowerCase();
-        const filtered = q ? labels.filter(l => l.name.toLowerCase().includes(q) || l.city.toLowerCase().includes(q) || l.pincode.includes(q) || l.phone.includes(q) || l.state.toLowerCase().includes(q)) : labels;
-        const totalPages = Math.ceil(filtered.length / addrPerPage);
-        const paged = filtered.slice(addrPage * addrPerPage, (addrPage + 1) * addrPerPage);
-        return loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div> :
-        filtered.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{labels.length === 0 ? 'No saved addresses yet. Click "+ Add Address" to create one.' : 'No matches found.'}</div> :
-        <><div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {paged.map(l => (
+      {/* List */}
+      {loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div> :
+      filtered.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{labels.length === 0 ? 'No saved addresses yet. Click "+ Add Address" to create one.' : 'No matches found.'}</div> :
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {paged.map(l => (
           <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: selected.has(l.id) ? 'rgba(99,102,241,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selected.has(l.id) ? 'rgba(99,102,241,.25)' : T.bd}`, borderRadius: 8, cursor: 'pointer', transition: 'all .15s' }} onClick={() => toggleSelect(l.id)}>
             <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${selected.has(l.id) ? T.ac : T.bd2}`, background: selected.has(l.id) ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>{selected.has(l.id) && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><path d="M20 6L9 17l-5-5" /></svg>}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -151,27 +110,28 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
               <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{l.phone}</div>
             </div>
             <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-              <span onClick={() => printSingle(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '5px 10px', fontSize: 10 }}>Print</span>
+              <span onClick={() => setPrintHtml(buildLabelHtml([l]))} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '5px 10px', fontSize: 10 }}>Print</span>
               <span onClick={() => openEdit(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '5px 10px', fontSize: 10 }}>Edit</span>
               <span onClick={() => deleteLabel(l.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '5px 10px', fontSize: 10 }}>Del</span>
             </div>
           </div>
         ))}
-      </div>
+      </div>}
+
+      {/* Pagination */}
       {totalPages > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span onClick={() => setAddrPage(Math.max(0, addrPage - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: addrPage === 0 ? 'default' : 'pointer', opacity: addrPage === 0 ? 0.3 : 1 }}>Prev</span>
-          <span style={{ fontSize: 10, color: T.tx3 }}>{addrPage + 1} / {totalPages}</span>
-          <span onClick={() => setAddrPage(Math.min(totalPages - 1, addrPage + 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: addrPage >= totalPages - 1 ? 'default' : 'pointer', opacity: addrPage >= totalPages - 1 ? 0.3 : 1 }}>Next</span>
+          <span onClick={() => setPage(Math.max(0, page - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }}>Prev</span>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
+          <span onClick={() => setPage(Math.min(totalPages - 1, page + 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }}>Next</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 10, color: T.tx3 }}>{filtered.length} addresses</span>
-          <select value={addrPerPage} onChange={e => { setAddrPerPage(Number(e.target.value)); setAddrPage(0); }} style={{ padding: '4px 8px', fontSize: 11, height: 28, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, outline: 'none' }}>
+          <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setPage(0); }} style={{ padding: '4px 8px', fontSize: 11, height: 28, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, outline: 'none' }}>
             {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}/page</option>)}
           </select>
         </div>
-      </div>}</>;
-      })()}
+      </div>}
 
       {/* Add/Edit Modal */}
       {showAdd && createPortal(<div style={S.modalOverlay} onClick={() => { setShowAdd(false); setEditingId(null); }}>
@@ -189,8 +149,6 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
               <div><label style={S.fLabel}>State *</label><input value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} placeholder="State" style={S.fInput} /></div>
             </div>
             <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Pincode *</label><input value={form.pincode} onChange={e => setForm({ ...form, pincode: e.target.value })} placeholder="395006" style={{ ...S.fInput, fontFamily: T.mono }} maxLength={6} /></div>
-
-            {/* Live preview */}
             <div style={{ background: '#fff', color: '#000', borderRadius: 8, padding: 14, marginBottom: 14, border: '1px solid #ddd', fontFamily: 'Arial, sans-serif' }}>
               <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: 2, color: '#666', textTransform: 'uppercase', marginBottom: 3 }}>TO</div>
               <div style={{ fontSize: 14, fontWeight: 700 }}>{form.name || 'Recipient Name'}</div>
@@ -198,7 +156,6 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
               <div style={{ fontSize: 11, color: '#333' }}>{form.city || 'City'}, {form.state || 'State'} - {form.pincode || '000000'}</div>
               <div style={{ fontSize: 11, fontWeight: 600, marginTop: 3 }}>{form.phone || 'Phone'}</div>
             </div>
-
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${T.bd}` }}>
               <span onClick={() => { setShowAdd(false); setEditingId(null); }} style={S.btnGhost}>Cancel</span>
               <span onClick={handleSave} style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving...' : editingId ? 'Update' : 'Save'}</span>
@@ -222,45 +179,6 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
         </div>,
         document.body
       )}
-    </div>
-  );
-
-  return (
-    <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Address Printer</div>
-          <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>4x6 inch courier label stickers</div>
-        </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <div onClick={() => { setShowList(true); fetchLabels(); }} style={S.btnGhost}>Saved Addresses{labels.length > 0 ? ` (${labels.length})` : ''}</div>
-          <div onClick={openAdd} style={S.btnPrimary}>+ Add Address</div>
-        </div>
-      </div>
-
-      {/* Add/Edit Modal (accessible from compact card too) */}
-      {showAdd && createPortal(<div style={S.modalOverlay} onClick={() => { setShowAdd(false); setEditingId(null); }}>
-        <div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
-          <div style={S.modalHead}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{editingId ? 'Edit' : 'Add'} Address</span>
-            <span onClick={() => { setShowAdd(false); setEditingId(null); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
-          </div>
-          <div style={{ padding: 16 }}>
-            <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Name *</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Recipient name" style={S.fInput} /></div>
-            <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Phone *</label><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+91 99999 99999" style={S.fInput} /></div>
-            <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Address *</label><textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Street address, building, area" rows={2} style={{ ...S.fInput, height: 'auto', resize: 'vertical' }} /></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-              <div><label style={S.fLabel}>City *</label><input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} placeholder="City" style={S.fInput} /></div>
-              <div><label style={S.fLabel}>State *</label><input value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} placeholder="State" style={S.fInput} /></div>
-            </div>
-            <div style={{ marginBottom: 14 }}><label style={S.fLabel}>Pincode *</label><input value={form.pincode} onChange={e => setForm({ ...form, pincode: e.target.value })} placeholder="395006" style={{ ...S.fInput, fontFamily: T.mono }} maxLength={6} /></div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${T.bd}` }}>
-              <span onClick={() => { setShowAdd(false); setEditingId(null); }} style={S.btnGhost}>Cancel</span>
-              <span onClick={handleSave} style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving...' : editingId ? 'Update' : 'Save'}</span>
-            </div>
-          </div>
-        </div>
-      </div>, document.body)}
     </div>
   );
 }
