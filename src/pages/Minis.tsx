@@ -84,6 +84,7 @@ export default function Minis() {
           <div style={{ display: 'flex', gap: 6 }}>
             <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
             {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export XLS</div>}
+            {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Close</div>}
           </div>
         </div>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} style={{ display: 'none' }} />
