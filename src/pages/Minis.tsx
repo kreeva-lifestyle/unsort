@@ -10,6 +10,7 @@ interface UtsavRow { relid: string; vendorno: string; stock: number; leadtime: n
 
 export default function Minis() {
   const { addToast } = useNotifications();
+  const [view, setView] = useState<'home' | 'utsav' | 'address'>('home');
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<UtsavRow[]>([]);
   const [fileName, setFileName] = useState('');
@@ -25,32 +26,17 @@ export default function Minis() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
         if (raw.length === 0) { addToast('File is empty', 'error'); return; }
-
         const parsed: UtsavRow[] = [];
         for (const r of raw) {
           const designno = String(r.designno || r.DESIGNNO || r.DesignNo || '').trim();
           const sizeNum = Number(r.size || r.SIZE || r.Size || 0);
           const sizeName = SIZE_MAP[sizeNum] || '';
           const aryaSku = designno ? (sizeNum > 0 && sizeName ? `${designno}-${sizeName}` : designno) : '';
-
-          parsed.push({
-            relid: String(r.relid || r.RELID || ''),
-            vendorno: String(r.vendorno || r.VENDORNO || ''),
-            stock: Number(r.stock || r.STOCK || 0),
-            leadtime: Number(r.leadtime || r.LEADTIME || 0),
-            block: Number(r.block || r.BLOCK || 0),
-            designno,
-            size: sizeNum,
-            catalogname: String(r.catalogname || r.CATALOGNAME || ''),
-            updateddate: String(r.updateddate || r.UPDATEDDATE || ''),
-            aryaSku,
-          });
+          parsed.push({ relid: String(r.relid || r.RELID || ''), vendorno: String(r.vendorno || r.VENDORNO || ''), stock: Number(r.stock || r.STOCK || 0), leadtime: Number(r.leadtime || r.LEADTIME || 0), block: Number(r.block || r.BLOCK || 0), designno, size: sizeNum, catalogname: String(r.catalogname || r.CATALOGNAME || ''), updateddate: String(r.updateddate || r.UPDATEDDATE || ''), aryaSku });
         }
         setRows(parsed);
         addToast(`${parsed.length} rows imported`, 'success');
-      } catch (err: any) {
-        addToast('Failed to parse file — check format', 'error');
-      }
+      } catch { addToast('Failed to parse file — check format', 'error'); }
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
@@ -65,73 +51,82 @@ export default function Minis() {
     XLSX.writeFile(wb, `Utsav_Export_${new Date().toISOString().slice(0, 10)}.xls`);
   };
 
-  const th: React.CSSProperties = S.thStyle;
-  const td: React.CSSProperties = S.tdStyle;
+  const back = <span onClick={() => setView('home')} style={{ ...S.btnGhost, padding: '6px 10px', cursor: 'pointer' }}>
+    <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+  </span>;
 
+  if (view === 'address') return (
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        {back}
+        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Address Printer</span>
+      </div>
+      <AddressPrinter addToast={addToast} />
+    </div>
+  );
+
+  if (view === 'utsav') return (
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {back}
+          <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Utsav Import</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
+          {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export XLS</div>}
+          {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Close</div>}
+        </div>
+      </div>
+      <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} style={{ display: 'none' }} />
+      {fileName && <div style={{ fontSize: 10, color: T.tx3, marginBottom: 8 }}>File: {fileName} -- {rows.length} rows</div>}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: rows.length > 0 ? 12 : 0 }}>
+        {Object.entries(SIZE_MAP).map(([num, name]) => (
+          <span key={num} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(99,102,241,.08)', color: T.ac2, fontFamily: T.mono }}>{num}={name}</span>
+        ))}
+      </div>
+      {rows.length > 0 && <div style={{ overflowX: 'auto', borderRadius: 8, border: `1px solid ${T.bd}`, marginTop: 8 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+          <thead><tr>
+            <th style={S.thStyle}>Rel ID</th><th style={S.thStyle}>Vendor</th><th style={S.thStyle}>Stock</th><th style={S.thStyle}>Lead</th><th style={S.thStyle}>Block</th><th style={S.thStyle}>Design No</th><th style={S.thStyle}>Size</th><th style={{ ...S.thStyle, color: T.ac2 }}>ARYA SKU</th>
+          </tr></thead>
+          <tbody>
+            {rows.slice(0, 50).map((r, i) => (
+              <tr key={i}>
+                <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 10 }}>{r.relid}</td>
+                <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 10 }}>{r.vendorno}</td>
+                <td style={{ ...S.tdStyle, textAlign: 'right' }}>{r.stock}</td>
+                <td style={{ ...S.tdStyle, textAlign: 'right' }}>{r.leadtime}</td>
+                <td style={{ ...S.tdStyle, textAlign: 'right' }}>{r.block}</td>
+                <td style={{ ...S.tdStyle, fontWeight: 600 }}>{r.designno}</td>
+                <td style={S.tdStyle}>{r.size > 0 ? `${r.size} (${SIZE_MAP[r.size] || '?'})` : '0'}</td>
+                <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600, color: r.aryaSku ? T.ac2 : T.tx3 }}>{r.aryaSku || '--'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length > 50 && <div style={{ padding: '8px 14px', fontSize: 10, color: T.tx3, borderTop: `1px solid ${T.bd}`, textAlign: 'center' }}>Showing 50 of {rows.length} rows.</div>}
+      </div>}
+      {rows.length === 0 && !fileName && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Click "Import Excel" to upload a vendor file.</div>}
+    </div>
+  );
+
+  // Home — tool launcher
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      <div style={{ marginBottom: 14 }}>
         <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Minis</span>
       </div>
-
-      {/* Utsav Import */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Utsav Import</div>
-            <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>Import vendor Excel, get CSV with ARYA SKU column</div>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
-            {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export XLS</div>}
-            {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Close</div>}
-          </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+        <div onClick={() => setView('utsav')} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>Utsav Import</div>
+          <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5 }}>Import vendor Excel, generate ARYA SKU column, export as XLS</div>
         </div>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} style={{ display: 'none' }} />
-
-        {fileName && <div style={{ fontSize: 10, color: T.tx3, marginBottom: 8 }}>File: {fileName} -- {rows.length} rows</div>}
-
-        {/* Size mapping reference */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: rows.length > 0 ? 12 : 0 }}>
-          {Object.entries(SIZE_MAP).map(([num, name]) => (
-            <span key={num} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(99,102,241,.08)', color: T.ac2, fontFamily: T.mono }}>{num}={name}</span>
-          ))}
+        <div onClick={() => setView('address')} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>Address Printer</div>
+          <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5 }}>Save addresses, print 4x6 inch courier label stickers</div>
         </div>
-
-        {/* Preview table */}
-        {rows.length > 0 && <div style={{ overflowX: 'auto', borderRadius: 8, border: `1px solid ${T.bd}`, marginTop: 8 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
-            <thead><tr>
-              <th style={th}>Rel ID</th>
-              <th style={th}>Vendor</th>
-              <th style={th}>Stock</th>
-              <th style={th}>Lead</th>
-              <th style={th}>Block</th>
-              <th style={th}>Design No</th>
-              <th style={th}>Size</th>
-              <th style={{ ...th, color: T.ac2 }}>ARYA SKU</th>
-            </tr></thead>
-            <tbody>
-              {rows.slice(0, 50).map((r, i) => (
-                <tr key={i}>
-                  <td style={{ ...td, fontFamily: T.mono, fontSize: 10 }}>{r.relid}</td>
-                  <td style={{ ...td, fontFamily: T.mono, fontSize: 10 }}>{r.vendorno}</td>
-                  <td style={{ ...td, textAlign: 'right' }}>{r.stock}</td>
-                  <td style={{ ...td, textAlign: 'right' }}>{r.leadtime}</td>
-                  <td style={{ ...td, textAlign: 'right' }}>{r.block}</td>
-                  <td style={{ ...td, fontWeight: 600 }}>{r.designno}</td>
-                  <td style={td}>{r.size > 0 ? `${r.size} (${SIZE_MAP[r.size] || '?'})` : '0'}</td>
-                  <td style={{ ...td, fontFamily: T.mono, fontWeight: 600, color: r.aryaSku ? T.ac2 : T.tx3 }}>{r.aryaSku || '--'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {rows.length > 50 && <div style={{ padding: '8px 14px', fontSize: 10, color: T.tx3, borderTop: `1px solid ${T.bd}`, textAlign: 'center' }}>Showing 50 of {rows.length} rows. Full data included in CSV export.</div>}
-        </div>}
       </div>
-
-      {/* Address Printer */}
-      <AddressPrinter addToast={addToast} />
     </div>
   );
 }
