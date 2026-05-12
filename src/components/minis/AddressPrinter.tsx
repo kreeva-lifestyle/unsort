@@ -62,7 +62,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const deleteLabel = async (id: string) => {
     const { error } = await supabase.from('address_labels').delete().eq('id', id);
     if (error) { addToast('Delete failed — ' + friendlyError(error), 'error'); return; }
-    addToast('Address deleted', 'success'); setSelected(prev => { const n = new Set(prev); n.delete(id); return n; }); fetchLabels();
+    addToast('Address deleted', 'success'); setSelected(prev => { const n = new Set(prev); n.delete(id); return n; }); setPage(0); fetchLabels();
   };
 
   const toggleSelect = (id: string) => setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -140,7 +140,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{editingId ? 'Edit' : 'Add'} Address</span>
             <span onClick={() => { setShowAdd(false); setEditingId(null); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
           </div>
-          <div style={{ padding: 16 }}>
+          <form onSubmit={e => { e.preventDefault(); handleSave(); }} style={{ padding: 16 }}>
             <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Name *</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Recipient name" style={S.fInput} /></div>
             <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Phone *</label><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+91 99999 99999" style={S.fInput} /></div>
             <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Address *</label><textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Street address, building, area" rows={2} style={{ ...S.fInput, height: 'auto', resize: 'vertical' }} /></div>
@@ -158,9 +158,9 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${T.bd}` }}>
               <span onClick={() => { setShowAdd(false); setEditingId(null); }} style={S.btnGhost}>Cancel</span>
-              <span onClick={handleSave} style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving...' : editingId ? 'Update' : 'Save'}</span>
+              <button type="submit" style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving...' : editingId ? 'Update' : 'Save'}</button>
             </div>
-          </div>
+          </form>
         </div>
       </div>, document.body)}
 

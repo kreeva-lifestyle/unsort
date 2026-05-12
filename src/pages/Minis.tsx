@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../lib/theme';
 import { useNotifications } from '../hooks/useNotifications';
@@ -9,12 +9,25 @@ const SIZE_MAP: Record<number, string> = { 34: 'XS', 36: 'S', 38: 'M', 40: 'L', 
 
 interface UtsavRow { relid: string; vendorno: string; stock: number; leadtime: number; block: number; designno: string; size: number; catalogname: string; updateddate: string; aryaSku: string }
 
+type MiniView = 'home' | 'utsav' | 'cbazaar' | 'address';
+
 export default function Minis() {
   const { addToast } = useNotifications();
-  const [view, setView] = useState<'home' | 'utsav' | 'cbazaar' | 'address'>('home');
+  const [view, setViewState] = useState<MiniView>('home');
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<UtsavRow[]>([]);
   const [fileName, setFileName] = useState('');
+
+  const setView = useCallback((v: MiniView) => {
+    setViewState(v);
+    if (v !== 'home') window.history.pushState({ miniView: v }, '');
+  }, []);
+
+  useEffect(() => {
+    const onPop = () => setViewState('home');
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -27,16 +40,22 @@ export default function Minis() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
         if (raw.length === 0) { addToast('File is empty', 'error'); return; }
+        if (raw.length > 5000) { addToast('File too large — max 5,000 rows', 'error'); return; }
+        const keys = Object.keys(raw[0]).map(k => k.toLowerCase());
+        if (!keys.some(k => k.includes('designno') || k.includes('design'))) { addToast('Missing "designno" column — check file format', 'error'); return; }
+        let unmappedSizes = 0;
         const parsed: UtsavRow[] = [];
         for (const r of raw) {
           const designno = String(r.designno || r.DESIGNNO || r.DesignNo || '').trim();
           const sizeNum = Number(r.size || r.SIZE || r.Size || 0);
           const sizeName = SIZE_MAP[sizeNum] || '';
-          const aryaSku = designno ? (sizeNum > 0 && sizeName ? `${designno}-${sizeName}` : designno) : '';
+          if (sizeNum > 0 && !sizeName) unmappedSizes++;
+          const aryaSku = designno ? (sizeNum > 0 ? (sizeName ? `${designno}-${sizeName}` : `${designno}-${sizeNum}`) : designno) : '';
           parsed.push({ relid: String(r.relid || r.RELID || ''), vendorno: String(r.vendorno || r.VENDORNO || ''), stock: Number(r.stock || r.STOCK || 0), leadtime: Number(r.leadtime || r.LEADTIME || 0), block: Number(r.block || r.BLOCK || 0), designno, size: sizeNum, catalogname: String(r.catalogname || r.CATALOGNAME || ''), updateddate: String(r.updateddate || r.UPDATEDDATE || ''), aryaSku });
         }
         setRows(parsed);
         addToast(`${parsed.length} rows imported`, 'success');
+        if (unmappedSizes > 0) addToast(`${unmappedSizes} rows have unmapped sizes — used raw number in SKU`, 'error');
       } catch { addToast('Failed to parse file — check format', 'error'); }
     };
     reader.readAsArrayBuffer(file);
@@ -52,7 +71,7 @@ export default function Minis() {
     XLSX.writeFile(wb, `Utsav_Export_${new Date().toISOString().slice(0, 10)}.xls`);
   };
 
-  const back = <span onClick={() => setView('home')} style={{ ...S.btnGhost, padding: '6px 10px', cursor: 'pointer' }}>
+  const back = <span onClick={() => setViewState('home')} style={{ ...S.btnGhost, padding: '6px 10px', cursor: 'pointer' }}>
     <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
   </span>;
 
@@ -110,7 +129,7 @@ export default function Minis() {
                 <td style={{ ...S.tdStyle, textAlign: 'right' }}>{r.leadtime}</td>
                 <td style={{ ...S.tdStyle, textAlign: 'right' }}>{r.block}</td>
                 <td style={{ ...S.tdStyle, fontWeight: 600 }}>{r.designno}</td>
-                <td style={S.tdStyle}>{r.size > 0 ? `${r.size} (${SIZE_MAP[r.size] || '?'})` : '0'}</td>
+                <td style={S.tdStyle}>{r.size > 0 ? `${r.size} (${SIZE_MAP[r.size] || r.size})` : '0'}</td>
                 <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600, color: r.aryaSku ? T.ac2 : T.tx3 }}>{r.aryaSku || '--'}</td>
               </tr>
             ))}
@@ -122,25 +141,22 @@ export default function Minis() {
     </div>
   );
 
-  // Home — tool launcher
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ marginBottom: 14 }}>
         <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Minis</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-        <div onClick={() => setView('utsav')} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>Utsav Import</div>
-          <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5 }}>Import vendor Excel, generate ARYA SKU column, export as XLS</div>
-        </div>
-        <div onClick={() => setView('cbazaar')} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>Cbazaar Import</div>
-          <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5 }}>Import Cbazaar vendor Excel, generate ARYA SKU column, export as CSV</div>
-        </div>
-        <div onClick={() => setView('address')} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>Address Printer</div>
-          <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5 }}>Save addresses, print 4x6 inch courier label stickers</div>
-        </div>
+        {[
+          { id: 'utsav' as MiniView, title: 'Utsav Import', desc: 'Import vendor Excel, generate ARYA SKU column, export as XLS' },
+          { id: 'cbazaar' as MiniView, title: 'Cbazaar Import', desc: 'Import Cbazaar vendor Excel, generate ARYA SKU column, export as CSV' },
+          { id: 'address' as MiniView, title: 'Address Printer', desc: 'Save addresses, print 4x6 inch courier label stickers' },
+        ].map(t => (
+          <div key={t.id} onClick={() => setView(t.id)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>{t.title}</div>
+            <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5 }}>{t.desc}</div>
+          </div>
+        ))}
       </div>
     </div>
   );

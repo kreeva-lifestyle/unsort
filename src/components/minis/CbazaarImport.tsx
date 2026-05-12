@@ -25,18 +25,24 @@ export default function CbazaarImport({ addToast }: { addToast: (msg: string, ty
         const ws = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
         if (raw.length === 0) { addToast('File is empty', 'error'); return; }
+        if (raw.length > 5000) { addToast('File too large — max 5,000 rows', 'error'); return; }
+        const keys = Object.keys(raw[0]).map(k => k.toLowerCase());
+        if (!keys.some(k => k.includes('design'))) { addToast('Missing "Design No" column — check file format', 'error'); return; }
+        let unmappedSizes = 0;
         const parsed: CbRow[] = [];
         for (const r of raw) {
           const designNo = String(r['Design No(view only)'] || r['Design No'] || r.designno || r.DesignNo || '').trim();
           const sizeRaw = String(r['Size(view only)'] || r['Size'] || r.size || '').trim();
           const sizeShort = CBAZAAR_SIZE_MAP[sizeRaw] || '';
           const isNA = sizeRaw === '-NA-' || sizeRaw === 'NA' || sizeRaw === '-na-' || !sizeRaw;
-          const aryaSku = designNo ? (isNA ? designNo : (sizeShort ? `${designNo}-${sizeShort}` : designNo)) : '';
+          const sizeFallback = !sizeShort && !isNA && sizeRaw ? sizeRaw.split(/\s/)[0] : '';
+          if (!isNA && !sizeShort && sizeRaw) unmappedSizes++;
+          const aryaSku = designNo ? (isNA ? designNo : (sizeShort ? `${designNo}-${sizeShort}` : (sizeFallback ? `${designNo}-${sizeFallback}` : designNo))) : '';
           parsed.push({
             catalogue: String(r['Catalogue'] || r.catalogue || '').trim(),
             designNo,
             sizeRaw,
-            sizeShort: isNA ? '-' : (sizeShort || '?'),
+            sizeShort: isNA ? '-' : (sizeShort || sizeFallback || '?'),
             productCategory: String(r['Product Category'] || r['Product C'] || '').trim(),
             productName: String(r['Product Name'] || r['Product N'] || '').trim(),
             readyToShipQty: Number(r['ReadyToShipQty'] || 0),
@@ -47,6 +53,7 @@ export default function CbazaarImport({ addToast }: { addToast: (msg: string, ty
         }
         setRows(parsed);
         addToast(`${parsed.length} rows imported`, 'success');
+        if (unmappedSizes > 0) addToast(`${unmappedSizes} rows have non-standard sizes — used first word as fallback`, 'error');
       } catch { addToast('Failed to parse file — check format', 'error'); }
     };
     reader.readAsArrayBuffer(file);
