@@ -115,7 +115,7 @@ export default function Minis() {
           <span key={num} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(99,102,241,.08)', color: T.ac2, fontFamily: T.mono }}>{num}={name}</span>
         ))}
       </div>
-      {rows.length > 0 && <div style={{ overflowX: 'auto', borderRadius: 8, border: `1px solid ${T.bd}`, marginTop: 8 }}>
+      {rows.length > 0 && <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}`, marginTop: 8 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
           <thead><tr>
             <th style={S.thStyle}>Rel ID</th><th style={S.thStyle}>Vendor</th><th style={S.thStyle}>Stock</th><th style={S.thStyle}>Lead</th><th style={S.thStyle}>Block</th><th style={S.thStyle}>Design No</th><th style={S.thStyle}>Size</th><th style={{ ...S.thStyle, color: T.ac2 }}>ARYA SKU</th>
@@ -146,7 +146,7 @@ export default function Minis() {
       <div style={{ marginBottom: 14 }}>
         <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Minis</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+      <div className="minis-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
         {[
           { id: 'utsav' as MiniView, title: 'Utsav Import', desc: 'Import vendor Excel, generate ARYA SKU column, export as XLS' },
           { id: 'cbazaar' as MiniView, title: 'Cbazaar Import', desc: 'Import Cbazaar vendor Excel, generate ARYA SKU column, export as CSV' },

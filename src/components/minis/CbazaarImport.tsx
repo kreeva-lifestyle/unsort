@@ -89,7 +89,7 @@ export default function CbazaarImport({ addToast }: { addToast: (msg: string, ty
         <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(255,255,255,.04)', color: T.tx3, fontFamily: T.mono }}>-NA- = no size</span>
       </div>
 
-      {rows.length > 0 && <div style={{ overflowX: 'auto', borderRadius: 8, border: `1px solid ${T.bd}`, marginTop: 8 }}>
+      {rows.length > 0 && <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}`, marginTop: 8 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
           <thead><tr>
             <th style={S.thStyle}>Catalogue</th><th style={S.thStyle}>Design No</th><th style={S.thStyle}>Size</th>
