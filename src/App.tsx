@@ -27,6 +27,7 @@ const CashChallan = retryImport(() => import('./pages/CashChallan'));
 const SettingsPage = retryImport(() => import('./pages/Settings'));
 const Inventory = retryImport(() => import('./pages/Inventory'));
 const ProgramsModule = retryImport(() => import('./modules/programs'));
+const Minis = retryImport(() => import('./pages/Minis'));
 const LazyPublicShareView = retryImport(() => import('./modules/programs/PublicShareView'));
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -95,7 +96,7 @@ const MainApp = () => {
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', programs: 'Programs', settings: 'Settings' };
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', programs: 'Programs', minis: 'Minis', settings: 'Settings' };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
@@ -134,6 +135,7 @@ const MainApp = () => {
         {mounted.has('packtime') && checkTab('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime active={tab === 'packtime'} /></div>}
         {mounted.has('challan') && checkTab('challan') && <div style={{ display: tab === 'challan' ? 'block' : 'none' }}><CashChallan active={tab === 'challan'} /></div>}
         {mounted.has('programs') && checkTab('programs') && <div style={{ display: tab === 'programs' ? 'block' : 'none' }}><ProgramsModule /></div>}
+        {mounted.has('minis') && checkTab('minis') && <div style={{ display: tab === 'minis' ? 'block' : 'none' }}><Minis /></div>}
         {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage profile={profile} addToast={addToast} /></div>}
         </Suspense>
       </main>
