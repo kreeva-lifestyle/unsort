@@ -55,18 +55,13 @@ export default function Minis() {
     e.target.value = '';
   };
 
-  const exportCsv = () => {
+  const exportXls = () => {
     if (rows.length === 0) return;
-    const header = 'relid,vendorno,stock,leadtime,block,ARYA SKU';
-    const csvRows = rows.map(r =>
-      `${r.relid},${r.vendorno},${r.stock},${r.leadtime},${r.block},${r.aryaSku}`
-    );
-    const csv = header + '\n' + csvRows.join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `Utsav_Export_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    const data = rows.map(r => ({ relid: r.relid, vendorno: r.vendorno, stock: r.stock, leadtime: r.leadtime, block: r.block, 'ARYA SKU': r.aryaSku }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Utsav Export');
+    XLSX.writeFile(wb, `Utsav_Export_${new Date().toISOString().slice(0, 10)}.xls`);
   };
 
   const th: React.CSSProperties = S.thStyle;
@@ -87,7 +82,7 @@ export default function Minis() {
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
-            {rows.length > 0 && <div onClick={exportCsv} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export CSV</div>}
+            {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export XLS</div>}
           </div>
         </div>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} style={{ display: 'none' }} />
