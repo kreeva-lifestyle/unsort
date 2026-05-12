@@ -56,6 +56,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showList, setShowList] = useState(false);
+  const [addrSearch, setAddrSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', phone: '', address: '', city: '', state: '', pincode: '' });
@@ -104,58 +105,56 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const openEdit = (l: Label) => { setEditingId(l.id); setForm({ name: l.name, phone: l.phone, address: l.address, city: l.city, state: l.state, pincode: l.pincode }); setShowAdd(true); };
   const openAdd = () => { setEditingId(null); setForm(emptyForm); setShowAdd(true); };
 
-  return (
-    <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Address Printer</div>
-          <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>4x6 inch courier label stickers</div>
+  if (showList) return (
+    <div style={{ animation: 'fi .15s ease' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span onClick={() => { setShowList(false); setSelected(new Set()); }} style={{ ...S.btnGhost, padding: '6px 10px', cursor: 'pointer' }}>
+            <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+          </span>
+          <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Saved Addresses</span>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{labels.length} address{labels.length !== 1 ? 'es' : ''}</span>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <div onClick={() => { setShowList(true); fetchLabels(); }} style={S.btnGhost}>Saved Addresses{labels.length > 0 ? ` (${labels.length})` : ''}</div>
+          {selected.size > 0 && <div onClick={printBulk} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Print {selected.size} Label{selected.size > 1 ? 's' : ''}</div>}
           <div onClick={openAdd} style={S.btnPrimary}>+ Add Address</div>
         </div>
       </div>
 
-      {/* Saved Addresses Modal */}
-      {showList && createPortal(<div style={S.modalOverlay} onClick={() => { setShowList(false); setSelected(new Set()); }}>
-        <div className="modal-inner" style={{ ...S.modalBox, width: 560 }} onClick={e => e.stopPropagation()}>
-          <div style={S.modalHead}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Saved Addresses</span>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              {selected.size > 0 && <div onClick={printBulk} style={{ ...S.btnSm, cursor: 'pointer', color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Print {selected.size}</div>}
-              <span onClick={() => { setShowList(false); setSelected(new Set()); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+      {labels.length > 0 && <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
+        <span onClick={selected.size === labels.length ? clearSelection : selectAll} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: `1px solid rgba(99,102,241,.2)`, background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>{selected.size === labels.length ? 'Deselect All' : 'Select All'}</span>
+        {selected.size > 0 && <span style={{ fontSize: 10, color: T.tx3 }}>{selected.size} selected</span>}
+      </div>}
+
+      {/* Search */}
+      <div style={{ position: 'relative', marginBottom: 10 }}>
+        <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
+        <input value={addrSearch} onChange={e => setAddrSearch(e.target.value)} placeholder="Search name, city, pincode..." style={S.fSearch} />
+      </div>
+
+      {(() => {
+        const q = addrSearch.toLowerCase();
+        const filtered = q ? labels.filter(l => l.name.toLowerCase().includes(q) || l.city.toLowerCase().includes(q) || l.pincode.includes(q) || l.phone.includes(q) || l.state.toLowerCase().includes(q)) : labels;
+        return loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div> :
+        filtered.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{labels.length === 0 ? 'No saved addresses yet. Click "+ Add Address" to create one.' : 'No matches found.'}</div> :
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {filtered.map(l => (
+          <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: selected.has(l.id) ? 'rgba(99,102,241,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selected.has(l.id) ? 'rgba(99,102,241,.25)' : T.bd}`, borderRadius: 8, cursor: 'pointer', transition: 'all .15s' }} onClick={() => toggleSelect(l.id)}>
+            <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${selected.has(l.id) ? T.ac : T.bd2}`, background: selected.has(l.id) ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>{selected.has(l.id) && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><path d="M20 6L9 17l-5-5" /></svg>}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{l.name}</div>
+              <div style={{ fontSize: 11, color: T.tx2, marginTop: 2 }}>{l.address}, {l.city}, {l.state} - {l.pincode}</div>
+              <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{l.phone}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+              <span onClick={() => printSingle(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '5px 10px', fontSize: 10 }}>Print</span>
+              <span onClick={() => openEdit(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '5px 10px', fontSize: 10 }}>Edit</span>
+              <span onClick={() => deleteLabel(l.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '5px 10px', fontSize: 10 }}>Del</span>
             </div>
           </div>
-          <div style={{ padding: '8px 14px', borderBottom: `1px solid ${T.bd}`, display: 'flex', gap: 8, alignItems: 'center' }}>
-            {labels.length > 0 && <span onClick={selected.size === labels.length ? clearSelection : selectAll} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: `1px solid rgba(99,102,241,.2)`, background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>{selected.size === labels.length ? 'Deselect All' : 'Select All'}</span>}
-            {selected.size > 0 && <span style={{ fontSize: 10, color: T.tx3 }}>{selected.size} selected</span>}
-            <span style={{ flex: 1 }} />
-            <span style={{ fontSize: 10, color: T.tx3 }}>{labels.length} address{labels.length !== 1 ? 'es' : ''}</span>
-          </div>
-          <div style={{ padding: 12, maxHeight: '60vh', overflowY: 'auto' }}>
-            {loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div> :
-            labels.length === 0 ? <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No saved addresses yet.</div> :
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {labels.map(l => (
-                <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: selected.has(l.id) ? 'rgba(99,102,241,.06)' : 'rgba(255,255,255,0.01)', border: `1px solid ${selected.has(l.id) ? 'rgba(99,102,241,.25)' : T.bd}`, borderRadius: 8, cursor: 'pointer', transition: 'all .15s' }} onClick={() => toggleSelect(l.id)}>
-                  <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${selected.has(l.id) ? T.ac : T.bd2}`, background: selected.has(l.id) ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>{selected.has(l.id) && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><path d="M20 6L9 17l-5-5" /></svg>}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{l.name}</div>
-                    <div style={{ fontSize: 11, color: T.tx2, marginTop: 1 }}>{l.address}, {l.city}, {l.state} - {l.pincode}</div>
-                    <div style={{ fontSize: 10, color: T.tx3, marginTop: 1 }}>{l.phone}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                    <span onClick={() => printSingle(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '4px 8px', fontSize: 9 }}>Print</span>
-                    <span onClick={() => openEdit(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '4px 8px', fontSize: 9 }}>Edit</span>
-                    <span onClick={() => deleteLabel(l.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '4px 8px', fontSize: 9 }}>Del</span>
-                  </div>
-                </div>
-              ))}
-            </div>}
-          </div>
-        </div>
-      </div>, document.body)}
+        ))}
+      </div>;
+      })()}
 
       {/* Add/Edit Modal */}
       {showAdd && createPortal(<div style={S.modalOverlay} onClick={() => { setShowAdd(false); setEditingId(null); }}>
