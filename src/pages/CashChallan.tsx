@@ -604,7 +604,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (wasNew) {
       addToast('Challan created!', 'success');
       if (savedPhone) {
-        const msg = encodeURIComponent(`Hi ${savedName},\nYour invoice of ₹${savedTotal.toLocaleString('en-IN')} (${savedItemCount} item${savedItemCount !== 1 ? 's' : ''}) has been generated.\n— Arya Designs`);
+        const msg = encodeURIComponent(`Hi ${savedName},\nYour sales cash challan of ₹${savedTotal.toLocaleString('en-IN')} (${savedItemCount} item${savedItemCount !== 1 ? 's' : ''}) has been generated.\n— Arya Designs`);
         setWhatsAppShare({ phone: savedPhone, url: `https://wa.me/${waPhone(savedPhone)}?text=${msg}` });
       }
       const suppressed = localStorage.getItem('ccErpReminderHidden');
