@@ -129,9 +129,12 @@ export default function ChallanLedger({
         )}
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-        <input type="text" value={search} onChange={e => onSearchChange(e.target.value)} placeholder="Enter customer name..."
-          style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '8px 12px', outline: 'none', boxSizing: 'border-box', height: 36 }} />
-        <button onClick={() => onSearchSubmit(search)} style={{ padding: '7px 12px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Search</button>
+        <div style={{ flex: 1, position: 'relative' }}>
+          <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
+          <input type="text" value={search} onChange={e => onSearchChange(e.target.value)} onKeyDown={e => e.key === 'Enter' && onSearchSubmit(search)} placeholder="Enter customer name..."
+            style={{ ...S.fSearch, width: '100%' }} />
+        </div>
+        <button onClick={() => onSearchSubmit(search)} style={S.btnPrimary}>Search</button>
       </div>
       <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 6 }}>{search ? 'Search Results' : 'Recent Customers'}</div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
