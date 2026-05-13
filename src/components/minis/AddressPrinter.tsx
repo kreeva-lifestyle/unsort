@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
+import SwipeRow from '../ui/SwipeRow';
 
 const FROM = { name: 'Arya Designs', city: 'Surat', phone: '+91 63544 82868' };
 
@@ -105,24 +106,30 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
         <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search name, city, pincode, phone..." style={S.fSearch} />
       </div>
 
-      {/* List */}
+      {/* List — desktop with inline buttons, mobile with swipe actions */}
       {loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div> :
       filtered.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{labels.length === 0 ? 'No saved addresses yet. Click "+ Add Address" to create one.' : 'No matches found.'}</div> :
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {paged.map(l => (
-          <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: selected.has(l.id) ? 'rgba(99,102,241,.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selected.has(l.id) ? 'rgba(99,102,241,.25)' : T.bd}`, borderRadius: 8, cursor: 'pointer', transition: 'all .15s' }} onClick={() => toggleSelect(l.id)}>
-            <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${selected.has(l.id) ? T.ac : T.bd2}`, background: selected.has(l.id) ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>{selected.has(l.id) && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><path d="M20 6L9 17l-5-5" /></svg>}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{l.name}</div>
-              <div style={{ fontSize: 11, color: T.tx2, marginTop: 2 }}>{l.address}, {l.city}, {l.state} - {l.pincode}</div>
-              <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{l.phone}</div>
+        {paged.map((l, idx) => (
+          <SwipeRow key={l.id} hint={idx === 0} hintKey="label-maker" actions={[
+            { label: 'Print', color: '#6366F1', onClick: () => setPrintHtml(buildLabelHtml([l])) },
+            { label: 'Edit', color: '#818CF8', onClick: () => openEdit(l) },
+            { label: 'Delete', color: '#EF4444', onClick: () => deleteLabel(l.id) },
+          ]}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: selected.has(l.id) ? 'rgba(99,102,241,.06)' : 'transparent', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }} onClick={() => toggleSelect(l.id)}>
+              <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${selected.has(l.id) ? T.ac : T.bd2}`, background: selected.has(l.id) ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>{selected.has(l.id) && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><path d="M20 6L9 17l-5-5" /></svg>}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{l.name}</div>
+                <div style={{ fontSize: 11, color: T.tx2, marginTop: 2 }}>{l.address}, {l.city}, {l.state} - {l.pincode}</div>
+                <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{l.phone}</div>
+              </div>
+              <div className="desktop-only" style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                <span onClick={() => setPrintHtml(buildLabelHtml([l]))} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '6px 12px', fontSize: 11 }}>Print</span>
+                <span onClick={() => openEdit(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '6px 12px', fontSize: 11 }}>Edit</span>
+                <span onClick={() => deleteLabel(l.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '6px 12px', fontSize: 11 }}>Del</span>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-              <span onClick={() => setPrintHtml(buildLabelHtml([l]))} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '6px 12px', fontSize: 11, minHeight: 32 }}>Print</span>
-              <span onClick={() => openEdit(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '6px 12px', fontSize: 11, minHeight: 32 }}>Edit</span>
-              <span onClick={() => deleteLabel(l.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '6px 12px', fontSize: 11, minHeight: 32 }}>Del</span>
-            </div>
-          </div>
+          </SwipeRow>
         ))}
       </div>}
 
