@@ -39,6 +39,9 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', phone: '', address: '', city: '', state: '', pincode: '' });
   const [printHtml, setPrintHtml] = useState<string | null>(null);
+  const [copies, setCopies] = useState<Record<string, number>>({});
+  const getCopies = (id: string) => copies[id] || 1;
+  const setCopy = (id: string, v: number) => setCopies(prev => ({ ...prev, [id]: Math.max(1, v) }));
   const emptyForm = { name: '', phone: '', address: '', city: '', state: '', pincode: '' };
 
   const fetchLabels = useCallback(async () => {
@@ -76,7 +79,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const toggleSelect = (id: string) => setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const selectAll = () => setSelected(new Set(labels.map(l => l.id)));
   const clearSelection = () => setSelected(new Set());
-  const printBulk = () => { const toPrint = labels.filter(l => selected.has(l.id)); if (toPrint.length === 0) { addToast('Select addresses to print', 'error'); return; } setPrintHtml(buildLabelHtml(toPrint)); };
+  const printBulk = () => { const toPrint = labels.filter(l => selected.has(l.id)); if (toPrint.length === 0) { addToast('Select addresses to print', 'error'); return; } const expanded = toPrint.flatMap(l => Array(getCopies(l.id)).fill(l)); setPrintHtml(buildLabelHtml(expanded)); };
   const closeModal = () => { setShowAdd(false); setEditingId(null); setForm(emptyForm); setFormError(''); };
   const openEdit = (l: Label) => { setEditingId(l.id); setForm({ name: l.name, phone: l.phone, address: l.address, city: l.city, state: l.state, pincode: l.pincode }); setFormError(''); setShowAdd(true); };
   const openAdd = () => { setEditingId(null); setForm(emptyForm); setFormError(''); setShowAdd(true); };
@@ -112,7 +115,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {paged.map((l, idx) => (
           <SwipeRow key={l.id} hint={idx === 0} hintKey="label-maker" actions={[
-            { label: 'Print', color: '#6366F1', onClick: () => setPrintHtml(buildLabelHtml([l])) },
+            { label: 'Print', color: '#6366F1', onClick: () => { const expanded = Array(getCopies(l.id)).fill(l); setPrintHtml(buildLabelHtml(expanded)); } },
             { label: 'Edit', color: '#818CF8', onClick: () => openEdit(l) },
             { label: 'Delete', color: '#EF4444', onClick: () => deleteLabel(l.id) },
           ]}>
@@ -123,8 +126,13 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
                 <div style={{ fontSize: 11, color: T.tx2, marginTop: 2 }}>{l.address}, {l.city}, {l.state} - {l.pincode}</div>
                 <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{l.phone}</div>
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                <button onClick={() => setCopy(l.id, getCopies(l.id) - 1)} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
+                <span style={{ width: 30, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: getCopies(l.id) > 1 ? T.ac2 : T.tx3, background: getCopies(l.id) > 1 ? 'rgba(99,102,241,.06)' : 'transparent' }}>{getCopies(l.id)}</span>
+                <button onClick={() => setCopy(l.id, getCopies(l.id) + 1)} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+              </div>
               <div className="desktop-only" style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                <span onClick={() => setPrintHtml(buildLabelHtml([l]))} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '6px 12px', fontSize: 11 }}>Print</span>
+                <span onClick={() => { const expanded = Array(getCopies(l.id)).fill(l); setPrintHtml(buildLabelHtml(expanded)); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '6px 12px', fontSize: 11 }}>Print</span>
                 <span onClick={() => openEdit(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '6px 12px', fontSize: 11 }}>Edit</span>
                 <span onClick={() => deleteLabel(l.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '6px 12px', fontSize: 11 }}>Del</span>
               </div>
