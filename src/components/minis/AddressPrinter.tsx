@@ -25,6 +25,12 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    document.body.classList.toggle('modal-open', showAdd);
+    return () => { document.body.classList.remove('modal-open'); };
+  }, [showAdd]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [perPage, setPerPage] = useState(25);
@@ -44,7 +50,8 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   useEffect(() => { fetchLabels(); }, [fetchLabels]);
 
   const handleSave = async () => {
-    if (!form.name.trim() || !form.phone.trim() || !form.address.trim() || !form.city.trim() || !form.state.trim() || !form.pincode.trim()) { addToast('All fields are required', 'error'); return; }
+    setFormError('');
+    if (!form.name.trim() || !form.phone.trim() || !form.address.trim() || !form.city.trim() || !form.state.trim() || !form.pincode.trim()) { setFormError('All fields are required'); return; }
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (editingId) {
@@ -56,7 +63,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
       if (error) { addToast('Save failed — ' + friendlyError(error), 'error'); setSaving(false); return; }
       addToast('Address saved', 'success');
     }
-    setSaving(false); setShowAdd(false); setEditingId(null); setForm(emptyForm); fetchLabels();
+    setSaving(false); closeModal(); fetchLabels();
   };
 
   const deleteLabel = async (id: string) => {
@@ -69,8 +76,9 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const selectAll = () => setSelected(new Set(labels.map(l => l.id)));
   const clearSelection = () => setSelected(new Set());
   const printBulk = () => { const toPrint = labels.filter(l => selected.has(l.id)); if (toPrint.length === 0) { addToast('Select addresses to print', 'error'); return; } setPrintHtml(buildLabelHtml(toPrint)); };
-  const openEdit = (l: Label) => { setEditingId(l.id); setForm({ name: l.name, phone: l.phone, address: l.address, city: l.city, state: l.state, pincode: l.pincode }); setShowAdd(true); };
-  const openAdd = () => { setEditingId(null); setForm(emptyForm); setShowAdd(true); };
+  const closeModal = () => { setShowAdd(false); setEditingId(null); setForm(emptyForm); setFormError(''); };
+  const openEdit = (l: Label) => { setEditingId(l.id); setForm({ name: l.name, phone: l.phone, address: l.address, city: l.city, state: l.state, pincode: l.pincode }); setFormError(''); setShowAdd(true); };
+  const openAdd = () => { setEditingId(null); setForm(emptyForm); setFormError(''); setShowAdd(true); };
 
   const q = search.toLowerCase();
   const filtered = q ? labels.filter(l => l.name.toLowerCase().includes(q) || l.city.toLowerCase().includes(q) || l.pincode.includes(q) || l.phone.includes(q) || l.state.toLowerCase().includes(q)) : labels;
@@ -134,11 +142,11 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
       </div>}
 
       {/* Add/Edit Modal */}
-      {showAdd && createPortal(<div style={S.modalOverlay} onClick={() => { setShowAdd(false); setEditingId(null); }}>
+      {showAdd && createPortal(<div style={S.modalOverlay} onClick={closeModal}>
         <div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
           <div style={S.modalHead}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{editingId ? 'Edit' : 'Add'} Address</span>
-            <span onClick={() => { setShowAdd(false); setEditingId(null); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+            <span onClick={closeModal} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
           </div>
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} style={{ padding: 16 }}>
             <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Name *</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Recipient name" style={S.fInput} /></div>
@@ -156,8 +164,9 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
               <div style={{ fontSize: 11, color: '#333' }}>{form.city || 'City'}, {form.state || 'State'} - {form.pincode || '000000'}</div>
               <div style={{ fontSize: 11, fontWeight: 600, marginTop: 3 }}>{form.phone || 'Phone'}</div>
             </div>
+            {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{formError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${T.bd}` }}>
-              <span onClick={() => { setShowAdd(false); setEditingId(null); }} style={S.btnGhost}>Cancel</span>
+              <span onClick={closeModal} style={S.btnGhost}>Cancel</span>
               <button type="submit" style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving...' : editingId ? 'Update' : 'Save'}</button>
             </div>
           </form>
