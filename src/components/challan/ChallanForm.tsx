@@ -271,7 +271,7 @@ export default function ChallanForm(p: ChallanFormProps) {
             </div>
             <div>
               <label style={lbl}>Notes</label>
-              <input value={p.notes} onChange={e => p.setNotes(e.target.value)} placeholder="Optional" style={{ ...inp, fontSize: 11 }} />
+              <textarea value={p.notes} onChange={e => p.setNotes(e.target.value)} placeholder="Add notes about this challan..." rows={2} style={{ ...inp, height: 'auto', fontSize: 11, resize: 'vertical', lineHeight: 1.5 }} />
             </div>
           </div>
 

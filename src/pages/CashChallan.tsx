@@ -506,6 +506,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (amountPaid < 0) { setFormError('Amount paid cannot be negative'); return; }
     if (amountPaid > grandTotal) { setFormError(`Amount paid (₹${amountPaid}) cannot exceed total (₹${grandTotal})`); return; }
     if (!paymentMode && amountPaid > 0) { setFormError('Select a payment mode when amount is paid'); return; }
+    if (!paymentDate && amountPaid > 0) { setFormError('Payment date is required when amount is paid'); return; }
     if (editing && editing.status !== 'draft' && challanStatus === 'draft') { setFormError('Cannot revert to Draft once saved'); return; }
     if (challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(isReturn ? `Refund amount (₹${amountPaid}) must equal return total (₹${grandTotal})` : `Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
     if (!isReturn && challanStatus === 'partial' && (amountPaid <= 0 || amountPaid >= grandTotal)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
