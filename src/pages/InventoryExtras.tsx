@@ -231,7 +231,7 @@ export default function InventoryExtras() {
         .select().single();
       if (upErr || !updated) { setError('Another user just updated this extra. Close and reopen to retry.'); return; }
     }
-    setAdjustExtra(null); setAdjustQty('1'); setAdjustReason(''); addToast('Quantity adjusted', 'success'); fetchExtras();
+    setAdjustExtra(null); setAdjustQty('1'); setAdjustReason(''); addToast('Quantity adjusted', 'success'); setPage(0); fetchExtras();
   };
 
   const completeWithExtra = async () => {
@@ -254,7 +254,7 @@ export default function InventoryExtras() {
       const { error: delErr } = await supabase.from('inventory_extras').delete().eq('id', extra.id);
       if (delErr) addToast('Item completed but spare part row cleanup failed — ' + friendlyError(delErr), 'error');
     }
-    setSaving(false); setCompleteItem(null); setMatchExtra(null); addToast('Item completed', 'success'); fetchExtras();
+    setSaving(false); setCompleteItem(null); setMatchExtra(null); addToast('Item completed', 'success'); setPage(0); fetchExtras();
   };
 
   // Filtered list + pagination

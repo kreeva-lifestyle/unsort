@@ -545,7 +545,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       subtotal, discount_type: null, discount_value: 0,
       discount_amount: totalDiscount, shipping_charges: clampedShipping, round_off: roundOff, total: grandTotal,
       amount_paid: amountPaid, payment_mode: paymentMode || null,
-      payment_date: paymentDate || null, notes, tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      payment_date: paymentDate || null, notes, tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : null,
       is_return: isReturn,
       modified_by: user?.id,
     };
@@ -588,7 +588,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           p_payment: amountPaid > 0 ? { amount: amountPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || new Date().toISOString().slice(0, 10), paid_by: user?.id } : null,
         };
         const { data: newChallan, error: crErr } = await supabase.rpc('create_challan_with_items', rpcPayload);
-        if (crErr || !newChallan) throw new Error(crErr?.message || 'Failed to create challan');
+        if (crErr || !newChallan?.id || !newChallan?.challan_number) throw new Error(crErr?.message || 'Failed to create challan — missing response data');
         await ccAuditLog('CREATE', newChallan.id, `${isReturn ? 'Return' : 'Challan'} #${newChallan.challan_number} created for ${customerName.trim()} — ₹${grandTotal}`);
       }
     } catch (e: any) {
@@ -605,8 +605,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (wasNew) {
       addToast('Challan created!', 'success');
       if (savedPhone) {
+        const newChallanOutstanding = Math.max(0, savedTotal - amountPaid);
         const { data: outData } = await supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', savedName).in('status', ['unpaid', 'partial']).eq('is_return', false);
-        const totalOutstanding = Math.round((outData || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0));
+        const dbOutstanding = (outData || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0);
+        const totalOutstanding = Math.round(dbOutstanding + (challanStatus !== 'paid' ? newChallanOutstanding : 0));
         const outLine = totalOutstanding > 0 ? `\nTotal outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}` : '';
         const msg = encodeURIComponent(`Hi ${savedName},\nYour sales cash challan of ₹${savedTotal.toLocaleString('en-IN')} (${savedItemCount} item${savedItemCount !== 1 ? 's' : ''}) has been generated.${outLine}\n— Arya Designs`);
         setWhatsAppShare({ phone: savedPhone, url: `https://wa.me/${waPhone(savedPhone)}?text=${msg}` });
