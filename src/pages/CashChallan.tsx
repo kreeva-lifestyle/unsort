@@ -604,7 +604,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (wasNew) {
       addToast('Challan created!', 'success');
       if (savedPhone) {
-        const msg = encodeURIComponent(`Hi ${savedName},\nYour sales cash challan of ₹${savedTotal.toLocaleString('en-IN')} (${savedItemCount} item${savedItemCount !== 1 ? 's' : ''}) has been generated.\n— Arya Designs`);
+        const { data: outData } = await supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', savedName).in('status', ['unpaid', 'partial']).eq('is_return', false);
+        const totalOutstanding = Math.round((outData || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0));
+        const outLine = totalOutstanding > 0 ? `\nTotal outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}` : '';
+        const msg = encodeURIComponent(`Hi ${savedName},\nYour sales cash challan of ₹${savedTotal.toLocaleString('en-IN')} (${savedItemCount} item${savedItemCount !== 1 ? 's' : ''}) has been generated.${outLine}\n— Arya Designs`);
         setWhatsAppShare({ phone: savedPhone, url: `https://wa.me/${waPhone(savedPhone)}?text=${msg}` });
       }
       const suppressed = localStorage.getItem('ccErpReminderHidden');
