@@ -529,7 +529,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     const aDamaged = (aComps || []).filter(c => c.status === 'damaged').map(c => c.component_id);
     const bDamaged = (bComps || []).filter(c => c.status === 'damaged').map(c => c.component_id);
     const unresolvedDamage = [...aDamaged, ...bDamaged].filter(id => !aP.has(id) && !bP.has(id));
-    if (unresolvedDamage.length > 0) { addToast('Cannot complete — some components are damaged in both items and have no undamaged replacement.', 'error'); setShowCompleteModal(null); fetchData(); return; }
+    if (unresolvedDamage.length > 0) { addToast('Cannot complete — some components are damaged with no undamaged replacement in either item.', 'error'); setShowCompleteModal(null); fetchData(); return; }
     type ProdJoin = { product_id: string; products: { total_components: number } | { total_components: number }[] | null };
     const prodRow = prod as ProdJoin | null;
     const prodProducts = prodRow?.products;
