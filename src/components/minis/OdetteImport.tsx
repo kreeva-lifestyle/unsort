@@ -13,6 +13,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
   const [results, setResults] = useState<OdResult[]>([]);
   const [computed, setComputed] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'ok' | 'last' | 'oos' | 'not_found'>('all');
 
   const importMaster = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -104,6 +105,8 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     XLSX.writeFile(wb, `Odette_Export_${new Date().toISOString().slice(0, 10)}.xls`);
   };
 
+  const filtered = filter === 'all' ? results : results.filter(r => r.flag === filter);
+
   const flagColor = (f: OdResult['flag']) => f === 'oos' ? T.re : f === 'not_found' ? T.tx3 : f === 'last' ? T.yl : T.gr;
   const flagLabel = (f: OdResult['flag']) => f === 'oos' ? 'Out of Stock' : f === 'not_found' ? 'Not Found' : f === 'last' ? 'Last Qty' : '';
 
@@ -128,15 +131,28 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
 
       {/* Results */}
       {computed && results.length > 0 && <>
-        {/* Summary */}
+        {/* Summary — clickable filters */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          {[{ label: 'Total', count: results.length, color: T.tx2 }, { label: 'In Stock', count: results.filter(r => r.flag === 'ok').length, color: T.gr }, { label: 'Last Qty', count: results.filter(r => r.flag === 'last').length, color: T.yl }, { label: 'Out of Stock', count: results.filter(r => r.flag === 'oos').length, color: T.re }, { label: 'Not Found', count: results.filter(r => r.flag === 'not_found').length, color: T.tx3 }].map(s => (
-            <div key={s.label} style={{ padding: '8px 14px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, textAlign: 'center' }}>
+          {([
+            { key: 'all' as const, label: 'Total', count: results.length, color: T.tx2 },
+            { key: 'ok' as const, label: 'In Stock', count: results.filter(r => r.flag === 'ok').length, color: T.gr },
+            { key: 'last' as const, label: 'Last Qty', count: results.filter(r => r.flag === 'last').length, color: T.yl },
+            { key: 'oos' as const, label: 'Out of Stock', count: results.filter(r => r.flag === 'oos').length, color: T.re },
+            { key: 'not_found' as const, label: 'Not Found', count: results.filter(r => r.flag === 'not_found').length, color: T.tx3 },
+          ]).map(s => (
+            <div key={s.key} onClick={() => setFilter(filter === s.key ? 'all' : s.key)} style={{ padding: '8px 14px', background: filter === s.key ? `${s.color}12` : 'rgba(255,255,255,0.02)', border: `1px solid ${filter === s.key ? `${s.color}44` : T.bd}`, borderRadius: 8, textAlign: 'center', cursor: 'pointer', transition: 'all .15s' }}>
               <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.mono, color: s.color }}>{s.count}</div>
               <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
             </div>
           ))}
         </div>
+
+        {/* Filter export */}
+        {filter !== 'all' && <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: T.tx2 }}>Showing: <b style={{ color: flagColor(filter) }}>{flagLabel(filter) || 'In Stock'}</b> ({filtered.length})</span>
+          <div onClick={() => { const data = filtered.map(r => ({ SKU: r.sku, Quantity: r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? 'Not Found' : r.total })); const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Filtered'); XLSX.writeFile(wb, `Odette_${filter}_${new Date().toISOString().slice(0, 10)}.xls`); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Export {filtered.length}</div>
+          <div onClick={() => setFilter('all')} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx3, border: `1px solid ${T.bd}`, borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Clear</div>
+        </div>}
 
         {/* Table */}
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}` }}>
@@ -145,7 +161,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
               <th style={S.thStyle}>SKU</th><th style={S.thStyle}>Qty</th><th style={S.thStyle}>Vendors</th><th style={S.thStyle}>Status</th>
             </tr></thead>
             <tbody>
-              {results.map(r => (
+              {filtered.map(r => (
                 <tr key={r.sku}>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 700, color: flagColor(r.flag) }}>{r.flag === 'oos' ? 'OOS' : r.flag === 'not_found' ? '--' : r.total}</td>
