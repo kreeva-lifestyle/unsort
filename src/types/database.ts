@@ -712,3 +712,23 @@ export type AddressLabelInsert = {
   created_at?: string | null;
   updated_at?: string | null;
 };
+
+// ─── virtual_stock (6 cols) ─────────────────────────────────────────
+
+export interface VirtualStockRow {
+  id: string;
+  sku: string;
+  quantity: number;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export type VirtualStockInsert = {
+  id?: string;
+  sku: string;
+  quantity: number;
+  created_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
