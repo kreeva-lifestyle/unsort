@@ -19,35 +19,39 @@
 
 import React from 'react';
 
-// ─── Design tokens (superset of all 6 duplicated `T` objects) ────────────
+// ─── OKLCH tint helper ──────────────────────────────────────────────────
+// Generates alpha-transparent tints from oklch base values.
+export const oklchTint = (l: number, c: number, h: number, a: number) => `oklch(${l} ${c} ${h} / ${a})`;
+
+// ─── Design tokens (OKLCH color space) ──────────────────────────────────
 export const T = {
-  // Surfaces
-  bg:  '#060810',
-  s:   '#0B0F19',
-  s2:  '#0F1420',
-  s3:  '#141B2B',
-  glass1: 'rgba(255,255,255,0.02)',
-  glass2: 'rgba(255,255,255,0.04)',
+  // Surfaces (perceptually uniform dark scale, hue 265 = deep blue)
+  bg:  'oklch(0.08 0.02 265)',
+  s:   'oklch(0.12 0.02 265)',
+  s2:  'oklch(0.15 0.02 265)',
+  s3:  'oklch(0.18 0.02 265)',
+  glass1: 'oklch(1 0 0 / 0.02)',
+  glass2: 'oklch(1 0 0 / 0.04)',
 
   // Borders
-  bd:  'rgba(255,255,255,0.05)',
-  bd2: 'rgba(255,255,255,0.08)',
+  bd:  'oklch(1 0 0 / 0.05)',
+  bd2: 'oklch(1 0 0 / 0.08)',
 
-  // Text
-  tx:  '#E2E8F0',
-  tx2: '#8896B0',
-  tx3: '#6B7890',
+  // Text (consistent lightness steps)
+  tx:  'oklch(0.93 0.01 250)',
+  tx2: 'oklch(0.62 0.04 255)',
+  tx3: 'oklch(0.53 0.04 255)',
 
-  // Accent
-  ac:  '#6366F1',
-  ac2: '#818CF8',
-  ac3: 'rgba(99,102,241,0.12)',
+  // Accent (indigo, hue ~265)
+  ac:  'oklch(0.55 0.22 265)',
+  ac2: 'oklch(0.65 0.18 270)',
+  ac3: 'oklch(0.55 0.22 265 / 0.12)',
 
   // Semantic
-  gr:  '#22C55E',
-  re:  '#EF4444',
-  yl:  '#F59E0B',
-  bl:  '#38BDF8',
+  gr:  'oklch(0.72 0.19 145)',
+  re:  'oklch(0.63 0.22 25)',
+  yl:  'oklch(0.78 0.18 75)',
+  bl:  'oklch(0.77 0.14 230)',
 
   // Radii
   r:   8,
@@ -75,7 +79,7 @@ export const S = {
   } as React.CSSProperties,
 
   fInput: {
-    width: '100%', background: 'rgba(255,255,255,0.04)',
+    width: '100%', background: T.glass2,
     border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx,
     fontFamily: T.sans, fontSize: 13, padding: '8px 12px', height: 36,
     outline: 'none', transition: T.transition,
@@ -83,7 +87,7 @@ export const S = {
   } as React.CSSProperties,
 
   fSearch: {
-    width: '100%', background: 'rgba(255,255,255,0.04)',
+    width: '100%', background: T.glass2,
     border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx,
     fontFamily: T.sans, fontSize: 12, padding: '8px 12px 8px 34px',
     outline: 'none', transition: T.transition,
@@ -93,9 +97,9 @@ export const S = {
   btnPrimary: {
     padding: '8px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
     fontSize: 12, fontWeight: 600, fontFamily: T.sans,
-    background: 'linear-gradient(135deg, rgba(99,102,241,.87), rgba(129,140,248,.80))',
+    background: `linear-gradient(135deg, ${oklchTint(0.55, 0.22, 265, 0.87)}, ${oklchTint(0.65, 0.18, 270, 0.80)})`,
     color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 5,
-    boxShadow: '0 2px 10px rgba(99,102,241,0.25)',
+    boxShadow: `0 2px 10px ${oklchTint(0.55, 0.22, 265, 0.25)}`,
     transition: T.transition,
     whiteSpace: 'nowrap' as const,
     letterSpacing: '0.02em',
@@ -103,9 +107,9 @@ export const S = {
 
   btnGhost: {
     padding: '8px 14px', borderRadius: 8,
-    border: `1px solid rgba(99,102,241,0.15)`,
+    border: `1px solid ${oklchTint(0.55, 0.22, 265, 0.15)}`,
     cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: T.sans,
-    background: 'rgba(99,102,241,0.06)', color: T.ac2,
+    background: oklchTint(0.55, 0.22, 265, 0.06), color: T.ac2,
     display: 'inline-flex', alignItems: 'center', gap: 5,
     transition: T.transition,
     whiteSpace: 'nowrap' as const,
@@ -113,9 +117,9 @@ export const S = {
 
   btnDanger: {
     padding: '8px 14px', borderRadius: 8,
-    border: '1px solid rgba(239,68,68,0.20)',
+    border: `1px solid ${oklchTint(0.63, 0.22, 25, 0.20)}`,
     cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: T.sans,
-    background: 'rgba(239,68,68,0.08)', color: T.re,
+    background: oklchTint(0.63, 0.22, 25, 0.08), color: T.re,
     display: 'inline-flex', alignItems: 'center', gap: 5,
     transition: T.transition,
     whiteSpace: 'nowrap' as const,
@@ -125,25 +129,25 @@ export const S = {
   btnLg: { padding: '10px 18px', fontSize: 13, height: 40 } as React.CSSProperties,
 
   fDate: {
-    background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`,
+    background: T.glass2, border: `1px solid ${T.bd}`,
     borderRadius: 8, color: T.tx, fontSize: 13, padding: '8px 12px',
     outline: 'none', height: 36, boxSizing: 'border-box' as const,
   } as React.CSSProperties,
 
   modalOverlay: {
-    position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,.80)',
+    position: 'fixed' as const, inset: 0, background: 'oklch(0 0 0 / 0.80)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: 200, backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)', padding: 16,
   } as React.CSSProperties,
 
   modalBox: {
-    background: 'rgba(14,18,30,0.96)',
+    background: 'oklch(0.12 0.02 265 / 0.96)',
     backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
     border: `1px solid ${T.bd2}`, borderRadius: 14,
     width: 480, maxWidth: 'calc(100vw - 32px)', maxHeight: '90vh',
     overflowY: 'auto' as const,
-    boxShadow: '0 24px 80px rgba(0,0,0,.65)', padding: 0,
+    boxShadow: '0 24px 80px oklch(0 0 0 / 0.65)', padding: 0,
   } as React.CSSProperties,
 
   modalHead: {
@@ -156,17 +160,17 @@ export const S = {
   } as React.CSSProperties,
 
   errorBox: {
-    background: 'rgba(248,113,113,.08)', border: '1px solid rgba(248,113,113,.2)',
+    background: oklchTint(0.63, 0.22, 25, 0.08), border: `1px solid ${oklchTint(0.63, 0.22, 25, 0.2)}`,
     borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re,
   } as React.CSSProperties,
 
   successBox: {
-    background: 'rgba(52,211,153,.08)', border: '1px solid rgba(52,211,153,.2)',
+    background: oklchTint(0.72, 0.19, 145, 0.08), border: `1px solid ${oklchTint(0.72, 0.19, 145, 0.2)}`,
     borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.gr,
   } as React.CSSProperties,
 
   warningBox: {
-    background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)',
+    background: oklchTint(0.78, 0.18, 75, 0.08), border: `1px solid ${oklchTint(0.78, 0.18, 75, 0.2)}`,
     borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl,
   } as React.CSSProperties,
 
@@ -174,7 +178,7 @@ export const S = {
     fontSize: 10, color: T.tx3, padding: '11px 14px',
     textAlign: 'left' as const, fontWeight: 600,
     borderBottom: `1px solid ${T.bd}`,
-    background: 'rgba(255,255,255,0.015)',
+    background: 'oklch(1 0 0 / 0.015)',
     textTransform: 'uppercase' as const, letterSpacing: '0.1em',
     whiteSpace: 'nowrap' as const,
   } as React.CSSProperties,
@@ -186,11 +190,11 @@ export const S = {
 };
 
 export const CHALLAN_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  draft: { bg: 'rgba(56,189,248,.10)', color: T.bl },
-  paid: { bg: 'rgba(34,197,94,.10)', color: T.gr },
-  unpaid: { bg: 'rgba(239,68,68,.10)', color: T.re },
-  partial: { bg: 'rgba(245,158,11,.10)', color: T.yl },
-  voided: { bg: 'rgba(255,255,255,.10)', color: T.tx3 },
+  draft: { bg: oklchTint(0.77, 0.14, 230, 0.10), color: T.bl },
+  paid: { bg: oklchTint(0.72, 0.19, 145, 0.10), color: T.gr },
+  unpaid: { bg: oklchTint(0.63, 0.22, 25, 0.10), color: T.re },
+  partial: { bg: oklchTint(0.78, 0.18, 75, 0.10), color: T.yl },
+  voided: { bg: 'oklch(1 0 0 / 0.10)', color: T.tx3 },
 };
 
 // ─── Pill (status / aging / attention chip) ─────────────────────────────
@@ -198,12 +202,12 @@ export const CHALLAN_STATUS_COLORS: Record<string, { bg: string; color: string }
 // Existing inline status badges keep working — Pill is opt-in for new code.
 type PillTone = 'neutral' | 'gr' | 'yl' | 're' | 'bl' | 'ac';
 const PILL_TONES: Record<PillTone, { bg: string; fg: string; bd: string }> = {
-  neutral: { bg: 'rgba(255,255,255,.04)', fg: T.tx2, bd: T.bd },
-  gr:      { bg: 'rgba(34,197,94,.10)',   fg: '#4ADE80', bd: 'rgba(34,197,94,.25)' },
-  yl:      { bg: 'rgba(245,158,11,.10)',  fg: '#FCD34D', bd: 'rgba(245,158,11,.25)' },
-  re:      { bg: 'rgba(239,68,68,.10)',   fg: '#FCA5A5', bd: 'rgba(239,68,68,.25)' },
-  bl:      { bg: 'rgba(56,189,248,.10)',  fg: '#7DD3FC', bd: 'rgba(56,189,248,.25)' },
-  ac:      { bg: T.ac3,                    fg: T.ac2, bd: 'rgba(99,102,241,.25)' },
+  neutral: { bg: T.glass2, fg: T.tx2, bd: T.bd },
+  gr:      { bg: oklchTint(0.72, 0.19, 145, 0.10), fg: 'oklch(0.82 0.16 145)', bd: oklchTint(0.72, 0.19, 145, 0.25) },
+  yl:      { bg: oklchTint(0.78, 0.18, 75, 0.10),  fg: 'oklch(0.88 0.14 85)',  bd: oklchTint(0.78, 0.18, 75, 0.25) },
+  re:      { bg: oklchTint(0.63, 0.22, 25, 0.10),  fg: 'oklch(0.78 0.12 20)',  bd: oklchTint(0.63, 0.22, 25, 0.25) },
+  bl:      { bg: oklchTint(0.77, 0.14, 230, 0.10), fg: 'oklch(0.83 0.10 230)', bd: oklchTint(0.77, 0.14, 230, 0.25) },
+  ac:      { bg: T.ac3,                              fg: T.ac2,                  bd: oklchTint(0.55, 0.22, 265, 0.25) },
 };
 export const Pill = ({ tone = 'neutral', dot, children, style }: { tone?: PillTone; dot?: boolean; children: React.ReactNode; style?: React.CSSProperties }) => {
   const t = PILL_TONES[tone];
