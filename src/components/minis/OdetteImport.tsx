@@ -27,7 +27,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         const wb = XLSX.read(ev.target?.result, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
-        const skus = raw.map(r => String(r.sku || r.SKU || r.Sku || Object.values(r)[0] || '').trim()).filter(Boolean);
+        const skus = raw.map(r => String(r.sku || r.SKU || r.Sku || Object.values(r)[0] || '').trim().toUpperCase()).filter(Boolean);
         if (skus.length === 0) { addToast('No SKUs found in master file', 'error'); setImporting(false); return; }
         setMasterSkus([...new Set(skus)]);
         setComputed(false); setResults([]);
@@ -70,7 +70,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     for (const sku of masterSkus) {
       let total = 0; let naCount = 0; let oosCount = 0; let vendorCount = 0;
       for (const v of vendorFiles) {
-        const row = v.rows.find(r => String(r.sku || r.SKU || r.Sku || '').trim() === sku);
+        const row = v.rows.find(r => String(r.sku || r.SKU || r.Sku || '').trim().toUpperCase() === sku);
         if (!row) { naCount++; continue; }
         const qtyRaw = row.qty ?? row.QTY ?? row.Qty ?? row.quantity ?? '';
         const qtyStr = String(qtyRaw).trim();
