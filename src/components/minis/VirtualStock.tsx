@@ -14,6 +14,7 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
+  const [editSku, setEditSku] = useState('');
   const [editQty, setEditQty] = useState('');
   const [expanded, setExpanded] = useState(false);
 
@@ -51,12 +52,16 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
   };
 
   const saveEdit = async (id: string) => {
+    const s = editSku.trim().toUpperCase();
     const q = parseInt(editQty) || 0;
+    if (!s) { addToast('SKU cannot be empty', 'error'); return; }
     if (q < 0) return;
     if (q === 0) { remove(id); return; }
-    const { error } = await supabase.from('virtual_stock').update({ quantity: q, updated_at: new Date().toISOString() }).eq('id', id);
+    const duplicate = rows.find(r => r.sku === s && r.id !== id);
+    if (duplicate) { addToast(`SKU "${s}" already exists — delete it first or update that entry`, 'error'); return; }
+    const { error } = await supabase.from('virtual_stock').update({ sku: s, quantity: q, updated_at: new Date().toISOString() }).eq('id', id);
     if (error) { addToast('Update failed — ' + friendlyError(error), 'error'); return; }
-    setEditId(null); setEditQty(''); addToast('Updated', 'success'); fetch();
+    setEditId(null); setEditSku(''); setEditQty(''); addToast('Updated', 'success'); fetch();
   };
 
   const remove = async (id: string) => {
@@ -97,20 +102,21 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {filtered.map(r => (
             <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(255,255,255,0.01)', border: `1px solid ${T.bd}`, borderRadius: 6 }}>
-              <div style={{ flex: 1, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.tx }}>{r.sku}</div>
               {editId === r.id ? (
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                  <input type="number" min="0" step="1" value={editQty} onChange={e => setEditQty(e.target.value)} onKeyDown={e => { numericKeyDown(e); if (e.key === 'Enter') saveEdit(r.id); if (e.key === 'Escape') setEditId(null); }} autoFocus style={{ ...S.fInput, width: 60, height: 28, fontSize: 12, textAlign: 'right', fontFamily: T.mono, padding: '4px 8px' }} />
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flex: 1 }}>
+                  <input value={editSku} onChange={e => setEditSku(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveEdit(r.id); if (e.key === 'Escape') { setEditId(null); setEditSku(''); setEditQty(''); } }} autoFocus style={{ ...S.fInput, flex: 1, height: 28, fontSize: 12, fontFamily: T.mono, padding: '4px 8px' }} />
+                  <input type="number" min="0" step="1" value={editQty} onChange={e => setEditQty(e.target.value)} onKeyDown={e => { numericKeyDown(e); if (e.key === 'Enter') saveEdit(r.id); if (e.key === 'Escape') { setEditId(null); setEditSku(''); setEditQty(''); } }} style={{ ...S.fInput, width: 60, height: 28, fontSize: 12, textAlign: 'right', fontFamily: T.mono, padding: '4px 8px' }} />
                   <span onClick={() => saveEdit(r.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', borderRadius: 5, padding: '4px 8px', fontSize: 10 }}>Save</span>
-                  <span onClick={() => setEditId(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 13 }}>x</span>
+                  <span onClick={() => { setEditId(null); setEditSku(''); setEditQty(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 13 }}>x</span>
                 </div>
-              ) : (
+              ) : (<>
+                <div style={{ flex: 1, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.tx }}>{r.sku}</div>
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 700, color: T.gr, minWidth: 30, textAlign: 'right' }}>+{r.quantity}</span>
-                  <span onClick={() => { setEditId(r.id); setEditQty(String(r.quantity)); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '4px 8px', fontSize: 10 }}>Edit</span>
+                  <span onClick={() => { setEditId(r.id); setEditSku(r.sku); setEditQty(String(r.quantity)); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '4px 8px', fontSize: 10 }}>Edit</span>
                   <span onClick={() => remove(r.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '4px 8px', fontSize: 10 }}>Del</span>
                 </div>
-              )}
+              </>)}
             </div>
           ))}
         </div>}
