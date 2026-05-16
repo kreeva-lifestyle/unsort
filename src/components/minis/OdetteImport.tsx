@@ -1,0 +1,165 @@
+import { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
+import { T, S } from '../../lib/theme';
+
+interface OdResult { sku: string; total: number; vendorCount: number; naCount: number; oosCount: number; flag: 'ok' | 'last' | 'oos' | 'not_found' }
+
+export default function OdetteImport({ addToast, virtualStock }: { addToast: (msg: string, type?: string) => void; virtualStock: Record<string, number> }) {
+  const masterRef = useRef<HTMLInputElement>(null);
+  const vendorRef = useRef<HTMLInputElement>(null);
+  const [masterSkus, setMasterSkus] = useState<string[]>([]);
+  const [masterFile, setMasterFile] = useState('');
+  const [vendorFiles, setVendorFiles] = useState<{ name: string; rows: Record<string, number | string>[] }[]>([]);
+  const [results, setResults] = useState<OdResult[]>([]);
+  const [computed, setComputed] = useState(false);
+
+  const importMaster = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setMasterFile(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const wb = XLSX.read(ev.target?.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
+        const skus = raw.map(r => String(r.sku || r.SKU || r.Sku || Object.values(r)[0] || '').trim()).filter(Boolean);
+        if (skus.length === 0) { addToast('No SKUs found in master file', 'error'); return; }
+        setMasterSkus([...new Set(skus)]);
+        setComputed(false); setResults([]);
+        addToast(`${skus.length} SKUs loaded from master`, 'success');
+      } catch { addToast('Failed to parse master file', 'error'); }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  };
+
+  const importVendor = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    let loaded = 0;
+    const newVendors: typeof vendorFiles = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const wb = XLSX.read(ev.target?.result, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
+          newVendors.push({ name: file.name, rows: raw });
+        } catch { addToast(`Failed to parse ${file.name}`, 'error'); }
+        loaded++;
+        if (loaded === files.length) {
+          setVendorFiles(prev => [...prev, ...newVendors]);
+          setComputed(false); setResults([]);
+          addToast(`${newVendors.length} vendor file${newVendors.length > 1 ? 's' : ''} added`, 'success');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+    e.target.value = '';
+  };
+
+  const compute = () => {
+    if (masterSkus.length === 0) { addToast('Import master file first', 'error'); return; }
+    if (vendorFiles.length === 0) { addToast('Import at least one vendor file', 'error'); return; }
+    const res: OdResult[] = [];
+    for (const sku of masterSkus) {
+      let total = 0; let naCount = 0; let oosCount = 0; let vendorCount = 0;
+      for (const v of vendorFiles) {
+        const row = v.rows.find(r => String(r.sku || r.SKU || r.Sku || '').trim() === sku);
+        if (!row) { naCount++; continue; }
+        const qtyRaw = row.qty ?? row.QTY ?? row.Qty ?? row.quantity ?? '';
+        const qtyStr = String(qtyRaw).trim();
+        if (qtyStr.toUpperCase() === 'NA' || qtyStr === '') { naCount++; continue; }
+        if (qtyStr.toLowerCase().includes('out of stock') || qtyStr.toLowerCase().includes('out_of_stock')) { oosCount++; vendorCount++; continue; }
+        const num = Number(qtyStr);
+        if (isNaN(num) || num <= 0) { oosCount++; vendorCount++; continue; }
+        total += num; vendorCount++;
+      }
+      const vs = virtualStock[sku] || 0;
+      const finalTotal = total + vs;
+      let flag: OdResult['flag'] = 'ok';
+      if (naCount === vendorFiles.length) flag = 'not_found';
+      else if (total === 0 && oosCount > 0 && vs === 0) flag = 'oos';
+      else if (finalTotal === 1) flag = 'last';
+      res.push({ sku, total: finalTotal, vendorCount, naCount, oosCount, flag });
+    }
+    setResults(res);
+    setComputed(true);
+    const notFound = res.filter(r => r.flag === 'not_found').length;
+    const oos = res.filter(r => r.flag === 'oos').length;
+    const last = res.filter(r => r.flag === 'last').length;
+    addToast(`Computed ${res.length} SKUs — ${notFound} not found, ${oos} out of stock, ${last} last qty`, 'success');
+  };
+
+  const exportXls = () => {
+    if (results.length === 0) return;
+    const data = results.map(r => ({ SKU: r.sku, Quantity: r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? 'Not Found' : r.total }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Odette Export');
+    XLSX.writeFile(wb, `Odette_Export_${new Date().toISOString().slice(0, 10)}.xls`);
+  };
+
+  const flagColor = (f: OdResult['flag']) => f === 'oos' ? T.re : f === 'not_found' ? T.tx3 : f === 'last' ? T.yl : T.gr;
+  const flagLabel = (f: OdResult['flag']) => f === 'oos' ? 'Out of Stock' : f === 'not_found' ? 'Not Found' : f === 'last' ? 'Last Qty' : '';
+
+  return (
+    <div style={{ animation: 'fi .15s ease' }}>
+      {/* Step 1: Master */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div onClick={() => masterRef.current?.click()} style={S.btnPrimary}>Import Master SKUs</div>
+        <div onClick={() => vendorRef.current?.click()} style={S.btnGhost}>+ Add Vendor Files</div>
+        {masterSkus.length > 0 && vendorFiles.length > 0 && <div onClick={compute} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Compute</div>}
+        {computed && results.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)' }}>Export XLS</div>}
+        {(masterSkus.length > 0 || vendorFiles.length > 0) && <div onClick={() => { setMasterSkus([]); setMasterFile(''); setVendorFiles([]); setResults([]); setComputed(false); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Reset</div>}
+      </div>
+      <input ref={masterRef} type="file" accept=".xlsx,.xls,.csv" onChange={importMaster} style={{ display: 'none' }} />
+      <input ref={vendorRef} type="file" accept=".xlsx,.xls,.csv" multiple onChange={importVendor} style={{ display: 'none' }} />
+
+      {/* Status chips */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+        {masterFile && <span style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: 'rgba(99,102,241,.08)', color: T.ac2 }}>Master: {masterSkus.length} SKUs</span>}
+        {vendorFiles.map((v, i) => <span key={i} style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 500, background: 'rgba(255,255,255,.04)', color: T.tx2, border: `1px solid ${T.bd}` }}>{v.name} ({v.rows.length})</span>)}
+      </div>
+
+      {/* Results */}
+      {computed && results.length > 0 && <>
+        {/* Summary */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          {[{ label: 'Total', count: results.length, color: T.tx2 }, { label: 'In Stock', count: results.filter(r => r.flag === 'ok').length, color: T.gr }, { label: 'Last Qty', count: results.filter(r => r.flag === 'last').length, color: T.yl }, { label: 'Out of Stock', count: results.filter(r => r.flag === 'oos').length, color: T.re }, { label: 'Not Found', count: results.filter(r => r.flag === 'not_found').length, color: T.tx3 }].map(s => (
+            <div key={s.label} style={{ padding: '8px 14px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, textAlign: 'center' }}>
+              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.mono, color: s.color }}>{s.count}</div>
+              <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Table */}
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}` }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
+            <thead><tr>
+              <th style={S.thStyle}>SKU</th><th style={S.thStyle}>Qty</th><th style={S.thStyle}>Vendors</th><th style={S.thStyle}>Status</th>
+            </tr></thead>
+            <tbody>
+              {results.map(r => (
+                <tr key={r.sku}>
+                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
+                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 700, color: flagColor(r.flag) }}>{r.flag === 'oos' ? 'OOS' : r.flag === 'not_found' ? '--' : r.total}</td>
+                  <td style={{ ...S.tdStyle, fontSize: 10, color: T.tx3 }}>{r.vendorCount}/{vendorFiles.length}{r.naCount > 0 ? ` (${r.naCount} N/A)` : ''}</td>
+                  <td style={S.tdStyle}>{flagLabel(r.flag) && <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: flagColor(r.flag), background: `${flagColor(r.flag)}18` }}>{flagLabel(r.flag)}</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>}
+
+      {!computed && masterSkus.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Import a master SKU file, then add vendor files to aggregate quantities.</div>}
+      {!computed && masterSkus.length > 0 && vendorFiles.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Master loaded. Now add vendor files.</div>}
+      {!computed && masterSkus.length > 0 && vendorFiles.length > 0 && <div style={{ padding: 30, textAlign: 'center', color: T.yl, fontSize: 12 }}>Ready to compute. Click "Compute" to aggregate.</div>}
+    </div>
+  );
+}

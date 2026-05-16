@@ -4,12 +4,14 @@ import { T, S } from '../lib/theme';
 import { useNotifications } from '../hooks/useNotifications';
 import AddressPrinter from '../components/minis/AddressPrinter';
 import CbazaarImport from '../components/minis/CbazaarImport';
+import OdetteImport from '../components/minis/OdetteImport';
+import VirtualStock from '../components/minis/VirtualStock';
 
 const SIZE_MAP: Record<number, string> = { 34: 'XS', 36: 'S', 38: 'M', 40: 'L', 42: 'XL', 44: 'XXL' };
 
 interface UtsavRow { relid: string; vendorno: string; stock: number; leadtime: number; block: number; designno: string; size: number; catalogname: string; updateddate: string; aryaSku: string }
 
-type MiniView = 'home' | 'utsav' | 'cbazaar' | 'address';
+type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'address';
 
 export default function Minis() {
   const { addToast } = useNotifications();
@@ -17,6 +19,8 @@ export default function Minis() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<UtsavRow[]>([]);
   const [fileName, setFileName] = useState('');
+  const [virtualStock, setVirtualStock] = useState<Record<string, number>>(() => { try { return JSON.parse(localStorage.getItem('virtualStock') || '{}'); } catch { return {}; } });
+  const updateVirtualStock = (s: Record<string, number>) => { setVirtualStock(s); localStorage.setItem('virtualStock', JSON.stringify(s)); };
 
   const setView = useCallback((v: MiniView) => {
     setViewState(v);
@@ -81,7 +85,19 @@ export default function Minis() {
         {back}
         <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Cbazaar Import</span>
       </div>
+      <VirtualStock stock={virtualStock} setStock={updateVirtualStock} />
       <CbazaarImport addToast={addToast} />
+    </div>
+  );
+
+  if (view === 'odette') return (
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        {back}
+        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Odette Import</span>
+      </div>
+      <VirtualStock stock={virtualStock} setStock={updateVirtualStock} />
+      <OdetteImport addToast={addToast} virtualStock={virtualStock} />
     </div>
   );
 
@@ -109,6 +125,7 @@ export default function Minis() {
         </div>
       </div>
       <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} style={{ display: 'none' }} />
+      <VirtualStock stock={virtualStock} setStock={updateVirtualStock} />
       {fileName && <div style={{ fontSize: 10, color: T.tx3, marginBottom: 8 }}>File: {fileName} -- {rows.length} rows</div>}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: rows.length > 0 ? 12 : 0 }}>
         {Object.entries(SIZE_MAP).map(([num, name]) => (
@@ -150,6 +167,7 @@ export default function Minis() {
         {[
           { id: 'utsav' as MiniView, title: 'Utsav Import', desc: 'Import vendor Excel, generate ARYA SKU column, export as XLS' },
           { id: 'cbazaar' as MiniView, title: 'Cbazaar Import', desc: 'Import Cbazaar vendor Excel, generate ARYA SKU column, export as CSV' },
+          { id: 'odette' as MiniView, title: 'Odette Import', desc: 'Aggregate SKU quantities across multiple vendor sheets' },
           { id: 'address' as MiniView, title: 'LabelMaker', desc: 'Save addresses, print 4x6 inch courier label stickers' },
         ].map(t => (
           <div key={t.id} onClick={() => setView(t.id)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
