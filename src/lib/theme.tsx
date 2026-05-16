@@ -187,6 +187,54 @@ export const S = {
     padding: '11px 14px', fontSize: 13,
     borderBottom: `1px solid ${T.bd}`, color: T.tx2,
   } as React.CSSProperties,
+
+  // ─── Containers ───────────────────────────────────────────
+  card: {
+    background: T.glass1, border: `1px solid ${T.bd}`,
+    borderRadius: T.rLg, padding: 16,
+  } as React.CSSProperties,
+
+  tableWrap: {
+    overflowX: 'auto' as const, WebkitOverflowScrolling: 'touch' as any,
+    borderRadius: T.r, border: `1px solid ${T.bd}`,
+  } as React.CSSProperties,
+
+  // ─── Layout ───────────────────────────────────────────────
+  flexCenter: {
+    display: 'flex', alignItems: 'center',
+  } as React.CSSProperties,
+
+  flexBetween: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+  } as React.CSSProperties,
+
+  flexWrap: {
+    display: 'flex', flexWrap: 'wrap' as const, gap: 8,
+  } as React.CSSProperties,
+
+  // ─── Typography ───────────────────────────────────────────
+  sectionTitle: {
+    fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx,
+  } as React.CSSProperties,
+
+  badge: {
+    padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600,
+    display: 'inline-flex', alignItems: 'center',
+  } as React.CSSProperties,
+
+  // ─── Form ─────────────────────────────────────────────────
+  formField: {
+    marginBottom: 10,
+  } as React.CSSProperties,
+
+  modalClose: {
+    cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1,
+  } as React.CSSProperties,
+
+  // ─── Empty state ──────────────────────────────────────────
+  emptyState: {
+    padding: 30, textAlign: 'center' as const, color: T.tx3, fontSize: 12,
+  } as React.CSSProperties,
 };
 
 export const CHALLAN_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
