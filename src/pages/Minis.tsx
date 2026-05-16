@@ -19,8 +19,7 @@ export default function Minis() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<UtsavRow[]>([]);
   const [fileName, setFileName] = useState('');
-  const [virtualStock, setVirtualStock] = useState<Record<string, number>>(() => { try { return JSON.parse(localStorage.getItem('virtualStock') || '{}'); } catch { return {}; } });
-  const updateVirtualStock = (s: Record<string, number>) => { setVirtualStock(s); localStorage.setItem('virtualStock', JSON.stringify(s)); };
+  const [virtualStock, setVirtualStock] = useState<Record<string, number>>({});
 
   const setView = useCallback((v: MiniView) => {
     setViewState(v);
@@ -85,7 +84,7 @@ export default function Minis() {
         {back}
         <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Cbazaar Import</span>
       </div>
-      <VirtualStock stock={virtualStock} setStock={updateVirtualStock} />
+      <VirtualStock stock={virtualStock} setStock={setVirtualStock} addToast={addToast} />
       <CbazaarImport addToast={addToast} />
     </div>
   );
@@ -96,7 +95,7 @@ export default function Minis() {
         {back}
         <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Odette Import</span>
       </div>
-      <VirtualStock stock={virtualStock} setStock={updateVirtualStock} />
+      <VirtualStock stock={virtualStock} setStock={setVirtualStock} addToast={addToast} />
       <OdetteImport addToast={addToast} virtualStock={virtualStock} />
     </div>
   );
@@ -125,7 +124,7 @@ export default function Minis() {
         </div>
       </div>
       <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} style={{ display: 'none' }} />
-      <VirtualStock stock={virtualStock} setStock={updateVirtualStock} />
+      <VirtualStock stock={virtualStock} setStock={setVirtualStock} addToast={addToast} />
       {fileName && <div style={{ fontSize: 10, color: T.tx3, marginBottom: 8 }}>File: {fileName} -- {rows.length} rows</div>}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: rows.length > 0 ? 12 : 0 }}>
         {Object.entries(SIZE_MAP).map(([num, name]) => (
