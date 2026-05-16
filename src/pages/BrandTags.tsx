@@ -549,8 +549,8 @@ export default function BrandTagPrinter() {
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {orderLoading && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: T.yl }}><span style={{ width: 10, height: 10, border: '1.5px solid rgba(251,191,36,.2)', borderTopColor: T.yl, borderRadius: '50%', animation: 'btnSpin .6s linear infinite', flexShrink: 0 }} />{orderLoadMsg}</span>}
-          <input ref={orderFileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleOrderImport} />
-          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImport} />
+          <input ref={orderFileRef} type="file" accept=".xlsx,.xls" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} onChange={handleOrderImport} />
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} onChange={handleImport} />
           <div style={{ position: 'relative' }} className="desktop-only">
             <button style={S.btnGhost} onClick={() => setMoreMenuOpen(o => !o)}>
               <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
