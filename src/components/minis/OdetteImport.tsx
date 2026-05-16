@@ -12,52 +12,53 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
   const [vendorFiles, setVendorFiles] = useState<{ name: string; rows: Record<string, number | string>[] }[]>([]);
   const [results, setResults] = useState<OdResult[]>([]);
   const [computed, setComputed] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const importMaster = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setMasterFile(file.name);
+    setImporting(true);
     const reader = new FileReader();
+    reader.onerror = () => { addToast('Failed to read master file', 'error'); setImporting(false); };
     reader.onload = (ev) => {
       try {
         const wb = XLSX.read(ev.target?.result, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
         const skus = raw.map(r => String(r.sku || r.SKU || r.Sku || Object.values(r)[0] || '').trim()).filter(Boolean);
-        if (skus.length === 0) { addToast('No SKUs found in master file', 'error'); return; }
+        if (skus.length === 0) { addToast('No SKUs found in master file', 'error'); setImporting(false); return; }
         setMasterSkus([...new Set(skus)]);
         setComputed(false); setResults([]);
         addToast(`${skus.length} SKUs loaded from master`, 'success');
       } catch { addToast('Failed to parse master file', 'error'); }
+      setImporting(false);
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
   };
 
-  const importVendor = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const importVendor = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    let loaded = 0;
+    setImporting(true);
     const newVendors: typeof vendorFiles = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const wb = XLSX.read(ev.target?.result, { type: 'array' });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
-          newVendors.push({ name: file.name, rows: raw });
-        } catch { addToast(`Failed to parse ${file.name}`, 'error'); }
-        loaded++;
-        if (loaded === files.length) {
-          setVendorFiles(prev => [...prev, ...newVendors]);
-          setComputed(false); setResults([]);
-          addToast(`${newVendors.length} vendor file${newVendors.length > 1 ? 's' : ''} added`, 'success');
-        }
-      };
-      reader.readAsArrayBuffer(file);
+      try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
+        newVendors.push({ name: file.name, rows: raw });
+      } catch { addToast(`Failed to parse ${file.name}`, 'error'); }
     }
+    if (newVendors.length > 0) {
+      setVendorFiles(prev => [...prev, ...newVendors]);
+      setComputed(false); setResults([]);
+      addToast(`${newVendors.length} vendor file${newVendors.length > 1 ? 's' : ''} added (${newVendors.reduce((s, v) => s + v.rows.length, 0)} rows)`, 'success');
+    }
+    setImporting(false);
     e.target.value = '';
   };
 
@@ -110,8 +111,8 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     <div style={{ animation: 'fi .15s ease' }}>
       {/* Step 1: Master */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div onClick={() => masterRef.current?.click()} style={S.btnPrimary}>Import Master SKUs</div>
-        <div onClick={() => vendorRef.current?.click()} style={S.btnGhost}>+ Add Vendor Files</div>
+        <div onClick={() => !importing && masterRef.current?.click()} style={{ ...S.btnPrimary, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>{importing ? 'Loading...' : 'Import Master SKUs'}</div>
+        <div onClick={() => !importing && vendorRef.current?.click()} style={{ ...S.btnGhost, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>+ Add Vendor Files</div>
         {masterSkus.length > 0 && vendorFiles.length > 0 && <div onClick={compute} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Compute</div>}
         {computed && results.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)' }}>Export XLS</div>}
         {(masterSkus.length > 0 || vendorFiles.length > 0) && <div onClick={() => { setMasterSkus([]); setMasterFile(''); setVendorFiles([]); setResults([]); setComputed(false); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Reset</div>}
