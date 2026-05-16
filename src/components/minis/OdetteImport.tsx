@@ -67,7 +67,8 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     if (masterSkus.length === 0) { addToast('Import master file first', 'error'); return; }
     if (vendorFiles.length === 0) { addToast('Import at least one vendor file', 'error'); return; }
     const res: OdResult[] = [];
-    for (const sku of masterSkus) {
+    for (const rawSku of masterSkus) {
+      const sku = rawSku.toUpperCase();
       let total = 0; let naCount = 0; let oosCount = 0; let vendorCount = 0;
       for (const v of vendorFiles) {
         const row = v.rows.find(r => String(r.sku || r.SKU || r.Sku || '').trim().toUpperCase() === sku);
