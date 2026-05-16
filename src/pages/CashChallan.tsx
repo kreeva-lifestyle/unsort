@@ -1320,7 +1320,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         </div>,
         document.body
       )}
-      {!viewingChallan && !showLedger && !showAnalytics && !showCashBook && <button className="fab" onClick={() => { setShowModal(true); window.history.pushState({ view: 'challan-new' }, ''); }}>+</button>}
+      {!viewingChallan && !showLedger && !showAnalytics && !showCashBook && !showModal && <button className="fab" onClick={() => { setShowModal(true); window.history.pushState({ view: 'challan-new' }, ''); }}>+</button>}
     </div>
   );
 }
