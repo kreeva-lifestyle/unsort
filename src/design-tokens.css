@@ -4,63 +4,63 @@
    ============================================================ */
 
 :root {
-  /* ── Surfaces (dark workspace; near-black with blue undertone) ── */
-  --do-bg:        #060810;   /* app background */
-  --do-s1:        #0B0F19;   /* raised surface 1 (cards, tables) */
-  --do-s2:        #0F1420;   /* raised surface 2 (inputs, menus) */
-  --do-s3:        #141B2B;   /* raised surface 3 (modals) */
-  --do-glass-1:   rgba(255,255,255,0.02);  /* resting card */
-  --do-glass-2:   rgba(255,255,255,0.04);  /* hover card */
-  --do-modal-bg:  rgba(14,18,30,0.96);     /* modal backdrop-blur panel */
-  --do-sidebar:   rgba(8,11,20,0.85);      /* sidebar / header (with blur) */
+  /* ── Surfaces (OKLCH dark scale, hue 265 = deep blue) ── */
+  --do-bg:        oklch(0.08 0.02 265);
+  --do-s1:        oklch(0.12 0.02 265);
+  --do-s2:        oklch(0.15 0.02 265);
+  --do-s3:        oklch(0.18 0.02 265);
+  --do-glass-1:   oklch(1 0 0 / 0.02);
+  --do-glass-2:   oklch(1 0 0 / 0.04);
+  --do-modal-bg:  oklch(0.12 0.02 265 / 0.96);
+  --do-sidebar:   oklch(0.09 0.02 265 / 0.85);
 
-  /* ── Borders (hairline whites over dark) ── */
-  --do-bd:        rgba(255,255,255,0.05);
-  --do-bd-2:      rgba(255,255,255,0.08);
-  --do-bd-focus:  rgba(99,102,241,0.35);
-  --do-focus-ring: 0 0 0 2px rgba(99,102,241,0.08);
+  /* ── Borders ── */
+  --do-bd:        oklch(1 0 0 / 0.05);
+  --do-bd-2:      oklch(1 0 0 / 0.08);
+  --do-bd-focus:  oklch(0.55 0.22 265 / 0.35);
+  --do-focus-ring: 0 0 0 2px oklch(0.55 0.22 265 / 0.08);
 
   /* ── Text ── */
-  --do-tx-1:      #E2E8F0;   /* primary */
-  --do-tx-2:      #8896B0;   /* secondary */
-  --do-tx-3:      #6B7890;   /* tertiary / labels (bumped from #4A5568 for WCAG contrast) */
+  --do-tx-1:      oklch(0.93 0.01 250);
+  --do-tx-2:      oklch(0.62 0.04 255);
+  --do-tx-3:      oklch(0.53 0.04 255);
 
-  /* ── Brand / accent (indigo) ── */
-  --do-ac:        #6366F1;   /* primary accent */
-  --do-ac-2:      #818CF8;   /* lighter accent / gradient end */
-  --do-ac-grad:   linear-gradient(135deg, #6366F1, #818CF8);
-  --do-ac-grad-btn: linear-gradient(135deg, rgba(99,102,241,.87), rgba(129,140,248,.80));
-  --do-ac-tint-6:  rgba(99,102,241,0.06);
-  --do-ac-tint-8:  rgba(99,102,241,0.08);
-  --do-ac-tint-12: rgba(99,102,241,0.12);
-  --do-ac-glow:    0 0 8px rgba(99,102,241,.55);
-  --do-ac-shadow:  0 2px 10px rgba(99,102,241,.25);
+  /* ── Brand / accent (indigo, hue ~265) ── */
+  --do-ac:        oklch(0.55 0.22 265);
+  --do-ac-2:      oklch(0.65 0.18 270);
+  --do-ac-grad:   linear-gradient(135deg, oklch(0.55 0.22 265), oklch(0.65 0.18 270));
+  --do-ac-grad-btn: linear-gradient(135deg, oklch(0.55 0.22 265 / 0.87), oklch(0.65 0.18 270 / 0.80));
+  --do-ac-tint-6:  oklch(0.55 0.22 265 / 0.06);
+  --do-ac-tint-8:  oklch(0.55 0.22 265 / 0.08);
+  --do-ac-tint-12: oklch(0.55 0.22 265 / 0.12);
+  --do-ac-glow:    0 0 8px oklch(0.55 0.22 265 / 0.55);
+  --do-ac-shadow:  0 2px 10px oklch(0.55 0.22 265 / 0.25);
 
-  /* ── Semantic status colors ── */
-  --do-success:    #22C55E;  /* "complete" */
-  --do-success-2:  #4ADE80;  /* lighter for text on tinted bg */
-  --do-danger:     #EF4444;  /* "damaged" */
-  --do-danger-2:   #FCA5A5;
-  --do-warn:       #F59E0B;  /* "unsorted" */
-  --do-warn-2:     #FCD34D;
-  --do-info:       #38BDF8;  /* info / cash in hand */
-  --do-info-2:     #7DD3FC;
-  --do-cyan:       #06B6D4;  /* "dry_clean" */
-  --do-magenta:    #E879F9;  /* login orb accent only */
+  /* ── Semantic status colors (OKLCH) ── */
+  --do-success:    oklch(0.72 0.19 145);
+  --do-success-2:  oklch(0.82 0.16 145);
+  --do-danger:     oklch(0.63 0.22 25);
+  --do-danger-2:   oklch(0.78 0.12 20);
+  --do-warn:       oklch(0.78 0.18 75);
+  --do-warn-2:     oklch(0.88 0.14 85);
+  --do-info:       oklch(0.77 0.14 230);
+  --do-info-2:     oklch(0.83 0.10 230);
+  --do-cyan:       oklch(0.73 0.13 200);
+  --do-magenta:    oklch(0.72 0.18 320);
 
-  /* Status tag recipe (bg / border / fg) — per state */
-  --tag-success-bg:  rgba(34,197,94,0.10);
-  --tag-success-bd:  rgba(34,197,94,0.25);
-  --tag-success-fg:  #4ADE80;
-  --tag-danger-bg:   rgba(239,68,68,0.10);
-  --tag-danger-bd:   rgba(239,68,68,0.25);
-  --tag-danger-fg:   #FCA5A5;
-  --tag-warn-bg:     rgba(245,158,11,0.10);
-  --tag-warn-bd:     rgba(245,158,11,0.25);
-  --tag-warn-fg:     #FCD34D;
-  --tag-info-bg:     rgba(56,189,248,0.10);
-  --tag-info-bd:     rgba(56,189,248,0.25);
-  --tag-info-fg:     #7DD3FC;
+  /* Status tag recipe (OKLCH tints) */
+  --tag-success-bg:  oklch(0.72 0.19 145 / 0.10);
+  --tag-success-bd:  oklch(0.72 0.19 145 / 0.25);
+  --tag-success-fg:  oklch(0.82 0.16 145);
+  --tag-danger-bg:   oklch(0.63 0.22 25 / 0.10);
+  --tag-danger-bd:   oklch(0.63 0.22 25 / 0.25);
+  --tag-danger-fg:   oklch(0.78 0.12 20);
+  --tag-warn-bg:     oklch(0.78 0.18 75 / 0.10);
+  --tag-warn-bd:     oklch(0.78 0.18 75 / 0.25);
+  --tag-warn-fg:     oklch(0.88 0.14 85);
+  --tag-info-bg:     oklch(0.77 0.14 230 / 0.10);
+  --tag-info-bd:     oklch(0.77 0.14 230 / 0.25);
+  --tag-info-fg:     oklch(0.83 0.10 230);
 
   /* ── Type families ── */
   --do-sans:  'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -98,13 +98,13 @@
   --sp-7: 16px;
   --sp-8: 20px;
 
-  /* ── Shadows & glow ── */
-  --shadow-sm:    0 2px 10px rgba(0,0,0,.25);
-  --shadow-md:    0 4px 20px rgba(0,0,0,.50);
-  --shadow-lg:    0 10px 40px rgba(0,0,0,.55);
-  --shadow-xl:    0 24px 80px rgba(0,0,0,.65);
-  --shadow-toast: 0 4px 20px rgba(0,0,0,.50);
-  --shadow-accent: 0 4px 20px rgba(99,102,241,.35);
+  /* ── Shadows & glow (OKLCH) ── */
+  --shadow-sm:    0 2px 10px oklch(0 0 0 / 0.25);
+  --shadow-md:    0 4px 20px oklch(0 0 0 / 0.50);
+  --shadow-lg:    0 10px 40px oklch(0 0 0 / 0.55);
+  --shadow-xl:    0 24px 80px oklch(0 0 0 / 0.65);
+  --shadow-toast: 0 4px 20px oklch(0 0 0 / 0.50);
+  --shadow-accent: 0 4px 20px oklch(0.55 0.22 265 / 0.35);
 
   /* ── Motion ── */
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
