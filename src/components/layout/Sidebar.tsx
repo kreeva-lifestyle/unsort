@@ -9,8 +9,8 @@ export default function Sidebar({ activeTab, setActiveTab, profile }: { activeTa
     { id: 'brandtag', icon: 'tag', label: 'Brand Tags' },
     { id: 'packtime', icon: 'scan', label: 'PackStation' },
     { id: 'challan', icon: 'file', label: 'Cash Challan' },
-    { id: 'programs', icon: 'box', label: 'Programs' },
-    { id: 'minis', icon: 'box', label: 'Minis' },
+    { id: 'programs', icon: 'layers', label: 'Programs' },
+    { id: 'minis', icon: 'sparkles', label: 'Minis' },
     ...(profile ? [{ id: 'settings', icon: 'settings', label: 'Settings' }] : []),
   ].filter(t => canAccessTab(profile?.role, t.id));
 

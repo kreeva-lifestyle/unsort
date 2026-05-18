@@ -19,17 +19,17 @@ export default function Header({ title, onNotifClick, notifications, markAsRead 
   };
 
   return (
-    <header className="header-bar" style={{ background: 'rgba(8,11,20,0.60)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', borderBottom: `1px solid ${T.bd}`, padding: '0 16px', position: 'sticky', top: 0, zIndex: 50, height: 44, display: 'flex', alignItems: 'center' }}>
+    <header className="header-bar" style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '0 16px', position: 'sticky', top: 0, zIndex: 50, height: 56, display: 'flex', alignItems: 'center' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, boxShadow: `0 0 8px ${T.ac}55` }} />
-          <h1 className="header-title" style={{ margin: 0, fontSize: 13, fontWeight: 700, color: crumbs.length > 0 ? T.tx3 : T.tx, whiteSpace: 'nowrap', fontFamily: T.sora, letterSpacing: -0.2 }}>{title}{crumbs.length > 0 && <>{crumbs.map((c, i) => <span key={i}><span style={{ color: T.tx3, margin: '0 5px', fontSize: 10 }}>/</span><span style={{ color: T.tx, fontWeight: 700 }}>{c}</span></span>)}</>}</h1>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.bl, boxShadow: `0 0 8px ${T.bl}` }} />
+          <h1 className="header-title" style={{ margin: 0, fontSize: 17, fontWeight: 700, color: crumbs.length > 0 ? T.tx3 : T.tx, whiteSpace: 'nowrap', fontFamily: T.sora, letterSpacing: -0.2 }}>{title}{crumbs.length > 0 && <>{crumbs.map((c, i) => <span key={i}><span style={{ color: T.tx3, margin: '0 5px', fontSize: 12 }}>/</span><span style={{ color: T.tx, fontWeight: 700 }}>{c}</span></span>)}</>}</h1>
         </div>
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <div style={{ position: 'relative' }}>
-        <button onClick={() => setShow(!show)} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', position: 'relative', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = T.bd2; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = T.bd; }}>
-          <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
+        <button onClick={() => setShow(!show)} style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', position: 'relative', color: T.tx, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.background = 'oklch(1 0 0 / 0.05)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+          <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
           {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono, boxShadow: `0 0 8px ${T.ac}66`, animation: 'subtlePulse 2s ease-in-out infinite' }}>{unread}</span>}
         </button>
         {show && (

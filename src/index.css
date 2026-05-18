@@ -174,8 +174,8 @@ body.modal-open { overflow: hidden !important; }
   .page-pad { padding: 14px max(12px, env(safe-area-inset-right, 0)) 70px max(12px, env(safe-area-inset-left, 0)) !important; }
   .filter-bar { gap: 6px !important; padding: 8px 10px !important; }
   .filter-bar select, .filter-bar input { font-size: 12px !important; padding: 6px 8px !important; min-width: 0 !important; }
-  .header-bar { padding: 0 12px !important; }
-  .header-title { font-size: 13px !important; }
+  .header-bar { padding: 0 16px !important; height: 56px !important; }
+  .header-title { font-size: 17px !important; }
 
   .header-bar button { min-width: 44px !important; min-height: 44px !important; }
   .stat-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
