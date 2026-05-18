@@ -2,7 +2,7 @@ import { supabase } from '../../lib/supabase';
 import { T, Icon } from '../../lib/theme';
 import { canAccessTab } from '../../lib/tabs';
 
-export default function Sidebar({ activeTab, setActiveTab, profile }: { activeTab: string; setActiveTab: (t: string) => void; profile: any }) {
+export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }: { activeTab: string; setActiveTab: (t: string) => void; profile: any; collapsed?: boolean }) {
   const tabs = [
     { id: 'dashboard', icon: 'grid', label: 'Home' },
     { id: 'inventory', icon: 'box', label: 'Inventory' },
@@ -21,7 +21,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile }: { activeTa
   };
 
   return (
-    <div className="sidebar" style={{ width: 220, height: '100vh', background: 'rgba(8,11,20,0.95)', backdropFilter: 'blur(36px)', WebkitBackdropFilter: 'blur(36px)', borderRight: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, zIndex: 100, overflowY: 'auto' }}>
+    <div className="sidebar" style={{ width: 220, height: '100vh', background: 'rgba(8,11,20,0.95)', backdropFilter: 'blur(36px)', WebkitBackdropFilter: 'blur(36px)', borderRight: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, zIndex: 100, overflowY: 'auto', transform: collapsed ? 'translateX(-220px)' : 'translateX(0)', transition: 'transform .25s cubic-bezier(.4,0,.2,1)' }}>
 
       {/* User profile header */}
       <div style={{ padding: '20px 18px 16px', borderBottom: `1px solid ${T.bd}` }}>
