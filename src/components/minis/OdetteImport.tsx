@@ -31,11 +31,9 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
         const skus = raw.map(r => String(r.sku || r.SKU || r.Sku || Object.values(r)[0] || '').trim().toUpperCase()).filter(Boolean);
         if (skus.length === 0) { addToast('No SKUs found in master file', 'error'); setImporting(false); return; }
-        const unique = [...new Set(skus)];
-        setMasterSkus(unique);
+        setMasterSkus(skus);
         setComputed(false); setResults([]);
-        const dupes = skus.length - unique.length;
-        addToast(`${unique.length} unique SKUs loaded${dupes > 0 ? ` (${dupes} duplicates removed from ${skus.length} rows)` : ''}`, 'success');
+        addToast(`${skus.length} SKUs loaded from master`, 'success');
       } catch { addToast('Failed to parse master file', 'error'); }
       setImporting(false);
     };
