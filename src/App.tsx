@@ -104,9 +104,7 @@ const MainApp = () => {
 
   return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflowX: 'hidden', position: 'relative' }}>
     <div className="app-glows" aria-hidden="true" />
-    <div className="sidebar-wrap" style={{ width: sidebarOpen ? 220 : 0, transition: 'width .25s cubic-bezier(.4,0,.2,1)', overflow: 'hidden', position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100 }}>
-      <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setNotifItemId(null); setMobileMenu(false); }} profile={profile} />
-    </div>
+    <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setNotifItemId(null); setMobileMenu(false); }} profile={profile} collapsed={!sidebarOpen} />
     {/* Mobile overlay */}
     <div className="mobile-overlay" onClick={() => setMobileMenu(false)} style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 98, opacity: mobileMenu ? 1 : 0, pointerEvents: mobileMenu ? 'auto' : 'none', transition: 'opacity .25s ease', backdropFilter: 'blur(2px)' }} />
     {/* Mobile sidebar drawer */}
