@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { T } from '../../lib/theme';
 import { useBreadcrumb } from '../../hooks/useBreadcrumb';
 
-export default function Header({ title, onNotifClick, notifications, markAsRead }: {
+export default function Header({ title, onNotifClick, notifications, markAsRead, sidebarOpen, onToggleSidebar }: {
   title: string;
   onNotifClick?: (n: any) => void;
   notifications: any[];
   markAsRead: (id: string) => void;
+  sidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }) {
   const [show, setShow] = useState(false);
   const { crumbs } = useBreadcrumb();
@@ -21,6 +23,9 @@ export default function Header({ title, onNotifClick, notifications, markAsRead 
   return (
     <header className="header-bar" style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '0 16px', position: 'sticky', top: 0, zIndex: 50, height: 56, display: 'flex', alignItems: 'center' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
+        {onToggleSidebar && <button className="desktop-only" onClick={onToggleSidebar} style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${T.bd}`, background: 'transparent', cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }} title={sidebarOpen ? 'Collapse menu' : 'Expand menu'}>
+          <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' }}>{sidebarOpen ? <><path d="M3 12h18M3 6h18M3 18h18" /></> : <><path d="M3 12h18M3 6h18M3 18h18" /></>}</svg>
+        </button>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.bl, boxShadow: `0 0 8px ${T.bl}` }} />
           <h1 className="header-title" style={{ margin: 0, fontSize: 17, fontWeight: 700, color: crumbs.length > 0 ? T.tx3 : T.tx, whiteSpace: 'nowrap', fontFamily: T.sora, letterSpacing: -0.2 }}>{title}{crumbs.length > 0 && <>{crumbs.map((c, i) => <span key={i}><span style={{ color: T.tx3, margin: '0 5px', fontSize: 12 }}>/</span><span style={{ color: T.tx, fontWeight: 700 }}>{c}</span></span>)}</>}</h1>
