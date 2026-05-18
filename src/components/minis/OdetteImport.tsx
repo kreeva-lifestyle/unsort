@@ -29,7 +29,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
         const skus = raw.map(r => String(r.sku || r.SKU || r.Sku || Object.values(r)[0] || '').trim().toUpperCase()).filter(Boolean);
         if (skus.length === 0) { addToast('No SKUs found in master file', 'error'); setImporting(false); return; }
-        setMasterSkus([...new Set(skus)]);
+        setMasterSkus(skus);
         setComputed(false); setResults([]);
         addToast(`${skus.length} SKUs loaded from master`, 'success');
       } catch { addToast('Failed to parse master file', 'error'); }
@@ -84,7 +84,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
       const vs = virtualStock[sku] || 0;
       const finalTotal = total + vs;
       let flag: OdResult['flag'] = 'ok';
-      if (naCount === vendorFiles.length) flag = 'not_found';
+      if (vendorFiles.length > 0 && naCount === vendorFiles.length) flag = 'not_found';
       else if (total === 0 && oosCount > 0 && vs === 0) flag = 'oos';
       else if (finalTotal === 1) flag = 'last';
       res.push({ sku, total: finalTotal, vendorCount, naCount, oosCount, flag });
@@ -175,9 +175,9 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         </div>
       </>}
 
-      {!computed && masterSkus.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Import a master SKU file, then add vendor files to aggregate quantities.</div>}
+      {!computed && masterSkus.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Import a master SKU file, then add vendor files to compute.</div>}
       {!computed && masterSkus.length > 0 && vendorFiles.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Master loaded. Now add vendor files.</div>}
-      {!computed && masterSkus.length > 0 && vendorFiles.length > 0 && <div style={{ padding: 30, textAlign: 'center', color: T.yl, fontSize: 12 }}>Ready to compute. Click "Compute" to aggregate.</div>}
+      {!computed && masterSkus.length > 0 && vendorFiles.length > 0 && <div style={{ padding: 30, textAlign: 'center', color: T.yl, fontSize: 12 }}>Ready. Click "Compute" to aggregate.</div>}
     </div>
   );
 }
