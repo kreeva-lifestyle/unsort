@@ -1,9 +1,8 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../../lib/theme';
 
-interface VendorDetail { name: string; status: 'qty' | 'oos' | 'na'; qty: number }
-interface OdResult { sku: string; total: number; vendorCount: number; naCount: number; oosCount: number; flag: 'ok' | 'last' | 'oos' | 'not_found'; vendors: VendorDetail[] }
+interface OdResult { sku: string; total: number; vendorCount: number; naCount: number; oosCount: number; flag: 'ok' | 'last' | 'oos' | 'not_found' }
 
 export default function OdetteImport({ addToast, virtualStock }: { addToast: (msg: string, type?: string) => void; virtualStock: Record<string, number> }) {
   const masterRef = useRef<HTMLInputElement>(null);
@@ -15,7 +14,6 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
   const [computed, setComputed] = useState(false);
   const [importing, setImporting] = useState(false);
   const [filter, setFilter] = useState<'all' | 'ok' | 'last' | 'oos' | 'not_found'>('all');
-  const [expandedSku, setExpandedSku] = useState<string | null>(null);
 
   const importMaster = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -67,29 +65,29 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
 
   const compute = () => {
     if (masterSkus.length === 0) { addToast('Import master file first', 'error'); return; }
+    if (vendorFiles.length === 0) { addToast('Import at least one vendor file', 'error'); return; }
     const res: OdResult[] = [];
     for (const rawSku of masterSkus) {
       const sku = rawSku.toUpperCase();
       let total = 0; let naCount = 0; let oosCount = 0; let vendorCount = 0;
-      const vendors: VendorDetail[] = [];
       for (const v of vendorFiles) {
         const row = v.rows.find(r => String(r.sku || r.SKU || r.Sku || '').trim().toUpperCase() === sku);
-        if (!row) { naCount++; vendors.push({ name: v.name, status: 'na', qty: 0 }); continue; }
+        if (!row) { naCount++; continue; }
         const qtyRaw = row.qty ?? row.QTY ?? row.Qty ?? row.quantity ?? '';
         const qtyStr = String(qtyRaw).trim();
-        if (qtyStr.toUpperCase() === 'NA' || qtyStr === '') { naCount++; vendors.push({ name: v.name, status: 'na', qty: 0 }); continue; }
-        if (qtyStr.toLowerCase().includes('out of stock') || qtyStr.toLowerCase().includes('out_of_stock')) { oosCount++; vendorCount++; vendors.push({ name: v.name, status: 'oos', qty: 0 }); continue; }
+        if (qtyStr.toUpperCase() === 'NA' || qtyStr === '') { naCount++; continue; }
+        if (qtyStr.toLowerCase().includes('out of stock') || qtyStr.toLowerCase().includes('out_of_stock')) { oosCount++; vendorCount++; continue; }
         const num = Number(qtyStr);
-        if (isNaN(num) || num <= 0) { oosCount++; vendorCount++; vendors.push({ name: v.name, status: 'oos', qty: 0 }); continue; }
-        total += num; vendorCount++; vendors.push({ name: v.name, status: 'qty', qty: num });
+        if (isNaN(num) || num <= 0) { oosCount++; vendorCount++; continue; }
+        total += num; vendorCount++;
       }
       const vs = virtualStock[sku] || 0;
       const finalTotal = total + vs;
       let flag: OdResult['flag'] = 'ok';
-      if (naCount === vendorFiles.length) flag = 'not_found';
+      if (vendorFiles.length > 0 && naCount === vendorFiles.length) flag = 'not_found';
       else if (total === 0 && oosCount > 0 && vs === 0) flag = 'oos';
       else if (finalTotal === 1) flag = 'last';
-      res.push({ sku, total: finalTotal, vendorCount, naCount, oosCount, flag, vendors });
+      res.push({ sku, total: finalTotal, vendorCount, naCount, oosCount, flag });
     }
     setResults(res);
     setComputed(true);
@@ -119,7 +117,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div onClick={() => !importing && masterRef.current?.click()} style={{ ...S.btnPrimary, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>{importing ? 'Loading...' : 'Import Master SKUs'}</div>
         <div onClick={() => !importing && vendorRef.current?.click()} style={{ ...S.btnGhost, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>+ Add Vendor Files</div>
-        {masterSkus.length > 0 && <div onClick={compute} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Compute</div>}
+        {masterSkus.length > 0 && vendorFiles.length > 0 && <div onClick={compute} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Compute</div>}
         {computed && results.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)' }}>Export XLS</div>}
         {(masterSkus.length > 0 || vendorFiles.length > 0) && <div onClick={() => { setMasterSkus([]); setMasterFile(''); setVendorFiles([]); setResults([]); setComputed(false); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Reset</div>}
       </div>
@@ -164,30 +162,22 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
               <th style={S.thStyle}>SKU</th><th style={S.thStyle}>Qty</th><th style={S.thStyle}>Vendors</th><th style={S.thStyle}>Status</th>
             </tr></thead>
             <tbody>
-              {filtered.map(r => (<React.Fragment key={r.sku}>
-                <tr onClick={() => setExpandedSku(expandedSku === r.sku ? null : r.sku)} style={{ cursor: 'pointer', transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'oklch(1 0 0 / 0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku} <span style={{ fontSize: 9, color: T.tx3 }}>{expandedSku === r.sku ? '▾' : '▸'}</span></td>
+              {filtered.map(r => (
+                <tr key={r.sku}>
+                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 700, color: flagColor(r.flag) }}>{r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? '--' : r.total}</td>
                   <td style={{ ...S.tdStyle, fontSize: 10, color: T.tx3 }}>{r.vendorCount}/{vendorFiles.length}{r.naCount > 0 ? ` (${r.naCount} N/A)` : ''}</td>
                   <td style={S.tdStyle}>{flagLabel(r.flag) && <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: flagColor(r.flag), background: `${flagColor(r.flag)}18` }}>{flagLabel(r.flag)}</span>}</td>
                 </tr>
-                {expandedSku === r.sku && <tr><td colSpan={4} style={{ padding: '0 14px 10px', borderBottom: `1px solid ${T.bd}` }}>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 6 }}>
-                    {r.vendors.map((v, i) => (
-                      <span key={i} style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, fontFamily: T.mono, background: v.status === 'qty' ? 'oklch(0.72 0.19 145 / 0.08)' : v.status === 'oos' ? 'oklch(0.63 0.22 25 / 0.08)' : 'oklch(1 0 0 / 0.03)', color: v.status === 'qty' ? T.gr : v.status === 'oos' ? T.re : T.tx3, border: `1px solid ${v.status === 'qty' ? 'oklch(0.72 0.19 145 / 0.15)' : v.status === 'oos' ? 'oklch(0.63 0.22 25 / 0.15)' : T.bd}` }}>
-                        {v.name.replace(/\.\w+$/, '')}: {v.status === 'qty' ? v.qty : v.status === 'oos' ? 'OOS' : 'N/A'}
-                      </span>
-                    ))}
-                  </div>
-                </td></tr>}
-              </React.Fragment>))}
+              ))}
             </tbody>
           </table>
         </div>
       </>}
 
-      {!computed && masterSkus.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Import a master SKU file to get started. Vendor files are optional.</div>}
-      {!computed && masterSkus.length > 0 && <div style={{ padding: 30, textAlign: 'center', color: T.yl, fontSize: 12 }}>Ready to compute. Add vendor files or click "Compute" directly.</div>}
+      {!computed && masterSkus.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Import a master SKU file, then add vendor files to compute.</div>}
+      {!computed && masterSkus.length > 0 && vendorFiles.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Master loaded. Now add vendor files.</div>}
+      {!computed && masterSkus.length > 0 && vendorFiles.length > 0 && <div style={{ padding: 30, textAlign: 'center', color: T.yl, fontSize: 12 }}>Ready. Click "Compute" to aggregate.</div>}
     </div>
   );
 }
