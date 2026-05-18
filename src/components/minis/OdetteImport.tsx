@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../../lib/theme';
 
-interface OdResult { sku: string; total: number; vendorCount: number; naCount: number; oosCount: number; flag: 'ok' | 'last' | 'oos' | 'not_found' }
+interface VendorDetail { name: string; status: 'qty' | 'oos' | 'na'; qty: number }
+interface OdResult { sku: string; total: number; vendorCount: number; naCount: number; oosCount: number; flag: 'ok' | 'last' | 'oos' | 'not_found'; vendors: VendorDetail[] }
 
 export default function OdetteImport({ addToast, virtualStock }: { addToast: (msg: string, type?: string) => void; virtualStock: Record<string, number> }) {
   const masterRef = useRef<HTMLInputElement>(null);
@@ -14,6 +15,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
   const [computed, setComputed] = useState(false);
   const [importing, setImporting] = useState(false);
   const [filter, setFilter] = useState<'all' | 'ok' | 'last' | 'oos' | 'not_found'>('all');
+  const [expandedSku, setExpandedSku] = useState<string | null>(null);
 
   const importMaster = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -70,16 +72,17 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     for (const rawSku of masterSkus) {
       const sku = rawSku.toUpperCase();
       let total = 0; let naCount = 0; let oosCount = 0; let vendorCount = 0;
+      const vendors: VendorDetail[] = [];
       for (const v of vendorFiles) {
         const row = v.rows.find(r => String(r.sku || r.SKU || r.Sku || '').trim().toUpperCase() === sku);
-        if (!row) { naCount++; continue; }
+        if (!row) { naCount++; vendors.push({ name: v.name, status: 'na', qty: 0 }); continue; }
         const qtyRaw = row.qty ?? row.QTY ?? row.Qty ?? row.quantity ?? '';
         const qtyStr = String(qtyRaw).trim();
-        if (qtyStr.toUpperCase() === 'NA' || qtyStr === '') { naCount++; continue; }
-        if (qtyStr.toLowerCase().includes('out of stock') || qtyStr.toLowerCase().includes('out_of_stock')) { oosCount++; vendorCount++; continue; }
+        if (qtyStr.toUpperCase() === 'NA' || qtyStr === '') { naCount++; vendors.push({ name: v.name, status: 'na', qty: 0 }); continue; }
+        if (qtyStr.toLowerCase().includes('out of stock') || qtyStr.toLowerCase().includes('out_of_stock')) { oosCount++; vendorCount++; vendors.push({ name: v.name, status: 'oos', qty: 0 }); continue; }
         const num = Number(qtyStr);
-        if (isNaN(num) || num <= 0) { oosCount++; vendorCount++; continue; }
-        total += num; vendorCount++;
+        if (isNaN(num) || num <= 0) { oosCount++; vendorCount++; vendors.push({ name: v.name, status: 'oos', qty: 0 }); continue; }
+        total += num; vendorCount++; vendors.push({ name: v.name, status: 'qty', qty: num });
       }
       const vs = virtualStock[sku] || 0;
       const finalTotal = total + vs;
@@ -87,7 +90,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
       if (naCount === vendorFiles.length) flag = 'not_found';
       else if (total === 0 && oosCount > 0 && vs === 0) flag = 'oos';
       else if (finalTotal === 1) flag = 'last';
-      res.push({ sku, total: finalTotal, vendorCount, naCount, oosCount, flag });
+      res.push({ sku, total: finalTotal, vendorCount, naCount, oosCount, flag, vendors });
     }
     setResults(res);
     setComputed(true);
@@ -162,14 +165,23 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
               <th style={S.thStyle}>SKU</th><th style={S.thStyle}>Qty</th><th style={S.thStyle}>Vendors</th><th style={S.thStyle}>Status</th>
             </tr></thead>
             <tbody>
-              {filtered.map(r => (
-                <tr key={r.sku}>
-                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
+              {filtered.map(r => (<React.Fragment key={r.sku}>
+                <tr onClick={() => setExpandedSku(expandedSku === r.sku ? null : r.sku)} style={{ cursor: 'pointer', transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'oklch(1 0 0 / 0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku} <span style={{ fontSize: 9, color: T.tx3 }}>{expandedSku === r.sku ? '▾' : '▸'}</span></td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 700, color: flagColor(r.flag) }}>{r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? '--' : r.total}</td>
                   <td style={{ ...S.tdStyle, fontSize: 10, color: T.tx3 }}>{r.vendorCount}/{vendorFiles.length}{r.naCount > 0 ? ` (${r.naCount} N/A)` : ''}</td>
                   <td style={S.tdStyle}>{flagLabel(r.flag) && <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: flagColor(r.flag), background: `${flagColor(r.flag)}18` }}>{flagLabel(r.flag)}</span>}</td>
                 </tr>
-              ))}
+                {expandedSku === r.sku && <tr><td colSpan={4} style={{ padding: '0 14px 10px', borderBottom: `1px solid ${T.bd}` }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 6 }}>
+                    {r.vendors.map((v, i) => (
+                      <span key={i} style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, fontFamily: T.mono, background: v.status === 'qty' ? 'oklch(0.72 0.19 145 / 0.08)' : v.status === 'oos' ? 'oklch(0.63 0.22 25 / 0.08)' : 'oklch(1 0 0 / 0.03)', color: v.status === 'qty' ? T.gr : v.status === 'oos' ? T.re : T.tx3, border: `1px solid ${v.status === 'qty' ? 'oklch(0.72 0.19 145 / 0.15)' : v.status === 'oos' ? 'oklch(0.63 0.22 25 / 0.15)' : T.bd}` }}>
+                        {v.name.replace(/\.\w+$/, '')}: {v.status === 'qty' ? v.qty : v.status === 'oos' ? 'OOS' : 'N/A'}
+                      </span>
+                    ))}
+                  </div>
+                </td></tr>}
+              </React.Fragment>))}
             </tbody>
           </table>
         </div>
