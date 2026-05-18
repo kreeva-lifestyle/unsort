@@ -67,7 +67,6 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
 
   const compute = () => {
     if (masterSkus.length === 0) { addToast('Import master file first', 'error'); return; }
-    if (vendorFiles.length === 0) { addToast('Import at least one vendor file', 'error'); return; }
     const res: OdResult[] = [];
     for (const rawSku of masterSkus) {
       const sku = rawSku.toUpperCase();
@@ -120,7 +119,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div onClick={() => !importing && masterRef.current?.click()} style={{ ...S.btnPrimary, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>{importing ? 'Loading...' : 'Import Master SKUs'}</div>
         <div onClick={() => !importing && vendorRef.current?.click()} style={{ ...S.btnGhost, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>+ Add Vendor Files</div>
-        {masterSkus.length > 0 && vendorFiles.length > 0 && <div onClick={compute} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Compute</div>}
+        {masterSkus.length > 0 && <div onClick={compute} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Compute</div>}
         {computed && results.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)' }}>Export XLS</div>}
         {(masterSkus.length > 0 || vendorFiles.length > 0) && <div onClick={() => { setMasterSkus([]); setMasterFile(''); setVendorFiles([]); setResults([]); setComputed(false); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Reset</div>}
       </div>
@@ -187,9 +186,8 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         </div>
       </>}
 
-      {!computed && masterSkus.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Import a master SKU file, then add vendor files to aggregate quantities.</div>}
-      {!computed && masterSkus.length > 0 && vendorFiles.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Master loaded. Now add vendor files.</div>}
-      {!computed && masterSkus.length > 0 && vendorFiles.length > 0 && <div style={{ padding: 30, textAlign: 'center', color: T.yl, fontSize: 12 }}>Ready to compute. Click "Compute" to aggregate.</div>}
+      {!computed && masterSkus.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Import a master SKU file to get started. Vendor files are optional.</div>}
+      {!computed && masterSkus.length > 0 && <div style={{ padding: 30, textAlign: 'center', color: T.yl, fontSize: 12 }}>Ready to compute. Add vendor files or click "Compute" directly.</div>}
     </div>
   );
 }
