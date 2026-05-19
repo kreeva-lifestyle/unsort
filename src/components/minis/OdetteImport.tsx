@@ -30,7 +30,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         body: JSON.stringify({ action: 'push', sheetName: SHEET_NAME, rows }),
       });
       const data = await resp.json();
-      if (!resp.ok || !data.ok) { addToast(`Push failed — ${data.error || data.details || 'Unknown error'}`, 'error'); setPushing(false); return; }
+      if (!resp.ok || !data.ok) { addToast(`Push failed — ${data.details || data.error || 'Unknown error'}`, 'error'); setPushing(false); return; }
       addToast(`Pushed to "${SHEET_NAME}" — ${data.matched || 0} SKUs matched of ${data.totalRows || 0} rows`, 'success');
     } catch (e: any) { addToast(`Push failed — ${e.message || 'Network error'}`, 'error'); }
     setPushing(false);
