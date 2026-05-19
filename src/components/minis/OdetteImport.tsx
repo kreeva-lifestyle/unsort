@@ -23,7 +23,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     if (results.length === 0) return;
     setPushing(true);
     try {
-      const rows = results.map(r => [r.sku, r.flag === 'oos' ? 0 : r.flag === 'not_found' ? 0 : r.total]);
+      const rows = results.map(r => [r.sku, r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? 'Not Found' : r.total]);
       const resp = await fetch(ODETTE_EDGE_FN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY },
