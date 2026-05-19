@@ -143,6 +143,7 @@ export type InventoryItemInsert = {
   paired_with?: string | null;
   size?: string | null;
   status_changed_at?: string | null;
+  manufacturer: string;
 };
 
 // ─── item_components (6 cols) ────────────────────────────────────────────
@@ -675,6 +676,19 @@ export interface CashChallanPayment {
   created_at: string | null;
   batch_id: string | null;
 }
+
+export type CashChallanPaymentInsert = {
+  id?: string;
+  challan_id: string;
+  amount: number;
+  payment_mode: string;
+  payment_date: string;
+  paid_by?: string | null;
+  notes?: string | null;
+  is_reversal: boolean;
+  created_at?: string | null;
+  batch_id?: string | null;
+};
 
 // Constant arrays for dropdowns / validation
 export const INVENTORY_STATUSES: InventoryStatus[] = ['unsorted', 'damaged', 'dry_clean', 'complete', 'completed'];

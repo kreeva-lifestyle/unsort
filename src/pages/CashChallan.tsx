@@ -570,7 +570,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         const newPaid = amountPaid;
         const today = new Date().toISOString().slice(0, 10);
         if (newPaid > prevPaid) {
-          const { error: payErr } = await supabase.from('cash_challan_payments').insert({ challan_id: editing.id, amount: newPaid - prevPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || today, paid_by: user?.id });
+          const { error: payErr } = await supabase.from('cash_challan_payments').insert({ challan_id: editing.id, amount: newPaid - prevPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || today, paid_by: user?.id, is_reversal: false });
           if (payErr) addToast('Payment record failed — ' + friendlyError(payErr), 'error');
         } else if (newPaid < prevPaid) {
           const { error: payErr } = await supabase.from('cash_challan_payments').insert({ challan_id: editing.id, amount: prevPaid - newPaid, payment_mode: editing.payment_mode || paymentMode || 'Cash', payment_date: today, paid_by: user?.id, notes: 'Payment removed/reduced', is_reversal: true });
@@ -933,7 +933,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       if (updated && updated.length > 0 && outstanding > 0) {
         const { error: payErr } = await supabase.from('cash_challan_payments').insert({
           challan_id: c.id, amount: outstanding, payment_mode: bulkPayMode,
-          payment_date: today, paid_by: user?.id, notes: receiptNote, batch_id: batchId,
+          payment_date: today, paid_by: user?.id, notes: receiptNote, batch_id: batchId, is_reversal: false,
         });
         if (payErr) { failCount++; addToast('Payment record failed — ' + friendlyError(payErr), 'error'); }
       }
