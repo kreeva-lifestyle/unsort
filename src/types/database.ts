@@ -427,6 +427,7 @@ export interface CashChallan {
   shipping_charges: number | null;
   is_return: boolean | null;
   source_challan_id: string | null;
+  inventory_deducted: boolean;
 }
 
 export type CashChallanInsert = {
@@ -455,6 +456,7 @@ export type CashChallanInsert = {
   shipping_charges?: number | null;
   is_return?: boolean | null;
   source_challan_id?: string | null;
+  inventory_deducted?: boolean;
 };
 
 // ─── cash_challan_items (11 cols) ────────────────────────────────────────
