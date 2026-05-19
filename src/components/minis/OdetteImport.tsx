@@ -185,8 +185,8 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
               <th style={S.thStyle}>SKU</th><th style={S.thStyle}>Qty</th><th style={S.thStyle}>Vendors</th><th style={S.thStyle}>Status</th>
             </tr></thead>
             <tbody>
-              {filtered.map(r => (
-                <tr key={r.sku}>
+              {filtered.map((r, i) => (
+                <tr key={`${r.sku}-${i}`}>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 700, color: flagColor(r.flag) }}>{r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? '--' : r.total}</td>
                   <td style={{ ...S.tdStyle, fontSize: 10, color: T.tx3 }}>{r.vendorCount}/{vendorFiles.length}{r.naCount > 0 ? ` (${r.naCount} N/A)` : ''}</td>
