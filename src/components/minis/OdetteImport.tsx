@@ -4,7 +4,7 @@ import { T, S } from '../../lib/theme';
 import { SUPABASE_ANON_KEY } from '../../lib/supabase';
 
 const ODETTE_EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
-const SHEET_NAME = 'Arya - odette stock sheet';
+const SHEET_NAME = 'ARYA STOCK';
 
 interface OdResult { sku: string; total: number; vendorCount: number; naCount: number; oosCount: number; flag: 'ok' | 'last' | 'oos' | 'not_found' }
 
