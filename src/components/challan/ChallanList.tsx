@@ -48,10 +48,14 @@ interface Props {
   onRemind: (c: Challan) => void;
   onCreateReturn: (c: Challan) => void;
   onVoid: (c: Challan) => void;
+  // Inventory deducted
+  invFilter: string;
+  onInvFilterChange: (v: string) => void;
+  onToggleInventoryDeducted: (id: string, value: boolean) => void;
 }
 
 export default function ChallanList(p: Props) {
-  const filterActive = p.statusFilter || p.tagFilter || p.dateFrom || p.dateTo;
+  const filterActive = p.statusFilter || p.tagFilter || p.dateFrom || p.dateTo || p.invFilter;
   return (
     <>
       <div className="challan-filters" style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -62,7 +66,7 @@ export default function ChallanList(p: Props) {
         <div className="challan-filter-btns" style={{ display: 'flex', gap: 6 }}>
           <button onClick={p.onToggleFilters} style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${p.showFilters || filterActive ? T.ac + '44' : T.bd2}`, background: p.showFilters ? 'rgba(99,102,241,.08)' : 'rgba(255,255,255,0.03)', color: p.showFilters || filterActive ? T.ac2 : T.tx3, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, height: 36 }}>
             <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
-            Filters{filterActive ? ` (${[p.statusFilter, p.tagFilter, p.dateFrom, p.dateTo].filter(Boolean).length})` : ''}
+            Filters{filterActive ? ` (${[p.statusFilter, p.tagFilter, p.dateFrom, p.dateTo, p.invFilter].filter(Boolean).length})` : ''}
           </button>
           <button className="desktop-only" onClick={p.onExport} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', color: T.gr, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', height: 36 }}>Export</button>
           <button className="desktop-only" onClick={p.onToggleBulkMode} style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${p.bulkMode ? T.ac + '44' : T.bd2}`, background: p.bulkMode ? 'rgba(99,102,241,.1)' : 'rgba(255,255,255,0.03)', color: p.bulkMode ? T.ac2 : T.tx3, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', height: 36 }}>{p.bulkMode ? 'Cancel' : '☑ Select'}</button>
@@ -93,6 +97,12 @@ export default function ChallanList(p: Props) {
             <div>
               <label style={S.fLabel}>To</label>
               <input type="date" value={p.dateTo} onChange={e => { p.onDateToChange(e.target.value); p.onResetPage(); }} style={{ ...S.fDate, width: '100%' }} />
+            </div>
+            <div>
+              <label style={S.fLabel}>Inv. Deducted</label>
+              <select value={p.invFilter} onChange={e => { p.onInvFilterChange(e.target.value); p.onResetPage(); }} style={S.fInput}>
+                <option value="">All</option><option value="yes">Yes</option><option value="no">No</option>
+              </select>
             </div>
             <div>
               <label style={S.fLabel}>Per page</label>
@@ -142,6 +152,7 @@ export default function ChallanList(p: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 9, color: T.tx3 }}>{new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
                   <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: sc.bg, color: sc.color, fontWeight: 600, textTransform: 'uppercase' }}>{c.status}</span>
+                  <span onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ fontSize: 7, padding: '1px 5px', borderRadius: 3, background: c.inventory_deducted ? 'rgba(34,197,94,.10)' : 'rgba(239,68,68,.08)', color: c.inventory_deducted ? T.gr : T.re, fontWeight: 600, cursor: 'pointer', userSelect: 'none', letterSpacing: 0.3 }}>{c.inventory_deducted ? 'INV ✓' : 'INV ✗'}</span>
                   {pendingDays > 0 && <span style={{ fontSize: 8, color: T.re, fontWeight: 600 }}>({pendingDays}d pending)</span>}
                   {(c.tags || []).map(t => <span key={t} style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: 'rgba(99,102,241,.08)', color: T.ac2 }}>{t}</span>)}
                 </div>

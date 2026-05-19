@@ -65,6 +65,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [tagFilter, setTagFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [invFilter, setInvFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   // Bulk pay/unpay
   const [bulkMode, setBulkMode] = useState(false);
@@ -209,12 +210,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (tagFilter) query = query.contains('tags', [tagFilter]);
     if (dateFrom) query = query.gte('created_at', dateFrom + 'T00:00:00');
     if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59');
+    if (invFilter === 'yes') query = query.eq('inventory_deducted', true);
+    else if (invFilter === 'no') query = query.eq('inventory_deducted', false);
     query = query.order('created_at', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
     const { data, count } = await query;
     setChallans((data as Challan[] | null) || []);
     setTotalCount(count || 0);
     setLoading(false);
-  }, [debouncedSearch, statusFilter, tagFilter, dateFrom, dateTo, page, pageSize]);
+  }, [debouncedSearch, statusFilter, tagFilter, dateFrom, dateTo, invFilter, page, pageSize]);
 
   useEffect(() => { fetchChallans(); }, [fetchChallans]);
 
@@ -618,6 +621,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       if (!suppressed || Number(suppressed) < aWeekAgo) setShowErpReminder(true);
     }
     } finally { setSaving(false); }
+  };
+
+  // ── Toggle inventory deducted ──────────────────────────────────────────────
+  const toggleInventoryDeducted = async (id: string, value: boolean) => {
+    setChallans(prev => prev.map(c => c.id === id ? { ...c, inventory_deducted: value } : c));
+    const { error } = await supabase.from('cash_challans').update({ inventory_deducted: value }).eq('id', id);
+    if (error) { addToast(friendlyError(error), 'error'); setChallans(prev => prev.map(c => c.id === id ? { ...c, inventory_deducted: !value } : c)); }
   };
 
   // ── Void challan ───────────────────────────────────────────────────────────
@@ -1154,7 +1164,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         onDateToChange={setDateTo}
         pageSize={pageSize}
         onPageSizeChange={setPageSize}
-        onClearFilters={() => { setStatusFilter(''); setTagFilter(''); setDateFrom(''); setDateTo(''); setPage(0); }}
+        invFilter={invFilter}
+        onInvFilterChange={setInvFilter}
+        onToggleInventoryDeducted={toggleInventoryDeducted}
+        onClearFilters={() => { setStatusFilter(''); setTagFilter(''); setDateFrom(''); setDateTo(''); setInvFilter(''); setPage(0); }}
         onExport={exportChallansCSV}
         onResetPage={() => setPage(0)}
         bulkMode={bulkMode}

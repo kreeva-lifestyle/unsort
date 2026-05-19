@@ -1,6 +1,10 @@
 import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../../lib/theme';
+import { SUPABASE_ANON_KEY } from '../../lib/supabase';
+
+const ODETTE_EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
+const SHEET_NAME = 'Arya - odette stock sheet';
 
 interface OdResult { sku: string; total: number; vendorCount: number; naCount: number; oosCount: number; flag: 'ok' | 'last' | 'oos' | 'not_found' }
 
@@ -13,6 +17,24 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
   const [results, setResults] = useState<OdResult[]>([]);
   const [computed, setComputed] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [pushing, setPushing] = useState(false);
+
+  const pushToSheet = async () => {
+    if (results.length === 0) return;
+    setPushing(true);
+    try {
+      const rows = results.map(r => [r.sku, r.flag === 'oos' ? 0 : r.flag === 'not_found' ? 0 : r.total]);
+      const resp = await fetch(ODETTE_EDGE_FN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ action: 'push', sheetName: SHEET_NAME, rows }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) { addToast(`Push failed — ${data.error || data.details || 'Unknown error'}`, 'error'); setPushing(false); return; }
+      addToast(`Pushed to "${SHEET_NAME}" — ${data.matched || 0} SKUs matched of ${data.totalRows || 0} rows`, 'success');
+    } catch (e: any) { addToast(`Push failed — ${e.message || 'Network error'}`, 'error'); }
+    setPushing(false);
+  };
   const [filter, setFilter] = useState<'all' | 'ok' | 'last' | 'oos' | 'not_found'>('all');
 
   const importMaster = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,6 +141,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         <div onClick={() => !importing && vendorRef.current?.click()} style={{ ...S.btnGhost, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>+ Add Vendor Files</div>
         {masterSkus.length > 0 && vendorFiles.length > 0 && <div onClick={compute} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Compute</div>}
         {computed && results.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)' }}>Export XLS</div>}
+        {computed && results.length > 0 && <div onClick={pushToSheet} style={{ ...S.btnPrimary, background: T.gr, color: '#000', fontWeight: 700, opacity: pushing ? 0.5 : 1, pointerEvents: pushing ? 'none' : 'auto' }}>{pushing ? 'Pushing...' : 'Push to Sheet'}</div>}
         {(masterSkus.length > 0 || vendorFiles.length > 0) && <div onClick={() => { setMasterSkus([]); setMasterFile(''); setVendorFiles([]); setResults([]); setComputed(false); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Reset</div>}
       </div>
       <input ref={masterRef} type="file" accept=".xlsx,.xls,.csv" onChange={importMaster} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
