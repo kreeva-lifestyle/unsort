@@ -131,15 +131,15 @@ Deno.serve(async (req) => {
       if (!readResp.ok) throw new Error(`Sheets read ${readResp.status}: ${readData.error?.message || 'unknown'}`);
       const sheetRows: string[][] = readData.values || [];
 
-      // Build column B values matching each row's SKU from col A
-      const colB = sheetRows.map((row: string[]) => {
+      // Build column B values matching each row's SKU from col A (skip header row)
+      const colB = sheetRows.slice(1).map((row: string[]) => {
         const sku = (row[0] || '').trim().toUpperCase();
         if (!sku) return [''];
         return [qtyMap[sku] !== undefined ? qtyMap[sku] : ''];
       });
 
-      // Write column B only
-      const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sid}/values/${encodeURIComponent(sheetName + '!B1')}?valueInputOption=USER_ENTERED`;
+      // Write column B starting at B2 (preserve header)
+      const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sid}/values/${encodeURIComponent(sheetName + '!B2')}?valueInputOption=USER_ENTERED`;
       const writeResp = await fetch(writeUrl, {
         method: 'PUT',
         headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
