@@ -122,17 +122,17 @@ Deno.serve(async (req) => {
       const qtyMap: Record<string, string | number> = {};
       for (const r of rows) qtyMap[String(r[0] || '').toUpperCase()] = r[1] ?? 0;
 
-      // Read existing SKUs from column A
+      // Read column A (ARYA SKU) for matching
       const token = await getGoogleToken();
       const sid = getSheetId();
       const readUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sid}/values/${encodeURIComponent(sheetName + '!A:A')}`;
       const readResp = await fetch(readUrl, { headers: { authorization: `Bearer ${token}` } });
       const readData = await readResp.json();
       if (!readResp.ok) throw new Error(`Sheets read ${readResp.status}: ${readData.error?.message || 'unknown'}`);
-      const sheetSkus: string[][] = readData.values || [];
+      const sheetRows: string[][] = readData.values || [];
 
-      // Build column B values matching each row's SKU
-      const colB = sheetSkus.map((row: string[]) => {
+      // Build column B values matching each row's SKU from col A
+      const colB = sheetRows.map((row: string[]) => {
         const sku = (row[0] || '').trim().toUpperCase();
         if (!sku) return [''];
         return [qtyMap[sku] !== undefined ? qtyMap[sku] : ''];
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
       }
 
       const matched = colB.filter(r => r[0] !== '').length;
-      return json({ ok: true, count: rows.length, matched, totalRows: sheetSkus.length }, req);
+      return json({ ok: true, count: rows.length, matched, totalRows: sheetRows.length }, req);
     }
     return fail(400, `Unknown action: ${action}`, req);
   } catch (e) {
