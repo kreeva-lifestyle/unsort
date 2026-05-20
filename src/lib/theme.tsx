@@ -125,6 +125,17 @@ export const S = {
     whiteSpace: 'nowrap' as const,
   } as React.CSSProperties,
 
+  btnDangerSolid: {
+    padding: '8px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+    fontSize: 12, fontWeight: 600, fontFamily: T.sans,
+    background: `linear-gradient(135deg, ${oklchTint(0.50, 0.22, 25, 0.85)}, ${oklchTint(0.58, 0.20, 25, 0.75)})`,
+    color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 5,
+    boxShadow: `0 2px 10px ${oklchTint(0.50, 0.22, 25, 0.25)}`,
+    transition: T.transition,
+    whiteSpace: 'nowrap' as const,
+    letterSpacing: '0.02em',
+  } as React.CSSProperties,
+
   btnSm: { padding: '4px 10px', fontSize: 10, borderRadius: 5 } as React.CSSProperties,
   btnLg: { padding: '10px 18px', fontSize: 13, height: 40 } as React.CSSProperties,
 
