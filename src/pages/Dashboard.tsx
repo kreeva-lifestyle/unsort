@@ -345,8 +345,8 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
               key={i}
               role={navigateTo ? 'button' : undefined}
               tabIndex={navigateTo ? 0 : undefined}
-              onClick={() => navigateTo?.('challan')}
-              onKeyDown={e => { if (navigateTo && (e.key === 'Enter' || e.key === ' ')) navigateTo('challan'); }}
+              onClick={() => { sessionStorage.setItem('challan_search', c.name); navigateTo?.('challan'); }}
+              onKeyDown={e => { if (navigateTo && (e.key === 'Enter' || e.key === ' ')) { sessionStorage.setItem('challan_search', c.name); navigateTo('challan'); } }}
               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 4px', borderBottom: `1px solid ${T.bd}`, cursor: navigateTo ? 'pointer' : 'default', borderRadius: 4, transition: 'background .15s' }}
               onMouseEnter={e => navigateTo && (e.currentTarget.style.background = 'rgba(99,102,241,.06)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}

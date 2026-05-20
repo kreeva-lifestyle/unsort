@@ -52,6 +52,10 @@
 - Never use padding below 4px or fontSize below 10 on buttons
 - Double-submit prevention: add `pointerEvents: saving ? 'none' : 'auto'` and `opacity: saving ? 0.5 : 1`
 - Desktop "Add" buttons: visible in page header toolbar, hidden on mobile (FAB replaces them)
+- Action feedback: every async button must show TWO signals:
+  1. Start: change label to "Saving…" / "Deleting…" / "Pushing…", disable button (`pointerEvents: 'none'`, `opacity: 0.5`)
+  2. End: show `addToast('...', 'success')` on success or `addToast(friendlyError(err), 'error')` on failure
+  Never leave the user wondering if a tap registered or if the operation completed.
 
 ### Modals
 - Overlay: `S.modalOverlay` (fixed, centered, blur 12px backdrop, z-index 200)
