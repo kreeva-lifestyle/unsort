@@ -613,7 +613,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         const dbOutstanding = (outData || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0);
         const totalOutstanding = Math.round(dbOutstanding + (challanStatus !== 'paid' ? newChallanOutstanding : 0));
         const outLine = totalOutstanding > 0 ? `\nTotal outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}` : '';
-        const msg = encodeURIComponent(`Hi ${savedName},\nYour sales cash challan of ₹${savedTotal.toLocaleString('en-IN')} (${savedItemCount} item${savedItemCount !== 1 ? 's' : ''}) has been generated.${outLine}\n— Arya Designs`);
+        const paidLine = challanStatus === 'paid'
+          ? ` Payment of ₹${savedTotal.toLocaleString('en-IN')} received — thank you!`
+          : amountPaid > 0
+            ? ` Payment of ₹${amountPaid.toLocaleString('en-IN')} received.\nBalance due: ₹${Math.max(0, savedTotal - amountPaid).toLocaleString('en-IN')}`
+            : '';
+        const msg = encodeURIComponent(`Hi ${savedName},\nYour sales cash challan of ₹${savedTotal.toLocaleString('en-IN')} (${savedItemCount} item${savedItemCount !== 1 ? 's' : ''}) has been generated.${paidLine}${outLine}\n— Arya Designs`);
         setWhatsAppShare({ phone: savedPhone, url: `https://wa.me/${waPhone(savedPhone)}?text=${msg}` });
       }
       const suppressed = localStorage.getItem('ccErpReminderHidden');
