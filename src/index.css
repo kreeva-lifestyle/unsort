@@ -117,6 +117,7 @@ tbody tr:hover { background: rgba(99,102,241,0.04); }
 @keyframes subtlePulse { 0%,100% { filter: brightness(1) drop-shadow(0 0 0 transparent); } 50% { filter: brightness(1.08) drop-shadow(0 0 6px rgba(99,102,241,.15)); } }
 @keyframes tabDot { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
 @keyframes undoProgress { from { width: 100%; } to { width: 0%; } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 .undo-bar { height: 3px; background: linear-gradient(90deg, #6366F1, #818CF8); border-radius: 2px; animation: undoProgress 5s linear forwards; }
 

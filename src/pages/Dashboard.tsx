@@ -116,6 +116,9 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
 
   const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(100).then(({ data }) => setTasks((data ?? []) as TaskRow[])); };
 
+  const [refreshing, setRefreshing] = useState(false);
+  const manualRefresh = useCallback(async () => { setRefreshing(true); await fetchAll(); fetchTasks(); setRefreshing(false); }, [fetchAll]);
+
   // Dashboard shows aggregate counts — a 2s lag is imperceptible.
   const { debounced: debouncedFetchAll } = useDebouncedFetch(fetchAll, 2000);
   const { debounced: debouncedFetchTasks } = useDebouncedFetch(fetchTasks, 2000);
@@ -127,7 +130,9 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
       .on('postgres_changes', { event: '*', schema: 'public', table: 'packtime_scans' }, debouncedFetchAll)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, debouncedFetchTasks)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    const onVisible = () => { if (document.visibilityState === 'visible') { fetchAll(); fetchTasks(); } };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { supabase.removeChannel(ch); document.removeEventListener('visibilitychange', onVisible); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -155,9 +160,14 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
 
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease', paddingBottom: 80 }}>
-      <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>{greeting}, {profile?.full_name?.split(' ')[0] || 'there'}</h2>
-        <p style={{ margin: '4px 0 0', fontSize: 14, color: T.tx2, fontWeight: 500 }}>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</p>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>{greeting}, {profile?.full_name?.split(' ')[0] || 'there'}</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 14, color: T.tx2, fontWeight: 500 }}>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</p>
+        </div>
+        <button onClick={manualRefresh} disabled={refreshing} title="Refresh dashboard" style={{ background: 'none', border: `1px solid ${T.bd2}`, borderRadius: 8, padding: 8, cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: T.transition, opacity: refreshing ? 0.5 : 1 }}>
+          <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 2, animation: refreshing ? 'spin 1s linear infinite' : 'none' }}><path d="M23 4v6h-6M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" /></svg>
+        </button>
       </div>
 
       {/* Row 1a: Today's Revenue — hero card (audit P1: the one number that matters) */}
