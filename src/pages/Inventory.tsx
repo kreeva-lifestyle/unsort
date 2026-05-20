@@ -324,6 +324,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.product_id) { addToast('Please select a category', 'error'); return; }
+    if (!form.serial_number.trim()) { addToast('SKU is required', 'error'); return; }
     if (!form.location) { addToast('Location is required', 'error'); return; }
     if (!form.manufacturer.trim()) { addToast('Manufacturer is required', 'error'); return; }
     if (selected && selected.product_id !== form.product_id) { addToast('Cannot change category on existing item. Delete and recreate instead.', 'error'); return; }
