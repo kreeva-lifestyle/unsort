@@ -38,6 +38,8 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
 
   const fetchAll = useCallback(async () => {
     const today = new Date(); today.setHours(0,0,0,0);
+    const y = today.getFullYear(), mo = String(today.getMonth() + 1).padStart(2, '0');
+    const monthStartStr = `${y}-${mo}-01`;
     const todayISO = today.toISOString();
     let scansRes, challansRes, itemsRes, expensesRes, handoversRes, balancesRes;
     try {
@@ -45,9 +47,9 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).gte('scanned_at', todayISO),
         supabase.from('cash_challans').select('total, amount_paid, status, is_return, customer_name, created_at').neq('status', 'voided').neq('status', 'draft'),
         supabase.from('inventory_items').select('status, status_changed_at'),
-        supabase.from('cash_expenses').select('amount').gte('date', today.toISOString().slice(0,10)),
+        supabase.from('cash_expenses').select('amount').gte('date', monthStartStr),
         supabase.from('cash_handovers').select('handover_number, amount, status, date, from_user_name, created_at'),
-        supabase.from('cash_book_balances').select('opening_balance').eq('date', today.toISOString().slice(0,10)).maybeSingle(),
+        supabase.from('cash_book_balances').select('opening_balance').eq('date', monthStartStr).maybeSingle(),
       ]);
     } catch (e: any) {
       console.error('Dashboard fetch failed:', e?.message || e);
@@ -60,18 +62,17 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     const balances = balancesRes.data as BalanceRow | null;
     const scanCount = scansRes.count ?? 0;
 
-    // Pulse
-    const todayStr = today.toISOString().slice(0, 10);
-    const todayChallans = challans.filter(c => c.created_at && c.created_at.slice(0, 10) >= todayStr);
-    const todayRev = todayChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total || 0), 0);
+    // Pulse — monthly metrics
+    const monthChallans = challans.filter(c => c.created_at && c.created_at.slice(0, 10) >= monthStartStr);
+    const monthRev = monthChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total || 0), 0);
     const unsortedCount = items.filter(i => i.status === 'unsorted').length;
     const opening = Number(balances?.opening_balance || 0);
-    const cashSales = todayChallans.filter(c => !c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
-    const cashReturns = todayChallans.filter(c => c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
+    const cashSales = monthChallans.filter(c => !c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
+    const cashReturns = monthChallans.filter(c => c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
     const totalExp = expenses.reduce((s, e) => s + Number(e.amount), 0);
-    const confirmedHand = handovers.filter(h => h.status === 'confirmed' && h.date === today.toISOString().slice(0,10)).reduce((s, h) => s + Number(h.amount), 0);
+    const confirmedHand = handovers.filter(h => h.status === 'confirmed' && h.date >= monthStartStr).reduce((s, h) => s + Number(h.amount), 0);
     const handoverTotal = handovers.filter(h => h.status === 'confirmed').reduce((s, h) => s + Number(h.amount), 0);
-    setPulse({ scans: scanCount, revenue: Math.round(todayRev), unsorted: unsortedCount, cashInHand: Math.round(opening + cashSales - cashReturns - totalExp - confirmedHand), handoverTotal: Math.round(handoverTotal) });
+    setPulse({ scans: scanCount, revenue: Math.round(monthRev), unsorted: unsortedCount, cashInHand: Math.round(opening + cashSales - cashReturns - totalExp - confirmedHand), handoverTotal: Math.round(handoverTotal) });
 
     // Alerts
     const sevenDaysAgo = Date.now() - 7 * 86400000;
@@ -164,7 +165,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         tabIndex={navigateTo ? 0 : undefined}
         onClick={() => navigateTo?.('challan')}
         onKeyDown={e => { if (navigateTo && (e.key === 'Enter' || e.key === ' ')) navigateTo('challan'); }}
-        title="Net cash received today (sales − returns)"
+        title="Net revenue this month (sales − returns)"
         className="stat-hero"
         style={{ background: `linear-gradient(135deg, rgba(34,197,94,.10), rgba(34,197,94,.04))`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid rgba(34,197,94,.18)`, borderRadius: 12, padding: '18px 22px', marginBottom: 10, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, cursor: navigateTo ? 'pointer' : 'default', transition: T.transition, position: 'relative', overflow: 'hidden' }}
         onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(34,197,94,.35)')}
@@ -172,11 +173,11 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
       >
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.gr}cc, ${T.gr}22)` }} />
         <div>
-          <p style={{ fontSize: 10, color: T.gr, letterSpacing: 1.2, marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Today's Revenue</p>
+          <p style={{ fontSize: 10, color: T.gr, letterSpacing: 1.2, marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Revenue ({new Date().toLocaleString('en-IN', { month: 'short' }).toUpperCase()})</p>
           <p style={{ fontFamily: T.sora, fontSize: 44, fontWeight: 800, color: T.gr, margin: 0, lineHeight: 1, letterSpacing: -1.5 }}>{loaded ? <CountUp value={pulse.revenue} prefix="₹" /> : <Skeleton width={120} height={44} borderRadius={8} />}</p>
         </div>
         <div style={{ textAlign: 'right' as const, fontSize: 11, color: T.tx3 }}>
-          Net of returns<br /><span style={{ color: T.tx2 }}>Tap to open Challan</span>
+          Net of returns · this month<br /><span style={{ color: T.tx2 }}>Tap to open Challan</span>
         </div>
       </div>
 
