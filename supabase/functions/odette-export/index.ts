@@ -113,6 +113,9 @@ Deno.serve(async (req) => {
   const sheetName = body?.sheetName;
   if (!action || !sheetName) return fail(400, 'Missing action or sheetName', req);
 
+  const ALLOWED_TABS = ['ARYA STOCK'];
+  if (!ALLOWED_TABS.includes(sheetName)) return fail(400, `Sheet tab "${sheetName}" not allowed`, req);
+
   try {
     if (action === 'push') {
       const rows = body.rows;
