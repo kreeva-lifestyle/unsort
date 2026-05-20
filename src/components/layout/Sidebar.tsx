@@ -42,7 +42,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
             onMouseLeave={e => { if (activeTab !== t.id) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx3; } }}>
             <Icon name={t.icon} size={18} />
             {t.label}
-            {activeTab === t.id && <span style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 3, height: 20, borderRadius: '0 3px 3px 0', background: T.ac, boxShadow: `0 0 8px ${T.ac}88` }} />}
+            {activeTab === t.id && <span style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 4, height: 24, borderRadius: '0 4px 4px 0', background: `linear-gradient(180deg, ${T.ac}, ${T.ac2})`, boxShadow: `0 0 12px ${T.ac}aa` }} />}
           </div>
         ))}
       </nav>

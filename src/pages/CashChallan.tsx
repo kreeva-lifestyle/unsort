@@ -222,7 +222,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   useEffect(() => { fetchChallans(); }, [fetchChallans]);
 
   useEffect(() => {
-    if (active) { setShowCashBook(false); setShowAnalytics(false); setShowLedger(false); setLedgerDetail(null); }
+    if (active) {
+      setShowCashBook(false); setShowAnalytics(false); setShowLedger(false); setLedgerDetail(null);
+      const deepSearch = sessionStorage.getItem('challan_search');
+      if (deepSearch !== null) { sessionStorage.removeItem('challan_search'); updateSearch(deepSearch); }
+    }
   }, [active]);
 
   // Browser back button support
