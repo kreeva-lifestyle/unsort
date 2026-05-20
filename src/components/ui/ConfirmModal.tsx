@@ -59,7 +59,7 @@ export default function ConfirmModal({
           <button
             ref={confirmRef}
             onClick={onConfirm}
-            style={danger ? { ...S.btnDanger, fontWeight: 600 } : S.btnPrimary}
+            style={danger ? S.btnDangerSolid : S.btnPrimary}
           >
             {confirmLabel}
           </button>

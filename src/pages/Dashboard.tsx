@@ -10,7 +10,7 @@ import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 import CountUp from '../components/ui/CountUp';
 import Skeleton from '../components/ui/Skeleton';
 
-type ChallanRow = { total: number | string; amount_paid: number | string | null; status: string; is_return: boolean; customer_name: string; created_at: string };
+type ChallanRow = { total: number | string; amount_paid: number | string | null; status: string; is_return: boolean; customer_name: string; created_at: string; payment_date: string | null };
 type InventoryRow = { status: string; status_changed_at: string | null };
 type ExpenseRow = { amount: number | string };
 type HandoverRow = { handover_number: number; amount: number | string; status: string; date: string; from_user_name: string; created_at: string };
@@ -45,7 +45,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     try {
       [scansRes, challansRes, itemsRes, expensesRes, handoversRes, balancesRes] = await Promise.all([
         supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).gte('scanned_at', todayISO),
-        supabase.from('cash_challans').select('total, amount_paid, status, is_return, customer_name, created_at').neq('status', 'voided').neq('status', 'draft'),
+        supabase.from('cash_challans').select('total, amount_paid, status, is_return, customer_name, created_at, payment_date').neq('status', 'voided').neq('status', 'draft'),
         supabase.from('inventory_items').select('status, status_changed_at'),
         supabase.from('cash_expenses').select('amount').gte('date', monthStartStr),
         supabase.from('cash_handovers').select('handover_number, amount, status, date, from_user_name, created_at'),
@@ -62,13 +62,14 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     const balances = balancesRes.data as BalanceRow | null;
     const scanCount = scansRes.count ?? 0;
 
-    // Pulse — monthly metrics
+    // Pulse — monthly metrics (matches Cash Book logic: payment_date, paid/partial only)
     const monthChallans = challans.filter(c => c.created_at && c.created_at.slice(0, 10) >= monthStartStr);
     const monthRev = monthChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total || 0), 0);
     const unsortedCount = items.filter(i => i.status === 'unsorted').length;
     const opening = Number(balances?.opening_balance || 0);
-    const cashSales = monthChallans.filter(c => !c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
-    const cashReturns = monthChallans.filter(c => c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
+    const paidInMonth = challans.filter(c => (c.status === 'paid' || c.status === 'partial') && c.payment_date && c.payment_date >= monthStartStr);
+    const cashSales = paidInMonth.filter(c => !c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
+    const cashReturns = paidInMonth.filter(c => c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
     const totalExp = expenses.reduce((s, e) => s + Number(e.amount), 0);
     const confirmedHand = handovers.filter(h => h.status === 'confirmed' && h.date >= monthStartStr).reduce((s, h) => s + Number(h.amount), 0);
     const handoverTotal = handovers.filter(h => h.status === 'confirmed').reduce((s, h) => s + Number(h.amount), 0);

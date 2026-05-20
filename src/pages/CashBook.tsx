@@ -487,14 +487,22 @@ export default function CashBook() {
     fetchData();
   };
 
-  const exportCSV = async () => {
-    // Export expenses for selected date range
-    const { data } = await supabase.from('cash_expenses').select('id, date, amount, category, description, paid_by, created_at').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false });
-    const rows = (data || []).map(e => `${e.date},${e.amount},${e.category},"${(e.description || '').replace(/"/g, '""')}"`);
-    const csv = 'Date,Amount,Category,Description\n' + rows.join('\n');
+  const exportCSV = () => {
+    const esc = (v: string) => `"${(v || '').replace(/"/g, '""')}"`;
+    let csv = '', label = '';
+    if (tab === 'expenses') {
+      label = 'Expenses';
+      csv = 'Date,Amount,Category,Description\n' + expenses.map(e => `${e.date},${e.amount},${esc(e.category)},${esc(e.description || '')}`).join('\n');
+    } else if (tab === 'sales') {
+      label = 'CashSales';
+      csv = 'Challan#,Customer,Amount Paid,Payment Mode,Payment Date,Return\n' + sales.map(s => `${s.challan_number},${esc(s.customer_name)},${s.amount_paid},${esc(s.payment_mode || '')},${s.payment_date || ''},${s.is_return ? 'Yes' : 'No'}`).join('\n');
+    } else {
+      label = 'Handovers';
+      csv = 'Handover#,Date,From,To,Amount,Status\n' + handovers.map(h => `${h.handover_number},${h.date},${esc(h.from_user_name)},${esc(h.to_user_name)},${h.amount},${h.status}`).join('\n');
+    }
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `CashBook_${fromDate}_to_${toDate}.csv`; a.click(); URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = url; a.download = `CashBook_${label}_${fromDate}_to_${toDate}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
   return (
@@ -600,7 +608,7 @@ export default function CashBook() {
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{s.customer_name}</span>
                   {s.is_return && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 600, textTransform: 'uppercase' }}>Return</span>}
                 </div>
-                <div style={{ fontSize: 9, color: T.tx3 }}>{s.status.toUpperCase()} · Paid ₹{Number(s.amount_paid).toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: 9, color: T.tx3 }}>₹{Number(s.amount_paid).toLocaleString('en-IN')}{s.payment_mode ? ` · ${s.payment_mode}` : ''}{s.payment_date ? ` · ${new Date(s.payment_date + 'T00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}</div>
               </div>
               <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: s.is_return ? T.re : T.gr }}>{s.is_return ? '−' : '+'}₹{Number(s.amount_paid).toLocaleString('en-IN')}</div>
             </div>
