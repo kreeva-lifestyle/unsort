@@ -557,6 +557,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       modified_by: user?.id,
     };
 
+    let createdNumber: string | null = null;
     try {
       if (editing) {
         const { data: current } = await supabase.from('cash_challans').select('updated_at').eq('id', editing.id).maybeSingle();
@@ -596,6 +597,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         };
         const { data: newChallan, error: crErr } = await supabase.rpc('create_challan_with_items', rpcPayload);
         if (crErr || !newChallan?.id || !newChallan?.challan_number) throw new Error(crErr?.message || 'Failed to create challan — missing response data');
+        createdNumber = newChallan.challan_number;
         await ccAuditLog('CREATE', newChallan.id, `${isReturn ? 'Return' : 'Challan'} #${newChallan.challan_number} created for ${customerName.trim()} — ₹${grandTotal}`);
       }
     } catch (e: any) {
@@ -607,22 +609,22 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const savedTotal = grandTotal;
     const savedPhone = customerPhone.trim();
     const savedItemCount = items.length;
+    const savedNumber = editing ? editing.challan_number : createdNumber;
     closeModal();
     fetchChallans();
     if (wasNew) {
       addToast('Challan created!', 'success');
       if (savedPhone) {
-        const newChallanOutstanding = Math.max(0, savedTotal - amountPaid);
         const { data: outData } = await supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', savedName).in('status', ['unpaid', 'partial']).eq('is_return', false);
-        const dbOutstanding = (outData || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0);
-        const totalOutstanding = Math.round(dbOutstanding + (challanStatus !== 'paid' ? newChallanOutstanding : 0));
+        const totalOutstanding = Math.round((outData || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0));
         const outLine = totalOutstanding > 0 ? `\nTotal outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}` : '';
         const paidLine = challanStatus === 'paid'
           ? ` Payment of ₹${savedTotal.toLocaleString('en-IN')} received — thank you!`
           : amountPaid > 0
             ? ` Payment of ₹${amountPaid.toLocaleString('en-IN')} received.\nBalance due: ₹${Math.max(0, savedTotal - amountPaid).toLocaleString('en-IN')}`
             : '';
-        const msg = encodeURIComponent(`Hi ${savedName},\nYour sales cash challan of ₹${savedTotal.toLocaleString('en-IN')} (${savedItemCount} item${savedItemCount !== 1 ? 's' : ''}) has been generated.${paidLine}${outLine}\n— Arya Designs`);
+        const numTag = savedNumber ? ` #${savedNumber}` : '';
+        const msg = encodeURIComponent(`Hi ${savedName},\nYour sales cash challan${numTag} of ₹${savedTotal.toLocaleString('en-IN')} (${savedItemCount} item${savedItemCount !== 1 ? 's' : ''}) has been generated.${paidLine}${outLine}\n— Arya Designs`);
         setWhatsAppShare({ phone: savedPhone, url: `https://wa.me/${waPhone(savedPhone)}?text=${msg}` });
       }
       const suppressed = localStorage.getItem('ccErpReminderHidden');
