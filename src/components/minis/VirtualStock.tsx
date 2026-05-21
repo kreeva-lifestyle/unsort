@@ -106,15 +106,15 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center', flex: 1 }}>
                   <input value={editSku} onChange={e => setEditSku(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveEdit(r.id); if (e.key === 'Escape') { setEditId(null); setEditSku(''); setEditQty(''); } }} autoFocus style={{ ...S.fInput, flex: 1, height: 28, fontSize: 12, fontFamily: T.mono, padding: '4px 8px' }} />
                   <input type="number" min="0" step="1" value={editQty} onChange={e => setEditQty(e.target.value)} onKeyDown={e => { numericKeyDown(e); if (e.key === 'Enter') saveEdit(r.id); if (e.key === 'Escape') { setEditId(null); setEditSku(''); setEditQty(''); } }} style={{ ...S.fInput, width: 60, height: 28, fontSize: 12, textAlign: 'right', fontFamily: T.mono, padding: '4px 8px' }} />
-                  <span onClick={() => saveEdit(r.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', borderRadius: 5, padding: '4px 8px', fontSize: 10 }}>Save</span>
+                  <span onClick={() => saveEdit(r.id)} style={{ ...S.btnSuccess, ...S.btnSm, cursor: 'pointer', padding: '4px 8px' }}>Save</span>
                   <span onClick={() => { setEditId(null); setEditSku(''); setEditQty(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 13 }}>x</span>
                 </div>
               ) : (<>
                 <div style={{ flex: 1, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.tx }}>{r.sku}</div>
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 700, color: T.gr, minWidth: 30, textAlign: 'right' }}>+{r.quantity}</span>
-                  <span onClick={() => { setEditId(r.id); setEditSku(r.sku); setEditQty(String(r.quantity)); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '4px 8px', fontSize: 10 }}>Edit</span>
-                  <span onClick={() => remove(r.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '4px 8px', fontSize: 10 }}>Del</span>
+                  <span onClick={() => { setEditId(r.id); setEditSku(r.sku); setEditQty(String(r.quantity)); }} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', padding: '4px 8px' }}>Edit</span>
+                  <span onClick={() => remove(r.id)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', padding: '4px 8px' }}>Del</span>
                 </div>
               </>)}
             </div>

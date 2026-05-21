@@ -94,11 +94,11 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
       {/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {labels.length > 0 && <span onClick={selected.size === labels.length ? clearSelection : selectAll} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: `1px solid rgba(99,102,241,.2)`, background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>{selected.size === labels.length ? 'Deselect All' : 'Select All'}</span>}
+          {labels.length > 0 && <span onClick={selected.size === labels.length ? clearSelection : selectAll} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', padding: '4px 10px' }}>{selected.size === labels.length ? 'Deselect All' : 'Select All'}</span>}
           {selected.size > 0 && <span style={{ fontSize: 10, color: T.tx3 }}>{selected.size} selected</span>}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {selected.size > 0 && <div onClick={printBulk} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Print {selected.size} Label{selected.size > 1 ? 's' : ''}</div>}
+          {selected.size > 0 && <div onClick={printBulk} style={{ ...S.btnSuccess, cursor: 'pointer' }}>Print {selected.size} Label{selected.size > 1 ? 's' : ''}</div>}
           <div onClick={openAdd} style={S.btnPrimary}>+ Add Address</div>
         </div>
       </div>
@@ -119,7 +119,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
             { label: 'Edit', color: '#818CF8', onClick: () => openEdit(l) },
             { label: 'Delete', color: '#EF4444', onClick: () => deleteLabel(l.id) },
           ]}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: selected.has(l.id) ? 'rgba(99,102,241,.06)' : 'transparent', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }} onClick={() => toggleSelect(l.id)}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: selected.has(l.id) ? T.ac3 : 'transparent', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }} onClick={() => toggleSelect(l.id)}>
               <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${selected.has(l.id) ? T.ac : T.bd2}`, background: selected.has(l.id) ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>{selected.has(l.id) && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><path d="M20 6L9 17l-5-5" /></svg>}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{l.name}</div>
@@ -128,13 +128,13 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                 <button onClick={() => setCopy(l.id, getCopies(l.id) - 1)} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
-                <span style={{ width: 30, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: getCopies(l.id) > 1 ? T.ac2 : T.tx3, background: getCopies(l.id) > 1 ? 'rgba(99,102,241,.06)' : 'transparent' }}>{getCopies(l.id)}</span>
+                <span style={{ width: 30, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: getCopies(l.id) > 1 ? T.ac2 : T.tx3, background: getCopies(l.id) > 1 ? T.ac3 : 'transparent' }}>{getCopies(l.id)}</span>
                 <button onClick={() => setCopy(l.id, getCopies(l.id) + 1)} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
               </div>
               <div className="desktop-only" style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                 <span onClick={() => { const expanded = Array(getCopies(l.id)).fill(l); setPrintHtml(buildLabelHtml(expanded)); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '6px 12px', fontSize: 11 }}>Print</span>
-                <span onClick={() => openEdit(l)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: '1px solid rgba(99,102,241,.2)', background: 'rgba(99,102,241,.06)', borderRadius: 5, padding: '6px 12px', fontSize: 11 }}>Edit</span>
-                <span onClick={() => deleteLabel(l.id)} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '6px 12px', fontSize: 11 }}>Del</span>
+                <span onClick={() => openEdit(l)} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', padding: '6px 12px', fontSize: 11 }}>Edit</span>
+                <span onClick={() => deleteLabel(l.id)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', padding: '6px 12px', fontSize: 11 }}>Del</span>
               </div>
             </div>
           </SwipeRow>
@@ -198,7 +198,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
           <iframe srcDoc={printHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#fff' }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button onClick={() => setPrintHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 200 }}>Close</button>
-            <button onClick={() => { const iframe = document.querySelector('iframe[srcdoc]') as HTMLIFrameElement; iframe?.contentWindow?.print(); }} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #6366F1, #818CF8)', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, flex: 1, maxWidth: 200, boxShadow: '0 4px 16px rgba(99,102,241,.35)' }}>Print</button>
+            <button onClick={() => { const iframe = document.querySelector('iframe[srcdoc]') as HTMLIFrameElement; iframe?.contentWindow?.print(); }} style={{ ...S.btnPrimary, padding: '10px 24px', fontSize: 13, flex: 1, maxWidth: 200 }}>Print</button>
           </div>
         </div>,
         document.body

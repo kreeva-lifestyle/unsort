@@ -71,7 +71,7 @@ export default function ChallanLedger({
         </div>
         {cust && (
           <div className="challan-ledger-kpis" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
-            <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.12)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
+            <div style={{ background: T.ac3, border: `1px solid ${T.bd2}`, borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
               <div style={{ fontSize: 7, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 2 }}>Total Billed</div>
               <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>₹{cust.total.toLocaleString('en-IN')}</div>
             </div>
@@ -165,7 +165,7 @@ export default function ChallanLedger({
           </div>
         ))}
         {customers.length === 0 && <div style={{ padding: 24, textAlign: 'center' as const, color: T.tx3, fontSize: 12 }}>No customers found. Search by name or click "Load More" below.</div>}
-        <button onClick={onLoadMore} style={{ width: '100%', padding: '8px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer', borderRadius: '0 0 8px 8px' }}>Load More Customers</button>
+        <button onClick={onLoadMore} style={{ width: '100%', padding: '8px', border: 'none', background: T.ac3, color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer', borderRadius: '0 0 8px 8px' }}>Load More Customers</button>
       </div>
     </div>
   );

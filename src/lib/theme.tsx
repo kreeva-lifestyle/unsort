@@ -136,6 +136,33 @@ export const S = {
     letterSpacing: '0.02em',
   } as React.CSSProperties,
 
+  btnSuccess: {
+    padding: '8px 14px', borderRadius: 8,
+    border: `1px solid ${oklchTint(0.72, 0.19, 145, 0.20)}`,
+    cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: T.sans,
+    background: oklchTint(0.72, 0.19, 145, 0.08), color: T.gr,
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    transition: T.transition, whiteSpace: 'nowrap' as const,
+  } as React.CSSProperties,
+
+  btnSuccessSolid: {
+    padding: '8px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+    fontSize: 12, fontWeight: 600, fontFamily: T.sans,
+    background: `linear-gradient(135deg, ${oklchTint(0.52, 0.17, 150, 0.90)}, ${oklchTint(0.62, 0.15, 155, 0.80)})`,
+    color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 5,
+    boxShadow: `0 2px 10px ${oklchTint(0.52, 0.17, 150, 0.25)}`,
+    transition: T.transition, whiteSpace: 'nowrap' as const, letterSpacing: '0.02em',
+  } as React.CSSProperties,
+
+  btnWarn: {
+    padding: '8px 14px', borderRadius: 8,
+    border: `1px solid ${oklchTint(0.78, 0.18, 75, 0.20)}`,
+    cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: T.sans,
+    background: oklchTint(0.78, 0.18, 75, 0.08), color: T.yl,
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    transition: T.transition, whiteSpace: 'nowrap' as const,
+  } as React.CSSProperties,
+
   btnSm: { padding: '4px 10px', fontSize: 10, borderRadius: 5 } as React.CSSProperties,
   btnLg: { padding: '10px 18px', fontSize: 13, height: 40 } as React.CSSProperties,
 

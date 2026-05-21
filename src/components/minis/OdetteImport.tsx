@@ -139,17 +139,17 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div onClick={() => !importing && masterRef.current?.click()} style={{ ...S.btnPrimary, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>{importing ? 'Loading...' : 'Import Master SKUs'}</div>
         <div onClick={() => !importing && vendorRef.current?.click()} style={{ ...S.btnGhost, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>+ Add Vendor Files</div>
-        {masterSkus.length > 0 && vendorFiles.length > 0 && <div onClick={compute} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Compute</div>}
+        {masterSkus.length > 0 && vendorFiles.length > 0 && <div onClick={compute} style={{ ...S.btnSuccess, cursor: 'pointer' }}>Compute</div>}
         {computed && results.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)' }}>Export XLS</div>}
         {computed && results.length > 0 && <div onClick={pushToSheet} style={{ ...S.btnPrimary, background: T.gr, color: '#000', fontWeight: 700, opacity: pushing ? 0.5 : 1, pointerEvents: pushing ? 'none' : 'auto' }}>{pushing ? 'Pushing...' : 'Push to Sheet'}</div>}
-        {(masterSkus.length > 0 || vendorFiles.length > 0) && <div onClick={() => { setMasterSkus([]); setMasterFile(''); setVendorFiles([]); setResults([]); setComputed(false); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Reset</div>}
+        {(masterSkus.length > 0 || vendorFiles.length > 0) && <div onClick={() => { setMasterSkus([]); setMasterFile(''); setVendorFiles([]); setResults([]); setComputed(false); }} style={{ ...S.btnDanger, cursor: 'pointer' }}>Reset</div>}
       </div>
       <input ref={masterRef} type="file" accept=".xlsx,.xls,.csv" onChange={importMaster} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
       <input ref={vendorRef} type="file" accept=".xlsx,.xls,.csv" multiple onChange={importVendor} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
 
       {/* Status chips */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-        {masterFile && <span style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: 'rgba(99,102,241,.08)', color: T.ac2 }}>Master: {masterSkus.length} SKUs</span>}
+        {masterFile && <span style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: T.ac3, color: T.ac2 }}>Master: {masterSkus.length} SKUs</span>}
         {vendorFiles.map((v, i) => <span key={i} style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 500, background: 'rgba(255,255,255,.04)', color: T.tx2, border: `1px solid ${T.bd}` }}>{v.name} ({v.rows.length})</span>)}
       </div>
 

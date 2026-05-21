@@ -338,9 +338,9 @@ export default function InventoryExtras() {
                   ) : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
                 </td>
                 <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                  {canEdit ? <><span onClick={() => openEdit(ex)} style={{ ...S.btnSm, cursor: 'pointer', color: T.ac2, border: `1px solid rgba(99,102,241,.2)`, background: 'rgba(99,102,241,.06)' }}>Edit</span>{' '}
-                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Add</span>{' '}
-                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Remove</span></> : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
+                  {canEdit ? <><span onClick={() => openEdit(ex)} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer' }}>Edit</span>{' '}
+                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...S.btnSuccess, ...S.btnSm, cursor: 'pointer' }}>Add</span>{' '}
+                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer' }}>Remove</span></> : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
                 </td>
               </tr>
             ))}
@@ -570,7 +570,7 @@ export default function InventoryExtras() {
           <iframe srcDoc={exportHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#060810' }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button onClick={() => setExportHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
-            <button onClick={() => { const iframe = document.querySelector('iframe[srcdoc]') as HTMLIFrameElement; iframe?.contentWindow?.print(); }} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #6366F1, #818CF8)', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, flex: 1, maxWidth: 160, boxShadow: '0 4px 16px rgba(99,102,241,.35)' }}>Print / Share</button>
+            <button onClick={() => { const iframe = document.querySelector('iframe[srcdoc]') as HTMLIFrameElement; iframe?.contentWindow?.print(); }} style={{ ...S.btnPrimary, padding: '10px 24px', fontSize: 13, flex: 1, maxWidth: 160 }}>Print / Share</button>
           </div>
         </div>,
         document.body

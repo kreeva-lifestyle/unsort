@@ -1,6 +1,6 @@
 // Bulk-mode toolbar + Bulk Pay / Bulk Unpay modals + last-batch undo banner.
 // Extracted from CashChallan.tsx — parent owns the data + RPC calls.
-import { T } from '../../lib/theme';
+import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import ChallanKPIs from './ChallanKPIs';
 import type { CashChallan } from '../../types/database';
@@ -46,20 +46,20 @@ export default function ChallanBulkActions(p: Props) {
   return (
     <>
       {p.bulkMode && (
-        <div className="challan-bulk-toolbar" style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', background: 'rgba(99,102,241,.04)', border: `1px solid rgba(99,102,241,.12)`, borderRadius: 6 }}>
+        <div className="challan-bulk-toolbar" style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', background: T.ac3, border: `1px solid ${T.bd2}`, borderRadius: 6 }}>
           <span style={{ fontSize: 10, color: T.tx2, fontWeight: 600 }}>{p.selectedCount} selected</span>
           <button onClick={p.onSelectAll} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Select All</button>
           <button onClick={p.onClearSelection} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Clear</button>
           <div style={{ flex: 1 }} />
           {p.payable.length > 0 && <button onClick={p.onOpenBulkPay} style={{ padding: '4px 12px', borderRadius: 5, border: 'none', background: T.gr, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Bulk Pay ({p.payable.length})</button>}
-          {p.unpayable.length > 0 && <button onClick={p.onOpenBulkUnpay} style={{ padding: '4px 12px', borderRadius: 5, border: '1px solid rgba(245,158,11,.3)', background: 'rgba(245,158,11,.08)', color: T.yl, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Bulk Unpay ({p.unpayable.length})</button>}
+          {p.unpayable.length > 0 && <button onClick={p.onOpenBulkUnpay} style={{ ...S.btnWarn, ...S.btnSm, padding: '4px 12px' }}>Bulk Unpay ({p.unpayable.length})</button>}
         </div>
       )}
 
       {p.lastBatch && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', marginBottom: 8, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 6 }}>
           <span style={{ fontSize: 10, color: T.gr, fontWeight: 600, flex: 1 }}>{p.lastBatch.id}: {p.lastBatch.count} challans paid via {p.lastBatch.mode}</span>
-          <button disabled={p.undoingBatch} onClick={p.onUndoBatch} style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{p.undoingBatch ? 'Undoing...' : 'Undo Batch'}</button>
+          <button disabled={p.undoingBatch} onClick={p.onUndoBatch} style={{ ...S.btnDanger, ...S.btnSm, padding: '4px 10px', pointerEvents: p.undoingBatch ? 'none' : 'auto', opacity: p.undoingBatch ? 0.5 : 1 }}>{p.undoingBatch ? 'Undoing…' : 'Undo Batch'}</button>
           <span onClick={p.onDismissBatch} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>&times;</span>
         </div>
       )}

@@ -49,7 +49,7 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
           <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.gr }}>₹{analytics.totalRevenue.toLocaleString('en-IN')}</div>
           {revChange && <div style={{ fontSize: 9, color: revChange.color, marginTop: 4, fontFamily: T.mono, fontWeight: 600 }}>{revChange.label} vs prev · ₹{(analytics.prevRevenue ?? 0).toLocaleString('en-IN')}</div>}
         </div>
-        <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.12)', borderRadius: 10, padding: '12px', textAlign: 'center' as const }}>
+        <div style={{ background: T.ac3, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '12px', textAlign: 'center' as const }}>
           <div style={{ fontSize: 9, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Sales</div>
           <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>{analytics.count}</div>
           {salesChange && <div style={{ fontSize: 9, color: salesChange.color, marginTop: 4, fontFamily: T.mono, fontWeight: 600 }}>{salesChange.label} vs prev · {analytics.prevCount ?? 0}</div>}
