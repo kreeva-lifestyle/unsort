@@ -612,10 +612,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (wasNew) {
       addToast('Challan created!', 'success');
       if (savedPhone) {
-        const newChallanOutstanding = Math.max(0, savedTotal - amountPaid);
         const { data: outData } = await supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', savedName).in('status', ['unpaid', 'partial']).eq('is_return', false);
-        const dbOutstanding = (outData || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0);
-        const totalOutstanding = Math.round(dbOutstanding + (challanStatus !== 'paid' ? newChallanOutstanding : 0));
+        const totalOutstanding = Math.round((outData || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0));
         const outLine = totalOutstanding > 0 ? `\nTotal outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}` : '';
         const paidLine = challanStatus === 'paid'
           ? ` Payment of ₹${savedTotal.toLocaleString('en-IN')} received — thank you!`
