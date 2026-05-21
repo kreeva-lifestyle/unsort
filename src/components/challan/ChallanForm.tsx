@@ -2,7 +2,7 @@
 // Parent owns all state and the submit logic; this component is just render + event routing.
 // Wide prop surface is intentional — keeps state in one place without introducing a context.
 import { useRef, useState, useEffect } from 'react';
-import { T } from '../../lib/theme';
+import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import { supabase } from '../../lib/supabase';
 import type { CashChallan, CashChallanCustomer, AuditLog } from '../../types/database';
@@ -109,7 +109,7 @@ export default function ChallanForm(p: ChallanFormProps) {
             {!p.editing && nextNum && <span title="Approximate — final number assigned on save" style={{ fontFamily: T.mono, fontSize: 11, color: T.tx3, fontWeight: 500, padding: '2px 7px', background: 'rgba(255,255,255,.03)', border: `1px solid ${T.bd}`, borderRadius: 6 }}>~#{nextNum}</span>}
             {p.editing && <button onClick={() => p.loadAuditTrail(p.editing!.challan_number)} style={{ padding: '3px 8px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>View History</button>}
           </div>
-          <button onClick={p.onClose} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', background: 'rgba(99,102,241,0.06)', color: T.ac2, fontSize: 10, cursor: 'pointer' }}>Cancel</button>
+          <button onClick={p.onClose} style={{ ...S.btnGhost, ...S.btnSm, padding: '5px 12px' }}>Cancel</button>
         </div>
 
         {/* Sale / Return Toggle */}
@@ -155,7 +155,7 @@ export default function ChallanForm(p: ChallanFormProps) {
             <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
               {recentCustomers.map(c => (
                 <span key={c.name} onClick={() => { p.setCustomerName(c.name); if (c.id) { p.setSelectedCustomerId(c.id); supabase.from('cash_challan_customers').select('phone').eq('name', c.name).maybeSingle().then(({ data }) => { if (data?.phone) p.setCustomerPhone(data.phone); }); } p.setCustomerSuggestions([]); }}
-                  style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', background: 'rgba(99,102,241,.06)', border: `1px solid rgba(99,102,241,.15)`, color: T.ac2, whiteSpace: 'nowrap' }}>{c.name}</span>
+                  style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', background: T.ac3, border: `1px solid ${T.ac3}`, color: T.ac2, whiteSpace: 'nowrap' }}>{c.name}</span>
               ))}
             </div>
           )}
@@ -255,7 +255,7 @@ export default function ChallanForm(p: ChallanFormProps) {
               </div>
               );
             })}
-            {!(p.isReturn && p.returnSource) && <button onClick={() => p.setItems([...p.items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: 'rgba(99,102,241,.06)', color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item (or press Enter on last row)</button>}
+            {!(p.isReturn && p.returnSource) && <button onClick={() => p.setItems([...p.items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: T.ac3, color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item (or press Enter on last row)</button>}
           </div>
 
           {/* Shipping + Tags + Notes */}
@@ -320,7 +320,7 @@ export default function ChallanForm(p: ChallanFormProps) {
         </div>
 
         {p.formError && <div style={{ background: 'rgba(239,68,68,.15)', borderLeft: `4px solid ${T.re}`, borderRadius: 6, padding: '10px 14px', fontSize: 11, color: T.tx, marginBottom: 8 }}>{p.formError}</div>}
-        <button onClick={p.onSave} disabled={p.saving} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: p.saving ? 'not-allowed' : 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,.3)', opacity: p.saving ? 0.6 : 1 }}>{p.saving ? 'Saving...' : p.editing ? (p.isReturn ? 'Update Return' : 'Update Challan') : (p.isReturn ? 'Create Return' : 'Create Challan')}</button>
+        <button onClick={p.onSave} disabled={p.saving} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: p.saving ? 'not-allowed' : 'pointer', boxShadow: `0 4px 16px ${T.ac3}`, opacity: p.saving ? 0.6 : 1 }}>{p.saving ? 'Saving...' : p.editing ? (p.isReturn ? 'Update Return' : 'Update Challan') : (p.isReturn ? 'Create Return' : 'Create Challan')}</button>
       </div>
 
       {/* Audit Trail Modal */}
@@ -335,7 +335,7 @@ export default function ChallanForm(p: ChallanFormProps) {
             {p.auditTrail.map(a => (
               <div key={a.id} style={{ padding: '8px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: a.action === 'VOID' ? 'rgba(239,68,68,.12)' : a.action === 'CREATE' ? 'rgba(34,197,94,.12)' : 'rgba(99,102,241,.12)', color: a.action === 'VOID' ? T.re : a.action === 'CREATE' ? T.gr : T.ac2, fontWeight: 700 }}>{a.action}</span>
+                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: a.action === 'VOID' ? 'oklch(0.63 0.22 25 / 0.12)' : a.action === 'CREATE' ? 'oklch(0.72 0.19 145 / 0.12)' : T.ac3, color: a.action === 'VOID' ? T.re : a.action === 'CREATE' ? T.gr : T.ac2, fontWeight: 700 }}>{a.action}</span>
                   <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>{a.created_at ? new Date(a.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
                 </div>
                 <div style={{ color: T.tx2, fontSize: 11 }}>{a.details}</div>

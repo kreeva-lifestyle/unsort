@@ -10,7 +10,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: an
       <div style={{ position: 'relative', zIndex: 1, background: 'rgba(14,18,30,.90)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 14, padding: '28px 32px', textAlign: 'center' as const, maxWidth: 380, boxShadow: '0 16px 48px rgba(0,0,0,.4)' }}>
         <p style={{ color: '#E2E8F0', fontSize: 14, fontWeight: 600, fontFamily: "'Sora', sans-serif", marginBottom: 6 }}>Something went wrong</p>
         <p style={{ color: '#4A5568', fontSize: 11, marginBottom: 16, lineHeight: 1.5 }}>{String(this.state.error?.message || this.state.error)}</p>
-        <button onClick={() => window.location.reload()} style={{ padding: '7px 18px', borderRadius: 6, border: 'none', background: 'linear-gradient(135deg, rgba(99,102,241,.87), rgba(129,140,248,.80))', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 600, boxShadow: '0 2px 10px rgba(99,102,241,.25)', transition: 'all .18s' }}>Reload</button>
+        <button onClick={() => window.location.reload()} style={{ ...S.btnPrimary, padding: '7px 18px', fontSize: 11 }}>Reload</button>
       </div>
     </div>;
     return this.props.children;
@@ -35,7 +35,7 @@ import SidebarComponent from './components/layout/Sidebar';
 import HeaderComponent from './components/layout/Header';
 import ToastContainerComponent from './components/layout/ToastContainer';
 import OfflineBar from './components/ui/OfflineBar';
-import { T, Icon } from './lib/theme';
+import { T, S, Icon } from './lib/theme';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { NotificationProvider, useNotifications } from './hooks/useNotifications';
 import { BreadcrumbProvider } from './hooks/useBreadcrumb';
@@ -156,13 +156,13 @@ const InstallPrompt = () => {
   }, []);
   if (!deferredPrompt || dismissed) return null;
   return (
-    <div style={{ position: 'fixed', bottom: 70, left: 12, right: 12, zIndex: 200, background: 'rgba(14,18,30,.96)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: `1px solid rgba(99,102,241,.2)`, borderRadius: 14, padding: '14px 16px', boxShadow: '0 12px 40px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 12, animation: 'slideUp .3s cubic-bezier(.2,.9,.3,1)' }}>
+    <div style={{ position: 'fixed', bottom: 70, left: 12, right: 12, zIndex: 200, background: 'rgba(14,18,30,.96)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: `1px solid ${T.ac3}`, borderRadius: 14, padding: '14px 16px', boxShadow: '0 12px 40px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 12, animation: 'slideUp .3s cubic-bezier(.2,.9,.3,1)' }}>
       <div style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg, #6366F1, #38BDF8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', flexShrink: 0 }}>D</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: '#E2E8F0' }}>Install DailyOffice</div>
         <div style={{ fontSize: 10, color: '#6B7890', marginTop: 1 }}>Add to home screen for the full app experience</div>
       </div>
-      <button onClick={() => { deferredPrompt.prompt(); setDeferredPrompt(null); }} style={{ padding: '7px 14px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg, #6366F1, #818CF8)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>Install</button>
+      <button onClick={() => { deferredPrompt.prompt(); setDeferredPrompt(null); }} style={{ ...S.btnPrimary, padding: '7px 14px', fontSize: 11, flexShrink: 0 }}>Install</button>
       <span onClick={() => { setDismissed(true); sessionStorage.setItem('pwa-dismiss', '1'); }} style={{ color: '#6B7890', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 4 }}>&times;</span>
     </div>
   );

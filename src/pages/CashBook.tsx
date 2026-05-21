@@ -528,7 +528,7 @@ export default function CashBook() {
             <div style={{ display: 'flex', gap: 4 }}>
               <input type="number" value={openingInput} onKeyDown={e => numericKeyDown(e, true)} onChange={e => setOpeningInput(e.target.value)} placeholder="0" style={{ ...S.fInput, width: 100, fontFamily: T.mono, textAlign: 'right' }} />
               <button onClick={saveOpening} disabled={busy} style={{ ...S.btnSm, border: 'none', background: T.ac, color: '#fff', fontWeight: 600, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Saving…' : 'Save'}</button>
-              <button onClick={() => { setEditingOpening(false); setOpeningInput(String(openingBalance)); }} style={{ ...S.btnSm, border: '1px solid rgba(99,102,241,0.15)', background: 'rgba(99,102,241,0.06)', color: T.ac2, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { setEditingOpening(false); setOpeningInput(String(openingBalance)); }} style={{ ...S.btnSm, border: '1px solid ${T.ac3}', background: '${T.ac3}', color: T.ac2, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
             </div>
           ) : (
             <span style={{ fontFamily: T.mono, color: T.tx, fontWeight: 600 }}>₹{openingBalance.toLocaleString('en-IN')}</span>
@@ -622,7 +622,7 @@ export default function CashBook() {
         {currentUserRole !== 'admin' ? (
           <button onClick={() => setShowHandover(true)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.yl}, ${T.yl}cc)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>+ Initiate Handover</button>
         ) : (
-          <div style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', color: T.tx2, fontSize: 10, marginBottom: 10 }}>Admins receive handovers — users initiate them. Review pending handovers below.</div>
+          <div style={{ padding: '8px 12px', borderRadius: 6, background: T.ac3, border: `1px solid ${T.ac3}`, color: T.tx2, fontSize: 10, marginBottom: 10 }}>Admins receive handovers — users initiate them. Review pending handovers below.</div>
         )}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
           {handovers.length === 0 && <div style={{ padding: 14 }}><Empty icon="🤝" title="No handovers" message="No cash handovers recorded in this date range." /></div>}
@@ -674,7 +674,7 @@ export default function CashBook() {
 
             {/* Breakdown Card */}
             {handBreakdown && (
-              <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 11 }}>
+              <div style={{ background: T.ac3, border: `1px solid ${T.ac3}`, borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 11 }}>
                 <div style={{ fontSize: 9, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Cash Flow Summary</div>
                 {!handBreakdown.openingIsSet && (
                   <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 4, padding: '6px 8px', marginBottom: 6, fontSize: 9, color: T.yl }}>
@@ -762,7 +762,7 @@ export default function CashBook() {
             </div>
             {handError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{handError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setShowHandover(false); setHandError(''); setHandReason(''); setHandAmount(''); setHandToId(''); setHandNotes(''); setHandBreakdown(null); setExcludePaise(false); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', fontSize: 11, fontWeight: 500, background: 'rgba(99,102,241,0.06)', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { setShowHandover(false); setHandError(''); setHandReason(''); setHandAmount(''); setHandToId(''); setHandNotes(''); setHandBreakdown(null); setExcludePaise(false); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid ${T.ac3}', fontSize: 11, fontWeight: 500, background: '${T.ac3}', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
               <button onClick={createHandover} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}, ${T.yl}cc)`, color: '#fff', cursor: 'pointer' }}>Initiate</button>
             </div>
           </div>
@@ -787,7 +787,7 @@ export default function CashBook() {
               <div><div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>Status</div><div style={{ color: viewingHandover.status === 'confirmed' ? T.gr : T.yl, fontWeight: 700, textTransform: 'uppercase', fontSize: 10 }}>{viewingHandover.status === 'confirmed' ? '✓ Signed' : 'Pending'}</div></div>
             </div>
             {viewingHandover.breakdown ? (
-              <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 11 }}>
+              <div style={{ background: T.ac3, border: `1px solid ${T.ac3}`, borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 11 }}>
                 <div style={{ fontSize: 9, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Cash Flow Snapshot</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4, fontFamily: T.mono }}>
                   <span style={{ color: T.tx2 }}>Opening Balance</span><span style={{ color: T.tx2 }}>₹{viewingHandover.breakdown.opening.toFixed(2)}</span>
@@ -821,7 +821,7 @@ export default function CashBook() {
             <input type="password" value={confirmPin} onChange={e => setConfirmPin(e.target.value)} placeholder="Your 4-6 digit PIN" autoFocus inputMode="numeric" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 18, padding: '10px 12px', outline: 'none', boxSizing: 'border-box', textAlign: 'center', letterSpacing: 6, marginBottom: 10 }} />
             {confirmError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{confirmError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setConfirmingHandover(null); setConfirmPin(''); setConfirmError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', fontSize: 11, fontWeight: 500, background: 'rgba(99,102,241,0.06)', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { setConfirmingHandover(null); setConfirmPin(''); setConfirmError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid ${T.ac3}', fontSize: 11, fontWeight: 500, background: '${T.ac3}', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
               <button onClick={confirmHandover} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Confirming…' : 'Sign & Confirm'}</button>
             </div>
           </div>
@@ -838,7 +838,7 @@ export default function CashBook() {
             <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="e.g. Amount doesn't match, missing cash, wrong period..." rows={3} autoFocus style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 13, padding: '8px 12px', outline: 'none', boxSizing: 'border-box', resize: 'vertical', marginBottom: 10, fontFamily: T.sans }} />
             {rejectError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{rejectError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setRejectingHandover(null); setRejectReason(''); setRejectError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', fontSize: 11, fontWeight: 500, background: 'rgba(99,102,241,0.06)', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { setRejectingHandover(null); setRejectReason(''); setRejectError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid ${T.ac3}', fontSize: 11, fontWeight: 500, background: '${T.ac3}', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
               <button onClick={submitReject} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Rejecting…' : 'Confirm Reject'}</button>
             </div>
           </div>
@@ -872,7 +872,7 @@ export default function CashBook() {
             </div>
             {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{formError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setShowAdd(false); setFormError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', fontSize: 11, fontWeight: 500, background: 'rgba(99,102,241,0.06)', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { setShowAdd(false); setFormError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid ${T.ac3}', fontSize: 11, fontWeight: 500, background: '${T.ac3}', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
               <button onClick={addExpense} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer' }}>Add</button>
             </div>
           </div>
@@ -887,7 +887,7 @@ export default function CashBook() {
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Delete Expense?</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This will permanently remove the expense.</div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: '1px solid rgba(99,102,241,0.15)', fontSize: 11, fontWeight: 500, background: 'rgba(99,102,241,0.06)', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: '1px solid ${T.ac3}', fontSize: 11, fontWeight: 500, background: '${T.ac3}', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
               <button onClick={() => deleteExpense(confirmDelete)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: 'pointer' }}>Delete</button>
             </div>
           </div>

@@ -229,14 +229,14 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
 
           {/* ── Notes + Tags ── */}
           {c.notes && <div style={{ fontSize: 11, color: T.tx2, marginBottom: 8, lineHeight: 1.5 }}><span style={{ color: T.tx3, fontSize: 9, fontWeight: 600, letterSpacing: 0.5 }}>NOTES: </span>{c.notes}</div>}
-          {c.tags && c.tags.length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 14 }}>{c.tags.map(t => <span key={t} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 4, background: 'rgba(99,102,241,.08)', color: T.ac2, fontWeight: 500 }}>{t}</span>)}</div>}
+          {c.tags && c.tags.length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 14 }}>{c.tags.map(t => <span key={t} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 4, background: T.ac3, color: T.ac2, fontWeight: 500 }}>{t}</span>)}</div>}
 
           {/* ── Action buttons ── */}
           <div className="challan-detail-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: `1px solid ${T.bd}`, paddingTop: 14 }}>
-            {!isVoided && c.status !== 'paid' && <button onClick={onEdit} style={{ ...btnBase, background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, border: 'none', color: '#fff' }}>Edit</button>}
+            {!isVoided && c.status !== 'paid' && <button onClick={onEdit} style={{ ...S.btnPrimary, padding: '8px 16px' }}>Edit</button>}
             <button onClick={onPrint} style={btnBase}>Print</button>
-            {canRemind && <button onClick={onRemind} style={{ ...btnBase, border: '1px solid rgba(34,197,94,.15)', background: 'rgba(34,197,94,.04)', color: T.gr }}>Remind</button>}
-            {canReturn && <button onClick={onReturn} style={{ ...btnBase, border: '1px solid rgba(239,68,68,.15)', background: 'rgba(239,68,68,.04)', color: T.re }}>Return</button>}
+            {canRemind && <button onClick={onRemind} style={{ ...S.btnSuccess, padding: '8px 16px' }}>Remind</button>}
+            {canReturn && <button onClick={onReturn} style={{ ...S.btnDanger, padding: '8px 16px' }}>Return</button>}
             {!isVoided && c.status !== 'paid' && <button onClick={onVoid} style={btnBase}>Void</button>}
           </div>
         </div>
