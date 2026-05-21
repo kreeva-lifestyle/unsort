@@ -685,13 +685,13 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           }} style={S.btnGhost} className="desktop-only">Export</div>}
           {!showExtras && !isCompletedView && <div onClick={computeIntel} title="Find cross-size completion possibilities" style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600 }} className="desktop-only">Find Pairs</div>}
           {!showExtras && <div onClick={exportPdf} style={{ ...S.btnGhost, fontSize: 11 }} className="mobile-only">Export</div>}
-          {!showExtras && <div onClick={() => { setShowExtras(true); window.history.pushState({ view: 'extras' }, ''); }} style={{ ...S.btnGhost, background: `linear-gradient(135deg, rgba(99,102,241,.08), rgba(56,189,248,.06))`, border: `1px solid rgba(99,102,241,.18)`, color: T.ac2, fontWeight: 600, gap: 6 }}>
+          {!showExtras && profile?.module_access?.extras !== false && <div onClick={() => { setShowExtras(true); window.history.pushState({ view: 'extras' }, ''); }} style={{ ...S.btnGhost, background: `linear-gradient(135deg, rgba(99,102,241,.08), rgba(56,189,248,.06))`, border: `1px solid rgba(99,102,241,.18)`, color: T.ac2, fontWeight: 600, gap: 6 }}>
             <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, flexShrink: 0 }}><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" /></svg>
             Spare Parts
           </div>}
         </div>
       </div>
-      {showExtras ? <InventoryExtras /> : <>
+      {showExtras && profile?.module_access?.extras !== false ? <InventoryExtras /> : <>
       {/* Preset strip + search + Filters popover (Claude-design v2 multi-select filter UX) */}
       <div className="filter-bar" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: activeFilterCount > 0 ? 10 : 14, flexWrap: 'wrap' }}>
         {/* Preset strip */}
