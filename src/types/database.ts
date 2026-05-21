@@ -31,6 +31,7 @@ export interface Profile {
   updated_at: string | null;
   cash_pin: string | null;
   phone: string | null;
+  module_access: Record<string, boolean> | null;
 }
 
 export type ProfileInsert = {
@@ -43,6 +44,7 @@ export type ProfileInsert = {
   updated_at?: string | null;
   cash_pin?: string | null;
   phone?: string | null;
+  module_access?: Record<string, boolean> | null;
 };
 
 // ─── products (10 cols) ──────────────────────────────────────────────────

@@ -54,7 +54,7 @@ const MainApp = () => {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [mounted, setMounted] = useState<Set<string>>(new Set([getTabFromHash()]));
 
-  const checkTab = (t: string) => canAccessTab(profile?.role, t);
+  const checkTab = (t: string) => canAccessTab(profile?.role, t, profile?.module_access);
 
   // Central navigate — updates URL + state
   const setTab = (t: string) => {
