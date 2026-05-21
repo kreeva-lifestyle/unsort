@@ -2,20 +2,28 @@ export const TAB_IDS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'chall
 export type TabId = typeof TAB_IDS[number];
 
 const TAB_TO_MODULE: Record<string, string> = {
-  inventory: 'inventory', brandtag: 'brandtag', packtime: 'packtime',
-  challan: 'challan', programs: 'programs', minis: 'extras',
+  dashboard: 'dashboard', inventory: 'inventory', brandtag: 'brandtag',
+  packtime: 'packtime', challan: 'challan', programs: 'programs', minis: 'minis',
 };
 
 export const MODULE_LABELS: Record<string, string> = {
-  inventory: 'Inventory', extras: 'Spare Parts', packtime: 'PackStation',
-  brandtag: 'Brand Tags', challan: 'Cash Challan', cashbook: 'Cash Book', programs: 'Programs',
+  dashboard: 'Dashboard', inventory: 'Inventory', extras: 'Spare Parts',
+  packtime: 'PackStation', brandtag: 'Brand Tags', challan: 'Cash Challan',
+  cashbook: 'Cash Book', programs: 'Programs', minis: 'Minis',
 };
 
 export const ALL_MODULE_KEYS = Object.keys(MODULE_LABELS);
 
+export const getFirstAllowedTab = (role: string | null | undefined, moduleAccess?: Record<string, boolean> | null): string => {
+  for (const t of TAB_IDS) {
+    if (t !== 'settings' && canAccessTab(role, t, moduleAccess)) return t;
+  }
+  return 'settings';
+};
+
 export const canAccessTab = (role: string | null | undefined, tab: string, moduleAccess?: Record<string, boolean> | null): boolean => {
   if (!role) return tab === 'dashboard';
-  if (tab === 'dashboard' || tab === 'settings') return true;
+  if (tab === 'settings') return true;
   if (role === 'admin') return true;
   const modKey = TAB_TO_MODULE[tab];
   if (modKey && moduleAccess && moduleAccess[modKey] === false) return false;
