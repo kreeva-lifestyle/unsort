@@ -40,7 +40,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { NotificationProvider, useNotifications } from './hooks/useNotifications';
 import { BreadcrumbProvider } from './hooks/useBreadcrumb';
 
-import { TAB_IDS, canAccessTab } from './lib/tabs';
+import { TAB_IDS, canAccessTab, getFirstAllowedTab } from './lib/tabs';
 const getTabFromHash = () => {
   const h = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   return (TAB_IDS as readonly string[]).includes(h) ? h : 'dashboard';
@@ -57,9 +57,10 @@ const MainApp = () => {
   const checkTab = (t: string) => canAccessTab(profile?.role, t, profile?.module_access);
 
   // Central navigate — updates URL + state
+  const fallback = () => getFirstAllowedTab(profile?.role, profile?.module_access);
   const setTab = (t: string) => {
-    if (!(TAB_IDS as readonly string[]).includes(t)) t = 'dashboard';
-    if (!checkTab(t)) t = 'dashboard';
+    if (!(TAB_IDS as readonly string[]).includes(t)) t = fallback();
+    if (!checkTab(t)) t = fallback();
     const newHash = `#/${t}`;
     if (window.location.hash !== newHash) window.history.pushState(null, '', newHash);
     setTabState(t);
@@ -67,7 +68,7 @@ const MainApp = () => {
 
   // Browser back/forward support
   useEffect(() => {
-    const onPop = () => { const t = getTabFromHash(); setTabState(checkTab(t) ? t : 'dashboard'); };
+    const onPop = () => { const t = getTabFromHash(); setTabState(checkTab(t) ? t : fallback()); };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, [profile]);
@@ -92,7 +93,7 @@ const MainApp = () => {
   }, []);
 
   // Redirect to dashboard if current tab became unauthorized after profile loads
-  useEffect(() => { if (profile && !checkTab(tab)) setTab('dashboard'); }, [profile]);
+  useEffect(() => { if (profile && !checkTab(tab)) setTab(fallback()); }, [profile]);
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
