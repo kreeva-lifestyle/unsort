@@ -12,7 +12,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
     { id: 'programs', icon: 'layers', label: 'Programs' },
     { id: 'minis', icon: 'sparkles', label: 'Minis' },
     ...(profile ? [{ id: 'settings', icon: 'settings', label: 'Settings' }] : []),
-  ].filter(t => canAccessTab(profile?.role, t.id));
+  ].filter(t => canAccessTab(profile?.role, t.id, profile?.module_access));
 
   const handleSignOut = async () => {
     try { localStorage.removeItem('ccDraft'); } catch {}

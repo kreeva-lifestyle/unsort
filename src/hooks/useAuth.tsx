@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!mounted) return;
         if (refreshed?.session?.user) {
           setUser(refreshed.session.user);
-          const { data: prof, error: profErr } = await supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').eq('id', refreshed.session.user.id).maybeSingle();
+          const { data: prof, error: profErr } = await supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at, module_access').eq('id', refreshed.session.user.id).maybeSingle();
           if (profErr) console.error('Profile load failed:', profErr.message);
           if (mounted) setProfile(prof);
         } else {
@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (!mounted) return;
       if (session?.user) {
         setUser(session.user);
-        supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').eq('id', session.user.id).maybeSingle().then(({ data, error }) => {
+        supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at, module_access').eq('id', session.user.id).maybeSingle().then(({ data, error }) => {
           if (error) console.error('Profile load failed:', error.message);
           if (mounted) { setProfile(data); setLoading(false); setReady(true); }
         });

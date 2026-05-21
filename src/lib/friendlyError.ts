@@ -18,6 +18,7 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   if (code === '23502' || l.includes('not null')) return 'A required field is missing.';
 
   // Permissions / RLS
+  if (l.includes('only admins can change module_access')) return 'Only admins can change user permissions.';
   if (code === '42501' || l.includes('permission denied') || l.includes('rls') || l.includes('row-level security')) {
     return 'You don\'t have permission to do that. Ask an admin if you need access.';
   }

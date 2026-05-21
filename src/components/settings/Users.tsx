@@ -1,11 +1,12 @@
 // Users management — admin-only user directory, role edits, invites.
 // Personal settings (Phone + Cash PIN) moved to MyProfile.tsx so non-admins
 // can still set their own PIN for cash handover confirmation.
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import Toggle from '../ui/Toggle';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
+import { MODULE_LABELS, ALL_MODULE_KEYS } from '../../lib/tabs';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
 export default function Users({ addToast, profile }: { addToast: (msg: string, type?: string) => void; profile: any }) {
@@ -21,7 +22,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     return () => { document.body.classList.remove('modal-open'); };
   }, [showInvite]);
 
-  const fetchUsers = () => { supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at').order('created_at', { ascending: false }).then(({ data, error }) => { if (error) addToast('Failed to load users — ' + friendlyError(error), 'error'); setUsers(data || []); }); };
+  const fetchUsers = () => { supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at, module_access').order('created_at', { ascending: false }).then(({ data, error }) => { if (error) addToast('Failed to load users — ' + friendlyError(error), 'error'); setUsers(data || []); }); };
   useEffect(() => {
     fetchUsers();
     const ch = supabase.channel('usr-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fetchUsers).subscribe();
@@ -48,6 +49,35 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     }
     const { error } = await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id);
     if (error) addToast(friendlyError(error), 'error'); else { addToast(isActive ? 'Access revoked' : 'Access granted', 'success'); fetchUsers(); }
+  };
+
+  const toggleModule = async (userId: string, modKey: string, currentAccess: Record<string, boolean> | null) => {
+    const access = { ...( currentAccess || Object.fromEntries(ALL_MODULE_KEYS.map(k => [k, true])) ) };
+    access[modKey] = !access[modKey];
+    const { error } = await supabase.from('profiles').update({ module_access: access }).eq('id', userId);
+    if (error) addToast('Failed to update access — ' + friendlyError(error), 'error');
+    else fetchUsers();
+  };
+
+  const ModuleChips = ({ u }: { u: any }) => {
+    if (u.role === 'admin') return null;
+    const access: Record<string, boolean> = u.module_access || Object.fromEntries(ALL_MODULE_KEYS.map(k => [k, true]));
+    return (
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
+        {ALL_MODULE_KEYS.map(k => {
+          const on = access[k] !== false;
+          return (
+            <span key={k} onClick={() => toggleModule(u.id, k, u.module_access)}
+              style={{ padding: '3px 8px', borderRadius: 5, fontSize: 9, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', userSelect: 'none',
+                background: on ? 'rgba(34,197,94,.08)' : 'rgba(255,255,255,.03)',
+                border: `1px solid ${on ? 'rgba(34,197,94,.2)' : T.bd}`,
+                color: on ? T.gr : T.tx3, opacity: on ? 1 : 0.5 }}>
+              {on ? '✓' : '✗'} {MODULE_LABELS[k]}
+            </span>
+          );
+        })}
+      </div>
+    );
   };
 
   const generatePassword = () => {
@@ -103,7 +133,8 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>{['User', 'Role', 'Status', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
           <tbody>{users.map((u) => (
-            <tr key={u.id} style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.015)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            <React.Fragment key={u.id}>
+            <tr style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.015)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <td style={S.tdStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 26, height: 26, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{(u.full_name || u.email || '?')[0].toUpperCase()}</div>
@@ -114,6 +145,8 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
               <td style={S.tdStyle}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, ...(u.is_active ? { background: 'rgba(45,212,160,.10)', color: T.gr } : { background: 'rgba(245,87,92,.10)', color: T.re }) }}>{u.is_active ? 'Active' : 'Inactive'}</span></td>
               <td style={S.tdStyle}>{u.id !== profile?.id && <Toggle on={u.is_active} onToggle={() => toggleActive(u.id, u.is_active)} size="sm" />}</td>
             </tr>
+            {u.role !== 'admin' && <tr><td colSpan={4} style={{ padding: '0 14px 10px' }}><ModuleChips u={u} /></td></tr>}
+            </React.Fragment>
           ))}</tbody>
         </table>
       </div>
@@ -135,6 +168,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
               <select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} disabled={u.id === profile?.id} style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '6px 10px', outline: 'none', cursor: u.id === profile?.id ? 'not-allowed' : 'pointer', opacity: u.id === profile?.id ? 0.5 : 1 }}><option value="admin">Admin</option><option value="manager">Manager</option><option value="operator">Operator</option><option value="viewer">Viewer</option></select>
               {u.id !== profile?.id ? <Toggle on={u.is_active} onToggle={() => toggleActive(u.id, u.is_active)} size="sm" /> : <span style={{ fontSize: 10, color: T.tx3 }}>You</span>}
             </div>
+            <ModuleChips u={u} />
           </div>
         ))}
       </div>
