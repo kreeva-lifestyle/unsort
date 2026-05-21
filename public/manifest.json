@@ -1,6 +1,6 @@
 {
   "name": "DailyOffice",
-  "short_name": "DailyOffice",
+  "short_name": "Daily",
   "description": "Your Workspace, Simplified — Inventory, billing, packing, cash management",
   "start_url": "/",
   "display": "standalone",
