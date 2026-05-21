@@ -79,8 +79,9 @@ export default function ChallanForm(p: ChallanFormProps) {
 
   useEffect(() => {
     if (!p.editing) {
-      supabase.rpc('get_next_challan_number').then(({ data }) => { if (data) setNextNum(data); });
-      supabase.from('cash_challans').select('customer_name, customer_id').order('created_at', { ascending: false }).limit(20).then(({ data }) => {
+      supabase.rpc('get_next_challan_number').then(({ data, error }) => { if (error) console.warn('Next number fetch failed'); if (data) setNextNum(data); });
+      supabase.from('cash_challans').select('customer_name, customer_id').order('created_at', { ascending: false }).limit(20).then(({ data, error }) => {
+        if (error) { console.warn('Recent customers fetch failed'); return; }
         const seen = new Set<string>();
         const recent: { name: string; id?: string }[] = [];
         (data || []).forEach(c => { if (!seen.has(c.customer_name)) { seen.add(c.customer_name); recent.push({ name: c.customer_name, id: c.customer_id }); } });
@@ -92,7 +93,8 @@ export default function ChallanForm(p: ChallanFormProps) {
 
   useEffect(() => {
     if (!p.customerName.trim()) { setOutstanding(0); return; }
-    supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', p.customerName.trim()).in('status', ['unpaid', 'partial']).eq('is_return', false).then(({ data }) => {
+    supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', p.customerName.trim()).in('status', ['unpaid', 'partial']).eq('is_return', false).then(({ data, error }) => {
+      if (error) { console.warn('Outstanding fetch failed'); return; }
       const total = (data || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0);
       setOutstanding(Math.round(total));
     });
@@ -154,7 +156,7 @@ export default function ChallanForm(p: ChallanFormProps) {
           {!p.editing && recentCustomers.length > 0 && !p.customerName && (
             <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
               {recentCustomers.map(c => (
-                <span key={c.name} onClick={() => { p.setCustomerName(c.name); if (c.id) { p.setSelectedCustomerId(c.id); supabase.from('cash_challan_customers').select('phone').eq('name', c.name).maybeSingle().then(({ data }) => { if (data?.phone) p.setCustomerPhone(data.phone); }); } p.setCustomerSuggestions([]); }}
+                <span key={c.name} onClick={() => { p.setCustomerName(c.name); if (c.id) { p.setSelectedCustomerId(c.id); supabase.from('cash_challan_customers').select('phone').eq('name', c.name).maybeSingle().then(({ data, error }) => { if (!error && data?.phone) p.setCustomerPhone(data.phone); }); } p.setCustomerSuggestions([]); }}
                   style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', background: T.ac3, border: `1px solid ${T.ac3}`, color: T.ac2, whiteSpace: 'nowrap' }}>{c.name}</span>
               ))}
             </div>

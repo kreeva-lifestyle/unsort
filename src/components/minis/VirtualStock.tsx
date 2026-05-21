@@ -72,6 +72,19 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
 
   const filtered = search ? rows.filter(r => r.sku.toLowerCase().includes(search.toLowerCase())) : rows;
 
+  const exportCSV = () => {
+    if (rows.length === 0) { addToast('No data to export', 'error'); return; }
+    const header = 'SKU,Quantity';
+    const csv = [header, ...rows.map(r => `${r.sku},${r.quantity}`)].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `virtual-stock-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    addToast(`Exported ${rows.length} SKUs`, 'success');
+  };
+
   return (
     <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 14, marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => setExpanded(e => !e)}>
@@ -79,7 +92,10 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
           <div style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>Virtual Stock Override {rows.length > 0 && <span style={{ fontSize: 10, color: T.tx3, fontWeight: 400 }}>({rows.length} SKU{rows.length !== 1 ? 's' : ''})</span>}</div>
           <div style={{ fontSize: 10, color: T.tx3, marginTop: 1 }}>Manual stock for SKUs showing 0 in vendor sheets. Applies to all exports.</div>
         </div>
-        <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: T.tx3, strokeWidth: 2, transform: expanded ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform .2s', flexShrink: 0 }}><path d="M6 9l6 6 6-6" /></svg>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {expanded && rows.length > 0 && <span onClick={e => { e.stopPropagation(); exportCSV(); }} style={{ ...S.btnSuccess, ...S.btnSm }}>Export</span>}
+          <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: T.tx3, strokeWidth: 2, transform: expanded ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform .2s', flexShrink: 0 }}><path d="M6 9l6 6 6-6" /></svg>
+        </div>
       </div>
 
       {expanded && <>

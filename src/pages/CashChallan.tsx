@@ -20,10 +20,13 @@ import type {
 } from '../types/database';
 
 const ccAuditLog = async (action: string, recordId: string, details: string, changes?: Record<string, { from: unknown; to: unknown }>) => {
-  const { data: { user } } = await supabase.auth.getUser();
-  let userName = user?.email || null;
-  if (user) { const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(); userName = prof?.full_name || userName; }
-  await supabase.from('audit_log').insert({ action, module: 'cash_challan', record_id: recordId, details, user_id: user?.id ?? null, user_email: userName, changes: changes || null });
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    let userName = user?.email || null;
+    if (user) { const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(); userName = prof?.full_name || userName; }
+    const { error } = await supabase.from('audit_log').insert({ action, module: 'cash_challan', record_id: recordId, details, user_id: user?.id ?? null, user_email: userName, changes: changes || null });
+    if (error) console.warn('Audit log failed:', error.message);
+  } catch { /* audit is best-effort — never block the main operation */ }
 };
 
 import { T, S, CHALLAN_STATUS_COLORS as STATUS_COLORS } from '../lib/theme';
@@ -567,23 +570,16 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           addToast(msg, 'error');
           return;
         }
-        const { error: delErr } = await supabase.from('cash_challan_items').delete().eq('challan_id', editing.id);
-        if (delErr) throw new Error(delErr.message);
-        const { error: insErr2 } = await supabase.from('cash_challan_items').insert(items.map((it, i) => ({ challan_id: editing.id, sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100, sort_order: i })));
-        if (insErr2) throw new Error(insErr2.message);
-        const { error: upErr } = await supabase.from('cash_challans').update({ ...challanData, updated_at: new Date().toISOString() }).eq('id', editing.id);
-        if (upErr) throw new Error(upErr.message);
-        // Record payment change
-        const prevPaid = Number(editing.amount_paid || 0);
-        const newPaid = amountPaid;
         const today = new Date().toISOString().slice(0, 10);
-        if (newPaid > prevPaid) {
-          const { error: payErr } = await supabase.from('cash_challan_payments').insert({ challan_id: editing.id, amount: newPaid - prevPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || today, paid_by: user?.id, is_reversal: false });
-          if (payErr) addToast('Payment record failed — ' + friendlyError(payErr), 'error');
-        } else if (newPaid < prevPaid) {
-          const { error: payErr } = await supabase.from('cash_challan_payments').insert({ challan_id: editing.id, amount: prevPaid - newPaid, payment_mode: editing.payment_mode || paymentMode || 'Cash', payment_date: today, paid_by: user?.id, notes: 'Payment removed/reduced', is_reversal: true });
-          if (payErr) addToast('Reversal record failed — ' + friendlyError(payErr), 'error');
-        }
+        const prevPaid = Number(editing.amount_paid || 0);
+        const payDiff = amountPaid - prevPaid;
+        const { error: upErr } = await supabase.rpc('update_challan_with_items', {
+          p_challan_id: editing.id,
+          p_challan: { ...challanData, tags: challanData.tags || null },
+          p_items: items.map((it) => ({ sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100 })),
+          p_payment: payDiff !== 0 ? { payment_mode: paymentMode || 'Cash', payment_date: paymentDate || today, paid_by: user?.id } : null,
+        });
+        if (upErr) throw new Error(upErr.message);
         // Structured field-level diff for audit
         const tracked: (keyof typeof challanData)[] = ['status', 'amount_paid', 'payment_mode', 'payment_date', 'total', 'customer_name', 'shipping_charges', 'notes'];
         const changes: Record<string, { from: unknown; to: unknown }> = {};
@@ -950,13 +946,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         status: 'paid', amount_paid: Number(c.total), payment_mode: bulkPayMode,
         payment_date: today, modified_by: user?.id, updated_at: new Date().toISOString(),
       }).eq('id', c.id).in('status', ['unpaid', 'partial']).select('id');
-      if (upErr) { failCount++; addToast('Failed to update challan — ' + friendlyError(upErr), 'error'); continue; }
+      if (upErr) { failCount++; continue; }
       if (updated && updated.length > 0 && outstanding > 0) {
         const { error: payErr } = await supabase.from('cash_challan_payments').insert({
           challan_id: c.id, amount: outstanding, payment_mode: bulkPayMode,
           payment_date: today, paid_by: user?.id, notes: receiptNote, batch_id: batchId, is_reversal: false,
         });
-        if (payErr) { failCount++; addToast('Payment record failed — ' + friendlyError(payErr), 'error'); }
+        if (payErr) { failCount++; }
       }
     }
     for (const c of bulkPayable) await ccAuditLog(isRefund ? 'SETTLE_REFUND' : 'BULK_PAY', c.id, `${isRefund ? 'Settled against returns' : 'Bulk paid'} (${batchId}) — ₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} via ${bulkPayMode}`, { status: { from: c.status, to: 'paid' }, amount_paid: { from: c.amount_paid, to: c.total }, ...(isRefund ? { refunded: { from: 0, to: received } } : { received_amount: { from: Math.abs(bulkNetTotal), to: received } }) });

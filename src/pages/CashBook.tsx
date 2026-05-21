@@ -59,6 +59,7 @@ export default function CashBook() {
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [description, setDescription] = useState('');
   const [formError, setFormError] = useState('');
+  const [expSaving, setExpSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [pendingExpDel, setPendingExpDel] = useState<{ id: string; timer: number } | null>(null);
   // Handover form
@@ -192,12 +193,14 @@ export default function CashBook() {
     const amt = Number(amount);
     if (!amt || amt <= 0) { setFormError('Amount must be greater than 0'); return; }
     if (!category) { setFormError('Category is required'); return; }
+    if (entryDate > today) { setFormError('Cannot add future expenses'); return; }
+    setExpSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
     const payload: CashExpenseInsert = { date: entryDate, amount: amt, category, description: description.trim() || null, paid_by: user?.id ?? null };
     const { error } = await supabase.from('cash_expenses').insert(payload);
-    if (error) { setFormError('Save failed — ' + friendlyError(error)); return; }
+    if (error) { setFormError('Save failed — ' + friendlyError(error)); setExpSaving(false); return; }
     addToast('Expense added!', 'success');
-    setAmount(''); setDescription(''); setCategory(CATEGORIES[0]); setShowAdd(false);
+    setAmount(''); setDescription(''); setCategory(CATEGORIES[0]); setEntryDate(today); setFormError(''); setShowAdd(false); setExpSaving(false);
     fetchData();
   };
 
@@ -528,7 +531,7 @@ export default function CashBook() {
             <div style={{ display: 'flex', gap: 4 }}>
               <input type="number" value={openingInput} onKeyDown={e => numericKeyDown(e, true)} onChange={e => setOpeningInput(e.target.value)} placeholder="0" style={{ ...S.fInput, width: 100, fontFamily: T.mono, textAlign: 'right' }} />
               <button onClick={saveOpening} disabled={busy} style={{ ...S.btnSm, border: 'none', background: T.ac, color: '#fff', fontWeight: 600, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Saving…' : 'Save'}</button>
-              <button onClick={() => { setEditingOpening(false); setOpeningInput(String(openingBalance)); }} style={{ ...S.btnSm, border: '1px solid ${T.ac3}', background: '${T.ac3}', color: T.ac2, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { setEditingOpening(false); setOpeningInput(String(openingBalance)); }} style={{ ...S.btnGhost, ...S.btnSm }}>Cancel</button>
             </div>
           ) : (
             <span style={{ fontFamily: T.mono, color: T.tx, fontWeight: 600 }}>₹{openingBalance.toLocaleString('en-IN')}</span>
@@ -762,7 +765,7 @@ export default function CashBook() {
             </div>
             {handError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{handError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setShowHandover(false); setHandError(''); setHandReason(''); setHandAmount(''); setHandToId(''); setHandNotes(''); setHandBreakdown(null); setExcludePaise(false); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid ${T.ac3}', fontSize: 11, fontWeight: 500, background: '${T.ac3}', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { setShowHandover(false); setHandError(''); setHandReason(''); setHandAmount(''); setHandToId(''); setHandNotes(''); setHandBreakdown(null); setExcludePaise(false); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
               <button onClick={createHandover} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}, ${T.yl}cc)`, color: '#fff', cursor: 'pointer' }}>Initiate</button>
             </div>
           </div>
@@ -821,7 +824,7 @@ export default function CashBook() {
             <input type="password" value={confirmPin} onChange={e => setConfirmPin(e.target.value)} placeholder="Your 4-6 digit PIN" autoFocus inputMode="numeric" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 18, padding: '10px 12px', outline: 'none', boxSizing: 'border-box', textAlign: 'center', letterSpacing: 6, marginBottom: 10 }} />
             {confirmError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{confirmError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setConfirmingHandover(null); setConfirmPin(''); setConfirmError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid ${T.ac3}', fontSize: 11, fontWeight: 500, background: '${T.ac3}', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { setConfirmingHandover(null); setConfirmPin(''); setConfirmError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
               <button onClick={confirmHandover} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Confirming…' : 'Sign & Confirm'}</button>
             </div>
           </div>
@@ -838,7 +841,7 @@ export default function CashBook() {
             <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="e.g. Amount doesn't match, missing cash, wrong period..." rows={3} autoFocus style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 13, padding: '8px 12px', outline: 'none', boxSizing: 'border-box', resize: 'vertical', marginBottom: 10, fontFamily: T.sans }} />
             {rejectError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{rejectError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setRejectingHandover(null); setRejectReason(''); setRejectError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid ${T.ac3}', fontSize: 11, fontWeight: 500, background: '${T.ac3}', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { setRejectingHandover(null); setRejectReason(''); setRejectError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
               <button onClick={submitReject} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Rejecting…' : 'Confirm Reject'}</button>
             </div>
           </div>
@@ -853,7 +856,7 @@ export default function CashBook() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Date</label>
-                <input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} style={{ ...S.fDate, width: '100%' }} />
+                <input type="date" value={entryDate} max={today} onChange={e => setEntryDate(e.target.value)} style={{ ...S.fDate, width: '100%' }} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Amount (₹)</label>
@@ -872,8 +875,8 @@ export default function CashBook() {
             </div>
             {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{formError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setShowAdd(false); setFormError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid ${T.ac3}', fontSize: 11, fontWeight: 500, background: '${T.ac3}', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={addExpense} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer' }}>Add</button>
+              <button onClick={() => { setShowAdd(false); setFormError(''); setExpSaving(false); }} style={{ ...S.btnGhost, flex: 1, padding: '9px 0', fontSize: 11 }}>Cancel</button>
+              <button onClick={addExpense} disabled={expSaving} style={{ ...S.btnPrimary, flex: 1, padding: '9px 0', fontSize: 11, opacity: expSaving ? 0.5 : 1, pointerEvents: expSaving ? 'none' : 'auto' }}>{expSaving ? 'Saving…' : 'Add'}</button>
             </div>
           </div>
         </div>
@@ -887,7 +890,7 @@ export default function CashBook() {
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Delete Expense?</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This will permanently remove the expense.</div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: '1px solid ${T.ac3}', fontSize: 11, fontWeight: 500, background: '${T.ac3}', color: T.ac2, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
               <button onClick={() => deleteExpense(confirmDelete)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: 'pointer' }}>Delete</button>
             </div>
           </div>

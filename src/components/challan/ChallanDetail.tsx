@@ -57,6 +57,8 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
       supabase.from('audit_log').select('action, details, user_email, changes, created_at').eq('module', 'cash_challan').eq('record_id', c.id).order('created_at'),
       supabase.from('cash_challan_payments').select('amount, payment_mode, payment_date, paid_by, notes, is_reversal, created_at, batch_id').eq('challan_id', c.id).order('created_at'),
     ]).then(async ([auditRes, payRes]) => {
+      if (auditRes.error) console.warn('Audit timeline failed:', auditRes.error.message);
+      if (payRes.error) console.warn('Payment timeline failed:', payRes.error.message);
       const entries: TimelineEntry[] = [];
       for (const a of (auditRes.data || [])) entries.push({ type: 'audit', time: a.created_at || '', action: a.action, details: a.details || '', user_name: a.user_email || undefined, changes: a.changes as any });
       const payData = payRes.data || [];
@@ -69,7 +71,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
       entries.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
       setTimeline(entries);
       setTimelineLoading(false);
-    });
+    }).catch(() => setTimelineLoading(false));
   }, [c.id]);
 
   const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
