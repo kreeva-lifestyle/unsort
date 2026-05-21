@@ -63,11 +63,10 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     const scanCount = scansRes.count ?? 0;
 
     // Pulse — monthly metrics (matches Cash Book logic: payment_date, paid/partial only)
-    const monthChallans = challans.filter(c => c.created_at && c.created_at.slice(0, 10) >= monthStartStr);
-    const monthRev = monthChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total || 0), 0);
+    const paidInMonth = challans.filter(c => (c.status === 'paid' || c.status === 'partial') && c.payment_date && c.payment_date >= monthStartStr);
+    const monthRev = paidInMonth.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total || 0), 0);
     const unsortedCount = items.filter(i => i.status === 'unsorted').length;
     const opening = Number(balances?.opening_balance || 0);
-    const paidInMonth = challans.filter(c => (c.status === 'paid' || c.status === 'partial') && c.payment_date && c.payment_date >= monthStartStr);
     const cashSales = paidInMonth.filter(c => !c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
     const cashReturns = paidInMonth.filter(c => c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
     const totalExp = expenses.reduce((s, e) => s + Number(e.amount), 0);

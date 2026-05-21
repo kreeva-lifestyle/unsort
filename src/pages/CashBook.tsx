@@ -35,7 +35,7 @@ const formatHandoverNo = (n: number | null | undefined) =>
   n == null ? '—' : `HO-${String(n).padStart(4, '0')}`;
 
 // View model: narrowed cash_expenses projection used by the expenses tab.
-type ExpenseRow = Pick<CashExpense, 'id' | 'date' | 'amount' | 'category' | 'description' | 'created_at'> & { profiles?: { full_name: string } | { full_name: string }[] | null };
+type ExpenseRow = Pick<CashExpense, 'id' | 'date' | 'amount' | 'category' | 'description' | 'created_at'> & { profiles?: { full_name: string } | null };
 
 // View model: narrowed cash_challans projection used by the sales tab.
 type CashSaleRow = Pick<CashChallan, 'id' | 'challan_number' | 'customer_name' | 'total' | 'amount_paid' | 'status' | 'is_return' | 'payment_mode' | 'payment_date' | 'created_at'>;
@@ -108,7 +108,7 @@ export default function CashBook() {
 
     // Expenses in date range
     const { data: exp } = await supabase.from('cash_expenses').select('id, date, amount, category, description, created_at, profiles:paid_by(full_name)').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
-    setExpenses(exp || []);
+    setExpenses((exp || []) as unknown as ExpenseRow[]);
 
     // Cash sales — filter by payment_date (when cash actually moved), not created_at
     const { data: ch } = await supabase.from('cash_challans').select('id, challan_number, customer_name, total, amount_paid, status, is_return, payment_mode, payment_date, created_at')
@@ -580,7 +580,7 @@ export default function CashBook() {
                   <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3, fontFamily: T.mono }}>{new Date(e.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
                 </div>
                 {e.description && <div style={{ fontSize: 10, color: T.tx3 }}>{e.description}</div>}
-                {e.profiles && <div style={{ fontSize: 9, color: T.tx3, marginTop: 1 }}>by {Array.isArray(e.profiles) ? e.profiles[0]?.full_name : e.profiles.full_name}</div>}
+                {e.profiles && <div style={{ fontSize: 9, color: T.tx3, marginTop: 1 }}>by {e.profiles.full_name}</div>}
               </div>
               <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.re }}>−₹{Number(e.amount).toLocaleString('en-IN')}</div>
               {lockedExpenseIds.has(e.id) ? (
