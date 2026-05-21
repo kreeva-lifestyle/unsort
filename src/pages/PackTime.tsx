@@ -16,6 +16,7 @@ import type {
   PackTimeCamera,
   PackTimeScan,
   PackTimeScanInsert,
+  PackTimeShortcut,
 } from '../types/database';
 
 // In-memory view model for the recent-scans strip. Not a DB row.
@@ -188,6 +189,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const [courierBrand, setCourierBrand] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('');
   const [camera, setCamera] = useState('');
+  const [shortcuts, setShortcuts] = useState<PackTimeShortcut[]>([]);
 
   const [started, setStarted] = useState(false);
 
@@ -254,7 +256,10 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       setCameras(cam || []);
       setBrands(((b as Pick<Brand, 'name'>[] | null) || []).map((x) => x.name));
       setLoadingConfig(false);
-      supabase.auth.getUser().then(({ data: { user } }) => { userIdRef.current = user?.id || null; });
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        userIdRef.current = user?.id || null;
+        if (user) supabase.from('packtime_shortcuts').select('id, user_id, courier, camera, brand, used_at').eq('user_id', user.id).order('used_at', { ascending: false }).limit(5).then(({ data: sc }) => setShortcuts(sc || []));
+      });
     })();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       userIdRef.current = session?.user?.id || null;
@@ -414,6 +419,15 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       sessionStorage.setItem('packtime_session', sessionIdRef.current);
       writeQueue.length = 0; flushing = false;
       setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned(''); setDbFails(0);
+      const finalBrand = selectedBrand || c.brand || 'FUSIONIC';
+      if (userIdRef.current) {
+        supabase.from('packtime_shortcuts').upsert(
+          { user_id: userIdRef.current, courier, camera, brand: finalBrand, used_at: new Date().toISOString() },
+          { onConflict: 'user_id,courier,camera,brand' }
+        ).select('id, user_id, courier, camera, brand, used_at').single().then(({ data: sc }) => {
+          if (sc) setShortcuts(prev => [sc as PackTimeShortcut, ...prev.filter(s => s.id !== sc.id)].slice(0, 5));
+        });
+      }
     }
     setVerifying(false);
   };
@@ -803,6 +817,19 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       <div style={{ maxWidth: 420, margin: '0 auto' }}>
         <div style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '22px 20px', boxShadow: '0 4px 24px rgba(0,0,0,.2)' }}>
+          {/* Recent shortcuts */}
+          {shortcuts.length > 0 && <div style={{ marginBottom: 18 }}>
+            <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Recent</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {shortcuts.map(s => (
+                <button key={s.id} onClick={() => { setCourier(s.courier); setCamera(s.camera); setSelectedBrand(s.brand); }}
+                  style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: courier === s.courier && camera === s.camera && selectedBrand === s.brand ? T.ac3 : 'rgba(255,255,255,0.03)', color: T.tx2, fontSize: 10, cursor: 'pointer', fontFamily: T.mono, transition: 'all .15s' }}>
+                  {s.courier} · {s.camera} · {s.brand}
+                </button>
+              ))}
+            </div>
+          </div>}
+
           {/* Brand */}
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: T.tx2, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 7 }}>Brand Name</label>

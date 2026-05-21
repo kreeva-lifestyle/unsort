@@ -24,7 +24,7 @@ export default function Header({ title, onNotifClick, notifications, markAsRead,
     <header className="header-bar" style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '0 16px', position: 'sticky', top: 0, zIndex: 50, height: 56, display: 'flex', alignItems: 'center' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
         {onToggleSidebar && <button className="desktop-only" onClick={onToggleSidebar} style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${T.bd}`, background: 'transparent', cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }} title={sidebarOpen ? 'Collapse menu' : 'Expand menu'}>
-          <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', transition: 'transform .2s ease', transform: sidebarOpen ? 'none' : 'scaleX(-1)' }}>{sidebarOpen ? <><path d="M19 12H5M12 5l-7 7 7 7" /></> : <><path d="M3 12h18M3 6h18M3 18h18" /></>}</svg>
+          <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' }}>{sidebarOpen ? <><path d="M19 12H5M12 5l-7 7 7 7" /></> : <><path d="M3 12h18M3 6h18M3 18h18" /></>}</svg>
         </button>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.bl, boxShadow: `0 0 8px ${T.bl}` }} />

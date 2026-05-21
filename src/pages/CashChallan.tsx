@@ -225,7 +225,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (active) {
       setShowCashBook(false); setShowAnalytics(false); setShowLedger(false); setLedgerDetail(null);
       const deepSearch = sessionStorage.getItem('challan_search');
-      if (deepSearch !== null) { sessionStorage.removeItem('challan_search'); updateSearch(deepSearch); }
+      if (deepSearch !== null) { sessionStorage.removeItem('challan_search'); setSearch(deepSearch); setDebouncedSearch(deepSearch); setPage(0); }
     }
   }, [active]);
 

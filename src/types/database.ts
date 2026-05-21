@@ -655,6 +655,26 @@ export type PackTimeScanInsert = {
   brand?: string | null;
 };
 
+// ─── packtime_shortcuts (5 cols) ────────────────────────────────────────
+
+export interface PackTimeShortcut {
+  id: string;
+  user_id: string;
+  courier: string;
+  camera: string;
+  brand: string;
+  used_at: string;
+}
+
+export type PackTimeShortcutInsert = {
+  id?: string;
+  user_id: string;
+  courier: string;
+  camera: string;
+  brand: string;
+  used_at?: string;
+};
+
 // ─── Status enum helpers ─────────────────────────────────────────────────
 
 export type InventoryStatus = NonNullable<InventoryItem['status']>;
