@@ -6,7 +6,7 @@ import { SUPABASE_ANON_KEY } from '../../lib/supabase';
 const ODETTE_EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
 const SHEET_NAME = 'ARYA STOCK';
 
-interface OdResult { sku: string; total: number; vendorCount: number; naCount: number; oosCount: number; blocked: number; flag: 'ok' | 'last' | 'oos' | 'not_found' }
+interface OdResult { sku: string; total: number; vendorCount: number; naCount: number; oosCount: number; blocked: number; flag: 'ok' | 'last' | 'oos' | 'not_found' | 'blocked' }
 
 export default function OdetteImport({ addToast, virtualStock }: { addToast: (msg: string, type?: string) => void; virtualStock: Record<string, number> }) {
   const masterRef = useRef<HTMLInputElement>(null);
@@ -26,7 +26,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     if (results.length === 0) return;
     setPushing(true);
     try {
-      const rows = results.map(r => [r.sku, r.flag === 'not_found' ? 'Not Found' : r.flag === 'oos' && r.total >= 0 ? 'Out of Stock' : r.total]);
+      const rows = results.map(r => [r.sku, r.flag === 'not_found' ? 'Not Found' : r.flag === 'oos' ? 'Out of Stock' : r.total]);
       const resp = await fetch(ODETTE_EDGE_FN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY },
@@ -38,7 +38,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     } catch (e: any) { addToast(`Push failed — ${e.message || 'Network error'}`, 'error'); }
     setPushing(false);
   };
-  const [filter, setFilter] = useState<'all' | 'ok' | 'last' | 'oos' | 'not_found'>('all');
+  const [filter, setFilter] = useState<'all' | 'ok' | 'last' | 'oos' | 'not_found' | 'blocked'>('all');
   const [search, setSearch] = useState('');
 
   const importMaster = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,8 +142,8 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
       const finalTotal = total + vs - blocked;
       let flag: OdResult['flag'] = 'ok';
       if (vendorFiles.length > 0 && naCount === vendorFiles.length) flag = 'not_found';
-      else if (total === 0 && oosCount > 0 && vs === 0 && blocked === 0) flag = 'oos';
-      else if (finalTotal <= 0 && (total + vs) > 0) flag = 'oos';
+      else if (blocked > 0 && finalTotal <= 0) flag = 'blocked';
+      else if (total === 0 && oosCount > 0 && vs === 0) flag = 'oos';
       else if (finalTotal === 1) flag = 'last';
       res.push({ sku, total: finalTotal, vendorCount, naCount, oosCount, blocked, flag });
     }
@@ -152,7 +152,8 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     const notFound = res.filter(r => r.flag === 'not_found').length;
     const oos = res.filter(r => r.flag === 'oos').length;
     const last = res.filter(r => r.flag === 'last').length;
-    addToast(`Computed ${res.length} SKUs — ${notFound} not found, ${oos} out of stock, ${last} last qty`, 'success');
+    const blockedCount = res.filter(r => r.flag === 'blocked').length;
+    addToast(`Computed ${res.length} SKUs — ${notFound} not found, ${oos} out of stock, ${last} last qty${blockedCount > 0 ? `, ${blockedCount} blocked` : ''}`, 'success');
     if (Object.keys(blockedMap).length === 0) addToast('Results exclude blocked inventory — no blocked sheet imported', 'error');
   };
 
@@ -171,8 +172,8 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     return true;
   });
 
-  const flagColor = (f: OdResult['flag']) => f === 'oos' ? T.re : f === 'not_found' ? T.tx3 : f === 'last' ? T.yl : T.gr;
-  const flagLabel = (f: OdResult['flag']) => f === 'oos' ? 'Out of Stock' : f === 'not_found' ? 'Not Found' : f === 'last' ? 'Last Qty' : '';
+  const flagColor = (f: OdResult['flag']) => f === 'oos' ? T.re : f === 'blocked' ? '#F97316' : f === 'not_found' ? T.tx3 : f === 'last' ? T.yl : T.gr;
+  const flagLabel = (f: OdResult['flag']) => f === 'oos' ? 'Out of Stock' : f === 'blocked' ? 'Blocked' : f === 'not_found' ? 'Not Found' : f === 'last' ? 'Last Qty' : '';
 
   return (
     <div style={{ animation: 'fi .15s ease' }}>
@@ -207,6 +208,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
             { key: 'last' as const, label: 'Last Qty', count: results.filter(r => r.flag === 'last').length, color: T.yl },
             { key: 'oos' as const, label: 'Out of Stock', count: results.filter(r => r.flag === 'oos').length, color: T.re },
             { key: 'not_found' as const, label: 'Not Found', count: results.filter(r => r.flag === 'not_found').length, color: T.tx3 },
+            { key: 'blocked' as const, label: 'Blocked', count: results.filter(r => r.flag === 'blocked').length, color: '#F97316' },
           ]).map(s => (
             <div key={s.key} onClick={() => setFilter(filter === s.key ? 'all' : s.key)} style={{ padding: '8px 14px', background: filter === s.key ? `${s.color}12` : 'rgba(255,255,255,0.02)', border: `1px solid ${filter === s.key ? `${s.color}44` : T.bd}`, borderRadius: 8, textAlign: 'center', cursor: 'pointer', transition: 'all .15s' }}>
               <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.mono, color: s.color }}>{s.count}</div>
@@ -238,7 +240,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
               {filtered.map((r, i) => (
                 <tr key={`${r.sku}-${i}`}>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
-                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 700, color: r.total < 0 ? T.re : flagColor(r.flag) }}>{r.flag === 'not_found' ? '--' : r.flag === 'oos' && r.total >= 0 ? 'Out of Stock' : r.total}</td>
+                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 700, color: r.flag === 'blocked' ? '#F97316' : r.total < 0 ? T.re : flagColor(r.flag) }}>{r.flag === 'not_found' ? '--' : r.flag === 'oos' ? 'Out of Stock' : r.total}</td>
                   <td style={{ ...S.tdStyle, fontSize: 10, color: T.tx3 }}>{r.vendorCount}/{vendorFiles.length}{r.naCount > 0 ? ` (${r.naCount} N/A)` : ''}</td>
                   <td style={S.tdStyle}>{flagLabel(r.flag) && <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: flagColor(r.flag), background: `${flagColor(r.flag)}18` }}>{flagLabel(r.flag)}</span>}</td>
                 </tr>
