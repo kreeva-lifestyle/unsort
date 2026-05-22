@@ -6,13 +6,16 @@ import { SUPABASE_ANON_KEY } from '../../lib/supabase';
 const ODETTE_EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
 const SHEET_NAME = 'ARYA STOCK';
 
-interface OdResult { sku: string; total: number; vendorCount: number; naCount: number; oosCount: number; flag: 'ok' | 'last' | 'oos' | 'not_found' }
+interface OdResult { sku: string; total: number; vendorCount: number; naCount: number; oosCount: number; blocked: number; flag: 'ok' | 'last' | 'oos' | 'not_found' }
 
 export default function OdetteImport({ addToast, virtualStock }: { addToast: (msg: string, type?: string) => void; virtualStock: Record<string, number> }) {
   const masterRef = useRef<HTMLInputElement>(null);
   const vendorRef = useRef<HTMLInputElement>(null);
+  const blockedRef = useRef<HTMLInputElement>(null);
   const [masterSkus, setMasterSkus] = useState<string[]>([]);
   const [masterFile, setMasterFile] = useState('');
+  const [blockedFile, setBlockedFile] = useState('');
+  const [blockedMap, setBlockedMap] = useState<Record<string, number>>({});
   const [vendorFiles, setVendorFiles] = useState<{ name: string; rows: Record<string, number | string>[] }[]>([]);
   const [results, setResults] = useState<OdResult[]>([]);
   const [computed, setComputed] = useState(false);
@@ -23,7 +26,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     if (results.length === 0) return;
     setPushing(true);
     try {
-      const rows = results.map(r => [r.sku, r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? 'Not Found' : r.total]);
+      const rows = results.map(r => [r.sku, r.flag === 'not_found' ? 'Not Found' : r.flag === 'oos' && r.total >= 0 ? 'Out of Stock' : r.total]);
       const resp = await fetch(ODETTE_EDGE_FN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY },
@@ -86,6 +89,36 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     e.target.value = '';
   };
 
+  const importBlocked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBlockedFile(file.name);
+    setImporting(true);
+    const reader = new FileReader();
+    reader.onerror = () => { addToast('Failed to read blocked file', 'error'); setImporting(false); };
+    reader.onload = (ev) => {
+      try {
+        const wb = XLSX.read(ev.target?.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
+        const map: Record<string, number> = {};
+        let count = 0;
+        for (const r of raw) {
+          const sku = String(r['Sku Code'] || r['sku code'] || r['SKU CODE'] || r.sku || r.SKU || r.Sku || '').trim().toUpperCase();
+          if (!sku) continue;
+          const val = Number(r['Blocked (Committed)'] || r['blocked (committed)'] || r['BLOCKED (COMMITTED)'] || r.blocked || r.BLOCKED || r.Blocked || 0);
+          if (val > 0) { map[sku] = (map[sku] || 0) + val; count++; }
+        }
+        setBlockedMap(map);
+        setComputed(false); setResults([]);
+        addToast(`${count} blocked values loaded from ${Object.keys(map).length} SKUs`, 'success');
+      } catch { addToast('Failed to parse blocked file', 'error'); }
+      setImporting(false);
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  };
+
   const compute = () => {
     if (masterSkus.length === 0) { addToast('Import master file first', 'error'); return; }
     if (vendorFiles.length === 0) { addToast('Import at least one vendor file', 'error'); return; }
@@ -105,12 +138,14 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         total += num; vendorCount++;
       }
       const vs = virtualStock[sku] || 0;
-      const finalTotal = total + vs;
+      const blocked = blockedMap[sku] || 0;
+      const finalTotal = total + vs - blocked;
       let flag: OdResult['flag'] = 'ok';
       if (vendorFiles.length > 0 && naCount === vendorFiles.length) flag = 'not_found';
-      else if (total === 0 && oosCount > 0 && vs === 0) flag = 'oos';
+      else if (total === 0 && oosCount > 0 && vs === 0 && blocked === 0) flag = 'oos';
+      else if (finalTotal <= 0 && (total + vs) > 0) flag = 'oos';
       else if (finalTotal === 1) flag = 'last';
-      res.push({ sku, total: finalTotal, vendorCount, naCount, oosCount, flag });
+      res.push({ sku, total: finalTotal, vendorCount, naCount, oosCount, blocked, flag });
     }
     setResults(res);
     setComputed(true);
@@ -118,6 +153,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     const oos = res.filter(r => r.flag === 'oos').length;
     const last = res.filter(r => r.flag === 'last').length;
     addToast(`Computed ${res.length} SKUs — ${notFound} not found, ${oos} out of stock, ${last} last qty`, 'success');
+    if (Object.keys(blockedMap).length === 0) addToast('Results exclude blocked inventory — no blocked sheet imported', 'error');
   };
 
   const exportXls = () => {
@@ -144,18 +180,21 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div onClick={() => !importing && masterRef.current?.click()} style={{ ...S.btnPrimary, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>{importing ? 'Loading...' : 'Import Master SKUs'}</div>
         <div onClick={() => !importing && vendorRef.current?.click()} style={{ ...S.btnGhost, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>+ Add Vendor Files</div>
+        <div onClick={() => !importing && blockedRef.current?.click()} style={{ ...S.btnGhost, color: T.yl, border: '1px solid rgba(245,158,11,.2)', background: 'rgba(245,158,11,.06)', opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>{blockedFile ? 'Replace Blocked' : 'Blocked Inventory'}</div>
         {masterSkus.length > 0 && vendorFiles.length > 0 && <div onClick={compute} style={{ ...S.btnSuccess, cursor: 'pointer' }}>Compute</div>}
         {computed && results.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)' }}>Export XLS</div>}
         {computed && results.length > 0 && <div onClick={pushToSheet} style={{ ...S.btnPrimary, background: T.gr, color: '#000', fontWeight: 700, opacity: pushing ? 0.5 : 1, pointerEvents: pushing ? 'none' : 'auto' }}>{pushing ? 'Pushing...' : 'Push to Sheet'}</div>}
-        {(masterSkus.length > 0 || vendorFiles.length > 0) && <div onClick={() => { setMasterSkus([]); setMasterFile(''); setVendorFiles([]); setResults([]); setComputed(false); }} style={{ ...S.btnDanger, cursor: 'pointer' }}>Reset</div>}
+        {(masterSkus.length > 0 || vendorFiles.length > 0 || blockedFile) && <div onClick={() => { setMasterSkus([]); setMasterFile(''); setVendorFiles([]); setBlockedFile(''); setBlockedMap({}); setResults([]); setComputed(false); }} style={{ ...S.btnDanger, cursor: 'pointer' }}>Reset</div>}
       </div>
       <input ref={masterRef} type="file" accept=".xlsx,.xls,.csv" onChange={importMaster} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
       <input ref={vendorRef} type="file" accept=".xlsx,.xls,.csv" multiple onChange={importVendor} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
+      <input ref={blockedRef} type="file" accept=".xlsx,.xls,.csv" onChange={importBlocked} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
 
       {/* Status chips */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
         {masterFile && <span style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: T.ac3, color: T.ac2 }}>Master: {masterSkus.length} SKUs</span>}
         {vendorFiles.map((v, i) => <span key={i} style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 500, background: 'rgba(255,255,255,.04)', color: T.tx2, border: `1px solid ${T.bd}` }}>{v.name} ({v.rows.length})</span>)}
+        {blockedFile && <span style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: 'rgba(245,158,11,.08)', color: T.yl, border: '1px solid rgba(245,158,11,.2)' }}>Blocked: {Object.keys(blockedMap).length} SKUs</span>}
       </div>
 
       {/* Results */}
@@ -199,7 +238,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
               {filtered.map((r, i) => (
                 <tr key={`${r.sku}-${i}`}>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
-                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 700, color: flagColor(r.flag) }}>{r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? '--' : r.total}</td>
+                  <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 700, color: r.total < 0 ? T.re : flagColor(r.flag) }}>{r.flag === 'not_found' ? '--' : r.flag === 'oos' && r.total >= 0 ? 'Out of Stock' : r.total}</td>
                   <td style={{ ...S.tdStyle, fontSize: 10, color: T.tx3 }}>{r.vendorCount}/{vendorFiles.length}{r.naCount > 0 ? ` (${r.naCount} N/A)` : ''}</td>
                   <td style={S.tdStyle}>{flagLabel(r.flag) && <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: flagColor(r.flag), background: `${flagColor(r.flag)}18` }}>{flagLabel(r.flag)}</span>}</td>
                 </tr>
