@@ -36,6 +36,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     setPushing(false);
   };
   const [filter, setFilter] = useState<'all' | 'ok' | 'last' | 'oos' | 'not_found'>('all');
+  const [search, setSearch] = useState('');
 
   const importMaster = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -128,7 +129,11 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     XLSX.writeFile(wb, `Odette_Export_${new Date().toISOString().slice(0, 10)}.xls`);
   };
 
-  const filtered = filter === 'all' ? results : results.filter(r => r.flag === filter);
+  const filtered = results.filter(r => {
+    if (filter !== 'all' && r.flag !== filter) return false;
+    if (search && !r.sku.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
 
   const flagColor = (f: OdResult['flag']) => f === 'oos' ? T.re : f === 'not_found' ? T.tx3 : f === 'last' ? T.yl : T.gr;
   const flagLabel = (f: OdResult['flag']) => f === 'oos' ? 'Out of Stock' : f === 'not_found' ? 'Not Found' : f === 'last' ? 'Last Qty' : '';
@@ -169,6 +174,12 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
               <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
             </div>
           ))}
+        </div>
+
+        {/* Search */}
+        <div style={{ position: 'relative', marginBottom: 10, maxWidth: 280 }}>
+          <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, strokeLinecap: 'round' as const, opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SKU…" style={{ ...S.fSearch, width: '100%' }} />
         </div>
 
         {/* Filter export */}
