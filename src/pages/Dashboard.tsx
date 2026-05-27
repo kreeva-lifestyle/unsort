@@ -380,7 +380,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         <div style={{ maxHeight: 200, overflowY: 'auto' }}>
           {tasks.map(t => (
             <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: `1px solid ${T.bd}`, opacity: t.is_done ? 0.45 : 1 }}>
-              <div onClick={() => toggleTask(t.id, t.is_done)} style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${t.is_done ? T.gr : T.bd2}`, background: t.is_done ? T.gr : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#000', fontWeight: 700, flexShrink: 0 }}>{t.is_done && '✓'}</div>
+              <div onClick={() => toggleTask(t.id, t.is_done)} style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${t.is_done ? T.gr : T.bd2}`, background: t.is_done ? T.gr : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 700, flexShrink: 0 }}>{t.is_done && '✓'}</div>
               <span style={{ flex: 1, fontSize: 11, color: T.tx, textDecoration: t.is_done ? 'line-through' : 'none' }}>{t.title}</span>
               <span onClick={() => deleteTask(t.id)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 11, opacity: 0.4 }}>×</span>
             </div>
