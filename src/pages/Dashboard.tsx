@@ -268,58 +268,66 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
         {/* Scan Trend 7d */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
-          <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 10 }}>Scans — Last 7 Days</p>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 80 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+            <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', margin: 0 }}>Scans — 7 Days</p>
+            <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.mono, color: T.ac2 }}>{scanTrend.reduce((s, d) => s + d.count, 0)}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 72, paddingTop: 8 }}>
             {scanTrend.map((s, i) => {
-              const barH = Math.max(6, (s.count / maxScan) * 60);
+              const barH = maxScan > 0 ? Math.max(4, (s.count / maxScan) * 52) : 4;
+              const isToday = i === scanTrend.length - 1;
               const isMax = s.count === maxScan && s.count > 0;
               return (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                  <span style={{ fontSize: 9, color: isMax ? T.ac2 : T.tx3, fontFamily: T.mono, fontWeight: isMax ? 700 : 400 }}>{s.count}</span>
-                  <div style={{ width: '100%', maxWidth: 32, background: isMax ? `linear-gradient(180deg, ${T.ac}, ${T.ac}66)` : `linear-gradient(180deg, ${T.ac}88, ${T.ac}22)`, borderRadius: '4px 4px 2px 2px', height: barH, transition: 'height .3s ease' }} />
-                  <span style={{ fontSize: 8, color: T.tx3, fontFamily: T.mono }}>{new Date(s.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }).replace(' ', '\n').split('\n')[0]}</span>
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <span style={{ fontSize: 8, color: isMax ? T.ac2 : T.tx3, fontFamily: T.mono, fontWeight: isMax ? 700 : 500 }}>{s.count}</span>
+                  <div style={{ width: '100%', maxWidth: 28, borderRadius: '4px 4px 2px 2px', height: barH, transition: 'height .4s ease',
+                    background: isToday ? `linear-gradient(180deg, ${T.ac}, ${T.ac2})` : isMax ? `linear-gradient(180deg, ${T.ac}cc, ${T.ac}55)` : `linear-gradient(180deg, ${T.ac}55, ${T.ac}18)`,
+                    boxShadow: isToday ? `0 2px 8px ${T.ac}44` : 'none' }} />
+                  <span style={{ fontSize: 7, color: isToday ? T.tx : T.tx3, fontFamily: T.mono, fontWeight: isToday ? 600 : 400 }}>{new Date(s.date).getDate()}</span>
                 </div>
               );
             })}
           </div>
         </div>
-        {/* Revenue Trend 30d — with peak labels + 7-day moving avg (audit P2) */}
+        {/* Revenue Trend 30d */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
           {(() => {
-            const peak = revTrend.reduce((acc, r) => r.amount > acc.amount ? r : acc, { date: '', amount: -Infinity });
-            const trough = revTrend.reduce((acc, r) => r.amount < acc.amount ? r : acc, { date: '', amount: Infinity });
-            // 7-day trailing moving average
+            const peak = revTrend.reduce((acc, r) => r.amount > acc.amount ? r : acc, { date: '', amount: 0 });
+            const range = Math.max(1, peak.amount);
+            const total = revTrend.reduce((s, r) => s + Math.max(0, r.amount), 0);
             const avgs = revTrend.map((_, i) => {
               const win = revTrend.slice(Math.max(0, i - 6), i + 1);
               return win.reduce((s, r) => s + r.amount, 0) / win.length;
             });
-            const range = Math.max(1, Math.abs(peak.amount), Math.abs(trough.amount));
             return (
               <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-                  <p style={{ fontSize: 9, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', margin: 0 }}>Revenue — Last 30 Days</p>
-                  <p style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, margin: 0 }}>peak ₹{peak.amount.toLocaleString('en-IN')}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                  <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', margin: 0 }}>Revenue — 30 Days</p>
+                  <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.mono, color: T.gr }}>₹{total > 1000 ? `${(total / 1000).toFixed(1)}k` : total.toLocaleString('en-IN')}</span>
                 </div>
-                <div style={{ position: 'relative', height: 80 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 0, height: 60, position: 'relative', zIndex: 1 }}>
+                <div style={{ position: 'relative', height: 72, paddingTop: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 0, height: 52, position: 'relative', zIndex: 1 }}>
                     {revTrend.map((r, i) => {
                       const isPeak = r.date === peak.date && r.amount > 0;
-                      const barH = Math.max(3, (Math.abs(r.amount) / range) * 54);
+                      const isToday = i === revTrend.length - 1;
+                      const barH = r.amount > 0 ? Math.max(3, (r.amount / range) * 48) : 2;
                       return (
-                        <div key={i} style={{ flex: 1, marginLeft: i > 0 ? 1 : 0, background: r.amount > 0
-                          ? isPeak ? `linear-gradient(180deg, ${T.gr}, ${T.gr}55)` : `linear-gradient(180deg, ${T.gr}99, ${T.gr}22)`
-                          : r.amount < 0 ? `linear-gradient(180deg, ${T.re}99, ${T.re}22)` : 'rgba(255,255,255,0.04)',
-                          borderRadius: '3px 3px 0 0', height: barH, transition: 'height .3s ease', minWidth: 0 }} title={`${r.date}: ₹${r.amount.toLocaleString('en-IN')}`} />
+                        <div key={i} style={{ flex: 1, marginLeft: i > 0 ? 0.5 : 0, borderRadius: '2px 2px 0 0', height: barH, transition: 'height .3s ease', minWidth: 0,
+                          background: r.amount <= 0 ? 'rgba(255,255,255,0.03)'
+                            : isToday ? `linear-gradient(180deg, ${T.gr}, ${T.gr}66)`
+                            : isPeak ? `linear-gradient(180deg, ${T.gr}cc, ${T.gr}44)`
+                            : `linear-gradient(180deg, ${T.gr}66, ${T.gr}15)`,
+                          boxShadow: isToday ? `0 1px 6px ${T.gr}33` : 'none' }} title={`${new Date(r.date).getDate()} ${new Date(r.date).toLocaleDateString('en-IN', { month: 'short' })}: ₹${r.amount.toLocaleString('en-IN')}`} />
                       );
                     })}
                   </div>
-                  <svg width="100%" height="60" preserveAspectRatio="none" style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }} viewBox={`0 0 ${revTrend.length} 60`}>
-                    <polyline points={avgs.map((a, i) => `${i + 0.5},${60 - Math.max(3, (Math.abs(a) / range) * 54)}`).join(' ')} fill="none" stroke={T.ac2} strokeWidth="0.5" strokeOpacity="0.9" />
+                  <svg width="100%" height="52" preserveAspectRatio="none" style={{ position: 'absolute', left: 0, top: 8, pointerEvents: 'none' }} viewBox={`0 0 ${revTrend.length} 52`}>
+                    <polyline points={avgs.map((a, i) => `${i + 0.5},${52 - Math.max(2, (Math.max(0, a) / range) * 48)}`).join(' ')} fill="none" stroke={T.ac2} strokeWidth="0.6" strokeOpacity="0.7" />
                   </svg>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 9, color: T.tx3, fontFamily: T.mono }}>
-                    <span>{revTrend[0] ? new Date(revTrend[0].date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}</span>
-                    <span style={{ color: T.ac2, fontSize: 8 }}>— 7d avg</span>
-                    <span>{revTrend.length > 0 ? new Date(revTrend[revTrend.length - 1].date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                    <span style={{ fontSize: 7, color: T.tx3, fontFamily: T.mono }}>{revTrend[0] ? new Date(revTrend[0].date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}</span>
+                    <span style={{ fontSize: 7, color: T.ac2, fontFamily: T.mono }}>— 7d avg</span>
+                    <span style={{ fontSize: 7, color: T.tx3, fontFamily: T.mono }}>{revTrend.length > 0 ? new Date(revTrend[revTrend.length - 1].date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}</span>
                   </div>
                 </div>
               </>
