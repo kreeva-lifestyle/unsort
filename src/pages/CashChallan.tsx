@@ -456,7 +456,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   }, [fetchLedger]);
 
   const fetchLedgerDetailWithRange = useCallback(async (name: string, from: string, to: string) => {
-    let q = supabase.from('cash_challans').select('id, challan_number, customer_id, customer_name, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, created_at, updated_at').ilike('customer_name', name.replace(/[%_]/g, '\\$&')).neq('status', 'voided').order('created_at', { ascending: false });
+    let q = supabase.from('cash_challans').select('id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, created_at, updated_at').ilike('customer_name', name.replace(/[%_]/g, '\\$&')).neq('status', 'voided').order('created_at', { ascending: false });
     if (from) q = q.gte('created_at', from + 'T00:00:00');
     if (to) q = q.lte('created_at', to + 'T23:59:59');
     const { data } = await q.limit(500);
@@ -528,32 +528,32 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     try {
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Upsert customer (case-insensitive match, save phone too)
+    // Upsert customer (match by name+phone so same name + different phone = different customer)
     let custId = selectedCustomerId;
+    const trimmedPhone = customerPhone.trim() || null;
     if (!custId) {
       const trimmed = customerName.trim();
-      const { data: existing } = await supabase.from('cash_challan_customers').select('id').ilike('name', trimmed).maybeSingle();
+      let q = supabase.from('cash_challan_customers').select('id').ilike('name', trimmed);
+      if (trimmedPhone) q = q.eq('phone', trimmedPhone); else q = q.is('phone', null);
+      const { data: existing } = await q.maybeSingle();
       if (existing) {
         custId = existing.id;
-        if (customerPhone.trim()) await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId).then(({ error: e }) => { if (e) addToast('Phone save failed — ' + friendlyError(e), 'error'); });
       } else {
-        const { data: newCust, error: insErr } = await supabase.from('cash_challan_customers').insert({ name: trimmed, phone: customerPhone.trim() || null }).select('id').single();
+        const { data: newCust, error: insErr } = await supabase.from('cash_challan_customers').insert({ name: trimmed, phone: trimmedPhone }).select('id').single();
         if (insErr && insErr.code === '23505') {
-          // Race: another user just created this customer — fetch them
-          const { data: raceCust } = await supabase.from('cash_challan_customers').select('id').ilike('name', trimmed).maybeSingle();
+          const { data: raceCust } = await supabase.from('cash_challan_customers').select('id').ilike('name', trimmed).eq('phone', trimmedPhone || '').maybeSingle();
           custId = raceCust?.id || null;
-          if (custId && customerPhone.trim()) await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId).then(({ error: e }) => { if (e) addToast('Phone save failed — ' + friendlyError(e), 'error'); });
         } else {
           custId = newCust?.id || null;
         }
       }
-    } else if (customerPhone.trim()) {
-      await supabase.from('cash_challan_customers').update({ phone: customerPhone.trim() }).eq('id', custId).then(({ error: e }) => { if (e) addToast('Phone save failed — ' + friendlyError(e), 'error'); });
+    } else if (trimmedPhone) {
+      await supabase.from('cash_challan_customers').update({ phone: trimmedPhone }).eq('id', custId).then(({ error: e }) => { if (e) addToast('Phone save failed — ' + friendlyError(e), 'error'); });
     }
 
     const challanData = {
       // Returns are always 'paid' (=Refunded) — refunds are instant.
-      customer_id: custId, customer_name: customerName.trim(), status: isReturn ? 'paid' : challanStatus,
+      customer_id: custId, customer_name: customerName.trim(), customer_phone: trimmedPhone, status: isReturn ? 'paid' : challanStatus,
       subtotal, discount_type: null, discount_value: 0,
       discount_amount: totalDiscount, shipping_charges: clampedShipping, round_off: roundOff, total: grandTotal,
       amount_paid: amountPaid, payment_mode: paymentMode || null,
@@ -563,6 +563,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     };
 
     let createdNumber: string | null = null;
+    let createdId: string | null = null;
     try {
       if (editing) {
         const { data: current } = await supabase.from('cash_challans').select('updated_at').eq('id', editing.id).maybeSingle();
@@ -596,6 +597,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         const { data: newChallan, error: crErr } = await supabase.rpc('create_challan_with_items', rpcPayload);
         if (crErr || !newChallan?.id || !newChallan?.challan_number) throw new Error(crErr?.message || 'Failed to create challan — missing response data');
         createdNumber = newChallan.challan_number;
+        createdId = newChallan.id;
         await ccAuditLog('CREATE', newChallan.id, `${isReturn ? 'Return' : 'Challan'} #${newChallan.challan_number} created for ${customerName.trim()} — ₹${grandTotal}`);
       }
     } catch (e: any) {
@@ -612,17 +614,21 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     fetchChallans();
     if (wasNew) {
       addToast('Challan created!', 'success');
-      if (savedPhone) {
-        const { data: outData } = await supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', savedName).in('status', ['unpaid', 'partial']).eq('is_return', false);
+      if (savedPhone && !isReturn) {
+        let outQ = supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', savedName).in('status', ['unpaid', 'partial']).eq('is_return', false);
+        if (createdId) outQ = outQ.neq('id', createdId);
+        if (custId) outQ = outQ.eq('customer_id', custId);
+        const { data: outData } = await outQ;
         const totalOutstanding = Math.round((outData || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0));
         const outLine = totalOutstanding > 0 ? `\nTotal outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}` : '';
+        const modeStr = paymentMode ? ` via ${paymentMode}` : '';
         const paidLine = challanStatus === 'paid'
-          ? ` Payment of ₹${savedTotal.toLocaleString('en-IN')} received — thank you!`
+          ? `\nPayment of ₹${amountPaid.toLocaleString('en-IN')}${modeStr} received — thank you!`
           : amountPaid > 0
-            ? ` Payment of ₹${amountPaid.toLocaleString('en-IN')} received.\nBalance due: ₹${Math.max(0, savedTotal - amountPaid).toLocaleString('en-IN')}`
+            ? `\nPayment of ₹${amountPaid.toLocaleString('en-IN')}${modeStr} received.\nBalance due: ₹${Math.max(0, savedTotal - amountPaid).toLocaleString('en-IN')}`
             : '';
         const numTag = savedNumber ? ` #${savedNumber}` : '';
-        const msg = encodeURIComponent(`Hi ${savedName},\nYour sales cash challan${numTag} of ₹${savedTotal.toLocaleString('en-IN')} (${savedItemCount} item${savedItemCount !== 1 ? 's' : ''}) has been generated.${paidLine}${outLine}\n— Arya Designs`);
+        const msg = encodeURIComponent(`Hi ${savedName},\nYour cash challan${numTag} of ₹${savedTotal.toLocaleString('en-IN')} (${savedItemCount} item${savedItemCount !== 1 ? 's' : ''}) has been generated.${paidLine}${outLine}\n— Arya Designs`);
         setWhatsAppShare({ phone: savedPhone, url: `https://wa.me/${waPhone(savedPhone)}?text=${msg}` });
       }
       const suppressed = localStorage.getItem('ccErpReminderHidden');
@@ -669,15 +675,23 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   // ── WhatsApp payment reminder ──────────────────────────────────────────────
+  const buildReminderMsg = (c: Challan) => {
+    const outstanding = Number(c.total) - Number(c.amount_paid || 0);
+    const paidSoFar = Number(c.amount_paid || 0);
+    const partialNote = paidSoFar > 0 ? `\n₹${paidSoFar.toLocaleString('en-IN')} received so far.` : '';
+    return encodeURIComponent(`Hi ${c.customer_name},\nGentle reminder — your Cash Challan #${c.challan_number} dated ${new Date(c.created_at).toLocaleDateString('en-IN')} for ₹${Number(c.total).toLocaleString('en-IN')} is pending.${partialNote}\nOutstanding: ₹${outstanding.toLocaleString('en-IN')}\nPlease arrange payment at your earliest convenience.\n— Arya Designs`);
+  };
+
   const sendReminder = async (c: Challan) => {
     const outstanding = Number(c.total) - Number(c.amount_paid || 0);
     if (outstanding <= 0) { addToast('Cannot remind — challan is fully paid', 'error'); return; }
-    // Try to get saved phone
-    const { data: cust } = await supabase.from('cash_challan_customers').select('phone').eq('name', c.customer_name).maybeSingle();
-    const phone = cust?.phone;
+    const phone = (c as any).customer_phone || null;
+    if (!phone && c.customer_id) {
+      const { data: cust } = await supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle();
+      if (cust?.phone) { window.location.href = `https://wa.me/${waPhone(cust.phone)}?text=${buildReminderMsg(c)}`; return; }
+    }
     if (phone) {
-      const msg = encodeURIComponent(`Hi ${c.customer_name},\nGentle reminder — your Cash Challan #${c.challan_number} dated ${new Date(c.created_at).toLocaleDateString('en-IN')} for ₹${Number(c.total).toLocaleString('en-IN')} is pending.\nOutstanding: ₹${outstanding.toLocaleString('en-IN')}\nPlease arrange payment at your earliest convenience.\n— Arya Designs`);
-      window.location.href = `https://wa.me/${waPhone(phone)}?text=${msg}`;
+      window.location.href = `https://wa.me/${waPhone(phone)}?text=${buildReminderMsg(c)}`;
     } else {
       setReminderChallan(c);
       setReminderPhone('');
@@ -686,12 +700,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   const saveReminderPhone = async () => {
     if (!reminderChallan || !reminderPhone.trim()) return;
-    const { error: phoneErr } = await supabase.from('cash_challan_customers').update({ phone: reminderPhone.trim() }).eq('name', reminderChallan.customer_name);
-    if (phoneErr) addToast('Phone save failed — ' + friendlyError(phoneErr), 'error');
-    const c = reminderChallan;
-    const outstanding = Number(c.total) - Number(c.amount_paid || 0);
-    const msg = encodeURIComponent(`Hi ${c.customer_name},\nGentle reminder — your Cash Challan #${c.challan_number} dated ${new Date(c.created_at).toLocaleDateString('en-IN')} for ₹${Number(c.total).toLocaleString('en-IN')} is pending.\nOutstanding: ₹${outstanding.toLocaleString('en-IN')}\nPlease arrange payment at your earliest convenience.\n— Arya Designs`);
-    window.location.href = `https://wa.me/${waPhone(reminderPhone)}?text=${msg}`;
+    if (reminderChallan.customer_id) {
+      await supabase.from('cash_challan_customers').update({ phone: reminderPhone.trim() }).eq('id', reminderChallan.customer_id).then(({ error: e }) => { if (e) addToast('Phone save failed — ' + friendlyError(e), 'error'); });
+    }
+    window.location.href = `https://wa.me/${waPhone(reminderPhone)}?text=${buildReminderMsg(reminderChallan)}`;
     setReminderChallan(null);
   };
 

@@ -407,6 +407,7 @@ export interface CashChallan {
   challan_number: number;
   customer_id: string | null;
   customer_name: string;
+  customer_phone: string | null;
   status: 'draft' | 'paid' | 'unpaid' | 'partial' | 'voided';
   subtotal: number;
   discount_type: 'flat' | 'percentage' | null;
@@ -437,6 +438,7 @@ export type CashChallanInsert = {
   challan_number: number;
   customer_id?: string | null;
   customer_name: string;
+  customer_phone?: string | null;
   status: 'draft' | 'paid' | 'unpaid' | 'partial' | 'voided';
   subtotal: number;
   discount_type?: 'flat' | 'percentage' | null;
