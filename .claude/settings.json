@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "echo '=== HEALTH CHECK ===' && echo '--- TypeScript ---' && npx tsc --noEmit 2>&1 | tail -20 && echo '--- Build ---' && npx vite build 2>&1 | tail -5 && echo '--- Security ---' && npm audit --audit-level=moderate 2>&1 | tail -10 && echo '=== DONE ==='",
+        "timeout": 60000
+      }
+    ]
+  }
+}
