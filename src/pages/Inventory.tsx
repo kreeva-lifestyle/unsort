@@ -681,9 +681,9 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           {!showExtras && <div style={{ position: 'relative' }}>
             <div onClick={() => setShowExportMenu(v => !v)} style={S.btnGhost}>Export ▾</div>
             {showExportMenu && <><div style={{ position: 'fixed', inset: 0, zIndex: 149 }} onClick={() => setShowExportMenu(false)} />
-            <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 150, background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.4)', overflow: 'hidden', minWidth: 130 }}>
-              <div onClick={() => { exportPdf(); setShowExportMenu(false); }} style={{ padding: '9px 14px', fontSize: 11, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+            <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 150, background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.4)', overflow: 'hidden', minWidth: 120 }}>
+              <div onClick={() => { exportPdf(); setShowExportMenu(false); }} style={{ padding: '12px 14px', fontSize: 12, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 44 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
                 PDF
               </div>
               <div onClick={() => {
@@ -692,8 +692,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
                 const blob = new Blob([csv], { type: 'text/csv' });
                 const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Inventory_${stage}_${new Date().toISOString().slice(0,10)}.csv`; a.click();
                 setShowExportMenu(false);
-              }} style={{ padding: '9px 14px', fontSize: 11, color: T.tx, cursor: 'pointer', borderTop: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', gap: 6 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: T.gr, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+              }} style={{ padding: '12px 14px', fontSize: 12, color: T.tx, cursor: 'pointer', borderTop: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', gap: 8, minHeight: 44 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.gr, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
                 CSV
               </div>
             </div></>}
