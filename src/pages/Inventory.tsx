@@ -101,6 +101,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const [intelResults, setIntelResults] = useState<any[]>([]);
   const [showExtras, setShowExtras] = useState(false);
   const [exportPdfHtml, setExportPdfHtml] = useState<string | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [invLimit, setInvLimit] = useState(5000);
   const [invTruncated, setInvTruncated] = useState(false);
 
@@ -677,14 +678,27 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         </div>
         <div className="inv-action-btns" style={{ display: 'flex', gap: 5 }}>
           {!showExtras && canEdit && !isCompletedView && <div onClick={() => { resetForm(); setShowModal(true); }} style={S.btnPrimary} className="desktop-only">+ Add Item</div>}
-          {!showExtras && <div title="Download filtered inventory as CSV" onClick={() => {
-            if (filtered.length === 0) return;
-            const csv = 'Batch,SKU,Category,Size,Status,Location,Missing,Damaged\n' + filtered.map(i => `${i.batch_number || ''},${i.serial_number || ''},"${i.products?.name || ''}",${i.size || ''},${i.status},${i.location || ''},"${(itemMissing[i.id] || []).join('; ')}","${(itemDamaged[i.id] || []).join('; ')}"`).join('\n');
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Inventory_${stage}_${new Date().toISOString().slice(0,10)}.csv`; a.click();
-          }} style={S.btnGhost} className="desktop-only">Export</div>}
+          {!showExtras && <div style={{ position: 'relative' }}>
+            <div onClick={() => setShowExportMenu(v => !v)} style={S.btnGhost}>Export ▾</div>
+            {showExportMenu && <><div style={{ position: 'fixed', inset: 0, zIndex: 149 }} onClick={() => setShowExportMenu(false)} />
+            <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 150, background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.4)', overflow: 'hidden', minWidth: 130 }}>
+              <div onClick={() => { exportPdf(); setShowExportMenu(false); }} style={{ padding: '9px 14px', fontSize: 11, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                PDF
+              </div>
+              <div onClick={() => {
+                if (filtered.length === 0) return;
+                const csv = 'Batch,SKU,Category,Size,Status,Location,Missing,Damaged\n' + filtered.map(i => `${i.batch_number || ''},${i.serial_number || ''},"${i.products?.name || ''}",${i.size || ''},${i.status},${i.location || ''},"${(itemMissing[i.id] || []).join('; ')}","${(itemDamaged[i.id] || []).join('; ')}"`).join('\n');
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Inventory_${stage}_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+                setShowExportMenu(false);
+              }} style={{ padding: '9px 14px', fontSize: 11, color: T.tx, cursor: 'pointer', borderTop: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', gap: 6 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: T.gr, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                CSV
+              </div>
+            </div></>}
+          </div>}
           {!showExtras && !isCompletedView && <div onClick={computeIntel} title="Find cross-size completion possibilities" style={{ ...S.btnGhost, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.15)', color: T.yl, fontWeight: 600 }} className="desktop-only">Find Pairs</div>}
-          {!showExtras && <div onClick={exportPdf} style={{ ...S.btnGhost, fontSize: 11 }} className="mobile-only">Export</div>}
           {!showExtras && profile?.module_access?.extras !== false && <div onClick={() => { setShowExtras(true); window.history.pushState({ view: 'extras' }, ''); }} style={{ ...S.btnGhost, background: `linear-gradient(135deg, rgba(99,102,241,.08), rgba(56,189,248,.06))`, border: `1px solid rgba(99,102,241,.18)`, color: T.ac2, fontWeight: 600, gap: 6 }}>
             <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, flexShrink: 0 }}><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" /></svg>
             Spare Parts
@@ -942,6 +956,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             style={{ ...S.fInput, width: 'auto', padding: '6px 10px', fontSize: 11, cursor: 'pointer' }}
           >
             <option value="">Change status to…</option>
+            <option value="completed">Completed</option>
             <option value="unsorted">Unsorted</option>
             <option value="dry_clean">Dry Clean</option>
             <option value="damaged">Damaged</option>
@@ -1133,7 +1148,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       {pendingDelete && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, animation: 'su .2s ease', overflow: 'hidden', minWidth: 280 }}>
         <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 12, color: T.tx, flex: 1 }}>Item deleted</span>
-          <span onClick={undoDelete} style={{ ...S.btnPrimary, padding: '4px 12px', fontSize: 11, background: T.yl, color: '#000', boxShadow: 'none' }}>Undo</span>
+          <span onClick={undoDelete} style={{ ...S.btnPrimary, padding: '4px 12px', fontSize: 11, background: T.yl, color: '#fff', boxShadow: 'none' }}>Undo</span>
           <span onClick={() => { clearTimeout(pendingDelete.timer); deleteTimerRef.current = null; const id = pendingDelete.id; setPendingDelete(null); supabase.rpc('delete_inventory_item_cascade', { p_item_id: id }).then(({ error }) => { if (error) addToast('Delete failed — ' + friendlyError(error), 'error'); fetchData(); }); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }}>✕</span>
         </div>
         <div className="undo-bar" key={pendingDelete.id} />

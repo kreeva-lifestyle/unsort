@@ -17,6 +17,8 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
   const [editSku, setEditSku] = useState('');
   const [editQty, setEditQty] = useState('');
   const [expanded, setExpanded] = useState(false);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
   const fetch = useCallback(async () => {
     const { data, error } = await supabase.from('virtual_stock').select('id, sku, quantity').order('sku').limit(1000);
@@ -67,10 +69,12 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
   const remove = async (id: string) => {
     const { error } = await supabase.from('virtual_stock').delete().eq('id', id);
     if (error) { addToast('Delete failed — ' + friendlyError(error), 'error'); return; }
-    addToast('Removed', 'success'); fetch();
+    addToast('Removed', 'success'); setPage(0); fetch();
   };
 
   const filtered = search ? rows.filter(r => r.sku.toLowerCase().includes(search.toLowerCase())) : rows;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice(page * pageSize, (page + 1) * pageSize);
 
   const exportCSV = () => {
     if (rows.length === 0) { addToast('No data to export', 'error'); return; }
@@ -109,33 +113,48 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
         {/* Search */}
         {rows.length > 5 && <div style={{ position: 'relative', marginBottom: 8 }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SKU..." style={S.fSearch} />
+          <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search SKU..." style={S.fSearch} />
         </div>}
 
         {/* List */}
         {loading ? <div style={{ padding: 12, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div> :
         filtered.length === 0 ? (rows.length === 0 ? null : <div style={{ padding: 12, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No matches</div>) :
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {filtered.map(r => (
-            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(255,255,255,0.01)', border: `1px solid ${T.bd}`, borderRadius: 6 }}>
-              {editId === r.id ? (
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flex: 1 }}>
-                  <input value={editSku} onChange={e => setEditSku(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveEdit(r.id); if (e.key === 'Escape') { setEditId(null); setEditSku(''); setEditQty(''); } }} autoFocus style={{ ...S.fInput, flex: 1, height: 28, fontSize: 12, fontFamily: T.mono, padding: '4px 8px' }} />
-                  <input type="number" min="0" step="1" value={editQty} onChange={e => setEditQty(e.target.value)} onKeyDown={e => { numericKeyDown(e); if (e.key === 'Enter') saveEdit(r.id); if (e.key === 'Escape') { setEditId(null); setEditSku(''); setEditQty(''); } }} style={{ ...S.fInput, width: 60, height: 28, fontSize: 12, textAlign: 'right', fontFamily: T.mono, padding: '4px 8px' }} />
-                  <span onClick={() => saveEdit(r.id)} style={{ ...S.btnSuccess, ...S.btnSm, cursor: 'pointer', padding: '4px 8px' }}>Save</span>
-                  <span onClick={() => { setEditId(null); setEditSku(''); setEditQty(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 13 }}>x</span>
-                </div>
-              ) : (<>
-                <div style={{ flex: 1, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.tx }}>{r.sku}</div>
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                  <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 700, color: T.gr, minWidth: 30, textAlign: 'right' }}>+{r.quantity}</span>
-                  <span onClick={() => { setEditId(r.id); setEditSku(r.sku); setEditQty(String(r.quantity)); }} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', padding: '4px 8px' }}>Edit</span>
-                  <span onClick={() => remove(r.id)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', padding: '4px 8px' }}>Del</span>
-                </div>
-              </>)}
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {paginated.map(r => (
+              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(255,255,255,0.01)', border: `1px solid ${T.bd}`, borderRadius: 6 }}>
+                {editId === r.id ? (
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center', flex: 1 }}>
+                    <input value={editSku} onChange={e => setEditSku(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveEdit(r.id); if (e.key === 'Escape') { setEditId(null); setEditSku(''); setEditQty(''); } }} autoFocus style={{ ...S.fInput, flex: 1, height: 28, fontSize: 12, fontFamily: T.mono, padding: '4px 8px' }} />
+                    <input type="number" min="0" step="1" value={editQty} onChange={e => setEditQty(e.target.value)} onKeyDown={e => { numericKeyDown(e); if (e.key === 'Enter') saveEdit(r.id); if (e.key === 'Escape') { setEditId(null); setEditSku(''); setEditQty(''); } }} style={{ ...S.fInput, width: 60, height: 28, fontSize: 12, textAlign: 'right', fontFamily: T.mono, padding: '4px 8px' }} />
+                    <span onClick={() => saveEdit(r.id)} style={{ ...S.btnSuccess, ...S.btnSm, cursor: 'pointer', padding: '4px 8px' }}>Save</span>
+                    <span onClick={() => { setEditId(null); setEditSku(''); setEditQty(''); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 13 }}>x</span>
+                  </div>
+                ) : (<>
+                  <div style={{ flex: 1, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.tx }}>{r.sku}</div>
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 700, color: T.gr, minWidth: 30, textAlign: 'right' }}>+{r.quantity}</span>
+                    <span onClick={() => { setEditId(r.id); setEditSku(r.sku); setEditQty(String(r.quantity)); }} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', padding: '4px 8px' }}>Edit</span>
+                    <span onClick={() => remove(r.id)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', padding: '4px 8px' }}>Del</span>
+                  </div>
+                </>)}
+              </div>
+            ))}
+          </div>
+          {filtered.length > pageSize && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, padding: '4px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }}>Prev</span>
+              <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
+              <span onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }}>Next</span>
             </div>
-          ))}
-        </div>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 10, color: T.tx3 }}>{filtered.length} items</span>
+              <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }} style={{ padding: '4px 8px', fontSize: 11, height: 28, borderRadius: 6, background: 'rgba(255,255,255,.04)', border: `1px solid ${T.bd}`, color: T.tx, outline: 'none' }}>
+                {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}/pg</option>)}
+              </select>
+            </div>
+          </div>}
+        </>}
       </>}
     </div>
   );
