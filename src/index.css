@@ -185,7 +185,7 @@ body.modal-open { overflow: hidden !important; }
   .stat-hero p[style*="fontSize: 44"] { font-size: 36px !important; }
   .cat-grid { grid-template-columns: 1fr !important; }
   .three-things { grid-template-columns: 1fr !important; }
-  .modal-inner { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; max-width: 100% !important; max-height: 85vh !important; border-radius: 14px 14px 0 0 !important; animation: slideUp .3s cubic-bezier(.2,.9,.3,1) both !important; margin: 0 !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; }
+  .modal-inner { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; max-width: 100% !important; max-height: 85vh !important; border-radius: 14px 14px 0 0 !important; animation: slideUp .3s cubic-bezier(.2,.9,.3,1) both !important; margin: 0 !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px) !important; }
   .modal-inner form { padding: 14px !important; }
   .two-col { grid-template-columns: 1fr !important; }
   .mobile-hamburger > div { min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-direction: column !important; gap: 3px !important; }

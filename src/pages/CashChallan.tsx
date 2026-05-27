@@ -1301,7 +1301,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       {/* ERP Reminder Modal */}
       {showErpReminder && (
         <div style={{ ...S.modalOverlay }}>
-          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380, padding: '24px 22px', textAlign: 'center', paddingBottom: 'max(24px, calc(env(safe-area-inset-bottom) + 16px))' }}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380, padding: '24px 22px', textAlign: 'center' }}>
             <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Hi {userName}!</div>
             <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 18 }}>Reminder to manually <strong style={{ color: T.yl }}>reduce these inventory items in ERP</strong>. Cash Challan does not sync inventory automatically.</div>
