@@ -1,5 +1,15 @@
 # Project rules for Unsort
 
+## Auto-deploy flow
+After every set of changes:
+1. **Commit** with a descriptive message
+2. **Push** to the feature branch
+3. **Create PR** via GitHub MCP (`mcp__github__create_pull_request`)
+4. **Squash merge** immediately via GitHub MCP (`mcp__github__merge_pull_request`)
+5. Do NOT wait for user permission — deploy automatically to main
+
+This applies to all code changes. No confirmation needed.
+
 ## File layout
 - Modular structure — DO NOT put new code in App.tsx
 - New components: `src/components/[feature]/`
