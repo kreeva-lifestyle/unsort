@@ -122,12 +122,18 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
   const compute = () => {
     if (masterSkus.length === 0) { addToast('Import master file first', 'error'); return; }
     if (vendorFiles.length === 0) { addToast('Import at least one vendor file', 'error'); return; }
+    const vendorMaps = vendorFiles.map(v => {
+      const m = new Map<string, Record<string, number | string>>();
+      for (const r of v.rows) { const s = String(r.sku || r.SKU || r.Sku || '').trim().toUpperCase(); if (s) m.set(s, r); }
+      return m;
+    });
     const res: OdResult[] = [];
+    let cntNotFound = 0, cntOos = 0, cntLast = 0, cntBlocked = 0;
     for (const rawSku of masterSkus) {
       const sku = rawSku.toUpperCase();
       let total = 0; let naCount = 0; let oosCount = 0; let vendorCount = 0;
-      for (const v of vendorFiles) {
-        const row = v.rows.find(r => String(r.sku || r.SKU || r.Sku || '').trim().toUpperCase() === sku);
+      for (const vm of vendorMaps) {
+        const row = vm.get(sku);
         if (!row) { naCount++; continue; }
         const qtyRaw = row.qty ?? row.QTY ?? row.Qty ?? row.quantity ?? '';
         const qtyStr = String(qtyRaw).trim();
@@ -145,15 +151,12 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
       else if (blocked > 0 && finalTotal <= 0) flag = 'blocked';
       else if (total === 0 && oosCount > 0 && vs === 0) flag = 'oos';
       else if (finalTotal === 1) flag = 'last';
+      if (flag === 'not_found') cntNotFound++; else if (flag === 'oos') cntOos++; else if (flag === 'last') cntLast++; else if (flag === 'blocked') cntBlocked++;
       res.push({ sku, total: finalTotal, vendorCount, naCount, oosCount, blocked, flag });
     }
     setResults(res);
     setComputed(true);
-    const notFound = res.filter(r => r.flag === 'not_found').length;
-    const oos = res.filter(r => r.flag === 'oos').length;
-    const last = res.filter(r => r.flag === 'last').length;
-    const blockedCount = res.filter(r => r.flag === 'blocked').length;
-    addToast(`Computed ${res.length} SKUs — ${notFound} not found, ${oos} out of stock, ${last} last qty${blockedCount > 0 ? `, ${blockedCount} blocked` : ''}`, 'success');
+    addToast(`Computed ${res.length} SKUs — ${cntNotFound} not found, ${cntOos} out of stock, ${cntLast} last qty${cntBlocked > 0 ? `, ${cntBlocked} blocked` : ''}`, 'success');
     if (Object.keys(blockedMap).length === 0) addToast('Results exclude blocked inventory — no blocked sheet imported', 'error');
   };
 

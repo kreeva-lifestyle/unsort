@@ -421,17 +421,17 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     if (error) { addToast(friendlyError(error), 'error'); return; }
     addToast('Updated!', 'success');
     await fetchComps(selected.id);
-    fetchData();
     if (newStatus === 'present' && selected.status === 'unsorted') {
       const { data: allComps } = await supabase.from('item_components').select('status').eq('inventory_item_id', selected.id);
       if (allComps && allComps.length > 0 && allComps.every(c => c.status === 'present')) {
         if (await ask({ title: 'All components present!', message: `Mark this item as Completed?`, confirmLabel: 'Mark Completed' })) {
           const { error: upErr } = await supabase.from('inventory_items').update({ status: 'completed' }).eq('id', selected.id);
           if (upErr) addToast(friendlyError(upErr), 'error');
-          else { addToast('Marked as completed', 'success'); fetchData(); }
+          else addToast('Marked as completed', 'success');
         }
       }
     }
+    fetchData();
   };
 
   const openEdit = async (item: any) => {

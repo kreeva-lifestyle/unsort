@@ -51,8 +51,9 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     if (error) addToast(friendlyError(error), 'error'); else { addToast(isActive ? 'Access revoked' : 'Access granted', 'success'); fetchUsers(); }
   };
 
-  const toggleModule = async (userId: string, modKey: string, currentAccess: Record<string, boolean> | null) => {
-    const access = { ...( currentAccess || Object.fromEntries(ALL_MODULE_KEYS.map(k => [k, true])) ) };
+  const toggleModule = async (userId: string, modKey: string) => {
+    const { data: fresh } = await supabase.from('profiles').select('module_access').eq('id', userId).maybeSingle();
+    const access = { ...( fresh?.module_access || Object.fromEntries(ALL_MODULE_KEYS.map(k => [k, true])) ) };
     access[modKey] = !access[modKey];
     const { error } = await supabase.from('profiles').update({ module_access: access }).eq('id', userId);
     if (error) addToast('Failed to update access — ' + friendlyError(error), 'error');
@@ -67,7 +68,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
         {ALL_MODULE_KEYS.map(k => {
           const on = access[k] !== false;
           return (
-            <span key={k} onClick={() => toggleModule(u.id, k, u.module_access)}
+            <span key={k} onClick={() => toggleModule(u.id, k)}
               style={{ padding: '3px 8px', borderRadius: 5, fontSize: 9, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', userSelect: 'none',
                 background: on ? 'rgba(34,197,94,.08)' : 'rgba(255,255,255,.03)',
                 border: `1px solid ${on ? 'rgba(34,197,94,.2)' : T.bd}`,
