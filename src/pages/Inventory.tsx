@@ -376,7 +376,12 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       if (error || !data) { addToast(error ? friendlyError(error) : 'Save failed', 'error'); return; }
       if (form.status === 'unsorted' || form.status === 'damaged' || form.status === 'dry_clean') await updateComponentStatuses(data.id);
       savedItemId = data.id;
-      addToast(`Item added! ID: ${uniqueId}`, 'success');
+      if (missingComps.size > 0) {
+        const names = catComps.filter(c => missingComps.has(c.id)).map(c => c.name).join(', ');
+        addToast(`Added with ${missingComps.size} missing (${names}) — stays Unsorted until complete`, 'success');
+      } else {
+        addToast(`Item added! ID: ${uniqueId}`, 'success');
+      }
     }
     // Save tags
     if (savedItemId && tagInput.trim()) {
@@ -411,7 +416,23 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     }
   };
 
-  const updateComp = async (id: string, status: string) => { const { error } = await supabase.from('item_components').update({ status }).eq('id', id); if (error) addToast(friendlyError(error), 'error'); else { addToast('Updated!', 'success'); fetchComps(selected.id); fetchData(); } };
+  const updateComp = async (id: string, newStatus: string) => {
+    const { error } = await supabase.from('item_components').update({ status: newStatus }).eq('id', id);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    addToast('Updated!', 'success');
+    await fetchComps(selected.id);
+    fetchData();
+    if (newStatus === 'present' && selected.status === 'unsorted') {
+      const { data: allComps } = await supabase.from('item_components').select('status').eq('inventory_item_id', selected.id);
+      if (allComps && allComps.length > 0 && allComps.every(c => c.status === 'present')) {
+        if (await ask({ title: 'All components present!', message: `Mark this item as Completed?`, confirmLabel: 'Mark Completed' })) {
+          const { error: upErr } = await supabase.from('inventory_items').update({ status: 'completed' }).eq('id', selected.id);
+          if (upErr) addToast(friendlyError(upErr), 'error');
+          else { addToast('Marked as completed', 'success'); fetchData(); }
+        }
+      }
+    }
+  };
 
   const openEdit = async (item: any) => {
     setSelected(item); setForm({ product_id: item.product_id, serial_number: item.serial_number || '', size: item.size || '', status: item.status, location: item.location || '', manufacturer: item.manufacturer || '', notes: item.notes || '', order_id: item.order_id || '', marketplace: item.marketplace || '', ticket_id: item.ticket_id || '', link: item.link || '' }); setCatSearch(item.products?.name || '');
@@ -1052,7 +1073,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   {form.status !== 'dry_clean' && missingComps.size > 0 && <p style={{ fontSize: 10, color: T.yl, marginTop: 5 }}>{missingComps.size} missing</p>}
   {form.status !== 'dry_clean' && damagedComps.size > 0 && <p style={{ fontSize: 10, color: T.re, marginTop: 3 }}>{damagedComps.size} damaged</p>}
   {form.status === 'unsorted' && missingComps.size === catComps.length && damagedComps.size === 0 && <p style={{ fontSize: 11, color: T.re, marginTop: 5, background: 'rgba(248,113,113,.06)', border: '1px solid rgba(248,113,113,.15)', borderRadius: 6, padding: '6px 10px' }}>All missing — change status to "Damaged" or deselect some.</p>}
-</div>}<div className="inv-more-fields" onClick={() => setShowMoreFields(v => !v)} style={{ display: 'none', padding: '8px 0', marginBottom: 8, cursor: 'pointer', fontSize: 11, color: T.ac2, fontWeight: 500, textAlign: 'center' }}>{showMoreFields ? '— Less details' : '+ More details (Order ID, Tags, Notes)'}</div><div className={showMoreFields ? '' : 'inv-more-content'}><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Order ID</label><input value={form.order_id} onChange={(e) => setForm({ ...form, order_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Ticket ID</label><input value={form.ticket_id} onChange={(e) => setForm({ ...form, ticket_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ marginBottom: 12 }}><label style={S.fLabel}>Link</label><input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="Optional URL" style={S.fInput} /></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Tags <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(comma separated)</span></label><input value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="e.g. urgent, wedding" style={S.fInput} /></div><div><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div></div><div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
+</div>}<div className="inv-more-fields" onClick={() => setShowMoreFields(v => !v)} style={{ display: 'none', padding: '8px 0', marginBottom: 8, cursor: 'pointer', fontSize: 11, color: T.ac2, fontWeight: 500, textAlign: 'center' }}>{showMoreFields ? '— Less details' : '+ More details (Order ID, Tags, Notes)'}</div><div className={showMoreFields ? '' : 'inv-more-content'}><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Order ID</label><input value={form.order_id} onChange={(e) => setForm({ ...form, order_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div><div><label style={S.fLabel}>Ticket ID</label><input value={form.ticket_id} onChange={(e) => setForm({ ...form, ticket_id: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div><div style={{ marginBottom: 12 }}><label style={S.fLabel}>Link</label><input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="Optional URL" style={S.fInput} /></div><div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}><div><label style={S.fLabel}>Tags <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(comma separated)</span></label><input value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="e.g. urgent, wedding" style={S.fInput} /></div><div><label style={S.fLabel}>Notes</label><input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional" style={S.fInput} /></div></div></div><div style={{ position: 'sticky', bottom: 0, zIndex: 2, padding: '14px 16px', borderTop: `1px solid ${T.bd}`, background: T.s2, display: 'flex', justifyContent: 'flex-end', gap: 9 }}><span onClick={() => setShowModal(false)} style={S.btnGhost}>Cancel</span><button type="submit" style={S.btnPrimary}>{selected ? 'Update' : 'Add'}</button></div></form></div></div>)}
 
       {showCompModal && selected && (<div style={S.modalOverlay} onClick={() => setShowCompModal(false)}><div className="modal-inner" style={{ ...S.modalBox, width: 520 }} onClick={e => e.stopPropagation()}><div style={S.modalHead}><div><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{selected.products?.name}</span><div style={{ display: 'flex', gap: 6, marginTop: 3, alignItems: 'center', flexWrap: 'wrap' }}><span style={{ fontSize: 10, fontFamily: T.mono, color: T.gr }}>{selected.batch_number}</span>{selected.serial_number && <span style={{ fontSize: 10, fontFamily: T.mono, color: T.ac2 }}>{selected.serial_number}</span>}<span style={statusTag(selected.status)}>{selected.status}</span>{selected.batch_number && <span onClick={() => printBarcode(selected.batch_number)} style={{ ...S.btnGhost, ...S.btnSm }}>Print Barcode</span>}</div>{selected.order_id && <p style={{ margin: '3px 0 0', fontSize: 10, color: T.tx3 }}>Order: {selected.order_id}{selected.marketplace ? ` | ${selected.marketplace}` : ''}</p>}{selected.ticket_id && <p style={{ margin: '2px 0 0', fontSize: 10, color: T.tx3 }}>Ticket: {selected.ticket_id}</p>}{selected.link && <a href={selected.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: T.ac, marginTop: 2, display: 'block' }}>Open Link</a>}</div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span></div><div style={{ padding: 16 }}>
         <p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 6 }}>Components</p>
