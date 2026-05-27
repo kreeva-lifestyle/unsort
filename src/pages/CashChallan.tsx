@@ -541,7 +541,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       } else {
         const { data: newCust, error: insErr } = await supabase.from('cash_challan_customers').insert({ name: trimmed, phone: trimmedPhone }).select('id').single();
         if (insErr && insErr.code === '23505') {
-          const { data: raceCust } = await supabase.from('cash_challan_customers').select('id').ilike('name', trimmed).eq('phone', trimmedPhone || '').maybeSingle();
+          let rq = supabase.from('cash_challan_customers').select('id').ilike('name', trimmed);
+          if (trimmedPhone) rq = rq.eq('phone', trimmedPhone); else rq = rq.is('phone', null);
+          const { data: raceCust } = await rq.maybeSingle();
           custId = raceCust?.id || null;
         } else {
           custId = newCust?.id || null;
