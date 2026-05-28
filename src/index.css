@@ -9,7 +9,7 @@ body {
   color: oklch(0.93 0.01 250);
   height: 100vh;
   -webkit-tap-highlight-color: transparent;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
   width: 100%;
   overflow: hidden;
   -webkit-text-size-adjust: 100%;
