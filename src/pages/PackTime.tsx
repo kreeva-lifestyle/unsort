@@ -718,7 +718,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                   <td style={{ ...S.tdStyle, color: T.gr, fontWeight: 600 }}>{r.brand || '—'}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx3, fontSize: 11 }}>{r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                   <td style={{ ...S.tdStyle, width: 40 }}>
-                    <button type="button" onClick={() => setConfirmDeleteId(r.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4, transition: 'opacity .15s' }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')}>
+                    <button type="button" onClick={() => setConfirmDeleteId(r.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4, transition: 'opacity .15s' }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')} aria-label="Delete">
                       <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 1.8 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
                     </button>
                   </td>
@@ -772,9 +772,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="scan-pagination" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 10 }}>
-          <span onClick={() => setHistoryPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage === 0 ? 0.3 : 1, pointerEvents: historyPage === 0 ? 'none' : 'auto' }}>Prev</span>
+          <span onClick={() => setHistoryPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage === 0 ? 0.3 : 1, pointerEvents: historyPage === 0 ? 'none' : 'auto' }} aria-label="Previous page">Prev</span>
           <span style={{ fontSize: 10, color: T.tx3 }}>{historyPage + 1} / {totalPages}</span>
-          <span onClick={() => setHistoryPage(p => Math.min(totalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: historyPage >= totalPages - 1 ? 'none' : 'auto' }}>Next</span>
+          <span onClick={() => setHistoryPage(p => Math.min(totalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: historyPage >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">Next</span>
         </div>
       )}
     </div>
