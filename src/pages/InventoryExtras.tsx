@@ -17,6 +17,7 @@ import type {
   InventoryExtra,
 } from '../types/database';
 
+const EXTRAS_LIMIT = 1000;
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
 import { isDupatta, isLehenga, isBottomType, mfrFromSku } from '../lib/garmentHelpers';
 
@@ -75,7 +76,7 @@ export default function InventoryExtras() {
   useEffect(() => () => { if (skuTimer.current) clearTimeout(skuTimer.current); }, []);
 
   const fetchExtras = useCallback(async () => {
-    const { data } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, location, manufacturer, quantity, notes, created_by, created_at, updated_at').gt('quantity', 0).order('updated_at', { ascending: false }).limit(1000);
+    const { data } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, location, manufacturer, quantity, notes, created_by, created_at, updated_at').gt('quantity', 0).order('updated_at', { ascending: false }).limit(EXTRAS_LIMIT);
     setExtras(data || []);
     // Compute match counts — check item actually has this component missing
     const counts: Record<string, number> = {};
@@ -385,6 +386,8 @@ export default function InventoryExtras() {
           </SwipeRow>
         ))}
       </div>
+
+      {extras.length === EXTRAS_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {EXTRAS_LIMIT} items. Use search to find more.</div>}
 
       {/* Pagination */}
       {totalPages > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
