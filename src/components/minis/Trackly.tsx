@@ -6,6 +6,7 @@ import { T, S } from '../../lib/theme';
 import { copyToClipboard } from '../../lib/clipboard';
 import type { ShortLink } from '../../types/database';
 import TracklyAnalytics from './TracklyAnalytics';
+import SwipeRow from '../ui/SwipeRow';
 
 const LINK_LIMIT = 500;
 const COLS = 'id, short_code, long_url, title, clicks, created_by, created_at, updated_at';
@@ -113,14 +114,20 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
       {loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div> :
       filtered.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{links.length === 0 ? 'No short links yet. Click "+ New Link" to create one.' : 'No matches found.'}</div> :
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {paged.map(l => (
-          <div key={l.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '12px 14px', transition: 'border-color .15s' }}
+        {paged.map((l, i) => (
+          <SwipeRow key={l.id} actions={[
+            { label: 'Print', color: '#6366F1', onClick: () => copyLink(l.short_code) },
+            { label: 'View', color: '#22C55E', onClick: () => { setAnalyticsLink(l); window.history.pushState({ view: 'short-analytics' }, ''); } },
+            { label: 'Del', color: '#EF4444', onClick: () => deleteLink(l.id) },
+          ]} hint={i === 0} hintKey="trackly">
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '12px 14px', transition: 'border-color .15s' }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; }}>
+            onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; }}
+            onClick={() => copyLink(l.short_code)}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 {l.title && <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 2 }}>{l.title}</div>}
-                <div style={{ fontSize: 12, fontFamily: T.mono, color: T.ac2, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => copyLink(l.short_code)} title="Click to copy">
+                <div style={{ fontSize: 12, fontFamily: T.mono, color: T.ac2, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {displayShortUrl(l.short_code)}
                 </div>
                 <div style={{ fontSize: 10, color: T.tx3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.long_url}</div>
@@ -130,25 +137,33 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
                 <div style={{ fontSize: 7, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5 }}>clicks</div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span onClick={() => copyLink(l.short_code)} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', minHeight: 32 }}>Copy</span>
-              <span onClick={() => { setAnalyticsLink(l); window.history.pushState({ view: 'short-analytics' }, ''); }} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', color: T.gr, borderColor: 'rgba(34,197,94,.2)', minHeight: 32 }}>Analytics</span>
-              <span onClick={() => deleteLink(l.id)} style={{ ...S.btnDanger, padding: '7px 12px', fontSize: 11, cursor: 'pointer', minHeight: 32 }}>Delete</span>
+            <div className="desktop-only" style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span onClick={e => { e.stopPropagation(); copyLink(l.short_code); }} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', minHeight: 32 }}>Copy</span>
+              <span onClick={e => { e.stopPropagation(); setAnalyticsLink(l); window.history.pushState({ view: 'short-analytics' }, ''); }} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', color: T.gr, borderColor: 'rgba(34,197,94,.2)', minHeight: 32 }}>Analytics</span>
+              <span onClick={e => { e.stopPropagation(); deleteLink(l.id); }} style={{ ...S.btnDanger, padding: '7px 12px', fontSize: 11, cursor: 'pointer', minHeight: 32 }}>Delete</span>
               <span style={{ fontSize: 9, color: T.tx3, marginLeft: 'auto', alignSelf: 'center' }}>
                 {l.created_at ? new Date(l.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
               </span>
             </div>
+            <div className="mobile-only" style={{ marginTop: 6 }}>
+              <span style={{ fontSize: 9, color: T.tx3 }}>
+                {l.created_at ? new Date(l.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+              </span>
+            </div>
           </div>
+          </SwipeRow>
         ))}
       </div>}
 
       {links.length === LINK_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {LINK_LIMIT} links. Use search to find older ones.</div>}
 
-      {totalPages > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
+      {filtered.length > 0 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span onClick={() => setPage(Math.max(0, page - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }}>Prev</span>
-          <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
-          <span onClick={() => setPage(Math.min(totalPages - 1, page + 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }}>Next</span>
+          {totalPages > 1 && <>
+            <span onClick={() => setPage(Math.max(0, page - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }}>Prev</span>
+            <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
+            <span onClick={() => setPage(Math.min(totalPages - 1, page + 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }}>Next</span>
+          </>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 10, color: T.tx3 }}>{filtered.length} links</span>
