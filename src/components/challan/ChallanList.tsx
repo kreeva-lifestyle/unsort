@@ -143,32 +143,31 @@ export default function ChallanList(p: Props) {
           ];
           return (
             <SwipeRow key={c.id} actions={swipeActions} hint={i === 0} hintKey="challan">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: rowBg, transition: 'background .15s' }} onClick={() => { if (p.bulkMode) { if (canSelect) p.onToggleSelect(c.id); } else { p.onOpenDetail(c); } }} onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.08)' : 'rgba(255,255,255,.02)'; }} onMouseLeave={e => { e.currentTarget.style.background = (isSelected ? 'rgba(99,102,241,.08)' : isRet ? 'rgba(239,68,68,.04)' : '') }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', borderBottom: `1px solid ${T.bd}`, borderLeft: `3px solid ${sc.color}`, cursor: 'pointer', background: rowBg, transition: 'background .15s' }} onClick={() => { if (p.bulkMode) { if (canSelect) p.onToggleSelect(c.id); } else { p.onOpenDetail(c); } }} onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = isRet ? 'rgba(239,68,68,.08)' : 'rgba(255,255,255,.02)'; }} onMouseLeave={e => { e.currentTarget.style.background = (isSelected ? 'rgba(99,102,241,.08)' : isRet ? 'rgba(239,68,68,.04)' : '') }}>
               {p.bulkMode && <div onClick={e => { e.stopPropagation(); if (canSelect) p.onToggleSelect(c.id); }} style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${canSelect ? (isSelected ? T.ac : T.bd2) : T.bd}`, background: isSelected ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: canSelect ? 'pointer' : 'not-allowed', opacity: canSelect ? 1 : 0.3 }}>
                 {isSelected && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><polyline points="20 6 9 17 4 12" /></svg>}
               </div>}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>#{c.challan_number}</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.customer_name}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.customer_name}</span>
                   {isRet && <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>↩ Return</span>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 9, color: T.tx3 }}>{new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
-                  <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: sc.bg, color: sc.color, fontWeight: 600, textTransform: 'uppercase' }}>{c.status}</span>
+                  <span style={{ fontSize: 10, color: T.tx3 }}>{new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
                   {c.status !== 'voided' && <span onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ fontSize: 7, padding: '1px 5px', borderRadius: 3, background: c.inventory_deducted ? 'rgba(34,197,94,.10)' : 'rgba(239,68,68,.08)', color: c.inventory_deducted ? T.gr : T.re, fontWeight: 600, cursor: 'pointer', userSelect: 'none', letterSpacing: 0.3 }}>{c.inventory_deducted ? 'INV ✓' : 'INV ✗'}</span>}
-                  {pendingDays > 0 && <span style={{ fontSize: 8, color: T.re, fontWeight: 600 }}>({pendingDays}d pending)</span>}
+                  {pendingDays > 0 && <span style={{ fontSize: 9, color: T.re, fontWeight: 600 }}>({pendingDays}d pending)</span>}
                   {(c.tags || []).map(t => <span key={t} style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: T.ac3, color: T.ac2 }}>{t}</span>)}
                 </div>
-                {skus && <div style={{ fontSize: 9, fontFamily: T.mono, color: T.tx3, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{skus}</div>}
+                {skus && <div style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{skus}</div>}
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: isRet ? T.re : T.tx }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.mono, color: isRet ? T.re : T.tx }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
                 {(c.status === 'paid' || c.status === 'partial') && Number(c.amount_paid || 0) > 0 && (() => {
                   const paid = Number(c.amount_paid);
                   const due = Math.max(0, Number(c.total) - paid);
                   return (
-                    <div style={{ fontSize: 9, fontFamily: T.mono, marginTop: 2, color: c.status === 'paid' ? T.gr : T.yl }}>
+                    <div style={{ fontSize: 10, fontFamily: T.mono, marginTop: 2, color: c.status === 'paid' ? T.gr : T.yl }}>
                       ₹{paid.toLocaleString('en-IN')} paid{c.status === 'partial' && due > 0 ? ` · ₹${due.toLocaleString('en-IN')} due` : ''}
                     </div>
                   );
