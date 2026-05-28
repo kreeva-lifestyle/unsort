@@ -1,5 +1,5 @@
 // Notifications hook + provider
-import { useState, useEffect, useCallback, useMemo, createContext, useContext } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, createContext, useContext } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
 
@@ -11,12 +11,16 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const [toasts, setToasts] = useState<any[]>([]);
   const { user } = useAuth();
 
+  // Narrow dedup: suppress identical toasts only within a 200ms window
+  // (catches render-loop spam without silencing legitimate sequential ones).
+  const lastToastRef = useRef<{ message: string; type: string; ts: number } | null>(null);
   const addToast = useCallback((message: string, type = 'info') => {
-    const id = Date.now() + Math.random();
-    setToasts((prev) => {
-      if (prev.some((t) => t.message === message && t.type === type)) return prev;
-      return [...prev, { id, message, type }];
-    });
+    const now = Date.now();
+    const last = lastToastRef.current;
+    if (last && last.message === message && last.type === type && now - last.ts < 200) return;
+    lastToastRef.current = { message, type, ts: now };
+    const id = now + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
   }, []);
 
