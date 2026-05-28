@@ -60,7 +60,10 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
       if (auditRes.error) console.warn('Audit timeline failed:', auditRes.error.message);
       if (payRes.error) console.warn('Payment timeline failed:', payRes.error.message);
       const entries: TimelineEntry[] = [];
-      for (const a of (auditRes.data || [])) entries.push({ type: 'audit', time: a.created_at || '', action: a.action, details: a.details || '', user_name: a.user_email || undefined, changes: a.changes as any });
+      for (const a of (auditRes.data || [])) {
+        if (a.action === 'INV_TOGGLE') continue;
+        entries.push({ type: 'audit', time: a.created_at || '', action: a.action, details: a.details || '', user_name: a.user_email || undefined, changes: a.changes as any });
+      }
       const payData = payRes.data || [];
       if (payData.length > 0) {
         const userIds = [...new Set(payData.filter(p => p.paid_by).map(p => p.paid_by!))];
