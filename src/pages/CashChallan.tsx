@@ -60,7 +60,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [challans, setChallans] = useState<Challan[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
   const [totalCount, setTotalCount] = useState(0);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -1207,6 +1207,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         onRemind={sendReminder}
         onCreateReturn={(c) => { setIsReturn(true); setChallanStatus('paid'); selectReturnSource(c); setShowModal(true); }}
         onVoid={(c) => setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number })}
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
       />
 
       <ChallanBulkActions
@@ -1334,17 +1337,6 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         </div>
       )}
 
-      {/* Pagination */}
-      {totalPages > 0 && (
-        <div className="challan-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
-          <span style={{ fontSize: 10, color: T.tx3 }}>{totalCount} records</span>
-          {totalPages > 1 && <>
-            <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }} aria-label="Previous page">Prev</span>
-            <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
-            <span onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">Next</span>
-          </>}
-        </div>
-      )}
 
       {printHtml && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#060810', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
