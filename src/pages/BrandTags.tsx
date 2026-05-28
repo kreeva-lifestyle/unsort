@@ -274,21 +274,22 @@ export default function BrandTagPrinter() {
   // Smart realtime: apply individual row changes without re-fetching entire page
   useEffect(() => {
     const mapRow = (d: BrandTag): BrandTagRow => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies });
+    let debounceTimer: any;
+    const debounced = (fn: () => void) => { clearTimeout(debounceTimer); debounceTimer = setTimeout(fn, 1500); };
     const ch = supabase.channel('bt-smart')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'brand_tags' }, (payload) => {
         const updated = mapRow(payload.new as BrandTag);
-        setRows(prev => prev.map(r => r.id === updated.id ? updated : r));
+        debounced(() => setRows(prev => prev.map(r => r.id === updated.id ? updated : r)));
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'brand_tags' }, (payload) => {
         const id = (payload.old as Partial<BrandTag> | null)?.id;
         if (id) { setRows(prev => prev.filter(r => r.id !== id)); setTotalCount(c => c - 1); }
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'brand_tags' }, () => {
-        // For inserts, just bump the count - user sees it when they paginate/refresh
-        setTotalCount(c => c + 1);
+        debounced(() => setTotalCount(c => c + 1));
       })
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => { clearTimeout(debounceTimer); supabase.removeChannel(ch); };
   }, []);
 
   // Debounce search to avoid hammering DB on every keystroke

@@ -3,8 +3,20 @@ import { useState, useEffect, useCallback, useMemo, useRef, createContext, useCo
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
 
-const NotificationContext = createContext<any>(null);
-export const useNotifications = () => useContext(NotificationContext);
+interface NotificationContextValue {
+  notifications: any[];
+  toasts: { id: number; message: string; type: string }[];
+  markAsRead: (id: string) => Promise<void>;
+  addToast: (message: string, type?: string) => void;
+  fetchNotifications: () => Promise<void>;
+}
+
+const NotificationContext = createContext<NotificationContextValue | null>(null);
+export const useNotifications = () => {
+  const ctx = useContext(NotificationContext);
+  if (!ctx) throw new Error('useNotifications must be used within NotificationProvider');
+  return ctx;
+};
 
 export const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
   const [notifications, setNotifications] = useState<any[]>([]);

@@ -7,6 +7,7 @@ import { copyToClipboard } from '../../lib/clipboard';
 import type { ShortLink } from '../../types/database';
 import TracklyAnalytics from './TracklyAnalytics';
 
+const LINK_LIMIT = 500;
 const COLS = 'id, short_code, long_url, title, clicks, created_by, created_at, updated_at';
 const APP_ORIGIN = typeof window !== 'undefined' ? window.location.origin : 'https://dailyoffice.aryadesigns.co.in';
 const shortUrl = (code: string) => `${APP_ORIGIN}/#/s/${code}`;
@@ -47,7 +48,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
   }, [showAdd]);
 
   const fetchLinks = useCallback(async () => {
-    const { data, error } = await supabase.from('short_links').select(COLS).order('created_at', { ascending: false }).limit(500);
+    const { data, error } = await supabase.from('short_links').select(COLS).order('created_at', { ascending: false }).limit(LINK_LIMIT);
     if (error) addToast(friendlyError(error), 'error');
     setLinks(data || []);
     setLoading(false);
@@ -139,6 +140,8 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
           </div>
         ))}
       </div>}
+
+      {links.length === LINK_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {LINK_LIMIT} links. Use search to find older ones.</div>}
 
       {totalPages > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

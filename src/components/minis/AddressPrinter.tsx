@@ -5,6 +5,7 @@ import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
 import SwipeRow from '../ui/SwipeRow';
 
+const LABEL_LIMIT = 500;
 const FROM = { name: 'Arya Designs', city: 'Surat', phone: '+91 63544 82868' };
 
 interface Label { id: string; name: string; phone: string; address: string; city: string; state: string; pincode: string; created_at: string }
@@ -45,7 +46,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const emptyForm = { name: '', phone: '', address: '', city: '', state: '', pincode: '' };
 
   const fetchLabels = useCallback(async () => {
-    const { data, error } = await supabase.from('address_labels').select('id, name, phone, address, city, state, pincode, created_at').order('created_at', { ascending: false }).limit(500);
+    const { data, error } = await supabase.from('address_labels').select('id, name, phone, address, city, state, pincode, created_at').order('created_at', { ascending: false }).limit(LABEL_LIMIT);
     if (error) addToast('Failed to load addresses — ' + friendlyError(error), 'error');
     setLabels(data || []);
     setLoading(false);
@@ -155,6 +156,8 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
           </select>
         </div>
       </div>}
+
+      {labels.length === LABEL_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {LABEL_LIMIT} addresses. Use search to find more.</div>}
 
       {/* Add/Edit Modal */}
       {showAdd && createPortal(<div style={S.modalOverlay} onClick={closeModal}>

@@ -18,6 +18,7 @@ type BalanceRow = { opening_balance: number | string };
 type OverdueAlert = { name: string; amount: number; days: number };
 type DryCleanAlert = { days: number };
 type TaskRow = { id: string; title: string; is_done: boolean; created_at: string };
+const TASK_LIMIT = 100;
 
 export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) => void } = {}) {
   const { profile } = useAuth();
@@ -113,7 +114,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     setLoaded(true);
   }, []);
 
-  const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(100).then(({ data }) => setTasks((data ?? []) as TaskRow[])); };
+  const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(TASK_LIMIT).then(({ data }) => setTasks((data ?? []) as TaskRow[])); };
 
   const [refreshing, setRefreshing] = useState(false);
   const manualRefresh = useCallback(async () => { setRefreshing(true); await fetchAll(); fetchTasks(); setRefreshing(false); }, [fetchAll]);
@@ -394,6 +395,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
             </div>
           ))}
           {tasks.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: T.tx3, fontSize: 10 }}>No tasks yet</div>}
+          {tasks.length === TASK_LIMIT && <div style={{ fontSize: 10, color: T.yl, padding: '6px 10px', textAlign: 'center' }}>Showing first {TASK_LIMIT} tasks.</div>}
         </div>
       </div>
       <ConfirmModal {...modalProps} />
