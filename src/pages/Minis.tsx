@@ -155,9 +155,6 @@ export default function Minis() {
 
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 14 }}>
-        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Minis</span>
-      </div>
       <div className="minis-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
         {[
           { id: 'utsav' as MiniView, title: 'Utsav Import', desc: 'Import vendor Excel, generate ARYA SKU column, export as XLS' },

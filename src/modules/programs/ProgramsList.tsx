@@ -74,8 +74,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
-          <div style={{ fontFamily: T.sora, fontSize: 24, fontWeight: 700, color: T.tx, letterSpacing: -0.5 }}>{t('title')}</div>
-          <div style={{ fontSize: 12, color: T.tx3, marginTop: 3 }}>{totalCount} recipes · stitching + fabric breakdown per SKU</div>
+          <div style={{ fontSize: 12, color: T.tx3 }}>{totalCount} recipes · stitching + fabric breakdown per SKU</div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button onClick={toggleLang} style={{ ...S.btnGhost, ...S.btnSm }}>{lang === 'en' ? 'ગુ' : 'EN'}</button>

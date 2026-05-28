@@ -34,9 +34,6 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
   const salesChange = pctChange(analytics.count, analytics.prevCount);
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Analytics</span>
-      </div>
       <div className="challan-analytics-dates" style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12 }}>
         <input type="date" value={from} onChange={e => onFromChange(e.target.value)} style={S.fDate} />
         <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
