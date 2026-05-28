@@ -1168,13 +1168,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── List View ──────────────────────────────────────────────────────────────
   return (
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
-      {/* Header */}
-      <div className="challan-header" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 12 }}>
-        <div className="challan-nav-btns" style={{ display: 'flex', gap: 6 }}>
+      {/* Header — Programs-style: subtitle left, action buttons right */}
+      <div className="challan-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 12, color: T.tx3 }}>{totalCount} challan{totalCount === 1 ? '' : 's'} · invoicing, payments, returns</div>
+        <div className="challan-nav-btns" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          {profile?.module_access?.cashbook !== false && <button onClick={() => { setShowCashBook(true); window.history.pushState({ view: 'cashbook' }, ''); }} style={{ ...S.btnGhost, ...S.btnSm, color: T.gr, borderColor: 'rgba(34,197,94,.25)', background: 'rgba(34,197,94,.06)' }}>Cash Book</button>}
+          <button onClick={() => { fetchLedger(); setShowLedger(true); window.history.pushState({ view: 'ledger' }, ''); }} style={{ ...S.btnGhost, ...S.btnSm }}>Ledger</button>
+          <button onClick={() => { fetchAnalytics(); setShowAnalytics(true); window.history.pushState({ view: 'analytics' }, ''); }} style={{ ...S.btnGhost, ...S.btnSm }}>Analytics</button>
           <button onClick={() => { setShowModal(true); window.history.pushState({ view: 'challan-new' }, ''); }} style={S.btnPrimary} className="desktop-only">+ New Challan</button>
-          {profile?.module_access?.cashbook !== false && <button onClick={() => { setShowCashBook(true); window.history.pushState({ view: 'cashbook' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.08)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Cash Book</button>}
-          <button onClick={() => { fetchLedger(); setShowLedger(true); window.history.pushState({ view: 'ledger' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Ledger</button>
-          <button onClick={() => { fetchAnalytics(); setShowAnalytics(true); window.history.pushState({ view: 'analytics' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Analytics</button>
         </div>
       </div>
 

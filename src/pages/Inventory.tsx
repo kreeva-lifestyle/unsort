@@ -702,15 +702,15 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
 
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      {/* Stage toggle */}
-      <div className="inv-top-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {!showExtras && <><div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, border: `1px solid ${T.bd}` }}>
+      {/* Stage toggle + subtitle (Brand Tags aesthetic) */}
+      <div className="inv-top-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {!showExtras && <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, border: `1px solid ${T.bd}`, width: 'fit-content' }}>
             {(['pending', 'completed'] as const).map(s => (
               <div key={s} onClick={() => { setStage(s); setPage(0); }} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 11, fontWeight: stage === s ? 600 : 400, cursor: 'pointer', background: stage === s ? `linear-gradient(135deg, ${T.ac87}, ${T.ac2cc})` : 'transparent', color: stage === s ? '#fff' : T.tx3, transition: 'all .15s' }}>{{ pending: 'Active', completed: 'Completed' }[s]}</div>
             ))}
-          </div>
-          <span style={{ fontSize: 10, fontWeight: 500, color: T.tx3 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length !== 1 ? 's' : ''}</span></>}
+          </div>}
+          {!showExtras && <div style={{ fontSize: 12, color: T.tx3 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length === 1 ? '' : 's'} · {isCompletedView ? 'completed batches' : 'active SKUs by status'}</div>}
         </div>
         <div className="inv-action-btns" style={{ display: 'flex', gap: 5 }}>
           {!showExtras && canEdit && !isCompletedView && <div onClick={() => { resetForm(); setShowModal(true); }} style={S.btnPrimary} className="desktop-only">+ Add Item</div>}
@@ -742,24 +742,24 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         </div>
       </div>
       {showExtras && profile?.module_access?.extras !== false ? <InventoryExtras /> : <>
-      {/* Preset strip + search + Filters popover (Claude-design v2 multi-select filter UX) */}
-      <div className="filter-bar" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: activeFilterCount > 0 ? 10 : 14, flexWrap: 'wrap' }}>
-        {/* Preset strip */}
-        <div style={{ display: 'flex', gap: 4, padding: 3, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, flexWrap: 'wrap' }}>
-          {PRESETS.filter(p => isCompletedView ? p.id === 'all' : true).map(p => (
-            <button key={p.id} onClick={() => applyPreset(p)} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: preset === p.id ? 600 : 500, background: preset === p.id ? 'rgba(99,102,241,.15)' : 'transparent', color: preset === p.id ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition }}>{p.label}</button>
-          ))}
-        </div>
-
+      {/* Preset chips + search + Filters popover — Brand Tags glass-card aesthetic */}
+      <div className="filter-bar" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: activeFilterCount > 0 ? 10 : 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {/* Search */}
         <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search SKU, product, notes…" style={S.fSearch} />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search SKU, product, notes…" style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
+        </div>
+
+        {/* Preset chips */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {PRESETS.filter(p => isCompletedView ? p.id === 'all' : true).map(p => (
+            <button key={p.id} onClick={() => applyPreset(p)} style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${preset === p.id ? 'rgba(99,102,241,.35)' : T.bd2}`, cursor: 'pointer', fontSize: 12, fontWeight: preset === p.id ? 600 : 500, background: preset === p.id ? 'rgba(99,102,241,.10)' : 'rgba(255,255,255,0.02)', color: preset === p.id ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition, height: 32 }}>{p.label}</button>
+          ))}
         </div>
 
         {/* Filters button with multi-select popover */}
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setShowFiltersPopover(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 36, padding: '0 12px', background: showFiltersPopover || activeFilterCount > 0 ? 'rgba(99,102,241,.10)' : 'rgba(255,255,255,0.03)', border: `1px solid ${showFiltersPopover || activeFilterCount > 0 ? 'rgba(99,102,241,.35)' : T.bd}`, borderRadius: 8, color: activeFilterCount > 0 ? T.ac2 : T.tx, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>
+          <button onClick={() => setShowFiltersPopover(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 32, padding: '0 12px', background: showFiltersPopover || activeFilterCount > 0 ? 'rgba(99,102,241,.10)' : 'rgba(255,255,255,0.02)', border: `1px solid ${showFiltersPopover || activeFilterCount > 0 ? 'rgba(99,102,241,.35)' : T.bd2}`, borderRadius: 8, color: activeFilterCount > 0 ? T.ac2 : T.tx2, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>
             <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" /></svg>
             Filters
             {activeFilterCount > 0 && <span style={{ background: T.ac, color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 10, fontFamily: T.mono, fontWeight: 600, minWidth: 18, textAlign: 'center' as const }}>{activeFilterCount}</span>}
