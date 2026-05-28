@@ -157,14 +157,10 @@ const InstallPrompt = () => {
   }, []);
   if (!deferredPrompt || dismissed) return null;
   return (
-    <div style={{ position: 'fixed', bottom: 70, left: 12, right: 12, zIndex: 200, background: 'rgba(14,18,30,.96)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: `1px solid ${T.ac3}`, borderRadius: 14, padding: '14px 16px', boxShadow: '0 12px 40px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 12, animation: 'slideUp .3s cubic-bezier(.2,.9,.3,1)' }}>
-      <div style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg, #6366F1, #38BDF8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', flexShrink: 0 }}>D</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#E2E8F0' }}>Install DailyOffice</div>
-        <div style={{ fontSize: 10, color: '#6B7890', marginTop: 1 }}>Add to home screen for the full app experience</div>
-      </div>
-      <button onClick={() => { deferredPrompt.prompt(); setDeferredPrompt(null); }} style={{ ...S.btnPrimary, padding: '7px 14px', fontSize: 11, flexShrink: 0 }}>Install</button>
-      <span onClick={() => { setDismissed(true); sessionStorage.setItem('pwa-dismiss', '1'); }} style={{ color: '#6B7890', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 4 }} aria-label="Close">&times;</span>
+    <div style={{ position: 'fixed', bottom: 'calc(70px + env(safe-area-inset-bottom, 0px))', right: 16, zIndex: 200, background: 'rgba(14,18,30,.96)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: `1px solid ${T.ac3}`, borderRadius: 10, padding: '8px 10px 8px 12px', boxShadow: '0 8px 24px rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', gap: 8, animation: 'slideUp .3s cubic-bezier(.2,.9,.3,1)' }}>
+      <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Install app</span>
+      <button onClick={() => { deferredPrompt.prompt(); setDeferredPrompt(null); }} style={{ ...S.btnPrimary, padding: '5px 12px', fontSize: 10, flexShrink: 0 }}>Install</button>
+      <span onClick={() => { setDismissed(true); sessionStorage.setItem('pwa-dismiss', '1'); }} style={{ color: T.tx3, cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 4 }} aria-label="Close">&times;</span>
     </div>
   );
 };
