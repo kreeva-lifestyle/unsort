@@ -204,17 +204,21 @@ body.modal-open .fab { display: none !important; }
 
 /* ── Cash Challan module mobile ──────────────────────────── */
 @media (max-width: 768px) {
-  .challan-header { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
-  .challan-nav-btns { overflow-x: auto !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important; padding-bottom: 2px !important; }
+  .challan-header { flex-direction: row !important; align-items: center !important; gap: 8px !important; margin-bottom: 8px !important; }
+  .challan-header > div:first-child { font-size: 10px !important; flex: 1 !important; }
+  .challan-nav-btns { overflow-x: auto !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important; gap: 4px !important; flex-shrink: 0 !important; }
   .challan-nav-btns::-webkit-scrollbar { display: none !important; }
-  .challan-filters { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
-  .challan-filters input { width: 100% !important; min-width: 0 !important; }
-  .challan-filter-btns { display: flex !important; gap: 6px !important; overflow-x: auto !important; scrollbar-width: none !important; }
+  .challan-nav-btns button { padding: 4px 8px !important; font-size: 9px !important; white-space: nowrap !important; }
+  .challan-filters { padding: 8px 10px !important; gap: 6px !important; margin-bottom: 6px !important; }
+  .challan-filters input { width: 100% !important; min-width: 0 !important; height: 32px !important; font-size: 13px !important; }
+  .challan-filter-btns { display: flex !important; gap: 4px !important; overflow-x: auto !important; scrollbar-width: none !important; flex-shrink: 0 !important; }
   .challan-filter-btns::-webkit-scrollbar { display: none !important; }
+  .challan-filter-btns button { font-size: 10px !important; padding: 4px 8px !important; }
 
   /* Filter grid (Status / Tag / From / To / Per page) — compact for 393px */
-  .challan-filter-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
-  .challan-filter-grid select, .challan-filter-grid input { font-size: 13px !important; min-height: 34px !important; height: 34px !important; padding: 6px 8px !important; }
+  .challan-filter-grid { grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
+  .challan-filter-grid > div > label { font-size: 9px !important; margin-bottom: 2px !important; }
+  .challan-filter-grid select, .challan-filter-grid input { font-size: 13px !important; min-height: 32px !important; height: 32px !important; padding: 4px 8px !important; }
 
   /* Per-row action icons (print/remind/return/void) */
   .challan-row-actions { gap: 2px !important; }
@@ -252,11 +256,11 @@ body.modal-open .fab { display: none !important; }
   .challan-aging-pills::-webkit-scrollbar { display: none !important; }
   .challan-aging-pills > span { flex-shrink: 0 !important; }
 
-  /* Analytics date row — side-by-side dates with Apply below */
-  .challan-analytics-dates { flex-wrap: wrap !important; gap: 6px !important; }
-  .challan-analytics-dates input { flex: 1 1 calc(45% - 6px) !important; min-height: 34px !important; height: 34px !important; font-size: 13px !important; padding: 6px 8px !important; }
+  /* Analytics date row — inline on mobile */
+  .challan-analytics-dates { flex-wrap: nowrap !important; gap: 6px !important; }
+  .challan-analytics-dates input { flex: 1 !important; min-height: 32px !important; height: 32px !important; font-size: 12px !important; padding: 4px 6px !important; min-width: 0 !important; }
   .challan-analytics-dates span { font-size: 9px !important; flex: 0 0 auto !important; }
-  .challan-analytics-dates button { width: 100% !important; min-height: 38px !important; }
+  .challan-analytics-dates button { padding: 6px 12px !important; font-size: 11px !important; min-height: 32px !important; white-space: nowrap !important; }
 
   /* Pagination */
   .challan-pagination { flex-wrap: wrap !important; gap: 4px !important; justify-content: center !important; }
@@ -285,14 +289,18 @@ body.modal-open .fab { display: none !important; }
 @media (max-width: 768px) {
   .inv-desktop { display: none !important; }
   .inv-mobile { display: block !important; }
-  .inv-top-actions { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
-  .inv-top-actions > div { flex-wrap: wrap !important; }
-  .inv-action-btns { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
-  .inv-action-btns > div { justify-content: center !important; text-align: center !important; }
-  .filter-bar { flex-direction: column !important; gap: 8px !important; align-items: stretch !important; }
-  .filter-bar > div:first-child { overflow-x: auto !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important; }
-  .filter-bar > div:first-child::-webkit-scrollbar { display: none !important; }
-  .filter-bar > div:nth-child(2) { min-width: 0 !important; }
+  .inv-top-actions { flex-direction: row !important; align-items: center !important; gap: 8px !important; margin-bottom: 8px !important; }
+  .inv-top-actions > div:first-child { flex: 1 !important; gap: 4px !important; }
+  .inv-top-actions > div:first-child > div:last-child { font-size: 10px !important; }
+  .inv-action-btns { display: flex !important; gap: 4px !important; flex-shrink: 0 !important; }
+  .inv-action-btns > div { padding: 6px 10px !important; font-size: 10px !important; }
+  .filter-bar { padding: 8px 10px !important; gap: 6px !important; margin-bottom: 8px !important; }
+  .filter-bar > div:first-child { min-width: 0 !important; }
+  .filter-bar > div:first-child input { height: 32px !important; font-size: 13px !important; }
+  .filter-bar > div:nth-child(2) { overflow-x: auto !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important; }
+  .filter-bar > div:nth-child(2)::-webkit-scrollbar { display: none !important; }
+  .filter-bar > div:nth-child(2) button { padding: 4px 10px !important; font-size: 11px !important; height: 28px !important; flex-shrink: 0 !important; }
+  .filter-bar > div:nth-child(3) button { height: 28px !important; font-size: 11px !important; padding: 0 10px !important; }
   .inv-filter-backdrop { background: rgba(0,0,0,.6) !important; }
   .inv-filter-popover { position: fixed !important; top: auto !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; border-radius: 14px 14px 0 0 !important; max-height: 80vh !important; overflow-y: auto !important; animation: slideUp .2s ease both !important; scrollbar-width: none !important; }
   .inv-filter-popover::-webkit-scrollbar { display: none !important; }
@@ -303,11 +311,12 @@ body.modal-open .fab { display: none !important; }
   .minis-grid { grid-template-columns: 1fr !important; }
   .addr-form-grid { grid-template-columns: 1fr !important; }
 
-  /* PackStation scan history — compact date range row */
-  .scan-date-range { padding: 10px 12px !important; gap: 6px !important; }
-  .scan-date-range > div { flex: 1 1 calc(50% - 6px) !important; }
-  .scan-date-range input[type="date"] { width: 100% !important; height: 34px !important; font-size: 13px !important; padding: 6px 8px !important; }
-  .scan-date-range button { padding: 4px 8px !important; font-size: 10px !important; }
+  /* PackStation scan history — compact date range */
+  .scan-date-range { padding: 8px 10px !important; gap: 6px !important; align-items: center !important; }
+  .scan-date-range > div { flex: 1 !important; }
+  .scan-date-range > div > div:first-child { font-size: 8px !important; margin-bottom: 2px !important; }
+  .scan-date-range input[type="date"] { width: 100% !important; height: 32px !important; font-size: 12px !important; padding: 4px 6px !important; }
+  .scan-date-range button { padding: 4px 8px !important; font-size: 9px !important; height: 28px !important; }
 
   /* Spare Parts — compact search + category filter */
   .inv-extra-filters select { height: 34px !important; font-size: 12px !important; padding: 6px 8px !important; }
