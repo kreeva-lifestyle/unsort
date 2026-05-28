@@ -60,7 +60,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [challans, setChallans] = useState<Challan[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
   const [totalCount, setTotalCount] = useState(0);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -121,7 +121,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [ledgerPdfTitle, setLedgerPdfTitle] = useState('');
   const ledgerPdfIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [userName, setUserName] = useState('there');
-  const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number; inventoryDeducted?: boolean } | null>(null);
   const [printHtml, setPrintHtml] = useState<string | null>(null);
   const printIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [viewingChallan, setViewingChallan] = useState<Challan | null>(null);
@@ -653,7 +653,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Void challan ───────────────────────────────────────────────────────────
   const voidChallan = async (id: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total, amount_paid, status, payment_mode').eq('id', id).maybeSingle();
+    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total, amount_paid, status, payment_mode, inventory_deducted').eq('id', id).maybeSingle();
     if (!before) return;
     if (before.status === 'paid') { addToast('Cannot void a fully paid challan', 'error'); return; }
     if (before.status === 'voided') { addToast('Already voided', 'error'); return; }
@@ -670,6 +670,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     }
     await ccAuditLog('VOID', id, `Challan #${before.challan_number} (${before.customer_name}) voided — was ₹${before.total}`, { status: { from: before.status, to: 'voided' }, amount_paid: { from: before.amount_paid, to: 0 } });
     addToast(`Challan #${before.challan_number} voided`, 'success');
+    if (before.inventory_deducted) addToast(`⚠ Inventory was deducted for this challan — please reverse the inventory transaction manually`, 'error');
     fetchChallans();
   };
 
@@ -681,11 +682,18 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   // ── WhatsApp payment reminder ──────────────────────────────────────────────
-  const buildReminderMsg = (c: Challan) => {
-    const outstanding = Number(c.total) - Number(c.amount_paid || 0);
+  const buildReminderMsg = async (c: Challan) => {
+    const challanDue = Number(c.total) - Number(c.amount_paid || 0);
     const paidSoFar = Number(c.amount_paid || 0);
     const partialNote = paidSoFar > 0 ? `\n₹${paidSoFar.toLocaleString('en-IN')} received so far.` : '';
-    return encodeURIComponent(`Hi ${c.customer_name},\nGentle reminder — your Cash Challan #${c.challan_number} dated ${new Date(c.created_at).toLocaleDateString('en-IN')} for ₹${Number(c.total).toLocaleString('en-IN')} is pending.${partialNote}\nOutstanding: ₹${outstanding.toLocaleString('en-IN')}\nPlease arrange payment at your earliest convenience.\n— Arya Designs`);
+    let totalOutQ = supabase.from('cash_challans').select('total, amount_paid, is_return').eq('customer_name', c.customer_name).in('status', ['unpaid', 'partial']);
+    if (c.customer_id) totalOutQ = totalOutQ.eq('customer_id', c.customer_id);
+    const { data: allChallans } = await totalOutQ;
+    const unpaidSum = (allChallans || []).filter(r => !r.is_return).reduce((s, r) => s + (Number(r.total) - Number(r.amount_paid || 0)), 0);
+    const returnSum = (allChallans || []).filter(r => r.is_return).reduce((s, r) => s + (Number(r.total) - Number(r.amount_paid || 0)), 0);
+    const totalOutstanding = Math.max(0, Math.round(unpaidSum - returnSum));
+    const outLine = totalOutstanding > challanDue ? `\nTotal outstanding across all challans: ₹${totalOutstanding.toLocaleString('en-IN')}` : '';
+    return encodeURIComponent(`Hi ${c.customer_name},\nGentle reminder — your Cash Challan #${c.challan_number} dated ${new Date(c.created_at).toLocaleDateString('en-IN')} for ₹${Number(c.total).toLocaleString('en-IN')} is pending.${partialNote}\nOutstanding: ₹${challanDue.toLocaleString('en-IN')}${outLine}\nPlease arrange payment at your earliest convenience.\n— Arya Designs`);
   };
 
   const sendReminder = async (c: Challan) => {
@@ -694,10 +702,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const phone = (c as any).customer_phone || null;
     if (!phone && c.customer_id) {
       const { data: cust } = await supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle();
-      if (cust?.phone) { window.location.href = `https://wa.me/${waPhone(cust.phone)}?text=${buildReminderMsg(c)}`; return; }
+      if (cust?.phone) { window.location.href = `https://wa.me/${waPhone(cust.phone)}?text=${await buildReminderMsg(c)}`; return; }
     }
     if (phone) {
-      window.location.href = `https://wa.me/${waPhone(phone)}?text=${buildReminderMsg(c)}`;
+      window.location.href = `https://wa.me/${waPhone(phone)}?text=${await buildReminderMsg(c)}`;
     } else {
       setReminderChallan(c);
       setReminderPhone('');
@@ -709,7 +717,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (reminderChallan.customer_id) {
       await supabase.from('cash_challan_customers').update({ phone: reminderPhone.trim() }).eq('id', reminderChallan.customer_id).then(({ error: e }) => { if (e) addToast('Phone save failed — ' + friendlyError(e), 'error'); });
     }
-    window.location.href = `https://wa.me/${waPhone(reminderPhone)}?text=${buildReminderMsg(reminderChallan)}`;
+    window.location.href = `https://wa.me/${waPhone(reminderPhone)}?text=${await buildReminderMsg(reminderChallan)}`;
     setReminderChallan(null);
   };
 
@@ -1160,14 +1168,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── List View ──────────────────────────────────────────────────────────────
   return (
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
-      {/* Header */}
-      <div className="challan-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Cash Challan</span>
-        <div className="challan-nav-btns" style={{ display: 'flex', gap: 6 }}>
+      {/* Header — Programs-style: subtitle left, action buttons right */}
+      <div className="challan-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 12, color: T.tx3 }}>{totalCount} challan{totalCount === 1 ? '' : 's'} · invoicing, payments, returns</div>
+        <div className="challan-nav-btns" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          {profile?.module_access?.cashbook !== false && <button onClick={() => { setShowCashBook(true); window.history.pushState({ view: 'cashbook' }, ''); }} style={{ ...S.btnGhost, ...S.btnSm, color: T.gr, borderColor: 'rgba(34,197,94,.25)', background: 'rgba(34,197,94,.06)' }}>Cash Book</button>}
+          <button onClick={() => { fetchLedger(); setShowLedger(true); window.history.pushState({ view: 'ledger' }, ''); }} style={{ ...S.btnGhost, ...S.btnSm }}>Ledger</button>
+          <button onClick={() => { fetchAnalytics(); setShowAnalytics(true); window.history.pushState({ view: 'analytics' }, ''); }} style={{ ...S.btnGhost, ...S.btnSm }}>Analytics</button>
           <button onClick={() => { setShowModal(true); window.history.pushState({ view: 'challan-new' }, ''); }} style={S.btnPrimary} className="desktop-only">+ New Challan</button>
-          {profile?.module_access?.cashbook !== false && <button onClick={() => { setShowCashBook(true); window.history.pushState({ view: 'cashbook' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.08)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Cash Book</button>}
-          <button onClick={() => { fetchLedger(); setShowLedger(true); window.history.pushState({ view: 'ledger' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Ledger</button>
-          <button onClick={() => { fetchAnalytics(); setShowAnalytics(true); window.history.pushState({ view: 'analytics' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Analytics</button>
         </div>
       </div>
 
@@ -1206,7 +1214,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         onPrint={printChallan}
         onRemind={sendReminder}
         onCreateReturn={(c) => { setIsReturn(true); setChallanStatus('paid'); selectReturnSource(c); setShowModal(true); }}
-        onVoid={(c) => setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number })}
+        onVoid={(c) => setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number, inventoryDeducted: !!c.inventory_deducted })}
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
       />
 
       <ChallanBulkActions
@@ -1269,7 +1280,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         onPrint={() => printChallan(viewingChallan)}
         onRemind={() => { const c = viewingChallan; setViewingChallan(null); sendReminder(c); }}
         onReturn={() => { const c = viewingChallan; setViewingChallan(null); setIsReturn(true); setChallanStatus('paid'); selectReturnSource(c); setShowModal(true); }}
-        onVoid={() => { const c = viewingChallan; setViewingChallan(null); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number }); }}
+        onVoid={() => { const c = viewingChallan; setViewingChallan(null); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number, inventoryDeducted: !!c.inventory_deducted }); }}
         hasNext={idx < challans.length - 1}
         hasPrev={idx > 0}
         onNext={() => { if (idx < challans.length - 1) setViewingChallan(challans[idx + 1]); }}
@@ -1288,7 +1299,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setReminderChallan(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.ac3}`, fontSize: 11, fontWeight: 500, background: T.ac3, color: T.ac2, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={saveReminderPhone} disabled={!reminderPhone.trim()} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: reminderPhone.trim() ? `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)` : 'rgba(255,255,255,.05)', color: '#fff', cursor: reminderPhone.trim() ? 'pointer' : 'not-allowed' }}>Send</button>
+              <button onClick={saveReminderPhone} disabled={!reminderPhone.trim()} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: reminderPhone.trim() ? `linear-gradient(135deg, ${T.gr}, ${T.grCC})` : 'rgba(255,255,255,.05)', color: '#fff', cursor: reminderPhone.trim() ? 'pointer' : 'not-allowed' }}>Send</button>
             </div>
           </div>
         </div>
@@ -1325,26 +1336,20 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }}>
             <div style={{ fontSize: 28, marginBottom: 6 }}>⚠️</div>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>{confirmAction.type === 'void' ? 'Void Challan?' : 'Delete Challan?'}</div>
-            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>{confirmAction.type === 'void' ? `Challan #${confirmAction.challanNumber} will be marked voided. This cannot be undone.` : `Challan #${confirmAction.challanNumber} will be permanently deleted.`}</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: confirmAction.type === 'void' && confirmAction.inventoryDeducted ? 8 : 14 }}>{confirmAction.type === 'void' ? `Challan #${confirmAction.challanNumber} will be marked voided. This cannot be undone.` : `Challan #${confirmAction.challanNumber} will be permanently deleted.`}</div>
+            {confirmAction.type === 'void' && confirmAction.inventoryDeducted && (
+              <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl, marginBottom: 14, textAlign: 'left' as const }}>
+                Inventory was deducted for this challan. After voiding, you'll need to reverse the inventory deduction manually.
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmAction(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.ac3}`, fontSize: 11, fontWeight: 500, background: T.ac3, color: T.ac2, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={async () => { const a = confirmAction; setConfirmAction(null); if (a.type === 'void') await voidChallan(a.id); }} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: 'pointer' }}>{confirmAction.type === 'void' ? 'Void' : 'Delete'}</button>
+              <button onClick={async () => { const a = confirmAction; setConfirmAction(null); if (a.type === 'void') await voidChallan(a.id); }} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', cursor: 'pointer' }}>{confirmAction.type === 'void' ? 'Void' : 'Delete'}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Pagination */}
-      {totalPages > 0 && (
-        <div className="challan-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
-          <span style={{ fontSize: 10, color: T.tx3 }}>{totalCount} records</span>
-          {totalPages > 1 && <>
-            <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }} aria-label="Previous page">Prev</span>
-            <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
-            <span onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">Next</span>
-          </>}
-        </div>
-      )}
 
       {printHtml && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#060810', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>

@@ -513,7 +513,6 @@ export default function CashBook() {
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>Cash Book</span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={S.fDate} />
           <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
@@ -532,7 +531,7 @@ export default function CashBook() {
           {editingOpening ? (
             <div style={{ display: 'flex', gap: 4 }}>
               <input type="number" value={openingInput} onKeyDown={e => numericKeyDown(e, true)} onChange={e => setOpeningInput(e.target.value)} placeholder="0" style={{ ...S.fInput, width: 100, fontFamily: T.mono, textAlign: 'right' }} />
-              <button onClick={saveOpening} disabled={busy} style={{ ...S.btnSm, border: 'none', background: T.ac, color: '#fff', fontWeight: 600, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Saving…' : 'Save'}</button>
+              <button onClick={saveOpening} disabled={busy} style={{ ...S.btnPrimary, ...S.btnSm, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Saving…' : 'Save'}</button>
               <button onClick={() => { setEditingOpening(false); setOpeningInput(String(openingBalance)); }} style={{ ...S.btnGhost, ...S.btnSm }}>Cancel</button>
             </div>
           ) : (
@@ -564,7 +563,7 @@ export default function CashBook() {
         ] as const).map(t => {
           const active = tab === t.id;
           return (
-            <div key={t.id} role="button" tabIndex={0} onClick={() => setTab(t.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setTab(t.id); }} style={{ padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: active ? 700 : 500, cursor: 'pointer', background: active ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'transparent', color: active ? '#fff' : T.tx3, display: 'flex', alignItems: 'center', gap: 8, transition: T.transition }}>
+            <div key={t.id} role="button" tabIndex={0} onClick={() => setTab(t.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setTab(t.id); }} style={{ padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: active ? 700 : 500, cursor: 'pointer', background: active ? `linear-gradient(135deg, ${T.ac87}, ${T.ac2cc})` : 'transparent', color: active ? '#fff' : T.tx3, display: 'flex', alignItems: 'center', gap: 8, transition: T.transition }}>
               <span>{t.label}</span>
               <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 10, background: active ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.04)', color: active ? '#fff' : T.tx3, fontFamily: T.mono, minWidth: 18, textAlign: 'center' as const }}>{t.count}</span>
             </div>
@@ -625,7 +624,7 @@ export default function CashBook() {
       {/* Handovers Tab */}
       {tab === 'handovers' && <>
         {currentUserRole !== 'admin' ? (
-          <button onClick={() => setShowHandover(true)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.yl}, ${T.yl}cc)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>+ Initiate Handover</button>
+          <button onClick={() => setShowHandover(true)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.yl}, ${T.ylCC})`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>+ Initiate Handover</button>
         ) : (
           <div style={{ padding: '8px 12px', borderRadius: 6, background: T.ac3, border: `1px solid ${T.ac3}`, color: T.tx2, fontSize: 10, marginBottom: 10 }}>Admins receive handovers — users initiate them. Review pending handovers below.</div>
         )}
@@ -648,8 +647,8 @@ export default function CashBook() {
               {h.status === 'confirmed' && h.confirmed_at && <div style={{ fontSize: 9, color: T.gr, fontFamily: T.mono, marginBottom: 4 }}>Signed at {new Date(h.confirmed_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
               {h.status === 'disputed' && h.rejected_at && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono, marginBottom: 4 }}>Rejected at {new Date(h.rejected_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
               <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                {h.status === 'pending' && h.to_user_id === currentUserId && <button onClick={() => setConfirmingHandover(h)} style={{ padding: '4px 12px', borderRadius: 5, border: 'none', background: T.gr, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Sign &amp; Confirm</button>}
-                {h.status === 'pending' && h.to_user_id === currentUserId && <button onClick={() => { setRejectingHandover(h); setRejectReason(''); setRejectError(''); }} style={{ padding: '4px 12px', borderRadius: 5, border: 'none', background: T.re, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Reject</button>}
+                {h.status === 'pending' && h.to_user_id === currentUserId && <button onClick={() => setConfirmingHandover(h)} style={{ ...S.btnSuccess, ...S.btnSm }}>Sign &amp; Confirm</button>}
+                {h.status === 'pending' && h.to_user_id === currentUserId && <button onClick={() => { setRejectingHandover(h); setRejectReason(''); setRejectError(''); }} style={{ ...S.btnDanger, ...S.btnSm }}>Reject</button>}
                 <button onClick={() => setViewingHandover(h)} style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>View Summary</button>
                 <button onClick={() => printHandoverReceipt(h)} style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Print</button>
               </div>
@@ -768,7 +767,7 @@ export default function CashBook() {
             {handError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{handError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setShowHandover(false); setHandError(''); setHandReason(''); setHandAmount(''); setHandToId(''); setHandNotes(''); setHandBreakdown(null); setExcludePaise(false); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
-              <button onClick={createHandover} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}, ${T.yl}cc)`, color: '#fff', cursor: 'pointer' }}>Initiate</button>
+              <button onClick={createHandover} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}, ${T.ylCC})`, color: '#fff', cursor: 'pointer' }}>Initiate</button>
             </div>
           </div>
         </div>
@@ -827,7 +826,7 @@ export default function CashBook() {
             {confirmError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{confirmError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setConfirmingHandover(null); setConfirmPin(''); setConfirmError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
-              <button onClick={confirmHandover} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Confirming…' : 'Sign & Confirm'}</button>
+              <button onClick={confirmHandover} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}, ${T.grCC})`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Confirming…' : 'Sign & Confirm'}</button>
             </div>
           </div>
         </div>
@@ -844,7 +843,7 @@ export default function CashBook() {
             {rejectError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{rejectError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setRejectingHandover(null); setRejectReason(''); setRejectError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
-              <button onClick={submitReject} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Rejecting…' : 'Confirm Reject'}</button>
+              <button onClick={submitReject} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Rejecting…' : 'Confirm Reject'}</button>
             </div>
           </div>
         </div>
@@ -893,13 +892,13 @@ export default function CashBook() {
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This will permanently remove the expense.</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
-              <button onClick={() => deleteExpense(confirmDelete)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: 'pointer' }}>Delete</button>
+              <button onClick={() => deleteExpense(confirmDelete)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', cursor: 'pointer' }}>Delete</button>
             </div>
           </div>
         </div>
       )}
       {pendingExpDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: '#0B0F19', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, overflow: 'hidden', minWidth: 260 }}>
-        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: '#E2E8F0', flex: 1 }}>Expense deleted</span><span onClick={undoExpDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: '#F59E0B', color: '#fff' }}>Undo</span><span onClick={dismissExpDel} style={{ cursor: 'pointer', color: '#4A5568', fontSize: 14 }} aria-label="Dismiss">✕</span></div>
+        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: '#E2E8F0', flex: 1 }}>Expense deleted</span><span onClick={undoExpDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#fff' }}>Undo</span><span onClick={dismissExpDel} style={{ cursor: 'pointer', color: '#4A5568', fontSize: 14 }} aria-label="Dismiss">✕</span></div>
         <div className="undo-bar" key={pendingExpDel.id} />
       </div>}
     </div>

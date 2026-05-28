@@ -29,6 +29,7 @@ const Inventory = retryImport(() => import('./pages/Inventory'));
 const ProgramsModule = retryImport(() => import('./modules/programs'));
 const Minis = retryImport(() => import('./pages/Minis'));
 const LazyPublicShareView = retryImport(() => import('./modules/programs/PublicShareView'));
+const LazyTracklyRedirect = retryImport(() => import('./components/minis/TracklyRedirect'));
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import SidebarComponent from './components/layout/Sidebar';
@@ -101,7 +102,10 @@ const MainApp = () => {
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try { const v = localStorage.getItem('sidebarOpen'); return v === null ? true : v === '1'; } catch { return true; }
+  });
+  useEffect(() => { try { localStorage.setItem('sidebarOpen', sidebarOpen ? '1' : '0'); } catch { /* private mode */ } }, [sidebarOpen]);
 
   return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflowX: 'hidden', position: 'relative' }}>
     <div className="app-glows" aria-hidden="true" />
@@ -118,7 +122,7 @@ const MainApp = () => {
         {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Inventory' }, { id: 'packtime', icon: 'scan', label: 'PackStation' }, { id: 'challan', icon: 'file', label: 'Challan' }].filter(t => checkTab(t.id)).map(t => (
           <div key={t.id} onClick={() => { setTab(t.id); setMobileMenu(false); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: tab === t.id ? T.ac : T.tx3, fontSize: 9, fontWeight: 500, transition: 'color .2s ease', position: 'relative' }}>
             <Icon name={t.icon} size={20} /><span>{t.label}</span>
-            {tab === t.id && <span style={{ position: 'absolute', top: -8, width: 20, height: 3, borderRadius: 2, background: T.ac, boxShadow: `0 0 8px ${T.ac}66`, animation: 'tabDot .25s cubic-bezier(.2,.9,.3,1)' }} />}
+            {tab === t.id && <span style={{ position: 'absolute', top: -8, width: 20, height: 3, borderRadius: 2, background: T.ac, boxShadow: `0 0 8px ${T.ac44}`, animation: 'tabDot .25s cubic-bezier(.2,.9,.3,1)' }} />}
           </div>
         ))}
         {/* More — opens full sidebar drawer for Brand Tags / Settings / anything else */}
@@ -157,14 +161,10 @@ const InstallPrompt = () => {
   }, []);
   if (!deferredPrompt || dismissed) return null;
   return (
-    <div style={{ position: 'fixed', bottom: 70, left: 12, right: 12, zIndex: 200, background: 'rgba(14,18,30,.96)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: `1px solid ${T.ac3}`, borderRadius: 14, padding: '14px 16px', boxShadow: '0 12px 40px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 12, animation: 'slideUp .3s cubic-bezier(.2,.9,.3,1)' }}>
-      <div style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg, #6366F1, #38BDF8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', flexShrink: 0 }}>D</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#E2E8F0' }}>Install DailyOffice</div>
-        <div style={{ fontSize: 10, color: '#6B7890', marginTop: 1 }}>Add to home screen for the full app experience</div>
-      </div>
-      <button onClick={() => { deferredPrompt.prompt(); setDeferredPrompt(null); }} style={{ ...S.btnPrimary, padding: '7px 14px', fontSize: 11, flexShrink: 0 }}>Install</button>
-      <span onClick={() => { setDismissed(true); sessionStorage.setItem('pwa-dismiss', '1'); }} style={{ color: '#6B7890', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 4 }} aria-label="Close">&times;</span>
+    <div style={{ position: 'fixed', bottom: 'calc(70px + env(safe-area-inset-bottom, 0px))', right: 16, zIndex: 200, background: 'rgba(14,18,30,.96)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: `1px solid ${T.ac3}`, borderRadius: 10, padding: '8px 10px 8px 12px', boxShadow: '0 8px 24px rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', gap: 8, animation: 'slideUp .3s cubic-bezier(.2,.9,.3,1)' }}>
+      <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Install app</span>
+      <button onClick={() => { deferredPrompt.prompt(); setDeferredPrompt(null); }} style={{ ...S.btnPrimary, padding: '5px 12px', fontSize: 10, flexShrink: 0 }}>Install</button>
+      <span onClick={() => { setDismissed(true); sessionStorage.setItem('pwa-dismiss', '1'); }} style={{ color: T.tx3, cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 4 }} aria-label="Close">&times;</span>
     </div>
   );
 };
@@ -178,6 +178,9 @@ const AppContent = () => {
   const hash = window.location.hash;
   const shareMatch = hash.match(/^#\/share\/program\/([a-f0-9]+)$/);
   if (shareMatch) return <Suspense fallback={<div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyPublicShareView shareToken={shareMatch[1]} /></Suspense>;
+
+  const shortMatch = hash.match(/^#\/s\/([a-zA-Z0-9_-]{3,32})$/);
+  if (shortMatch) return <Suspense fallback={<div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyTracklyRedirect shortCode={shortMatch[1]} /></Suspense>;
 
   if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100vh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}><div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Unsort</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase' }}>LOADING</p></div>;
   if (!auth?.user) return <Login signIn={auth.signIn} />;

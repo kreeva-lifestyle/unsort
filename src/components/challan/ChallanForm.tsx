@@ -215,7 +215,7 @@ export default function ChallanForm(p: ChallanFormProps) {
                 d < 0 ||
                 (it.discount_type === 'percentage' && d > 100) ||
                 (it.discount_type !== 'percentage' && q > 0 && pr > 0 && d > q * pr);
-              const errBorder = `1px solid ${T.re}aa`;
+              const errBorder = `1px solid ${T.reAA}`;
               const okBorder = `1px solid ${T.bd}`;
               return (
               <div key={i}>
@@ -264,7 +264,7 @@ export default function ChallanForm(p: ChallanFormProps) {
           <div className="challan-form-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
             <div>
               <label style={lbl}>Shipping/Porter</label>
-              <input type="number" min="0" value={p.shippingCharges || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setShippingCharges(Math.max(0, Number(e.target.value)))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11, border: p.shippingCharges < 0 ? `1px solid ${T.re}aa` : `1px solid ${T.bd}` }} />
+              <input type="number" min="0" value={p.shippingCharges || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setShippingCharges(Math.max(0, Number(e.target.value)))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11, border: p.shippingCharges < 0 ? `1px solid ${T.reAA}` : `1px solid ${T.bd}` }} />
               {p.shippingCharges < 0 && <div style={{ fontSize: 10, color: T.re, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>⚠ Cannot be negative</div>}
             </div>
             <div>

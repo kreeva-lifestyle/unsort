@@ -1,15 +1,60 @@
 // Notifications hook + provider
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, createContext, useContext } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
 
-const NotificationContext = createContext<any>(null);
-export const useNotifications = () => useContext(NotificationContext);
+interface NotificationContextValue {
+  notifications: any[];
+  toasts: { id: number; message: string; type: string }[];
+  markAsRead: (id: string) => Promise<void>;
+  addToast: (message: string, type?: string) => void;
+  fetchNotifications: () => Promise<void>;
+}
+
+const NotificationContext = createContext<NotificationContextValue | null>(null);
+export const useNotifications = () => {
+  const ctx = useContext(NotificationContext);
+  if (!ctx) throw new Error('useNotifications must be used within NotificationProvider');
+  return ctx;
+};
 
 export const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [toasts, setToasts] = useState<any[]>([]);
   const { user } = useAuth();
+
+  // Narrow dedup: suppress identical toasts only within a 200ms window
+  // (catches render-loop spam without silencing legitimate sequential ones).
+  const lastToastRef = useRef<{ message: string; type: string; ts: number } | null>(null);
+  const addToast = useCallback((message: string, type = 'info') => {
+    const now = Date.now();
+    const last = lastToastRef.current;
+    if (last && last.message === message && last.type === type && now - last.ts < 200) return;
+    lastToastRef.current = { message, type, ts: now };
+    const id = now + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
+  }, []);
+
+  const fetchNotifications = useCallback(async () => {
+    if (!user) return;
+    const { data, error } = await supabase.from('notifications').select('id, user_id, title, message, type, entity_id, is_read, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50);
+    if (!error) {
+      setNotifications(data || []);
+      try { const c = (data || []).filter((n: any) => !n.is_read).length; if (c > 0) (navigator as any).setAppBadge?.(c); else (navigator as any).clearAppBadge?.(); } catch {}
+    }
+  }, [user]);
+
+  const markAsRead = useCallback(async (id: string) => {
+    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+    if (!error) {
+      setNotifications((prev) => {
+        const next = prev.map((n) => (n.id === id ? { ...n, is_read: true } : n));
+        try { const c = next.filter((n: any) => !n.is_read).length; if (c > 0) (navigator as any).setAppBadge?.(c); else (navigator as any).clearAppBadge?.(); } catch {}
+        return next;
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -19,34 +64,9 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       addToast(payload.new.title, payload.new.type);
     }).subscribe();
     return () => { supabase.removeChannel(channel); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, addToast, fetchNotifications]);
 
-  const fetchNotifications = async () => {
-    if (!user) return;
-    const { data, error } = await supabase.from('notifications').select('id, user_id, title, message, type, entity_id, is_read, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50);
-    if (!error) {
-      setNotifications(data || []);
-      try { const c = (data || []).filter((n: any) => !n.is_read).length; if (c > 0) (navigator as any).setAppBadge?.(c); else (navigator as any).clearAppBadge?.(); } catch {}
-    }
-  };
+  const value = useMemo(() => ({ notifications, toasts, markAsRead, addToast, fetchNotifications }), [notifications, toasts, markAsRead, addToast, fetchNotifications]);
 
-  const markAsRead = async (id: string) => {
-    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
-    if (!error) {
-      setNotifications((prev) => {
-        const next = prev.map((n) => (n.id === id ? { ...n, is_read: true } : n));
-        try { const c = next.filter((n: any) => !n.is_read).length; if (c > 0) (navigator as any).setAppBadge?.(c); else (navigator as any).clearAppBadge?.(); } catch {}
-        return next;
-      });
-    }
-  };
-
-  const addToast = (message: string, type = 'info') => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
-  };
-
-  return <NotificationContext.Provider value={{ notifications, toasts, markAsRead, addToast, fetchNotifications }}>{children}</NotificationContext.Provider>;
+  return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 };

@@ -24,7 +24,7 @@ export default function Header({ title, onNotifClick, notifications, markAsRead,
     <header className="header-bar" style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '0 16px', position: 'sticky', top: 0, zIndex: 50, height: 56, display: 'flex', alignItems: 'center' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
         {onToggleSidebar && <button className="desktop-only" onClick={onToggleSidebar} style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${T.bd}`, background: 'transparent', cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }} title={sidebarOpen ? 'Collapse menu' : 'Expand menu'}>
-          <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' }}>{sidebarOpen ? <><path d="M18 6L6 18M6 6l12 12" /></> : <><path d="M3 12h18M3 6h18M3 18h18" /></>}</svg>
+          <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' }}>{sidebarOpen ? <><path d="M3 12h18M3 6h18M3 18h18" /></> : <><path d="M18 6L6 18M6 6l12 12" /></>}</svg>
         </button>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.bl, boxShadow: `0 0 8px ${T.bl}` }} />
@@ -35,7 +35,7 @@ export default function Header({ title, onNotifClick, notifications, markAsRead,
         <div style={{ position: 'relative' }}>
         <button onClick={() => setShow(!show)} style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${T.bd2}`, background: 'transparent', cursor: 'pointer', position: 'relative', color: T.tx, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.background = 'oklch(1 0 0 / 0.05)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
           <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
-          {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono, boxShadow: `0 0 8px ${T.ac}66`, animation: 'subtlePulse 2s ease-in-out infinite' }}>{unread}</span>}
+          {unread > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: T.ac, color: 'white', borderRadius: '50%', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.mono, boxShadow: `0 0 8px ${T.ac44}`, animation: 'subtlePulse 2s ease-in-out infinite' }}>{unread}</span>}
         </button>
         {show && (
           <div className="notif-dropdown" style={{ position: 'absolute', right: 0, top: 38, width: 'min(290px, calc(100vw - 32px))', background: 'rgba(12,16,28,0.96)', backdropFilter: 'blur(24px)', borderRadius: 8, boxShadow: '0 10px 40px rgba(0,0,0,.55)', border: `1px solid ${T.bd}`, zIndex: 50, maxHeight: 360, overflowY: 'auto' }}>

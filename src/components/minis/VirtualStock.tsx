@@ -4,6 +4,8 @@ import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 
+const STOCK_LIMIT = 1000;
+
 interface VsRow { id: string; sku: string; quantity: number }
 
 export default function VirtualStock({ setStock, addToast }: { stock: Record<string, number>; setStock: (s: Record<string, number>) => void; addToast: (msg: string, type?: string) => void }) {
@@ -21,7 +23,7 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
   const [pageSize, setPageSize] = useState(25);
 
   const fetch = useCallback(async () => {
-    const { data, error } = await supabase.from('virtual_stock').select('id, sku, quantity').order('sku').limit(1000);
+    const { data, error } = await supabase.from('virtual_stock').select('id, sku, quantity').order('sku').limit(STOCK_LIMIT);
     if (error) addToast('Failed to load virtual stock — ' + friendlyError(error), 'error');
     const items = data || [];
     setRows(items);
@@ -141,7 +143,8 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
               </div>
             ))}
           </div>
-          {filtered.length > pageSize && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, padding: '4px 0' }}>
+          {rows.length === STOCK_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {STOCK_LIMIT} items. Use search to find more.</div>}
+          {filtered.length > pageSize && <div className="vs-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, padding: '4px 0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }} aria-label="Previous page">Prev</span>
               <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>

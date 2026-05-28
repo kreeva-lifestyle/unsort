@@ -2,16 +2,18 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../lib/theme';
 import { useNotifications } from '../hooks/useNotifications';
+import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import AddressPrinter from '../components/minis/AddressPrinter';
 import CbazaarImport from '../components/minis/CbazaarImport';
 import OdetteImport from '../components/minis/OdetteImport';
 import VirtualStock from '../components/minis/VirtualStock';
+import Trackly from '../components/minis/Trackly';
 
-const SIZE_MAP: Record<number, string> = { 34: 'XS', 36: 'S', 38: 'M', 40: 'L', 42: 'XL', 44: 'XXL' };
+const SIZE_MAP: Record<number, string> = { 32: 'XXS', 34: 'XS', 36: 'S', 38: 'M', 40: 'L', 42: 'XL', 44: 'XXL' };
 
 interface UtsavRow { relid: string; vendorno: string; stock: number; leadtime: number; block: number; designno: string; size: number; catalogname: string; updateddate: string; aryaSku: string }
 
-type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'address';
+type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'address' | 'trackly';
 
 export default function Minis() {
   const { addToast } = useNotifications();
@@ -25,6 +27,13 @@ export default function Minis() {
     setViewState(v);
     if (v !== 'home') window.history.pushState({ miniView: v }, '');
   }, []);
+
+  const viewLabels: Record<MiniView, string | null> = { home: null, cbazaar: 'Cbazaar Import', odette: 'Odette Import', address: 'LabelMaker', utsav: 'Utsav Import', trackly: 'Trackly' };
+  const { set: setBreadcrumb } = useBreadcrumb();
+  useEffect(() => {
+    setBreadcrumb(viewLabels[view] ? [viewLabels[view]!] : null);
+    return () => setBreadcrumb(null);
+  }, [view, setBreadcrumb]);
 
   useEffect(() => {
     const onPop = () => setViewState('home');
@@ -80,10 +89,7 @@ export default function Minis() {
 
   if (view === 'cbazaar') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        {back}
-        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Cbazaar Import</span>
-      </div>
+      <div style={{ marginBottom: 14 }}>{back}</div>
       <VirtualStock stock={virtualStock} setStock={setVirtualStock} addToast={addToast} />
       <CbazaarImport addToast={addToast} />
     </div>
@@ -91,10 +97,7 @@ export default function Minis() {
 
   if (view === 'odette') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        {back}
-        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Odette Import</span>
-      </div>
+      <div style={{ marginBottom: 14 }}>{back}</div>
       <VirtualStock stock={virtualStock} setStock={setVirtualStock} addToast={addToast} />
       <OdetteImport addToast={addToast} virtualStock={virtualStock} />
     </div>
@@ -102,21 +105,21 @@ export default function Minis() {
 
   if (view === 'address') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        {back}
-        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>LabelMaker</span>
-      </div>
+      <div style={{ marginBottom: 14 }}>{back}</div>
       <AddressPrinter addToast={addToast} />
+    </div>
+  );
+
+  if (view === 'trackly') return (
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      <Trackly addToast={addToast} onBack={() => setViewState('home')} />
     </div>
   );
 
   if (view === 'utsav') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {back}
-          <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Utsav Import</span>
-        </div>
+        {back}
         <div style={{ display: 'flex', gap: 6 }}>
           <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
           {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export XLS</div>}
@@ -159,15 +162,13 @@ export default function Minis() {
 
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 14 }}>
-        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Minis</span>
-      </div>
       <div className="minis-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
         {[
           { id: 'utsav' as MiniView, title: 'Utsav Import', desc: 'Import vendor Excel, generate ARYA SKU column, export as XLS' },
           { id: 'cbazaar' as MiniView, title: 'Cbazaar Import', desc: 'Import Cbazaar vendor Excel, generate ARYA SKU column, export as CSV' },
           { id: 'odette' as MiniView, title: 'Odette Import', desc: 'Aggregate SKU quantities across multiple vendor sheets' },
           { id: 'address' as MiniView, title: 'LabelMaker', desc: 'Save addresses, print 4x6 inch courier label stickers' },
+          { id: 'trackly' as MiniView, title: 'Trackly', desc: 'Shorten URLs and track clicks — device, browser, location, timing analytics' },
         ].map(t => (
           <div key={t.id} onClick={() => setView(t.id)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>{t.title}</div>

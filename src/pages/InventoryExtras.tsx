@@ -17,6 +17,7 @@ import type {
   InventoryExtra,
 } from '../types/database';
 
+const EXTRAS_LIMIT = 1000;
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
 import { isDupatta, isLehenga, isBottomType, mfrFromSku } from '../lib/garmentHelpers';
 
@@ -35,6 +36,7 @@ export default function InventoryExtras() {
   const [catFilter, setCatFilter] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
   const [exportHtml, setExportHtml] = useState<string | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [editingExtra, setEditingExtra] = useState<InventoryExtra | null>(null);
@@ -74,7 +76,7 @@ export default function InventoryExtras() {
   useEffect(() => () => { if (skuTimer.current) clearTimeout(skuTimer.current); }, []);
 
   const fetchExtras = useCallback(async () => {
-    const { data } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, location, manufacturer, quantity, notes, created_by, created_at, updated_at').gt('quantity', 0).order('updated_at', { ascending: false }).limit(1000);
+    const { data } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, location, manufacturer, quantity, notes, created_by, created_at, updated_at').gt('quantity', 0).order('updated_at', { ascending: false }).limit(EXTRAS_LIMIT);
     setExtras(data || []);
     // Compute match counts — check item actually has this component missing
     const counts: Record<string, number> = {};
@@ -285,30 +287,41 @@ export default function InventoryExtras() {
     <div style={{ animation: 'fi .3s ease both' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Spare Parts</span>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <div onClick={() => {
-            if (filtered.length === 0) return;
-            const csv = 'SKU,Category,Component,Size,Qty\n' + filtered.map(ex => `${ex.sku},"${ex.product_name}",${ex.component_name},${ex.size},${ex.quantity}`).join('\n');
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Extras_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
-          }} style={btnGhost} className="desktop-only">Export</div>
-          <div onClick={() => {
+        <div>
+          <div style={{ fontSize: 11, color: T.tx3 }}>{filtered.length} items{catFilter !== 'all' ? ' (filtered)' : ''}</div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, position: 'relative' }}>
+          <div onClick={() => setShowExportMenu(v => !v)} style={btnGhost}>Export ▾</div>
+          {showExportMenu && <><div style={{ position: 'fixed', inset: 0, zIndex: 149 }} onClick={() => setShowExportMenu(false)} />
+          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'rgba(14,18,30,.97)', backdropFilter: 'blur(20px)', border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.4)', zIndex: 150, minWidth: 160, overflow: 'hidden' }}>
+            <div onClick={() => {
+              if (filtered.length === 0) { addToast('No data to export', 'error'); setShowExportMenu(false); return; }
+              const csv = 'SKU,Category,Component,Size,Qty\n' + filtered.map(ex => `${ex.sku},"${ex.product_name}",${ex.component_name},${ex.size},${ex.quantity}`).join('\n');
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Extras_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+              setShowExportMenu(false);
+            }} style={{ padding: '12px 14px', fontSize: 12, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 44 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>CSV Download</div>
+            <div onClick={() => {
+              setShowExportMenu(false);
             if (filtered.length === 0) return;
             const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
             const rows = filtered.map(ex => `<tr><td>${esc(ex.sku)}</td><td>${esc(ex.product_name)}</td><td>${esc(ex.component_name)}</td><td>${esc(ex.size)}</td><td>${esc(ex.location)}</td><td style="text-align:right;font-weight:600">${ex.quantity}</td></tr>`).join('');
             setExportHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spare Parts</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#060810;color:#E2E8F0;padding:16px;padding-bottom:80px;-webkit-text-size-adjust:100%}.header{margin-bottom:16px}.brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}.logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#6366F1,#38BDF8);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff}.title{font-size:15px;font-weight:700;letter-spacing:-0.3px}.sub{font-size:10px;color:#6B7890;letter-spacing:0.5px}.meta{display:flex;gap:12px;font-size:10px;color:#8896B0;margin-top:8px}.meta span{padding:3px 8px;border-radius:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}table{width:100%;border-collapse:collapse;margin-top:4px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.06)}th{background:rgba(255,255,255,.03);font-size:9px;font-weight:600;color:#6B7890;text-transform:uppercase;letter-spacing:0.8px;padding:10px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)}td{padding:9px 10px;font-size:11px;color:#8896B0;border-bottom:1px solid rgba(255,255,255,.04)}tr:nth-child(even) td{background:rgba(255,255,255,.015)}.footer{text-align:center;font-size:8px;color:#4A5568;margin-top:16px;letter-spacing:1px;text-transform:uppercase}.no-print{display:none}@page{size:A4;margin:8mm}@media print{body{background:#fff;color:#222;padding:8mm}th{background:#f5f5f5;color:#333}td{color:#444;border-color:#eee}.footer{color:#999}}</style></head><body><div class="header"><div class="brand"><div class="logo">D</div><div><div class="title">Spare Parts Report</div><div class="sub">Arya Designs</div></div></div><div class="meta"><span>${filtered.length} items</span><span>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div></div><table><thead><tr><th>SKU</th><th>Category</th><th>Component</th><th>Size</th><th>Location</th><th style="text-align:right">Qty</th></tr></thead><tbody>${rows}</tbody></table><div class="footer">Powered by DailyOffice</div></body></html>`);
-          }} style={btnGhost} className="mobile-only">Export</div>
+          }} style={{ padding: '12px 14px', fontSize: 12, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 44 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>Print / PDF</div>
+          </div></>}
           {canEdit && <div onClick={() => setShowAdd(true)} style={btn}>+ Add</div>}
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="inv-extra-filters" style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-        <input placeholder="Search SKU, category, component..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }}
-          style={{ ...input, flex: 1, minWidth: 120 }} />
+      {/* Filter bar */}
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
+          <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
+          <input placeholder="Search SKU, category, component..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }}
+            style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
+        </div>
         <select value={catFilter} onChange={e => { setCatFilter(e.target.value); setPage(0); }}
-          style={{ ...input, flex: 1, minWidth: 120 }}>
+          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', outline: 'none', cursor: 'pointer', flexShrink: 0 }}>
           <option value="all">All Categories</option>
           {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
         </select>
@@ -373,6 +386,8 @@ export default function InventoryExtras() {
           </SwipeRow>
         ))}
       </div>
+
+      {extras.length === EXTRAS_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {EXTRAS_LIMIT} items. Use search to find more.</div>}
 
       {/* Pagination */}
       {totalPages > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>

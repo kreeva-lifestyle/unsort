@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { BarcodeDetector } from 'barcode-detector/ponyfill';
 import { supabase, SUPABASE_ANON_KEY } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
+import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import { friendlyError } from '../lib/friendlyError';
 
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
@@ -565,6 +566,13 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   useEffect(() => { if (active) setShowHistory(false); }, [active]);
 
+  const { set: setBreadcrumb } = useBreadcrumb();
+  useEffect(() => {
+    if (showHistory) setBreadcrumb(['Scan History']);
+    else setBreadcrumb(null);
+    return () => setBreadcrumb(null);
+  }, [showHistory, setBreadcrumb]);
+
   // Browser back button support
   useEffect(() => {
     const onPop = () => { if (showHistory) setShowHistory(false); };
@@ -628,8 +636,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Scan History</div>
-          <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>{historyDateFrom && historyDateTo ? `${historyTotal} records · ${historyDateFrom} to ${historyDateTo}` : 'Pick a date range to view scans'}</div>
+          <div style={{ fontSize: 11, color: T.tx3 }}>{historyDateFrom && historyDateTo ? `${historyTotal} records · ${historyDateFrom} to ${historyDateTo}` : 'Pick a date range to view scans'}</div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button onClick={() => { setShowHistory(false); window.history.back(); }} style={S.btnGhost}>← Back</button>
@@ -660,17 +667,17 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {/* Stat strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.ac}cc, ${T.ac}22)` }} />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.ac87}, ${T.ac22})` }} />
           <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Total Scans</div>
           <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.ac2 }}>{historyTotal}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.gr}cc, ${T.gr}22)` }} />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.grCC}, ${T.gr22})` }} />
           <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Today</div>
           <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.gr }}>{historyData.filter(r => r.scanned_at && new Date(r.scanned_at).toDateString() === new Date().toDateString()).length}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.yl}cc, ${T.yl}22)` }} />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.ylCC}, ${T.yl22})` }} />
           <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Couriers</div>
           <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.yl }}>{new Set(historyData.map(r => r.courier)).size}</div>
         </div>
@@ -765,7 +772,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This will permanently remove the scan from the database and Google Sheet.</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmDeleteId(null)} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Cancel</button>
-              <button onClick={() => { deleteHistoryScan(confirmDeleteId); setConfirmDeleteId(null); }} style={{ ...S.btnDanger, flex: 1, justifyContent: 'center', background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', border: 'none' }}>Delete</button>
+              <button onClick={() => { deleteHistoryScan(confirmDeleteId); setConfirmDeleteId(null); }} style={{ ...S.btnDanger, flex: 1, justifyContent: 'center', background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', border: 'none' }}>Delete</button>
             </div>
           </div>
         </div>
@@ -794,8 +801,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768;
   if (isDesktop && !showHistory && !started) return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>PackStation</span>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 14 }}>
         <button onClick={() => { const d = new Date(); setHistoryDateTo(d.toISOString().slice(0,10)); d.setDate(d.getDate()-6); setHistoryDateFrom(d.toISOString().slice(0,10)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={S.btnGhost}>History</button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12 }}>
@@ -809,8 +815,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   // ── Setup Screen ────────────────────────────────────────────────────────────
   if (!started) return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>PackStation</span>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {dbFails > 0 && <span style={{ fontSize: 9, color: T.re, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)' }}>{dbFails} DB save failed</span>}
           <button onClick={() => { const d = new Date(); setHistoryDateTo(d.toISOString().slice(0,10)); d.setDate(d.getDate()-6); setHistoryDateFrom(d.toISOString().slice(0,10)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
@@ -856,13 +861,13 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: T.tx2, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 7 }}>Camera Number</label>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(cameras.length, 4)}, 1fr)`, gap: 10 }}>
               {cameras.map(c => (
-                <div key={c.id} onClick={() => setCamera(c.number)} style={{ padding: '14px 0', borderRadius: 10, textAlign: 'center', fontSize: 18, fontWeight: 700, fontFamily: T.mono, cursor: 'pointer', transition: 'all .2s', background: camera === c.number ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.04)', color: camera === c.number ? '#fff' : T.tx2, border: `1px solid ${camera === c.number ? T.ac + '55' : T.bd2}`, boxShadow: camera === c.number ? `0 6px 20px ${T.ac}40` : 'none' }}>{c.number}</div>
+                <div key={c.id} onClick={() => setCamera(c.number)} style={{ padding: '14px 0', borderRadius: 10, textAlign: 'center', fontSize: 18, fontWeight: 700, fontFamily: T.mono, cursor: 'pointer', transition: 'all .2s', background: camera === c.number ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.04)', color: camera === c.number ? '#fff' : T.tx2, border: `1px solid ${camera === c.number ? T.ac + '55' : T.bd2}`, boxShadow: camera === c.number ? `0 6px 20px ${T.ac44}` : 'none' }}>{c.number}</div>
               ))}
             </div>
             {cameras.length === 0 && <div style={{ fontSize: 11, color: T.yl, marginTop: 6 }}>No cameras configured. Add in Settings → PackStation.</div>}
           </div>
 
-          <button onClick={handleStart} disabled={!selectedBrand || !courier || !camera || verifying} style={{ width: '100%', padding: '16px 0', borderRadius: 12, border: 'none', fontSize: 16, fontWeight: 700, fontFamily: T.sora, cursor: selectedBrand && courier && camera && !verifying ? 'pointer' : 'not-allowed', background: selectedBrand && courier && camera && !verifying ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.06)', color: selectedBrand && courier && camera ? '#fff' : T.tx3, boxShadow: selectedBrand && courier && camera && !verifying ? `0 6px 24px ${T.ac}44` : 'none', transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: 0.3 }}>
+          <button onClick={handleStart} disabled={!selectedBrand || !courier || !camera || verifying} style={{ width: '100%', padding: '16px 0', borderRadius: 12, border: 'none', fontSize: 16, fontWeight: 700, fontFamily: T.sora, cursor: selectedBrand && courier && camera && !verifying ? 'pointer' : 'not-allowed', background: selectedBrand && courier && camera && !verifying ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.06)', color: selectedBrand && courier && camera ? '#fff' : T.tx3, boxShadow: selectedBrand && courier && camera && !verifying ? `0 6px 24px ${T.ac44}` : 'none', transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: 0.3 }}>
             {verifying && <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'btnSpin .6s linear infinite' }} />}
             {verifying ? 'Verifying Sheet...' : 'Start Scanning'}
           </button>
@@ -873,7 +878,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               <div style={{ fontSize: 12, fontWeight: 700, color: T.re, marginBottom: 4 }}>Connection Failed</div>
               <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5 }}>{verifyResult.error}</div>
               {verifyResult.details && <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, marginTop: 4, lineHeight: 1.5 }}>{verifyResult.details}</div>}
-              <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re}44`, background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>↻ Retry</button>
+              <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re44}`, background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>↻ Retry</button>
             </div>
           )}
           {verifyResult && verifyResult.ok && verifyResult.columnsOk === false && (
@@ -884,7 +889,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                 Please fix the sheet columns before scanning. Expected order:<br/>
                 <strong style={{ color: T.tx }}>A:</strong> Count &nbsp; <strong style={{ color: T.tx }}>B:</strong> AWB &nbsp; <strong style={{ color: T.tx }}>C:</strong> Timestamp &nbsp; <strong style={{ color: T.tx }}>D:</strong> Camera Number
               </div>
-              <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re}44`, background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>↻ Re-check sheet</button>
+              <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re44}`, background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>↻ Re-check sheet</button>
             </div>
           )}
         </div>
@@ -949,7 +954,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         <div style={{ fontSize: 22, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 6 }}>Scan</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.gr, boxShadow: `0 0 6px ${T.gr}80` }} />
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.gr, boxShadow: `0 0 6px ${T.gr80}` }} />
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{courier} · {courierBrand}</div>
               <div style={{ fontSize: 9, color: T.tx3, marginTop: 1 }}>Cam-{camera} · started {Math.round((Date.now() - sessionStartRef.current) / 60000)}m ago</div>
@@ -1041,7 +1046,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Camera viewport */}
       {cameraOpen && (
-        <div style={{ marginBottom: 12, borderRadius: 12, overflow: 'hidden', border: `1px solid ${T.ac}33`, position: 'relative', background: '#0a0e18' }}>
+        <div style={{ marginBottom: 12, borderRadius: 12, overflow: 'hidden', border: `1px solid ${T.ac33}`, position: 'relative', background: '#0a0e18' }}>
           <div ref={cameraRef} style={{ width: '100%', aspectRatio: '16/9' }}>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 2 }}>
               <div style={{ width: '75%', height: 50, border: `2px solid ${T.ac}`, borderRadius: 8, position: 'relative' }}>
@@ -1154,7 +1159,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             }} className="desktop-only" style={{ width: '100%', padding: '7px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 10, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx2, cursor: 'pointer', marginBottom: 10, fontFamily: T.sans }}>Export Session CSV</button>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setShowComplete(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Continue</button>
-              <button onClick={() => { endSession(); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}cc, ${T.gr}88)`, color: '#fff', cursor: 'pointer' }}>End Session</button>
+              <button onClick={() => { endSession(); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.grCC}, ${T.gr88})`, color: '#fff', cursor: 'pointer' }}>End Session</button>
             </div>
           </div>
         </div>
@@ -1169,7 +1174,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             <div style={{ fontSize: 12, color: T.tx3, marginBottom: 14, lineHeight: 1.5 }}>You've scanned <strong style={{ color: T.gr }}>{sessionCount}</strong> AWB{sessionCount === 1 ? '' : 's'} so far. They've already been saved to the sheet. Changing setup resets the in-app counter but does not delete the saved scans.</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmChangeSetup(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Keep scanning</button>
-              <button onClick={() => { setConfirmChangeSetup(false); endSession(); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}cc, ${T.yl}88)`, color: '#111', cursor: 'pointer' }}>Change setup</button>
+              <button onClick={() => { setConfirmChangeSetup(false); endSession(); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.ylCC}, ${T.yl88})`, color: '#111', cursor: 'pointer' }}>Change setup</button>
             </div>
           </div>
         </div>

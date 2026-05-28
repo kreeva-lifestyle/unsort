@@ -18,6 +18,7 @@ type BalanceRow = { opening_balance: number | string };
 type OverdueAlert = { name: string; amount: number; days: number };
 type DryCleanAlert = { days: number };
 type TaskRow = { id: string; title: string; is_done: boolean; created_at: string };
+const TASK_LIMIT = 100;
 
 export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) => void } = {}) {
   const { profile } = useAuth();
@@ -113,7 +114,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     setLoaded(true);
   }, []);
 
-  const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(100).then(({ data }) => setTasks((data ?? []) as TaskRow[])); };
+  const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(TASK_LIMIT).then(({ data }) => setTasks((data ?? []) as TaskRow[])); };
 
   const [refreshing, setRefreshing] = useState(false);
   const manualRefresh = useCallback(async () => { setRefreshing(true); await fetchAll(); fetchTasks(); setRefreshing(false); }, [fetchAll]);
@@ -181,7 +182,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(34,197,94,.35)')}
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(34,197,94,.18)')}
       >
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.gr}cc, ${T.gr}22)` }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.grCC}, ${T.gr22})` }} />
         <div>
           <p style={{ fontSize: 10, color: T.gr, letterSpacing: 1.2, marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Revenue ({new Date().toLocaleString('en-IN', { month: 'short' }).toUpperCase()})</p>
           <p style={{ fontFamily: T.sora, fontSize: 44, fontWeight: 800, color: T.gr, margin: 0, lineHeight: 1, letterSpacing: -1.5 }}>{loaded ? <CountUp value={pulse.revenue} prefix="₹" /> : <Skeleton width={120} height={44} borderRadius={8} />}</p>
@@ -280,9 +281,9 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
               return (
                 <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                   <span style={{ fontSize: 8, color: isMax ? T.ac2 : T.tx3, fontFamily: T.mono, fontWeight: isMax ? 700 : 500 }}>{s.count}</span>
-                  <div style={{ width: '100%', maxWidth: 28, borderRadius: '4px 4px 2px 2px', height: barH, transition: 'height .4s ease',
-                    background: isToday ? `linear-gradient(180deg, ${T.ac}, ${T.ac2})` : isMax ? `linear-gradient(180deg, ${T.ac}cc, ${T.ac}55)` : `linear-gradient(180deg, ${T.ac}55, ${T.ac}18)`,
-                    boxShadow: isToday ? `0 2px 8px ${T.ac}44` : 'none' }} />
+                  <div className="bar-hover-v" title={`${new Date(s.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}: ${s.count} scan${s.count === 1 ? '' : 's'}`} style={{ width: '100%', maxWidth: 28, borderRadius: '4px 4px 2px 2px', height: barH,
+                    background: isToday ? `linear-gradient(180deg, ${T.ac}, ${T.ac2})` : isMax ? `linear-gradient(180deg, ${T.ac87}, ${T.ac55})` : `linear-gradient(180deg, ${T.ac55}, ${T.ac22})`,
+                    boxShadow: isToday ? `0 2px 8px ${T.ac44}` : 'none' }} />
                   <span style={{ fontSize: 7, color: isToday ? T.tx : T.tx3, fontFamily: T.mono, fontWeight: isToday ? 600 : 400 }}>{new Date(s.date).getDate()}</span>
                 </div>
               );
@@ -312,12 +313,12 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
                       const isToday = i === revTrend.length - 1;
                       const barH = r.amount > 0 ? Math.max(3, (r.amount / range) * 48) : 2;
                       return (
-                        <div key={i} style={{ flex: 1, marginLeft: i > 0 ? 0.5 : 0, borderRadius: '2px 2px 0 0', height: barH, transition: 'height .3s ease', minWidth: 0,
+                        <div key={i} className={r.amount > 0 ? 'bar-hover-v' : undefined} style={{ flex: 1, marginLeft: i > 0 ? 0.5 : 0, borderRadius: '2px 2px 0 0', height: barH, minWidth: 0,
                           background: r.amount <= 0 ? 'rgba(255,255,255,0.03)'
-                            : isToday ? `linear-gradient(180deg, ${T.gr}, ${T.gr}66)`
-                            : isPeak ? `linear-gradient(180deg, ${T.gr}cc, ${T.gr}44)`
-                            : `linear-gradient(180deg, ${T.gr}66, ${T.gr}15)`,
-                          boxShadow: isToday ? `0 1px 6px ${T.gr}33` : 'none' }} title={`${new Date(r.date).getDate()} ${new Date(r.date).toLocaleDateString('en-IN', { month: 'short' })}: ₹${r.amount.toLocaleString('en-IN')}`} />
+                            : isToday ? `linear-gradient(180deg, ${T.gr}, ${T.gr66})`
+                            : isPeak ? `linear-gradient(180deg, ${T.grCC}, ${T.gr44})`
+                            : `linear-gradient(180deg, ${T.gr66}, ${T.gr15})`,
+                          boxShadow: isToday ? `0 1px 6px ${T.gr33}` : 'none' }} title={`${new Date(r.date).getDate()} ${new Date(r.date).toLocaleDateString('en-IN', { month: 'short' })}: ₹${r.amount.toLocaleString('en-IN')}`} />
                       );
                     })}
                   </div>
@@ -343,10 +344,10 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
           {(() => { const nonCompletedTotal = Object.entries(invBreakdown).filter(([s]) => s !== 'completed').reduce((a, [, c]) => a + c, 0) || 1; return Object.entries(invBreakdown).filter(([status]) => status !== 'completed').map(([status, count]) => {
             const total = nonCompletedTotal;
             return (
-              <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 9, color: T.tx2, width: 65, textTransform: 'capitalize' }}>{status.replace('_', ' ')}</span>
+              <div key={status} title={`${status.replace('_', ' ')}: ${count} of ${total}`} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 9, color: T.tx2, width: 80, textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{status.replace('_', ' ')}</span>
                 <div style={{ flex: 1, background: T.s2, borderRadius: 3, height: 8, overflow: 'hidden' }}>
-                  <div style={{ width: `${(count / total) * 100}%`, height: '100%', background: statusColors[status] || T.tx3, borderRadius: 3 }} />
+                  <div className="bar-hover-h" style={{ width: `${(count / total) * 100}%`, height: '100%', background: statusColors[status] || T.tx3, borderRadius: 3 }} />
                 </div>
                 <span style={{ fontSize: 9, fontFamily: T.mono, color: statusColors[status] || T.tx3, width: 28, textAlign: 'right' }}>{count}</span>
               </div>
@@ -394,6 +395,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
             </div>
           ))}
           {tasks.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: T.tx3, fontSize: 10 }}>No tasks yet</div>}
+          {tasks.length === TASK_LIMIT && <div style={{ fontSize: 10, color: T.yl, padding: '6px 10px', textAlign: 'center' }}>Showing first {TASK_LIMIT} tasks.</div>}
         </div>
       </div>
       <ConfirmModal {...modalProps} />

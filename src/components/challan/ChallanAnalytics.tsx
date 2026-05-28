@@ -34,14 +34,11 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
   const salesChange = pctChange(analytics.count, analytics.prevCount);
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Analytics</span>
-      </div>
       <div className="challan-analytics-dates" style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12 }}>
         <input type="date" value={from} onChange={e => onFromChange(e.target.value)} style={S.fDate} />
         <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
         <input type="date" value={to} onChange={e => onToChange(e.target.value)} style={S.fDate} />
-        <button onClick={onApply} style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)`, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', height: 36 }}>Apply</button>
+        <button onClick={onApply} style={S.btnPrimary}>Apply</button>
       </div>
       <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
         <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 10, padding: '12px', textAlign: 'center' as const }}>
