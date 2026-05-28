@@ -10,6 +10,18 @@ After every set of changes:
 
 This applies to all code changes. No confirmation needed.
 
+## Post-deploy verification — MANDATORY
+After every merge to main, you MUST:
+1. **Wait 30 seconds**, then check if the GitHub Pages deploy succeeded
+   (`mcp__github__get_commit` on the merge SHA → check CI status, or
+   ask the user to confirm the site updated)
+2. **Never declare work "done"** until deployment is confirmed
+3. If the deploy was cancelled or failed, investigate and fix — push a
+   follow-up commit to re-trigger the workflow if needed
+4. Think before acting: rapid-fire merges cancel in-flight builds.
+   Batch related changes into one PR when possible instead of
+   merging 3 PRs in 2 minutes.
+
 ## File layout
 - Modular structure — DO NOT put new code in App.tsx
 - New components: `src/components/[feature]/`
