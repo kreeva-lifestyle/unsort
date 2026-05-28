@@ -64,7 +64,7 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
             <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>{mode === 'add' ? 'New brand tag' : 'Edit brand tag'}</div>
             <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>Master record · prints on 1.97 × 2.97 in label</div>
           </div>
-          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)' }}>&times;</span>
+          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)' }} aria-label="Close">&times;</span>
         </div>
 
         {/* Body — form + live preview */}

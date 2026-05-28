@@ -164,7 +164,7 @@ const InstallPrompt = () => {
         <div style={{ fontSize: 10, color: '#6B7890', marginTop: 1 }}>Add to home screen for the full app experience</div>
       </div>
       <button onClick={() => { deferredPrompt.prompt(); setDeferredPrompt(null); }} style={{ ...S.btnPrimary, padding: '7px 14px', fontSize: 11, flexShrink: 0 }}>Install</button>
-      <span onClick={() => { setDismissed(true); sessionStorage.setItem('pwa-dismiss', '1'); }} style={{ color: '#6B7890', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 4 }}>&times;</span>
+      <span onClick={() => { setDismissed(true); sessionStorage.setItem('pwa-dismiss', '1'); }} style={{ color: '#6B7890', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 4 }} aria-label="Close">&times;</span>
     </div>
   );
 };
