@@ -11,6 +11,7 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   const l = msg.toLowerCase();
 
   // Postgres constraint violations
+  if ((code === '23505' || l.includes('duplicate key')) && l.includes('short_code')) return 'This short code is already taken. Try a different one.';
   if (code === '23505' || l.includes('duplicate key')) return 'A record with these details already exists.';
   if (code === '23503' || l.includes('foreign key')) return 'Cannot complete — this item is still referenced elsewhere.';
   if (l.includes('cash handover period') || l.includes('confirmed and is a permanent') || l.includes('permanent financial record') || l.includes('period start of a confirmed or pending')) return msg; // Pass through specific lock-period errors

@@ -7,12 +7,13 @@ import AddressPrinter from '../components/minis/AddressPrinter';
 import CbazaarImport from '../components/minis/CbazaarImport';
 import OdetteImport from '../components/minis/OdetteImport';
 import VirtualStock from '../components/minis/VirtualStock';
+import ShortNTrack from '../components/minis/ShortNTrack';
 
 const SIZE_MAP: Record<number, string> = { 32: 'XXS', 34: 'XS', 36: 'S', 38: 'M', 40: 'L', 42: 'XL', 44: 'XXL' };
 
 interface UtsavRow { relid: string; vendorno: string; stock: number; leadtime: number; block: number; designno: string; size: number; catalogname: string; updateddate: string; aryaSku: string }
 
-type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'address';
+type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'address' | 'shortntrack';
 
 export default function Minis() {
   const { addToast } = useNotifications();
@@ -27,7 +28,7 @@ export default function Minis() {
     if (v !== 'home') window.history.pushState({ miniView: v }, '');
   }, []);
 
-  const viewLabels: Record<MiniView, string | null> = { home: null, cbazaar: 'Cbazaar Import', odette: 'Odette Import', address: 'LabelMaker', utsav: 'Utsav Import' };
+  const viewLabels: Record<MiniView, string | null> = { home: null, cbazaar: 'Cbazaar Import', odette: 'Odette Import', address: 'LabelMaker', utsav: 'Utsav Import', shortntrack: 'Short N Track' };
   const { set: setBreadcrumb } = useBreadcrumb();
   useEffect(() => {
     setBreadcrumb(viewLabels[view] ? [viewLabels[view]!] : null);
@@ -109,6 +110,13 @@ export default function Minis() {
     </div>
   );
 
+  if (view === 'shortntrack') return (
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      <div style={{ marginBottom: 14 }}>{back}</div>
+      <ShortNTrack addToast={addToast} />
+    </div>
+  );
+
   if (view === 'utsav') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
@@ -161,6 +169,7 @@ export default function Minis() {
           { id: 'cbazaar' as MiniView, title: 'Cbazaar Import', desc: 'Import Cbazaar vendor Excel, generate ARYA SKU column, export as CSV' },
           { id: 'odette' as MiniView, title: 'Odette Import', desc: 'Aggregate SKU quantities across multiple vendor sheets' },
           { id: 'address' as MiniView, title: 'LabelMaker', desc: 'Save addresses, print 4x6 inch courier label stickers' },
+          { id: 'shortntrack' as MiniView, title: 'Short N Track', desc: 'Shorten URLs and track clicks — device, browser, location, timing analytics' },
         ].map(t => (
           <div key={t.id} onClick={() => setView(t.id)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>{t.title}</div>
