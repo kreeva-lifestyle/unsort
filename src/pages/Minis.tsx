@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../lib/theme';
 import { useNotifications } from '../hooks/useNotifications';
+import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import AddressPrinter from '../components/minis/AddressPrinter';
 import CbazaarImport from '../components/minis/CbazaarImport';
 import OdetteImport from '../components/minis/OdetteImport';
@@ -25,6 +26,13 @@ export default function Minis() {
     setViewState(v);
     if (v !== 'home') window.history.pushState({ miniView: v }, '');
   }, []);
+
+  const viewLabels: Record<MiniView, string | null> = { home: null, cbazaar: 'Cbazaar Import', odette: 'Odette Import', address: 'LabelMaker', utsav: 'Utsav Import' };
+  const { set: setBreadcrumb } = useBreadcrumb();
+  useEffect(() => {
+    setBreadcrumb(viewLabels[view] ? [viewLabels[view]!] : null);
+    return () => setBreadcrumb(null);
+  }, [view, setBreadcrumb]);
 
   useEffect(() => {
     const onPop = () => setViewState('home');
@@ -80,10 +88,7 @@ export default function Minis() {
 
   if (view === 'cbazaar') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        {back}
-        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Cbazaar Import</span>
-      </div>
+      <div style={{ marginBottom: 14 }}>{back}</div>
       <VirtualStock stock={virtualStock} setStock={setVirtualStock} addToast={addToast} />
       <CbazaarImport addToast={addToast} />
     </div>
@@ -91,10 +96,7 @@ export default function Minis() {
 
   if (view === 'odette') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        {back}
-        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Odette Import</span>
-      </div>
+      <div style={{ marginBottom: 14 }}>{back}</div>
       <VirtualStock stock={virtualStock} setStock={setVirtualStock} addToast={addToast} />
       <OdetteImport addToast={addToast} virtualStock={virtualStock} />
     </div>
@@ -102,10 +104,7 @@ export default function Minis() {
 
   if (view === 'address') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        {back}
-        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>LabelMaker</span>
-      </div>
+      <div style={{ marginBottom: 14 }}>{back}</div>
       <AddressPrinter addToast={addToast} />
     </div>
   );
@@ -113,10 +112,7 @@ export default function Minis() {
   if (view === 'utsav') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {back}
-          <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Utsav Import</span>
-        </div>
+        {back}
         <div style={{ display: 'flex', gap: 6 }}>
           <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
           {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export XLS</div>}

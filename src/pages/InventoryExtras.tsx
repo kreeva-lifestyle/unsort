@@ -287,8 +287,7 @@ export default function InventoryExtras() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Spare Parts</span>
-          <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{filtered.length} items{catFilter !== 'all' ? ' (filtered)' : ''}</div>
+          <div style={{ fontSize: 11, color: T.tx3 }}>{filtered.length} items{catFilter !== 'all' ? ' (filtered)' : ''}</div>
         </div>
         <div style={{ display: 'flex', gap: 6, position: 'relative' }}>
           <div onClick={() => setShowExportMenu(v => !v)} style={btnGhost}>Export ▾</div>

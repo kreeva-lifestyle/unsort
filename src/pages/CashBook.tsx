@@ -513,7 +513,6 @@ export default function CashBook() {
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>Cash Book</span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={S.fDate} />
           <span style={{ fontSize: 10, color: T.tx3 }}>to</span>

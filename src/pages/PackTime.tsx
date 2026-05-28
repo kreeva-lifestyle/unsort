@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { BarcodeDetector } from 'barcode-detector/ponyfill';
 import { supabase, SUPABASE_ANON_KEY } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
+import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import { friendlyError } from '../lib/friendlyError';
 
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
@@ -565,6 +566,13 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   useEffect(() => { if (active) setShowHistory(false); }, [active]);
 
+  const { set: setBreadcrumb } = useBreadcrumb();
+  useEffect(() => {
+    if (showHistory) setBreadcrumb(['Scan History']);
+    else setBreadcrumb(null);
+    return () => setBreadcrumb(null);
+  }, [showHistory, setBreadcrumb]);
+
   // Browser back button support
   useEffect(() => {
     const onPop = () => { if (showHistory) setShowHistory(false); };
@@ -628,8 +636,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Scan History</div>
-          <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>{historyDateFrom && historyDateTo ? `${historyTotal} records · ${historyDateFrom} to ${historyDateTo}` : 'Pick a date range to view scans'}</div>
+          <div style={{ fontSize: 11, color: T.tx3 }}>{historyDateFrom && historyDateTo ? `${historyTotal} records · ${historyDateFrom} to ${historyDateTo}` : 'Pick a date range to view scans'}</div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button onClick={() => { setShowHistory(false); window.history.back(); }} style={S.btnGhost}>← Back</button>
