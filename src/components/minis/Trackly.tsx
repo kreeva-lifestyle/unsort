@@ -27,6 +27,7 @@ function validateUrl(raw: string): { ok: true; href: string } | { ok: false; err
   try { url = new URL(trimmed); } catch { return { ok: false, error: 'Invalid URL format. Include https:// or http://' }; }
   if (!['http:', 'https:'].includes(url.protocol)) return { ok: false, error: 'Only http:// and https:// URLs are allowed' };
   if (!url.hostname || url.hostname === 'localhost') return { ok: false, error: 'Localhost URLs are not allowed' };
+  if (url.username || url.password) return { ok: false, error: 'URLs with embedded credentials are not allowed' };
   return { ok: true, href: url.href };
 }
 

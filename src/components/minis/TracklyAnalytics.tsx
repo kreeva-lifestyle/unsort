@@ -5,7 +5,7 @@ import { T, S } from '../../lib/theme';
 import { copyToClipboard } from '../../lib/clipboard';
 import type { ShortLink, LinkClick } from '../../types/database';
 
-const CLICK_COLS = 'id, link_id, clicked_at, user_agent, device_type, browser, os, referrer, country, city';
+const CLICK_COLS = 'id, link_id, clicked_at, user_agent, device_type, browser, os, referrer, country, city, visitor_hash';
 const CLICK_LIMIT = 2000;
 const APP_ORIGIN = typeof window !== 'undefined' ? window.location.origin : 'https://dailyoffice.aryadesigns.co.in';
 
@@ -49,7 +49,7 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
     addToast(ok ? 'Short link copied' : 'Copy failed — long-press the URL to copy manually', ok ? 'success' : 'error');
   };
 
-  const { deviceCounts, browserCounts, osCounts, countryCounts, dailyEntries, maxDaily, hourlyCounts, maxHourly } = useMemo(() => {
+  const { deviceCounts, browserCounts, osCounts, countryCounts, dailyEntries, maxDaily, hourlyCounts, maxHourly, uniqueVisitors } = useMemo(() => {
     const dev = aggregate(clicks, 'device_type');
     const br = aggregate(clicks, 'browser');
     const o = aggregate(clicks, 'os');
@@ -61,7 +61,8 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
     const hourly = new Array(24).fill(0);
     clicks.forEach(c => { if (c.clicked_at) hourly[new Date(c.clicked_at).getHours()]++; });
     const maxH = Math.max(1, ...hourly);
-    return { deviceCounts: dev, browserCounts: br, osCounts: o, countryCounts: co, dailyEntries: dailyArr, maxDaily: maxD, hourlyCounts: hourly, maxHourly: maxH };
+    const uniq = new Set(clicks.map(c => c.visitor_hash).filter(Boolean)).size;
+    return { deviceCounts: dev, browserCounts: br, osCounts: o, countryCounts: co, dailyEntries: dailyArr, maxDaily: maxD, hourlyCounts: hourly, maxHourly: maxH, uniqueVisitors: uniq };
   }, [clicks]);
 
   const isTruncated = clicks.length === CLICK_LIMIT;
@@ -95,8 +96,9 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
       </div>}
 
       {/* KPI cards */}
-      <div className="trackly-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
+      <div className="trackly-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
         <KpiCard label="Total Clicks" value={clicks.length} color={T.ac2} bg={T.ac3} bd="rgba(99,102,241,.15)" />
+        <KpiCard label="Unique Visitors" value={uniqueVisitors || '—'} color={T.bl} bg="rgba(56,189,248,.06)" bd="rgba(56,189,248,.15)" />
         <KpiCard label="Devices" value={Object.keys(deviceCounts).length} color={T.gr} bg="rgba(34,197,94,.06)" bd="rgba(34,197,94,.15)" />
         <KpiCard label="Countries" value={Object.keys(countryCounts).filter(k => k !== 'Unknown').length || '—'} color={T.yl} bg="rgba(251,191,36,.06)" bd="rgba(251,191,36,.15)" />
       </div>
