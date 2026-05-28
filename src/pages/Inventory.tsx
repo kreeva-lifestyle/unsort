@@ -511,6 +511,16 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   useEffect(() => () => { if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current); }, []);
 
   const quickStatusChange = async (itemId: string, newStatus: string) => {
+    if (newStatus === 'completed') {
+      const missing = itemMissing[itemId];
+      const damaged = itemDamaged[itemId];
+      if ((missing && missing.length > 0) || (damaged && damaged.length > 0)) {
+        const issues = [...(missing || []).map(n => `${n} missing`), ...(damaged || []).map(n => `${n} damaged`)];
+        addToast(`Cannot complete — ${issues.join(', ')}`, 'error');
+        setQuickStatusItem(null);
+        return;
+      }
+    }
     const { error } = await supabase.from('inventory_items').update({ status: newStatus, status_changed_at: new Date().toISOString() }).eq('id', itemId);
     if (error) addToast(friendlyError(error), 'error');
     else { addToast(`Status → ${newStatus}`, 'success'); fetchData(); }
@@ -969,9 +979,23 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             onChange={async e => {
               const newStatus = e.target.value;
               if (!newStatus) return;
-              if (!await ask({ title: 'Change status?', message: `Change status of ${selectedIds.size} item${selectedIds.size === 1 ? '' : 's'} to "${newStatus}".`, confirmLabel: 'Change' })) { e.target.value = ''; return; }
-              setBulkBusy(true);
               const ids = Array.from(selectedIds);
+              if (newStatus === 'completed') {
+                const problemIds: string[] = [];
+                for (const id of ids) {
+                  const missing = itemMissing[id];
+                  const damaged = itemDamaged[id];
+                  if ((missing && missing.length > 0) || (damaged && damaged.length > 0)) problemIds.push(id);
+                }
+                if (problemIds.length > 0) {
+                  const names = problemIds.map(id => items.find(i => i.id === id)?.batch_number || id).join(', ');
+                  addToast(`Cannot complete ${problemIds.length} item${problemIds.length > 1 ? 's' : ''} with missing/damaged components: ${names}`, 'error');
+                  e.target.value = '';
+                  return;
+                }
+              }
+              if (!await ask({ title: 'Change status?', message: `Change status of ${ids.length} item${ids.length === 1 ? '' : 's'} to "${newStatus}".`, confirmLabel: 'Change' })) { e.target.value = ''; return; }
+              setBulkBusy(true);
               const { error } = await supabase.from('inventory_items').update({ status: newStatus }).in('id', ids);
               setBulkBusy(false);
               if (error) { addToast(friendlyError(error), 'error'); return; }
