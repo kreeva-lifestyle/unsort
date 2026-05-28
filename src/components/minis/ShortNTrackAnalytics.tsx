@@ -17,7 +17,7 @@ export default function ShortNTrackAnalytics({ link, onBack, addToast }: Props) 
   const [clicks, setClicks] = useState<LinkClick[]>([]);
   const [loading, setLoading] = useState(true);
   const [from, setFrom] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 30);
+    const d = new Date(); d.setMonth(d.getMonth() - 3);
     return d.toISOString().slice(0, 10);
   });
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
@@ -65,7 +65,7 @@ export default function ShortNTrackAnalytics({ link, onBack, addToast }: Props) 
     <div>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-        <span onClick={onBack} style={{ ...S.btnGhost, padding: '6px 10px', cursor: 'pointer' }}>
+        <span onClick={onBack} style={{ ...S.btnGhost, padding: '8px 12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', minHeight: 36 }} aria-label="Back to links">
           <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
         </span>
         <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
