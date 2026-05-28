@@ -708,9 +708,9 @@ export default function BrandTagPrinter() {
               <select value={orderPerPage} onChange={e => { setOrderPerPage(Number(e.target.value)); setOrderPage(0); }} style={{ ...inp, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select>
               <span style={{ color: T.tx3 }}>rows</span>
               {otp > 1 && <>
-                <span onClick={() => setOrderPage(Math.max(0, orderPage - 1))} style={{ ...btnSm, opacity: orderPage === 0 ? 0.3 : 1 }}>Prev</span>
+                <span onClick={() => setOrderPage(Math.max(0, orderPage - 1))} style={{ ...btnSm, opacity: orderPage === 0 ? 0.3 : 1 }} aria-label="Previous page">Prev</span>
                 <span style={{ color: T.tx3 }}>{orderPage + 1} / {otp}</span>
-                <span onClick={() => setOrderPage(Math.min(otp - 1, orderPage + 1))} style={{ ...btnSm, opacity: orderPage >= otp - 1 ? 0.3 : 1 }}>Next</span>
+                <span onClick={() => setOrderPage(Math.min(otp - 1, orderPage + 1))} style={{ ...btnSm, opacity: orderPage >= otp - 1 ? 0.3 : 1 }} aria-label="Next page">Next</span>
               </>}
             </div>
           </div>
