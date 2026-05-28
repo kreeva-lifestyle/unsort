@@ -208,16 +208,25 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
                     ) : (
                       <>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 600, color: T.tx }}>{e.action === 'CREATE' ? 'Created' : e.action === 'UPDATE' ? 'Updated' : e.action === 'VOID' ? 'Voided' : e.action === 'BULK_PAY' ? 'Bulk Paid' : e.action === 'BULK_UNPAY' ? 'Bulk Unpaid' : e.action || 'Changed'}</span>
+                          <span style={{ fontWeight: 600, color: T.tx }}>{e.action === 'CREATE' ? 'Created' : e.action === 'UPDATE' ? 'Updated' : e.action === 'VOID' ? 'Voided' : e.action === 'BULK_PAY' ? 'Bulk Paid' : e.action === 'BULK_UNPAY' ? 'Bulk Unpaid' : e.action === 'INV_TOGGLE' ? 'Inv. Toggled' : e.action === 'SETTLE_REFUND' ? 'Settled Refund' : e.action === 'BATCH_UNDO' ? 'Batch Undo' : e.action || 'Changed'}</span>
                           {e.user_name && <span style={{ fontSize: 9, color: T.tx3 }}>by {e.user_name}</span>}
                         </div>
                         {e.changes && Object.keys(e.changes).length > 0 && (
                           <div style={{ marginTop: 3 }}>
-                            {Object.entries(e.changes).map(([field, { from, to }]) => (
-                              <div key={field} style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>
-                                {field}: <span style={{ color: T.re }}>{String(from ?? '—')}</span> → <span style={{ color: T.gr }}>{String(to ?? '—')}</span>
-                              </div>
-                            ))}
+                            {Object.entries(e.changes).map(([field, { from, to }]) => {
+                              const labels: Record<string, string> = { inventory_deducted: 'Inventory', status: 'Status', amount_paid: 'Amt Paid', payment_mode: 'Payment Mode', customer_name: 'Customer', total: 'Total' };
+                              const fmt = (v: unknown, f: string) => {
+                                if (v === null || v === undefined) return '—';
+                                if (f === 'inventory_deducted') return v ? 'Updated' : 'Not Updated';
+                                if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+                                return String(v);
+                              };
+                              return (
+                                <div key={field} style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>
+                                  {labels[field] || field}: <span style={{ color: T.re }}>{fmt(from, field)}</span> → <span style={{ color: T.gr }}>{fmt(to, field)}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </>
