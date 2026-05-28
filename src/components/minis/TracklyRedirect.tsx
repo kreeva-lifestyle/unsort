@@ -12,7 +12,7 @@ export default function TracklyRedirect({ shortCode }: { shortCode: string }) {
   const [status, setStatus] = useState<'loading' | 'notfound' | 'error'>('loading');
 
   useEffect(() => {
-    let cancelled = false;
+    const ctrl = new AbortController();
     (async () => {
       try {
         const res = await fetch(EDGE, {
@@ -23,9 +23,11 @@ export default function TracklyRedirect({ shortCode }: { shortCode: string }) {
             Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({ action: 'resolve', shortCode }),
+          signal: ctrl.signal,
         });
-        if (cancelled) return;
+        if (ctrl.signal.aborted) return;
         const data = await res.json().catch(() => ({}));
+        if (ctrl.signal.aborted) return;
         if (data.ok && typeof data.longUrl === 'string') {
           let target: URL;
           try { target = new URL(data.longUrl); } catch { setStatus('notfound'); return; }
@@ -34,11 +36,12 @@ export default function TracklyRedirect({ shortCode }: { shortCode: string }) {
         } else {
           setStatus('notfound');
         }
-      } catch {
-        if (!cancelled) setStatus('error');
+      } catch (err) {
+        if (ctrl.signal.aborted) return;
+        if ((err as Error)?.name !== 'AbortError') setStatus('error');
       }
     })();
-    return () => { cancelled = true; };
+    return () => { ctrl.abort(); };
   }, [shortCode]);
 
   return (

@@ -121,7 +121,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [ledgerPdfTitle, setLedgerPdfTitle] = useState('');
   const ledgerPdfIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [userName, setUserName] = useState('there');
-  const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number; inventoryDeducted?: boolean } | null>(null);
   const [printHtml, setPrintHtml] = useState<string | null>(null);
   const printIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [viewingChallan, setViewingChallan] = useState<Challan | null>(null);
@@ -1213,7 +1213,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         onPrint={printChallan}
         onRemind={sendReminder}
         onCreateReturn={(c) => { setIsReturn(true); setChallanStatus('paid'); selectReturnSource(c); setShowModal(true); }}
-        onVoid={(c) => setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number })}
+        onVoid={(c) => setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number, inventoryDeducted: !!c.inventory_deducted })}
         page={page}
         totalPages={totalPages}
         onPageChange={setPage}
@@ -1279,7 +1279,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         onPrint={() => printChallan(viewingChallan)}
         onRemind={() => { const c = viewingChallan; setViewingChallan(null); sendReminder(c); }}
         onReturn={() => { const c = viewingChallan; setViewingChallan(null); setIsReturn(true); setChallanStatus('paid'); selectReturnSource(c); setShowModal(true); }}
-        onVoid={() => { const c = viewingChallan; setViewingChallan(null); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number }); }}
+        onVoid={() => { const c = viewingChallan; setViewingChallan(null); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number, inventoryDeducted: !!c.inventory_deducted }); }}
         hasNext={idx < challans.length - 1}
         hasPrev={idx > 0}
         onNext={() => { if (idx < challans.length - 1) setViewingChallan(challans[idx + 1]); }}
@@ -1335,7 +1335,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }}>
             <div style={{ fontSize: 28, marginBottom: 6 }}>⚠️</div>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>{confirmAction.type === 'void' ? 'Void Challan?' : 'Delete Challan?'}</div>
-            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>{confirmAction.type === 'void' ? `Challan #${confirmAction.challanNumber} will be marked voided. This cannot be undone.` : `Challan #${confirmAction.challanNumber} will be permanently deleted.`}</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: confirmAction.type === 'void' && confirmAction.inventoryDeducted ? 8 : 14 }}>{confirmAction.type === 'void' ? `Challan #${confirmAction.challanNumber} will be marked voided. This cannot be undone.` : `Challan #${confirmAction.challanNumber} will be permanently deleted.`}</div>
+            {confirmAction.type === 'void' && confirmAction.inventoryDeducted && (
+              <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl, marginBottom: 14, textAlign: 'left' as const }}>
+                Inventory was deducted for this challan. After voiding, you'll need to reverse the inventory deduction manually.
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmAction(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.ac3}`, fontSize: 11, fontWeight: 500, background: T.ac3, color: T.ac2, cursor: 'pointer' }}>Cancel</button>
               <button onClick={async () => { const a = confirmAction; setConfirmAction(null); if (a.type === 'void') await voidChallan(a.id); }} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', cursor: 'pointer' }}>{confirmAction.type === 'void' ? 'Void' : 'Delete'}</button>

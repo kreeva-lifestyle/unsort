@@ -42,6 +42,31 @@ function isSafeUrl(s: string): boolean {
   }
 }
 
+// Sliding-window rate limit, best-effort within a single isolate.
+// Cold starts reset the map; that's fine for click-farm deterrence.
+const RATE_LIMIT_PER_MINUTE = 60;
+const rateBuckets = new Map<string, number[]>();
+function rateLimited(ip: string): boolean {
+  const now = Date.now();
+  const cutoff = now - 60_000;
+  const arr = (rateBuckets.get(ip) || []).filter(t => t > cutoff);
+  if (arr.length >= RATE_LIMIT_PER_MINUTE) return true;
+  arr.push(now);
+  rateBuckets.set(ip, arr);
+  // Opportunistic GC: every ~1000 hits, drop stale buckets
+  if (rateBuckets.size > 1000) {
+    for (const [k, v] of rateBuckets) {
+      if (v.length === 0 || v[v.length - 1] < cutoff) rateBuckets.delete(k);
+    }
+  }
+  return false;
+}
+
+function clientIp(req: Request): string {
+  const xff = req.headers.get('x-forwarded-for') || '';
+  return xff.split(',')[0].trim() || req.headers.get('cf-connecting-ip') || 'unknown';
+}
+
 function parseUA(ua: string): { device: string; browser: string; os: string } {
   const device = /mobile|android|iphone|ipad/i.test(ua)
     ? (/ipad|tablet/i.test(ua) ? 'tablet' : 'mobile')
@@ -67,6 +92,14 @@ function parseUA(ua: string): { device: string; browser: string; os: string } {
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders(req) });
+  }
+
+  const ip = clientIp(req);
+  if (rateLimited(ip)) {
+    return new Response(JSON.stringify({ ok: false, error: 'Rate limited' }), {
+      status: 429,
+      headers: { ...corsHeaders(req), 'Content-Type': 'application/json', 'Retry-After': '60' },
+    });
   }
 
   const url = new URL(req.url);
