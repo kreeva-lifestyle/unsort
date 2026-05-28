@@ -212,9 +212,9 @@ body.modal-open .fab { display: none !important; }
   .challan-filter-btns { display: flex !important; gap: 6px !important; overflow-x: auto !important; scrollbar-width: none !important; }
   .challan-filter-btns::-webkit-scrollbar { display: none !important; }
 
-  /* Filter grid (Status / Tag / From / To / Per page) */
-  .challan-filter-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
-  .challan-filter-grid select, .challan-filter-grid input { font-size: 14px !important; min-height: 38px !important; padding: 8px 10px !important; }
+  /* Filter grid (Status / Tag / From / To / Per page) — compact for 393px */
+  .challan-filter-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .challan-filter-grid select, .challan-filter-grid input { font-size: 13px !important; min-height: 34px !important; height: 34px !important; padding: 6px 8px !important; }
 
   /* Per-row action icons (print/remind/return/void) */
   .challan-row-actions { gap: 2px !important; }
@@ -234,6 +234,7 @@ body.modal-open .fab { display: none !important; }
   .challan-form-grid-2 { grid-template-columns: 1fr !important; }
   .challan-form-grid-3 { grid-template-columns: 1fr !important; }
   .challan-form-grid-4 { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .challan-form-grid-4 input[type="date"] { height: 38px !important; font-size: 14px !important; padding: 6px 8px !important; }
 
   /* Bulk toolbar */
   .challan-bulk-toolbar { flex-direction: column !important; align-items: stretch !important; gap: 6px !important; }
@@ -251,10 +252,11 @@ body.modal-open .fab { display: none !important; }
   .challan-aging-pills::-webkit-scrollbar { display: none !important; }
   .challan-aging-pills > span { flex-shrink: 0 !important; }
 
-  /* Analytics date row */
+  /* Analytics date row — side-by-side dates with Apply below */
   .challan-analytics-dates { flex-wrap: wrap !important; gap: 6px !important; }
-  .challan-analytics-dates input { flex: 1 1 calc(50% - 3px) !important; min-height: 36px !important; font-size: 14px !important; }
-  .challan-analytics-dates button { width: 100% !important; min-height: 36px !important; }
+  .challan-analytics-dates input { flex: 1 1 calc(45% - 6px) !important; min-height: 34px !important; height: 34px !important; font-size: 13px !important; padding: 6px 8px !important; }
+  .challan-analytics-dates span { font-size: 9px !important; flex: 0 0 auto !important; }
+  .challan-analytics-dates button { width: 100% !important; min-height: 38px !important; }
 
   /* Pagination */
   .challan-pagination { flex-wrap: wrap !important; gap: 4px !important; justify-content: center !important; }
@@ -300,6 +302,17 @@ body.modal-open .fab { display: none !important; }
 @media (max-width: 768px) {
   .minis-grid { grid-template-columns: 1fr !important; }
   .addr-form-grid { grid-template-columns: 1fr !important; }
+
+  /* PackStation scan history — compact date range row */
+  .scan-date-range { padding: 10px 12px !important; gap: 6px !important; }
+  .scan-date-range > div { flex: 1 1 calc(50% - 6px) !important; }
+  .scan-date-range input[type="date"] { width: 100% !important; height: 34px !important; font-size: 13px !important; padding: 6px 8px !important; }
+  .scan-date-range button { padding: 4px 8px !important; font-size: 10px !important; }
+
+  /* Spare Parts — compact search + category filter */
+  .inv-extra-filters select { height: 34px !important; font-size: 12px !important; padding: 6px 8px !important; }
+  .inv-extra-filters > div:first-child { min-width: 0 !important; }
+  .trackly-kpis { grid-template-columns: repeat(2, 1fr) !important; }
 }
 
 /* ── Programs module mobile ──────────────────────────────── */
