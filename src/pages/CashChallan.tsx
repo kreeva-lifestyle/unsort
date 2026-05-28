@@ -681,11 +681,18 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   // ── WhatsApp payment reminder ──────────────────────────────────────────────
-  const buildReminderMsg = (c: Challan) => {
-    const outstanding = Number(c.total) - Number(c.amount_paid || 0);
+  const buildReminderMsg = async (c: Challan) => {
+    const challanDue = Number(c.total) - Number(c.amount_paid || 0);
     const paidSoFar = Number(c.amount_paid || 0);
     const partialNote = paidSoFar > 0 ? `\n₹${paidSoFar.toLocaleString('en-IN')} received so far.` : '';
-    return encodeURIComponent(`Hi ${c.customer_name},\nGentle reminder — your Cash Challan #${c.challan_number} dated ${new Date(c.created_at).toLocaleDateString('en-IN')} for ₹${Number(c.total).toLocaleString('en-IN')} is pending.${partialNote}\nOutstanding: ₹${outstanding.toLocaleString('en-IN')}\nPlease arrange payment at your earliest convenience.\n— Arya Designs`);
+    let totalOutQ = supabase.from('cash_challans').select('total, amount_paid, is_return').eq('customer_name', c.customer_name).in('status', ['unpaid', 'partial']);
+    if (c.customer_id) totalOutQ = totalOutQ.eq('customer_id', c.customer_id);
+    const { data: allChallans } = await totalOutQ;
+    const unpaidSum = (allChallans || []).filter(r => !r.is_return).reduce((s, r) => s + (Number(r.total) - Number(r.amount_paid || 0)), 0);
+    const returnSum = (allChallans || []).filter(r => r.is_return).reduce((s, r) => s + (Number(r.total) - Number(r.amount_paid || 0)), 0);
+    const totalOutstanding = Math.max(0, Math.round(unpaidSum - returnSum));
+    const outLine = totalOutstanding > challanDue ? `\nTotal outstanding across all challans: ₹${totalOutstanding.toLocaleString('en-IN')}` : '';
+    return encodeURIComponent(`Hi ${c.customer_name},\nGentle reminder — your Cash Challan #${c.challan_number} dated ${new Date(c.created_at).toLocaleDateString('en-IN')} for ₹${Number(c.total).toLocaleString('en-IN')} is pending.${partialNote}\nOutstanding: ₹${challanDue.toLocaleString('en-IN')}${outLine}\nPlease arrange payment at your earliest convenience.\n— Arya Designs`);
   };
 
   const sendReminder = async (c: Challan) => {
@@ -694,10 +701,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const phone = (c as any).customer_phone || null;
     if (!phone && c.customer_id) {
       const { data: cust } = await supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle();
-      if (cust?.phone) { window.location.href = `https://wa.me/${waPhone(cust.phone)}?text=${buildReminderMsg(c)}`; return; }
+      if (cust?.phone) { window.location.href = `https://wa.me/${waPhone(cust.phone)}?text=${await buildReminderMsg(c)}`; return; }
     }
     if (phone) {
-      window.location.href = `https://wa.me/${waPhone(phone)}?text=${buildReminderMsg(c)}`;
+      window.location.href = `https://wa.me/${waPhone(phone)}?text=${await buildReminderMsg(c)}`;
     } else {
       setReminderChallan(c);
       setReminderPhone('');
@@ -709,7 +716,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (reminderChallan.customer_id) {
       await supabase.from('cash_challan_customers').update({ phone: reminderPhone.trim() }).eq('id', reminderChallan.customer_id).then(({ error: e }) => { if (e) addToast('Phone save failed — ' + friendlyError(e), 'error'); });
     }
-    window.location.href = `https://wa.me/${waPhone(reminderPhone)}?text=${buildReminderMsg(reminderChallan)}`;
+    window.location.href = `https://wa.me/${waPhone(reminderPhone)}?text=${await buildReminderMsg(reminderChallan)}`;
     setReminderChallan(null);
   };
 
