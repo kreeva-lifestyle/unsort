@@ -102,7 +102,10 @@ const MainApp = () => {
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try { const v = localStorage.getItem('sidebarOpen'); return v === null ? true : v === '1'; } catch { return true; }
+  });
+  useEffect(() => { try { localStorage.setItem('sidebarOpen', sidebarOpen ? '1' : '0'); } catch { /* private mode */ } }, [sidebarOpen]);
 
   return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflowX: 'hidden', position: 'relative' }}>
     <div className="app-glows" aria-hidden="true" />

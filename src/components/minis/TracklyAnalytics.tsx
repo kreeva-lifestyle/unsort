@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
+import { copyToClipboard } from '../../lib/clipboard';
 import type { ShortLink, LinkClick } from '../../types/database';
 
 const CLICK_COLS = 'id, link_id, clicked_at, user_agent, device_type, browser, os, referrer, country, city';
+const CLICK_LIMIT = 2000;
 const APP_ORIGIN = typeof window !== 'undefined' ? window.location.origin : 'https://dailyoffice.aryadesigns.co.in';
 
 interface Props {
@@ -21,8 +23,10 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
     return d.toISOString().slice(0, 10);
   });
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const reqIdRef = useRef(0);
 
   const fetchClicks = useCallback(async () => {
+    const myReq = ++reqIdRef.current;
     setLoading(true);
     const { data, error } = await supabase
       .from('link_clicks')
@@ -31,7 +35,8 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
       .gte('clicked_at', from + 'T00:00:00')
       .lte('clicked_at', to + 'T23:59:59')
       .order('clicked_at', { ascending: false })
-      .limit(2000);
+      .limit(CLICK_LIMIT);
+    if (reqIdRef.current !== myReq) return; // stale; newer fetch in flight
     if (error) addToast(friendlyError(error), 'error');
     setClicks(data || []);
     setLoading(false);
@@ -39,27 +44,27 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
 
   useEffect(() => { fetchClicks(); }, [fetchClicks]);
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(`${APP_ORIGIN}/#/s/${link.short_code}`);
-    addToast('Short link copied', 'success');
+  const copyLink = async () => {
+    const ok = await copyToClipboard(`${APP_ORIGIN}/#/s/${link.short_code}`);
+    addToast(ok ? 'Short link copied' : 'Copy failed — long-press the URL to copy manually', ok ? 'success' : 'error');
   };
 
-  const deviceCounts = aggregate(clicks, 'device_type');
-  const browserCounts = aggregate(clicks, 'browser');
-  const osCounts = aggregate(clicks, 'os');
-  const countryCounts = aggregate(clicks, 'country');
+  const { deviceCounts, browserCounts, osCounts, countryCounts, dailyEntries, maxDaily, hourlyCounts, maxHourly } = useMemo(() => {
+    const dev = aggregate(clicks, 'device_type');
+    const br = aggregate(clicks, 'browser');
+    const o = aggregate(clicks, 'os');
+    const co = aggregate(clicks, 'country');
+    const daily: Record<string, number> = {};
+    clicks.forEach(c => { const d = (c.clicked_at || '').slice(0, 10); if (d) daily[d] = (daily[d] || 0) + 1; });
+    const dailyArr = Object.entries(daily).sort((a, b) => a[0].localeCompare(b[0]));
+    const maxD = Math.max(1, ...dailyArr.map(e => e[1]));
+    const hourly = new Array(24).fill(0);
+    clicks.forEach(c => { if (c.clicked_at) hourly[new Date(c.clicked_at).getHours()]++; });
+    const maxH = Math.max(1, ...hourly);
+    return { deviceCounts: dev, browserCounts: br, osCounts: o, countryCounts: co, dailyEntries: dailyArr, maxDaily: maxD, hourlyCounts: hourly, maxHourly: maxH };
+  }, [clicks]);
 
-  const dailyCounts = clicks.reduce<Record<string, number>>((acc, c) => {
-    const day = (c.clicked_at || '').slice(0, 10);
-    if (day) acc[day] = (acc[day] || 0) + 1;
-    return acc;
-  }, {});
-  const dailyEntries = Object.entries(dailyCounts).sort((a, b) => a[0].localeCompare(b[0]));
-  const maxDaily = Math.max(1, ...dailyEntries.map(e => e[1]));
-
-  const hourlyCounts = new Array(24).fill(0);
-  clicks.forEach(c => { if (c.clicked_at) hourlyCounts[new Date(c.clicked_at).getHours()]++; });
-  const maxHourly = Math.max(1, ...hourlyCounts);
+  const isTruncated = clicks.length === CLICK_LIMIT;
 
   return (
     <div>
@@ -84,6 +89,10 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
       </div>
 
       {loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading analytics...</div> : <>
+
+      {isTruncated && <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 11, color: T.yl, marginBottom: 10 }}>
+        Showing the latest {CLICK_LIMIT.toLocaleString('en-IN')} clicks. There may be more — narrow the date range to see older data.
+      </div>}
 
       {/* KPI cards */}
       <div className="trackly-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>

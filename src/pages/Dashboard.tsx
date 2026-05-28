@@ -280,7 +280,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
               return (
                 <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                   <span style={{ fontSize: 8, color: isMax ? T.ac2 : T.tx3, fontFamily: T.mono, fontWeight: isMax ? 700 : 500 }}>{s.count}</span>
-                  <div style={{ width: '100%', maxWidth: 28, borderRadius: '4px 4px 2px 2px', height: barH, transition: 'height .4s ease',
+                  <div className="bar-hover-v" title={`${new Date(s.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}: ${s.count} scan${s.count === 1 ? '' : 's'}`} style={{ width: '100%', maxWidth: 28, borderRadius: '4px 4px 2px 2px', height: barH,
                     background: isToday ? `linear-gradient(180deg, ${T.ac}, ${T.ac2})` : isMax ? `linear-gradient(180deg, ${T.ac87}, ${T.ac55})` : `linear-gradient(180deg, ${T.ac55}, ${T.ac22})`,
                     boxShadow: isToday ? `0 2px 8px ${T.ac44}` : 'none' }} />
                   <span style={{ fontSize: 7, color: isToday ? T.tx : T.tx3, fontFamily: T.mono, fontWeight: isToday ? 600 : 400 }}>{new Date(s.date).getDate()}</span>
@@ -312,7 +312,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
                       const isToday = i === revTrend.length - 1;
                       const barH = r.amount > 0 ? Math.max(3, (r.amount / range) * 48) : 2;
                       return (
-                        <div key={i} style={{ flex: 1, marginLeft: i > 0 ? 0.5 : 0, borderRadius: '2px 2px 0 0', height: barH, transition: 'height .3s ease', minWidth: 0,
+                        <div key={i} className={r.amount > 0 ? 'bar-hover-v' : undefined} style={{ flex: 1, marginLeft: i > 0 ? 0.5 : 0, borderRadius: '2px 2px 0 0', height: barH, minWidth: 0,
                           background: r.amount <= 0 ? 'rgba(255,255,255,0.03)'
                             : isToday ? `linear-gradient(180deg, ${T.gr}, ${T.gr66})`
                             : isPeak ? `linear-gradient(180deg, ${T.grCC}, ${T.gr44})`
@@ -343,10 +343,10 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
           {(() => { const nonCompletedTotal = Object.entries(invBreakdown).filter(([s]) => s !== 'completed').reduce((a, [, c]) => a + c, 0) || 1; return Object.entries(invBreakdown).filter(([status]) => status !== 'completed').map(([status, count]) => {
             const total = nonCompletedTotal;
             return (
-              <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 9, color: T.tx2, width: 65, textTransform: 'capitalize' }}>{status.replace('_', ' ')}</span>
+              <div key={status} title={`${status.replace('_', ' ')}: ${count} of ${total}`} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 9, color: T.tx2, width: 80, textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{status.replace('_', ' ')}</span>
                 <div style={{ flex: 1, background: T.s2, borderRadius: 3, height: 8, overflow: 'hidden' }}>
-                  <div style={{ width: `${(count / total) * 100}%`, height: '100%', background: statusColors[status] || T.tx3, borderRadius: 3 }} />
+                  <div className="bar-hover-h" style={{ width: `${(count / total) * 100}%`, height: '100%', background: statusColors[status] || T.tx3, borderRadius: 3 }} />
                 </div>
                 <span style={{ fontSize: 9, fontFamily: T.mono, color: statusColors[status] || T.tx3, width: 28, textAlign: 'right' }}>{count}</span>
               </div>

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
+import { copyToClipboard } from '../../lib/clipboard';
 import type { ShortLink } from '../../types/database';
 import TracklyAnalytics from './TracklyAnalytics';
 
@@ -75,7 +76,10 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
     addToast('Link deleted', 'success'); setPage(0); fetchLinks();
   };
 
-  const copyLink = (code: string) => { navigator.clipboard.writeText(shortUrl(code)); addToast('Short link copied', 'success'); };
+  const copyLink = async (code: string) => {
+    const ok = await copyToClipboard(shortUrl(code));
+    addToast(ok ? 'Short link copied' : 'Copy failed — long-press the URL to copy manually', ok ? 'success' : 'error');
+  };
   const closeModal = () => { setShowAdd(false); setForm({ long_url: '', title: '', short_code: '' }); setFormError(''); };
   const openAdd = () => { setForm({ long_url: '', title: '', short_code: generateCode() }); setFormError(''); setShowAdd(true); };
 
