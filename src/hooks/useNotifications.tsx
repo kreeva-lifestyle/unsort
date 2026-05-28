@@ -23,16 +23,15 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const [toasts, setToasts] = useState<any[]>([]);
   const { user } = useAuth();
 
-  // Narrow dedup: suppress identical toasts only within a 200ms window
-  // (catches render-loop spam without silencing legitimate sequential ones).
   const lastToastRef = useRef<{ message: string; type: string; ts: number } | null>(null);
+  const toastIdRef = useRef(0);
   const addToast = useCallback((message: string, type = 'info') => {
     const now = Date.now();
     const last = lastToastRef.current;
     if (last && last.message === message && last.type === type && now - last.ts < 200) return;
     lastToastRef.current = { message, type, ts: now };
-    const id = now + Math.random();
-    setToasts((prev) => [...prev, { id, message, type }]);
+    const id = ++toastIdRef.current;
+    setToasts((prev) => [...prev.slice(-4), { id, message, type }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
   }, []);
 
