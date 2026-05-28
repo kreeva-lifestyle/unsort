@@ -1,4 +1,5 @@
-const CACHE = 'dailyoffice-v5';
+// __BUILD_TS__ is replaced at build time by vite.config.ts — forces SW update on every deploy
+const CACHE = 'dailyoffice-__BUILD_TS__';
 
 self.addEventListener('install', e => {
   self.skipWaiting();

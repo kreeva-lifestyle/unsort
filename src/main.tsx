@@ -11,7 +11,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(e => console.error('SW registration failed:', e));
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+      if (reg) setInterval(() => reg.update(), 60_000);
+    }).catch(e => console.error('SW registration failed:', e));
   });
   navigator.serviceWorker.addEventListener('message', (e) => {
     if (e.data?.type === 'SW_UPDATED') {
