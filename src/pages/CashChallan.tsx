@@ -202,8 +202,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const grandTotal = Math.round(afterAll);
 
   // ── Fetch challans ─────────────────────────────────────────────────────────
-  const fetchChallans = useCallback(async () => {
-    setLoading(true);
+  const fetchChallans = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     let query = supabase.from('cash_challans').select('*, cash_challan_items(sku, quantity, price, discount_amount, total)', { count: 'estimated' });
     if (debouncedSearch) {
       const s = debouncedSearch.replace(/[%_,().]/g, '');
@@ -219,10 +219,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     else if (invFilter === 'no') query = query.eq('inventory_deducted', false);
     query = query.order('created_at', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
     const { data, count, error } = await query;
-    if (error) { addToast(friendlyError(error), 'error'); setLoading(false); return; }
+    if (error) { addToast(friendlyError(error), 'error'); if (!silent) setLoading(false); return; }
     setChallans((data as Challan[] | null) || []);
     setTotalCount(count || 0);
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [debouncedSearch, statusFilter, tagFilter, dateFrom, dateTo, invFilter, page, pageSize]);
 
   useEffect(() => { fetchChallans(); }, [fetchChallans]);
@@ -252,9 +252,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Realtime sync — multi-user safety ──────────────────────────────────────
   // INSERT/DELETE instant; UPDATE debounced 500ms to coalesce bulk operations.
-  const { debounced: debouncedFetchChallans } = useDebouncedFetch(fetchChallans, 500);
+  const silentFetch = useCallback(() => fetchChallans(true), [fetchChallans]);
+  const { debounced: debouncedFetchChallans } = useDebouncedFetch(silentFetch, 500);
   useEffect(() => {
-    const imm = () => fetchChallans();
+    const imm = () => fetchChallans(true);
     const channel = supabase.channel('cash_challans_realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cash_challans' }, imm)
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cash_challans' }, imm)
@@ -645,9 +646,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Toggle inventory deducted ──────────────────────────────────────────────
   const toggleInventoryDeducted = async (id: string, value: boolean) => {
-    setChallans(prev => prev.map(c => c.id === id ? { ...c, inventory_deducted: value } : c));
+    const prev = challans.find(c => c.id === id);
+    setChallans(cs => cs.map(c => c.id === id ? { ...c, inventory_deducted: value } : c));
     const { error } = await supabase.from('cash_challans').update({ inventory_deducted: value }).eq('id', id);
-    if (error) { addToast(friendlyError(error), 'error'); setChallans(prev => prev.map(c => c.id === id ? { ...c, inventory_deducted: !value } : c)); }
+    if (error) { addToast(friendlyError(error), 'error'); setChallans(cs => cs.map(c => c.id === id ? { ...c, inventory_deducted: !value } : c)); return; }
+    addToast(value ? 'Inventory deducted' : 'Inventory restored', 'success');
+    await ccAuditLog('INV_TOGGLE', id, `Challan #${prev?.challan_number || '?'} — inventory ${value ? 'deducted' : 'restored'}`, { inventory_deducted: { from: !value, to: value } });
   };
 
   // ── Void challan ───────────────────────────────────────────────────────────
