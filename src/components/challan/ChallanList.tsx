@@ -62,18 +62,18 @@ export default function ChallanList(p: Props) {
   const filterActive = p.statusFilter || p.tagFilter || p.dateFrom || p.dateTo || p.invFilter;
   return (
     <>
-      <div className="challan-filters" style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 120, position: 'relative' }}>
+      <div className="challan-filters" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
-          <input type="text" value={p.search} onChange={e => { p.onSearchChange(e.target.value); p.onResetPage(); }} placeholder="Search name or #..." style={{ ...S.fSearch, width: '100%' }} />
+          <input type="text" value={p.search} onChange={e => { p.onSearchChange(e.target.value); p.onResetPage(); }} placeholder="Search name or #..." style={{ ...S.fSearch, background: 'transparent', border: 'none', width: '100%' }} />
         </div>
-        <div className="challan-filter-btns" style={{ display: 'flex', gap: 6 }}>
-          <button onClick={p.onToggleFilters} style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${p.showFilters || filterActive ? T.ac3 : T.bd2}`, background: p.showFilters ? T.ac3 : 'rgba(255,255,255,0.03)', color: p.showFilters || filterActive ? T.ac2 : T.tx3, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, height: 36 }}>
+        <div className="challan-filter-btns" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button onClick={p.onToggleFilters} style={{ ...S.btnGhost, ...S.btnSm, color: p.showFilters || filterActive ? T.ac2 : T.tx3, borderColor: p.showFilters || filterActive ? T.ac3 : T.bd2, background: p.showFilters ? T.ac3 : 'rgba(255,255,255,0.03)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
             Filters{filterActive ? ` (${[p.statusFilter, p.tagFilter, p.dateFrom, p.dateTo, p.invFilter].filter(Boolean).length})` : ''}
           </button>
-          <button className="desktop-only" onClick={p.onExport} style={{ ...S.btnSuccess, ...S.btnSm, padding: '6px 10px', fontSize: 11, height: 36 }}>Export</button>
-          <button className="desktop-only" onClick={p.onToggleBulkMode} style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${p.bulkMode ? T.ac3 : T.bd2}`, background: p.bulkMode ? T.ac3 : 'rgba(255,255,255,0.03)', color: p.bulkMode ? T.ac2 : T.tx3, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', height: 36 }}>{p.bulkMode ? 'Cancel' : '☑ Select'}</button>
+          <button className="desktop-only" onClick={p.onExport} style={{ ...S.btnGhost, ...S.btnSm, color: T.gr, borderColor: 'rgba(34,197,94,.25)', background: 'rgba(34,197,94,.06)' }}>Export</button>
+          <button className="desktop-only" onClick={p.onToggleBulkMode} style={{ ...S.btnGhost, ...S.btnSm, color: p.bulkMode ? T.ac2 : T.tx3, borderColor: p.bulkMode ? T.ac3 : T.bd2, background: p.bulkMode ? T.ac3 : 'rgba(255,255,255,0.03)' }}>{p.bulkMode ? 'Cancel' : '☑ Select'}</button>
         </div>
       </div>
 
