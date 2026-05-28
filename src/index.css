@@ -166,7 +166,7 @@ body.modal-open .fab { display: none !important; }
   .inv-action-btns { justify-content: flex-end !important; }
   .inv-more-fields { display: block !important; }
   .inv-more-content { display: none !important; }
-  .challan-filter-btns { flex: 0 !important; }
+  .challan-filter-btns { flex: none !important; }
   .toast-container { top: calc(12px + env(safe-area-inset-top, 0)) !important; bottom: auto !important; left: 12px !important; right: 12px !important; }
   .toast-item { animation: toastInTop .25s cubic-bezier(.2,.9,.3,1) !important; }
   .challan-pagination, .inv-pagination, .bt-pagination, .prg-pagination, .scan-pagination, .vs-pagination { padding-bottom: 70px !important; }
@@ -209,9 +209,10 @@ body.modal-open .fab { display: none !important; }
   .challan-nav-btns { overflow-x: auto !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important; gap: 4px !important; flex-shrink: 0 !important; }
   .challan-nav-btns::-webkit-scrollbar { display: none !important; }
   .challan-nav-btns button { padding: 4px 8px !important; font-size: 9px !important; white-space: nowrap !important; }
-  .challan-filters { padding: 8px 10px !important; gap: 6px !important; margin-bottom: 6px !important; }
+  .challan-filters { flex-direction: column !important; padding: 8px 10px !important; gap: 6px !important; margin-bottom: 6px !important; align-items: stretch !important; }
+  .challan-filters > div:first-child { min-width: 0 !important; width: 100% !important; }
   .challan-filters input { width: 100% !important; min-width: 0 !important; height: 32px !important; font-size: 13px !important; }
-  .challan-filter-btns { display: flex !important; gap: 4px !important; overflow-x: auto !important; scrollbar-width: none !important; flex-shrink: 0 !important; }
+  .challan-filter-btns { display: flex !important; flex: none !important; gap: 4px !important; overflow-x: auto !important; scrollbar-width: none !important; }
   .challan-filter-btns::-webkit-scrollbar { display: none !important; }
   .challan-filter-btns button { font-size: 10px !important; padding: 4px 8px !important; }
 
@@ -313,11 +314,11 @@ body.modal-open .fab { display: none !important; }
   .addr-form-grid { grid-template-columns: 1fr !important; }
 
   /* PackStation scan history — compact date range */
-  .scan-date-range { padding: 8px 10px !important; gap: 6px !important; align-items: center !important; }
-  .scan-date-range > div { flex: 1 !important; }
+  .scan-date-range { padding: 8px 10px !important; gap: 6px !important; align-items: flex-end !important; display: grid !important; grid-template-columns: 1fr 1fr !important; }
+  .scan-date-range > div { grid-column: span 1 !important; }
   .scan-date-range > div > div:first-child { font-size: 8px !important; margin-bottom: 2px !important; }
-  .scan-date-range input[type="date"] { width: 100% !important; height: 32px !important; font-size: 12px !important; padding: 4px 6px !important; }
-  .scan-date-range button { padding: 4px 8px !important; font-size: 9px !important; height: 28px !important; }
+  .scan-date-range input[type="date"] { width: 100% !important; height: 32px !important; font-size: 12px !important; padding: 4px 6px !important; box-sizing: border-box !important; }
+  .scan-date-range > button { padding: 4px 8px !important; font-size: 9px !important; height: 28px !important; }
 
   /* Spare Parts — compact search + category filter */
   .inv-extra-filters select { height: 34px !important; font-size: 12px !important; padding: 6px 8px !important; }
