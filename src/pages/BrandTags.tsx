@@ -543,8 +543,7 @@ export default function BrandTagPrinter() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Brand Tags</div>
-          <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>{totalCount} master tags · 1.97 × 2.97 in label · CODE128 barcode</div>
+          <div style={{ fontSize: 11, color: T.tx3 }}>{totalCount} master tags · 1.97 × 2.97 in label · CODE128 barcode</div>
           {importing && <span style={{ fontSize: 10, color: T.yl, marginTop: 4, fontWeight: 600, display: 'block' }}>Importing {importProgress}...</span>}
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
