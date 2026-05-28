@@ -286,7 +286,10 @@ export default function InventoryExtras() {
     <div style={{ animation: 'fi .3s ease both' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Spare Parts</span>
+        <div>
+          <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Spare Parts</span>
+          <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{filtered.length} items{catFilter !== 'all' ? ' (filtered)' : ''}</div>
+        </div>
         <div style={{ display: 'flex', gap: 6, position: 'relative' }}>
           <div onClick={() => setShowExportMenu(v => !v)} style={btnGhost}>Export ▾</div>
           {showExportMenu && <><div style={{ position: 'fixed', inset: 0, zIndex: 149 }} onClick={() => setShowExportMenu(false)} />
@@ -310,12 +313,15 @@ export default function InventoryExtras() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="inv-extra-filters" style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-        <input placeholder="Search SKU, category, component..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }}
-          style={{ ...input, flex: 1, minWidth: 120 }} />
+      {/* Filter bar */}
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
+          <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
+          <input placeholder="Search SKU, category, component..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }}
+            style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
+        </div>
         <select value={catFilter} onChange={e => { setCatFilter(e.target.value); setPage(0); }}
-          style={{ ...input, flex: 1, minWidth: 120 }}>
+          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', outline: 'none', cursor: 'pointer', flexShrink: 0 }}>
           <option value="all">All Categories</option>
           {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
         </select>
