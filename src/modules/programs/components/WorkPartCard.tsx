@@ -21,7 +21,7 @@ export default function WorkPartCard({ p, i, canDelete, numIn, txtIn, selIn, onU
     <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid rgba(255,255,255,0.05)`, borderRadius: 8, padding: 12, marginBottom: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <input list="dl-pn" value={p.part_name} onChange={e => onUpdate(i, 'part_name', e.target.value)} placeholder={t('partPlaceholder')} style={{ ...txtIn, flex: 1, fontWeight: 600, fontSize: 14 }} />
-        {canDelete && <button onClick={() => onDelete(i)} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 18, marginLeft: 8, minWidth: 44, minHeight: 44 }}>×</button>}
+        {canDelete && <button onClick={() => onDelete(i)} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 18, marginLeft: 8, minWidth: 44, minHeight: 44 }} aria-label="Remove part">×</button>}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
         <div><div style={lbl}>{t('stitch')}</div><input type="number" min="0" value={p.stitch || ''} onChange={e => onUpdate(i, 'stitch', Math.max(0, Number(e.target.value)))} placeholder="0" style={numIn} /></div>

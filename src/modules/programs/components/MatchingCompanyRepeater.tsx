@@ -30,7 +30,7 @@ export default function MatchingCompanyRepeater({ rows, onChange, t, brandOption
             placeholder={t('brandLabel')}
             style={{ ...S.fInput, fontSize: 11 }} />
           <button type="button" onClick={() => remove(i)}
-            style={{ ...S.btnDanger, ...S.btnSm, fontSize: 10, padding: '4px 8px', cursor: 'pointer', alignSelf: 'center' }}>×</button>
+            style={{ ...S.btnDanger, ...S.btnSm, fontSize: 10, padding: '4px 8px', cursor: 'pointer', alignSelf: 'center' }} aria-label="Remove">×</button>
         </div>
       ))}
       <datalist id="dl-brand">{brandOptions.map(n => <option key={n} value={n} />)}</datalist>

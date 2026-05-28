@@ -173,10 +173,10 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
                   </td>
                   <td style={{ ...S.tdStyle, whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
                     <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                      <button onClick={() => handleEdit(p)} style={{ ...iconBtn, color: T.ac2, borderColor: 'rgba(99,102,241,.25)' }} title="Edit"><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2 2 0 113 3L12 15l-4 1 1-4 9.5-9.5z" /></svg></button>
-                      <button onClick={() => onPDF(p)} style={iconBtn} title="PDF"><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6" /></svg></button>
-                      <button onClick={() => handleCopyLink(p)} style={iconBtn} title="Share link"><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg></button>
-                      <button onClick={() => handleDelete(p)} style={{ ...iconBtn, color: T.re, borderColor: 'rgba(239,68,68,.25)', opacity: deleting === p.id ? 0.5 : 1 }} title="Delete"><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /></svg></button>
+                      <button onClick={() => handleEdit(p)} style={{ ...iconBtn, color: T.ac2, borderColor: 'rgba(99,102,241,.25)' }} title="Edit" aria-label="Edit"><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2 2 0 113 3L12 15l-4 1 1-4 9.5-9.5z" /></svg></button>
+                      <button onClick={() => onPDF(p)} style={iconBtn} title="PDF" aria-label="Export PDF"><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6" /></svg></button>
+                      <button onClick={() => handleCopyLink(p)} style={iconBtn} title="Share link" aria-label="Share link"><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg></button>
+                      <button onClick={() => handleDelete(p)} style={{ ...iconBtn, color: T.re, borderColor: 'rgba(239,68,68,.25)', opacity: deleting === p.id ? 0.5 : 1 }} title="Delete" aria-label="Delete"><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /></svg></button>
                     </div>
                   </td>
                 </tr>
@@ -191,9 +191,9 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="prg-pagination" style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 10, alignItems: 'center' }}>
-          <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }}>{t('prev')}</span>
+          <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }} aria-label="Previous page">{t('prev')}</span>
           <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
-          <span onClick={() => setPage(p => p + 1)} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }}>{t('next')}</span>
+          <span onClick={() => setPage(p => p + 1)} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">{t('next')}</span>
         </div>
       )}
       <ConfirmModal {...modalProps} />
