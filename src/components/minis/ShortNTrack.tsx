@@ -28,13 +28,12 @@ function validateUrl(raw: string): { ok: true; href: string } | { ok: false; err
   return { ok: true, href: url.href };
 }
 
-export default function ShortNTrack({ addToast }: { addToast: (msg: string, type?: string) => void }) {
+export default function ShortNTrack({ addToast, onBack }: { addToast: (msg: string, type?: string) => void; onBack?: () => void }) {
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ long_url: '', title: '', short_code: '' });
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
@@ -64,15 +63,9 @@ export default function ShortNTrack({ addToast }: { addToast: (msg: string, type
     if (!/^[a-zA-Z0-9_-]+$/.test(code)) { setFormError('Short code: letters, numbers, hyphens, underscores only'); return; }
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (editingId) {
-      const { error } = await supabase.from('short_links').update({ long_url: v.href, title: form.title.trim() || null, short_code: code, updated_at: new Date().toISOString() }).eq('id', editingId);
-      if (error) { addToast(friendlyError(error), 'error'); setSaving(false); return; }
-      addToast('Link updated', 'success');
-    } else {
-      const { error } = await supabase.from('short_links').insert({ long_url: v.href, title: form.title.trim() || null, short_code: code, created_by: user?.id });
-      if (error) { addToast(friendlyError(error), 'error'); setSaving(false); return; }
-      addToast('Short link created', 'success');
-    }
+    const { error } = await supabase.from('short_links').insert({ long_url: v.href, title: form.title.trim() || null, short_code: code, created_by: user?.id });
+    if (error) { addToast(friendlyError(error), 'error'); setSaving(false); return; }
+    addToast('Short link created', 'success');
     setSaving(false); closeModal(); fetchLinks();
   };
 
@@ -83,9 +76,8 @@ export default function ShortNTrack({ addToast }: { addToast: (msg: string, type
   };
 
   const copyLink = (code: string) => { navigator.clipboard.writeText(shortUrl(code)); addToast('Short link copied', 'success'); };
-  const closeModal = () => { setShowAdd(false); setEditingId(null); setForm({ long_url: '', title: '', short_code: '' }); setFormError(''); };
-  const openEdit = (l: ShortLink) => { setEditingId(l.id); setForm({ long_url: l.long_url, title: l.title || '', short_code: l.short_code }); setFormError(''); setShowAdd(true); };
-  const openAdd = () => { setEditingId(null); setForm({ long_url: '', title: '', short_code: generateCode() }); setFormError(''); setShowAdd(true); };
+  const closeModal = () => { setShowAdd(false); setForm({ long_url: '', title: '', short_code: '' }); setFormError(''); };
+  const openAdd = () => { setForm({ long_url: '', title: '', short_code: generateCode() }); setFormError(''); setShowAdd(true); };
 
   const q = search.toLowerCase();
   const filtered = q ? links.filter(l => l.short_code.toLowerCase().includes(q) || l.long_url.toLowerCase().includes(q) || (l.title || '').toLowerCase().includes(q)) : links;
@@ -98,8 +90,13 @@ export default function ShortNTrack({ addToast }: { addToast: (msg: string, type
   // ── List View ─────────────────────────────────────────────────────────────
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 12, gap: 6 }}>
-        <div onClick={openAdd} style={S.btnPrimary}>+ New Link</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 6 }}>
+        {onBack ? (
+          <span onClick={onBack} style={{ ...S.btnGhost, padding: '8px 12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', minHeight: 36 }} aria-label="Back">
+            <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+          </span>
+        ) : <span />}
+        <div onClick={openAdd} style={{ ...S.btnPrimary, minHeight: 36, padding: '8px 14px' }}>+ New Link</div>
       </div>
 
       {links.length > 0 && <div style={{ position: 'relative', marginBottom: 10 }}>
@@ -127,11 +124,10 @@ export default function ShortNTrack({ addToast }: { addToast: (msg: string, type
                 <div style={{ fontSize: 7, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5 }}>clicks</div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
-              <span onClick={() => copyLink(l.short_code)} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer' }}>Copy</span>
-              <span onClick={() => { setAnalyticsLink(l); window.history.pushState({ view: 'short-analytics' }, ''); }} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', color: T.gr, borderColor: 'rgba(34,197,94,.2)' }}>Analytics</span>
-              <span onClick={() => openEdit(l)} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer' }}>Edit</span>
-              <span onClick={() => deleteLink(l.id)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer' }}>Delete</span>
+            <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span onClick={() => copyLink(l.short_code)} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', minHeight: 32 }}>Copy</span>
+              <span onClick={() => { setAnalyticsLink(l); window.history.pushState({ view: 'short-analytics' }, ''); }} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', color: T.gr, borderColor: 'rgba(34,197,94,.2)', minHeight: 32 }}>Analytics</span>
+              <span onClick={() => deleteLink(l.id)} style={{ ...S.btnDanger, padding: '7px 12px', fontSize: 11, cursor: 'pointer', minHeight: 32 }}>Delete</span>
               <span style={{ fontSize: 9, color: T.tx3, marginLeft: 'auto', alignSelf: 'center' }}>
                 {l.created_at ? new Date(l.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
               </span>
@@ -157,7 +153,7 @@ export default function ShortNTrack({ addToast }: { addToast: (msg: string, type
       {showAdd && createPortal(<div style={S.modalOverlay} onClick={closeModal}>
         <div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
           <div style={S.modalHead}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{editingId ? 'Edit' : 'Create'} Short Link</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Create Short Link</span>
             <span onClick={closeModal} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }} aria-label="Close">&#215;</span>
           </div>
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} style={{ padding: 16 }}>
@@ -174,7 +170,7 @@ export default function ShortNTrack({ addToast }: { addToast: (msg: string, type
             {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{formError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${T.bd}` }}>
               <span onClick={closeModal} style={S.btnGhost}>Cancel</span>
-              <button type="submit" style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving...' : editingId ? 'Update' : 'Create'}</button>
+              <button type="submit" style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving...' : 'Create'}</button>
             </div>
           </form>
         </div>

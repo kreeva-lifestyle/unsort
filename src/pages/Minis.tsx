@@ -112,8 +112,7 @@ export default function Minis() {
 
   if (view === 'shortntrack') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 14 }}>{back}</div>
-      <ShortNTrack addToast={addToast} />
+      <ShortNTrack addToast={addToast} onBack={() => setViewState('home')} />
     </div>
   );
 
