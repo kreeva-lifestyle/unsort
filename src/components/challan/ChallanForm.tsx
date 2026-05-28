@@ -183,7 +183,7 @@ export default function ChallanForm(p: ChallanFormProps) {
               )}
             </div>
             <div>
-              <label style={lbl}>Phone (for WhatsApp){p.selectedCustomerId && p.customerPhone && <span style={{ marginLeft: 6, fontSize: 8, color: T.gr, textTransform: 'none' as const, letterSpacing: 0, fontWeight: 600 }}>✓ Auto-filled</span>}</label>
+              <label style={lbl}>Phone <span style={{ color: T.re }}>*</span>{p.selectedCustomerId && p.customerPhone && <span style={{ marginLeft: 6, fontSize: 8, color: T.gr, textTransform: 'none' as const, letterSpacing: 0, fontWeight: 600 }}>✓ Auto-filled</span>}</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
                 <span style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRight: 'none', borderRadius: '6px 0 0 6px', fontSize: 12, color: T.tx3, fontFamily: T.mono, whiteSpace: 'nowrap', lineHeight: '1.2' }}>+91</span>
                 <input type="tel" value={p.customerPhone} onChange={e => p.setCustomerPhone(e.target.value)} placeholder="9876543210" style={{ ...inp, fontFamily: T.mono, borderRadius: '0 6px 6px 0', flex: 1 }} />

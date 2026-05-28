@@ -218,7 +218,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (invFilter === 'yes') query = query.eq('inventory_deducted', true);
     else if (invFilter === 'no') query = query.eq('inventory_deducted', false);
     query = query.order('created_at', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
-    const { data, count } = await query;
+    const { data, count, error } = await query;
+    if (error) { addToast(friendlyError(error), 'error'); setLoading(false); return; }
     setChallans((data as Challan[] | null) || []);
     setTotalCount(count || 0);
     setLoading(false);
@@ -514,6 +515,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       }
     }
     if (subtotal <= 0) { setFormError('Subtotal must be greater than zero'); return; }
+    if (!customerPhone.trim()) { setFormError('Phone number is required'); return; }
+    if (customerPhone.replace(/\D/g, '').length < 10) { setFormError('Enter a valid 10-digit phone number'); return; }
     if (grandTotal < 0) { setFormError('Total cannot be negative. Check item discounts.'); return; }
     if (amountPaid < 0) { setFormError('Amount paid cannot be negative'); return; }
     if (amountPaid > grandTotal) { setFormError(`Amount paid (₹${amountPaid}) cannot exceed total (₹${grandTotal})`); return; }
@@ -1293,7 +1296,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
       {/* WhatsApp Share Bar */}
       {whatsAppShare && (
-        <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 300, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '10px 14px', boxShadow: '0 8px 30px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 12, animation: 'su .2s ease', minWidth: 280 }}>
+        <div style={{ position: 'fixed', bottom: 'calc(80px + env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)', zIndex: 300, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '10px 14px', boxShadow: '0 8px 30px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 12, animation: 'su .2s ease', minWidth: 280 }}>
           <span style={{ fontSize: 20 }}>📱</span>
           <span style={{ flex: 1, fontSize: 12, color: T.tx }}>Share on WhatsApp?</span>
           <button onClick={() => { window.location.href = whatsAppShare.url; setWhatsAppShare(null); }} style={{ ...S.btnPrimary, background: '#25D366', boxShadow: 'none', gap: 4, fontSize: 11 }}>Send</button>
