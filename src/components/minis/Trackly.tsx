@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
 import type { ShortLink } from '../../types/database';
-import ShortNTrackAnalytics from './ShortNTrackAnalytics';
+import TracklyAnalytics from './TracklyAnalytics';
 
 const COLS = 'id, short_code, long_url, title, clicks, created_by, created_at, updated_at';
 const APP_ORIGIN = typeof window !== 'undefined' ? window.location.origin : 'https://dailyoffice.aryadesigns.co.in';
@@ -28,7 +28,7 @@ function validateUrl(raw: string): { ok: true; href: string } | { ok: false; err
   return { ok: true, href: url.href };
 }
 
-export default function ShortNTrack({ addToast, onBack }: { addToast: (msg: string, type?: string) => void; onBack?: () => void }) {
+export default function Trackly({ addToast, onBack }: { addToast: (msg: string, type?: string) => void; onBack?: () => void }) {
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -85,7 +85,7 @@ export default function ShortNTrack({ addToast, onBack }: { addToast: (msg: stri
   const paged = filtered.slice(page * perPage, (page + 1) * perPage);
 
   // ── Analytics sub-view ────────────────────────────────────────────────────
-  if (analyticsLink) return <ShortNTrackAnalytics link={analyticsLink} onBack={() => setAnalyticsLink(null)} addToast={addToast} />;
+  if (analyticsLink) return <TracklyAnalytics link={analyticsLink} onBack={() => setAnalyticsLink(null)} addToast={addToast} />;
 
   // ── List View ─────────────────────────────────────────────────────────────
   return (

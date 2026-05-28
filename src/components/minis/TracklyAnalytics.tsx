@@ -13,7 +13,7 @@ interface Props {
   addToast: (msg: string, type?: string) => void;
 }
 
-export default function ShortNTrackAnalytics({ link, onBack, addToast }: Props) {
+export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
   const [clicks, setClicks] = useState<LinkClick[]>([]);
   const [loading, setLoading] = useState(true);
   const [from, setFrom] = useState(() => {
@@ -86,7 +86,7 @@ export default function ShortNTrackAnalytics({ link, onBack, addToast }: Props) 
       {loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading analytics...</div> : <>
 
       {/* KPI cards */}
-      <div className="snt-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
+      <div className="trackly-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
         <KpiCard label="Total Clicks" value={clicks.length} color={T.ac2} bg={T.ac3} bd="rgba(99,102,241,.15)" />
         <KpiCard label="Devices" value={Object.keys(deviceCounts).length} color={T.gr} bg="rgba(34,197,94,.06)" bd="rgba(34,197,94,.15)" />
         <KpiCard label="Countries" value={Object.keys(countryCounts).filter(k => k !== 'Unknown').length || '—'} color={T.yl} bg="rgba(251,191,36,.06)" bd="rgba(251,191,36,.15)" />
@@ -120,7 +120,7 @@ export default function ShortNTrackAnalytics({ link, onBack, addToast }: Props) 
       </ChartCard>
 
       {/* Breakdown grids */}
-      <div className="snt-breakdowns" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+      <div className="trackly-breakdowns" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
         <BreakdownCard title="Device" data={deviceCounts} tone={T.ac2} />
         <BreakdownCard title="Browser" data={browserCounts} tone={T.bl} />
         <BreakdownCard title="OS" data={osCounts} tone={T.gr} />

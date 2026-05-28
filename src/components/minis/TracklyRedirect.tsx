@@ -8,7 +8,7 @@ import { T } from '../../lib/theme';
 const EDGE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
 const ALLOWED_SCHEMES = ['http:', 'https:'];
 
-export default function ShortLinkRedirect({ shortCode }: { shortCode: string }) {
+export default function TracklyRedirect({ shortCode }: { shortCode: string }) {
   const [status, setStatus] = useState<'loading' | 'notfound' | 'error'>('loading');
 
   useEffect(() => {
