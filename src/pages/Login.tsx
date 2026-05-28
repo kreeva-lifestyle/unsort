@@ -49,15 +49,15 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
   return (
     <div className="login-page" style={{ position: 'fixed', inset: 0, background: T.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Ambient orbs */}
-      <div style={{ position: 'absolute', width: 600, height: 600, top: -200, right: -100, background: `radial-gradient(circle, ${T.ac}40 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .3s ease forwards' }} />
-      <div style={{ position: 'absolute', width: 500, height: 500, bottom: -200, left: -100, background: `radial-gradient(circle, ${T.bl}30 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .5s ease forwards' }} />
+      <div style={{ position: 'absolute', width: 600, height: 600, top: -200, right: -100, background: `radial-gradient(circle, ${T.ac44} 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .3s ease forwards' }} />
+      <div style={{ position: 'absolute', width: 500, height: 500, bottom: -200, left: -100, background: `radial-gradient(circle, ${T.bl30} 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .5s ease forwards' }} />
 
       {/* Desktop: split layout */}
       <div className="login-split" style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: '1fr 420px', gap: 60, maxWidth: 1080, width: '100%', padding: '20px 40px', alignItems: 'center', margin: 'auto', animation: 'loginBoxEnter 1.2s cubic-bezier(.16,1,.3,1) both' }}>
         {/* Left: brand hero (desktop only) */}
         <div className="login-hero" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.sora, fontWeight: 800, fontSize: 22, color: '#fff', boxShadow: `0 10px 30px ${T.ac}55`, flexShrink: 0 }}>D</div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.sora, fontWeight: 800, fontSize: 22, color: '#fff', boxShadow: `0 10px 30px ${T.ac55}`, flexShrink: 0 }}>D</div>
             <div>
               <div style={{ fontFamily: T.sora, fontSize: 22, fontWeight: 700, color: T.tx, letterSpacing: -0.4 }}>DailyOffice</div>
               <div style={{ fontSize: 11, color: T.tx3, fontFamily: T.mono, marginTop: 2 }}>Your Workspace, Simplified</div>
@@ -75,7 +75,7 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
         <div className="login-card" style={{ background: 'rgba(14,18,30,.88)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 20, padding: '36px 28px 28px', boxShadow: '0 30px 80px rgba(0,0,0,.5)' }}>
           {/* Mobile brand mark */}
           <div className="login-mobile-brand" style={{ display: 'none', textAlign: 'center', marginBottom: 28 }}>
-            <div style={{ width: 56, height: 56, borderRadius: 14, background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.sora, fontWeight: 800, fontSize: 28, color: '#fff', boxShadow: `0 10px 30px ${T.ac}55`, marginBottom: 14 }}>D</div>
+            <div style={{ width: 56, height: 56, borderRadius: 14, background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.sora, fontWeight: 800, fontSize: 28, color: '#fff', boxShadow: `0 10px 30px ${T.ac55}`, marginBottom: 14 }}>D</div>
             <div style={{ fontFamily: T.sora, fontSize: 20, fontWeight: 700, color: T.tx, letterSpacing: -0.3 }}>DailyOffice</div>
             <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>Your Workspace, Simplified</div>
           </div>
@@ -98,7 +98,7 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
               <label style={{ display: 'block', fontSize: 12, color: T.tx2, fontWeight: 500, marginBottom: 6 }}>Password</label>
               <input type="password" autoComplete="current-password" placeholder="Enter password" value={password} onChange={e => setPassword(e.target.value)} required style={inp} />
             </div>
-            <button type="submit" disabled={loading} style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', cursor: loading ? 'default' : 'pointer', fontSize: 15, fontWeight: 600, fontFamily: T.sora, color: '#fff', background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, boxShadow: `0 8px 24px ${T.ac}44`, transition: 'all .2s', filter: loading ? 'brightness(0.7)' : 'none', letterSpacing: 0.3 }}>
+            <button type="submit" disabled={loading} style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', cursor: loading ? 'default' : 'pointer', fontSize: 15, fontWeight: 600, fontFamily: T.sora, color: '#fff', background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, boxShadow: `0 8px 24px ${T.ac44}`, transition: 'all .2s', filter: loading ? 'brightness(0.7)' : 'none', letterSpacing: 0.3 }}>
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
             <div style={{ marginTop: 16, textAlign: 'center' }}>

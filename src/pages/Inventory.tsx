@@ -707,7 +707,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {!showExtras && <><div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, border: `1px solid ${T.bd}` }}>
             {(['pending', 'completed'] as const).map(s => (
-              <div key={s} onClick={() => { setStage(s); setPage(0); }} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 11, fontWeight: stage === s ? 600 : 400, cursor: 'pointer', background: stage === s ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'transparent', color: stage === s ? '#fff' : T.tx3, transition: 'all .15s' }}>{{ pending: 'Active', completed: 'Completed' }[s]}</div>
+              <div key={s} onClick={() => { setStage(s); setPage(0); }} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 11, fontWeight: stage === s ? 600 : 400, cursor: 'pointer', background: stage === s ? `linear-gradient(135deg, ${T.ac87}, ${T.ac2cc})` : 'transparent', color: stage === s ? '#fff' : T.tx3, transition: 'all .15s' }}>{{ pending: 'Active', completed: 'Completed' }[s]}</div>
             ))}
           </div>
           <span style={{ fontSize: 10, fontWeight: 500, color: T.tx3 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length !== 1 ? 's' : ''}</span></>}
@@ -1270,7 +1270,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           <iframe srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#060810' }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button onClick={() => setExportPdfHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
-            <button onClick={() => { const iframe = document.querySelector('iframe[srcdoc]') as HTMLIFrameElement; iframe?.contentWindow?.print(); }} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #6366F1, #818CF8)', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, flex: 1, maxWidth: 160, boxShadow: '0 4px 16px rgba(99,102,241,.35)' }}>Print / Share</button>
+            <button onClick={() => { const iframe = document.querySelector('iframe[srcdoc]') as HTMLIFrameElement; iframe?.contentWindow?.print(); }} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, flex: 1, maxWidth: 160, boxShadow: '0 4px 16px rgba(99,102,241,.35)' }}>Print / Share</button>
           </div>
         </div>,
         document.body

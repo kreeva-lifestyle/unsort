@@ -664,8 +664,8 @@ export default function BrandTagPrinter() {
               </div>
               <div style={{ display: 'flex', gap: 5 }}>
                 {missing.length === 0
-                  ? <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={() => printOrderLabels(ready)}>Print All ({totalCopies})</button>
-                  : <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.gr}cc,${T.gr}88)` }} onClick={async () => { if (await ask({ title: `Print ${ready.length} ready label${ready.length === 1 ? '' : 's'}?`, message: `${totalCopies} cop${totalCopies === 1 ? 'y' : 'ies'} will print. ${missing.length} missing SKU${missing.length === 1 ? '' : 's'} will be skipped — resolve ${missing.length === 1 ? 'it' : 'them'} later and re-run.`, confirmLabel: 'Print' })) printOrderLabels(ready); }}>Print Ready ({totalCopies}) · Skip {missing.length}</button>
+                  ? <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.grCC},${T.gr88})` }} onClick={() => printOrderLabels(ready)}>Print All ({totalCopies})</button>
+                  : <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.grCC},${T.gr88})` }} onClick={async () => { if (await ask({ title: `Print ${ready.length} ready label${ready.length === 1 ? '' : 's'}?`, message: `${totalCopies} cop${totalCopies === 1 ? 'y' : 'ies'} will print. ${missing.length} missing SKU${missing.length === 1 ? '' : 's'} will be skipped — resolve ${missing.length === 1 ? 'it' : 'them'} later and re-run.`, confirmLabel: 'Print' })) printOrderLabels(ready); }}>Print Ready ({totalCopies}) · Skip {missing.length}</button>
                 }
                 <button style={btnGhost} onClick={() => {
                   const exportData = (orderRows || []).map(r => ({
@@ -729,7 +729,7 @@ export default function BrandTagPrinter() {
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14, fontFamily: T.mono }}>{confirmDel.sku || '(empty SKU)'}</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmDel(null)} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Cancel</button>
-              <button onClick={actuallyDelete} style={{ ...S.btnDanger, flex: 1, justifyContent: 'center', background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', border: 'none' }}>Delete</button>
+              <button onClick={actuallyDelete} style={{ ...S.btnDanger, flex: 1, justifyContent: 'center', background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', border: 'none' }}>Delete</button>
             </div>
           </div>
         </div>
@@ -764,7 +764,7 @@ export default function BrandTagPrinter() {
           <iframe ref={printIframeRef} title="Label print preview" srcDoc={printHtml} style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button onClick={() => setPrintHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
-            <button onClick={() => { printIframeRef.current?.contentWindow?.print(); }} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #6366F1, #818CF8)', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, flex: 1, maxWidth: 160, boxShadow: '0 4px 16px rgba(99,102,241,.35)' }}>Print</button>
+            <button onClick={() => { printIframeRef.current?.contentWindow?.print(); }} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, flex: 1, maxWidth: 160, boxShadow: '0 4px 16px rgba(99,102,241,.35)' }}>Print</button>
           </div>
         </div>,
         document.body

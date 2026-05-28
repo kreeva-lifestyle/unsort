@@ -26,7 +26,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
       {/* User profile header */}
       <div style={{ padding: '20px 18px 16px', borderBottom: `1px solid ${T.bd}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-          <div style={{ width: 40, height: 40, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff', flexShrink: 0, boxShadow: `0 4px 14px ${T.ac}33` }}>{(profile?.full_name || 'U')[0].toUpperCase()}</div>
+          <div style={{ width: 40, height: 40, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff', flexShrink: 0, boxShadow: `0 4px 14px ${T.ac33}` }}>{(profile?.full_name || 'U')[0].toUpperCase()}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Hello, {profile?.full_name?.split(' ')[0] || 'there'}</div>
             <div style={{ fontSize: 10, color: T.tx3, textTransform: 'capitalize' as const, marginTop: 1 }}>{profile?.role || ''}</div>
@@ -42,7 +42,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
             onMouseLeave={e => { if (activeTab !== t.id) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx3; } }}>
             <Icon name={t.icon} size={18} />
             {t.label}
-            {activeTab === t.id && <span style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 4, height: 24, borderRadius: '0 4px 4px 0', background: `linear-gradient(180deg, ${T.ac}, ${T.ac2})`, boxShadow: `0 0 12px ${T.ac}aa` }} />}
+            {activeTab === t.id && <span style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 4, height: 24, borderRadius: '0 4px 4px 0', background: `linear-gradient(180deg, ${T.ac}, ${T.ac2})`, boxShadow: `0 0 12px ${T.ac80}` }} />}
           </div>
         ))}
       </nav>

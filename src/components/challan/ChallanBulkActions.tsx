@@ -51,7 +51,7 @@ export default function ChallanBulkActions(p: Props) {
           <button onClick={p.onSelectAll} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Select All</button>
           <button onClick={p.onClearSelection} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Clear</button>
           <div style={{ flex: 1 }} />
-          {p.payable.length > 0 && <button onClick={p.onOpenBulkPay} style={{ padding: '4px 12px', borderRadius: 5, border: 'none', background: T.gr, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Bulk Pay ({p.payable.length})</button>}
+          {p.payable.length > 0 && <button onClick={p.onOpenBulkPay} style={{ ...S.btnSuccess, ...S.btnSm, padding: '4px 12px' }}>Bulk Pay ({p.payable.length})</button>}
           {p.unpayable.length > 0 && <button onClick={p.onOpenBulkUnpay} style={{ ...S.btnWarn, ...S.btnSm, padding: '4px 12px' }}>Bulk Unpay ({p.unpayable.length})</button>}
         </div>
       )}
@@ -82,7 +82,7 @@ export default function ChallanBulkActions(p: Props) {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={p.onCloseBulkPay} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={p.onConfirmBulkPay} disabled={!p.bulkPayMode || p.payable.length === 0 || p.bulkBusy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: p.bulkPayMode ? (p.netTotal < 0 ? T.re : T.gr) : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: p.bulkPayMode && !p.bulkBusy ? 'pointer' : 'default', opacity: p.bulkPayMode && !p.bulkBusy ? 1 : 0.4 }}>{p.bulkBusy ? 'Processing…' : p.netTotal < 0 ? 'Settle & Refund' : 'Confirm Pay'}</button>
+              <button onClick={p.onConfirmBulkPay} disabled={!p.bulkPayMode || p.payable.length === 0 || p.bulkBusy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: p.bulkPayMode ? `linear-gradient(135deg, ${p.netTotal < 0 ? T.re : T.gr}, ${p.netTotal < 0 ? T.reCC : T.grCC})` : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: p.bulkPayMode && !p.bulkBusy ? 'pointer' : 'default', opacity: p.bulkPayMode && !p.bulkBusy ? 1 : 0.4 }}>{p.bulkBusy ? 'Processing…' : p.netTotal < 0 ? 'Settle & Refund' : 'Confirm Pay'}</button>
             </div>
           </div>
         </div>
@@ -103,7 +103,7 @@ export default function ChallanBulkActions(p: Props) {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={p.onCloseBulkUnpay} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={p.onConfirmBulkUnpay} disabled={p.bulkBusy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: T.yl, color: '#fff', fontSize: 11, fontWeight: 600, cursor: p.bulkBusy ? 'default' : 'pointer', opacity: p.bulkBusy ? 0.5 : 1 }}>{p.bulkBusy ? 'Processing…' : 'Confirm Unpay'}</button>
+              <button onClick={p.onConfirmBulkUnpay} disabled={p.bulkBusy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.yl}, ${T.ylCC})`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: p.bulkBusy ? 'default' : 'pointer', opacity: p.bulkBusy ? 0.5 : 1 }}>{p.bulkBusy ? 'Processing…' : 'Confirm Unpay'}</button>
             </div>
           </div>
         </div>
