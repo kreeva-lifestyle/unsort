@@ -26,7 +26,7 @@ export default function Settings({ profile, addToast }: { profile: any; addToast
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div className="settings-tabs" style={{ display: 'flex', gap: 4, marginBottom: 14, background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: 3, border: `1px solid ${T.bd}`, overflowX: 'auto' }}>
         {tabs.map(t => (
-          <div key={t.id} onClick={() => setTab(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 6, fontSize: 12, fontWeight: tab === t.id ? 600 : 400, cursor: 'pointer', background: tab === t.id ? `linear-gradient(135deg, ${T.ac}dd, ${T.ac2}cc)` : 'transparent', color: tab === t.id ? '#fff' : T.tx3, transition: 'all .15s', whiteSpace: 'nowrap', flex: 'none' }}>
+          <div key={t.id} onClick={() => setTab(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 6, fontSize: 12, fontWeight: tab === t.id ? 600 : 400, cursor: 'pointer', background: tab === t.id ? `linear-gradient(135deg, ${T.ac87}, ${T.ac2cc})` : 'transparent', color: tab === t.id ? '#fff' : T.tx3, transition: 'all .15s', whiteSpace: 'nowrap', flex: 'none' }}>
             <Icon name={TAB_ICONS[t.id] || 'grid'} size={14} />
             {t.label}
           </div>

@@ -118,7 +118,7 @@ const MainApp = () => {
         {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Inventory' }, { id: 'packtime', icon: 'scan', label: 'PackStation' }, { id: 'challan', icon: 'file', label: 'Challan' }].filter(t => checkTab(t.id)).map(t => (
           <div key={t.id} onClick={() => { setTab(t.id); setMobileMenu(false); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: tab === t.id ? T.ac : T.tx3, fontSize: 9, fontWeight: 500, transition: 'color .2s ease', position: 'relative' }}>
             <Icon name={t.icon} size={20} /><span>{t.label}</span>
-            {tab === t.id && <span style={{ position: 'absolute', top: -8, width: 20, height: 3, borderRadius: 2, background: T.ac, boxShadow: `0 0 8px ${T.ac}66`, animation: 'tabDot .25s cubic-bezier(.2,.9,.3,1)' }} />}
+            {tab === t.id && <span style={{ position: 'absolute', top: -8, width: 20, height: 3, borderRadius: 2, background: T.ac, boxShadow: `0 0 8px ${T.ac44}`, animation: 'tabDot .25s cubic-bezier(.2,.9,.3,1)' }} />}
           </div>
         ))}
         {/* More — opens full sidebar drawer for Brand Tags / Settings / anything else */}

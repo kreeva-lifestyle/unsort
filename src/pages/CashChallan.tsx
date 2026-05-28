@@ -1298,7 +1298,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setReminderChallan(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.ac3}`, fontSize: 11, fontWeight: 500, background: T.ac3, color: T.ac2, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={saveReminderPhone} disabled={!reminderPhone.trim()} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: reminderPhone.trim() ? `linear-gradient(135deg, ${T.gr}, ${T.gr}cc)` : 'rgba(255,255,255,.05)', color: '#fff', cursor: reminderPhone.trim() ? 'pointer' : 'not-allowed' }}>Send</button>
+              <button onClick={saveReminderPhone} disabled={!reminderPhone.trim()} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: reminderPhone.trim() ? `linear-gradient(135deg, ${T.gr}, ${T.grCC})` : 'rgba(255,255,255,.05)', color: '#fff', cursor: reminderPhone.trim() ? 'pointer' : 'not-allowed' }}>Send</button>
             </div>
           </div>
         </div>
@@ -1338,7 +1338,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>{confirmAction.type === 'void' ? `Challan #${confirmAction.challanNumber} will be marked voided. This cannot be undone.` : `Challan #${confirmAction.challanNumber} will be permanently deleted.`}</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmAction(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.ac3}`, fontSize: 11, fontWeight: 500, background: T.ac3, color: T.ac2, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={async () => { const a = confirmAction; setConfirmAction(null); if (a.type === 'void') await voidChallan(a.id); }} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.re}cc)`, color: '#fff', cursor: 'pointer' }}>{confirmAction.type === 'void' ? 'Void' : 'Delete'}</button>
+              <button onClick={async () => { const a = confirmAction; setConfirmAction(null); if (a.type === 'void') await voidChallan(a.id); }} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', cursor: 'pointer' }}>{confirmAction.type === 'void' ? 'Void' : 'Delete'}</button>
             </div>
           </div>
         </div>

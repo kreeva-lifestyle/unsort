@@ -181,7 +181,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(34,197,94,.35)')}
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(34,197,94,.18)')}
       >
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.gr}cc, ${T.gr}22)` }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.grCC}, ${T.gr22})` }} />
         <div>
           <p style={{ fontSize: 10, color: T.gr, letterSpacing: 1.2, marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Revenue ({new Date().toLocaleString('en-IN', { month: 'short' }).toUpperCase()})</p>
           <p style={{ fontFamily: T.sora, fontSize: 44, fontWeight: 800, color: T.gr, margin: 0, lineHeight: 1, letterSpacing: -1.5 }}>{loaded ? <CountUp value={pulse.revenue} prefix="₹" /> : <Skeleton width={120} height={44} borderRadius={8} />}</p>
@@ -281,8 +281,8 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
                 <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                   <span style={{ fontSize: 8, color: isMax ? T.ac2 : T.tx3, fontFamily: T.mono, fontWeight: isMax ? 700 : 500 }}>{s.count}</span>
                   <div style={{ width: '100%', maxWidth: 28, borderRadius: '4px 4px 2px 2px', height: barH, transition: 'height .4s ease',
-                    background: isToday ? `linear-gradient(180deg, ${T.ac}, ${T.ac2})` : isMax ? `linear-gradient(180deg, ${T.ac}cc, ${T.ac}55)` : `linear-gradient(180deg, ${T.ac}55, ${T.ac}18)`,
-                    boxShadow: isToday ? `0 2px 8px ${T.ac}44` : 'none' }} />
+                    background: isToday ? `linear-gradient(180deg, ${T.ac}, ${T.ac2})` : isMax ? `linear-gradient(180deg, ${T.ac87}, ${T.ac55})` : `linear-gradient(180deg, ${T.ac55}, ${T.ac22})`,
+                    boxShadow: isToday ? `0 2px 8px ${T.ac44}` : 'none' }} />
                   <span style={{ fontSize: 7, color: isToday ? T.tx : T.tx3, fontFamily: T.mono, fontWeight: isToday ? 600 : 400 }}>{new Date(s.date).getDate()}</span>
                 </div>
               );
@@ -314,10 +314,10 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
                       return (
                         <div key={i} style={{ flex: 1, marginLeft: i > 0 ? 0.5 : 0, borderRadius: '2px 2px 0 0', height: barH, transition: 'height .3s ease', minWidth: 0,
                           background: r.amount <= 0 ? 'rgba(255,255,255,0.03)'
-                            : isToday ? `linear-gradient(180deg, ${T.gr}, ${T.gr}66)`
-                            : isPeak ? `linear-gradient(180deg, ${T.gr}cc, ${T.gr}44)`
-                            : `linear-gradient(180deg, ${T.gr}66, ${T.gr}15)`,
-                          boxShadow: isToday ? `0 1px 6px ${T.gr}33` : 'none' }} title={`${new Date(r.date).getDate()} ${new Date(r.date).toLocaleDateString('en-IN', { month: 'short' })}: ₹${r.amount.toLocaleString('en-IN')}`} />
+                            : isToday ? `linear-gradient(180deg, ${T.gr}, ${T.gr66})`
+                            : isPeak ? `linear-gradient(180deg, ${T.grCC}, ${T.gr44})`
+                            : `linear-gradient(180deg, ${T.gr66}, ${T.gr15})`,
+                          boxShadow: isToday ? `0 1px 6px ${T.gr33}` : 'none' }} title={`${new Date(r.date).getDate()} ${new Date(r.date).toLocaleDateString('en-IN', { month: 'short' })}: ₹${r.amount.toLocaleString('en-IN')}`} />
                       );
                     })}
                   </div>
