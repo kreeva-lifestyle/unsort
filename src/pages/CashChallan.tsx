@@ -653,7 +653,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Void challan ───────────────────────────────────────────────────────────
   const voidChallan = async (id: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total, amount_paid, status, payment_mode').eq('id', id).maybeSingle();
+    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total, amount_paid, status, payment_mode, inventory_deducted').eq('id', id).maybeSingle();
     if (!before) return;
     if (before.status === 'paid') { addToast('Cannot void a fully paid challan', 'error'); return; }
     if (before.status === 'voided') { addToast('Already voided', 'error'); return; }
@@ -670,6 +670,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     }
     await ccAuditLog('VOID', id, `Challan #${before.challan_number} (${before.customer_name}) voided — was ₹${before.total}`, { status: { from: before.status, to: 'voided' }, amount_paid: { from: before.amount_paid, to: 0 } });
     addToast(`Challan #${before.challan_number} voided`, 'success');
+    if (before.inventory_deducted) addToast(`⚠ Inventory was deducted for this challan — please reverse the inventory transaction manually`, 'error');
     fetchChallans();
   };
 
