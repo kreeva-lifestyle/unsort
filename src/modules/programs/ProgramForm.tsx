@@ -92,7 +92,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
       <div className="prg-form-modal modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 900, width: '100%', margin: '20px 0' }} onClick={e => e.stopPropagation()}>
         <div className="prg-form-head" style={{ ...S.modalHead, position: 'sticky', top: 0, zIndex: 2, background: 'rgba(14,18,30,.98)', borderRadius: '14px 14px 0 0' }}>
           <span style={S.modalTitle}>{editing ? t('editTitle') : t('addTitle')}</span>
-          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18 }}>&times;</span>
+          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18 }} aria-label="Close">&times;</span>
         </div>
         <div className="prg-form-body" style={{ padding: '0 20px 20px' }}>
           <SectionTitle color={T.ac2}>{t('programInfo')}</SectionTitle>
@@ -127,7 +127,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                     <td style={{ ...calcCell, color: T.gr }}>{p.total ? '₹' + p.total.toFixed(0) : '—'}</td>
                     <td style={td}><input list="dl-fn" value={p.fabric_name} onChange={e => updateWork(i, 'fabric_name', e.target.value)} placeholder={t('fabricPlaceholder')} style={txtIn} data-row={i} data-col={9} onKeyDown={workNav} /></td>
                     <td style={td}><input type="number" min="0" step="0.01" value={p.fabric_meter || ''} onChange={e => updateWork(i, 'fabric_meter', Math.max(0, Number(e.target.value)))} style={numIn} data-row={i} data-col={10} onKeyDown={workNav} /></td>
-                    <td style={td}>{workParts.length > 1 && <button onClick={() => setWorkParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 16, minWidth: 44, minHeight: 44 }}>×</button>}</td>
+                    <td style={td}>{workParts.length > 1 && <button onClick={() => setWorkParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 16, minWidth: 44, minHeight: 44 }} aria-label="Remove row">×</button>}</td>
                   </tr>
                 ))}
                 <tr style={{ background: 'rgba(52,211,153,.10)', borderTop: `2px solid ${T.gr}` }}>
@@ -158,7 +158,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                   <tr key={i}>
                     <td style={td}><input list="dl-pn" value={p.part_name} onChange={e => updateFabric(i, 'part_name', e.target.value)} placeholder={t('partPlaceholder')} style={txtIn} data-row={i} data-col={0} onKeyDown={fabricNav} /></td>
                     <td style={td}><input type="number" min="0" step="0.01" value={p.fabric_meter || ''} onChange={e => updateFabric(i, 'fabric_meter', Math.max(0, Number(e.target.value)))} style={numIn} data-row={i} data-col={1} onKeyDown={fabricNav} /></td>
-                    <td style={td}>{fabricParts.length > 1 && <button onClick={() => setFabricParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 16, minWidth: 44, minHeight: 44 }}>×</button>}</td>
+                    <td style={td}>{fabricParts.length > 1 && <button onClick={() => setFabricParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 16, minWidth: 44, minHeight: 44 }} aria-label="Remove row">×</button>}</td>
                   </tr>
                 ))}
                 <tr style={{ background: 'rgba(56,189,248,.06)' }}>
