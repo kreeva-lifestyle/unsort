@@ -161,11 +161,13 @@ export default function CashBook() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData, debouncedFetch]);
 
-  const cashInSales = sales.filter(s => !s.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
-  const cashOutReturns = sales.filter(s => s.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
-  const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
-  const totalHandovers = handovers.filter(h => h.status === 'confirmed').reduce((s, h) => s + Number(h.amount), 0);
-  const closingBalance = openingBalance + cashInSales - cashOutReturns - totalExpenses - totalHandovers;
+  const { cashInSales, cashOutReturns, totalExpenses, totalHandovers, closingBalance } = useMemo(() => {
+    const cIn = sales.filter(s => !s.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
+    const cOut = sales.filter(s => s.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
+    const tExp = expenses.reduce((s, e) => s + Number(e.amount), 0);
+    const tHand = handovers.filter(h => h.status === 'confirmed').reduce((s, h) => s + Number(h.amount), 0);
+    return { cashInSales: cIn, cashOutReturns: cOut, totalExpenses: tExp, totalHandovers: tHand, closingBalance: openingBalance + cIn - cOut - tExp - tHand };
+  }, [sales, expenses, handovers, openingBalance]);
 
   const saveOpening = async () => {
     if (busy) return;

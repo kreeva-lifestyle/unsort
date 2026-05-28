@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { BarcodeDetector } from 'barcode-detector/ponyfill';
 import { supabase, SUPABASE_ANON_KEY } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
@@ -201,6 +201,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const [awbInput, setAwbInput] = useState('');
   const [sessionCount, setSessionCount] = useState(0);
   const [recentScans, setRecentScans] = useState<ScanEntry[]>([]);
+  const successScans = useMemo(() => recentScans.filter(s => s.success), [recentScans]);
+  const failedScans = useMemo(() => recentScans.filter(s => !s.success), [recentScans]);
   const [flash, setFlash] = useState<'success' | 'error' | null>(null);
   const [confirmChangeSetup, setConfirmChangeSetup] = useState(false);
   const [sessionListOpen, setSessionListOpen] = useState(true);
@@ -895,7 +897,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80, minHeight: '100%', position: 'relative' }} onClick={focusInput}>
 
       {/* Scan counter badge */}
-      {recentScans.length > 0 && <div style={{ position: 'fixed', top: 52, right: 16, zIndex: 200, background: T.gr, color: '#fff', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, boxShadow: '0 2px 10px rgba(34,197,94,.4)' }}>{recentScans.filter(s => s.success).length} scanned</div>}
+      {recentScans.length > 0 && <div style={{ position: 'fixed', top: 52, right: 16, zIndex: 200, background: T.gr, color: '#fff', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, boxShadow: '0 2px 10px rgba(34,197,94,.4)' }}>{successScans.length} scanned</div>}
 
       {/* Flash */}
       {flash && <div style={{ position: 'fixed', inset: 0, zIndex: 300, pointerEvents: 'none', background: flash === 'success' ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.10)', animation: 'fi .15s ease' }} />}
@@ -1092,7 +1094,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <span style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' }}>Recent Scans</span>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 9, color: T.tx3 }}>{recentScans.length} this session</span>
-            {recentScans.filter(s => s.success).length > 0 && <button className="desktop-only" onClick={e => { e.stopPropagation(); const successScans = recentScans.filter(s => s.success); const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n'); const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `PackTime_${courier}_CAM${camera}_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url); }} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, fontWeight: 500, cursor: 'pointer' }}>Export</button>}
+            {successScans.length > 0 && <button className="desktop-only" onClick={e => { e.stopPropagation(); const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n'); const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `PackTime_${courier}_CAM${camera}_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url); }} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, fontWeight: 500, cursor: 'pointer' }}>Export</button>}
           </div>
         </div>
         {sessionListOpen && <div style={{ maxHeight: 280, overflowY: 'auto' }}>
@@ -1138,11 +1140,10 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                 <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 2 }}>Courier</div><div style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{courier}</div></div>
                 <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 2 }}>Camera</div><div style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{camera}</div></div>
                 <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 2 }}>Scanned</div><div style={{ fontSize: 20, fontWeight: 800, color: T.gr, fontFamily: T.sora }}>{sessionCount}</div></div>
-                <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 2 }}>Duplicates</div><div style={{ fontSize: 20, fontWeight: 800, color: recentScans.filter(s => !s.success).length > 0 ? T.re : T.tx3, fontFamily: T.sora }}>{recentScans.filter(s => !s.success).length}</div></div>
+                <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 2 }}>Duplicates</div><div style={{ fontSize: 20, fontWeight: 800, color: failedScans.length > 0 ? T.re : T.tx3, fontFamily: T.sora }}>{failedScans.length}</div></div>
               </div>
             </div>
             <button onClick={() => {
-              const successScans = recentScans.filter(s => s.success);
               if (successScans.length === 0) { addToast('No successful scans to export', 'error'); return; }
               const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n');
               const blob = new Blob([csv], { type: 'text/csv' });

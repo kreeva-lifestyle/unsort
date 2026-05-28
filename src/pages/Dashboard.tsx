@@ -340,8 +340,8 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         {/* Inventory Breakdown */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
           <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Inventory Breakdown</p>
-          {Object.entries(invBreakdown).filter(([status]) => status !== 'completed').map(([status, count]) => {
-            const total = Object.values(invBreakdown).filter((_, i) => Object.keys(invBreakdown)[i] !== 'completed').reduce((a, b) => a + b, 0) || 1;
+          {(() => { const nonCompletedTotal = Object.entries(invBreakdown).filter(([s]) => s !== 'completed').reduce((a, [, c]) => a + c, 0) || 1; return Object.entries(invBreakdown).filter(([status]) => status !== 'completed').map(([status, count]) => {
+            const total = nonCompletedTotal;
             return (
               <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <span style={{ fontSize: 9, color: T.tx2, width: 65, textTransform: 'capitalize' }}>{status.replace('_', ' ')}</span>
@@ -351,7 +351,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
                 <span style={{ fontSize: 9, fontFamily: T.mono, color: statusColors[status] || T.tx3, width: 28, textAlign: 'right' }}>{count}</span>
               </div>
             );
-          })}
+          }); })()}
         </div>
         {/* Top 5 Customers Outstanding — rows deep-link to Challan filtered by customer */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
