@@ -293,11 +293,12 @@ body.modal-open .fab { display: none !important; }
   .inv-top-actions > div:first-child { flex: 1 !important; gap: 4px !important; }
   .inv-top-actions > div:first-child > div:last-child { font-size: 10px !important; }
   .inv-action-btns { display: flex !important; gap: 4px !important; flex-shrink: 0 !important; }
-  .inv-action-btns > div { padding: 6px 10px !important; font-size: 10px !important; }
-  .filter-bar { padding: 8px 10px !important; gap: 6px !important; margin-bottom: 8px !important; }
-  .filter-bar > div:first-child { min-width: 0 !important; }
-  .filter-bar > div:first-child input { height: 32px !important; font-size: 13px !important; }
-  .filter-bar > div:nth-child(2) { overflow-x: auto !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important; }
+  .inv-action-btns > div { padding: 6px 10px !important; font-size: 10px !important; gap: 4px !important; }
+  .inv-action-btns > div svg { width: 11px !important; height: 11px !important; }
+  .filter-bar { flex-direction: column !important; padding: 8px 10px !important; gap: 6px !important; margin-bottom: 8px !important; align-items: stretch !important; }
+  .filter-bar > div:first-child { min-width: 0 !important; width: 100% !important; }
+  .filter-bar > div:first-child input { height: 32px !important; font-size: 13px !important; width: 100% !important; }
+  .filter-bar > div:nth-child(2) { display: flex !important; overflow-x: auto !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important; }
   .filter-bar > div:nth-child(2)::-webkit-scrollbar { display: none !important; }
   .filter-bar > div:nth-child(2) button { padding: 4px 10px !important; font-size: 11px !important; height: 28px !important; flex-shrink: 0 !important; }
   .filter-bar > div:nth-child(3) button { height: 28px !important; font-size: 11px !important; padding: 0 10px !important; }
