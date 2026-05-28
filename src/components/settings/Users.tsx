@@ -126,8 +126,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Users</span>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
         <div onClick={() => setShowInvite(true)} style={S.btnPrimary}>+ Invite User</div>
       </div>
       <div className="desktop-only" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>

@@ -117,8 +117,7 @@ export default function ChallanLedger({
   const totalOutstanding = customers.reduce((s, c) => s + c.outstanding, 0);
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Customer Ledger</span>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 12 }}>
         {customers.filter(c => c.outstanding > 0).length > 0 && (
           <button onClick={() => {
             const due = customers.filter(c => c.outstanding > 0);

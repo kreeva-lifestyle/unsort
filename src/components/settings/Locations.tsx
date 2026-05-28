@@ -48,9 +48,6 @@ export default function Locations({ addToast, canEdit }: { addToast: (msg: strin
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Locations</span>
-      </div>
       {canEdit && <form onSubmit={addLocation} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <input value={newLoc} onChange={(e) => setNewLoc(e.target.value)} placeholder="Add new location..." style={{ ...S.fInput, flex: 1 }} />
         <button type="submit" style={S.btnPrimary}>+ Add</button>

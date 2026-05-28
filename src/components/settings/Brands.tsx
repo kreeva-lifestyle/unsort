@@ -35,7 +35,6 @@ export default function Brands({ addToast }: { addToast: (msg: string, type?: st
 
   return (
     <div>
-      <h3 style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: T.tx }}>Brands</h3>
       <form onSubmit={addBrand} style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
         <input value={newBrand} onChange={e => setNewBrand(e.target.value)} placeholder="Brand name (e.g. TANUKA)" style={{ ...S.fInput, flex: 1 }} />
         <button type="submit" style={S.btnPrimary}>+ Add</button>

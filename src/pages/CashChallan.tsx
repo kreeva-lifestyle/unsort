@@ -1169,8 +1169,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   return (
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       {/* Header */}
-      <div className="challan-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: T.sora }}>Cash Challan</span>
+      <div className="challan-header" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 12 }}>
         <div className="challan-nav-btns" style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => { setShowModal(true); window.history.pushState({ view: 'challan-new' }, ''); }} style={S.btnPrimary} className="desktop-only">+ New Challan</button>
           {profile?.module_access?.cashbook !== false && <button onClick={() => { setShowCashBook(true); window.history.pushState({ view: 'cashbook' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.08)', color: T.gr, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Cash Book</button>}
