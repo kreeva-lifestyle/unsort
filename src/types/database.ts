@@ -772,3 +772,42 @@ export type VirtualStockInsert = {
   created_at?: string | null;
   updated_at?: string | null;
 };
+
+// ─── short_links (8 cols) ─────────────────────────────────────────────
+
+export interface ShortLink {
+  id: string;
+  short_code: string;
+  long_url: string;
+  title: string | null;
+  clicks: number;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export type ShortLinkInsert = {
+  id?: string;
+  short_code: string;
+  long_url: string;
+  title?: string | null;
+  clicks?: number;
+  created_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+// ─── link_clicks (10 cols) ────────────────────────────────────────────
+
+export interface LinkClick {
+  id: string;
+  link_id: string;
+  clicked_at: string | null;
+  user_agent: string | null;
+  device_type: string | null;
+  browser: string | null;
+  os: string | null;
+  referrer: string | null;
+  country: string | null;
+  city: string | null;
+}
