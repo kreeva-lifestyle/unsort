@@ -29,6 +29,7 @@ const Inventory = retryImport(() => import('./pages/Inventory'));
 const ProgramsModule = retryImport(() => import('./modules/programs'));
 const Minis = retryImport(() => import('./pages/Minis'));
 const LazyPublicShareView = retryImport(() => import('./modules/programs/PublicShareView'));
+const LazyShortLinkRedirect = retryImport(() => import('./components/minis/ShortLinkRedirect'));
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import SidebarComponent from './components/layout/Sidebar';
@@ -174,6 +175,9 @@ const AppContent = () => {
   const hash = window.location.hash;
   const shareMatch = hash.match(/^#\/share\/program\/([a-f0-9]+)$/);
   if (shareMatch) return <Suspense fallback={<div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyPublicShareView shareToken={shareMatch[1]} /></Suspense>;
+
+  const shortMatch = hash.match(/^#\/s\/([a-zA-Z0-9_-]{3,32})$/);
+  if (shortMatch) return <Suspense fallback={<div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyShortLinkRedirect shortCode={shortMatch[1]} /></Suspense>;
 
   if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100vh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}><div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Unsort</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase' }}>LOADING</p></div>;
   if (!auth?.user) return <Login signIn={auth.signIn} />;

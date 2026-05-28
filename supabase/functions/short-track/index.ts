@@ -33,6 +33,15 @@ const json = (body: any, req: Request, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders(req), 'Content-Type': 'application/json' } });
 const fail = (status: number, error: string, req: Request) => json({ ok: false, error }, req, status);
 
+function isSafeUrl(s: string): boolean {
+  try {
+    const u = new URL(s);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function parseUA(ua: string): { device: string; browser: string; os: string } {
   const device = /mobile|android|iphone|ipad/i.test(ua)
     ? (/ipad|tablet/i.test(ua) ? 'tablet' : 'mobile')
@@ -88,16 +97,16 @@ Deno.serve(async (req: Request) => {
       p_city: city,
     });
 
-    if (!longUrl) {
-      return new Response('<html><body><h1>Link not found</h1><p>This short link does not exist or has been removed.</p></body></html>', {
+    if (!longUrl || !isSafeUrl(longUrl)) {
+      return new Response('<!doctype html><html><head><meta charset="utf-8"><title>Link not found</title><meta name="robots" content="noindex"><style>body{font-family:-apple-system,sans-serif;background:#060810;color:#E2E8F0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center;padding:20px}h1{font-size:20px;margin:0 0 8px}p{font-size:13px;color:#8896B0;margin:0}</style></head><body><div><h1>Link not found</h1><p>This link does not exist or has been removed.</p></div></body></html>', {
         status: 404,
-        headers: { ...corsHeaders(req), 'Content-Type': 'text/html' },
+        headers: { 'Content-Type': 'text/html; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'X-Robots-Tag': 'noindex' },
       });
     }
 
     return new Response(null, {
       status: 302,
-      headers: { ...corsHeaders(req), Location: longUrl },
+      headers: { Location: longUrl, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' },
     });
   }
 
@@ -116,7 +125,7 @@ Deno.serve(async (req: Request) => {
           p_country: country,
           p_city: city,
         });
-        if (!longUrl) return fail(404, 'Link not found', req);
+        if (!longUrl || !isSafeUrl(longUrl)) return fail(404, 'Link not found', req);
         return json({ ok: true, longUrl }, req);
       }
       return fail(400, 'Unknown action', req);

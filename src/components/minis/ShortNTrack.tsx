@@ -6,14 +6,26 @@ import { T, S } from '../../lib/theme';
 import type { ShortLink } from '../../types/database';
 import ShortNTrackAnalytics from './ShortNTrackAnalytics';
 
-const EDGE_BASE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
 const COLS = 'id, short_code, long_url, title, clicks, created_by, created_at, updated_at';
+const APP_ORIGIN = typeof window !== 'undefined' ? window.location.origin : 'https://dailyoffice.aryadesigns.co.in';
+const shortUrl = (code: string) => `${APP_ORIGIN}/#/s/${code}`;
+const displayShortUrl = (code: string) => shortUrl(code).replace(/^https?:\/\//, '');
 
-function generateCode(len = 6): string {
+function generateCode(len = 5): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let code = '';
   for (let i = 0; i < len; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
+}
+
+function validateUrl(raw: string): { ok: true; href: string } | { ok: false; error: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { ok: false, error: 'URL is required' };
+  let url: URL;
+  try { url = new URL(trimmed); } catch { return { ok: false, error: 'Invalid URL format. Include https:// or http://' }; }
+  if (!['http:', 'https:'].includes(url.protocol)) return { ok: false, error: 'Only http:// and https:// URLs are allowed' };
+  if (!url.hostname || url.hostname === 'localhost') return { ok: false, error: 'Localhost URLs are not allowed' };
+  return { ok: true, href: url.href };
 }
 
 export default function ShortNTrack({ addToast }: { addToast: (msg: string, type?: string) => void }) {
@@ -45,19 +57,19 @@ export default function ShortNTrack({ addToast }: { addToast: (msg: string, type
 
   const handleSave = async () => {
     setFormError('');
-    if (!form.long_url.trim()) { setFormError('URL is required'); return; }
-    try { new URL(form.long_url.trim()); } catch { setFormError('Invalid URL format'); return; }
+    const v = validateUrl(form.long_url);
+    if (!v.ok) { setFormError(v.error); return; }
     const code = form.short_code.trim() || generateCode();
     if (code.length < 3) { setFormError('Short code must be at least 3 characters'); return; }
     if (!/^[a-zA-Z0-9_-]+$/.test(code)) { setFormError('Short code: letters, numbers, hyphens, underscores only'); return; }
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (editingId) {
-      const { error } = await supabase.from('short_links').update({ long_url: form.long_url.trim(), title: form.title.trim() || null, short_code: code, updated_at: new Date().toISOString() }).eq('id', editingId);
+      const { error } = await supabase.from('short_links').update({ long_url: v.href, title: form.title.trim() || null, short_code: code, updated_at: new Date().toISOString() }).eq('id', editingId);
       if (error) { addToast(friendlyError(error), 'error'); setSaving(false); return; }
       addToast('Link updated', 'success');
     } else {
-      const { error } = await supabase.from('short_links').insert({ long_url: form.long_url.trim(), title: form.title.trim() || null, short_code: code, created_by: user?.id });
+      const { error } = await supabase.from('short_links').insert({ long_url: v.href, title: form.title.trim() || null, short_code: code, created_by: user?.id });
       if (error) { addToast(friendlyError(error), 'error'); setSaving(false); return; }
       addToast('Short link created', 'success');
     }
@@ -70,7 +82,7 @@ export default function ShortNTrack({ addToast }: { addToast: (msg: string, type
     addToast('Link deleted', 'success'); setPage(0); fetchLinks();
   };
 
-  const copyLink = (code: string) => { navigator.clipboard.writeText(`${EDGE_BASE}/${code}`); addToast('Short link copied', 'success'); };
+  const copyLink = (code: string) => { navigator.clipboard.writeText(shortUrl(code)); addToast('Short link copied', 'success'); };
   const closeModal = () => { setShowAdd(false); setEditingId(null); setForm({ long_url: '', title: '', short_code: '' }); setFormError(''); };
   const openEdit = (l: ShortLink) => { setEditingId(l.id); setForm({ long_url: l.long_url, title: l.title || '', short_code: l.short_code }); setFormError(''); setShowAdd(true); };
   const openAdd = () => { setEditingId(null); setForm({ long_url: '', title: '', short_code: generateCode() }); setFormError(''); setShowAdd(true); };
@@ -106,7 +118,7 @@ export default function ShortNTrack({ addToast }: { addToast: (msg: string, type
               <div style={{ flex: 1, minWidth: 0 }}>
                 {l.title && <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 2 }}>{l.title}</div>}
                 <div style={{ fontSize: 12, fontFamily: T.mono, color: T.ac2, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => copyLink(l.short_code)} title="Click to copy">
-                  {EDGE_BASE}/{l.short_code}
+                  {displayShortUrl(l.short_code)}
                 </div>
                 <div style={{ fontSize: 10, color: T.tx3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.long_url}</div>
               </div>
@@ -157,7 +169,7 @@ export default function ShortNTrack({ addToast }: { addToast: (msg: string, type
                 <input value={form.short_code} onChange={e => setForm({ ...form, short_code: e.target.value })} placeholder="abc123" style={{ ...S.fInput, fontFamily: T.mono }} />
                 <span onClick={() => setForm({ ...form, short_code: generateCode() })} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', whiteSpace: 'nowrap' }}>Random</span>
               </div>
-              <div style={{ fontSize: 10, color: T.tx3, marginTop: 4, fontFamily: T.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{EDGE_BASE}/{form.short_code || '...'}</div>
+              <div style={{ fontSize: 10, color: T.tx3, marginTop: 4, fontFamily: T.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayShortUrl(form.short_code || '...')}</div>
             </div>
             {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{formError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${T.bd}` }}>

@@ -5,7 +5,7 @@ import { T, S } from '../../lib/theme';
 import type { ShortLink, LinkClick } from '../../types/database';
 
 const CLICK_COLS = 'id, link_id, clicked_at, user_agent, device_type, browser, os, referrer, country, city';
-const EDGE_BASE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
+const APP_ORIGIN = typeof window !== 'undefined' ? window.location.origin : 'https://dailyoffice.aryadesigns.co.in';
 
 interface Props {
   link: ShortLink;
@@ -40,7 +40,7 @@ export default function ShortNTrackAnalytics({ link, onBack, addToast }: Props) 
   useEffect(() => { fetchClicks(); }, [fetchClicks]);
 
   const copyLink = () => {
-    navigator.clipboard.writeText(`${EDGE_BASE}/${link.short_code}`);
+    navigator.clipboard.writeText(`${APP_ORIGIN}/#/s/${link.short_code}`);
     addToast('Short link copied', 'success');
   };
 
