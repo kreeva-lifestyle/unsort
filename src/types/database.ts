@@ -810,4 +810,5 @@ export interface LinkClick {
   referrer: string | null;
   country: string | null;
   city: string | null;
+  visitor_hash: string | null;
 }

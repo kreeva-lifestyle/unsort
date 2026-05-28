@@ -36,10 +36,19 @@ const fail = (status: number, error: string, req: Request) => json({ ok: false, 
 function isSafeUrl(s: string): boolean {
   try {
     const u = new URL(s);
-    return u.protocol === 'http:' || u.protocol === 'https:';
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    if (u.username || u.password) return false;
+    return true;
   } catch {
     return false;
   }
+}
+
+async function visitorHash(ip: string, ua: string): Promise<string> {
+  const day = new Date().toISOString().slice(0, 10);
+  const raw = `${ip}|${ua}|${day}`;
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // Sliding-window rate limit, best-effort within a single isolate.
@@ -110,6 +119,7 @@ Deno.serve(async (req: Request) => {
   const { device, browser, os } = parseUA(ua);
 
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const vHash = await visitorHash(ip, ua);
 
   // GET /:shortCode — redirect
   if (req.method === 'GET') {
@@ -128,6 +138,7 @@ Deno.serve(async (req: Request) => {
       p_referrer: referer.slice(0, 500),
       p_country: country,
       p_city: city,
+      p_visitor_hash: vHash,
     });
 
     if (!longUrl || !isSafeUrl(longUrl)) {
@@ -157,6 +168,7 @@ Deno.serve(async (req: Request) => {
           p_referrer: referer.slice(0, 500),
           p_country: country,
           p_city: city,
+          p_visitor_hash: vHash,
         });
         if (!longUrl || !isSafeUrl(longUrl)) return fail(404, 'Link not found', req);
         return json({ ok: true, longUrl }, req);
