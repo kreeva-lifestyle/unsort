@@ -7,7 +7,7 @@ import CbazaarImport from '../components/minis/CbazaarImport';
 import OdetteImport from '../components/minis/OdetteImport';
 import VirtualStock from '../components/minis/VirtualStock';
 
-const SIZE_MAP: Record<number, string> = { 34: 'XS', 36: 'S', 38: 'M', 40: 'L', 42: 'XL', 44: 'XXL' };
+const SIZE_MAP: Record<number, string> = { 32: 'XXS', 34: 'XS', 36: 'S', 38: 'M', 40: 'L', 42: 'XL', 44: 'XXL' };
 
 interface UtsavRow { relid: string; vendorno: string; stock: number; leadtime: number; block: number; designno: string; size: number; catalogname: string; updateddate: string; aryaSku: string }
 
