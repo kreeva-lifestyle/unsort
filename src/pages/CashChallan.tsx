@@ -672,7 +672,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Audit trail for a challan ──────────────────────────────────────────────
   const loadAuditTrail = async (challanNumber: number) => {
-    const { data } = await supabase.from('audit_log').select('id, action, module, record_id, details, user_id, user_email, created_at, changes').eq('module', 'cash_challan').ilike('details', `%#${challanNumber} %`).order('created_at', { ascending: false });
+    const { data, error: auditErr } = await supabase.from('audit_log').select('id, action, module, record_id, details, user_id, user_email, created_at, changes').eq('module', 'cash_challan').ilike('details', `%#${challanNumber} %`).order('created_at', { ascending: false });
+    if (auditErr) { addToast(friendlyError(auditErr), 'error'); return; }
     setAuditTrail(data || []);
   };
 
