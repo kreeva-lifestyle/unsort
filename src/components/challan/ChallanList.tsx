@@ -52,6 +52,10 @@ interface Props {
   invFilter: string;
   onInvFilterChange: (v: string) => void;
   onToggleInventoryDeducted: (id: string, value: boolean) => void;
+  // Pagination
+  page: number;
+  totalPages: number;
+  onPageChange: (p: number | ((prev: number) => number)) => void;
 }
 
 export default function ChallanList(p: Props) {
@@ -106,8 +110,8 @@ export default function ChallanList(p: Props) {
             </div>
             <div>
               <label style={S.fLabel}>Per page</label>
-              <select value={p.pageSize} onChange={e => { p.onPageSizeChange(Number(e.target.value)); p.onResetPage(); }} style={S.fInput}>
-                <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option>
+              <select value={p.pageSize} onChange={e => { p.onPageSizeChange(Number(e.target.value)); p.onResetPage(); }} style={{ padding: '4px 8px', fontSize: 11, height: 28, borderRadius: 6, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.05)', color: '#8896B0', cursor: 'pointer' }}>
+                <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
               </select>
             </div>
           </div>
@@ -189,6 +193,24 @@ export default function ChallanList(p: Props) {
           );
         })}
       </div>
+
+      {p.totalPages > 0 && (
+        <div className="challan-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, fontSize: 11 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {p.totalPages > 1 && <>
+              <span onClick={() => p.onPageChange((prev: number) => Math.max(0, prev - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: p.page === 0 ? 0.3 : 1, pointerEvents: p.page === 0 ? 'none' : 'auto', cursor: 'pointer' } as React.CSSProperties} aria-label="Previous page">Prev</span>
+              <span style={{ fontSize: 10, color: T.tx3 }}>{p.page + 1} / {p.totalPages}</span>
+              <span onClick={() => p.onPageChange((prev: number) => Math.min(p.totalPages - 1, prev + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: p.page >= p.totalPages - 1 ? 0.3 : 1, pointerEvents: p.page >= p.totalPages - 1 ? 'none' : 'auto', cursor: 'pointer' } as React.CSSProperties} aria-label="Next page">Next</span>
+            </>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 10, color: T.tx3 }}>{p.totalCount} items</span>
+            <select value={p.pageSize} onChange={e => { p.onPageSizeChange(Number(e.target.value)); p.onResetPage(); }} style={{ padding: '4px 8px', fontSize: 11, height: 28, borderRadius: 6, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.05)', color: '#8896B0', cursor: 'pointer' }}>
+              <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
+            </select>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -90,7 +90,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
           <input value={search} onChange={e => onSearch(e.target.value)} placeholder="Search UID, SKU, brand, label…" style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
         </div>
         <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }} style={{ ...S.fInput, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}>
-          <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option>
+          <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
         </select>
       </div>
 
@@ -190,10 +190,13 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="prg-pagination" style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 10, alignItems: 'center' }}>
-          <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }} aria-label="Previous page">{t('prev')}</span>
-          <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
-          <span onClick={() => setPage(p => p + 1)} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">{t('next')}</span>
+        <div className="prg-pagination" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 10, alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }} aria-label="Previous page">{t('prev')}</span>
+            <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
+            <span onClick={() => setPage(p => p + 1)} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">{t('next')}</span>
+          </div>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{totalCount} items</span>
         </div>
       )}
       <ConfirmModal {...modalProps} />

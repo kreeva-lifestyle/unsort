@@ -632,14 +632,18 @@ export default function BrandTagPrinter() {
           </tbody>
         </table>
       </div>
-      <div className="bt-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>
-        <select value={btPerPage} onChange={e => { setBtPerPage(Number(e.target.value)); setBtPage(0); }} style={{ ...S.fInput, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select>
-        <span style={{ color: T.tx3 }}>rows</span>
-        {totalPages > 1 && <>
-          <span onClick={() => setBtPage(Math.max(0, btPage - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: btPage === 0 ? 0.3 : 1, pointerEvents: btPage === 0 ? 'none' : 'auto' }} aria-label="Previous page">Prev</span>
-          <span style={{ fontSize: 10, color: T.tx3 }}>{btPage + 1} / {totalPages}</span>
-          <span onClick={() => setBtPage(Math.min(totalPages - 1, btPage + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: btPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">Next</span>
-        </>}
+      <div className="bt-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 10, fontSize: 11 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {totalPages > 1 && <>
+            <span onClick={() => setBtPage(Math.max(0, btPage - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: btPage === 0 ? 0.3 : 1, pointerEvents: btPage === 0 ? 'none' : 'auto' }} aria-label="Previous page">Prev</span>
+            <span style={{ fontSize: 10, color: T.tx3 }}>{btPage + 1} / {totalPages}</span>
+            <span onClick={() => setBtPage(Math.min(totalPages - 1, btPage + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: btPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">Next</span>
+          </>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{totalCount} items</span>
+          <select value={btPerPage} onChange={e => { setBtPerPage(Number(e.target.value)); setBtPage(0); }} style={{ ...S.fInput, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
+        </div>
       </div>
 
       {/* ── Order Sheet Preview ── */}
