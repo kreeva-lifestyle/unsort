@@ -120,7 +120,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
               </span>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.bd}`, borderRadius: 6, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1, flexShrink: 0 }}>&times;</button>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.bd}`, borderRadius: 6, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1, flexShrink: 0 }} aria-label="Close">&times;</button>
         </div>
 
         <div style={{ padding: mobile ? '12px 16px' : '16px 20px', paddingBottom: mobile ? 20 : 16 }}>

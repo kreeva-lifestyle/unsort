@@ -250,7 +250,7 @@ export default function ChallanForm(p: ChallanFormProps) {
                       style={{ background: 'rgba(255,255,255,0.04)', border: discBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, flex: 1, minWidth: 0 }}
                     />
                   </div>
-                  <button onClick={() => { if (p.items.length > 1) p.setItems(p.items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }}>×</button>
+                  <button onClick={() => { if (p.items.length > 1) p.setItems(p.items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }} aria-label="Remove item">×</button>
                 </div>
                 {err && <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.re, borderBottom: `1px solid ${T.bd}`, background: 'rgba(239,68,68,.04)', display: 'flex', alignItems: 'center', gap: 5 }}>⚠ {err}</div>}
                 {!err && d > 0 && q > 0 && pr > 0 && (() => { const pct = it.discount_type === 'percentage' ? d : (d / (q * pr)) * 100; return pct > 10 ? <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.yl, borderBottom: `1px solid ${T.bd}`, background: 'rgba(245,158,11,.04)', display: 'flex', alignItems: 'center', gap: 5 }}>High discount: {Math.round(pct)}% off this item</div> : null; })()}
