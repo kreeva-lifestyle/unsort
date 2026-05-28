@@ -196,7 +196,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     };
     if ('requestIdleCallback' in window) requestIdleCallback(compute);
     else setTimeout(compute, 100);
-  }, [items, itemMissing, itemPresent]);
+  }, [items, itemMissing, itemPresent, itemDamagedIds]);
   useEffect(() => {
     fetchData();
     let debounceTimer: any;
