@@ -4,20 +4,33 @@ import { SUPABASE_ANON_KEY } from '../../lib/supabase';
 
 const EDGE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
 
-type Result = { input: string; sku: string | null; name: string | null; category: string | null; is_active: boolean | null; match: string; size?: string };
+function csvSafe(s: string): string {
+  return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+}
+
+function autoDownload(results: { input: string; status: string }[]) {
+  const rows = ['SKU,STOCK STATUS', ...results.map(r => `"${csvSafe(r.input).replace(/"/g, '""')}","${r.status}"`)];
+  const blob = new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `stock-status-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
 
 export default function TracklyImport({ onBack }: { onBack: () => void }) {
-  const [text, setText] = useState('');
-  const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const lookup = async (skus: string[]) => {
+  const process = async (skus: string[]) => {
     const clean = skus.map(s => s.trim()).filter(Boolean);
-    if (!clean.length) { setError('Paste at least one SKU'); return; }
-    if (clean.length > 500) { setError('Maximum 500 SKUs per lookup'); return; }
-    setLoading(true); setError(''); setResults([]);
+    if (!clean.length) { setError('No SKUs found in the file'); return; }
+    if (clean.length > 500) { setError('Maximum 500 SKUs per file'); return; }
+    setLoading(true); setError(''); setMsg(`Looking up ${clean.length} SKUs…`);
     try {
       const res = await fetch(EDGE, {
         method: 'POST',
@@ -25,8 +38,15 @@ export default function TracklyImport({ onBack }: { onBack: () => void }) {
         body: JSON.stringify({ action: 'lookup', skus: clean }),
       });
       const data = await res.json();
-      if (data.ok) setResults(data.results);
-      else setError(data.error || 'Lookup failed');
+      if (data.ok && Array.isArray(data.results)) {
+        autoDownload(data.results);
+        const active = data.results.filter((r: any) => r.status === 'Active').length;
+        const inactive = data.results.filter((r: any) => r.status === 'Inactive').length;
+        const notFound = data.results.filter((r: any) => r.status === 'Not Found').length;
+        setMsg(`Done — ${active} Active, ${inactive} Inactive, ${notFound} Not Found`);
+      } else {
+        setError(data.error || 'Lookup failed');
+      }
     } catch { setError('Network error — please try again'); }
     setLoading(false);
   };
@@ -34,93 +54,64 @@ export default function TracklyImport({ onBack }: { onBack: () => void }) {
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
-      const t = await file.text();
-      const skus = t.split(/[\r\n,;]+/).map(s => s.trim()).filter(Boolean);
-      lookup(skus);
-    } else {
-      const XLSX = await import('xlsx');
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf);
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws);
-      const skus = rows.map(r => String(r.sku || r.SKU || r.Sku || r['SKU Code'] || r['sku_code'] || Object.values(r)[0] || '').trim()).filter(Boolean);
-      lookup(skus);
-    }
+    setError(''); setMsg('');
+    try {
+      if (file.name.match(/\.csv$|\.txt$/i)) {
+        const t = await file.text();
+        const lines = t.split(/\r?\n/).filter(s => s.trim());
+        const skus = lines.slice(1).map(l => l.split(',')[0].replace(/^"|"$/g, '').trim()).filter(Boolean);
+        await process(skus);
+      } else {
+        const XLSX = await import('xlsx');
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf);
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        const skus = rows.slice(1).map(r => String(r[0] ?? '').trim()).filter(Boolean);
+        await process(skus);
+      }
+    } catch { setError('Could not read the file — ensure it is .xlsx or .csv'); }
     e.target.value = '';
   };
 
-  const download = () => {
-    const header = 'Input SKU,Matched SKU,Product,Category,Status,Match Type\n';
-    const rows = results.map(r => [r.input, r.sku || '', r.name || '', r.category || '', r.match === 'not_found' ? 'Not Found' : r.is_active ? 'Active' : 'Inactive', r.match].join(',')).join('\n');
-    const blob = new Blob([header + rows], { type: 'text/csv' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sku-lookup.csv'; a.click();
-  };
-
-  const matchColor = (m: string, active: boolean | null) => {
-    if (m === 'not_found') return '#EF4444';
-    if (m === 'partial' || m === 'size_variant') return '#F59E0B';
-    return active ? '#22C55E' : '#EF4444';
-  };
-  const matchLabel = (r: Result) => {
-    if (r.match === 'not_found') return 'Not Found';
-    if (r.match === 'size_variant') return `Size variant (${r.size})`;
-    if (r.match === 'partial') return 'Partial match';
-    return r.is_active ? 'Active' : 'Inactive';
-  };
-
-  const found = results.filter(r => r.match !== 'not_found').length;
-  const active = results.filter(r => r.match !== 'not_found' && r.is_active).length;
-
   return (
-    <div style={{ position: 'fixed', inset: 0, background: T.bg, fontFamily: T.sans, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, background: T.bg, fontFamily: T.sans, display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, paddingTop: 'max(14px, env(safe-area-inset-top))' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: T.tx2, cursor: 'pointer', padding: 6, fontSize: 18, lineHeight: 1 }}>&larr;</button>
-        <div style={{ fontFamily: 'Sora, Inter, sans-serif', fontSize: 15, fontWeight: 700, color: T.tx }}>SKU Lookup</div>
+        <div style={{ fontFamily: 'Sora, Inter, sans-serif', fontSize: 15, fontWeight: 700, color: T.tx }}>Self Import</div>
       </div>
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '16px', WebkitOverflowScrolling: 'touch', paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
-        {!results.length && (
-          <div style={{ maxWidth: 500, margin: '0 auto' }}>
-            <div style={{ fontSize: 12, color: T.tx2, marginBottom: 8 }}>Paste SKUs (one per line) or upload a file:</div>
-            <textarea value={text} onChange={e => setText(e.target.value)} placeholder={'TF243\nSW101\nTN-442XL\n...'} rows={8}
-              style={{ width: '100%', background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, color: T.tx, fontFamily: T.mono, fontSize: 13, padding: '12px 14px', resize: 'vertical', outline: 'none', boxSizing: 'border-box' }} />
-            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-              <button onClick={() => lookup(text.split('\n'))} disabled={loading}
-                style={{ flex: 1, padding: '12px 16px', borderRadius: 10, border: '1px solid rgba(34,197,94,0.3)', background: 'linear-gradient(135deg, rgba(34,197,94,0.15), rgba(34,197,94,0.05))', color: '#22C55E', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 48, opacity: loading ? 0.5 : 1, pointerEvents: loading ? 'none' : 'auto' }}>
-                {loading ? 'Looking up…' : 'Look Up'}
-              </button>
-              <button onClick={() => fileRef.current?.click()}
-                style={{ padding: '12px 16px', borderRadius: 10, border: `1px solid ${T.bd2}`, background: T.s, color: T.tx2, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', minHeight: 48 }}>
-                Upload
-              </button>
-            </div>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.txt" onChange={handleFile} style={{ display: 'none' }} />
-            {error && <div style={{ marginTop: 12, padding: '10px 12px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, fontSize: 12, color: T.re }}>{error}</div>}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={{ maxWidth: 380, width: '100%', textAlign: 'center' }}>
+          <div style={{ fontSize: 13, color: T.tx2, marginBottom: 20, lineHeight: 1.6 }}>
+            Upload your file with SKUs in <strong style={{ color: T.tx }}>Column A</strong> (starting from row 2).
+            <br />Results will auto-download as CSV.
           </div>
-        )}
 
-        {results.length > 0 && (
-          <div style={{ maxWidth: 600, margin: '0 auto' }}>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-              <div style={{ fontSize: 11, color: T.tx3 }}>{results.length} SKUs &middot; {found} matched &middot; {active} active</div>
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-                <button onClick={download} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: T.s, color: T.tx2, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>Download CSV</button>
-                <button onClick={() => { setResults([]); setText(''); }} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: T.s, color: T.tx2, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>New Lookup</button>
-              </div>
+          <button onClick={() => !loading && fileRef.current?.click()} style={{
+            width: '100%', padding: '20px', borderRadius: 12,
+            border: `2px dashed ${loading ? T.bd : 'rgba(34,197,94,0.3)'}`,
+            background: loading ? T.s : 'rgba(34,197,94,0.04)',
+            color: loading ? T.tx3 : '#22C55E', fontSize: 14, fontWeight: 600,
+            cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit',
+            minHeight: 56, transition: 'all 0.2s',
+            opacity: loading ? 0.6 : 1, pointerEvents: loading ? 'none' : 'auto',
+          }}>
+            {loading ? msg || 'Processing…' : 'Upload .xlsx or .csv'}
+          </button>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.txt" onChange={handleFile} style={{ display: 'none' }} />
+
+          {!loading && msg && (
+            <div style={{ marginTop: 16, padding: '12px 14px', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 8, fontSize: 12, color: '#22C55E' }}>
+              {msg}
             </div>
-            {results.map((r, i) => (
-              <div key={i} style={{ padding: '12px 14px', background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: matchColor(r.match, r.is_active), flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: T.tx, fontFamily: T.mono, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.input}</div>
-                  {r.sku && <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>{r.name}{r.category ? ` · ${r.category}` : ''}</div>}
-                </div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: matchColor(r.match, r.is_active), textAlign: 'right', flexShrink: 0 }}>{matchLabel(r)}</div>
-              </div>
-            ))}
-          </div>
-        )}
+          )}
+          {error && (
+            <div style={{ marginTop: 16, padding: '12px 14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, fontSize: 12, color: T.re }}>
+              {error}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
