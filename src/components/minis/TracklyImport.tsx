@@ -29,7 +29,7 @@ export default function TracklyImport({ onBack }: { onBack: () => void }) {
   const process = async (skus: string[]) => {
     const clean = skus.map(s => s.trim()).filter(Boolean);
     if (!clean.length) { setError('No SKUs found in the file'); return; }
-    if (clean.length > 500) { setError('Maximum 500 SKUs per file'); return; }
+    if (clean.length > 5000) { setError('Maximum 5000 SKUs per file'); return; }
     setLoading(true); setError(''); setMsg(`Looking up ${clean.length} SKUs…`);
     try {
       const res = await fetch(EDGE, {

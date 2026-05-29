@@ -6,33 +6,67 @@ import TracklyImport from './TracklyImport';
 
 const EDGE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
 const ALLOWED_SCHEMES = ['http:', 'https:'];
-// Only this short code shows the Arya Designs Matrix landing + Self Import.
-// Every other short link redirects instantly, as before.
 const LANDING_CODE = 'RW5Un';
 
+// Fire the resolve fetch at module load time — before React's useEffect cycle starts.
+// This runs the instant the lazy chunk finishes parsing, saving ~30ms on every open.
+const _preCode = window.location.hash.match(/^#\/s\/([a-zA-Z0-9_-]{3,32})/)?.[1];
+const _prefetchData: Promise<any> | null = _preCode
+  ? fetch(EDGE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ action: 'resolve', shortCode: _preCode }),
+    }).then(r => r.json()).catch(() => null)
+  : null;
+
+// localStorage cache — 24h TTL so repeat visitors (vendors) never wait for the network.
+function getCachedUrl(code: string): string | null {
+  try {
+    const raw = localStorage.getItem(`tly_${code}`);
+    if (!raw) return null;
+    const { url, exp } = JSON.parse(raw);
+    return exp > Date.now() ? url : null;
+  } catch { return null; }
+}
+function setCachedUrl(code: string, url: string) {
+  try { localStorage.setItem(`tly_${code}`, JSON.stringify({ url, exp: Date.now() + 86_400_000 })); } catch {}
+}
+
 export default function TracklyRedirect({ shortCode }: { shortCode: string }) {
-  const [status, setStatus] = useState<'loading' | 'landing' | 'import' | 'notfound' | 'error'>('loading');
-  const [longUrl, setLongUrl] = useState('');
+  const [status, setStatus] = useState<'loading' | 'landing' | 'import' | 'notfound' | 'error'>(() => {
+    if (shortCode === LANDING_CODE && getCachedUrl(shortCode)) return 'landing';
+    return 'loading';
+  });
+  const [longUrl, setLongUrl] = useState(() => {
+    if (shortCode === LANDING_CODE) return getCachedUrl(shortCode) || '';
+    return '';
+  });
 
   useEffect(() => {
+    // Cache hit — already showing landing, no network needed
+    if (shortCode === LANDING_CODE && longUrl) return;
+
     const ctrl = new AbortController();
     (async () => {
       try {
-        const res = await fetch(EDGE, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
-          body: JSON.stringify({ action: 'resolve', shortCode }),
-          signal: ctrl.signal,
-        });
+        // Use pre-fetched promise when possible; avoids starting a second request
+        const data = (_prefetchData && _preCode === shortCode)
+          ? await _prefetchData
+          : await fetch(EDGE, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+              body: JSON.stringify({ action: 'resolve', shortCode }),
+              signal: ctrl.signal,
+            }).then(r => r.json()).catch(() => null);
+
         if (ctrl.signal.aborted) return;
-        const data = await res.json().catch(() => ({}));
-        if (ctrl.signal.aborted) return;
+        if (!data) { setStatus('error'); return; }
         if (data.ok && typeof data.longUrl === 'string') {
           let target: URL;
           try { target = new URL(data.longUrl); } catch { setStatus('notfound'); return; }
           if (!ALLOWED_SCHEMES.includes(target.protocol)) { setStatus('notfound'); return; }
-          // Only the hardcoded landing code gets the Matrix landing page.
           if (shortCode !== LANDING_CODE) { window.location.replace(target.href); return; }
+          setCachedUrl(shortCode, target.href);
           setLongUrl(target.href);
           setStatus('landing');
         } else {
