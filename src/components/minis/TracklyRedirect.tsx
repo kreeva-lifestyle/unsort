@@ -6,6 +6,9 @@ import TracklyImport from './TracklyImport';
 
 const EDGE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
 const ALLOWED_SCHEMES = ['http:', 'https:'];
+// Only this short code shows the Arya Designs Matrix landing + Self Import.
+// Every other short link redirects instantly, as before.
+const LANDING_CODE = 'RW5Un';
 
 export default function TracklyRedirect({ shortCode }: { shortCode: string }) {
   const [status, setStatus] = useState<'loading' | 'landing' | 'import' | 'notfound' | 'error'>('loading');
@@ -28,6 +31,8 @@ export default function TracklyRedirect({ shortCode }: { shortCode: string }) {
           let target: URL;
           try { target = new URL(data.longUrl); } catch { setStatus('notfound'); return; }
           if (!ALLOWED_SCHEMES.includes(target.protocol)) { setStatus('notfound'); return; }
+          // Only the hardcoded landing code gets the Matrix landing page.
+          if (shortCode !== LANDING_CODE) { window.location.replace(target.href); return; }
           setLongUrl(target.href);
           setStatus('landing');
         } else {

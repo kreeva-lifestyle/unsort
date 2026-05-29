@@ -10,6 +10,9 @@ import SwipeRow from '../ui/SwipeRow';
 
 const LINK_LIMIT = 500;
 const COLS = 'id, short_code, long_url, title, clicks, created_by, created_at, updated_at';
+// This short link powers the public Arya Designs stock landing page.
+// It must never be deleted from the admin UI by anyone.
+const PROTECTED_CODE = 'RW5Un';
 const APP_ORIGIN = typeof window !== 'undefined' ? window.location.origin : 'https://dailyoffice.aryadesigns.co.in';
 const shortUrl = (code: string) => `${APP_ORIGIN}/#/s/${code}`;
 const displayShortUrl = (code: string) => shortUrl(code).replace(/^https?:\/\//, '');
@@ -74,6 +77,11 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
   };
 
   const deleteLink = async (id: string) => {
+    const link = links.find(l => l.id === id);
+    if (link?.short_code === PROTECTED_CODE) {
+      addToast('This link is protected and cannot be deleted', 'error');
+      return;
+    }
     const { error } = await supabase.from('short_links').delete().eq('id', id);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     addToast('Link deleted', 'success'); setPage(0); fetchLinks();
@@ -118,7 +126,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
           <SwipeRow key={l.id} actions={[
             { label: 'Print', color: '#6366F1', onClick: () => copyLink(l.short_code) },
             { label: 'View', color: '#22C55E', onClick: () => { setAnalyticsLink(l); window.history.pushState({ view: 'short-analytics' }, ''); } },
-            { label: 'Del', color: '#EF4444', onClick: () => deleteLink(l.id) },
+            ...(l.short_code === PROTECTED_CODE ? [] : [{ label: 'Del', color: '#EF4444', onClick: () => deleteLink(l.id) }]),
           ]} hint={i === 0} hintKey="trackly">
           <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '12px 14px', transition: 'border-color .15s' }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; }}
@@ -140,7 +148,9 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
             <div className="desktop-only" style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
               <span onClick={e => { e.stopPropagation(); copyLink(l.short_code); }} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', minHeight: 32 }}>Copy</span>
               <span onClick={e => { e.stopPropagation(); setAnalyticsLink(l); window.history.pushState({ view: 'short-analytics' }, ''); }} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', color: T.gr, borderColor: 'rgba(34,197,94,.2)', minHeight: 32 }}>Analytics</span>
-              <span onClick={e => { e.stopPropagation(); deleteLink(l.id); }} style={{ ...S.btnDanger, padding: '7px 12px', fontSize: 11, cursor: 'pointer', minHeight: 32 }}>Delete</span>
+              {l.short_code === PROTECTED_CODE
+                ? <span style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'default', color: T.tx3, display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 32 }} title="This link is protected and cannot be deleted"><svg viewBox="0 0 24 24" style={{ width: 11, height: 11, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>Protected</span>
+                : <span onClick={e => { e.stopPropagation(); deleteLink(l.id); }} style={{ ...S.btnDanger, padding: '7px 12px', fontSize: 11, cursor: 'pointer', minHeight: 32 }}>Delete</span>}
               <span style={{ fontSize: 9, color: T.tx3, marginLeft: 'auto', alignSelf: 'center' }}>
                 {l.created_at ? new Date(l.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
               </span>
