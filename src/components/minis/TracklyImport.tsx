@@ -101,6 +101,22 @@ export default function TracklyImport({ onBack }: { onBack: () => void }) {
           </button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.txt" onChange={handleFile} style={{ display: 'none' }} />
 
+          <div style={{ marginTop: 22, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>The CSV will mark each SKU as</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: T.tx2 }}><strong style={{ color: T.tx }}>Active</strong> — in stock at Arya Designs</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444', flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: T.tx2 }}><strong style={{ color: T.tx }}>Inactive</strong> — currently out of stock</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.tx3, flexShrink: 0, marginTop: 4 }} />
+              <span style={{ fontSize: 12, color: T.tx2 }}><strong style={{ color: T.tx }}>Not Found</strong> — this SKU doesn't match any Arya Designs SKU. Please double-check it, or contact the admin for help.</span>
+            </div>
+          </div>
+
           {!loading && msg && (
             <div style={{ marginTop: 16, padding: '12px 14px', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 8, fontSize: 12, color: '#22C55E' }}>
               {msg}
