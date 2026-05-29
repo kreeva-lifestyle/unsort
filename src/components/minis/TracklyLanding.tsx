@@ -39,19 +39,20 @@ function MatrixCanvas() {
   return <canvas ref={ref} style={{ position: 'fixed', inset: 0, zIndex: 0 }} />;
 }
 
-// Same DailyOffice "D" brand mark as the login page — just a Matrix-green
-// color touch (green gradient + glow) instead of the indigo→cyan original.
+// The real Arya Designs logo (gold AD crest + wordmark). Kept in its
+// original gold for brand fidelity, with a Matrix-green glow as the
+// theme color touch. The logo already contains the "ARYA DESIGNS"
+// wordmark, so no separate text heading is rendered.
 function AryaLogo() {
   return (
-    <div style={{
-      width: 64, height: 64, margin: '0 auto', borderRadius: 16,
-      background: 'linear-gradient(135deg, #16A34A, #22C55E)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'Sora, Inter, sans-serif', fontWeight: 800, fontSize: 32, color: '#fff',
-      boxShadow: '0 10px 30px rgba(34,197,94,0.35), 0 0 40px rgba(34,197,94,0.25)',
-    }}>
-      D
-    </div>
+    <img
+      src="/arya-designs-logo.png"
+      alt="Arya Designs"
+      style={{
+        width: '72%', maxWidth: 260, height: 'auto', margin: '0 auto', display: 'block',
+        filter: 'drop-shadow(0 0 18px rgba(34,197,94,0.45)) drop-shadow(0 2px 8px rgba(0,0,0,0.5))',
+      }}
+    />
   );
 }
 
@@ -82,16 +83,8 @@ export default function TracklyLanding({ longUrl, onImport }: Props) {
             <AryaLogo />
 
             <div style={{
-              fontFamily: 'Sora, Inter, sans-serif', fontSize: 22, fontWeight: 700,
-              color: '#22C55E', marginTop: 18, marginBottom: 6, letterSpacing: '0.04em',
-              textShadow: '0 0 18px rgba(34,197,94,0.45)',
-            }}>
-              ARYA DESIGNS
-            </div>
-
-            <div style={{
               fontSize: 14, color: 'rgba(226,232,240,0.82)', lineHeight: 1.6, fontWeight: 500,
-              marginBottom: 28, maxWidth: 300, marginLeft: 'auto', marginRight: 'auto',
+              marginTop: 22, marginBottom: 28, maxWidth: 300, marginLeft: 'auto', marginRight: 'auto',
             }}>
               Take the green pill.<br />See <span style={{ color: '#22C55E', fontWeight: 600 }}>our stock status</span> in real time.
             </div>
