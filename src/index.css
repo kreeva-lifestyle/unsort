@@ -119,6 +119,8 @@ tbody tr:hover { background: rgba(99,102,241,0.04); }
 @keyframes tabDot { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
 @keyframes undoProgress { from { width: 100%; } to { width: 0%; } }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+/* Phosphor-green CRT flicker for the Trackly Matrix landing logo */
+@keyframes aryaPhosphor { 0%,100% { filter: drop-shadow(0 0 6px rgba(34,197,94,.45)) drop-shadow(0 0 14px rgba(34,197,94,.25)); } 50% { filter: drop-shadow(0 0 10px rgba(34,197,94,.7)) drop-shadow(0 0 24px rgba(34,197,94,.4)); } }
 
 .undo-bar { height: 3px; background: linear-gradient(90deg, #6366F1, #818CF8); border-radius: 2px; animation: undoProgress 5s linear forwards; }
 
