@@ -39,29 +39,18 @@ function MatrixCanvas() {
   return <canvas ref={ref} style={{ position: 'fixed', inset: 0, zIndex: 0 }} />;
 }
 
-// Matrix-themed "A" monogram for Arya Designs. The PSD logo can't be embedded
-// directly, so this is a digital-rain reinterpretation: a glowing green "A"
-// stamped on a glassy tile with a subtle code-glyph backdrop.
+// Same DailyOffice "D" brand mark as the login page — just a Matrix-green
+// color touch (green gradient + glow) instead of the indigo→cyan original.
 function AryaLogo() {
   return (
     <div style={{
-      width: 72, height: 72, margin: '0 auto', borderRadius: 18,
-      background: 'radial-gradient(circle at 50% 30%, rgba(34,197,94,0.18), rgba(6,8,16,0.6))',
-      border: '1px solid rgba(34,197,94,0.35)',
+      width: 64, height: 64, margin: '0 auto', borderRadius: 16,
+      background: 'linear-gradient(135deg, #16A34A, #22C55E)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      boxShadow: '0 0 40px rgba(34,197,94,0.25), inset 0 0 24px rgba(34,197,94,0.1)',
-      position: 'relative', overflow: 'hidden',
+      fontFamily: 'Sora, Inter, sans-serif', fontWeight: 800, fontSize: 32, color: '#fff',
+      boxShadow: '0 10px 30px rgba(34,197,94,0.35), 0 0 40px rgba(34,197,94,0.25)',
     }}>
-      <svg viewBox="0 0 48 48" width="72" height="72" style={{ position: 'absolute', inset: 0, opacity: 0.18 }}>
-        <text x="6" y="14" fontFamily="JetBrains Mono, monospace" fontSize="7" fill="#22C55E">10</text>
-        <text x="32" y="20" fontFamily="JetBrains Mono, monospace" fontSize="7" fill="#22C55E">01</text>
-        <text x="4" y="42" fontFamily="JetBrains Mono, monospace" fontSize="7" fill="#22C55E">11</text>
-        <text x="34" y="44" fontFamily="JetBrains Mono, monospace" fontSize="7" fill="#22C55E">10</text>
-      </svg>
-      <svg viewBox="0 0 48 48" width="40" height="40" fill="none" stroke="#22C55E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 6px rgba(34,197,94,0.7))', position: 'relative' }}>
-        <path d="M10 40 L24 8 L38 40" />
-        <path d="M16 28 L32 28" />
-      </svg>
+      D
     </div>
   );
 }
