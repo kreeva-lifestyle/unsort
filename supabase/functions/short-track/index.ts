@@ -3,6 +3,7 @@
 // Client contract:
 //   GET  /:shortCode          -> 302 redirect to long_url (logs click)
 //   POST { action: 'resolve', shortCode } -> { ok, longUrl } (used by preview)
+//   POST { action: 'lookup', skus: string[] } -> { ok, results: [...] } (public SKU lookup)
 //
 // Click metadata parsed from request headers (User-Agent, Referer, CF geo headers).
 
@@ -158,6 +159,35 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'POST') {
     try {
       const body = await req.json();
+      if (body.action === 'lookup') {
+        const skus = body.skus;
+        if (!Array.isArray(skus) || skus.length === 0 || skus.length > 500) return fail(400, 'Provide 1-500 SKUs', req);
+        const { data: products, error: pErr } = await sb.from('products').select('sku, name, category, is_active');
+        if (pErr || !products) return fail(500, 'Lookup failed', req);
+        const norm = (s: string) => s.toUpperCase().replace(/[-\s.]/g, '');
+        const pMap = new Map(products.map((p: any) => [norm(p.sku), p]));
+        const SIZES = ['XXXL', 'XXL', 'XL', 'XXS', 'XS', 'S', 'M', 'L'];
+        const NUM: Record<string, string> = { '32': 'XXS', '34': 'XS', '36': 'S', '38': 'M', '40': 'L', '42': 'XL', '44': 'XXL', '46': 'XXXL' };
+        const results = skus.map((raw: any) => {
+          const input = String(raw).trim();
+          if (!input) return null;
+          const n = norm(input);
+          const exact = pMap.get(n) as any;
+          if (exact) return { input, sku: exact.sku, name: exact.name, category: exact.category, is_active: exact.is_active, match: 'exact' };
+          for (const sz of SIZES) {
+            if (n.endsWith(sz)) { const m = pMap.get(n.slice(0, -sz.length)) as any; if (m) return { input, sku: m.sku, name: m.name, category: m.category, is_active: m.is_active, match: 'size_variant', size: sz }; }
+          }
+          for (const [num, sz] of Object.entries(NUM)) {
+            if (n.endsWith(num)) { const m = pMap.get(n.slice(0, -num.length)) as any; if (m) return { input, sku: m.sku, name: m.name, category: m.category, is_active: m.is_active, match: 'size_variant', size: sz }; }
+          }
+          for (const [nk, p] of pMap) {
+            if (nk.startsWith(n) || n.startsWith(nk)) return { input, sku: (p as any).sku, name: (p as any).name, category: (p as any).category, is_active: (p as any).is_active, match: 'partial' };
+          }
+          return { input, sku: null, name: null, category: null, is_active: null, match: 'not_found' };
+        }).filter(Boolean);
+        return json({ ok: true, results }, req);
+      }
+
       if (body.action === 'resolve') {
         const { data: longUrl } = await sb.rpc('record_link_click', {
           p_short_code: body.shortCode,
