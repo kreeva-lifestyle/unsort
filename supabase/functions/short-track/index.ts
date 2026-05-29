@@ -339,7 +339,7 @@ Deno.serve(async (req: Request) => {
       if (body.action === 'lookup') {
         const skus = body.skus;
         if (!Array.isArray(skus) || skus.length === 0) return fail(400, 'Provide at least one SKU', req);
-        if (skus.length > 500) return fail(400, 'Maximum 500 SKUs per request', req);
+        if (skus.length > 5000) return fail(400, 'Maximum 5000 SKUs per request', req);
         try {
           const stock = await getStock();
           const results = skus.map((raw: any) => {

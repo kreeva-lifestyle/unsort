@@ -1,5 +1,13 @@
 import React, { useState, useEffect, Component, Suspense, lazy } from 'react';
 
+// Preload logo immediately for short-link pages — fires before React renders anything,
+// so the 474KB PNG downloads in parallel with JS chunk evaluation.
+if (window.location.hash.startsWith('#/s/')) {
+  const _lnk = document.createElement('link');
+  _lnk.rel = 'preload'; _lnk.as = 'image'; _lnk.href = '/arya-designs-logo.png';
+  document.head.appendChild(_lnk);
+}
+
 // Error boundary to prevent blank screen crashes
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: any }> {
   state = { error: null as any };
@@ -169,7 +177,22 @@ const InstallPrompt = () => {
   );
 };
 
-export default function App() { return <ErrorBoundary><AuthProvider><AppContent /></AuthProvider></ErrorBoundary>; }
+export default function App() {
+  // Short-circuit all auth/providers for public short links — AuthProvider never mounts,
+  // Supabase client never initializes, saving ~100ms on every cold open.
+  const hash = window.location.hash;
+  const shortMatch = hash.match(/^#\/s\/([a-zA-Z0-9_-]{3,32})$/);
+  if (shortMatch) {
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<div style={{ minHeight: '100vh', background: '#000' }} />}>
+          <LazyTracklyRedirect shortCode={shortMatch[1]} />
+        </Suspense>
+      </ErrorBoundary>
+    );
+  }
+  return <ErrorBoundary><AuthProvider><AppContent /></AuthProvider></ErrorBoundary>;
+}
 
 const AppContent = () => {
   const auth = useAuth();

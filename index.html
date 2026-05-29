@@ -32,6 +32,6 @@
     </style>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script>var _sr=false;new MutationObserver(function(m,o){if(!_sr&&document.getElementById('root').children.length){_sr=true;var s=document.getElementById('splash');if(s){s.style.opacity='0';setTimeout(function(){if(s.parentNode)s.remove()},400)}o.disconnect()}}).observe(document.getElementById('root'),{childList:true})</script>
+    <script>if(window.location.hash.startsWith('#/s/')){var _sp=document.getElementById('splash');if(_sp)_sp.style.display='none';}var _sr=false;new MutationObserver(function(m,o){if(!_sr&&document.getElementById('root').children.length){_sr=true;var s=document.getElementById('splash');if(s){s.style.opacity='0';setTimeout(function(){if(s.parentNode)s.remove()},400)}o.disconnect()}}).observe(document.getElementById('root'),{childList:true})</script>
   </body>
 </html>
