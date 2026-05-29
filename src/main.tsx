@@ -17,6 +17,7 @@ if ('serviceWorker' in navigator) {
   });
   navigator.serviceWorker.addEventListener('message', (e) => {
     if (e.data?.type === 'SW_UPDATED') {
+      if (window.location.hash.startsWith('#/s/')) return;
       const overlay = document.createElement('div');
       overlay.setAttribute('style', 'position:fixed;inset:0;z-index:99999;background:rgba(6,8,16,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,-apple-system,sans-serif');
       overlay.innerHTML = `
