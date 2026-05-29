@@ -101,7 +101,9 @@ function parseUA(ua: string): { device: string; browser: string; os: string } {
 // Uses spreadsheets.readonly scope — this function can NEVER write to any sheet.
 
 const STOCK_SHEET_ID = '1r1ZyfTcbd8QUI_AZ5ddmSR_uS9ogS6O5LeU4eyDlg-s';
-const STOCK_GID = 1113876767;
+// The OFFLINE MASTER SHEET has two brand tabs to look up — ARYA and DRESSTIVE.
+// SKUs from both are merged into one stock map (Active wins on any collision).
+const STOCK_TABS = ['ARYA', 'DRESSTIVE'];
 
 function pemToDer(pem: string): Uint8Array {
   const normalized = pem.includes('\\n') ? pem.replace(/\\n/g, '\n') : pem;
@@ -167,41 +169,16 @@ const STOCK_SIZE_COL = 14; // Column O = SIZE (per spec)
 type Stock = { skuMap: Map<string, string>; sizeMap: Map<string, string> };
 let stockCache: { data: Stock; exp: number } | null = null;
 
-async function getStock(): Promise<Stock> {
-  if (stockCache && stockCache.exp > Date.now()) return stockCache.data;
-  const token = await googleReadToken();
+const rank = (s: string) => (s === 'Active' ? 1 : 0); // Active wins for bare-SKU rollup
 
-  // Discover tab name from GID
-  const metaRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${STOCK_SHEET_ID}?fields=sheets.properties`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  if (!metaRes.ok) throw new Error('Cannot access stock sheet');
-  const meta = await metaRes.json();
-  const tab = meta.sheets?.find((s: any) => s.properties?.sheetId === STOCK_GID);
-  if (!tab) throw new Error('Stock sheet tab not found');
-  const tabName = tab.properties.title;
-
-  // Read all data (readonly)
-  const range = encodeURIComponent(tabName);
-  const dataRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${STOCK_SHEET_ID}/values/${range}`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  if (!dataRes.ok) throw new Error('Cannot read stock data');
-  const sheet = await dataRes.json();
-  const rows: string[][] = sheet.values || [];
-  if (rows.length < 2) throw new Error('Stock sheet is empty');
-
-  // Find SKU + STATUS columns by header; SIZE is Column O (per spec).
+// Fold one tab's rows into the shared maps. Each tab has its own header row,
+// so SKU/STATUS columns are detected per tab; SIZE is Column O (per spec).
+function ingestRows(rows: string[][], skuMap: Map<string, string>, sizeMap: Map<string, string>) {
+  if (!rows || rows.length < 2) return;
   const headers = rows[0].map((h: string) => String(h).trim().toUpperCase());
   const skuCol = headers.findIndex(h => h.includes('SKU') || h === 'ARTICLE' || h === 'CODE');
   const statusCol = headers.findIndex(h => h.includes('STATUS') || h.includes('STOCK') || h === 'ACTIVE');
-  if (skuCol < 0) throw new Error('No SKU column in stock sheet');
-
-  const skuMap = new Map<string, string>();   // base SKU            → status
-  const sizeMap = new Map<string, string>();  // base SKU + canon size → status
-  const rank = (s: string) => (s === 'Active' ? 1 : 0); // Active wins for bare-SKU rollup
+  if (skuCol < 0) return; // tab without a SKU column — skip it
 
   for (let i = 1; i < rows.length; i++) {
     const skuRaw = String(rows[i]?.[skuCol] ?? '').trim();
@@ -217,13 +194,36 @@ async function getStock(): Promise<Stock> {
     // Column O size — append to SKU unless it's a construction descriptor.
     const sizeRaw = String(rows[i]?.[STOCK_SIZE_COL] ?? '').trim();
     if (sizeRaw && !isNonSize(sizeRaw)) {
-      sizeMap.set(sku + canonSize(sizeRaw), status);
+      const k = sku + canonSize(sizeRaw);
+      const prevSz = sizeMap.get(k);
+      if (prevSz === undefined || rank(status) > rank(prevSz)) sizeMap.set(k, status);
     }
 
     // Bare-SKU rollup: Active wins so "any size in stock" reports Active.
     const prev = skuMap.get(sku);
     if (prev === undefined || rank(status) > rank(prev)) skuMap.set(sku, status);
   }
+}
+
+async function getStock(): Promise<Stock> {
+  if (stockCache && stockCache.exp > Date.now()) return stockCache.data;
+  const token = await googleReadToken();
+
+  // Read both brand tabs (ARYA + DRESSTIVE) in a single batched request.
+  const ranges = STOCK_TABS.map(t => `ranges=${encodeURIComponent(`'${t}'`)}`).join('&');
+  const dataRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${STOCK_SHEET_ID}/values:batchGet?${ranges}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!dataRes.ok) throw new Error('Cannot read stock data');
+  const payload = await dataRes.json();
+  const valueRanges: any[] = payload.valueRanges || [];
+
+  const skuMap = new Map<string, string>();   // base SKU             → status
+  const sizeMap = new Map<string, string>();  // base SKU + canon size → status
+  for (const vr of valueRanges) ingestRows(vr.values || [], skuMap, sizeMap);
+
+  if (skuMap.size === 0) throw new Error('Stock sheet is empty');
 
   const data = { skuMap, sizeMap };
   stockCache = { data, exp: Date.now() + 5 * 60_000 };
