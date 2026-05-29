@@ -3,9 +3,10 @@
 // Client contract:
 //   GET  /:shortCode          -> 302 redirect to long_url (logs click)
 //   POST { action: 'resolve', shortCode } -> { ok, longUrl } (used by preview)
-//   POST { action: 'lookup', skus: string[] } -> { ok, results: [...] } (public SKU lookup)
+//   POST { action: 'lookup', skus: string[] } -> { ok, results: [...] } (public SKU lookup via Google Sheet)
 //
 // Click metadata parsed from request headers (User-Agent, Referer, CF geo headers).
+// SKU lookup reads from a Google Sheet (READONLY scope — never writes).
 
 // deno-lint-ignore-file no-explicit-any
 
@@ -52,8 +53,6 @@ async function visitorHash(ip: string, ua: string): Promise<string> {
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Sliding-window rate limit, best-effort within a single isolate.
-// Cold starts reset the map; that's fine for click-farm deterrence.
 const RATE_LIMIT_PER_MINUTE = 60;
 const rateBuckets = new Map<string, number[]>();
 function rateLimited(ip: string): boolean {
@@ -63,7 +62,6 @@ function rateLimited(ip: string): boolean {
   if (arr.length >= RATE_LIMIT_PER_MINUTE) return true;
   arr.push(now);
   rateBuckets.set(ip, arr);
-  // Opportunistic GC: every ~1000 hits, drop stale buckets
   if (rateBuckets.size > 1000) {
     for (const [k, v] of rateBuckets) {
       if (v.length === 0 || v[v.length - 1] < cutoff) rateBuckets.delete(k);
@@ -98,6 +96,133 @@ function parseUA(ua: string): { device: string; browser: string; os: string } {
 
   return { device, browser, os };
 }
+
+// ── Google Sheets READONLY auth (for SKU stock lookup) ─────────────────
+// Uses spreadsheets.readonly scope — this function can NEVER write to any sheet.
+
+const STOCK_SHEET_ID = '1r1ZyfTcbd8QUI_AZ5ddmSR_uS9ogS6O5LeU4eyDlg-s';
+const STOCK_GID = 1113876767;
+
+function pemToDer(pem: string): Uint8Array {
+  const normalized = pem.includes('\\n') ? pem.replace(/\\n/g, '\n') : pem;
+  const body = normalized.replace(/-----BEGIN [^-]+-----/g, '').replace(/-----END [^-]+-----/g, '').replace(/\s+/g, '');
+  const bin = atob(body);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function b64url(input: Uint8Array | string): string {
+  const bin = typeof input === 'string' ? input : String.fromCharCode(...input);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+let gToken: { token: string; expiresAt: number } | null = null;
+
+async function googleReadToken(): Promise<string> {
+  if (gToken && gToken.expiresAt > Date.now() + 60_000) return gToken.token;
+  const email = Deno.env.get('GOOGLE_CLIENT_EMAIL');
+  const pkRaw = Deno.env.get('GOOGLE_PRIVATE_KEY');
+  if (!email) throw new Error('Missing GOOGLE_CLIENT_EMAIL');
+  if (!pkRaw) throw new Error('Missing GOOGLE_PRIVATE_KEY');
+  const key = await crypto.subtle.importKey('pkcs8', pemToDer(pkRaw), { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const now = Math.floor(Date.now() / 1000);
+  const unsigned = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' })) + '.' + b64url(JSON.stringify({
+    iss: email,
+    scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+  }));
+  const sig = await crypto.subtle.sign({ name: 'RSASSA-PKCS1-v1_5' }, key, new TextEncoder().encode(unsigned));
+  const assertion = `${unsigned}.${b64url(new Uint8Array(sig))}`;
+  const resp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(`Google OAuth ${resp.status}: ${data.error_description || data.error}`);
+  gToken = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
+  return gToken.token;
+}
+
+const norm = (s: string) => s.toUpperCase().replace(/[-\s.]/g, '');
+const SIZES = ['XXXL', 'XXL', 'XL', 'XXS', 'XS', 'S', 'M', 'L'];
+const NUM_SIZES: Record<string, string> = { '32': 'XXS', '34': 'XS', '36': 'S', '38': 'M', '40': 'L', '42': 'XL', '44': 'XXL', '46': 'XXXL' };
+
+let stockCache: { data: Map<string, string>; exp: number } | null = null;
+
+async function getStockMap(): Promise<Map<string, string>> {
+  if (stockCache && stockCache.exp > Date.now()) return stockCache.data;
+  const token = await googleReadToken();
+
+  // Discover tab name from GID
+  const metaRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${STOCK_SHEET_ID}?fields=sheets.properties`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!metaRes.ok) throw new Error('Cannot access stock sheet');
+  const meta = await metaRes.json();
+  const tab = meta.sheets?.find((s: any) => s.properties?.sheetId === STOCK_GID);
+  if (!tab) throw new Error('Stock sheet tab not found');
+  const tabName = tab.properties.title;
+
+  // Read all data (readonly)
+  const range = encodeURIComponent(tabName);
+  const dataRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${STOCK_SHEET_ID}/values/${range}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!dataRes.ok) throw new Error('Cannot read stock data');
+  const sheet = await dataRes.json();
+  const rows: string[][] = sheet.values || [];
+  if (rows.length < 2) throw new Error('Stock sheet is empty');
+
+  // Find columns by header
+  const headers = rows[0].map((h: string) => String(h).trim().toUpperCase());
+  const skuCol = headers.findIndex(h => h.includes('SKU') || h === 'ARTICLE' || h === 'CODE');
+  const statusCol = headers.findIndex(h => h.includes('STATUS') || h.includes('STOCK') || h === 'ACTIVE');
+  if (skuCol < 0) throw new Error('No SKU column in stock sheet');
+
+  const map = new Map<string, string>();
+  for (let i = 1; i < rows.length; i++) {
+    const raw = String(rows[i]?.[skuCol] ?? '').trim();
+    if (!raw) continue;
+    const key = norm(raw);
+    if (statusCol >= 0) {
+      const val = String(rows[i]?.[statusCol] ?? '').trim().toLowerCase();
+      const inactive = val === 'inactive' || val === 'discontinued' || val === 'no' || val === 'false' || val === '0' || val === 'out of stock';
+      map.set(key, inactive ? 'Inactive' : 'Active');
+    } else {
+      map.set(key, 'Active');
+    }
+  }
+
+  stockCache = { data: map, exp: Date.now() + 5 * 60_000 };
+  return map;
+}
+
+function matchSku(n: string, stockMap: Map<string, string>): string {
+  // Exact
+  const exact = stockMap.get(n);
+  if (exact) return exact;
+  // Size suffix (text)
+  for (const sz of SIZES) {
+    if (n.endsWith(sz)) { const m = stockMap.get(n.slice(0, -sz.length)); if (m) return m; }
+  }
+  // Size suffix (numeric)
+  for (const [num] of Object.entries(NUM_SIZES)) {
+    if (n.endsWith(num)) { const m = stockMap.get(n.slice(0, -num.length)); if (m) return m; }
+  }
+  // Prefix match (vendor SKU is prefix of master, or vice versa)
+  for (const [key, status] of stockMap) {
+    if (key.startsWith(n) || n.startsWith(key)) return status;
+  }
+  return 'Not Found';
+}
+
+// ── Main handler ───────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -155,39 +280,30 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  // POST — resolve without redirect (for preview/API)
+  // POST — actions
   if (req.method === 'POST') {
     try {
       const body = await req.json();
+
+      // SKU stock lookup against Google Sheet (READONLY)
       if (body.action === 'lookup') {
         const skus = body.skus;
-        if (!Array.isArray(skus) || skus.length === 0 || skus.length > 500) return fail(400, 'Provide 1-500 SKUs', req);
-        const { data: products, error: pErr } = await sb.from('products').select('sku, name, category, is_active');
-        if (pErr || !products) return fail(500, 'Lookup failed', req);
-        const norm = (s: string) => s.toUpperCase().replace(/[-\s.]/g, '');
-        const pMap = new Map(products.map((p: any) => [norm(p.sku), p]));
-        const SIZES = ['XXXL', 'XXL', 'XL', 'XXS', 'XS', 'S', 'M', 'L'];
-        const NUM: Record<string, string> = { '32': 'XXS', '34': 'XS', '36': 'S', '38': 'M', '40': 'L', '42': 'XL', '44': 'XXL', '46': 'XXXL' };
-        const results = skus.map((raw: any) => {
-          const input = String(raw).trim();
-          if (!input) return null;
-          const n = norm(input);
-          const exact = pMap.get(n) as any;
-          if (exact) return { input, sku: exact.sku, name: exact.name, category: exact.category, is_active: exact.is_active, match: 'exact' };
-          for (const sz of SIZES) {
-            if (n.endsWith(sz)) { const m = pMap.get(n.slice(0, -sz.length)) as any; if (m) return { input, sku: m.sku, name: m.name, category: m.category, is_active: m.is_active, match: 'size_variant', size: sz }; }
-          }
-          for (const [num, sz] of Object.entries(NUM)) {
-            if (n.endsWith(num)) { const m = pMap.get(n.slice(0, -num.length)) as any; if (m) return { input, sku: m.sku, name: m.name, category: m.category, is_active: m.is_active, match: 'size_variant', size: sz }; }
-          }
-          for (const [nk, p] of pMap) {
-            if (nk.startsWith(n) || n.startsWith(nk)) return { input, sku: (p as any).sku, name: (p as any).name, category: (p as any).category, is_active: (p as any).is_active, match: 'partial' };
-          }
-          return { input, sku: null, name: null, category: null, is_active: null, match: 'not_found' };
-        }).filter(Boolean);
-        return json({ ok: true, results }, req);
+        if (!Array.isArray(skus) || skus.length === 0) return fail(400, 'Provide at least one SKU', req);
+        if (skus.length > 500) return fail(400, 'Maximum 500 SKUs per request', req);
+        try {
+          const stockMap = await getStockMap();
+          const results = skus.map((raw: any) => {
+            const input = String(raw).trim();
+            if (!input) return null;
+            return { input, status: matchSku(norm(input), stockMap) };
+          }).filter(Boolean);
+          return json({ ok: true, results }, req);
+        } catch (e: any) {
+          return fail(500, e.message || 'Stock lookup failed', req);
+        }
       }
 
+      // Resolve short link without redirect
       if (body.action === 'resolve') {
         const { data: longUrl } = await sb.rpc('record_link_click', {
           p_short_code: body.shortCode,
@@ -203,6 +319,7 @@ Deno.serve(async (req: Request) => {
         if (!longUrl || !isSafeUrl(longUrl)) return fail(404, 'Link not found', req);
         return json({ ok: true, longUrl }, req);
       }
+
       return fail(400, 'Unknown action', req);
     } catch {
       return fail(400, 'Invalid JSON body', req);
