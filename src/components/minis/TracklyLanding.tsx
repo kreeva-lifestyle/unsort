@@ -39,20 +39,33 @@ function MatrixCanvas() {
   return <canvas ref={ref} style={{ position: 'fixed', inset: 0, zIndex: 0 }} />;
 }
 
-// The real Arya Designs logo (gold AD crest + wordmark). Kept in its
-// original gold for brand fidelity, with a Matrix-green glow as the
-// theme color touch. The logo already contains the "ARYA DESIGNS"
-// wordmark, so no separate text heading is rendered.
+// The real Arya Designs logo (gold AD crest + wordmark), recolored into the
+// Matrix phosphor palette so it belongs in the green code rain instead of
+// floating on top of it. Technique: the PNG's alpha channel is used as a CSS
+// mask over a green gradient (bright phosphor top → deep green bottom, the way
+// Matrix glyphs glow brightest at the leading edge). True #22C55E green with
+// no hue-rotate guesswork, ornate filigree preserved via the alpha edges, and
+// a gentle CRT flicker glow. The logo already contains the wordmark, so no
+// separate text heading is rendered.
+const LOGO_MASK = {
+  WebkitMaskImage: 'url(/arya-designs-logo.png)',
+  maskImage: 'url(/arya-designs-logo.png)',
+  WebkitMaskSize: 'contain',
+  maskSize: 'contain',
+  WebkitMaskRepeat: 'no-repeat',
+  maskRepeat: 'no-repeat',
+  WebkitMaskPosition: 'center',
+  maskPosition: 'center',
+} as const;
+
 function AryaLogo() {
   return (
-    <img
-      src="/arya-designs-logo.png"
-      alt="Arya Designs"
-      style={{
-        width: '72%', maxWidth: 260, height: 'auto', margin: '0 auto', display: 'block',
-        filter: 'drop-shadow(0 0 18px rgba(34,197,94,0.45)) drop-shadow(0 2px 8px rgba(0,0,0,0.5))',
-      }}
-    />
+    <div role="img" aria-label="Arya Designs" style={{
+      width: '54%', maxWidth: 156, aspectRatio: '1536 / 1088', margin: '0 auto',
+      background: 'linear-gradient(180deg, #6EE7A8 0%, #22C55E 52%, #15803D 100%)',
+      animation: 'aryaPhosphor 3.4s ease-in-out infinite',
+      ...LOGO_MASK,
+    }} />
   );
 }
 
