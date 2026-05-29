@@ -61,11 +61,33 @@ const LOGO_MASK = {
 function AryaLogo() {
   return (
     <div role="img" aria-label="Arya Designs" style={{
-      width: '54%', maxWidth: 156, aspectRatio: '1536 / 1088', margin: '0 auto',
-      background: 'linear-gradient(180deg, #6EE7A8 0%, #22C55E 52%, #15803D 100%)',
-      animation: 'aryaPhosphor 3.4s ease-in-out infinite',
-      ...LOGO_MASK,
-    }} />
+      position: 'relative', width: '54%', maxWidth: 156, aspectRatio: '1536 / 1088', margin: '0 auto',
+      animation: 'aryaJelly 1.1s cubic-bezier(.2,1.3,.35,1) both',
+      willChange: 'transform',
+    }}>
+      {/* Soft phosphor glow — masked + blurred, breathes via opacity (composited, no repaint) */}
+      <div style={{
+        position: 'absolute', inset: 0, background: '#22C55E',
+        filter: 'blur(9px)', opacity: 0.6, transform: 'scale(1.04)',
+        animation: 'aryaGlowPulse 3.4s ease-in-out infinite', willChange: 'opacity',
+        ...LOGO_MASK,
+      }} />
+      {/* Main logo — glossy green gradient + static emboss bevel (dark below, light above) */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(177deg, #D1FAE0 0%, #6EE7A8 22%, #22C55E 56%, #16A34A 80%, #0E6B33 100%)',
+        filter: 'drop-shadow(0 1.5px 0.5px rgba(0,0,0,0.55)) drop-shadow(0 -1px 0.5px rgba(209,250,224,0.55))',
+        ...LOGO_MASK,
+      }} />
+      {/* Gloss sheen — bright streak sweeping across, clipped to the logo shape */}
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', ...LOGO_MASK }}>
+        <div style={{
+          position: 'absolute', top: '-20%', bottom: '-20%', left: 0, width: '32%',
+          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)',
+          animation: 'aryaSheen 5s ease-in-out infinite', willChange: 'transform',
+        }} />
+      </div>
+    </div>
   );
 }
 

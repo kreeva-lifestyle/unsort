@@ -151,9 +151,23 @@ const norm = (s: string) => s.toUpperCase().replace(/[-\s.]/g, '');
 const SIZES = ['XXXL', 'XXL', 'XL', 'XXS', 'XS', 'S', 'M', 'L'];
 const NUM_SIZES: Record<string, string> = { '32': 'XXS', '34': 'XS', '36': 'S', '38': 'M', '40': 'L', '42': 'XL', '44': 'XXL', '46': 'XXXL' };
 
-let stockCache: { data: Map<string, string>; exp: number } | null = null;
+// Canonicalize a size token so "42", "XL", "xl ", "X-L" all collapse to one key.
+const canonSize = (s: string): string => {
+  const n = norm(s);
+  return NUM_SIZES[n] ?? n;
+};
 
-async function getStockMap(): Promise<Map<string, string>> {
+// Column O values describing garment construction (unstitched / semi stitched /
+// semi-stitched / etc.) are NOT real sizes — ignore them so the row matches on
+// SKU alone. Tolerant of case, hyphens, extra spaces and stray punctuation.
+const isNonSize = (s: string): boolean => s.toLowerCase().replace(/[^a-z]/g, '').includes('stitched');
+
+const STOCK_SIZE_COL = 14; // Column O = SIZE (per spec)
+
+type Stock = { skuMap: Map<string, string>; sizeMap: Map<string, string> };
+let stockCache: { data: Stock; exp: number } | null = null;
+
+async function getStock(): Promise<Stock> {
   if (stockCache && stockCache.exp > Date.now()) return stockCache.data;
   const token = await googleReadToken();
 
@@ -179,46 +193,82 @@ async function getStockMap(): Promise<Map<string, string>> {
   const rows: string[][] = sheet.values || [];
   if (rows.length < 2) throw new Error('Stock sheet is empty');
 
-  // Find columns by header
+  // Find SKU + STATUS columns by header; SIZE is Column O (per spec).
   const headers = rows[0].map((h: string) => String(h).trim().toUpperCase());
   const skuCol = headers.findIndex(h => h.includes('SKU') || h === 'ARTICLE' || h === 'CODE');
   const statusCol = headers.findIndex(h => h.includes('STATUS') || h.includes('STOCK') || h === 'ACTIVE');
   if (skuCol < 0) throw new Error('No SKU column in stock sheet');
 
-  const map = new Map<string, string>();
+  const skuMap = new Map<string, string>();   // base SKU            → status
+  const sizeMap = new Map<string, string>();  // base SKU + canon size → status
+  const rank = (s: string) => (s === 'Active' ? 1 : 0); // Active wins for bare-SKU rollup
+
   for (let i = 1; i < rows.length; i++) {
-    const raw = String(rows[i]?.[skuCol] ?? '').trim();
-    if (!raw) continue;
-    const key = norm(raw);
+    const skuRaw = String(rows[i]?.[skuCol] ?? '').trim();
+    if (!skuRaw) continue;
+    const sku = norm(skuRaw);
+
+    let status = 'Active';
     if (statusCol >= 0) {
       const val = String(rows[i]?.[statusCol] ?? '').trim().toLowerCase();
-      const inactive = val === 'inactive' || val === 'discontinued' || val === 'no' || val === 'false' || val === '0' || val === 'out of stock';
-      map.set(key, inactive ? 'Inactive' : 'Active');
-    } else {
-      map.set(key, 'Active');
+      if (val === 'inactive' || val === 'discontinued' || val === 'no' || val === 'false' || val === '0' || val === 'out of stock') status = 'Inactive';
+    }
+
+    // Column O size — append to SKU unless it's a construction descriptor.
+    const sizeRaw = String(rows[i]?.[STOCK_SIZE_COL] ?? '').trim();
+    if (sizeRaw && !isNonSize(sizeRaw)) {
+      sizeMap.set(sku + canonSize(sizeRaw), status);
+    }
+
+    // Bare-SKU rollup: Active wins so "any size in stock" reports Active.
+    const prev = skuMap.get(sku);
+    if (prev === undefined || rank(status) > rank(prev)) skuMap.set(sku, status);
+  }
+
+  const data = { skuMap, sizeMap };
+  stockCache = { data, exp: Date.now() + 5 * 60_000 };
+  return data;
+}
+
+function matchSku(input: string, stock: Stock): string {
+  const n = norm(input);
+  const { skuMap, sizeMap } = stock;
+
+  // 1. Vendor SKU already carries a canonical size (e.g. TF243XL)
+  const direct = sizeMap.get(n);
+  if (direct) return direct;
+
+  // 2. Split a trailing size token, canonicalize it, match SKU + size
+  for (const sz of SIZES) {
+    if (n.length > sz.length && n.endsWith(sz)) {
+      const hit = sizeMap.get(n.slice(0, -sz.length) + canonSize(sz));
+      if (hit) return hit;
+    }
+  }
+  for (const num of Object.keys(NUM_SIZES)) {
+    if (n.length > num.length && n.endsWith(num)) {
+      const hit = sizeMap.get(n.slice(0, -num.length) + canonSize(num));
+      if (hit) return hit;
     }
   }
 
-  stockCache = { data: map, exp: Date.now() + 5 * 60_000 };
-  return map;
-}
+  // 3. Exact base SKU (size-agnostic rows, or "any size" rollup)
+  const bare = skuMap.get(n);
+  if (bare) return bare;
 
-function matchSku(n: string, stockMap: Map<string, string>): string {
-  // Exact
-  const exact = stockMap.get(n);
-  if (exact) return exact;
-  // Size suffix (text)
+  // 4. Strip a trailing size token and match the base SKU
   for (const sz of SIZES) {
-    if (n.endsWith(sz)) { const m = stockMap.get(n.slice(0, -sz.length)); if (m) return m; }
+    if (n.length > sz.length && n.endsWith(sz)) { const m = skuMap.get(n.slice(0, -sz.length)); if (m) return m; }
   }
-  // Size suffix (numeric)
-  for (const [num] of Object.entries(NUM_SIZES)) {
-    if (n.endsWith(num)) { const m = stockMap.get(n.slice(0, -num.length)); if (m) return m; }
+  for (const num of Object.keys(NUM_SIZES)) {
+    if (n.length > num.length && n.endsWith(num)) { const m = skuMap.get(n.slice(0, -num.length)); if (m) return m; }
   }
-  // Prefix match (vendor SKU is prefix of master, or vice versa)
-  for (const [key, status] of stockMap) {
+
+  // 5. Prefix match (vendor SKU is prefix of master, or vice versa)
+  for (const [key, status] of skuMap) {
     if (key.startsWith(n) || n.startsWith(key)) return status;
   }
+
   return 'Not Found';
 }
 
@@ -291,11 +341,11 @@ Deno.serve(async (req: Request) => {
         if (!Array.isArray(skus) || skus.length === 0) return fail(400, 'Provide at least one SKU', req);
         if (skus.length > 500) return fail(400, 'Maximum 500 SKUs per request', req);
         try {
-          const stockMap = await getStockMap();
+          const stock = await getStock();
           const results = skus.map((raw: any) => {
             const input = String(raw).trim();
             if (!input) return null;
-            return { input, status: matchSku(norm(input), stockMap) };
+            return { input, status: matchSku(input, stock) };
           }).filter(Boolean);
           return json({ ok: true, results }, req);
         } catch (e: any) {
