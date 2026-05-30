@@ -1,4 +1,4 @@
-// Dashboard page — KPI cards, alerts, trends, task list
+// Dashboard page — KPI cards, alerts, trends, notes list
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { T, S, Pill } from '../lib/theme';
@@ -34,6 +34,8 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
   const [revTrend, setRevTrend] = useState<{ date: string; amount: number }[]>([]);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [newTask, setNewTask] = useState('');
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTaskTitle, setEditingTaskTitle] = useState('');
   const [loaded, setLoaded] = useState(false);
   const { ask, modalProps } = useConfirm();
 
@@ -149,9 +151,19 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     fetchTasks();
   };
   const deleteTask = async (id: string) => {
-    if (!await ask({ title: 'Delete task?', confirmLabel: 'Delete', danger: true })) return;
+    if (!await ask({ title: 'Delete note?', confirmLabel: 'Delete', danger: true })) return;
     const { error } = await supabase.from('tasks').delete().eq('id', id);
     if (error) { addToast(friendlyError(error), 'error'); return; }
+    fetchTasks();
+  };
+  const updateTask = async (id: string) => {
+    const trimmed = editingTaskTitle.trim();
+    if (!trimmed) { setEditingTaskId(null); return; }
+    const orig = tasks.find(t => t.id === id);
+    if (orig && orig.title === trimmed) { setEditingTaskId(null); return; }
+    const { error } = await supabase.from('tasks').update({ title: trimmed }).eq('id', id);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    setEditingTaskId(null);
     fetchTasks();
   };
 
@@ -376,26 +388,30 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         </div>
       </div>
 
-      {/* Row 4: Tasks */}
+      {/* Row 4: Notes */}
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         <div style={{ padding: '10px 14px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Tasks</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Notes</span>
           <span style={{ fontSize: 9, color: T.tx3 }}>{tasks.filter(t => !t.is_done).length} pending</span>
         </div>
         <form onSubmit={addTask} style={{ display: 'flex', gap: 6, padding: '8px 12px', borderBottom: `1px solid ${T.bd}` }}>
-          <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Add a task..." style={{ ...S.fInput, flex: 1 }} />
+          <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Add a note..." style={{ ...S.fInput, flex: 1 }} />
           <button type="submit" style={S.btnPrimary}>Add</button>
         </form>
         <div style={{ maxHeight: 200, overflowY: 'auto' }}>
           {tasks.map(t => (
             <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: `1px solid ${T.bd}`, opacity: t.is_done ? 0.45 : 1 }}>
               <div onClick={() => toggleTask(t.id, t.is_done)} style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${t.is_done ? T.gr : T.bd2}`, background: t.is_done ? T.gr : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 700, flexShrink: 0 }}>{t.is_done && '✓'}</div>
-              <span style={{ flex: 1, fontSize: 11, color: T.tx, textDecoration: t.is_done ? 'line-through' : 'none' }}>{t.title}</span>
+              {editingTaskId === t.id ? (
+                <input autoFocus value={editingTaskTitle} onChange={e => setEditingTaskTitle(e.target.value)} onBlur={() => updateTask(t.id)} onKeyDown={e => { if (e.key === 'Enter') updateTask(t.id); if (e.key === 'Escape') setEditingTaskId(null); }} style={{ ...S.fInput, flex: 1, fontSize: 11, padding: '2px 6px', height: 24 }} />
+              ) : (
+                <span onClick={() => { setEditingTaskId(t.id); setEditingTaskTitle(t.title); }} style={{ flex: 1, fontSize: 11, color: T.tx, textDecoration: t.is_done ? 'line-through' : 'none', cursor: 'text' }}>{t.title}</span>
+              )}
               <span onClick={() => deleteTask(t.id)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 11, opacity: 0.4 }}>×</span>
             </div>
           ))}
-          {tasks.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: T.tx3, fontSize: 10 }}>No tasks yet</div>}
-          {tasks.length === TASK_LIMIT && <div style={{ fontSize: 10, color: T.yl, padding: '6px 10px', textAlign: 'center' }}>Showing first {TASK_LIMIT} tasks.</div>}
+          {tasks.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: T.tx3, fontSize: 10 }}>No notes yet</div>}
+          {tasks.length === TASK_LIMIT && <div style={{ fontSize: 10, color: T.yl, padding: '6px 10px', textAlign: 'center' }}>Showing first {TASK_LIMIT} notes.</div>}
         </div>
       </div>
       <ConfirmModal {...modalProps} />
