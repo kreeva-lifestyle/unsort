@@ -142,10 +142,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [ledgerTo, setLedgerTo] = useState('');
 
   useEffect(() => {
-    const hasModal = showModal || !!viewingChallan || !!printHtml || !!confirmAction || showBulkPay || showBulkUnpay || !!ledgerPdfHtml;
+    const hasModal = showModal || !!viewingChallan || !!printHtml || !!confirmAction || showBulkPay || showBulkUnpay || !!ledgerPdfHtml || showErpReminder || !!reminderChallan || !!auditTrail;
     document.body.classList.toggle('modal-open', hasModal);
     return () => { document.body.classList.remove('modal-open'); };
-  }, [showModal, viewingChallan, printHtml, confirmAction, showBulkPay, showBulkUnpay, ledgerPdfHtml]);
+  }, [showModal, viewingChallan, printHtml, confirmAction, showBulkPay, showBulkUnpay, ledgerPdfHtml, showErpReminder, reminderChallan, auditTrail]);
 
   const { set: setBreadcrumb } = useBreadcrumb();
   useEffect(() => {
@@ -822,6 +822,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setShippingCharges(0); setNotes(''); setTags('');
     setPaymentMode(''); setPaymentDate(''); setAmountPaid(0); setChallanStatus('unpaid');
     setCustomerSuggestions([]);
+    setAuditTrail(null);
   };
 
   // ── Print ──────────────────────────────────────────────────────────────────
@@ -1256,8 +1257,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
       {/* Audit Trail Modal */}
       {auditTrail && (
-        <div style={{ ...S.modalOverlay }}>
-          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 420, padding: '18px 16px' }}>
+        <div style={{ ...S.modalOverlay }} onClick={() => setAuditTrail(null)}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 420, padding: '18px 16px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <span style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Audit Trail</span>
               <button onClick={() => setAuditTrail(null)} style={{ padding: '3px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Close</button>
@@ -1293,8 +1294,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
       {/* WhatsApp Phone Prompt Modal */}
       {reminderChallan && (
-        <div style={S.modalOverlay}>
-          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }}>
+        <div style={S.modalOverlay} onClick={() => setReminderChallan(null)}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Add Customer Phone</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>No phone saved for <strong style={{ color: T.tx }}>{reminderChallan.customer_name}</strong>. Enter a 10-digit mobile to send reminder:</div>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
@@ -1321,8 +1322,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
       {/* ERP Reminder Modal */}
       {showErpReminder && (
-        <div style={{ ...S.modalOverlay }}>
-          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380, padding: '24px 22px', textAlign: 'center' }}>
+        <div style={{ ...S.modalOverlay }} onClick={() => setShowErpReminder(false)}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380, padding: '24px 22px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Hi {userName}!</div>
             <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 18 }}>Reminder to manually <strong style={{ color: T.yl }}>reduce these inventory items in ERP</strong>. Cash Challan does not sync inventory automatically.</div>
@@ -1336,8 +1337,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
       {/* Confirm Action Modal */}
       {confirmAction && (
-        <div style={{ ...S.modalOverlay }}>
-          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }}>
+        <div style={{ ...S.modalOverlay }} onClick={() => setConfirmAction(null)}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 28, marginBottom: 6 }}>⚠️</div>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>{confirmAction.type === 'void' ? 'Void Challan?' : 'Delete Challan?'}</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: confirmAction.type === 'void' && confirmAction.inventoryDeducted ? 8 : 14 }}>{confirmAction.type === 'void' ? `Challan #${confirmAction.challanNumber} will be marked voided. This cannot be undone.` : `Challan #${confirmAction.challanNumber} will be permanently deleted.`}</div>
