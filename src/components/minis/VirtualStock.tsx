@@ -65,13 +65,13 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
     if (duplicate) { addToast(`SKU "${s}" already exists — delete it first or update that entry`, 'error'); return; }
     const { error } = await supabase.from('virtual_stock').update({ sku: s, quantity: q, updated_at: new Date().toISOString() }).eq('id', id);
     if (error) { addToast('Update failed — ' + friendlyError(error), 'error'); return; }
-    setEditId(null); setEditSku(''); setEditQty(''); addToast('Updated', 'success'); fetch();
+    setEditId(null); setEditSku(''); setEditQty(''); addToast(`Virtual stock updated — ${s}`, 'success'); fetch();
   };
 
   const remove = async (id: string) => {
     const { error } = await supabase.from('virtual_stock').delete().eq('id', id);
     if (error) { addToast('Delete failed — ' + friendlyError(error), 'error'); return; }
-    addToast('Removed', 'success'); setPage(0); fetch();
+    addToast('Virtual stock entry removed', 'success'); setPage(0); fetch();
   };
 
   const filtered = search ? rows.filter(r => r.sku.toLowerCase().includes(search.toLowerCase())) : rows;

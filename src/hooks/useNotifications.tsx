@@ -31,7 +31,8 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     if (last && last.message === message && last.type === type && now - last.ts < 200) return;
     lastToastRef.current = { message, type, ts: now };
     const id = ++toastIdRef.current;
-    setToasts((prev) => [...prev.slice(-4), { id, message, type }]);
+    setToasts((prev) => [...prev.slice(-4), { id, message, type, leaving: false }]);
+    setTimeout(() => setToasts((prev) => prev.map((t) => t.id === id ? { ...t, leaving: true } : t)), 4700);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
   }, []);
 

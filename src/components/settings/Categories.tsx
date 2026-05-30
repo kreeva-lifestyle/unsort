@@ -53,7 +53,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
         const { error: compsErr } = await supabase.from('components').insert(compsToInsert);
         if (compsErr) { addToast('Component add failed — ' + friendlyError(compsErr), 'error'); return; }
       }
-      addToast('Updated!', 'success');
+      addToast(`Product "${form.name}" updated`, 'success');
     } else {
       const validComps = newComps.filter(c => c.trim());
       if (validComps.length === 0) { addToast('Add at least 1 component', 'error'); return; }
@@ -105,7 +105,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
     const { error: delErr } = await supabase.from('components').delete().eq('id', id);
     if (delErr) { addToast('Delete failed — ' + friendlyError(delErr), 'error'); return; }
     // total_components is auto-maintained by trigger_update_component_count
-    addToast('Deleted!', 'success'); fetchComps(selected.id); fetchCategories();
+    addToast('Component deleted', 'success'); fetchComps(selected.id); fetchCategories();
   };
 
   const openEdit = async (p: any) => { setSelected(p); setForm({ sku: p.sku || '', name: p.name, description: p.description || '', category: p.category || '' }); setNewComps(['']); await fetchComps(p.id); setShowModal(true); };

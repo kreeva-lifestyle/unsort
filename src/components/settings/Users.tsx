@@ -37,7 +37,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
       if (adminCount < 1) { addToast('Cannot demote — at least 1 admin must remain', 'error'); fetchUsers(); return; }
     }
     const { error } = await supabase.from('profiles').update({ role }).eq('id', id);
-    if (error) addToast('Role change failed — ' + friendlyError(error), 'error'); else { addToast('Role updated!', 'success'); fetchUsers(); }
+    if (error) addToast('Role change failed — ' + friendlyError(error), 'error'); else { addToast(`Role updated to ${role}`, 'success'); fetchUsers(); }
   };
   const toggleActive = async (id: string, isActive: boolean) => {
     if (isActive) {
