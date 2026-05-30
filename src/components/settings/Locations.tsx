@@ -34,7 +34,7 @@ export default function Locations({ addToast, canEdit }: { addToast: (msg: strin
     if (!editName.trim()) return;
     const { error } = await supabase.from('locations').update({ name: editName.trim() }).eq('id', id);
     if (error) addToast(friendlyError(error), 'error');
-    else { addToast('Updated!', 'success'); setEditId(null); fetchLocations(); }
+    else { addToast(`Location renamed to "${editName.trim()}"`, 'success'); setEditId(null); fetchLocations(); }
   };
 
   const deleteLocation = async (id: string) => {

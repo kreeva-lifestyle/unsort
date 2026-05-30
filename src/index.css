@@ -99,8 +99,9 @@ tbody tr:hover { background: rgba(99,102,241,0.04); }
 /* Animations */
 @keyframes fi { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes su { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes toastIn { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
-@keyframes toastInTop { from { opacity: 0; transform: translateY(-8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes toastIn { 0% { opacity: 0; transform: translateY(24px) scale(.95); } 60% { opacity: 1; transform: translateY(-3px) scale(1.01); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes toastOut { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(16px) scale(.96); } }
+.toast-item.leaving { animation: toastOut .3s ease-in forwards !important; }
 @keyframes loginBoxEnter { from { opacity: 0; transform: translateY(24px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes loginGlowFloat { 0% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-20px) scale(1.1); } 100% { transform: translate(-20px,30px) scale(.95); } }
 @keyframes loginGlowIn { from { opacity: 0; transform: scale(.8); } to { opacity: .12; transform: scale(1); } }
@@ -173,8 +174,9 @@ body.modal-open .fab { display: none !important; }
   .inv-more-fields { display: block !important; }
   .inv-more-content { display: none !important; }
   .challan-filter-btns { flex: none !important; }
-  .toast-container { top: calc(12px + env(safe-area-inset-top, 0)) !important; bottom: auto !important; left: 12px !important; right: 12px !important; }
-  .toast-item { animation: toastInTop .25s cubic-bezier(.2,.9,.3,1) !important; }
+  .toast-container { top: auto !important; bottom: calc(56px + env(safe-area-inset-bottom, 0)) !important; left: 12px !important; right: 12px !important; display: flex !important; flex-direction: column-reverse !important; }
+  .toast-item { animation: toastIn .4s cubic-bezier(.2,1,.3,1) !important; }
+  .toast-item.leaving { animation: toastOut .3s ease-in forwards !important; }
   .challan-pagination, .inv-pagination, .bt-pagination, .prg-pagination, .scan-pagination, .vs-pagination { padding-bottom: 70px !important; }
   .inv-extra-filters { flex-direction: column !important; }
   .inv-extra-filters input, .inv-extra-filters select { max-width: none !important; width: 100% !important; }

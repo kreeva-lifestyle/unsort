@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../../lib/theme';
 import { SUPABASE_ANON_KEY } from '../../lib/supabase';
+import { friendlyError } from '../../lib/friendlyError';
 
 const ODETTE_EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
 const SHEET_NAME = 'ARYA STOCK';
@@ -33,9 +34,9 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         body: JSON.stringify({ action: 'push', sheetName: SHEET_NAME, rows }),
       });
       const data = await resp.json();
-      if (!resp.ok || !data.ok) { addToast(`Push failed — ${data.details || data.error || 'Unknown error'}`, 'error'); setPushing(false); return; }
+      if (!resp.ok || !data.ok) { addToast(friendlyError(data.details || data.error || 'Push failed'), 'error'); setPushing(false); return; }
       addToast(`Pushed to "${SHEET_NAME}" — ${data.matched || 0} SKUs matched of ${data.totalRows || 0} rows`, 'success');
-    } catch (e: any) { addToast(`Push failed — ${e.message || 'Network error'}`, 'error'); }
+    } catch (e: any) { addToast(friendlyError(e), 'error'); }
     setPushing(false);
   };
   const [filter, setFilter] = useState<'all' | 'ok' | 'last' | 'oos' | 'not_found' | 'blocked'>('all');
@@ -157,7 +158,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     setResults(res);
     setComputed(true);
     addToast(`Computed ${res.length} SKUs — ${cntNotFound} not found, ${cntOos} out of stock, ${cntLast} last qty${cntBlocked > 0 ? `, ${cntBlocked} blocked` : ''}`, 'success');
-    if (Object.keys(blockedMap).length === 0) addToast('Results exclude blocked inventory — no blocked sheet imported', 'error');
+    if (Object.keys(blockedMap).length === 0) addToast('Results exclude blocked inventory — no blocked sheet imported', 'info');
   };
 
   const exportXls = () => {
