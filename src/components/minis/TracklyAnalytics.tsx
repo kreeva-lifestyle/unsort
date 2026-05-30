@@ -24,6 +24,8 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
   });
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   const reqIdRef = useRef(0);
+  const [page, setPage] = useState(0);
+  const [perPage, setPerPage] = useState(25);
 
   const fetchClicks = useCallback(async () => {
     const myReq = ++reqIdRef.current;
@@ -39,6 +41,7 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
     if (reqIdRef.current !== myReq) return; // stale; newer fetch in flight
     if (error) addToast(friendlyError(error), 'error');
     setClicks(data || []);
+    setPage(0);
     setLoading(false);
   }, [link.id, from, to, addToast]);
 
@@ -139,6 +142,12 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
       </div>
 
       {/* Recent clicks table */}
+      {(() => {
+        const totalPages = Math.max(1, Math.ceil(clicks.length / perPage));
+        const safePage = Math.min(page, totalPages - 1);
+        const sliceStart = safePage * perPage;
+        const pageClicks = clicks.slice(sliceStart, sliceStart + perPage);
+        return (
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
         <div style={{ padding: '10px 14px', borderBottom: `1px solid ${T.bd}`, fontSize: 10, fontWeight: 600, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1 }}>Recent Clicks ({clicks.length})</div>
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
@@ -147,7 +156,7 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
               {['Time', 'Device', 'Browser', 'OS', 'Country'].map(h => <th key={h} style={S.thStyle}>{h}</th>)}
             </tr></thead>
             <tbody>
-              {clicks.slice(0, 50).map(c => (
+              {pageClicks.map(c => (
                 <tr key={c.id}>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 10, whiteSpace: 'nowrap' }}>{c.clicked_at ? new Date(c.clicked_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                   <td style={S.tdStyle}>{c.device_type || '—'}</td>
@@ -160,8 +169,24 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
           </table>
         </div>
         {clicks.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No clicks in this date range.</div>}
-        {clicks.length > 50 && <div style={{ padding: '8px 14px', fontSize: 10, color: T.tx3, borderTop: `1px solid ${T.bd}`, textAlign: 'center' }}>Showing 50 of {clicks.length} clicks</div>}
+        {clicks.length > 0 && (
+          <div className="trackly-pagination" style={{ padding: '8px 14px', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={safePage === 0} style={{ ...S.btnGhost, ...S.btnSm, opacity: safePage === 0 ? 0.3 : 1, cursor: safePage === 0 ? 'default' : 'pointer' }}>Prev</button>
+              <span style={{ fontSize: 10, color: T.tx3 }}>{safePage + 1} / {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={safePage >= totalPages - 1} style={{ ...S.btnGhost, ...S.btnSm, opacity: safePage >= totalPages - 1 ? 0.3 : 1, cursor: safePage >= totalPages - 1 ? 'default' : 'pointer' }}>Next</button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 10, color: T.tx3 }}>{clicks.length} clicks</span>
+              <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setPage(0); }} style={{ padding: '4px 8px', fontSize: 11, height: 28, borderRadius: 6, background: T.s, border: `1px solid ${T.bd2}`, color: T.tx2, cursor: 'pointer' }}>
+                {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n} / page</option>)}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
+        );
+      })()}
       </>}
     </div>
   );
