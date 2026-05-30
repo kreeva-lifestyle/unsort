@@ -99,14 +99,26 @@ export default function Minis() {
       const data = await res.json();
       if (!data.ok) { addToast(data.error || 'Compare failed', 'error'); return; }
       const headers: string[] = data.headers || [];
-      const missing: string[][] = data.rows || [];
-      if (missing.length === 0) { addToast('All Active SKUs are uploaded — nothing missing!', 'success'); return; }
-      const wsData = [headers, ...missing];
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Non Uploaded');
-      XLSX.writeFile(wb, `Utsav_NonUploaded_${new Date().toISOString().slice(0, 10)}.xlsx`);
-      addToast(`${missing.length} Active products not uploaded by Utsav Fashion`, 'success');
+      const inactive: string[][] = data.inactive || [];
+      const nonUploaded: string[][] = data.nonUploaded || [];
+      if (inactive.length === 0 && nonUploaded.length === 0) { addToast('All SKUs are Active and uploaded!', 'success'); return; }
+      const today = new Date().toISOString().slice(0, 10);
+      if (inactive.length > 0) {
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...inactive]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Inactive');
+        XLSX.writeFile(wb, `Utsav_Inactive_${today}.xlsx`);
+      }
+      if (nonUploaded.length > 0) {
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...nonUploaded]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Non Uploaded');
+        XLSX.writeFile(wb, `Utsav_NonUploaded_${today}.xlsx`);
+      }
+      const parts: string[] = [];
+      if (inactive.length > 0) parts.push(`${inactive.length} inactive`);
+      if (nonUploaded.length > 0) parts.push(`${nonUploaded.length} not uploaded`);
+      addToast(parts.join(', '), 'success');
     } catch { addToast('Network error — please try again', 'error'); }
     finally { setComparing(false); }
   };
