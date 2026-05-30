@@ -24,7 +24,14 @@ export default function Minis() {
   const [fileName, setFileName] = useState('');
   const [virtualStock, setVirtualStock] = useState<Record<string, number>>({});
   const [comparing, setComparing] = useState(false);
-  const [notFoundSkus, setNotFoundSkus] = useState<string[]>([]);
+
+  type CompareFilter = 'all' | 'na' | 'inactive' | 'not_uploaded' | 'vs_missing';
+  interface CompareRow { sku: string; category: CompareFilter; cells?: string[] }
+  const [compareHeaders, setCompareHeaders] = useState<string[]>([]);
+  const [compareRows, setCompareRows] = useState<CompareRow[]>([]);
+  const [compareFilter, setCompareFilter] = useState<CompareFilter>('all');
+  const [compareSearch, setCompareSearch] = useState('');
+  const compareComputed = compareRows.length > 0;
 
   const setView = useCallback((v: MiniView) => {
     setViewState(v);
@@ -103,28 +110,62 @@ export default function Minis() {
       const inactive: string[][] = data.inactive || [];
       const nonUploaded: string[][] = data.nonUploaded || [];
       const notFound: string[] = data.notFound || [];
-      setNotFoundSkus(notFound);
-      if (inactive.length === 0 && nonUploaded.length === 0 && notFound.length === 0) { addToast('All SKUs are Active and uploaded!', 'success'); return; }
-      const today = new Date().toISOString().slice(0, 10);
-      if (inactive.length > 0) {
-        const ws = XLSX.utils.aoa_to_sheet([headers, ...inactive]);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Inactive');
-        XLSX.writeFile(wb, `Utsav_Inactive_${today}.xlsx`);
+
+      const vendorSet = new Set(skus.map(s => s.toUpperCase().replace(/[-\s.]/g, '')));
+      const vsMissing: string[] = [];
+      for (const [sku, qty] of Object.entries(virtualStock)) {
+        if (qty > 0 && !vendorSet.has(sku.toUpperCase().replace(/[-\s.]/g, ''))) vsMissing.push(sku);
       }
-      if (nonUploaded.length > 0) {
-        const ws = XLSX.utils.aoa_to_sheet([headers, ...nonUploaded]);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Non Uploaded');
-        XLSX.writeFile(wb, `Utsav_NonUploaded_${today}.xlsx`);
+
+      const all: CompareRow[] = [
+        ...notFound.map(sku => ({ sku, category: 'na' as const })),
+        ...inactive.map(cells => ({ sku: cells[0] || '', category: 'inactive' as const, cells })),
+        ...nonUploaded.map(cells => ({ sku: cells[0] || '', category: 'not_uploaded' as const, cells })),
+        ...vsMissing.map(sku => ({ sku, category: 'vs_missing' as const })),
+      ];
+
+      setCompareHeaders(headers);
+      setCompareRows(all);
+      setCompareFilter('all');
+      setCompareSearch('');
+
+      if (all.length === 0) addToast('All SKUs are Active and uploaded!', 'success');
+      else {
+        const parts: string[] = [];
+        if (notFound.length > 0) parts.push(`${notFound.length} NA`);
+        if (inactive.length > 0) parts.push(`${inactive.length} inactive`);
+        if (nonUploaded.length > 0) parts.push(`${nonUploaded.length} not uploaded`);
+        if (vsMissing.length > 0) parts.push(`${vsMissing.length} virtual stock missing`);
+        addToast(parts.join(', '), 'success');
       }
-      const parts: string[] = [];
-      if (inactive.length > 0) parts.push(`${inactive.length} inactive`);
-      if (nonUploaded.length > 0) parts.push(`${nonUploaded.length} not uploaded`);
-      if (notFound.length > 0) parts.push(`${notFound.length} not in master`);
-      addToast(parts.join(', '), 'success');
     } catch { addToast('Network error — please try again', 'error'); }
     finally { setComparing(false); }
+  };
+
+  const compareFiltered = compareRows.filter(r => {
+    if (compareFilter !== 'all' && r.category !== compareFilter) return false;
+    if (compareSearch && !r.sku.toLowerCase().includes(compareSearch.toLowerCase())) return false;
+    return true;
+  });
+
+  const exportCompareFilter = (cat: CompareFilter) => {
+    const items = cat === 'all' ? compareRows : compareRows.filter(r => r.category === cat);
+    if (items.length === 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const hasFullData = items.some(r => r.cells);
+    if (hasFullData && compareHeaders.length > 0) {
+      const ws = XLSX.utils.aoa_to_sheet([compareHeaders, ...items.map(r => r.cells || [r.sku])]);
+      const wb = XLSX.utils.book_new();
+      const label = cat === 'inactive' ? 'Inactive' : cat === 'not_uploaded' ? 'Not Uploaded' : 'Export';
+      XLSX.utils.book_append_sheet(wb, ws, label);
+      XLSX.writeFile(wb, `Utsav_${label.replace(/\s/g, '')}_${today}.xlsx`);
+    } else {
+      const ws = XLSX.utils.aoa_to_sheet([['SKU'], ...items.map(r => [r.sku])]);
+      const wb = XLSX.utils.book_new();
+      const label = cat === 'na' ? 'NA' : cat === 'vs_missing' ? 'VirtualStockMissing' : 'Export';
+      XLSX.utils.book_append_sheet(wb, ws, label);
+      XLSX.writeFile(wb, `Utsav_${label}_${today}.xlsx`);
+    }
   };
 
   const back = <span onClick={() => setViewState('home')} style={{ ...S.btnGhost, padding: '6px 10px', cursor: 'pointer' }}>
@@ -168,7 +209,7 @@ export default function Minis() {
           <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
           {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export XLS</div>}
           {rows.length > 0 && <div onClick={!comparing ? compareNonUploaded : undefined} style={{ ...S.btnGhost, color: T.yl, border: '1px solid rgba(251,191,36,.2)', background: 'rgba(251,191,36,.06)', opacity: comparing ? 0.5 : 1, pointerEvents: comparing ? 'none' : 'auto' }}>{comparing ? 'Comparing…' : 'Compare Non-Uploaded'}</div>}
-          {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); setNotFoundSkus([]); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Close</div>}
+          {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); setCompareRows([]); setCompareHeaders([]); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Close</div>}
         </div>
       </div>
       <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
@@ -201,14 +242,51 @@ export default function Minis() {
         </table>
         {rows.length > 50 && <div style={{ padding: '8px 14px', fontSize: 10, color: T.tx3, borderTop: `1px solid ${T.bd}`, textAlign: 'center' }}>Showing 50 of {rows.length} rows.</div>}
       </div>}
-      {notFoundSkus.length > 0 && <div style={{ marginTop: 14, border: `1px solid rgba(251,191,36,.2)`, borderRadius: 10, background: 'rgba(251,191,36,.04)', padding: 14 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: T.yl, marginBottom: 8 }}>Not In Master Sheet ({notFoundSkus.length})</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {notFoundSkus.map((sku, i) => (
-            <span key={i} style={{ padding: '3px 8px', borderRadius: 5, fontSize: 10, fontFamily: T.mono, background: 'rgba(251,191,36,.08)', color: T.yl, border: '1px solid rgba(251,191,36,.15)' }}>{sku}</span>
+      {compareComputed && <>
+        <div style={{ marginTop: 16, marginBottom: 12, fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Compare Results</div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          {([
+            { key: 'all' as CompareFilter, label: 'Total', count: compareRows.length, color: T.tx2 },
+            { key: 'na' as CompareFilter, label: 'NA', count: compareRows.filter(r => r.category === 'na').length, color: T.yl },
+            { key: 'inactive' as CompareFilter, label: 'Inactive', count: compareRows.filter(r => r.category === 'inactive').length, color: T.re },
+            { key: 'not_uploaded' as CompareFilter, label: 'Not Uploaded', count: compareRows.filter(r => r.category === 'not_uploaded').length, color: T.bl },
+            { key: 'vs_missing' as CompareFilter, label: 'Virtual Stock', count: compareRows.filter(r => r.category === 'vs_missing').length, color: T.gr },
+          ]).map(s => (
+            <div key={s.key} onClick={() => setCompareFilter(compareFilter === s.key ? 'all' : s.key)} style={{ padding: '8px 14px', background: compareFilter === s.key ? `${s.color}12` : 'rgba(255,255,255,0.02)', border: `1px solid ${compareFilter === s.key ? `${s.color}44` : T.bd}`, borderRadius: 8, textAlign: 'center', cursor: 'pointer', transition: 'all .15s' }}>
+              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.mono, color: s.color }}>{s.count}</div>
+              <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
+            </div>
           ))}
         </div>
-      </div>}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', maxWidth: 240 }}>
+            <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, strokeLinecap: 'round' as const, opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+            <input value={compareSearch} onChange={e => setCompareSearch(e.target.value)} placeholder="Search SKU…" style={{ ...S.fSearch, width: '100%' }} />
+          </div>
+          {compareFilter !== 'all' && <div onClick={() => exportCompareFilter(compareFilter)} style={{ ...S.btnSm, cursor: 'pointer', color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Export {compareFiltered.length}</div>}
+          {compareFilter !== 'all' && <div onClick={() => setCompareFilter('all')} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx3, border: `1px solid ${T.bd}`, borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Clear</div>}
+        </div>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}` }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 300 }}>
+            <thead><tr>
+              <th style={S.thStyle}>SKU</th><th style={S.thStyle}>Category</th>
+            </tr></thead>
+            <tbody>
+              {compareFiltered.slice(0, 100).map((r, i) => {
+                const catColor = r.category === 'na' ? T.yl : r.category === 'inactive' ? T.re : r.category === 'not_uploaded' ? T.bl : T.gr;
+                const catLabel = r.category === 'na' ? 'NA' : r.category === 'inactive' ? 'Inactive' : r.category === 'not_uploaded' ? 'Not Uploaded' : 'Virtual Stock';
+                return (
+                  <tr key={`${r.sku}-${i}`}>
+                    <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
+                    <td style={S.tdStyle}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: catColor, background: `${catColor}18` }}>{catLabel}</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {compareFiltered.length > 100 && <div style={{ padding: '8px 14px', fontSize: 10, color: T.tx3, borderTop: `1px solid ${T.bd}`, textAlign: 'center' }}>Showing 100 of {compareFiltered.length} rows.</div>}
+        </div>
+      </>}
       {rows.length === 0 && !fileName && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Click "Import Excel" to upload a vendor file.</div>}
     </div>
   );
