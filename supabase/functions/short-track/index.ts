@@ -419,9 +419,12 @@ Deno.serve(async (req: Request) => {
         try {
           const full = await getFullStock();
           const vendorSet = new Set(skus.map((s: any) => norm(String(s))));
+          const allMasterKeys = new Set(full.rows.map(r => r.key));
           const inactive = full.rows.filter(r => r.status === 'Inactive' && vendorSet.has(r.key));
           const nonUploaded = full.rows.filter(r => r.status === 'Active' && !vendorSet.has(r.key));
-          return json({ ok: true, headers: full.headers, inactive: inactive.map(r => r.cells), nonUploaded: nonUploaded.map(r => r.cells) }, req);
+          const notFound: string[] = [];
+          for (const k of vendorSet) { if (!allMasterKeys.has(k)) notFound.push(k); }
+          return json({ ok: true, headers: full.headers, inactive: inactive.map(r => r.cells), nonUploaded: nonUploaded.map(r => r.cells), notFound }, req);
         } catch (e: any) {
           return fail(500, e.message || 'Compare failed', req);
         }

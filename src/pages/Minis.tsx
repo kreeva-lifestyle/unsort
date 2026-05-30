@@ -24,6 +24,7 @@ export default function Minis() {
   const [fileName, setFileName] = useState('');
   const [virtualStock, setVirtualStock] = useState<Record<string, number>>({});
   const [comparing, setComparing] = useState(false);
+  const [notFoundSkus, setNotFoundSkus] = useState<string[]>([]);
 
   const setView = useCallback((v: MiniView) => {
     setViewState(v);
@@ -101,7 +102,9 @@ export default function Minis() {
       const headers: string[] = data.headers || [];
       const inactive: string[][] = data.inactive || [];
       const nonUploaded: string[][] = data.nonUploaded || [];
-      if (inactive.length === 0 && nonUploaded.length === 0) { addToast('All SKUs are Active and uploaded!', 'success'); return; }
+      const notFound: string[] = data.notFound || [];
+      setNotFoundSkus(notFound);
+      if (inactive.length === 0 && nonUploaded.length === 0 && notFound.length === 0) { addToast('All SKUs are Active and uploaded!', 'success'); return; }
       const today = new Date().toISOString().slice(0, 10);
       if (inactive.length > 0) {
         const ws = XLSX.utils.aoa_to_sheet([headers, ...inactive]);
@@ -118,6 +121,7 @@ export default function Minis() {
       const parts: string[] = [];
       if (inactive.length > 0) parts.push(`${inactive.length} inactive`);
       if (nonUploaded.length > 0) parts.push(`${nonUploaded.length} not uploaded`);
+      if (notFound.length > 0) parts.push(`${notFound.length} not in master`);
       addToast(parts.join(', '), 'success');
     } catch { addToast('Network error — please try again', 'error'); }
     finally { setComparing(false); }
@@ -164,7 +168,7 @@ export default function Minis() {
           <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
           {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export XLS</div>}
           {rows.length > 0 && <div onClick={!comparing ? compareNonUploaded : undefined} style={{ ...S.btnGhost, color: T.yl, border: '1px solid rgba(251,191,36,.2)', background: 'rgba(251,191,36,.06)', opacity: comparing ? 0.5 : 1, pointerEvents: comparing ? 'none' : 'auto' }}>{comparing ? 'Comparing…' : 'Compare Non-Uploaded'}</div>}
-          {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Close</div>}
+          {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); setNotFoundSkus([]); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Close</div>}
         </div>
       </div>
       <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
@@ -196,6 +200,14 @@ export default function Minis() {
           </tbody>
         </table>
         {rows.length > 50 && <div style={{ padding: '8px 14px', fontSize: 10, color: T.tx3, borderTop: `1px solid ${T.bd}`, textAlign: 'center' }}>Showing 50 of {rows.length} rows.</div>}
+      </div>}
+      {notFoundSkus.length > 0 && <div style={{ marginTop: 14, border: `1px solid rgba(251,191,36,.2)`, borderRadius: 10, background: 'rgba(251,191,36,.04)', padding: 14 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: T.yl, marginBottom: 8 }}>Not In Master Sheet ({notFoundSkus.length})</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {notFoundSkus.map((sku, i) => (
+            <span key={i} style={{ padding: '3px 8px', borderRadius: 5, fontSize: 10, fontFamily: T.mono, background: 'rgba(251,191,36,.08)', color: T.yl, border: '1px solid rgba(251,191,36,.15)' }}>{sku}</span>
+          ))}
+        </div>
       </div>}
       {rows.length === 0 && !fileName && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Click "Import Excel" to upload a vendor file.</div>}
     </div>
