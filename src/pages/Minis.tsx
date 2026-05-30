@@ -118,9 +118,9 @@ export default function Minis() {
       }
 
       const all: CompareRow[] = [
-        ...notFound.map(sku => ({ sku, category: 'na' as const })),
-        ...inactive.map(cells => ({ sku: cells[0] || '', category: 'inactive' as const, cells })),
-        ...nonUploaded.map(cells => ({ sku: cells[0] || '', category: 'not_uploaded' as const, cells })),
+        ...notFound.filter(Boolean).map(sku => ({ sku, category: 'na' as const })),
+        ...inactive.filter(c => c.length > 0 && c[0]).map(cells => ({ sku: cells[0], category: 'inactive' as const, cells })),
+        ...nonUploaded.filter(c => c.length > 0 && c[0]).map(cells => ({ sku: cells[0], category: 'not_uploaded' as const, cells })),
         ...vsMissing.map(sku => ({ sku, category: 'vs_missing' as const })),
       ];
 
@@ -209,7 +209,7 @@ export default function Minis() {
           <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
           {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export XLS</div>}
           {rows.length > 0 && <div onClick={!comparing ? compareNonUploaded : undefined} style={{ ...S.btnGhost, color: T.yl, border: '1px solid rgba(251,191,36,.2)', background: 'rgba(251,191,36,.06)', opacity: comparing ? 0.5 : 1, pointerEvents: comparing ? 'none' : 'auto' }}>{comparing ? 'Comparing…' : 'Compare Non-Uploaded'}</div>}
-          {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); setCompareRows([]); setCompareHeaders([]); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Close</div>}
+          {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); setCompareRows([]); setCompareHeaders([]); setCompareFilter('all'); setCompareSearch(''); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Close</div>}
         </div>
       </div>
       <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />

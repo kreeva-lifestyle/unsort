@@ -254,25 +254,35 @@ async function getFullStock(): Promise<FullStock> {
     const raw: string[][] = vr.values || [];
     if (raw.length < 2) continue;
     const hdr = raw[0].map((h: string) => String(h).trim());
-    if (headers.length === 0) headers = hdr;
     const hdrUpper = hdr.map(h => h.toUpperCase());
     const skuCol = hdrUpper.findIndex(h => h.includes('SKU') || h === 'ARTICLE' || h === 'CODE');
     const statusCol = hdrUpper.findIndex(h => h.includes('STATUS') || h.includes('STOCK') || h === 'ACTIVE');
     if (skuCol < 0) continue;
 
+    // First tab sets the canonical header order; subsequent tabs remap cells
+    let colMap: number[] | null = null;
+    if (headers.length === 0) {
+      headers = hdr;
+    } else if (hdr.length !== headers.length || hdr.some((h, i) => h.toUpperCase() !== headers[i].toUpperCase())) {
+      colMap = headers.map(h => hdr.findIndex(th => th.toUpperCase() === h.toUpperCase()));
+    }
+
     for (let i = 1; i < raw.length; i++) {
-      const cells = raw[i].map((c: any) => String(c ?? ''));
-      const skuRaw = cells[skuCol]?.trim() || '';
+      const rawCells = raw[i].map((c: any) => String(c ?? ''));
+      const cells = colMap ? colMap.map(ci => ci >= 0 ? (rawCells[ci] || '') : '') : rawCells;
+      const skuRaw = (colMap ? rawCells[skuCol] : cells[skuCol])?.trim() || '';
       if (!skuRaw) continue;
       const sku = norm(skuRaw);
 
       let status = 'Active';
       if (statusCol >= 0) {
-        const val = (cells[statusCol] || '').trim().toLowerCase();
+        const statusVal = colMap ? rawCells[statusCol] : cells[statusCol];
+        const val = (statusVal || '').trim().toLowerCase();
         if (val === 'inactive' || val === 'discontinued' || val === 'no' || val === 'false' || val === '0' || val === 'out of stock') status = 'Inactive';
       }
 
-      const sizeRaw = (cells[STOCK_SIZE_COL] || '').trim();
+      const sizeVal = colMap ? (rawCells[STOCK_SIZE_COL] || '') : (cells[STOCK_SIZE_COL] || '');
+      const sizeRaw = sizeVal.trim();
       let key = sku;
       if (sizeRaw && !isNonSize(sizeRaw)) {
         key = sku + canonSize(sizeRaw);
