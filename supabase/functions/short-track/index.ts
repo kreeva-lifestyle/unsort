@@ -230,6 +230,64 @@ async function getStock(): Promise<Stock> {
   return data;
 }
 
+// ── Full-row stock (for compare action) ────────────────────────────────
+type FullRow = { key: string; status: string; cells: string[] };
+type FullStock = { headers: string[]; rows: FullRow[] };
+let fullStockCache: { data: FullStock; exp: number } | null = null;
+
+async function getFullStock(): Promise<FullStock> {
+  if (fullStockCache && fullStockCache.exp > Date.now()) return fullStockCache.data;
+  const token = await googleReadToken();
+  const ranges = STOCK_TABS.map(t => `ranges=${encodeURIComponent(`'${t}'`)}`).join('&');
+  const dataRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${STOCK_SHEET_ID}/values:batchGet?${ranges}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!dataRes.ok) throw new Error('Cannot read stock data');
+  const payload = await dataRes.json();
+  const valueRanges: any[] = payload.valueRanges || [];
+
+  let headers: string[] = [];
+  const rows: FullRow[] = [];
+
+  for (const vr of valueRanges) {
+    const raw: string[][] = vr.values || [];
+    if (raw.length < 2) continue;
+    const hdr = raw[0].map((h: string) => String(h).trim());
+    if (headers.length === 0) headers = hdr;
+    const hdrUpper = hdr.map(h => h.toUpperCase());
+    const skuCol = hdrUpper.findIndex(h => h.includes('SKU') || h === 'ARTICLE' || h === 'CODE');
+    const statusCol = hdrUpper.findIndex(h => h.includes('STATUS') || h.includes('STOCK') || h === 'ACTIVE');
+    if (skuCol < 0) continue;
+
+    for (let i = 1; i < raw.length; i++) {
+      const cells = raw[i].map((c: any) => String(c ?? ''));
+      const skuRaw = cells[skuCol]?.trim() || '';
+      if (!skuRaw) continue;
+      const sku = norm(skuRaw);
+
+      let status = 'Active';
+      if (statusCol >= 0) {
+        const val = (cells[statusCol] || '').trim().toLowerCase();
+        if (val === 'inactive' || val === 'discontinued' || val === 'no' || val === 'false' || val === '0' || val === 'out of stock') status = 'Inactive';
+      }
+
+      const sizeRaw = (cells[STOCK_SIZE_COL] || '').trim();
+      let key = sku;
+      if (sizeRaw && !isNonSize(sizeRaw)) {
+        key = sku + canonSize(sizeRaw);
+      }
+
+      rows.push({ key, status, cells });
+    }
+  }
+
+  if (rows.length === 0) throw new Error('Stock sheet is empty');
+  const data: FullStock = { headers, rows };
+  fullStockCache = { data, exp: Date.now() + 5 * 60_000 };
+  return data;
+}
+
 function matchSku(input: string, stock: Stock): string {
   const n = norm(input);
   const { skuMap, sizeMap } = stock;
@@ -350,6 +408,22 @@ Deno.serve(async (req: Request) => {
           return json({ ok: true, results }, req);
         } catch (e: any) {
           return fail(500, e.message || 'Stock lookup failed', req);
+        }
+      }
+
+      // Compare vendor SKUs against full master sheet (READONLY)
+      if (body.action === 'compare') {
+        const skus = body.skus;
+        if (!Array.isArray(skus) || skus.length === 0) return fail(400, 'Provide at least one SKU', req);
+        if (skus.length > 10000) return fail(400, 'Maximum 10000 SKUs per request', req);
+        try {
+          const full = await getFullStock();
+          const vendorSet = new Set(skus.map((s: any) => norm(String(s))));
+          const inactive = full.rows.filter(r => r.status === 'Inactive' && vendorSet.has(r.key));
+          const nonUploaded = full.rows.filter(r => r.status === 'Active' && !vendorSet.has(r.key));
+          return json({ ok: true, headers: full.headers, inactive: inactive.map(r => r.cells), nonUploaded: nonUploaded.map(r => r.cells) }, req);
+        } catch (e: any) {
+          return fail(500, e.message || 'Compare failed', req);
         }
       }
 
