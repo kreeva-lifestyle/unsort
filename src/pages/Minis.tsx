@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../lib/theme';
+import { SUPABASE_ANON_KEY } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import AddressPrinter from '../components/minis/AddressPrinter';
@@ -22,6 +23,7 @@ export default function Minis() {
   const [rows, setRows] = useState<UtsavRow[]>([]);
   const [fileName, setFileName] = useState('');
   const [virtualStock, setVirtualStock] = useState<Record<string, number>>({});
+  const [comparing, setComparing] = useState(false);
 
   const setView = useCallback((v: MiniView) => {
     setViewState(v);
@@ -83,6 +85,32 @@ export default function Minis() {
     XLSX.writeFile(wb, `Utsav_Export_${new Date().toISOString().slice(0, 10)}.xls`);
   };
 
+  const EDGE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
+  const compareNonUploaded = async () => {
+    const skus = [...new Set(rows.map(r => r.aryaSku).filter(Boolean))];
+    if (skus.length === 0) { addToast('No ARYA SKUs to compare', 'error'); return; }
+    setComparing(true);
+    try {
+      const res = await fetch(EDGE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ action: 'compare', skus }),
+      });
+      const data = await res.json();
+      if (!data.ok) { addToast(data.error || 'Compare failed', 'error'); return; }
+      const headers: string[] = data.headers || [];
+      const missing: string[][] = data.rows || [];
+      if (missing.length === 0) { addToast('All Active SKUs are uploaded — nothing missing!', 'success'); return; }
+      const wsData = [headers, ...missing];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Non Uploaded');
+      XLSX.writeFile(wb, `Utsav_NonUploaded_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      addToast(`${missing.length} Active products not uploaded by Utsav Fashion`, 'success');
+    } catch { addToast('Network error — please try again', 'error'); }
+    finally { setComparing(false); }
+  };
+
   const back = <span onClick={() => setViewState('home')} style={{ ...S.btnGhost, padding: '6px 10px', cursor: 'pointer' }}>
     <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
   </span>;
@@ -123,6 +151,7 @@ export default function Minis() {
         <div style={{ display: 'flex', gap: 6 }}>
           <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
           {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export XLS</div>}
+          {rows.length > 0 && <div onClick={!comparing ? compareNonUploaded : undefined} style={{ ...S.btnGhost, color: T.yl, border: '1px solid rgba(251,191,36,.2)', background: 'rgba(251,191,36,.06)', opacity: comparing ? 0.5 : 1, pointerEvents: comparing ? 'none' : 'auto' }}>{comparing ? 'Comparing…' : 'Compare Non-Uploaded'}</div>}
           {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Close</div>}
         </div>
       </div>
