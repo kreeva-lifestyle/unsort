@@ -127,7 +127,7 @@ export default function ChallanList(p: Props) {
 
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         {p.loading && <SkeletonRows rows={4} />}
-        {!p.loading && p.challans.length === 0 && <div style={{ padding: 14 }}><Empty icon="🧾" title="No challans yet" message="Create your first challan — invoice customers, record payments, and track outstanding amounts all from one place." cta="+ New Challan" onCta={p.onOpenEmpty} /></div>}
+        {!p.loading && p.challans.length === 0 && <div style={{ padding: 14 }}><Empty icon="receipt" title="No challans yet" message="Create your first challan — invoice customers, record payments, and track outstanding amounts all from one place." cta="+ New Challan" onCta={p.onOpenEmpty} /></div>}
         {p.challans.map((c, i) => {
           const sc = p.statusColors[c.status] || p.statusColors.unpaid;
           const skus = (c.cash_challan_items || []).map(i => i.sku).filter(Boolean).join(', ');

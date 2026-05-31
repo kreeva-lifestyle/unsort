@@ -767,7 +767,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {confirmDeleteId && (
         <div style={S.modalOverlay}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }}>
-            <div style={{ fontSize: 28, marginBottom: 6 }}>⚠️</div>
+            <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg></div>
             <div style={{ ...S.modalTitle, marginBottom: 4 }}>Delete Scan?</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This will permanently remove the scan from the database and Google Sheet.</div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -928,7 +928,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {duplicateAwb && (
         <div style={{ position: 'fixed', top: 56, left: '50%', transform: 'translateX(-50%)', zIndex: 400, pointerEvents: 'none', animation: 'slideDown .15s ease' }}>
           <div style={{ background: 'rgba(60,15,15,.95)', border: '1px solid rgba(239,68,68,.45)', borderRadius: 10, padding: '8px 14px', boxShadow: '0 8px 24px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 10, color: '#fff' }}>
-            <span style={{ fontSize: 16 }}>⚠️</span>
+            <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round', flexShrink: 0 }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: T.re, textTransform: 'uppercase', letterSpacing: 1 }}>Duplicate — not saved</div>
               <div style={{ fontSize: 12, fontFamily: T.mono, color: '#fff', wordBreak: 'break-all' }}>{duplicateAwb}</div>
@@ -1169,7 +1169,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {confirmChangeSetup && (
         <div style={{ ...S.modalOverlay, zIndex: 250 }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px', textAlign: 'center' }}>
-            <div style={{ fontSize: 32, marginBottom: 6 }}>⚠️</div>
+            <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 32, height: 32, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg></div>
             <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Change setup mid-session?</div>
             <div style={{ fontSize: 12, color: T.tx3, marginBottom: 14, lineHeight: 1.5 }}>You've scanned <strong style={{ color: T.gr }}>{sessionCount}</strong> AWB{sessionCount === 1 ? '' : 's'} so far. They've already been saved to the sheet. Changing setup resets the in-app counter but does not delete the saved scans.</div>
             <div style={{ display: 'flex', gap: 8 }}>

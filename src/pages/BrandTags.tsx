@@ -725,7 +725,7 @@ export default function BrandTagPrinter() {
       {confirmDel && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
           <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', textAlign: 'center' as const, maxWidth: 340, width: '100%' }}>
-            <div style={{ fontSize: 28, marginBottom: 6 }}>⚠️</div>
+            <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg></div>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Delete this SKU?</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14, fontFamily: T.mono }}>{confirmDel.sku || '(empty SKU)'}</div>
             <div style={{ display: 'flex', gap: 8 }}>
