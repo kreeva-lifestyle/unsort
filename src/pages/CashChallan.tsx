@@ -427,8 +427,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       }
     });
     const list = Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count, aging: v.aging }));
-    list.sort((a, b) => (map[b.name].latest > map[a.name].latest ? 1 : -1));
-    setLedgerCustomers(list.slice(0, 10));
+    list.sort((a, b) => {
+      if (a.outstanding > 0 && b.outstanding <= 0) return -1;
+      if (a.outstanding <= 0 && b.outstanding > 0) return 1;
+      if (a.outstanding > 0 && b.outstanding > 0) return b.outstanding - a.outstanding;
+      return 0;
+    });
+    setLedgerCustomers(list);
   }, [ledgerFetchLimit]);
 
   const searchLedgerCustomer = useCallback(async (q: string) => {
@@ -454,7 +459,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         else map[name].aging.d90plus += outstanding;
       }
     });
-    setLedgerCustomers(Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count, aging: v.aging })));
+    const list = Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count, aging: v.aging }));
+    list.sort((a, b) => {
+      if (a.outstanding > 0 && b.outstanding <= 0) return -1;
+      if (a.outstanding <= 0 && b.outstanding > 0) return 1;
+      if (a.outstanding > 0 && b.outstanding > 0) return b.outstanding - a.outstanding;
+      return 0;
+    });
+    setLedgerCustomers(list);
   }, [fetchLedger]);
 
   const fetchLedgerDetailWithRange = useCallback(async (name: string, from: string, to: string) => {
