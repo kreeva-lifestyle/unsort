@@ -158,8 +158,7 @@ body.modal-open .fab { display: none !important; }
   .login-mobile-brand { display: block !important; }
   .login-card { border-radius: 20px !important; padding: 28px 22px 22px !important; }
   .sidebar { display: none !important; }
-  .main-area { margin-left: 0 !important; height: -webkit-fill-available !important; }
-  @supports (height: 100dvh) { .main-area { height: 100dvh !important; } }
+  .main-area { margin-left: 0 !important; }
   .mobile-hamburger { display: flex !important; }
   .mobile-overlay { display: block !important; }
   .mobile-drawer { display: block !important; }
