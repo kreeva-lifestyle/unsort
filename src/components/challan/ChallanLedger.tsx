@@ -115,30 +115,36 @@ export default function ChallanLedger({
 
   // List screen
   const totalOutstanding = customers.reduce((s, c) => s + c.outstanding, 0);
+  const dueCount = customers.filter(c => c.outstanding > 0).length;
   return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 12 }}>
-        {customers.filter(c => c.outstanding > 0).length > 0 && (
+    <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+            <input type="text" value={search} onChange={e => onSearchChange(e.target.value)} onKeyDown={e => e.key === 'Enter' && onSearchSubmit(search)} placeholder="Search customer..."
+              style={{ ...S.fSearch, width: '100%' }} />
+          </div>
+          <button onClick={() => onSearchSubmit(search)} style={S.btnPrimary}>Search</button>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 2 }}>{search ? 'Search Results' : 'Customers'}</div>
+            <div style={{ fontSize: 10, color: T.tx2 }}>{customers.length} total{dueCount > 0 ? ` · ${dueCount} due` : ''}</div>
+          </div>
+          <div style={{ textAlign: 'right' as const }}>
+            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: totalOutstanding > 0 ? T.re : T.gr }}>₹{totalOutstanding.toLocaleString('en-IN')}</div>
+            <div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Outstanding</div>
+          </div>
+        </div>
+        {dueCount > 0 && (
           <button onClick={() => {
             const due = customers.filter(c => c.outstanding > 0);
             const csv = 'Customer,Billed,Paid,Outstanding,Challans\n' + due.map(c => `"${c.name}",${c.total},${c.paid},${c.outstanding},${c.count}`).join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Outstanding_Customers_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
-          }} style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', color: T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Export Outstanding</button>
+          }} style={{ width: '100%', marginTop: 10, padding: '7px', borderRadius: 6, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.04)', color: T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Export Outstanding ({dueCount})</button>
         )}
-      </div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-        <div style={{ flex: 1, position: 'relative' }}>
-          <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
-          <input type="text" value={search} onChange={e => onSearchChange(e.target.value)} onKeyDown={e => e.key === 'Enter' && onSearchSubmit(search)} placeholder="Enter customer name..."
-            style={{ ...S.fSearch, width: '100%' }} />
-        </div>
-        <button onClick={() => onSearchSubmit(search)} style={S.btnPrimary}>Search</button>
-      </div>
-      <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 6 }}>{search ? 'Search Results' : 'Recent Customers'}</div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <span style={{ fontSize: 9, color: T.tx3 }}>{customers.length} customers</span>
-        <span style={{ fontSize: 10, color: totalOutstanding > 0 ? T.re : T.gr, fontWeight: 600 }}>Total Outstanding: ₹{totalOutstanding.toLocaleString('en-IN')}</span>
       </div>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         {customers.map(c => (
