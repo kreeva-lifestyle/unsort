@@ -800,7 +800,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   // ── Desktop: block scanning, show history only ─────────────────────────────
   const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768;
   if (isDesktop && !showHistory && !started) return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+    <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 14 }}>
         <button onClick={() => { const d = new Date(); setHistoryDateTo(d.toISOString().slice(0,10)); d.setDate(d.getDate()-6); setHistoryDateFrom(d.toISOString().slice(0,10)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={S.btnGhost}>History</button>
       </div>

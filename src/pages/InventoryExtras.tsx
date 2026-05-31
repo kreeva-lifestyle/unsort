@@ -284,7 +284,7 @@ export default function InventoryExtras() {
   const td: React.CSSProperties = S.tdStyle;
 
   return (
-    <div style={{ animation: 'fi .3s ease both' }}>
+    <div className="page-pad" style={{ animation: 'fi .3s ease both' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div>
