@@ -163,9 +163,9 @@ export default function ChallanLedger({
             )}
           </div>
         ))}
-        {customers.length === 0 && <div style={{ padding: 24, textAlign: 'center' as const, color: T.tx3, fontSize: 12 }}>No customers found. Search by name or click "Load More" below.</div>}
-        <button onClick={onLoadMore} style={{ width: '100%', padding: '8px', border: 'none', background: T.ac3, color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer', borderRadius: '0 0 8px 8px' }}>Load More Customers</button>
+        {customers.length === 0 && <div style={{ padding: 24, textAlign: 'center' as const, color: T.tx3, fontSize: 12 }}>No customers found. Search by name below.</div>}
       </div>
+      <button onClick={onLoadMore} style={{ width: '100%', padding: '12px', marginTop: 8, marginBottom: 20, border: 'none', background: T.ac3, color: T.ac2, fontSize: 11, fontWeight: 600, cursor: 'pointer', borderRadius: 8 }}>Load More Customers</button>
     </div>
   );
 }
