@@ -192,7 +192,7 @@ body.modal-open .fab { display: none !important; }
   .page-pad { padding: 14px max(12px, env(safe-area-inset-right, 0)) calc(52px + env(safe-area-inset-bottom, 0) + 16px) max(12px, env(safe-area-inset-left, 0)) !important; }
   .filter-bar { gap: 6px !important; padding: 8px 10px !important; }
   .filter-bar select, .filter-bar input { font-size: 12px !important; padding: 6px 8px !important; min-width: 0 !important; }
-  .header-bar { padding: env(safe-area-inset-top, 0) 16px 0 16px !important; height: calc(56px + env(safe-area-inset-top, 0)) !important; }
+  .header-bar { padding: 0 16px !important; height: 56px !important; }
   .header-title { font-size: 17px !important; }
 
   .header-bar button { min-width: 44px !important; min-height: 44px !important; }
@@ -208,6 +208,11 @@ body.modal-open .fab { display: none !important; }
   .mobile-hamburger > div { min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-direction: column !important; gap: 3px !important; }
   .mobile-hamburger { padding-left: env(safe-area-inset-left, 0) !important; padding-right: env(safe-area-inset-right, 0) !important; padding-bottom: env(safe-area-inset-bottom, 0) !important; }
   .filter-bar { padding-left: max(10px, env(safe-area-inset-left, 0)) !important; padding-right: max(10px, env(safe-area-inset-right, 0)) !important; }
+}
+
+/* PWA standalone — header extends behind status bar */
+@media (display-mode: standalone) {
+  .header-bar { padding-top: env(safe-area-inset-top, 0) !important; height: calc(56px + env(safe-area-inset-top, 0)) !important; }
 }
 
 /* ── Cash Challan module mobile ──────────────────────────── */
