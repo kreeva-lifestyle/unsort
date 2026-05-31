@@ -158,7 +158,8 @@ body.modal-open .fab { display: none !important; }
   .login-mobile-brand { display: block !important; }
   .login-card { border-radius: 20px !important; padding: 28px 22px 22px !important; }
   .sidebar { display: none !important; }
-  .main-area { margin-left: 0 !important; }
+  .main-area { margin-left: 0 !important; height: -webkit-fill-available !important; }
+  @supports (height: 100dvh) { .main-area { height: 100dvh !important; } }
   .mobile-hamburger { display: flex !important; }
   .mobile-overlay { display: block !important; }
   .mobile-drawer { display: block !important; }
@@ -206,7 +207,7 @@ body.modal-open .fab { display: none !important; }
   .modal-inner form { padding: 14px !important; }
   .two-col { grid-template-columns: 1fr !important; }
   .mobile-hamburger > div { min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-direction: column !important; gap: 3px !important; }
-  .mobile-hamburger { padding-left: env(safe-area-inset-left, 0) !important; padding-right: env(safe-area-inset-right, 0) !important; }
+  .mobile-hamburger { padding-left: env(safe-area-inset-left, 0) !important; padding-right: env(safe-area-inset-right, 0) !important; padding-bottom: env(safe-area-inset-bottom, 0) !important; }
   .filter-bar { padding-left: max(10px, env(safe-area-inset-left, 0)) !important; padding-right: max(10px, env(safe-area-inset-right, 0)) !important; }
 }
 
