@@ -119,7 +119,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
         <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search links..." style={S.fSearch} />
       </div>}
 
-      {loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div> :
+      {loading ? <div style={{ padding: 20, textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }} /></div> :
       filtered.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{links.length === 0 ? 'No short links yet. Click "+ New Link" to create one.' : 'No matches found.'}</div> :
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {paged.map((l, i) => (

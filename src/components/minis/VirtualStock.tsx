@@ -119,7 +119,7 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
         </div>}
 
         {/* List */}
-        {loading ? <div style={{ padding: 12, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div> :
+        {loading ? <div style={{ padding: 12, textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }} /></div> :
         filtered.length === 0 ? (rows.length === 0 ? null : <div style={{ padding: 12, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No matches</div>) :
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

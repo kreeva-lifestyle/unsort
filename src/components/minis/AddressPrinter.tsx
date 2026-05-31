@@ -111,7 +111,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
       </div>
 
       {/* List — desktop with inline buttons, mobile with swipe actions */}
-      {loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading...</div> :
+      {loading ? <div style={{ padding: 20, textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }} /></div> :
       filtered.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{labels.length === 0 ? 'No saved addresses yet. Click "+ Add Address" to create one.' : 'No matches found.'}</div> :
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {paged.map((l, idx) => (
