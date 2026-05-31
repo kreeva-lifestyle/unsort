@@ -47,7 +47,7 @@ export default function ChallanLedger({
   if (detailName) {
     const cust = customers.find(c => c.name === detailName);
     return (
-      <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+      <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div>
             <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>{detailName}</span>
