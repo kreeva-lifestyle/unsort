@@ -8,6 +8,7 @@ import { numericKeyDown } from '../lib/numericInput';
 import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
 import { useNotifications } from '../hooks/useNotifications';
 import Empty from '../components/ui/Empty';
+import { SkeletonRows } from '../components/ui/Skeleton';
 
 import { T, S } from '../lib/theme';
 import type {
@@ -48,6 +49,8 @@ export default function CashBook() {
   // Single 'date' for new expense/handover input — defaults to today
   const [entryDate, setEntryDate] = useState(today);
   const [tab, setTab] = useState<'expenses' | 'sales' | 'handovers'>('expenses');
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [sales, setSales] = useState<CashSaleRow[]>([]);
   const [handovers, setHandovers] = useState<Handover[]>([]);
@@ -102,6 +105,7 @@ export default function CashBook() {
   }, [pinLockUntil]);
 
   const fetchData = useCallback(async () => {
+    setLoading(true);
     // Opening balance — uses From date
     const { data: bal } = await supabase.from('cash_book_balances').select('opening_balance').eq('date', fromDate).maybeSingle();
     setOpeningBalance(Number(bal?.opening_balance || 0));
@@ -119,6 +123,7 @@ export default function CashBook() {
     // Handovers in date range
     const { data: ho } = await supabase.from('cash_handovers').select('id, handover_number, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
     setHandovers((ho as Handover[] | null) || []);
+    setLoading(false);
   }, [fromDate, toDate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -492,6 +497,11 @@ export default function CashBook() {
     fetchData();
   };
 
+  const sq = search.toLowerCase().trim();
+  const filteredExpenses = sq ? expenses.filter(e => (e.description || '').toLowerCase().includes(sq) || (e.category || '').toLowerCase().includes(sq)) : expenses;
+  const filteredSales = sq ? sales.filter(s => (s.customer_name || '').toLowerCase().includes(sq) || String(s.challan_number || '').includes(sq)) : sales;
+  const filteredHandovers = sq ? handovers.filter(h => (h.from_user_name || '').toLowerCase().includes(sq) || (h.to_user_name || '').toLowerCase().includes(sq) || (h.notes || '').toLowerCase().includes(sq)) : handovers;
+
   const exportCSV = () => {
     const esc = (v: string) => `"${(v || '').replace(/"/g, '""')}"`;
     let csv = '', label = '';
@@ -518,6 +528,10 @@ export default function CashBook() {
           <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
           <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={S.fDate} />
           <button className="desktop-only" onClick={exportCSV} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans, height: 36 }}>Export</button>
+        </div>
+        <div style={{ position: 'relative', maxWidth: 200 }}>
+          <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, strokeLinecap: 'round' as const, opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" style={{ ...S.fSearch, width: '100%' }} />
         </div>
       </div>
 
@@ -575,8 +589,9 @@ export default function CashBook() {
       {tab === 'expenses' && <>
         <button onClick={() => setShowAdd(true)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>+ Add Expense</button>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-          {expenses.length === 0 && <div style={{ padding: 14 }}><Empty icon="📋" title="No expenses" message="No expenses recorded in this date range." /></div>}
-          {expenses.map(e => (
+          {loading && expenses.length === 0 && <SkeletonRows rows={4} />}
+          {!loading && filteredExpenses.length === 0 && <div style={{ padding: 14 }}><Empty icon="📋" title={sq ? 'No matching expenses' : 'No expenses'} message={sq ? 'Try a different search term.' : 'No expenses recorded in this date range.'} /></div>}
+          {filteredExpenses.map(e => (
             <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
@@ -604,8 +619,9 @@ export default function CashBook() {
       {/* Sales Tab */}
       {tab === 'sales' && (
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-          {sales.length === 0 && <div style={{ padding: 14 }}><Empty icon="🧾" title="No cash sales" message="No cash-paid challans in this date range." /></div>}
-          {sales.map(s => (
+          {loading && sales.length === 0 && <SkeletonRows rows={4} />}
+          {!loading && filteredSales.length === 0 && <div style={{ padding: 14 }}><Empty icon="🧾" title={sq ? 'No matching sales' : 'No cash sales'} message={sq ? 'Try a different search term.' : 'No cash-paid challans in this date range.'} /></div>}
+          {filteredSales.map(s => (
             <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
@@ -629,8 +645,9 @@ export default function CashBook() {
           <div style={{ padding: '8px 12px', borderRadius: 6, background: T.ac3, border: `1px solid ${T.ac3}`, color: T.tx2, fontSize: 10, marginBottom: 10 }}>Admins receive handovers — users initiate them. Review pending handovers below.</div>
         )}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-          {handovers.length === 0 && <div style={{ padding: 14 }}><Empty icon="🤝" title="No handovers" message="No cash handovers recorded in this date range." /></div>}
-          {handovers.map(h => (
+          {loading && handovers.length === 0 && <SkeletonRows rows={4} />}
+          {!loading && filteredHandovers.length === 0 && <div style={{ padding: 14 }}><Empty icon="🤝" title={sq ? 'No matching handovers' : 'No handovers'} message={sq ? 'Try a different search term.' : 'No cash handovers recorded in this date range.'} /></div>}
+          {filteredHandovers.map(h => (
             <div key={h.id} style={{ padding: '11px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
