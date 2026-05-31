@@ -174,7 +174,7 @@ body.modal-open .fab { display: none !important; }
   .inv-more-fields { display: block !important; }
   .inv-more-content { display: none !important; }
   .challan-filter-btns { flex: none !important; }
-  .toast-container { top: auto !important; bottom: calc(56px + env(safe-area-inset-bottom, 0)) !important; left: 12px !important; right: 12px !important; display: flex !important; flex-direction: column-reverse !important; }
+  .toast-container { top: auto !important; bottom: calc(52px + env(safe-area-inset-bottom, 0) + 4px) !important; left: 12px !important; right: 12px !important; display: flex !important; flex-direction: column-reverse !important; }
   .toast-item { animation: toastIn .4s cubic-bezier(.2,1,.3,1) !important; }
   .toast-item.leaving { animation: toastOut .3s ease-in forwards !important; }
   .challan-pagination, .inv-pagination, .bt-pagination, .prg-pagination, .scan-pagination, .vs-pagination { padding-bottom: 70px !important; }
@@ -189,7 +189,7 @@ body.modal-open .fab { display: none !important; }
   .scan-courier-pills::-webkit-scrollbar { display: none !important; }
   .mobile-drawer { top: env(safe-area-inset-top, 0) !important; bottom: calc(52px + env(safe-area-inset-bottom, 0)) !important; height: auto !important; }
   .mobile-drawer .sidebar { display: flex !important; width: 100% !important; height: 100% !important; padding-bottom: 0 !important; }
-  .page-pad { padding: 14px max(12px, env(safe-area-inset-right, 0)) 70px max(12px, env(safe-area-inset-left, 0)) !important; }
+  .page-pad { padding: 14px max(12px, env(safe-area-inset-right, 0)) calc(52px + env(safe-area-inset-bottom, 0) + 16px) max(12px, env(safe-area-inset-left, 0)) !important; }
   .filter-bar { gap: 6px !important; padding: 8px 10px !important; }
   .filter-bar select, .filter-bar input { font-size: 12px !important; padding: 6px 8px !important; min-width: 0 !important; }
   .header-bar { padding: 0 16px !important; height: 56px !important; }
