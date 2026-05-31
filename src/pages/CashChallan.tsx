@@ -1325,7 +1325,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       {/* WhatsApp Share Bar */}
       {whatsAppShare && (
         <div style={{ position: 'fixed', bottom: 'calc(80px + env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)', zIndex: 300, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '10px 14px', boxShadow: '0 8px 30px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 12, animation: 'su .2s ease', minWidth: 280 }}>
-          <span style={{ fontSize: 20 }}>📱</span>
+          <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: 'none', stroke: T.ac2, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', flexShrink: 0 }}><rect x="5" y="2" width="14" height="20" rx="3" /><path d="M5 6h14M5 18h14" /><circle cx="12" cy="20" r=".5" fill={T.ac2} /></svg>
           <span style={{ flex: 1, fontSize: 12, color: T.tx }}>Share on WhatsApp?</span>
           <button onClick={() => { window.location.href = whatsAppShare.url; setWhatsAppShare(null); }} style={{ ...S.btnPrimary, background: '#25D366', boxShadow: 'none', gap: 4, fontSize: 11 }}>Send</button>
           <span onClick={() => setWhatsAppShare(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }} aria-label="Dismiss">✕</span>
@@ -1336,7 +1336,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       {showErpReminder && (
         <div style={{ ...S.modalOverlay }} onClick={() => setShowErpReminder(false)}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380, padding: '24px 22px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
+            <div style={{ marginBottom: 10 }}><svg viewBox="0 0 24 24" style={{ width: 36, height: 36, fill: 'none', stroke: '#6366F1', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' }}><rect x="6" y="3" width="12" height="18" rx="2" /><rect x="9" y="1" width="6" height="4" rx="1" /><path d="M9 10h6M9 13h4M9 16h5" opacity=".5" /></svg></div>
             <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Hi {userName}!</div>
             <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 18 }}>Reminder to manually <strong style={{ color: T.yl }}>reduce these inventory items in ERP</strong>. Cash Challan does not sync inventory automatically.</div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -1351,7 +1351,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       {confirmAction && (
         <div style={{ ...S.modalOverlay }} onClick={() => setConfirmAction(null)}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 28, marginBottom: 6 }}>⚠️</div>
+            <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg></div>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>{confirmAction.type === 'void' ? 'Void Challan?' : 'Delete Challan?'}</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: confirmAction.type === 'void' && confirmAction.inventoryDeducted ? 8 : 14 }}>{confirmAction.type === 'void' ? `Challan #${confirmAction.challanNumber} will be marked voided. This cannot be undone.` : `Challan #${confirmAction.challanNumber} will be permanently deleted.`}</div>
             {confirmAction.type === 'void' && confirmAction.inventoryDeducted && (

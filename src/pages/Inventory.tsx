@@ -953,8 +953,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           })}
         </div>
         {filtered.length === 0 && <div style={{ padding: 14 }}>{hasActiveFilters
-          ? <Empty icon="🔎" title="No items match your filters" message="Try adjusting the filters, or click Clear filters to reset." cta="Clear filters" onCta={clearFilters} />
-          : <Empty icon="📦" title="No items yet" message="Register your first inventory item to start tracking components and pair matches." cta={canEdit ? '+ Add Item' : undefined} onCta={canEdit ? () => setShowModal(true) : undefined} />
+          ? <Empty icon="search" title="No items match your filters" message="Try adjusting the filters, or click Clear filters to reset." cta="Clear filters" onCta={clearFilters} />
+          : <Empty icon="box" title="No items yet" message="Register your first inventory item to start tracking components and pair matches." cta={canEdit ? '+ Add Item' : undefined} onCta={canEdit ? () => setShowModal(true) : undefined} />
         }</div>}
       </div>
       <div className="inv-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontSize: 11 }}>

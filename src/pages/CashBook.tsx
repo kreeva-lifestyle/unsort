@@ -590,7 +590,7 @@ export default function CashBook() {
         <button onClick={() => setShowAdd(true)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>+ Add Expense</button>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
           {loading && expenses.length === 0 && <SkeletonRows rows={4} />}
-          {!loading && filteredExpenses.length === 0 && <div style={{ padding: 14 }}><Empty icon="📋" title={sq ? 'No matching expenses' : 'No expenses'} message={sq ? 'Try a different search term.' : 'No expenses recorded in this date range.'} /></div>}
+          {!loading && filteredExpenses.length === 0 && <div style={{ padding: 14 }}><Empty icon="clipboard" title={sq ? 'No matching expenses' : 'No expenses'} message={sq ? 'Try a different search term.' : 'No expenses recorded in this date range.'} /></div>}
           {filteredExpenses.map(e => (
             <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ flex: 1 }}>
@@ -620,7 +620,7 @@ export default function CashBook() {
       {tab === 'sales' && (
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
           {loading && sales.length === 0 && <SkeletonRows rows={4} />}
-          {!loading && filteredSales.length === 0 && <div style={{ padding: 14 }}><Empty icon="🧾" title={sq ? 'No matching sales' : 'No cash sales'} message={sq ? 'Try a different search term.' : 'No cash-paid challans in this date range.'} /></div>}
+          {!loading && filteredSales.length === 0 && <div style={{ padding: 14 }}><Empty icon="receipt" title={sq ? 'No matching sales' : 'No cash sales'} message={sq ? 'Try a different search term.' : 'No cash-paid challans in this date range.'} /></div>}
           {filteredSales.map(s => (
             <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ flex: 1 }}>
@@ -646,7 +646,7 @@ export default function CashBook() {
         )}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
           {loading && handovers.length === 0 && <SkeletonRows rows={4} />}
-          {!loading && filteredHandovers.length === 0 && <div style={{ padding: 14 }}><Empty icon="🤝" title={sq ? 'No matching handovers' : 'No handovers'} message={sq ? 'Try a different search term.' : 'No cash handovers recorded in this date range.'} /></div>}
+          {!loading && filteredHandovers.length === 0 && <div style={{ padding: 14 }}><Empty icon="handshake" title={sq ? 'No matching handovers' : 'No handovers'} message={sq ? 'Try a different search term.' : 'No cash handovers recorded in this date range.'} /></div>}
           {filteredHandovers.map(h => (
             <div key={h.id} style={{ padding: '11px 12px', borderBottom: `1px solid ${T.bd}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -904,7 +904,7 @@ export default function CashBook() {
       {confirmDelete && (
         <div style={{ ...S.modalOverlay }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }}>
-            <div style={{ fontSize: 28, marginBottom: 6 }}>⚠️</div>
+            <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg></div>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Delete Expense?</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This will permanently remove the expense.</div>
             <div style={{ display: 'flex', gap: 8 }}>
