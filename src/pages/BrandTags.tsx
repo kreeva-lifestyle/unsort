@@ -536,9 +536,8 @@ export default function BrandTagPrinter() {
 
   return (
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
-      {loading && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 12 }}>
-        <div style={{ width: 32, height: 32, border: `2px solid ${T.bd2}`, borderTopColor: T.ac, borderRadius: '50%', animation: 'btnSpin .7s linear infinite' }} />
-        <span style={{ fontSize: 11, color: T.tx3 }}>Loading brand tags...</span>
+      {loading && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
+        <div className="spinner" />
       </div>}
       {!loading && <>
       {/* Header */}
