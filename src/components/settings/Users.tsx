@@ -8,6 +8,7 @@ import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { MODULE_LABELS, ALL_MODULE_KEYS } from '../../lib/tabs';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
+import Empty from '../ui/Empty';
 
 export default function Users({ addToast, profile }: { addToast: (msg: string, type?: string) => void; profile: any }) {
   const [users, setUsers] = useState<any[]>([]);
@@ -132,7 +133,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
       <div className="desktop-only" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>{['User', 'Role', 'Status', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>
-          <tbody>{users.map((u) => (
+          <tbody>{users.length === 0 && <tr><td colSpan={4} style={{ padding: 0 }}><Empty icon="📋" title="No team members" message="Invite your first team member to get started." cta="+ Invite User" onCta={() => setShowInvite(true)} /></td></tr>}{users.map((u) => (
             <React.Fragment key={u.id}>
             <tr style={{ transition: 'background .1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.015)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <td style={S.tdStyle}>
@@ -152,6 +153,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
       </div>
       {/* Mobile card view */}
       <div className="mobile-only" style={{ display: 'none', flexDirection: 'column', gap: 8 }}>
+        {users.length === 0 && <Empty icon="📋" title="No team members" message="Invite your first team member to get started." cta="+ Invite User" onCta={() => setShowInvite(true)} />}
         {users.map((u) => (
           <div key={u.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
