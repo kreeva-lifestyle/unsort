@@ -194,9 +194,14 @@ function ingestRows(rows: string[][], skuMap: Map<string, string>, sizeMap: Map<
     // Column O size — append to SKU unless it's a construction descriptor.
     const sizeRaw = String(rows[i]?.[STOCK_SIZE_COL] ?? '').trim();
     if (sizeRaw && !isNonSize(sizeRaw)) {
-      const k = sku + canonSize(sizeRaw);
-      const prevSz = sizeMap.get(k);
-      if (prevSz === undefined || rank(status) > rank(prevSz)) sizeMap.set(k, status);
+      const parts = sizeRaw.includes(',') ? sizeRaw.split(',').map(s => s.trim()).filter(Boolean) : [sizeRaw];
+      for (const part of parts) {
+        if (!isNonSize(part)) {
+          const k = sku + canonSize(part);
+          const prevSz = sizeMap.get(k);
+          if (prevSz === undefined || rank(status) > rank(prevSz)) sizeMap.set(k, status);
+        }
+      }
     }
 
     // Bare-SKU rollup: Active wins so "any size in stock" reports Active.
@@ -283,12 +288,16 @@ async function getFullStock(): Promise<FullStock> {
 
       const sizeVal = colMap ? (rawCells[STOCK_SIZE_COL] || '') : (cells[STOCK_SIZE_COL] || '');
       const sizeRaw = sizeVal.trim();
-      let key = sku;
       if (sizeRaw && !isNonSize(sizeRaw)) {
-        key = sku + canonSize(sizeRaw);
+        const parts = sizeRaw.includes(',') ? sizeRaw.split(',').map(s => s.trim()).filter(Boolean) : [sizeRaw];
+        for (const part of parts) {
+          if (!isNonSize(part)) {
+            rows.push({ key: sku + canonSize(part), status, cells });
+          }
+        }
+      } else {
+        rows.push({ key: sku, status, cells });
       }
-
-      rows.push({ key, status, cells });
     }
   }
 
