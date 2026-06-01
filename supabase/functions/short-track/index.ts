@@ -428,12 +428,14 @@ Deno.serve(async (req: Request) => {
         if (skus.length > 10000) return fail(400, 'Maximum 10000 SKUs per request', req);
         try {
           const full = await getFullStock();
-          const vendorSet = new Set(skus.map((s: any) => norm(String(s))));
+          const normToOriginal = new Map<string, string>();
+          for (const s of skus) { const n = norm(String(s)); if (!normToOriginal.has(n)) normToOriginal.set(n, String(s)); }
+          const vendorSet = new Set(normToOriginal.keys());
           const allMasterKeys = new Set(full.rows.map(r => r.key));
           const inactive = full.rows.filter(r => r.status === 'Inactive' && vendorSet.has(r.key));
           const nonUploaded = full.rows.filter(r => r.status === 'Active' && !vendorSet.has(r.key));
           const notFound: string[] = [];
-          for (const k of vendorSet) { if (!allMasterKeys.has(k)) notFound.push(k); }
+          for (const k of vendorSet) { if (!allMasterKeys.has(k)) notFound.push(normToOriginal.get(k) || k); }
           return json({ ok: true, headers: full.headers, inactive: inactive.map(r => r.cells), nonUploaded: nonUploaded.map(r => r.cells), notFound }, req);
         } catch (e: any) {
           return fail(500, e.message || 'Compare failed', req);
