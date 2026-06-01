@@ -132,7 +132,7 @@ export default function Minis() {
 
       const all: CompareRow[] = [
         ...notFound.filter(Boolean).map(sku => ({ sku, category: 'na' as const })),
-        ...inactive.filter(c => c.length > 0 && c[0]).map(cells => ({ sku: cells[0], category: 'stock_out' as const, cells })),
+        ...inactive.filter(c => c.length > 0 && c[0] && (stockMap.get(norm(c[0])) || 0) > 0).map(cells => ({ sku: cells[0], category: 'stock_out' as const, cells })),
         ...nonUploaded.filter(c => c.length > 0 && c[0]).map(cells => ({ sku: cells[0], category: 'not_uploaded' as const, cells })),
         ...zeroStockActive.map(sku => ({ sku, category: 'zero_stock' as const })),
         ...vsMissing.map(sku => ({ sku, category: 'vs_missing' as const })),
