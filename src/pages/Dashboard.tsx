@@ -44,15 +44,19 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     const y = today.getFullYear(), mo = String(today.getMonth() + 1).padStart(2, '0');
     const monthStartStr = `${y}-${mo}-01`;
     const todayISO = today.toISOString();
-    let scansRes, challansRes, itemsRes, expensesRes, handoversRes, balancesRes;
+    const weekAgoISO = new Date(Date.now() - 7 * 86400000).toISOString();
+    let scansRes, challansRes, itemsRes, expensesRes, handoversRes, balancesRes, scanTrendRes;
     try {
-      [scansRes, challansRes, itemsRes, expensesRes, handoversRes, balancesRes] = await Promise.all([
+      // All reads run in one parallel batch (single round-trip) so the dashboard
+      // can render as soon as it resolves — no second sequential hop gating `loaded`.
+      [scansRes, challansRes, itemsRes, expensesRes, handoversRes, balancesRes, scanTrendRes] = await Promise.all([
         supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).gte('scanned_at', todayISO),
         supabase.from('cash_challans').select('total, amount_paid, status, is_return, customer_name, created_at, payment_date').neq('status', 'voided').neq('status', 'draft'),
         supabase.from('inventory_items').select('status, status_changed_at'),
         supabase.from('cash_expenses').select('amount').gte('date', monthStartStr),
         supabase.from('cash_handovers').select('handover_number, amount, status, date, from_user_name, created_at'),
         supabase.from('cash_book_balances').select('opening_balance').eq('date', monthStartStr).maybeSingle(),
+        supabase.from('packtime_scans').select('scanned_at').gte('scanned_at', weekAgoISO),
       ]);
     } catch (e: any) {
       console.error('Dashboard fetch failed:', e?.message || e);
@@ -101,8 +105,8 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     });
     setTopCustomers(Object.entries(custMap).map(([name, outstanding]) => ({ name, outstanding })).sort((a, b) => b.outstanding - a.outstanding).slice(0, 5));
 
-    // Scan trend (7 days)
-    const { data: scanData } = await supabase.from('packtime_scans').select('scanned_at').gte('scanned_at', new Date(Date.now() - 7 * 86400000).toISOString());
+    // Scan trend (7 days) — from the parallel batch above (no extra round-trip)
+    const scanData = scanTrendRes.data;
     const scanByDay: Record<string, number> = {};
     for (let d = 6; d >= 0; d--) { const dt = new Date(Date.now() - d * 86400000); scanByDay[dt.toISOString().slice(0,10)] = 0; }
     ((scanData ?? []) as { scanned_at: string }[]).forEach(s => { const d = new Date(s.scanned_at).toISOString().slice(0,10); if (scanByDay[d] !== undefined) scanByDay[d]++; });
@@ -126,10 +130,12 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
   const { debounced: debouncedFetchTasks } = useDebouncedFetch(fetchTasks, 2000);
   useEffect(() => {
     fetchAll(); fetchTasks();
+    // NB: deliberately NOT subscribing to packtime_scans — during active
+    // packing it fires continuously and would re-run the whole dashboard on
+    // every scan. Today's-scan count refreshes on tab focus / manual refresh.
     const ch = supabase.channel('dash-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, debouncedFetchAll)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, debouncedFetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'packtime_scans' }, debouncedFetchAll)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, debouncedFetchTasks)
       .subscribe();
     const onVisible = () => { if (document.visibilityState === 'visible') { fetchAll(); fetchTasks(); } };
