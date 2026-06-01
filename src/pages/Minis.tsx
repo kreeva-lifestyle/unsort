@@ -25,7 +25,7 @@ export default function Minis() {
   const [virtualStock, setVirtualStock] = useState<Record<string, number>>({});
   const [comparing, setComparing] = useState(false);
 
-  type CompareFilter = 'all' | 'na' | 'inactive' | 'not_uploaded' | 'vs_missing';
+  type CompareFilter = 'all' | 'na' | 'stock_out' | 'not_uploaded' | 'zero_stock' | 'vs_missing';
   interface CompareRow { sku: string; category: CompareFilter; cells?: string[] }
   const [compareHeaders, setCompareHeaders] = useState<string[]>([]);
   const [compareRows, setCompareRows] = useState<CompareRow[]>([]);
@@ -112,16 +112,29 @@ export default function Minis() {
       const nonUploaded: string[][] = data.nonUploaded || [];
       const notFound: string[] = data.notFound || [];
 
-      const vendorSet = new Set(skus.map(s => s.toUpperCase().replace(/[-\s.]/g, '')));
+      const norm = (s: string) => s.toUpperCase().replace(/[-\s.]/g, '');
+      const vendorSet = new Set(skus.map(norm));
       const vsMissing: string[] = [];
       for (const [sku, qty] of Object.entries(virtualStock)) {
-        if (qty > 0 && !vendorSet.has(sku.toUpperCase().replace(/[-\s.]/g, ''))) vsMissing.push(sku);
+        if (qty > 0 && !vendorSet.has(norm(sku))) vsMissing.push(sku);
+      }
+
+      const stockMap = new Map<string, number>();
+      for (const r of rows) { if (r.aryaSku) stockMap.set(norm(r.aryaSku), r.stock); }
+
+      const notFoundSet = new Set(notFound.map(norm));
+      const inactiveSet = new Set(inactive.filter(c => c.length > 0 && c[0]).map(c => norm(c[0])));
+      const zeroStockActive: string[] = [];
+      for (const sku of skus) {
+        const n = norm(sku);
+        if ((stockMap.get(n) || 0) === 0 && !notFoundSet.has(n) && !inactiveSet.has(n)) zeroStockActive.push(sku);
       }
 
       const all: CompareRow[] = [
         ...notFound.filter(Boolean).map(sku => ({ sku, category: 'na' as const })),
-        ...inactive.filter(c => c.length > 0 && c[0]).map(cells => ({ sku: cells[0], category: 'inactive' as const, cells })),
+        ...inactive.filter(c => c.length > 0 && c[0]).map(cells => ({ sku: cells[0], category: 'stock_out' as const, cells })),
         ...nonUploaded.filter(c => c.length > 0 && c[0]).map(cells => ({ sku: cells[0], category: 'not_uploaded' as const, cells })),
+        ...zeroStockActive.map(sku => ({ sku, category: 'zero_stock' as const })),
         ...vsMissing.map(sku => ({ sku, category: 'vs_missing' as const })),
       ];
 
@@ -135,8 +148,9 @@ export default function Minis() {
       else {
         const parts: string[] = [];
         if (notFound.length > 0) parts.push(`${notFound.length} NA`);
-        if (inactive.length > 0) parts.push(`${inactive.length} inactive`);
+        if (inactive.length > 0) parts.push(`${inactive.length} stock out`);
         if (nonUploaded.length > 0) parts.push(`${nonUploaded.length} not uploaded`);
+        if (zeroStockActive.length > 0) parts.push(`${zeroStockActive.length} in stock but 0`);
         if (vsMissing.length > 0) parts.push(`${vsMissing.length} virtual stock missing`);
         addToast(parts.join(', '), 'success');
       }
@@ -158,13 +172,13 @@ export default function Minis() {
     if (hasFullData && compareHeaders.length > 0) {
       const ws = XLSX.utils.aoa_to_sheet([compareHeaders, ...items.map(r => r.cells || [r.sku])]);
       const wb = XLSX.utils.book_new();
-      const label = cat === 'inactive' ? 'Inactive' : cat === 'not_uploaded' ? 'Not Uploaded' : 'Export';
+      const label = cat === 'stock_out' ? 'StockOut' : cat === 'not_uploaded' ? 'NotUploaded' : 'Export';
       XLSX.utils.book_append_sheet(wb, ws, label);
       XLSX.writeFile(wb, `Utsav_${label.replace(/\s/g, '')}_${today}.xlsx`);
     } else {
       const ws = XLSX.utils.aoa_to_sheet([['SKU'], ...items.map(r => [r.sku])]);
       const wb = XLSX.utils.book_new();
-      const label = cat === 'na' ? 'NA' : cat === 'vs_missing' ? 'VirtualStockMissing' : 'Export';
+      const label = cat === 'na' ? 'NA' : cat === 'zero_stock' ? 'InStockBut0' : cat === 'vs_missing' ? 'VirtualStockMissing' : 'Export';
       XLSX.utils.book_append_sheet(wb, ws, label);
       XLSX.writeFile(wb, `Utsav_${label}_${today}.xlsx`);
     }
@@ -250,8 +264,9 @@ export default function Minis() {
           {([
             { key: 'all' as CompareFilter, label: 'Total', count: compareRows.length, color: T.tx2 },
             { key: 'na' as CompareFilter, label: 'NA', count: compareRows.filter(r => r.category === 'na').length, color: T.yl },
-            { key: 'inactive' as CompareFilter, label: 'Inactive', count: compareRows.filter(r => r.category === 'inactive').length, color: T.re },
+            { key: 'stock_out' as CompareFilter, label: 'Stock Out', count: compareRows.filter(r => r.category === 'stock_out').length, color: T.re },
             { key: 'not_uploaded' as CompareFilter, label: 'Not Uploaded', count: compareRows.filter(r => r.category === 'not_uploaded').length, color: T.bl },
+            { key: 'zero_stock' as CompareFilter, label: 'In Stock but 0', count: compareRows.filter(r => r.category === 'zero_stock').length, color: '#F97316' },
             { key: 'vs_missing' as CompareFilter, label: 'Virtual Stock', count: compareRows.filter(r => r.category === 'vs_missing').length, color: T.gr },
           ]).map(s => (
             <div key={s.key} onClick={() => { setCompareFilter(compareFilter === s.key ? 'all' : s.key); setCompareLimit(50); }} style={{ padding: '8px 14px', background: compareFilter === s.key ? `${s.color}12` : 'rgba(255,255,255,0.02)', border: `1px solid ${compareFilter === s.key ? `${s.color}44` : T.bd}`, borderRadius: 8, textAlign: 'center', cursor: 'pointer', transition: 'all .15s' }}>
@@ -275,8 +290,8 @@ export default function Minis() {
             </tr></thead>
             <tbody>
               {compareFiltered.slice(0, compareLimit).map((r, i) => {
-                const catColor = r.category === 'na' ? T.yl : r.category === 'inactive' ? T.re : r.category === 'not_uploaded' ? T.bl : T.gr;
-                const catLabel = r.category === 'na' ? 'NA' : r.category === 'inactive' ? 'Inactive' : r.category === 'not_uploaded' ? 'Not Uploaded' : 'Virtual Stock';
+                const catColor = r.category === 'na' ? T.yl : r.category === 'stock_out' ? T.re : r.category === 'not_uploaded' ? T.bl : r.category === 'zero_stock' ? '#F97316' : T.gr;
+                const catLabel = r.category === 'na' ? 'NA' : r.category === 'stock_out' ? 'Stock Out' : r.category === 'not_uploaded' ? 'Not Uploaded' : r.category === 'zero_stock' ? 'In Stock but 0' : 'Virtual Stock';
                 return (
                   <tr key={`${r.sku}-${i}`}>
                     <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
