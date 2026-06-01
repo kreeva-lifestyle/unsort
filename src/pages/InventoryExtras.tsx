@@ -19,7 +19,7 @@ import type {
 
 const EXTRAS_LIMIT = 1000;
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
-import { isDupatta, isLehenga, isBottomType, mfrFromSku } from '../lib/garmentHelpers';
+import { isDupatta, isLehenga, isBottomType, isBlouse, mfrFromSku } from '../lib/garmentHelpers';
 
 // View model: narrowed inventory_items row for the matching UI.
 type InventoryItemMatch = Pick<InventoryItem, 'id' | 'batch_number' | 'serial_number' | 'size' | 'location' | 'status'>;
@@ -187,7 +187,8 @@ export default function InventoryExtras() {
     const compIsBottom = comp && isBottomType(comp.name);
     if (compIsDupatta && fSize !== 'N/A') { setError('Dupatta must have size "N/A"'); return; }
     if (!compIsDupatta && fSize === 'N/A') { setError('N/A is only allowed for Dupatta/Orhni/Chunni/Stole'); return; }
-    if (fSize === 'Semi-Stitched' && !compIsLehenga) { setError('Semi-Stitched is only allowed for Lehenga'); return; }
+    const compIsBlouse = comp && isBlouse(comp.name);
+    if (fSize === 'Semi-Stitched' && !compIsLehenga && !compIsBlouse) { setError('Semi-Stitched is only allowed for Lehenga or Blouse'); return; }
     if (compIsBottom && (fSize === 'N/A' || fSize === 'Semi-Stitched')) { setError('Bottom/Pant requires a specific size (not N/A or Semi-Stitched)'); return; }
     const qty = parseInt(fQty) || 0;
     if (qty < 1) { setError('Initial quantity must be at least 1 (cannot be zero)'); return; }
