@@ -25,8 +25,8 @@ export default function Minis() {
   const [virtualStock, setVirtualStock] = useState<Record<string, number>>({});
   const [comparing, setComparing] = useState(false);
 
-  type CompareFilter = 'all' | 'na' | 'stock_out' | 'not_uploaded' | 'zero_stock' | 'vs_missing';
-  interface CompareRow { sku: string; category: CompareFilter; cells?: string[] }
+  type CompareFilter = 'all' | 'na' | 'stock_out' | 'not_uploaded' | 'zero_stock' | 'vs_missing' | 'duplicate';
+  interface CompareRow { sku: string; category: CompareFilter; cells?: string[]; extra?: string }
   const [compareHeaders, setCompareHeaders] = useState<string[]>([]);
   const [compareRows, setCompareRows] = useState<CompareRow[]>([]);
   const [compareFilter, setCompareFilter] = useState<CompareFilter>('all');
@@ -130,12 +130,15 @@ export default function Minis() {
         if ((stockMap.get(n) || 0) === 0 && !notFoundSet.has(n) && !inactiveSet.has(n)) zeroStockActive.push(sku);
       }
 
+      const duplicates: { sku: string; tabs: string[] }[] = data.duplicates || [];
+
       const all: CompareRow[] = [
         ...notFound.filter(Boolean).map(sku => ({ sku, category: 'na' as const })),
         ...inactive.filter(c => c.length > 0 && c[0] && (stockMap.get(norm(c[0])) || 0) > 0).map(cells => ({ sku: cells[0], category: 'stock_out' as const, cells })),
         ...nonUploaded.filter(c => c.length > 0 && c[0]).map(cells => ({ sku: cells[0], category: 'not_uploaded' as const, cells })),
         ...zeroStockActive.map(sku => ({ sku, category: 'zero_stock' as const })),
         ...vsMissing.map(sku => ({ sku, category: 'vs_missing' as const })),
+        ...duplicates.map(d => ({ sku: d.sku, category: 'duplicate' as const, extra: d.tabs.join(' + ') })),
       ];
 
       setCompareHeaders(headers);
@@ -152,6 +155,7 @@ export default function Minis() {
         if (nonUploaded.length > 0) parts.push(`${nonUploaded.length} not uploaded`);
         if (zeroStockActive.length > 0) parts.push(`${zeroStockActive.length} in stock but 0`);
         if (vsMissing.length > 0) parts.push(`${vsMissing.length} virtual stock missing`);
+        if (duplicates.length > 0) parts.push(`${duplicates.length} duplicates`);
         addToast(parts.join(', '), 'success');
       }
     } catch { addToast('Network error — please try again', 'error'); }
@@ -178,7 +182,7 @@ export default function Minis() {
     } else {
       const ws = XLSX.utils.aoa_to_sheet([['SKU'], ...items.map(r => [r.sku])]);
       const wb = XLSX.utils.book_new();
-      const label = cat === 'na' ? 'NA' : cat === 'zero_stock' ? 'InStockBut0' : cat === 'vs_missing' ? 'VirtualStockMissing' : 'Export';
+      const label = cat === 'na' ? 'NA' : cat === 'zero_stock' ? 'InStockBut0' : cat === 'vs_missing' ? 'VirtualStockMissing' : cat === 'duplicate' ? 'Duplicates' : 'Export';
       XLSX.utils.book_append_sheet(wb, ws, label);
       XLSX.writeFile(wb, `Utsav_${label}_${today}.xlsx`);
     }
@@ -268,6 +272,7 @@ export default function Minis() {
             { key: 'not_uploaded' as CompareFilter, label: 'Not Uploaded', count: compareRows.filter(r => r.category === 'not_uploaded').length, color: T.bl },
             { key: 'zero_stock' as CompareFilter, label: 'In Stock but 0', count: compareRows.filter(r => r.category === 'zero_stock').length, color: '#F97316' },
             { key: 'vs_missing' as CompareFilter, label: 'Virtual Stock', count: compareRows.filter(r => r.category === 'vs_missing').length, color: T.gr },
+            { key: 'duplicate' as CompareFilter, label: 'Duplicate', count: compareRows.filter(r => r.category === 'duplicate').length, color: '#A78BFA' },
           ]).map(s => (
             <div key={s.key} onClick={() => { setCompareFilter(compareFilter === s.key ? 'all' : s.key); setCompareLimit(50); }} style={{ padding: '8px 14px', background: compareFilter === s.key ? `${s.color}12` : 'rgba(255,255,255,0.02)', border: `1px solid ${compareFilter === s.key ? `${s.color}44` : T.bd}`, borderRadius: 8, textAlign: 'center', cursor: 'pointer', transition: 'all .15s' }}>
               <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.mono, color: s.color }}>{s.count}</div>
@@ -290,11 +295,11 @@ export default function Minis() {
             </tr></thead>
             <tbody>
               {compareFiltered.slice(0, compareLimit).map((r, i) => {
-                const catColor = r.category === 'na' ? T.yl : r.category === 'stock_out' ? T.re : r.category === 'not_uploaded' ? T.bl : r.category === 'zero_stock' ? '#F97316' : T.gr;
-                const catLabel = r.category === 'na' ? 'NA' : r.category === 'stock_out' ? 'Stock Out' : r.category === 'not_uploaded' ? 'Not Uploaded' : r.category === 'zero_stock' ? 'In Stock but 0' : 'Virtual Stock';
+                const catColor = r.category === 'na' ? T.yl : r.category === 'stock_out' ? T.re : r.category === 'not_uploaded' ? T.bl : r.category === 'zero_stock' ? '#F97316' : r.category === 'duplicate' ? '#A78BFA' : T.gr;
+                const catLabel = r.category === 'na' ? 'NA' : r.category === 'stock_out' ? 'Stock Out' : r.category === 'not_uploaded' ? 'Not Uploaded' : r.category === 'zero_stock' ? 'In Stock but 0' : r.category === 'duplicate' ? 'Duplicate' : 'Virtual Stock';
                 return (
-                  <tr key={`${r.sku}-${i}`}>
-                    <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
+                  <tr key={`${r.sku}-${r.category}-${i}`}>
+                    <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}{r.extra ? <span style={{ fontSize: 9, color: T.tx3, fontWeight: 400, marginLeft: 6 }}>{r.extra}</span> : null}</td>
                     <td style={S.tdStyle}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: catColor, background: `${catColor}18` }}>{catLabel}</span></td>
                   </tr>
                 );
