@@ -97,6 +97,16 @@ export default function TracklyLanding({ longUrl, onImport }: Props) {
   const [show, setShow] = useState(false);
   useEffect(() => { const t = setTimeout(() => setShow(true), 600); return () => clearTimeout(t); }, []);
   const redirect = useCallback(() => window.location.replace(longUrl), [longUrl]);
+  // Convert a Google Sheets edit URL to its direct xlsx export endpoint so the
+  // browser downloads the file (export?format=xlsx returns it as an attachment).
+  const sheetId = longUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)?.[1];
+  const downloadSheet = useCallback(() => {
+    if (!sheetId) { window.open(longUrl, '_blank'); return; }
+    const a = document.createElement('a');
+    a.href = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx`;
+    a.rel = 'noopener';
+    a.click();
+  }, [sheetId, longUrl]);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#000', fontFamily: T.sans }}>
@@ -149,6 +159,18 @@ export default function TracklyLanding({ longUrl, onImport }: Props) {
                 }}>
                 Redirect to GSheet
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7M7 7h10v10"/></svg>
+              </button>
+              <button onClick={downloadSheet}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(129,140,248,0.4)'; e.currentTarget.style.color = '#818CF8'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(226,232,240,0.1)'; e.currentTarget.style.color = 'rgba(226,232,240,0.7)'; }}
+                style={{
+                  width: '100%', padding: '13px 20px', borderRadius: 10, border: '1px solid rgba(226,232,240,0.1)',
+                  background: 'rgba(226,232,240,0.04)', color: 'rgba(226,232,240,0.7)',
+                  fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                  minHeight: 48, transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}>
+                Download Sheet
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
               </button>
             </div>
           </div>
