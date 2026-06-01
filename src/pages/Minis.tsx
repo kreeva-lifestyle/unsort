@@ -31,6 +31,7 @@ export default function Minis() {
   const [compareRows, setCompareRows] = useState<CompareRow[]>([]);
   const [compareFilter, setCompareFilter] = useState<CompareFilter>('all');
   const [compareSearch, setCompareSearch] = useState('');
+  const [compareLimit, setCompareLimit] = useState(50);
   const compareComputed = compareRows.length > 0;
 
   const setView = useCallback((v: MiniView) => {
@@ -128,6 +129,7 @@ export default function Minis() {
       setCompareRows(all);
       setCompareFilter('all');
       setCompareSearch('');
+      setCompareLimit(50);
 
       if (all.length === 0) addToast('All SKUs are Active and uploaded!', 'success');
       else {
@@ -252,7 +254,7 @@ export default function Minis() {
             { key: 'not_uploaded' as CompareFilter, label: 'Not Uploaded', count: compareRows.filter(r => r.category === 'not_uploaded').length, color: T.bl },
             { key: 'vs_missing' as CompareFilter, label: 'Virtual Stock', count: compareRows.filter(r => r.category === 'vs_missing').length, color: T.gr },
           ]).map(s => (
-            <div key={s.key} onClick={() => setCompareFilter(compareFilter === s.key ? 'all' : s.key)} style={{ padding: '8px 14px', background: compareFilter === s.key ? `${s.color}12` : 'rgba(255,255,255,0.02)', border: `1px solid ${compareFilter === s.key ? `${s.color}44` : T.bd}`, borderRadius: 8, textAlign: 'center', cursor: 'pointer', transition: 'all .15s' }}>
+            <div key={s.key} onClick={() => { setCompareFilter(compareFilter === s.key ? 'all' : s.key); setCompareLimit(50); }} style={{ padding: '8px 14px', background: compareFilter === s.key ? `${s.color}12` : 'rgba(255,255,255,0.02)', border: `1px solid ${compareFilter === s.key ? `${s.color}44` : T.bd}`, borderRadius: 8, textAlign: 'center', cursor: 'pointer', transition: 'all .15s' }}>
               <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.mono, color: s.color }}>{s.count}</div>
               <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
             </div>
@@ -272,7 +274,7 @@ export default function Minis() {
               <th style={S.thStyle}>SKU</th><th style={S.thStyle}>Category</th>
             </tr></thead>
             <tbody>
-              {compareFiltered.slice(0, 100).map((r, i) => {
+              {compareFiltered.slice(0, compareLimit).map((r, i) => {
                 const catColor = r.category === 'na' ? T.yl : r.category === 'inactive' ? T.re : r.category === 'not_uploaded' ? T.bl : T.gr;
                 const catLabel = r.category === 'na' ? 'NA' : r.category === 'inactive' ? 'Inactive' : r.category === 'not_uploaded' ? 'Not Uploaded' : 'Virtual Stock';
                 return (
@@ -284,8 +286,9 @@ export default function Minis() {
               })}
             </tbody>
           </table>
-          {compareFiltered.length > 100 && <div style={{ padding: '8px 14px', fontSize: 10, color: T.tx3, borderTop: `1px solid ${T.bd}`, textAlign: 'center' }}>Showing 100 of {compareFiltered.length} rows.</div>}
+          {compareFiltered.length > compareLimit && <div style={{ padding: '8px 14px', fontSize: 10, color: T.tx3, borderTop: `1px solid ${T.bd}`, textAlign: 'center' }}>Showing {compareLimit} of {compareFiltered.length} rows.</div>}
         </div>
+        {compareFiltered.length > compareLimit && <button onClick={() => setCompareLimit(l => l + 50)} style={{ width: '100%', padding: '12px', marginTop: 8, border: 'none', background: T.ac3, color: T.ac2, fontSize: 11, fontWeight: 600, cursor: 'pointer', borderRadius: 8 }}>Load More ({compareFiltered.length - compareLimit} remaining)</button>}
       </>}
       {rows.length === 0 && !fileName && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Click "Import Excel" to upload a vendor file.</div>}
     </div>
