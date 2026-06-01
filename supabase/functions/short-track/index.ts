@@ -442,7 +442,8 @@ Deno.serve(async (req: Request) => {
           const vendorSet = new Set(normToOriginal.keys());
           const allMasterKeys = new Set(full.rows.map(r => r.key));
           const inactive = full.rows.filter(r => r.status === 'Inactive' && vendorSet.has(r.key));
-          const nonUploaded = full.rows.filter(r => r.status === 'Active' && !vendorSet.has(r.key));
+          const inactiveBaseSkus = new Set(full.rows.filter(r => r.status === 'Inactive').map(r => r.key.replace(/(?:XXXL|XXL|XXS|XL|XS|S|M|L)$/, '')));
+          const nonUploaded = full.rows.filter(r => r.status === 'Active' && !vendorSet.has(r.key) && !inactiveBaseSkus.has(r.key.replace(/(?:XXXL|XXL|XXS|XL|XS|S|M|L)$/, '')));
           const notFound: string[] = [];
           for (const k of vendorSet) { if (!allMasterKeys.has(k)) notFound.push(normToOriginal.get(k) || k); }
           return json({ ok: true, headers: full.headers, inactive: inactive.map(r => r.cells), nonUploaded: nonUploaded.map(r => r.cells), notFound }, req);
