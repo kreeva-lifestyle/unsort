@@ -162,7 +162,7 @@ const canonSize = (s: string): string => {
 // Column O values describing garment construction (unstitched / semi stitched /
 // semi-stitched / etc.) are NOT real sizes — ignore them so the row matches on
 // SKU alone. Tolerant of case, hyphens, extra spaces and stray punctuation.
-const isNonSize = (s: string): boolean => s.toLowerCase().replace(/[^a-z]/g, '').includes('stitched');
+const isNonSize = (s: string): boolean => { const l = s.toLowerCase().replace(/[^a-z]/g, ''); return l.includes('stitched') || l.includes('stiched') || l.includes('unstitched') || l.includes('unstiched'); };
 
 const STOCK_SIZE_COL = 14; // Column O = SIZE (per spec)
 
