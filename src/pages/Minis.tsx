@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../lib/theme';
 import { SUPABASE_ANON_KEY, supabase } from '../lib/supabase';
@@ -28,7 +28,7 @@ export default function Minis() {
 
   type CompareCategory = 'na' | 'stock_out' | 'not_uploaded' | 'zero_stock' | 'vs_missing' | 'duplicate';
   type CompareFilter = 'all' | CompareCategory | 'ignored';
-  interface CompareRow { sku: string; category: CompareCategory; cells?: string[]; extra?: string }
+  interface CompareRow { sku: string; category: CompareCategory; cells?: string[]; extra?: string; _key: string }
   const [compareHeaders, setCompareHeaders] = useState<string[]>([]);
   const [compareRows, setCompareRows] = useState<CompareRow[]>([]);
   const [compareFilter, setCompareFilter] = useState<CompareFilter>('all');
@@ -48,7 +48,7 @@ export default function Minis() {
   useEffect(() => { fetchIgnored(); }, [fetchIgnored]);
 
   const ignoreSku = async (row: CompareRow) => {
-    const key = cmpNorm(row.sku);
+    const key = row._key;
     const { error } = await supabase.from('utsav_ignored_skus').insert({ sku_key: key, display_sku: row.sku, category: row.category, created_by: (await supabase.auth.getUser()).data.user?.id });
     if (error) { addToast(friendlyError(error), 'error'); return; }
     setIgnoredSkus(prev => new Map(prev).set(key, { displaySku: row.sku, category: row.category }));
@@ -160,12 +160,12 @@ export default function Minis() {
       const duplicates: { sku: string; tabs: string[] }[] = data.duplicates || [];
 
       const all: CompareRow[] = [
-        ...notFound.filter(Boolean).map(sku => ({ sku, category: 'na' as const })),
-        ...inactive.filter(c => c.length > 0 && c[0] && (stockMap.get(norm(c[0])) || 0) > 0).map(cells => ({ sku: cells[0], category: 'stock_out' as const, cells })),
-        ...nonUploaded.filter(c => c.length > 0 && c[0]).map(cells => ({ sku: cells[0], category: 'not_uploaded' as const, cells })),
-        ...zeroStockActive.map(sku => ({ sku, category: 'zero_stock' as const })),
-        ...vsMissing.map(sku => ({ sku, category: 'vs_missing' as const })),
-        ...duplicates.map(d => ({ sku: d.sku, category: 'duplicate' as const, extra: d.tabs.join(' + ') })),
+        ...notFound.filter(Boolean).map(sku => ({ sku, category: 'na' as const, _key: norm(sku) })),
+        ...inactive.filter(c => c.length > 0 && c[0] && (stockMap.get(norm(c[0])) || 0) > 0).map(cells => ({ sku: cells[0], category: 'stock_out' as const, cells, _key: norm(cells[0]) })),
+        ...nonUploaded.filter(c => c.length > 0 && c[0]).map(cells => ({ sku: cells[0], category: 'not_uploaded' as const, cells, _key: norm(cells[0]) })),
+        ...zeroStockActive.map(sku => ({ sku, category: 'zero_stock' as const, _key: norm(sku) })),
+        ...vsMissing.map(sku => ({ sku, category: 'vs_missing' as const, _key: norm(sku) })),
+        ...duplicates.map(d => ({ sku: d.sku, category: 'duplicate' as const, extra: d.tabs.join(' + '), _key: norm(d.sku) })),
       ];
 
       setCompareHeaders(headers);
@@ -189,27 +189,39 @@ export default function Minis() {
     finally { setComparing(false); }
   };
 
-  const isIgnored = (sku: string) => ignoredSkus.has(cmpNorm(sku));
+  // Ignore keys are already normalized in the DB — O(1) lookups, no per-row regex.
+  const ignoredKeySet = useMemo(() => new Set(ignoredSkus.keys()), [ignoredSkus]);
   // Strip a trailing size suffix so "TF-224-XL" → "TF-224" for squeezed exports.
   const baseSku = (sku: string) => sku.replace(/[-\s]?(XXXL|XXL|XL|XXS|XS|S|M|L)$/i, '');
 
-  const compareFiltered: CompareRow[] = compareFilter === 'ignored'
-    ? [...ignoredSkus.entries()]
-        .map(([, v]) => ({ sku: v.displaySku, category: (v.category || 'na') as CompareCategory }))
-        .filter(r => !compareSearch || r.sku.toLowerCase().includes(compareSearch.toLowerCase()))
-    : compareRows.filter(r => {
-        if (isIgnored(r.sku)) return false;
-        if (compareFilter !== 'all' && r.category !== compareFilter) return false;
-        if (compareSearch && !r.sku.toLowerCase().includes(compareSearch.toLowerCase())) return false;
-        return true;
-      });
+  // Single pass over compareRows for all category counts + total (excludes ignored).
+  const counts = useMemo(() => {
+    const c = { all: 0, na: 0, stock_out: 0, not_uploaded: 0, zero_stock: 0, vs_missing: 0, duplicate: 0 } as Record<string, number>;
+    for (const r of compareRows) {
+      if (ignoredKeySet.has(r._key)) continue;
+      c.all++; c[r.category]++;
+    }
+    return c;
+  }, [compareRows, ignoredKeySet]);
 
-  const catCount = (cat: CompareCategory) => compareRows.filter(r => r.category === cat && !isIgnored(r.sku)).length;
-  const totalCount = compareRows.filter(r => !isIgnored(r.sku)).length;
+  const compareFiltered: CompareRow[] = useMemo(() => {
+    const q = compareSearch.toLowerCase();
+    if (compareFilter === 'ignored') {
+      return [...ignoredSkus.values()]
+        .map(v => ({ sku: v.displaySku, category: (v.category || 'na') as CompareCategory, _key: cmpNorm(v.displaySku) }))
+        .filter(r => !q || r.sku.toLowerCase().includes(q));
+    }
+    return compareRows.filter(r => {
+      if (ignoredKeySet.has(r._key)) return false;
+      if (compareFilter !== 'all' && r.category !== compareFilter) return false;
+      if (q && !r.sku.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [compareRows, compareFilter, compareSearch, ignoredSkus, ignoredKeySet]);
 
   const exportCompareFilter = (cat: CompareFilter) => {
     if (cat === 'ignored') return;
-    const items = (cat === 'all' ? compareRows : compareRows.filter(r => r.category === cat)).filter(r => !isIgnored(r.sku));
+    const items = (cat === 'all' ? compareRows : compareRows.filter(r => r.category === cat)).filter(r => !ignoredKeySet.has(r._key));
     if (items.length === 0) return;
     const today = new Date().toISOString().slice(0, 10);
     const hasFullData = items.some(r => r.cells);
@@ -324,13 +336,13 @@ export default function Minis() {
         <div style={{ marginTop: 16, marginBottom: 12, fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Compare Results</div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
           {([
-            { key: 'all' as CompareFilter, label: 'Total', count: totalCount, color: T.tx2 },
-            { key: 'na' as CompareFilter, label: 'NA', count: catCount('na'), color: T.yl },
-            { key: 'stock_out' as CompareFilter, label: 'Stock Out', count: catCount('stock_out'), color: T.re },
-            { key: 'not_uploaded' as CompareFilter, label: 'Not Uploaded', count: catCount('not_uploaded'), color: T.bl },
-            { key: 'zero_stock' as CompareFilter, label: 'In Stock but 0', count: catCount('zero_stock'), color: '#F97316' },
-            { key: 'vs_missing' as CompareFilter, label: 'Virtual Stock', count: catCount('vs_missing'), color: T.gr },
-            { key: 'duplicate' as CompareFilter, label: 'Duplicate', count: catCount('duplicate'), color: '#A78BFA' },
+            { key: 'all' as CompareFilter, label: 'Total', count: counts.all, color: T.tx2 },
+            { key: 'na' as CompareFilter, label: 'NA', count: counts.na, color: T.yl },
+            { key: 'stock_out' as CompareFilter, label: 'Stock Out', count: counts.stock_out, color: T.re },
+            { key: 'not_uploaded' as CompareFilter, label: 'Not Uploaded', count: counts.not_uploaded, color: T.bl },
+            { key: 'zero_stock' as CompareFilter, label: 'In Stock but 0', count: counts.zero_stock, color: '#F97316' },
+            { key: 'vs_missing' as CompareFilter, label: 'Virtual Stock', count: counts.vs_missing, color: T.gr },
+            { key: 'duplicate' as CompareFilter, label: 'Duplicate', count: counts.duplicate, color: '#A78BFA' },
             { key: 'ignored' as CompareFilter, label: 'Ignored', count: ignoredSkus.size, color: T.tx3 },
           ]).map(s => (
             <div key={s.key} onClick={() => { setCompareFilter(compareFilter === s.key ? 'all' : s.key); setCompareLimit(50); }} style={{ padding: '8px 14px', background: compareFilter === s.key ? `${s.color}12` : 'rgba(255,255,255,0.02)', border: `1px solid ${compareFilter === s.key ? `${s.color}44` : T.bd}`, borderRadius: 8, textAlign: 'center', cursor: 'pointer', transition: 'all .15s' }}>
@@ -362,7 +374,7 @@ export default function Minis() {
                     <td style={S.tdStyle}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: catColor, background: `${catColor}18` }}>{catLabel}</span></td>
                     <td style={{ ...S.tdStyle, textAlign: 'right' as const }}>
                       {compareFilter === 'ignored'
-                        ? <span onClick={() => unignoreSku(cmpNorm(r.sku), r.sku)} style={{ cursor: 'pointer', color: T.re, fontSize: 10, fontWeight: 600, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '3px 9px' }}>Delete</span>
+                        ? <span onClick={() => unignoreSku(r._key, r.sku)} style={{ cursor: 'pointer', color: T.re, fontSize: 10, fontWeight: 600, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '3px 9px' }}>Delete</span>
                         : <span onClick={() => ignoreSku(r)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 10, fontWeight: 600, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '3px 9px' }}>Ignore</span>}
                     </td>
                   </tr>
