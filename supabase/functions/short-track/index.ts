@@ -236,7 +236,7 @@ async function getStock(): Promise<Stock> {
 }
 
 // ── Full-row stock (for compare action) ────────────────────────────────
-type FullRow = { key: string; status: string; cells: string[] };
+type FullRow = { key: string; displaySku: string; status: string; cells: string[]; tab: string };
 type FullStock = { headers: string[]; rows: FullRow[] };
 let fullStockCache: { data: FullStock; exp: number } | null = null;
 
@@ -255,7 +255,9 @@ async function getFullStock(): Promise<FullStock> {
   let headers: string[] = [];
   const rows: FullRow[] = [];
 
-  for (const vr of valueRanges) {
+  for (let vi = 0; vi < valueRanges.length; vi++) {
+    const vr = valueRanges[vi];
+    const tabName = STOCK_TABS[vi] || `Tab${vi}`;
     const raw: string[][] = vr.values || [];
     if (raw.length < 2) continue;
     const hdr = raw[0].map((h: string) => String(h).trim());
@@ -292,11 +294,12 @@ async function getFullStock(): Promise<FullStock> {
         const parts = sizeRaw.includes(',') ? sizeRaw.split(',').map(s => s.trim()).filter(Boolean) : [sizeRaw];
         for (const part of parts) {
           if (!isNonSize(part)) {
-            rows.push({ key: sku + canonSize(part), status, cells });
+            const cs = canonSize(part);
+            rows.push({ key: sku + cs, displaySku: skuRaw + '-' + cs, status, cells, tab: tabName });
           }
         }
       } else {
-        rows.push({ key: sku, status, cells });
+        rows.push({ key: sku, displaySku: skuRaw, status, cells, tab: tabName });
       }
     }
   }
@@ -446,7 +449,19 @@ Deno.serve(async (req: Request) => {
           const nonUploaded = full.rows.filter(r => r.status === 'Active' && !vendorSet.has(r.key) && !inactiveBaseSkus.has(r.key.replace(/(?:XXXL|XXL|XXS|XL|XS|S|M|L)$/, '')));
           const notFound: string[] = [];
           for (const k of vendorSet) { if (!allMasterKeys.has(k)) notFound.push(normToOriginal.get(k) || k); }
-          return json({ ok: true, headers: full.headers, inactive: inactive.map(r => r.cells), nonUploaded: nonUploaded.map(r => r.cells), notFound }, req);
+          const dupMap = new Map<string, Set<string>>();
+          for (const r of full.rows) {
+            const base = r.key.replace(/(?:XXXL|XXL|XXS|XL|XS|S|M|L)$/, '');
+            if (!dupMap.has(base)) dupMap.set(base, new Set());
+            dupMap.get(base)!.add(r.tab);
+          }
+          const duplicates: { sku: string; tabs: string[] }[] = [];
+          const seen = new Set<string>();
+          for (const [base, tabs] of dupMap) {
+            if (tabs.size > 1 && !seen.has(base)) { seen.add(base); duplicates.push({ sku: base, tabs: [...tabs] }); }
+          }
+          const fmtCells = (r: FullRow) => { const c = [...r.cells]; c[0] = r.displaySku; return c; };
+          return json({ ok: true, headers: full.headers, inactive: inactive.map(fmtCells), nonUploaded: nonUploaded.map(fmtCells), notFound, duplicates }, req);
         } catch (e: any) {
           return fail(500, e.message || 'Compare failed', req);
         }
