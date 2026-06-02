@@ -162,7 +162,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
   };
 
   const exportXls = () => {
-    if (results.length === 0) return;
+    if (results.length === 0) { addToast('Nothing to export — compute results first', 'error'); return; }
     const data = results.map(r => ({ SKU: r.sku, Quantity: r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? 'Not Found' : r.total }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -230,7 +230,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         {/* Filter export */}
         {filter !== 'all' && <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
           <span style={{ fontSize: 11, color: T.tx2 }}>Showing: <b style={{ color: flagColor(filter) }}>{flagLabel(filter) || 'In Stock'}</b> ({filtered.length})</span>
-          <div onClick={() => { const data = filtered.map(r => ({ SKU: r.sku, Quantity: r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? 'Not Found' : r.total })); const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Filtered'); XLSX.writeFile(wb, `Odette_${filter}_${new Date().toISOString().slice(0, 10)}.xls`); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Export {filtered.length}</div>
+          <div onClick={() => { if (filtered.length === 0) { addToast('Nothing to export in this filter', 'error'); return; } const data = filtered.map(r => ({ SKU: r.sku, Quantity: r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? 'Not Found' : r.total })); const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Filtered'); XLSX.writeFile(wb, `Odette_${filter}_${new Date().toISOString().slice(0, 10)}.xls`); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Export {filtered.length}</div>
           <div onClick={() => setFilter('all')} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx3, border: `1px solid ${T.bd}`, borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Clear</div>
         </div>}
 

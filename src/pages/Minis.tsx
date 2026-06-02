@@ -113,7 +113,7 @@ export default function Minis() {
   };
 
   const exportXls = () => {
-    if (rows.length === 0) return;
+    if (rows.length === 0) { addToast('Nothing to export — import a file first', 'error'); return; }
     const data = rows.map(r => ({ relid: r.relid, vendorno: r.vendorno, stock: r.stock, leadtime: r.leadtime, block: r.block, 'ARYA SKU': r.aryaSku }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -222,7 +222,7 @@ export default function Minis() {
   const exportCompareFilter = (cat: CompareFilter) => {
     if (cat === 'ignored') return;
     const items = (cat === 'all' ? compareRows : compareRows.filter(r => r.category === cat)).filter(r => !ignoredKeySet.has(r._key));
-    if (items.length === 0) return;
+    if (items.length === 0) { addToast('Nothing to export in this category', 'error'); return; }
     const today = new Date().toISOString().slice(0, 10);
     const hasFullData = items.some(r => r.cells);
     if (hasFullData && compareHeaders.length > 0) {

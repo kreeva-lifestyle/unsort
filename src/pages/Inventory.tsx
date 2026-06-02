@@ -723,7 +723,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
                 PDF
               </div>
               <div onClick={() => {
-                if (filtered.length === 0) return;
+                if (filtered.length === 0) { addToast('Nothing to export — no items match the current filters', 'error'); setShowExportMenu(false); return; }
                 const csv = 'Batch,SKU,Category,Size,Status,Location,Missing,Damaged\n' + filtered.map(i => `${i.batch_number || ''},${i.serial_number || ''},"${i.products?.name || ''}",${i.size || ''},${i.status},${i.location || ''},"${(itemMissing[i.id] || []).join('; ')}","${(itemDamaged[i.id] || []).join('; ')}"`).join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
                 const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Inventory_${stage}_${new Date().toISOString().slice(0,10)}.csv`; a.click();
