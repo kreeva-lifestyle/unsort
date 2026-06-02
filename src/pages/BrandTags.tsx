@@ -415,6 +415,7 @@ export default function BrandTagPrinter() {
 
   // ── Export Excel ──
   const handleExport = useCallback(() => {
+    if (rows.length === 0) { addToast('Nothing to export — add or import SKUs first', 'error'); return; }
     const data = rows.map(r => ({
       'BRAND NAME': r.brand,
       'EAN': r.ean,
@@ -432,7 +433,7 @@ export default function BrandTagPrinter() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Brand Tags');
     XLSX.writeFile(wb, 'brand_tags_export.xlsx');
-  }, [rows]);
+  }, [rows, addToast]);
 
   // ── Row Mutations ──
 

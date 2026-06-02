@@ -617,7 +617,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       if (data.length < ps) break;
       page++;
     }
-    if (allData.length === 0) return;
+    if (allData.length === 0) { addToast('Nothing to export in this date range', 'error'); return; }
     const csv = 'AWB,Courier,Camera,Brand,Scanned At,Session ID\n' + allData.map((r) => {
       const when = r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
       return `${r.awb},${r.courier},${r.camera},${r.brand || ''},${when},${r.session_id}`;

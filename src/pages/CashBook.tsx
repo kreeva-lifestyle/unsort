@@ -503,6 +503,8 @@ export default function CashBook() {
   const filteredHandovers = sq ? handovers.filter(h => (h.from_user_name || '').toLowerCase().includes(sq) || (h.to_user_name || '').toLowerCase().includes(sq) || (h.notes || '').toLowerCase().includes(sq)) : handovers;
 
   const exportCSV = () => {
+    const rowsForTab = tab === 'expenses' ? expenses : tab === 'sales' ? sales : handovers;
+    if (rowsForTab.length === 0) { addToast('Nothing to export in this date range', 'error'); return; }
     const esc = (v: string) => `"${(v || '').replace(/"/g, '""')}"`;
     let csv = '', label = '';
     if (tab === 'expenses') {
