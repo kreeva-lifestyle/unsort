@@ -92,11 +92,11 @@ export default function Minis() {
         if (raw.length === 0) { addToast('File is empty', 'error'); return; }
         if (raw.length > 5000) { addToast('File too large — max 5,000 rows', 'error'); return; }
         const keys = Object.keys(raw[0]).map(k => k.toLowerCase());
-        if (!keys.some(k => k.includes('designno') || k.includes('design'))) { addToast('Missing "designno" column — check file format', 'error'); return; }
+        if (!keys.some(k => k.includes('designno') || k.includes('design') || k === 'sku' || k.includes('vendor_design'))) { addToast('Missing design column (designno / sku / vendor_design)', 'error'); return; }
         let unmappedSizes = 0;
         const parsed: UtsavRow[] = [];
         for (const r of raw) {
-          const designno = String(r.designno || r.DESIGNNO || r.DesignNo || '').trim();
+          const designno = String(r.designno || r.DESIGNNO || r.DesignNo || r.sku || r.SKU || r.Sku || r.vendor_design || r.VENDOR_DESIGN || r.Vendor_Design || r.vendor_designno || r.VENDOR_DESIGNNO || '').trim();
           const sizeNum = Number(r.size || r.SIZE || r.Size || 0);
           const sizeName = SIZE_MAP[sizeNum] || '';
           if (sizeNum > 0 && !sizeName) unmappedSizes++;
