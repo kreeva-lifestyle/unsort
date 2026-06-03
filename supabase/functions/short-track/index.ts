@@ -444,11 +444,13 @@ Deno.serve(async (req: Request) => {
           for (const s of skus) { const n = norm(String(s)); if (!normToOriginal.has(n)) normToOriginal.set(n, String(s)); }
           const vendorSet = new Set(normToOriginal.keys());
           const allMasterKeys = new Set(full.rows.map(r => r.key));
-          const inactive = full.rows.filter(r => r.status === 'Inactive' && vendorSet.has(r.key));
+          const inactive = full.rows.filter(r => r.status === 'Inactive' && (vendorSet.has(r.key) || vendorSet.has(r.key.replace(/(?:XXXL|XXL|XXS|XL|XS|S|M|L)$/, ''))));
           const inactiveBaseSkus = new Set(full.rows.filter(r => r.status === 'Inactive').map(r => r.key.replace(/(?:XXXL|XXL|XXS|XL|XS|S|M|L)$/, '')));
-          const nonUploaded = full.rows.filter(r => r.status === 'Active' && !vendorSet.has(r.key) && !inactiveBaseSkus.has(r.key.replace(/(?:XXXL|XXL|XXS|XL|XS|S|M|L)$/, '')));
+          const vendorBaseSkus = new Set([...vendorSet].map(k => k.replace(/(?:XXXL|XXL|XXS|XL|XS|S|M|L)$/, '')));
+          const nonUploaded = full.rows.filter(r => r.status === 'Active' && !vendorSet.has(r.key) && !vendorBaseSkus.has(r.key.replace(/(?:XXXL|XXL|XXS|XL|XS|S|M|L)$/, '')) && !inactiveBaseSkus.has(r.key.replace(/(?:XXXL|XXL|XXS|XL|XS|S|M|L)$/, '')));
+          const masterBaseSkus = new Set(full.rows.map(r => r.key.replace(/(?:XXXL|XXL|XXS|XL|XS|S|M|L)$/, '')));
           const notFound: string[] = [];
-          for (const k of vendorSet) { if (!allMasterKeys.has(k)) notFound.push(normToOriginal.get(k) || k); }
+          for (const k of vendorSet) { if (!allMasterKeys.has(k) && !masterBaseSkus.has(k)) notFound.push(normToOriginal.get(k) || k); }
           const dupMap = new Map<string, Set<string>>();
           for (const r of full.rows) {
             const base = r.key.replace(/(?:XXXL|XXL|XXS|XL|XS|S|M|L)$/, '');
