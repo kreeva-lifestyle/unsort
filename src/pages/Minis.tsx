@@ -101,7 +101,11 @@ export default function Minis() {
           const sizeName = SIZE_MAP[sizeNum] || '';
           if (sizeNum > 0 && !sizeName) unmappedSizes++;
           const aryaSku = designno ? (sizeNum > 0 ? (sizeName ? `${designno}-${sizeName}` : `${designno}-${sizeNum}`) : designno) : '';
-          parsed.push({ relid: String(r.relid || r.RELID || ''), vendorno: String(r.vendorno || r.VENDORNO || ''), stock: Number(r.stock || r.STOCK || 0), leadtime: Number(r.leadtime || r.LEADTIME || 0), block: Number(r.block || r.BLOCK || 0), designno, size: sizeNum, catalogname: String(r.catalogname || r.CATALOGNAME || ''), updateddate: String(r.updateddate || r.UPDATEDDATE || ''), aryaSku });
+          const rawStock = r.stock ?? r.STOCK ?? r.inventory_status ?? r.INVENTORY_STATUS ?? r.Inventory_Status ?? r.inventory ?? r.INVENTORY ?? r.Inventory ?? 0;
+          let stockVal: number;
+          if (typeof rawStock === 'number') { stockVal = rawStock; }
+          else { const s = String(rawStock).trim().toLowerCase(); stockVal = (s === '' || s === '0' || s === 'inactive' || s === 'out of stock' || s === 'out_of_stock' || s === 'oos' || s === 'no') ? 0 : (isNaN(Number(s)) ? 1 : Number(s)); }
+          parsed.push({ relid: String(r.relid || r.RELID || ''), vendorno: String(r.vendorno || r.VENDORNO || ''), stock: stockVal, leadtime: Number(r.leadtime || r.LEADTIME || 0), block: Number(r.block || r.BLOCK || 0), designno, size: sizeNum, catalogname: String(r.catalogname || r.CATALOGNAME || ''), updateddate: String(r.updateddate || r.UPDATEDDATE || ''), aryaSku });
         }
         setRows(parsed);
         addToast(`${parsed.length} rows imported`, 'success');
