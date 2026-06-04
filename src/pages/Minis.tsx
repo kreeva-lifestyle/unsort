@@ -10,12 +10,13 @@ import CbazaarImport from '../components/minis/CbazaarImport';
 import OdetteImport from '../components/minis/OdetteImport';
 import VirtualStock from '../components/minis/VirtualStock';
 import Trackly from '../components/minis/Trackly';
+import ReturnLabels from '../components/minis/ReturnLabels';
 
 const SIZE_MAP: Record<number, string> = { 32: 'XXS', 34: 'XS', 36: 'S', 38: 'M', 40: 'L', 42: 'XL', 44: 'XXL' };
 
 interface UtsavRow { relid: string; vendorno: string; stock: number; leadtime: number; block: number; designno: string; size: number; catalogname: string; updateddate: string; aryaSku: string }
 
-type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'address' | 'trackly';
+type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'address' | 'trackly' | 'return_labels';
 
 export default function Minis() {
   const { addToast } = useNotifications();
@@ -66,7 +67,7 @@ export default function Minis() {
     if (v !== 'home') window.history.pushState({ miniView: v }, '');
   }, []);
 
-  const viewLabels: Record<MiniView, string | null> = { home: null, cbazaar: 'Cbazaar Import', odette: 'Odette Import', address: 'LabelMaker', utsav: 'Utsav Import', trackly: 'Trackly' };
+  const viewLabels: Record<MiniView, string | null> = { home: null, cbazaar: 'Cbazaar Import', odette: 'Odette Import', address: 'LabelMaker', utsav: 'Utsav Import', trackly: 'Trackly', return_labels: 'Return Labels' };
   const { set: setBreadcrumb } = useBreadcrumb();
   useEffect(() => {
     setBreadcrumb(viewLabels[view] ? [viewLabels[view]!] : null);
@@ -295,6 +296,13 @@ export default function Minis() {
     </div>
   );
 
+  if (view === 'return_labels') return (
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      <div style={{ marginBottom: 14 }}>{back}</div>
+      <ReturnLabels addToast={addToast} />
+    </div>
+  );
+
   if (view === 'utsav') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
@@ -403,6 +411,7 @@ export default function Minis() {
           { id: 'odette' as MiniView, title: 'Odette Import', desc: 'Aggregate SKU quantities across multiple vendor sheets' },
           { id: 'address' as MiniView, title: 'LabelMaker', desc: 'Save addresses, print 4x6 inch courier label stickers' },
           { id: 'trackly' as MiniView, title: 'Trackly', desc: 'Shorten URLs and track clicks — device, browser, location, timing analytics' },
+          { id: 'return_labels' as MiniView, title: 'Return Labels', desc: 'Print bold return-reason stickers — same size as brand tag labels' },
         ].map(t => (
           <div key={t.id} onClick={() => setView(t.id)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>{t.title}</div>
