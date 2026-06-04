@@ -589,7 +589,7 @@ export default function CashBook() {
 
       {/* Expenses Tab */}
       {tab === 'expenses' && <>
-        <button onClick={() => setShowAdd(true)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>+ Add Expense</button>
+        <button onClick={() => setShowAdd(true)} style={{ ...S.btnPrimary, marginBottom: 10 }}>+ Add Expense</button>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
           {loading && expenses.length === 0 && <SkeletonRows rows={4} />}
           {!loading && filteredExpenses.length === 0 && <div style={{ padding: 14 }}><Empty icon="clipboard" title={sq ? 'No matching expenses' : 'No expenses'} message={sq ? 'Try a different search term.' : 'No expenses recorded in this date range.'} /></div>}
