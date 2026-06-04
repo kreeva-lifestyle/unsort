@@ -91,7 +91,7 @@ body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000}
 @media print{
   @page{margin:0;size:1.97in 2.97in}
   body{margin:0}
-  .label{width:100%;height:100%}
+  .label{width:100%;height:100%}.label:last-child{page-break-after:auto}
 }
 @media screen{.label{border:1px solid #ccc;margin:8px auto}}
 </style></head><body>${labels.join('')}</body></html>`;
