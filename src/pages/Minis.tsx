@@ -67,7 +67,7 @@ export default function Minis() {
     if (v !== 'home') window.history.pushState({ miniView: v }, '');
   }, []);
 
-  const viewLabels: Record<MiniView, string | null> = { home: null, cbazaar: 'Cbazaar Import', odette: 'Odette Import', address: 'LabelMaker', utsav: 'Utsav Import', trackly: 'Trackly', return_labels: 'Return Labels' };
+  const viewLabels: Record<MiniView, string | null> = { home: null, cbazaar: 'Cbazaar Import', odette: 'Odette Import', address: 'LabelMaker', utsav: 'Utsav Import', trackly: 'Trackly', return_labels: 'Product QC Labels' };
   const { set: setBreadcrumb } = useBreadcrumb();
   useEffect(() => {
     setBreadcrumb(viewLabels[view] ? [viewLabels[view]!] : null);
@@ -411,7 +411,7 @@ export default function Minis() {
           { id: 'odette' as MiniView, title: 'Odette Import', desc: 'Aggregate SKU quantities across multiple vendor sheets' },
           { id: 'address' as MiniView, title: 'LabelMaker', desc: 'Save addresses, print 4x6 inch courier label stickers' },
           { id: 'trackly' as MiniView, title: 'Trackly', desc: 'Shorten URLs and track clicks — device, browser, location, timing analytics' },
-          { id: 'return_labels' as MiniView, title: 'Return Labels', desc: 'Print bold return-reason stickers — same size as brand tag labels' },
+          { id: 'return_labels' as MiniView, title: 'Product QC Labels', desc: 'Print QC assured & return stickers — same size as brand tag labels' },
         ].map(t => (
           <div key={t.id} onClick={() => setView(t.id)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>{t.title}</div>
