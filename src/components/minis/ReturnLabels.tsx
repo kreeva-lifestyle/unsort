@@ -290,7 +290,22 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
               )}
               <div style={{ marginBottom: 12 }}>
                 <label style={S.fLabel}>Label Text</label>
-                <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') save(); }} placeholder="e.g. Pant Missing, Product Damage…" style={S.fInput} autoFocus />
+                <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') save(); }} placeholder={labelType === 'qc_assured' ? 'e.g. All OK, Minor Fix Done…' : 'e.g. Pant Missing, Product Damage…'} style={S.fInput} autoFocus />
+              </div>
+              {/* Live Preview */}
+              <div style={{ marginBottom: 12 }}>
+                <label style={S.fLabel}>Preview</label>
+                <div style={{ background: '#fff', borderRadius: 8, border: `1px solid ${T.bd2}`, overflow: 'hidden', width: 160, margin: '0 auto' }}>
+                  <div style={{ aspectRatio: '1.97 / 2.97', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ background: labelType === 'qc_assured' ? '#0a6e2e' : '#1a1a1a', color: '#fff', textAlign: 'center', padding: '6px 4px', fontSize: 10, fontWeight: 900, letterSpacing: 1.5, textTransform: 'uppercase' as const }}>{labelType === 'qc_assured' ? '✓ QC ASSURED' : '⚠ RETURN'}</div>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 6px', textAlign: 'center', fontSize: text.trim().length > 30 ? 9 : text.trim().length > 15 ? 11 : 13, fontWeight: 900, color: '#000', lineHeight: 1.3, wordBreak: 'break-word', borderLeft: `3px solid ${labelType === 'qc_assured' ? '#0a6e2e' : '#1a1a1a'}`, borderRight: `3px solid ${labelType === 'qc_assured' ? '#0a6e2e' : '#1a1a1a'}`, fontFamily: 'Arial, sans-serif' }}>{text.trim().toUpperCase() || 'LABEL TEXT'}</div>
+                    {labelType === 'qc_assured' && qcPerson && <div style={{ textAlign: 'center', padding: '2px 6px 4px', fontSize: 7, fontWeight: 700, color: '#333', borderLeft: '3px solid #0a6e2e', borderRight: '3px solid #0a6e2e', fontFamily: 'Arial, sans-serif' }}>QC By: {qcPerson}</div>}
+                    <div style={{ borderTop: `1.5px solid ${labelType === 'qc_assured' ? '#0a6e2e' : '#1a1a1a'}`, padding: '4px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 5, fontWeight: 700, color: '#333', letterSpacing: 0.5, fontFamily: 'Arial, sans-serif' }}>ARYA DESIGNS</span>
+                      <span style={{ fontSize: 5, color: '#555', fontFamily: 'Arial, sans-serif' }}>{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
               {formError && <div style={{ ...S.errorBox, marginTop: 0, marginBottom: 12 }}>{formError}</div>}
               <div style={{ display: 'flex', gap: 8 }}>
