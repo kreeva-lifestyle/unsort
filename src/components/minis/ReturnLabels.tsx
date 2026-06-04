@@ -112,6 +112,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [printHtml, setPrintHtml] = useState<string | null>(null);
+  const [printCount, setPrintCount] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const printRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -150,13 +151,24 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
   const openEdit = (l: Label) => { setEditId(l.id); setText(l.label_text); setLabelType(l.label_type as LabelType); setQcPerson(l.qc_person || ''); setFormError(''); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setEditId(null); setText(''); setLabelType('return'); setQcPerson(''); setFormError(''); };
 
-  const save = async () => {
+  // QC Assured labels are print-only — never persisted to the DB.
+  const printQc = () => {
     const trimmed = text.trim();
     if (!trimmed) { setFormError('Label text is required'); return; }
-    if (labelType === 'qc_assured' && !qcPerson) { setFormError('QC person is required'); return; }
+    if (!qcPerson) { setFormError('QC person is required'); return; }
+    const html = buildPrintHtml([{ text: trimmed, type: 'qc_assured', qcPerson, copies: 1 }]);
+    closeModal();
+    setPrintCount(1);
+    setPrintHtml(html);
+  };
+
+  const save = async () => {
+    if (labelType === 'qc_assured') { printQc(); return; }
+    const trimmed = text.trim();
+    if (!trimmed) { setFormError('Label text is required'); return; }
     setSaving(true);
     try {
-      const row = { label_text: trimmed, label_type: labelType, qc_person: labelType === 'qc_assured' ? qcPerson : null };
+      const row = { label_text: trimmed, label_type: labelType, qc_person: null };
       if (editId) {
         const { error } = await supabase.from('return_labels').update(row).eq('id', editId);
         if (error) throw error;
@@ -186,10 +198,12 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
   const printAll = () => {
     const items = filtered.filter(l => getCopies(l.id) > 0).map(l => ({ text: l.label_text, type: l.label_type as LabelType, qcPerson: l.qc_person, copies: getCopies(l.id) }));
     if (items.length === 0) { addToast('Nothing to print', 'error'); return; }
+    setPrintCount(items.reduce((s, it) => s + it.copies, 0));
     setPrintHtml(buildPrintHtml(items));
   };
 
   const printOne = (l: Label) => {
+    setPrintCount(getCopies(l.id));
     setPrintHtml(buildPrintHtml([{ text: l.label_text, type: l.label_type as LabelType, qcPerson: l.qc_person, copies: getCopies(l.id) }]));
   };
 
@@ -329,6 +343,11 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
                 </select>
               </div>
               {isQc && (
+                <div style={{ marginBottom: 12, fontSize: 11, color: T.tx3, lineHeight: 1.4 }}>
+                  QC Assured labels are print-only and aren't saved to the list.
+                </div>
+              )}
+              {isQc && (
                 <div style={{ marginBottom: 12 }}>
                   <label style={S.fLabel}>QC Person</label>
                   <select value={qcPerson} onChange={e => setQcPerson(e.target.value)} style={S.fInput}>
@@ -383,7 +402,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
               {formError && <div style={{ ...S.errorBox, marginTop: 0, marginBottom: 12 }}>{formError}</div>}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={closeModal} style={{ ...S.btnGhost, flex: 1 }}>Cancel</button>
-                <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, flex: 1, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving…' : editId ? 'Update' : 'Add'}</button>
+                <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, flex: 1, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{isQc ? 'Print' : saving ? 'Saving…' : editId ? 'Update' : 'Add'}</button>
               </div>
             </div>
           </div>
@@ -415,7 +434,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
           <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
             <div>
               <span style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', fontFamily: "'Sora',sans-serif" }}>QC Label Preview</span>
-              <div style={{ fontSize: 10, color: '#6B7890' }}>{totalCopies} label{totalCopies === 1 ? '' : 's'}</div>
+              <div style={{ fontSize: 10, color: '#6B7890' }}>{printCount} label{printCount === 1 ? '' : 's'}</div>
             </div>
             <button onClick={() => setPrintHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Close">&times;</button>
           </div>
