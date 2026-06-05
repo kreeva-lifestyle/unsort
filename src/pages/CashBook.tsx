@@ -529,7 +529,8 @@ export default function CashBook() {
           <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={S.fDate} />
           <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
           <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={S.fDate} />
-          <button className="desktop-only" onClick={exportCSV} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans, height: 36 }}>Export</button>
+          {(search || fromDate !== today || toDate !== today) && <button onClick={() => { setSearch(''); setFromDate(today); setToDate(today); }} style={{ ...S.btnGhost, ...S.btnSm }}>Clear</button>}
+          <button className="desktop-only" onClick={exportCSV} style={{ ...S.btnGhost, height: 36 }}>Export</button>
         </div>
         <div style={{ position: 'relative', maxWidth: 200 }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, strokeLinecap: 'round' as const, opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>

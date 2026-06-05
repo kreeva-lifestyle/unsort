@@ -326,6 +326,7 @@ export default function InventoryExtras() {
           <option value="all">All Categories</option>
           {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
         </select>
+        {(search || catFilter !== 'all') && <button onClick={() => { setSearch(''); setCatFilter('all'); setPage(0); }} style={{ ...S.btnGhost, ...S.btnSm }}>Clear</button>}
       </div>
 
       {/* Desktop Table */}
