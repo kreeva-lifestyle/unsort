@@ -277,7 +277,7 @@ export default function InventoryExtras() {
   const paged = filtered.slice(page * perPage, (page + 1) * perPage);
 
   // Shared styles
-  const label: React.CSSProperties = { display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' };
+  const label: React.CSSProperties = { ...S.fLabel, display: 'block', marginBottom: 4 };
   const input: React.CSSProperties = S.fInput;
   const btn: React.CSSProperties = S.btnPrimary;
   const btnGhost: React.CSSProperties = { ...S.btnGhost, cursor: 'pointer' };
@@ -416,7 +416,7 @@ export default function InventoryExtras() {
           </div>
           <form onSubmit={e => { e.preventDefault(); addExtra(); }} style={{ padding: 16 }}>
             <div style={{ marginBottom: 10 }}>
-              <label style={label}>Category * <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0, fontSize: 8, color: '#4A5568' }}>Select product category</span></label>
+              <label style={label}>Category * <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0, fontSize: 8, color: T.tx3 }}>Select product category</span></label>
               <select value={fProductId} onChange={e => { setFProductId(e.target.value); setFComponentId(''); }} style={input}>
                 <option value="">Select category...</option>
                 {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
@@ -581,14 +581,14 @@ export default function InventoryExtras() {
       </div>, document.body)}
 
       {exportHtml && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#060810', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
-          <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', fontFamily: "'Sora',sans-serif" }}>Export Preview</span>
-            <button onClick={() => setExportHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+          <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Export Preview</span>
+            <button onClick={() => setExportHtml(null)} style={{ width: 44, height: 44, borderRadius: 8, border: `1px solid ${T.bd}`, background: T.glass2, color: T.tx2, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
           </div>
-          <iframe srcDoc={exportHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#060810' }} />
-          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <button onClick={() => setExportHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
+          <iframe srcDoc={exportHtml} style={{ flex: 1, border: 'none', width: '100%', background: T.bg }} />
+          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <button onClick={() => setExportHtml(null)} style={{ ...S.btnGhost, flex: 1, maxWidth: 160 }}>Close</button>
             <button onClick={() => { const iframe = document.querySelector('iframe[srcdoc]') as HTMLIFrameElement; iframe?.contentWindow?.print(); }} style={{ ...S.btnPrimary, padding: '10px 24px', fontSize: 13, flex: 1, maxWidth: 160 }}>Print / Share</button>
           </div>
         </div>,

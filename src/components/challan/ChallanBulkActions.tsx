@@ -77,13 +77,13 @@ export default function ChallanBulkActions(p: Props) {
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 12 }}>{p.netTotal < 0 ? 'Settle & Refund' : 'Bulk Pay'}</div>
             <ChallanKPIs payableCount={p.payable.length} outstanding={p.outstanding} returnsCount={p.returns.length} returnsTotal={p.returnsTotal} netTotal={p.netTotal} />
             <div style={{ marginBottom: 10 }}>
-              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>{p.netTotal < 0 ? 'Amount Refunded to Customer' : 'Amount Received from Customer'}</label>
-              <input type="number" min="0" value={p.bulkReceivedAmount} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setBulkReceivedAmount(e.target.value)} placeholder={String(Math.abs(p.netTotal))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+              <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>{p.netTotal < 0 ? 'Amount Refunded to Customer' : 'Amount Received from Customer'}</label>
+              <input type="number" min="0" value={p.bulkReceivedAmount} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setBulkReceivedAmount(e.target.value)} placeholder={String(Math.abs(p.netTotal))} style={{ ...S.fInput, width: '100%', fontFamily: T.mono, fontSize: 14 }} />
               {(() => { const recv = Number(p.bulkReceivedAmount) || 0; const expected = Math.abs(p.netTotal); const diff = recv - expected; if (!p.bulkReceivedAmount || diff === 0) return null; return <div style={{ marginTop: 4, fontSize: 10, color: T.yl, fontWeight: 600 }}>₹{Math.abs(diff).toLocaleString('en-IN')} {diff > 0 ? 'more than expected' : 'less than expected'}</div>; })()}
             </div>
             <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>{p.netTotal < 0 ? 'Refund Mode' : 'Payment Mode'}</label>
-              <select value={p.bulkPayMode} onChange={e => p.setBulkPayMode(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 12, padding: '8px 10px', outline: 'none' }}>
+              <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>{p.netTotal < 0 ? 'Refund Mode' : 'Payment Mode'}</label>
+              <select value={p.bulkPayMode} onChange={e => p.setBulkPayMode(e.target.value)} style={{ ...S.fInput, width: '100%', cursor: 'pointer' }}>
                 <option value="">Select...</option>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
