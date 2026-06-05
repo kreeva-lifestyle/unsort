@@ -28,20 +28,20 @@ const buildReturnLabel = (text: string, date: string, time: string) => `<div cla
 
 const buildQcLabel = (text: string, person: string | null, date: string, time: string) => `<div class="label">
   <div class="qc-inner">
-    <div class="qc-top">QUALITY CONTROL</div>
-    <div class="qc-stamp-area">
-      <div class="qc-stamp">
-        <div class="qc-ring">
-          <div class="qc-check">&#10003;</div>
-          <div class="qc-assured">QC ASSURED</div>
-        </div>
-      </div>
+    <div class="qc-header">
+      <div class="qc-header-brand">ARYA DESIGNS</div>
+      <div class="qc-header-title">QUALITY CONTROL</div>
     </div>
-    <div class="qc-text">${esc(text.toUpperCase())}</div>
-    ${person ? `<div class="qc-person">Inspected by: <strong>${esc(person)}</strong></div>` : ''}
+    <div class="qc-body">
+      <div class="qc-badge">
+        <div class="qc-badge-check">&#10003;</div>
+        <div class="qc-badge-text">QC ASSURED</div>
+      </div>
+      <div class="qc-desc">${esc(text.toUpperCase())}</div>
+    </div>
+    ${person ? `<div class="qc-inspector"><span class="qc-inspector-label">Inspected by</span><span class="qc-inspector-name">${esc(person)}</span></div>` : ''}
     <div class="qc-contact">${esc(CONTACT_LINE)}</div>
     <div class="qc-footer">
-      <span class="brand">ARYA DESIGNS</span>
       <span class="ts">${esc(date)} &middot; ${esc(time)}</span>
     </div>
   </div>
@@ -71,19 +71,20 @@ body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000}
 .ret-footer{border-top:2px solid #1a1a1a;padding:5px 10px;display:flex;justify-content:space-between;align-items:center}
 
 /* ── QC Assured label ── */
-.qc-inner{flex:1;display:flex;flex-direction:column;border:3px solid #0a6e2e}
-.qc-top{background:#0a6e2e;color:#fff;text-align:center;padding:5px 6px;font-size:8pt;font-weight:800;letter-spacing:3px}
-.qc-stamp-area{flex:1;display:flex;align-items:center;justify-content:center;padding:4px}
-.qc-stamp{width:100px;height:100px;border-radius:50%;border:3px solid #0a6e2e;display:flex;align-items:center;justify-content:center;position:relative}
-.qc-stamp::before{content:'';position:absolute;inset:4px;border-radius:50%;border:1.5px dashed #0a6e2e}
-.qc-ring{text-align:center}
-.qc-check{font-size:28pt;color:#0a6e2e;line-height:1}
-.qc-assured{font-size:8pt;font-weight:900;color:#0a6e2e;letter-spacing:1.5px;margin-top:-2px}
-.qc-text{text-align:center;padding:0 10px 4px;font-size:10pt;font-weight:800;color:#000;letter-spacing:0.5px;word-break:break-word;line-height:1.3}
-.qc-person{text-align:center;padding:2px 8px 4px;font-size:8pt;color:#333}
-.qc-person strong{font-weight:800}
-.qc-contact{text-align:center;padding:1px 8px 4px;font-size:6pt;color:#666}
-.qc-footer{border-top:1.5px solid #0a6e2e;padding:4px 8px;display:flex;justify-content:space-between;align-items:center}
+.qc-inner{flex:1;display:flex;flex-direction:column;border:2.5px solid #000}
+.qc-header{background:#000;color:#fff;text-align:center;padding:8px 8px 6px}
+.qc-header-brand{font-size:11pt;font-weight:900;letter-spacing:3px;margin-bottom:2px}
+.qc-header-title{font-size:7pt;font-weight:600;letter-spacing:2px;opacity:0.85}
+.qc-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 10px 4px}
+.qc-badge{display:flex;align-items:center;gap:6px;margin-bottom:8px;border:2px solid #000;border-radius:4px;padding:5px 12px}
+.qc-badge-check{font-size:16pt;line-height:1}
+.qc-badge-text{font-size:11pt;font-weight:900;letter-spacing:2px}
+.qc-desc{text-align:center;font-size:12pt;font-weight:900;line-height:1.3;word-break:break-word;letter-spacing:0.5px;padding:0 4px}
+.qc-inspector{display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 8px 2px;border-top:1px dashed #999;margin:0 10px}
+.qc-inspector-label{font-size:7pt;color:#555;text-transform:uppercase;letter-spacing:1px}
+.qc-inspector-name{font-size:9pt;font-weight:800}
+.qc-contact{text-align:center;padding:4px 10px 6px;font-size:6.5pt;color:#444;line-height:1.4}
+.qc-footer{border-top:1.5px solid #000;padding:4px 8px;display:flex;justify-content:center;align-items:center}
 
 /* ── Shared ── */
 .brand{font-size:6.5pt;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#333}
@@ -367,21 +368,25 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
                 <label style={S.fLabel}>Preview</label>
                 {isQc ? (
                   <div style={{ background: '#fff', borderRadius: 8, border: `1px solid ${T.bd2}`, overflow: 'hidden', width: 160, margin: '0 auto' }}>
-                    <div style={{ aspectRatio: '1.97 / 2.97', display: 'flex', flexDirection: 'column', border: '2px solid #0a6e2e' }}>
-                      <div style={{ background: '#0a6e2e', color: '#fff', textAlign: 'center', padding: '3px 4px', fontSize: 6, fontWeight: 800, letterSpacing: 2, fontFamily: 'Arial, sans-serif' }}>QUALITY CONTROL</div>
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4 }}>
-                        <div style={{ width: 70, height: 70, borderRadius: '50%', border: '2px solid #0a6e2e', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', position: 'relative' }}>
-                          <div style={{ position: 'absolute', inset: 3, borderRadius: '50%', border: '1px dashed #0a6e2e' }} />
-                          <span style={{ fontSize: 20, color: '#0a6e2e', lineHeight: 1, fontFamily: 'Arial, sans-serif' }}>✓</span>
-                          <span style={{ fontSize: 5.5, fontWeight: 900, color: '#0a6e2e', letterSpacing: 1, fontFamily: 'Arial, sans-serif', marginTop: -2 }}>QC ASSURED</span>
-                        </div>
+                    <div style={{ aspectRatio: '1.97 / 2.97', display: 'flex', flexDirection: 'column', border: '2px solid #000', fontFamily: 'Arial, sans-serif', color: '#000' }}>
+                      <div style={{ background: '#000', color: '#fff', textAlign: 'center', padding: '5px 4px 4px' }}>
+                        <div style={{ fontSize: 8, fontWeight: 900, letterSpacing: 2, marginBottom: 1 }}>ARYA DESIGNS</div>
+                        <div style={{ fontSize: 5, fontWeight: 600, letterSpacing: 1.5, opacity: 0.85 }}>QUALITY CONTROL</div>
                       </div>
-                      <div style={{ textAlign: 'center', padding: '0 6px 2px', fontSize: text.trim().length > 25 ? 6 : 8, fontWeight: 800, color: '#000', lineHeight: 1.3, wordBreak: 'break-word', fontFamily: 'Arial, sans-serif' }}>{previewText}</div>
-                      {qcPerson && <div style={{ textAlign: 'center', padding: '1px 6px 2px', fontSize: 6, color: '#333', fontFamily: 'Arial, sans-serif' }}>Inspected by: <strong>{qcPerson}</strong></div>}
-                      <div style={{ textAlign: 'center', padding: '0 6px 3px', fontSize: 3.5, color: '#666', fontFamily: 'Arial, sans-serif', lineHeight: 1.3 }}>{CONTACT_LINE}</div>
-                      <div style={{ borderTop: '1px solid #0a6e2e', padding: '3px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 4.5, fontWeight: 700, color: '#333', letterSpacing: 0.5, fontFamily: 'Arial, sans-serif' }}>ARYA DESIGNS</span>
-                        <span style={{ fontSize: 4, color: '#555', fontFamily: 'Arial, sans-serif' }}>{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6px 6px 2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, border: '1.5px solid #000', borderRadius: 3, padding: '3px 8px', marginBottom: 6 }}>
+                          <span style={{ fontSize: 12, lineHeight: 1 }}>✓</span>
+                          <span style={{ fontSize: 7.5, fontWeight: 900, letterSpacing: 1.5 }}>QC ASSURED</span>
+                        </div>
+                        <div style={{ textAlign: 'center', fontSize: text.trim().length > 25 ? 7 : 9, fontWeight: 900, lineHeight: 1.3, wordBreak: 'break-word', padding: '0 2px' }}>{previewText}</div>
+                      </div>
+                      {qcPerson && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '3px 6px 1px', borderTop: '1px dashed #999', margin: '0 8px' }}>
+                        <span style={{ fontSize: 4.5, color: '#555', textTransform: 'uppercase', letterSpacing: 0.5 }}>Inspected by</span>
+                        <span style={{ fontSize: 6, fontWeight: 800 }}>{qcPerson}</span>
+                      </div>}
+                      <div style={{ textAlign: 'center', padding: '3px 6px 4px', fontSize: 4, color: '#444', lineHeight: 1.4 }}>{CONTACT_LINE}</div>
+                      <div style={{ borderTop: '1px solid #000', padding: '3px 6px', display: 'flex', justifyContent: 'center' }}>
+                        <span style={{ fontSize: 4, color: '#555' }}>{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
                       </div>
                     </div>
                   </div>
