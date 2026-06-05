@@ -18,7 +18,7 @@ const buildReturnLabel = (text: string, date: string, time: string) => `<div cla
   <div class="inner">
     <div class="ret-banner">&#9888; RETURN</div>
     <div class="ret-reason">${esc(text.toUpperCase())}</div>
-    <div class="ret-contact">${esc(CONTACT_LINE)}</div>
+    <div class="ret-contact">Contact Owner: ${esc(CONTACT)}</div>
     <div class="ret-footer">
       <span class="brand">ARYA DESIGNS</span>
       <span class="ts">${esc(date)} &middot; ${esc(time)}</span>
@@ -390,7 +390,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
                     <div style={{ aspectRatio: '1.97 / 2.97', display: 'flex', flexDirection: 'column' }}>
                       <div style={{ background: '#1a1a1a', color: '#fff', textAlign: 'center', padding: '6px 4px', fontSize: 10, fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Arial, sans-serif' }}>⚠ RETURN</div>
                       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 6px', textAlign: 'center', fontSize: text.trim().length > 30 ? 9 : text.trim().length > 15 ? 11 : 13, fontWeight: 900, color: '#000', lineHeight: 1.3, wordBreak: 'break-word', borderLeft: '3px solid #1a1a1a', borderRight: '3px solid #1a1a1a', fontFamily: 'Arial, sans-serif' }}>{previewText}</div>
-                      <div style={{ textAlign: 'center', padding: '1px 6px 3px', fontSize: 3.5, color: '#666', borderLeft: '3px solid #1a1a1a', borderRight: '3px solid #1a1a1a', fontFamily: 'Arial, sans-serif', lineHeight: 1.3 }}>{CONTACT_LINE}</div>
+                      <div style={{ textAlign: 'center', padding: '1px 6px 3px', fontSize: 4.5, color: '#666', borderLeft: '3px solid #1a1a1a', borderRight: '3px solid #1a1a1a', fontFamily: 'Arial, sans-serif' }}>Contact Owner: {CONTACT}</div>
                       <div style={{ borderTop: '1.5px solid #1a1a1a', padding: '4px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 5, fontWeight: 700, color: '#333', letterSpacing: 0.5, fontFamily: 'Arial, sans-serif' }}>ARYA DESIGNS</span>
                         <span style={{ fontSize: 4.5, color: '#555', fontFamily: 'Arial, sans-serif' }}>{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
