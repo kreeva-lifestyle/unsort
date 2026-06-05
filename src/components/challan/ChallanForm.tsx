@@ -2,6 +2,7 @@
 // Parent owns all state and the submit logic; this component is just render + event routing.
 // Wide prop surface is intentional — keeps state in one place without introducing a context.
 import { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import { supabase } from '../../lib/supabase';
@@ -90,6 +91,11 @@ export default function ChallanForm(p: ChallanFormProps) {
     }
     return () => { clearTimeout(searchTimeout.current); };
   }, [p.editing]);
+
+  useEffect(() => {
+    document.body.classList.toggle('modal-open', !!p.auditTrail);
+    return () => { document.body.classList.remove('modal-open'); };
+  }, [p.auditTrail]);
 
   useEffect(() => {
     if (!p.customerName.trim()) { setOutstanding(0); return; }
@@ -326,12 +332,12 @@ export default function ChallanForm(p: ChallanFormProps) {
       </div>
 
       {/* Audit Trail Modal */}
-      {p.auditTrail && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
-          <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '18px 16px', maxWidth: 420, width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
+      {p.auditTrail && createPortal(
+        <div style={S.modalOverlay}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', padding: '18px 16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <span style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Audit Trail</span>
-              <button onClick={() => p.setAuditTrail(null)} style={{ padding: '3px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Close</button>
+              <button onClick={() => p.setAuditTrail(null)} style={{ ...S.btnGhost, ...S.btnSm }}>Close</button>
             </div>
             {p.auditTrail.length === 0 && <div style={{ padding: 16, textAlign: 'center' as const, color: T.tx3, fontSize: 11 }}>No history for this challan.</div>}
             {p.auditTrail.map(a => (
@@ -344,7 +350,8 @@ export default function ChallanForm(p: ChallanFormProps) {
               </div>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

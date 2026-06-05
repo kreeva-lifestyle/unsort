@@ -1,5 +1,6 @@
 /* eslint-disable */
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
@@ -128,6 +129,12 @@ export default function CashBook() {
   }, [fromDate, toDate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    const open = showHandover || !!viewingHandover || !!confirmingHandover || !!rejectingHandover || showAdd || !!confirmDelete;
+    document.body.classList.toggle('modal-open', open);
+    return () => { document.body.classList.remove('modal-open'); };
+  }, [showHandover, viewingHandover, confirmingHandover, rejectingHandover, showAdd, confirmDelete]);
 
   // Load active users for handover recipient dropdown
   useEffect(() => {
@@ -680,7 +687,7 @@ export default function CashBook() {
       </>}
 
       {/* Initiate Handover Modal */}
-      {showHandover && (
+      {showHandover && createPortal(
         <div style={{ ...S.modalOverlay }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 460, padding: '20px 18px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Initiate Cash Handover</div>
@@ -792,11 +799,12 @@ export default function CashBook() {
               <button onClick={createHandover} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}, ${T.ylCC})`, color: '#fff', cursor: 'pointer', opacity: handSaving ? 0.5 : 1, pointerEvents: handSaving ? 'none' : 'auto' }}>{handSaving ? 'Initiating…' : 'Initiate'}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* View Handover Details Modal */}
-      {viewingHandover && (
+      {viewingHandover && createPortal(
         <div style={{ ...S.modalOverlay }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 460, padding: '20px 18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -835,11 +843,12 @@ export default function CashBook() {
             {viewingHandover.confirmed_at && <div style={{ fontSize: 10, color: T.gr, marginBottom: 10 }}>✓ Signed at {new Date(viewingHandover.confirmed_at).toLocaleString('en-IN')}</div>}
             <button onClick={() => printHandoverReceipt(viewingHandover)} style={{ width: '100%', padding: '10px', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer' }}>Print Receipt</button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Confirm Handover (Sign with PIN) Modal */}
-      {confirmingHandover && (
+      {confirmingHandover && createPortal(
         <div style={{ ...S.modalOverlay }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Sign &amp; Confirm {formatHandoverNo(confirmingHandover.handover_number)}</div>
@@ -851,11 +860,12 @@ export default function CashBook() {
               <button onClick={confirmHandover} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}, ${T.grCC})`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Confirming…' : 'Sign & Confirm'}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Reject Handover Modal — only visible to the intended recipient while status is still pending */}
-      {rejectingHandover && (
+      {rejectingHandover && createPortal(
         <div style={{ ...S.modalOverlay }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 400, padding: '20px 18px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Reject {formatHandoverNo(rejectingHandover.handover_number)}</div>
@@ -868,11 +878,12 @@ export default function CashBook() {
               <button onClick={submitReject} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Rejecting…' : 'Confirm Reject'}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Add Expense Modal */}
-      {showAdd && (
+      {showAdd && createPortal(
         <div style={{ ...S.modalOverlay }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380, padding: '20px 18px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 14 }}>Add Expense</div>
@@ -902,11 +913,12 @@ export default function CashBook() {
               <button onClick={addExpense} disabled={expSaving} style={{ ...S.btnPrimary, flex: 1, padding: '9px 0', fontSize: 11, opacity: expSaving ? 0.5 : 1, pointerEvents: expSaving ? 'none' : 'auto' }}>{expSaving ? 'Saving…' : 'Add'}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Delete confirmation */}
-      {confirmDelete && (
+      {confirmDelete && createPortal(
         <div style={{ ...S.modalOverlay }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }}>
             <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg></div>
@@ -917,7 +929,8 @@ export default function CashBook() {
               <button onClick={() => deleteExpense(confirmDelete)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', cursor: 'pointer' }}>Delete</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       {pendingExpDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: '#0B0F19', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, overflow: 'hidden', minWidth: 260 }}>
         <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: '#E2E8F0', flex: 1 }}>Expense deleted</span><span onClick={undoExpDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#fff' }}>Undo</span><span onClick={dismissExpDel} style={{ cursor: 'pointer', color: '#4A5568', fontSize: 14 }} aria-label="Dismiss">✕</span></div>
