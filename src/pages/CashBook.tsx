@@ -75,6 +75,7 @@ export default function CashBook() {
   const [handPeriodTo, setHandPeriodTo] = useState(today);
   const [handBreakdown, setHandBreakdown] = useState<Breakdown | null>(null);
   const [handError, setHandError] = useState('');
+  const [handSaving, setHandSaving] = useState(false);
   const [viewingHandover, setViewingHandover] = useState<Handover | null>(null);
   // Users list (for recipient dropdown)
   const [users, setUsers] = useState<{ id: string; full_name: string; email: string; has_pin: boolean; phone: string | null; role: string }[]>([]);
@@ -255,6 +256,7 @@ export default function CashBook() {
 
   const createHandover = async () => {
     setHandError('');
+    if (handSaving) return;
     if (currentUserRole === 'admin') { setHandError('Admins receive handovers — they do not initiate them.'); return; }
     const amt = Number(handAmount);
     if (!amt || amt <= 0) { setHandError('Amount must be greater than 0'); return; }
@@ -268,15 +270,15 @@ export default function CashBook() {
     if (amt > handBreakdown.available) { setHandError(`Cannot exceed available cash: ₹${handBreakdown.available.toLocaleString('en-IN')}`); return; }
     const amountDiffers = Math.abs(amt - handBreakdown.available) > 0.01;
     if (amountDiffers && !handReason.trim()) { setHandError('Amount differs from available cash. Add a reason in Notes/Reason field.'); return; }
-    // Enforce: only one handover per day per recipient
+    setHandSaving(true);
     const todayDate = new Date().toISOString().slice(0, 10);
     const { data: existing } = await supabase.from('cash_handovers').select('id, status, amount').eq('to_user_id', recipient.id).eq('date', todayDate).neq('status', 'disputed').maybeSingle();
-    if (existing) { setHandError(`A handover already exists for ${recipient.full_name} today (₹${Number(existing.amount).toLocaleString('en-IN')}, ${existing.status}). Only one handover per recipient per day.`); return; }
+    if (existing) { setHandSaving(false); setHandError(`A handover already exists for ${recipient.full_name} today (₹${Number(existing.amount).toLocaleString('en-IN')}, ${existing.status}). Only one handover per recipient per day.`); return; }
     // Prevent overlapping pending/confirmed handovers (would double-claim cash)
     const { data: overlapping } = await supabase.from('cash_handovers').select('handover_number, status, period_from, period_to').in('status', ['confirmed', 'pending']).lte('period_from', handPeriodTo).gte('period_to', handPeriodFrom);
     if (overlapping && overlapping.length > 0) {
       const h = overlapping[0];
-      setHandError(`HO-${String(h.handover_number).padStart(4, '0')} (${h.status}) already covers ${h.period_from} to ${h.period_to}. Resolve or reject it before creating an overlapping handover.`);
+      setHandSaving(false); setHandError(`HO-${String(h.handover_number).padStart(4, '0')} (${h.status}) already covers ${h.period_from} to ${h.period_to}. Resolve or reject it before creating an overlapping handover.`);
       return;
     }
     const { data: { user } } = await supabase.auth.getUser();
@@ -293,7 +295,7 @@ export default function CashBook() {
     };
     // Insert and return the generated handover_number for the notification
     const { data: inserted, error: hoErr } = await supabase.from('cash_handovers').insert(handoverPayload).select('handover_number').single();
-    if (hoErr) { addToast(friendlyError(hoErr), 'error'); return; }
+    if (hoErr) { setHandSaving(false); addToast(friendlyError(hoErr), 'error'); return; }
     addToast('Handover created!', 'success');
     const hoNo = formatHandoverNo((inserted as { handover_number?: number } | null)?.handover_number);
     // WhatsApp notification to recipient
@@ -301,7 +303,7 @@ export default function CashBook() {
       const msg = encodeURIComponent(`Hi ${recipient.full_name},\n${prof?.full_name || 'Sender'} has initiated cash handover ${hoNo} of ₹${amt.toLocaleString('en-IN')} for you (period ${handPeriodFrom} to ${handPeriodTo}).\nPlease open DailyOffice → Cash Book → Handovers and sign with your PIN to confirm receipt, or reject with a reason.\n— Arya Designs`);
       window.location.href = `https://wa.me/${waPhone(recipient.phone)}?text=${msg}`;
     }
-    setHandAmount(''); setHandToId(''); setHandNotes(''); setHandReason(''); setHandBreakdown(null); setShowHandover(false);
+    setHandSaving(false); setHandAmount(''); setHandToId(''); setHandNotes(''); setHandReason(''); setHandBreakdown(null); setShowHandover(false);
     fetchData();
   };
 
@@ -787,7 +789,7 @@ export default function CashBook() {
             {handError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{handError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setShowHandover(false); setHandError(''); setHandReason(''); setHandAmount(''); setHandToId(''); setHandNotes(''); setHandBreakdown(null); setExcludePaise(false); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
-              <button onClick={createHandover} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}, ${T.ylCC})`, color: '#fff', cursor: 'pointer' }}>Initiate</button>
+              <button onClick={createHandover} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}, ${T.ylCC})`, color: '#fff', cursor: 'pointer', opacity: handSaving ? 0.5 : 1, pointerEvents: handSaving ? 'none' : 'auto' }}>{handSaving ? 'Initiating…' : 'Initiate'}</button>
             </div>
           </div>
         </div>

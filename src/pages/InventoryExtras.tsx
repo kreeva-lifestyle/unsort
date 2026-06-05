@@ -162,18 +162,19 @@ export default function InventoryExtras() {
   };
 
   const saveEdit = async () => {
-    if (!editingExtra) return;
+    if (!editingExtra || saving) return;
     if (!canEdit) { addToast('You do not have permission to edit spare parts', 'error'); return; }
     if (!editForm.sku.trim() || !editForm.size || !editForm.location || !editForm.manufacturer.trim()) {
       setError('All mandatory fields (*) are required'); return;
     }
+    setSaving(true);
     const { error: err } = await supabase.from('inventory_extras').update({
       sku: editForm.sku.trim(), size: editForm.size, location: editForm.location,
       manufacturer: editForm.manufacturer.trim(), notes: editForm.notes.trim() || null,
       updated_at: new Date().toISOString(),
     }).eq('id', editingExtra.id);
-    if (err) { setError(friendlyError(err)); return; }
-    setError('');
+    if (err) { setSaving(false); setError(friendlyError(err)); return; }
+    setSaving(false); setError('');
     setEditingExtra(null); addToast('Spare part updated', 'success'); fetchExtras();
   };
 
@@ -216,25 +217,26 @@ export default function InventoryExtras() {
   };
 
   const adjustQuantity = async () => {
-    if (!adjustExtra) return;
+    if (!adjustExtra || saving) return;
     if (!canEdit) { addToast('You do not have permission to adjust quantities', 'error'); return; }
     const qty = parseInt(adjustQty) || 0;
     if (qty < 1) return;
+    setSaving(true);
     const newQty = adjustMode === 'add' ? adjustExtra.quantity + qty : adjustExtra.quantity - qty;
-    if (newQty < 0) { setError('Cannot go below 0'); return; }
+    if (newQty < 0) { setSaving(false); setError('Cannot go below 0'); return; }
     if (newQty <= 0) {
       // Qty reached zero — delete the row entirely
       const { error: delErr } = await supabase.from('inventory_extras').delete().eq('id', adjustExtra.id);
-      if (delErr) { setError('Delete failed: ' + friendlyError(delErr)); return; }
+      if (delErr) { setSaving(false); setError('Delete failed: ' + friendlyError(delErr)); return; }
     } else {
       const { data: updated, error: upErr } = await supabase.from('inventory_extras')
         .update({ quantity: newQty, updated_at: new Date().toISOString() })
         .eq('id', adjustExtra.id)
         .eq('quantity', adjustExtra.quantity)
         .select().single();
-      if (upErr || !updated) { setError('Another user just updated this extra. Close and reopen to retry.'); return; }
+      if (upErr || !updated) { setSaving(false); setError('Another user just updated this extra. Close and reopen to retry.'); return; }
     }
-    setAdjustExtra(null); setAdjustQty('1'); setAdjustReason(''); addToast('Quantity adjusted', 'success'); setPage(0); fetchExtras();
+    setSaving(false); setAdjustExtra(null); setAdjustQty('1'); setAdjustReason(''); addToast('Quantity adjusted', 'success'); setPage(0); fetchExtras();
   };
 
   const completeWithExtra = async () => {
@@ -491,8 +493,8 @@ export default function InventoryExtras() {
             <div><label style={label}>Reason (optional)</label>
               <input value={adjustReason} onChange={e => setAdjustReason(e.target.value)} placeholder="e.g. Found more stock" style={input} /></div>
             {error && <div style={{ color: T.re, fontSize: 11 }}>{error}</div>}
-            <div onClick={adjustQuantity} style={{ ...btn, textAlign: 'center', justifyContent: 'center', display: 'flex', background: adjustMode === 'remove' ? 'rgba(239,68,68,0.7)' : undefined }}>
-              {adjustMode === 'add' ? 'Add' : 'Remove'}
+            <div onClick={adjustQuantity} style={{ ...btn, textAlign: 'center', justifyContent: 'center', display: 'flex', background: adjustMode === 'remove' ? 'rgba(239,68,68,0.7)' : undefined, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>
+              {saving ? 'Saving…' : adjustMode === 'add' ? 'Add' : 'Remove'}
             </div>
           </div>
         </div>
@@ -572,7 +574,7 @@ export default function InventoryExtras() {
             <div style={{ marginBottom: 12 }}><label style={label}>Notes</label><input value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} placeholder="Optional" style={input} /></div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <span onClick={() => setEditingExtra(null)} style={btnGhost}>Cancel</span>
-              <span onClick={saveEdit} style={btn}>Update</span>
+              <span onClick={saveEdit} style={{ ...btn, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Updating…' : 'Update'}</span>
             </div>
           </div>
         </div>
