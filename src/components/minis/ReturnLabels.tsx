@@ -9,7 +9,8 @@ interface Label { id: string; label_text: string; label_type: string; qc_person:
 
 type LabelType = 'return' | 'qc_assured';
 const QC_PEOPLE = ['Bhavika', 'Parul', 'Aarti', 'Rekha', 'Sarla', 'Jayshree'];
-const CONTACT = '+91 953 765 6191';
+const CONTACT = '9537656191';
+const CONTACT_LINE = `Contact Owner: ${CONTACT} for any type of quality issue, quickest action will be taken.`;
 
 const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
 
@@ -17,7 +18,7 @@ const buildReturnLabel = (text: string, date: string, time: string) => `<div cla
   <div class="inner">
     <div class="ret-banner">&#9888; RETURN</div>
     <div class="ret-reason">${esc(text.toUpperCase())}</div>
-    <div class="ret-contact">Contact Owner: ${esc(CONTACT)}</div>
+    <div class="ret-contact">${esc(CONTACT_LINE)}</div>
     <div class="ret-footer">
       <span class="brand">ARYA DESIGNS</span>
       <span class="ts">${esc(date)} &middot; ${esc(time)}</span>
@@ -38,7 +39,7 @@ const buildQcLabel = (text: string, person: string | null, date: string, time: s
     </div>
     <div class="qc-text">${esc(text.toUpperCase())}</div>
     ${person ? `<div class="qc-person">Inspected by: <strong>${esc(person)}</strong></div>` : ''}
-    <div class="qc-contact">Contact Owner: ${esc(CONTACT)}</div>
+    <div class="qc-contact">${esc(CONTACT_LINE)}</div>
     <div class="qc-footer">
       <span class="brand">ARYA DESIGNS</span>
       <span class="ts">${esc(date)} &middot; ${esc(time)}</span>
@@ -377,7 +378,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
                       </div>
                       <div style={{ textAlign: 'center', padding: '0 6px 2px', fontSize: text.trim().length > 25 ? 6 : 8, fontWeight: 800, color: '#000', lineHeight: 1.3, wordBreak: 'break-word', fontFamily: 'Arial, sans-serif' }}>{previewText}</div>
                       {qcPerson && <div style={{ textAlign: 'center', padding: '1px 6px 2px', fontSize: 6, color: '#333', fontFamily: 'Arial, sans-serif' }}>Inspected by: <strong>{qcPerson}</strong></div>}
-                      <div style={{ textAlign: 'center', padding: '0 6px 3px', fontSize: 4.5, color: '#666', fontFamily: 'Arial, sans-serif' }}>Contact Owner: {CONTACT}</div>
+                      <div style={{ textAlign: 'center', padding: '0 6px 3px', fontSize: 3.5, color: '#666', fontFamily: 'Arial, sans-serif', lineHeight: 1.3 }}>{CONTACT_LINE}</div>
                       <div style={{ borderTop: '1px solid #0a6e2e', padding: '3px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 4.5, fontWeight: 700, color: '#333', letterSpacing: 0.5, fontFamily: 'Arial, sans-serif' }}>ARYA DESIGNS</span>
                         <span style={{ fontSize: 4, color: '#555', fontFamily: 'Arial, sans-serif' }}>{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
@@ -389,7 +390,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
                     <div style={{ aspectRatio: '1.97 / 2.97', display: 'flex', flexDirection: 'column' }}>
                       <div style={{ background: '#1a1a1a', color: '#fff', textAlign: 'center', padding: '6px 4px', fontSize: 10, fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Arial, sans-serif' }}>⚠ RETURN</div>
                       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 6px', textAlign: 'center', fontSize: text.trim().length > 30 ? 9 : text.trim().length > 15 ? 11 : 13, fontWeight: 900, color: '#000', lineHeight: 1.3, wordBreak: 'break-word', borderLeft: '3px solid #1a1a1a', borderRight: '3px solid #1a1a1a', fontFamily: 'Arial, sans-serif' }}>{previewText}</div>
-                      <div style={{ textAlign: 'center', padding: '1px 6px 3px', fontSize: 4.5, color: '#666', borderLeft: '3px solid #1a1a1a', borderRight: '3px solid #1a1a1a', fontFamily: 'Arial, sans-serif' }}>Contact Owner: {CONTACT}</div>
+                      <div style={{ textAlign: 'center', padding: '1px 6px 3px', fontSize: 3.5, color: '#666', borderLeft: '3px solid #1a1a1a', borderRight: '3px solid #1a1a1a', fontFamily: 'Arial, sans-serif', lineHeight: 1.3 }}>{CONTACT_LINE}</div>
                       <div style={{ borderTop: '1.5px solid #1a1a1a', padding: '4px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 5, fontWeight: 700, color: '#333', letterSpacing: 0.5, fontFamily: 'Arial, sans-serif' }}>ARYA DESIGNS</span>
                         <span style={{ fontSize: 4.5, color: '#555', fontFamily: 'Arial, sans-serif' }}>{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
