@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { softDeleteProgram, generateShareToken, fetchMatchings } from './lib/supabase-rpc';
 import { getShareUrl } from './lib/share-token';
 import { useNotifications } from '../../hooks/useNotifications';
+import { friendlyError } from '../../lib/friendlyError';
 import ConfirmModal, { useConfirm } from '../../components/ui/ConfirmModal';
 import type { Program } from './types';
 
@@ -31,13 +32,13 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
     setDeleting(p.id);
     const { error } = await softDeleteProgram(p.id);
     setDeleting(null);
-    if (error) { addToast(t('saveFailed'), 'error'); return; }
+    if (error) { addToast(friendlyError(error), 'error'); return; }
     addToast(t('deleted'), 'success');
     reload();
     addToast(`${p.program_uid} deleted. Tap to undo.`, 'info');
     const handler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (target.closest?.('[data-toast]')) { supabase.from('programs').update({ is_deleted: false, updated_at: new Date().toISOString() }).eq('id', p.id).then(() => { addToast(t('restored'), 'success'); reload(); }); document.removeEventListener('click', handler); }
+      if (target.closest?.('[data-toast]')) { supabase.from('programs').update({ is_deleted: false, updated_at: new Date().toISOString() }).eq('id', p.id).then(({ error: undoErr }) => { if (undoErr) addToast(friendlyError(undoErr), 'error'); else { addToast(t('restored'), 'success'); reload(); } }); document.removeEventListener('click', handler); }
     };
     document.addEventListener('click', handler);
     setTimeout(() => document.removeEventListener('click', handler), 5000);
@@ -45,7 +46,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
 
   const handleCopyLink = async (p: Program) => {
     let token = p.share_token;
-    if (!token) { const { token: newToken, error } = await generateShareToken(p.id); if (error || !newToken) { addToast(t('shareLinkFailed'), 'error'); return; } token = newToken; }
+    if (!token) { const { token: newToken, error } = await generateShareToken(p.id); if (error || !newToken) { addToast(error ? friendlyError(error) : t('shareLinkFailed'), 'error'); return; } token = newToken; }
     const url = getShareUrl(token);
     try { await navigator.clipboard.writeText(url); addToast(t('copied'), 'success'); } catch { addToast(url, 'info'); }
   };
@@ -99,7 +100,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
         {loading && <SkeletonRows rows={4} />}
         {!loading && programs.length === 0 && (
           <div style={{ padding: 40, textAlign: 'center' }}>
-            <div style={{ marginBottom: 10, opacity: 0.85 }}>{search ? <svg viewBox="0 0 24 24" style={{ width: 32, height: 32, fill: 'none', stroke: '#6366F1', strokeWidth: 1.8, strokeLinecap: 'round' }}><circle cx="11" cy="11" r="7" /><path d="m17 17 4 4" /></svg> : <svg viewBox="0 0 24 24" style={{ width: 32, height: 32, fill: 'none', stroke: '#6366F1', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' }}><rect x="6" y="3" width="12" height="18" rx="2" /><rect x="9" y="1" width="6" height="4" rx="1" /><path d="M9 10h6M9 13h4M9 16h5" opacity=".5" /></svg>}</div>
+            <div style={{ marginBottom: 10, opacity: 0.85 }}>{search ? <svg viewBox="0 0 24 24" style={{ width: 32, height: 32, fill: 'none', stroke: T.ac, strokeWidth: 1.8, strokeLinecap: 'round' }}><circle cx="11" cy="11" r="7" /><path d="m17 17 4 4" /></svg> : <svg viewBox="0 0 24 24" style={{ width: 32, height: 32, fill: 'none', stroke: T.ac, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' }}><rect x="6" y="3" width="12" height="18" rx="2" /><rect x="9" y="1" width="6" height="4" rx="1" /><path d="M9 10h6M9 13h4M9 16h5" opacity=".5" /></svg>}</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: T.tx, fontFamily: T.sora, marginBottom: 6 }}>{search ? t('noResults') : t('noPrograms')}</div>
             <div style={{ fontSize: 12, color: T.tx3, marginBottom: 14 }}>{search ? t('noResultsHint') : t('noProgramsHint')}</div>
             {!search && <button onClick={onAdd} style={S.btnPrimary}>{t('addProgram')}</button>}
