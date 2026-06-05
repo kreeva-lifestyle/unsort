@@ -1,5 +1,7 @@
 // Bulk-mode toolbar + Bulk Pay / Bulk Unpay modals + last-batch undo banner.
 // Extracted from CashChallan.tsx — parent owns the data + RPC calls.
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import ChallanKPIs from './ChallanKPIs';
@@ -43,6 +45,11 @@ interface Props {
 }
 
 export default function ChallanBulkActions(p: Props) {
+  useEffect(() => {
+    document.body.classList.toggle('modal-open', p.showBulkPay || p.showBulkUnpay);
+    return () => { document.body.classList.remove('modal-open'); };
+  }, [p.showBulkPay, p.showBulkUnpay]);
+
   return (
     <>
       {p.bulkMode && (
@@ -64,9 +71,9 @@ export default function ChallanBulkActions(p: Props) {
         </div>
       )}
 
-      {p.showBulkPay && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={p.onCloseBulkPay}>
-          <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 420, width: '100%' }} onClick={e => e.stopPropagation()}>
+      {p.showBulkPay && createPortal(
+        <div style={S.modalOverlay} onClick={p.onCloseBulkPay}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 420, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 12 }}>{p.netTotal < 0 ? 'Settle & Refund' : 'Bulk Pay'}</div>
             <ChallanKPIs payableCount={p.payable.length} outstanding={p.outstanding} returnsCount={p.returns.length} returnsTotal={p.returnsTotal} netTotal={p.netTotal} />
             <div style={{ marginBottom: 10 }}>
@@ -85,12 +92,13 @@ export default function ChallanBulkActions(p: Props) {
               <button onClick={p.onConfirmBulkPay} disabled={!p.bulkPayMode || p.payable.length === 0 || p.bulkBusy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: p.bulkPayMode ? `linear-gradient(135deg, ${p.netTotal < 0 ? T.re : T.gr}, ${p.netTotal < 0 ? T.reCC : T.grCC})` : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: p.bulkPayMode && !p.bulkBusy ? 'pointer' : 'default', opacity: p.bulkPayMode && !p.bulkBusy ? 1 : 0.4 }}>{p.bulkBusy ? 'Processing…' : p.netTotal < 0 ? 'Settle & Refund' : 'Confirm Pay'}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {p.showBulkUnpay && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={p.onCloseBulkUnpay}>
-          <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', maxWidth: 400, width: '100%' }} onClick={e => e.stopPropagation()}>
+      {p.showBulkUnpay && createPortal(
+        <div style={S.modalOverlay} onClick={p.onCloseBulkUnpay}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 400, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Bulk Unpay</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>This will revert <strong style={{ color: T.yl }}>{p.unpayable.length}</strong> challan{p.unpayable.length !== 1 ? 's' : ''} to unpaid and clear their payment info. Returns cannot be unpaid.</div>
             <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 6, maxHeight: 160, overflowY: 'auto', marginBottom: 14 }}>
@@ -106,7 +114,8 @@ export default function ChallanBulkActions(p: Props) {
               <button onClick={p.onConfirmBulkUnpay} disabled={p.bulkBusy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.yl}, ${T.ylCC})`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: p.bulkBusy ? 'default' : 'pointer', opacity: p.bulkBusy ? 0.5 : 1 }}>{p.bulkBusy ? 'Processing…' : 'Confirm Unpay'}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
