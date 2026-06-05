@@ -116,6 +116,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
   const [printHtml, setPrintHtml] = useState<string | null>(null);
   const [printCount, setPrintCount] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const printRef = useRef<HTMLIFrameElement | null>(null);
 
   const fetchLabels = useCallback(async () => {
@@ -188,9 +189,11 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
   };
 
   const doDelete = async (id: string) => {
+    setDeleting(true);
     const { error } = await supabase.from('return_labels').delete().eq('id', id);
     if (error) addToast(friendlyError(error), 'error');
     else { addToast('Label deleted', 'success'); fetchLabels(); setPage(0); }
+    setDeleting(false);
     setConfirmDelete(null);
   };
 
@@ -290,9 +293,9 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
                 <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, marginBottom: 10 }}>{l.label_text}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 0, border: `1px solid ${T.bd2}`, borderRadius: 6, overflow: 'hidden' }}>
-                    <button onClick={() => setCopy(l.id, getCopies(l.id) - 1)} style={{ width: 36, height: 36, border: 'none', background: T.glass2, color: T.tx2, cursor: 'pointer', fontSize: 18, fontWeight: 700 }}>−</button>
+                    <button onClick={() => setCopy(l.id, getCopies(l.id) - 1)} style={{ width: 44, height: 44, border: 'none', background: T.glass2, color: T.tx2, cursor: 'pointer', fontSize: 18, fontWeight: 700 }}>−</button>
                     <span style={{ width: 36, textAlign: 'center', fontSize: 14, fontWeight: 600, color: T.tx, fontFamily: T.mono }}>{getCopies(l.id)}</span>
-                    <button onClick={() => setCopy(l.id, getCopies(l.id) + 1)} style={{ width: 36, height: 36, border: 'none', background: T.glass2, color: T.tx2, cursor: 'pointer', fontSize: 18, fontWeight: 700 }}>+</button>
+                    <button onClick={() => setCopy(l.id, getCopies(l.id) + 1)} style={{ width: 44, height: 44, border: 'none', background: T.glass2, color: T.tx2, cursor: 'pointer', fontSize: 18, fontWeight: 700 }}>+</button>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button onClick={() => printOne(l)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 44, padding: '8px 12px' }}>Print</button>
@@ -339,7 +342,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
             <div style={{ padding: '16px 18px' }}>
               <div style={{ marginBottom: 12 }}>
                 <label style={S.fLabel}>Type</label>
-                <select value={labelType} onChange={e => handleTypeChange(e.target.value as LabelType)} style={S.fInput}>
+                <select value={labelType} onChange={e => handleTypeChange(e.target.value as LabelType)} disabled={!!editId} style={{ ...S.fInput, opacity: editId ? 0.5 : 1 }}>
                   <option value="return">Return</option>
                   <option value="qc_assured">QC Assured</option>
                 </select>
@@ -427,7 +430,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
             <div style={{ fontSize: 12, color: T.tx2, marginBottom: 14, lineHeight: 1.5 }}>This label will be permanently removed.</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmDelete(null)} style={{ ...S.btnGhost, flex: 1 }}>Cancel</button>
-              <button onClick={() => doDelete(confirmDelete)} style={{ ...S.btnDangerSolid, flex: 1 }}>Delete</button>
+              <button onClick={() => doDelete(confirmDelete)} style={{ ...S.btnDangerSolid, flex: 1, opacity: deleting ? 0.5 : 1, pointerEvents: deleting ? 'none' : 'auto' }}>{deleting ? 'Deleting…' : 'Delete'}</button>
             </div>
           </div>
         </div>,
@@ -436,16 +439,16 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
 
       {/* Print Preview */}
       {printHtml && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#060810', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
-          <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+          <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
             <div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', fontFamily: "'Sora',sans-serif" }}>QC Label Preview</span>
-              <div style={{ fontSize: 10, color: '#6B7890' }}>{printCount} label{printCount === 1 ? '' : 's'}</div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>QC Label Preview</span>
+              <div style={{ fontSize: 10, color: T.tx3 }}>{printCount} label{printCount === 1 ? '' : 's'}</div>
             </div>
-            <button onClick={() => setPrintHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Close">&times;</button>
+            <button onClick={() => setPrintHtml(null)} style={{ width: 44, height: 44, borderRadius: 8, border: `1px solid ${T.bd}`, background: T.glass2, color: T.tx2, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Close">&times;</button>
           </div>
           <iframe ref={printRef} title="QC label print preview" srcDoc={printHtml} style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }} />
-          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button onClick={() => setPrintHtml(null)} style={{ ...S.btnGhost, flex: 1, maxWidth: 200 }}>Close</button>
             <button onClick={() => { printRef.current?.contentWindow?.print(); }} style={{ ...S.btnPrimary, ...S.btnLg, flex: 1, maxWidth: 200, justifyContent: 'center' }}>Print</button>
           </div>
