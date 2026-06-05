@@ -8,6 +8,7 @@ import SwipeRow from '../components/ui/SwipeRow';
 import { friendlyError } from '../lib/friendlyError';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
+import { printOrQueue } from '../lib/printQueue';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import InventoryExtras from './InventoryExtras';
 import Empty from '../components/ui/Empty';
@@ -486,18 +487,12 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     setExportPdfHtml(html);
   };
 
-  const printBarcode = (uniqueId: string) => {
+  const printBarcode = async (uniqueId: string) => {
     const canvas = document.createElement('canvas');
     try { JsBarcode(canvas, uniqueId, { format: 'CODE128', width: 2, height: 60, displayValue: true, fontSize: 14, font: 'IBM Plex Mono', margin: 10 }); } catch { return; }
     const html = `<html><head><title>${uniqueId}</title><style>body{font-family:'IBM Plex Sans',sans-serif;text-align:center;padding:20px}@media print{@page{margin:10mm}}</style></head><body><img src="${canvas.toDataURL()}" /></body></html>`;
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
-    document.body.appendChild(iframe);
-    const iw = iframe.contentWindow;
-    if (!iw) { iframe.remove(); return; }
-    iw.document.write(html);
-    iw.document.close();
-    setTimeout(() => { iw.print(); setTimeout(() => iframe.remove(), 1000); }, 300);
+    const { error } = await printOrQueue('label_small', html, { width: 1.97, height: 2.97 }, `Barcode ${uniqueId}`);
+    if (error) addToast(error.message, 'error'); else addToast('Print job sent', 'success');
   };
   const openComps = async (item: any) => {
     setSelected(item); await fetchComps(item.id);
@@ -1270,7 +1265,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           <iframe srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#060810' }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button onClick={() => setExportPdfHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
-            <button onClick={() => { const iframe = document.querySelector('iframe[srcdoc]') as HTMLIFrameElement; iframe?.contentWindow?.print(); }} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, flex: 1, maxWidth: 160, boxShadow: '0 4px 16px rgba(99,102,241,.35)' }}>Print / Share</button>
+            <button onClick={async () => { const { error } = await printOrQueue('document', exportPdfHtml!, 'A4', 'Inventory Export'); if (error) addToast(error.message, 'error'); else addToast('Print job sent', 'success'); }} style={{ ...S.btnPrimary, ...S.btnLg, flex: 1, maxWidth: 160 }}>Print / Share</button>
           </div>
         </div>,
         document.body

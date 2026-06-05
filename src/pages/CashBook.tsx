@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
+import { printOrQueue } from '../lib/printQueue';
 
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
 import { friendlyError } from '../lib/friendlyError';
@@ -316,7 +317,7 @@ export default function CashBook() {
 
   // Print receipt for a handover
   const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
-  const printHandoverReceipt = (h: Handover) => {
+  const printHandoverReceipt = async (h: Handover) => {
     const b = h.breakdown;
     let html = `<html><head><meta charset="utf-8"><title>Cash Handover Receipt</title><style>
       body{font-family:Arial,sans-serif;padding:24px;max-width:600px;margin:auto;color:#222}
@@ -371,14 +372,8 @@ export default function CashBook() {
     </div>`;
     html += `<p style="text-align:center;color:#999;font-size:9px;margin-top:30px;letter-spacing:1px;text-transform:uppercase">Powered by DailyOffice</p>`;
     html += `</body></html>`;
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
-    document.body.appendChild(iframe);
-    const iw = iframe.contentWindow;
-    if (!iw) { iframe.remove(); return; }
-    iw.document.write(html);
-    iw.document.close();
-    setTimeout(() => { iw.print(); setTimeout(() => iframe.remove(), 1000); }, 300);
+    const { error } = await printOrQueue('document', html, 'A4', `Handover ${formatHandoverNo(h.handover_number)}`);
+    if (error) addToast(error.message, 'error'); else addToast('Print job sent', 'success');
   };
 
   const confirmHandover = async () => {

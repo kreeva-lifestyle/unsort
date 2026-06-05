@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
+import { printOrQueue } from '../../lib/printQueue';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import Empty from '../ui/Empty';
@@ -450,7 +451,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
           <iframe ref={printRef} title="QC label print preview" srcDoc={printHtml} style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button onClick={() => setPrintHtml(null)} style={{ ...S.btnGhost, flex: 1, maxWidth: 200 }}>Close</button>
-            <button onClick={() => { printRef.current?.contentWindow?.print(); }} style={{ ...S.btnPrimary, ...S.btnLg, flex: 1, maxWidth: 200, justifyContent: 'center' }}>Print</button>
+            <button onClick={async () => { const { error } = await printOrQueue('label_small', printHtml!, { width: 1.97, height: 2.97 }, 'QC Labels', printCount); if (error) addToast(error.message, 'error'); else addToast('Print job sent', 'success'); }} style={{ ...S.btnPrimary, ...S.btnLg, flex: 1, maxWidth: 200, justifyContent: 'center' }}>Print</button>
           </div>
         </div>,
         document.body
