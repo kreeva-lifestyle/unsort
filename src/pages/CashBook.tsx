@@ -696,11 +696,11 @@ export default function CashBook() {
             {/* Period Range */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Period From</label>
+                <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Period From</label>
                 <input type="date" value={handPeriodFrom} onChange={e => { setHandPeriodFrom(e.target.value); setHandAmount(''); }} style={{ ...S.fDate, width: '100%' }} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Period To</label>
+                <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Period To</label>
                 <input type="date" value={handPeriodTo} onChange={e => { setHandPeriodTo(e.target.value); setHandAmount(''); }} style={{ ...S.fDate, width: '100%' }} />
               </div>
             </div>
@@ -749,8 +749,8 @@ export default function CashBook() {
             {/* Recipient + Amount */}
             <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 8, marginBottom: 10 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Recipient (Admin)</label>
-                <select value={handToId} onChange={e => setHandToId(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 13, padding: '8px 12px', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}>
+                <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Recipient (Admin)</label>
+                <select value={handToId} onChange={e => setHandToId(e.target.value)} style={{ ...S.fInput, width: '100%', cursor: 'pointer' }}>
                   <option value="">Select admin...</option>
                   {users.filter(u => u.id !== currentUserId && u.role === 'admin').map(u => {
                     const issues = [];
@@ -762,8 +762,8 @@ export default function CashBook() {
                 </select>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Amount (₹)</label>
-                <input type="number" value={handAmount} onKeyDown={e => numericKeyDown(e)} onChange={e => setHandAmount(e.target.value)} placeholder="0.00" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: handBreakdown && Math.abs(Number(handAmount) - handBreakdown.available) > 0.01 ? '1px solid rgba(245,158,11,.4)' : `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 13, padding: '8px 12px', outline: 'none', boxSizing: 'border-box' }} />
+                <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Amount (₹)</label>
+                <input type="number" value={handAmount} onKeyDown={e => numericKeyDown(e)} onChange={e => setHandAmount(e.target.value)} placeholder="0.00" style={{ ...S.fInput, width: '100%', fontFamily: T.mono, border: handBreakdown && Math.abs(Number(handAmount) - handBreakdown.available) > 0.01 ? '1px solid rgba(245,158,11,.4)' : `1px solid ${T.bd2}` }} />
               </div>
             </div>
 
@@ -785,13 +785,13 @@ export default function CashBook() {
                 <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.yl, marginBottom: 6 }}>
                   ⚠ Amount differs from available (₹{handBreakdown.available.toFixed(2)}). Reason required:
                 </div>
-                <input type="text" value={handReason} onChange={e => setHandReason(e.target.value)} placeholder="e.g., Keeping ₹200 as petty cash" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 13, padding: '8px 12px', outline: 'none', boxSizing: 'border-box' }} />
+                <input type="text" value={handReason} onChange={e => setHandReason(e.target.value)} placeholder="e.g., Keeping ₹200 as petty cash" style={{ ...S.fInput, width: '100%' }} />
               </div>
             )}
 
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Notes (optional)</label>
-              <textarea value={handNotes} onChange={e => setHandNotes(e.target.value)} rows={2} placeholder="Additional context..." style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 13, padding: '8px 12px', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+              <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Notes (optional)</label>
+              <textarea value={handNotes} onChange={e => setHandNotes(e.target.value)} rows={2} placeholder="Additional context..." style={{ ...S.fInput, width: '100%', resize: 'vertical' }} />
             </div>
             {handError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{handError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
@@ -853,7 +853,7 @@ export default function CashBook() {
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Sign &amp; Confirm {formatHandoverNo(confirmingHandover.handover_number)}</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>You are confirming receipt of <strong style={{ color: T.gr, fontFamily: T.mono }}>₹{Number(confirmingHandover.amount).toLocaleString('en-IN')}</strong> from <strong style={{ color: T.tx }}>{confirmingHandover.from_user_name}</strong>. This is a permanent legal record.</div>
-            <input type="password" value={confirmPin} onChange={e => setConfirmPin(e.target.value)} placeholder="Your 4-6 digit PIN" autoFocus inputMode="numeric" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 18, padding: '10px 12px', outline: 'none', boxSizing: 'border-box', textAlign: 'center', letterSpacing: 6, marginBottom: 10 }} />
+            <input type="password" value={confirmPin} onChange={e => setConfirmPin(e.target.value)} placeholder="Your 4-6 digit PIN" autoFocus inputMode="numeric" style={{ ...S.fInput, width: '100%', fontFamily: T.mono, fontSize: 18, padding: '10px 12px', textAlign: 'center', letterSpacing: 6, marginBottom: 10 }} />
             {confirmError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{confirmError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setConfirmingHandover(null); setConfirmPin(''); setConfirmError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
@@ -870,8 +870,8 @@ export default function CashBook() {
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 400, padding: '20px 18px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Reject {formatHandoverNo(rejectingHandover.handover_number)}</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>You are rejecting <strong style={{ color: T.re, fontFamily: T.mono }}>₹{Number(rejectingHandover.amount).toLocaleString('en-IN')}</strong> from <strong style={{ color: T.tx }}>{rejectingHandover.from_user_name}</strong>. This action is final — the sender will need to initiate a new handover.</div>
-            <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Reason for rejection</label>
-            <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="e.g. Amount doesn't match, missing cash, wrong period..." rows={3} autoFocus style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontSize: 13, padding: '8px 12px', outline: 'none', boxSizing: 'border-box', resize: 'vertical', marginBottom: 10, fontFamily: T.sans }} />
+            <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Reason for rejection</label>
+            <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="e.g. Amount doesn't match, missing cash, wrong period..." rows={3} autoFocus style={{ ...S.fInput, width: '100%', resize: 'vertical', marginBottom: 10 }} />
             {rejectError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{rejectError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setRejectingHandover(null); setRejectReason(''); setRejectError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
@@ -889,23 +889,23 @@ export default function CashBook() {
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 14 }}>Add Expense</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Date</label>
+                <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Date</label>
                 <input type="date" value={entryDate} max={today} onChange={e => setEntryDate(e.target.value)} style={{ ...S.fDate, width: '100%' }} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Amount (₹)</label>
-                <input type="number" min="0.01" step="0.01" value={amount} onKeyDown={e => numericKeyDown(e)} onChange={e => setAmount(e.target.value)} autoFocus placeholder="0.00" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 13, padding: '8px 12px', outline: 'none', boxSizing: 'border-box' }} />
+                <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Amount (₹)</label>
+                <input type="number" min="0.01" step="0.01" value={amount} onKeyDown={e => numericKeyDown(e)} onChange={e => setAmount(e.target.value)} autoFocus placeholder="0.00" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
               </div>
             </div>
             <div style={{ marginBottom: 10 }}>
-              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Category</label>
-              <select value={category} onChange={e => setCategory(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 13, padding: '8px 12px', outline: 'none' }}>
+              <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Category</label>
+              <select value={category} onChange={e => setCategory(e.target.value)} style={{ ...S.fInput, width: '100%', cursor: 'pointer' }}>
                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Description (optional)</label>
-              <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="What was this expense for?" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 13, padding: '8px 12px', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+              <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Description (optional)</label>
+              <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="What was this expense for?" style={{ ...S.fInput, width: '100%', resize: 'vertical' }} />
             </div>
             {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{formError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
@@ -921,7 +921,7 @@ export default function CashBook() {
       {confirmDelete && createPortal(
         <div style={{ ...S.modalOverlay }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }}>
-            <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg></div>
+            <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: T.yl, strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill={T.yl} /></svg></div>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Delete Expense?</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This will permanently remove the expense.</div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -932,8 +932,8 @@ export default function CashBook() {
         </div>,
         document.body
       )}
-      {pendingExpDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: '#0B0F19', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, overflow: 'hidden', minWidth: 260 }}>
-        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: '#E2E8F0', flex: 1 }}>Expense deleted</span><span onClick={undoExpDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#fff' }}>Undo</span><span onClick={dismissExpDel} style={{ cursor: 'pointer', color: '#4A5568', fontSize: 14 }} aria-label="Dismiss">✕</span></div>
+      {pendingExpDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, overflow: 'hidden', minWidth: 260 }}>
+        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: T.tx, flex: 1 }}>Expense deleted</span><span onClick={undoExpDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#fff' }}>Undo</span><span onClick={dismissExpDel} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }} aria-label="Dismiss">✕</span></div>
         <div className="undo-bar" key={pendingExpDel.id} />
       </div>}
     </div>
