@@ -145,7 +145,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
 
   const handleTypeChange = (t: LabelType) => {
     setLabelType(t);
-    if (t === 'return') { setQcPerson(''); }
+    if (t === 'return') { setQcPerson(''); setText(''); }
     if (t === 'qc_assured' && !editId && !text.trim()) { setText('Double-Checked'); }
   };
 
