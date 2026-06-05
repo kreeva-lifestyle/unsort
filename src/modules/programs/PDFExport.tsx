@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import QRCodeLib from 'qrcode';
 import { T } from '../../lib/theme';
+import { printOrQueue } from '../../lib/printQueue';
 import { fetchProgramById, fetchMatchings, fetchPriceWithParts, generateShareToken } from './lib/supabase-rpc';
 import { toDirectImageUrl } from './lib/image-url-converters';
 import { getShareUrl } from './lib/share-token';
@@ -56,7 +57,7 @@ export default function PDFExport({ programId, onClose, t }: Props) {
   return null;
 }
 
-function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: ProgramPricePart[], L: Record<string, string>, qrDataUrl?: string) {
+async function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: ProgramPricePart[], L: Record<string, string>, qrDataUrl?: string) {
   const esc = (s: string | null) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const imageUrl = p.dropbox_gdrive_link ? toDirectImageUrl(p.dropbox_gdrive_link) : '';
   let html = '';
@@ -124,12 +125,5 @@ function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: Progra
     html +=`<div style="margin:16px 0;text-align:center;border-top:1px solid #eee;padding-top:12px"><p style="font-size:9px;color:#888;margin:0 0 6px;text-transform:uppercase;letter-spacing:1px">${esc(L.voiceNote)} — Scan QR</p><img src="${qrDataUrl}" style="width:120px;height:120px" /></div>`;
   }
   html +=`<div class="footer">${esc(L.poweredBy)}</div></body></html>`;
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
-  document.body.appendChild(iframe);
-  const iw = iframe.contentWindow;
-  if (!iw) { iframe.remove(); return; }
-  iw.document.write(html);
-  iw.document.close();
-  setTimeout(() => { iw.print(); setTimeout(() => iframe.remove(), 1000); }, 300);
+  await printOrQueue('document', html, 'A4', `Program ${p.program_uid}`);
 }

@@ -11,6 +11,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
     { id: 'challan', icon: 'file', label: 'Cash Challan' },
     { id: 'programs', icon: 'layers', label: 'Programs' },
     { id: 'minis', icon: 'sparkles', label: 'Minis' },
+    { id: 'printstation', icon: 'print', label: 'Print Station' },
     ...(profile ? [{ id: 'settings', icon: 'settings', label: 'Settings' }] : []),
   ].filter(t => canAccessTab(profile?.role, t.id, profile?.module_access));
 

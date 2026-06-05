@@ -812,3 +812,30 @@ export interface LinkClick {
   city: string | null;
   visitor_hash: string | null;
 }
+
+// ─── print_queue (12 cols) ──────────────────────────────────────────────
+
+export type PrintSlot = 'label_small' | 'label_large' | 'document';
+export const PRINT_SLOTS: PrintSlot[] = ['label_small', 'label_large', 'document'];
+export type PrintJobStatus = 'pending' | 'printing' | 'done' | 'failed';
+
+export interface PrintJob {
+  id: string;
+  printer_slot: PrintSlot;
+  html: string;
+  page_size: Record<string, unknown> | string;
+  copies: number;
+  title: string | null;
+  status: PrintJobStatus;
+  error_message: string | null;
+  created_by: string | null;
+  created_at: string;
+  printed_at: string | null;
+  printed_by_station: string | null;
+}
+
+export type PrintJobInsert = Pick<PrintJob, 'printer_slot' | 'html' | 'page_size'> & {
+  copies?: number;
+  title?: string | null;
+  created_by?: string | null;
+};

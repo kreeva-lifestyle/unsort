@@ -15,6 +15,7 @@
     "barcode-detector": "^3.1.2",
     "jsbarcode": "^3.12.3",
     "qrcode": "^1.5.4",
+    "qz-tray": "^2.2.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "xlsx": "^0.18.5"

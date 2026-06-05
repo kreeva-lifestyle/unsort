@@ -8,8 +8,9 @@ import LocationsSettings from '../components/settings/Locations';
 import UsersSettings from '../components/settings/Users';
 import BrandsSettings from '../components/settings/Brands';
 import PackStationSettings from '../components/settings/PackStation';
+import PrinterSettings from '../components/settings/PrinterSettings';
 
-const TAB_ICONS: Record<string, string> = { myprofile: 'user', categories: 'grid', locations: 'pin', brands: 'tag', users: 'users', packtime: 'scan' };
+const TAB_ICONS: Record<string, string> = { myprofile: 'user', categories: 'grid', locations: 'pin', brands: 'tag', users: 'users', packtime: 'scan', printers: 'print' };
 
 export default function Settings({ profile, addToast }: { profile: any; addToast: (msg: string, type?: string) => void }) {
   const isAdmin = profile?.role === 'admin';
@@ -17,7 +18,7 @@ export default function Settings({ profile, addToast }: { profile: any; addToast
   const canManage = isAdmin || isManager;
   const tabs = [{ id: 'myprofile', label: 'My Profile' }];
   if (canManage) tabs.push({ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }, { id: 'brands', label: 'Brands' });
-  if (isAdmin) tabs.push({ id: 'users', label: 'Users' }, { id: 'packtime', label: 'PackStation' });
+  if (isAdmin) tabs.push({ id: 'users', label: 'Users' }, { id: 'packtime', label: 'PackStation' }, { id: 'printers', label: 'Printers' });
   const [tab, setTab] = useState('myprofile');
   const { set: setBreadcrumb } = useBreadcrumb();
   const tabLabel = tabs.find(t => t.id === tab)?.label || '';
@@ -38,6 +39,7 @@ export default function Settings({ profile, addToast }: { profile: any; addToast
       {tab === 'users' && isAdmin && <UsersSettings addToast={addToast} profile={profile} />}
       {tab === 'brands' && canManage && <BrandsSettings addToast={addToast} />}
       {tab === 'packtime' && isAdmin && <PackStationSettings addToast={addToast} />}
+      {tab === 'printers' && isAdmin && <PrinterSettings addToast={addToast} />}
     </div>
   );
 }
