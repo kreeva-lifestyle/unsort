@@ -15,7 +15,7 @@ declare module 'qz-tray' {
     security: {
       setCertificatePromise(fn: (resolve: (cert: string) => void) => void): void;
       setSignatureAlgorithm(algo: string): void;
-      setSignaturePromise(fn: (toSign: string) => Promise<string>): void;
+      setSignaturePromise(fn: (toSign: string) => (resolve: (sig: string) => void, reject: (err: unknown) => void) => void): void;
     };
   };
   export default qz;
