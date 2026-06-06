@@ -109,7 +109,7 @@ export default function ChallanForm(p: ChallanFormProps) {
     });
   }, [p.customerName]);
   const lbl: React.CSSProperties = { ...S.fLabel, marginBottom: 4 };
-  const inp: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 13, padding: '8px 12px', height: 36, outline: 'none', boxSizing: 'border-box' };
+  const inp: React.CSSProperties = { ...S.fInput, width: '100%' };
 
   return (
     <div className="challan-form" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', display: 'flex', justifyContent: 'center' }}>
@@ -120,7 +120,7 @@ export default function ChallanForm(p: ChallanFormProps) {
             {!p.editing && nextNum && <span title="Approximate — final number assigned on save" style={{ fontFamily: T.mono, fontSize: 11, color: T.tx3, fontWeight: 500, padding: '2px 7px', background: 'rgba(255,255,255,.03)', border: `1px solid ${T.bd}`, borderRadius: 6 }}>~#{nextNum}</span>}
             {p.editing && <button onClick={() => p.loadAuditTrail(p.editing!.challan_number)} style={{ ...S.btnGhost, ...S.btnSm }}>View History</button>}
           </div>
-          <button onClick={p.onClose} style={{ ...S.btnGhost, ...S.btnSm, padding: '5px 12px' }}>Cancel</button>
+          <button onClick={p.onClose} style={{ ...S.btnGhost, ...S.btnSm }}>Cancel</button>
         </div>
 
         {/* Sale / Return Toggle */}

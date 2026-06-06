@@ -310,7 +310,7 @@ export default function InventoryExtras() {
               if (filtered.length === 0) { addToast('No data to export', 'error'); setShowExportMenu(false); return; }
               const csv = 'SKU,Category,Component,Size,Qty\n' + filtered.map(ex => `${ex.sku},"${ex.product_name}",${ex.component_name},${ex.size},${ex.quantity}`).join('\n');
               const blob = new Blob([csv], { type: 'text/csv' });
-              const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Extras_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+              const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Extras_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
               setShowExportMenu(false);
             }} style={{ padding: '12px 14px', fontSize: 12, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 44 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>CSV Download</div>
             <div onClick={() => {

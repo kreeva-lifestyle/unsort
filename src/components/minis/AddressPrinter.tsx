@@ -96,7 +96,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
       {/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {labels.length > 0 && <span onClick={selected.size === labels.length ? clearSelection : selectAll} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', padding: '4px 10px' }}>{selected.size === labels.length ? 'Deselect All' : 'Select All'}</span>}
+          {labels.length > 0 && <span onClick={selected.size === labels.length ? clearSelection : selectAll} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer' }}>{selected.size === labels.length ? 'Deselect All' : 'Select All'}</span>}
           {selected.size > 0 && <span style={{ fontSize: 10, color: T.tx3 }}>{selected.size} selected</span>}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
