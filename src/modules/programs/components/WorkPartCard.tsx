@@ -14,7 +14,7 @@ interface Props {
   t: (key: TranslationKey) => string;
 }
 
-const lbl: React.CSSProperties = { fontSize: 10, color: '#6B7890', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3, fontWeight: 600 };
+const lbl: React.CSSProperties = { fontSize: 10, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3, fontWeight: 600 };
 
 export default function WorkPartCard({ p, i, canDelete, numIn, txtIn, selIn, onUpdate, onDelete, t }: Props) {
   return (

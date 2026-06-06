@@ -22,8 +22,8 @@ interface Props {
   validateRow: (row: BrandTagRow) => string | null;
 }
 
-const fLabel: React.CSSProperties = { display: 'block', fontSize: 10, fontWeight: 600, color: T.tx3, marginBottom: 5, letterSpacing: '0.06em', textTransform: 'uppercase' };
-const fInput: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 13, padding: '8px 12px', height: 36, outline: 'none', boxSizing: 'border-box' };
+const fLabel = S.fLabel;
+const fInput = S.fInput;
 const fSelect: React.CSSProperties = { ...fInput, cursor: 'pointer' };
 
 export default function BrandTagModal({ mode, initial, onSave, onClose, brandOptions, productOptions, sizeOptions, colorOptions, qtyOptions, validateRow }: Props) {

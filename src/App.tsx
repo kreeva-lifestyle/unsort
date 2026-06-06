@@ -13,11 +13,11 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: an
   state = { error: null as any };
   static getDerivedStateFromError(error: any) { return { error }; }
   render() {
-    if (this.state.error) return <div style={{ minHeight: '100vh', background: '#060810', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' as const, gap: 14, padding: 20, position: 'relative' }}>
-      <div style={{ position: 'absolute', top: '30%', left: '40%', width: 300, height: 300, background: 'radial-gradient(circle, rgba(99,102,241,.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
-      <div style={{ position: 'relative', zIndex: 1, background: 'rgba(14,18,30,.90)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 14, padding: '28px 32px', textAlign: 'center' as const, maxWidth: 380, boxShadow: '0 16px 48px rgba(0,0,0,.4)' }}>
-        <p style={{ color: '#E2E8F0', fontSize: 14, fontWeight: 600, fontFamily: "'Sora', sans-serif", marginBottom: 6 }}>Something went wrong</p>
-        <p style={{ color: '#4A5568', fontSize: 11, marginBottom: 16, lineHeight: 1.5 }}>{String(this.state.error?.message || this.state.error)}</p>
+    if (this.state.error) return <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' as const, gap: 14, padding: 20, position: 'relative' }}>
+      <div style={{ position: 'absolute', top: '30%', left: '40%', width: 300, height: 300, background: `radial-gradient(circle, ${T.ac3} 0%, transparent 70%)`, pointerEvents: 'none' }} />
+      <div style={{ position: 'relative', zIndex: 1, background: T.s, backdropFilter: 'blur(24px)', border: `1px solid ${T.bd}`, borderRadius: T.rXl, padding: '28px 32px', textAlign: 'center' as const, maxWidth: 380, boxShadow: '0 16px 48px rgba(0,0,0,.4)' }}>
+        <p style={{ color: T.tx, fontSize: 14, fontWeight: 600, fontFamily: T.sora, marginBottom: 6 }}>Something went wrong</p>
+        <p style={{ color: T.tx3, fontSize: 11, marginBottom: 16, lineHeight: 1.5 }}>{String(this.state.error?.message || this.state.error)}</p>
         <button onClick={() => window.location.reload()} style={{ ...S.btnPrimary, padding: '7px 18px', fontSize: 11 }}>Reload</button>
       </div>
     </div>;
