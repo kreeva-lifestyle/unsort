@@ -45,7 +45,12 @@ export default function PrinterSettings({ addToast }: { addToast: (msg: string, 
       .then(({ data }) => { if (data) setRecentJobs(data as PrintJob[]); });
   }, [mode]);
 
-  const handleModeChange = (m: 'cloud' | 'default') => { setMode(m); setPrintMode(m); };
+  const handleModeChange = async (m: 'cloud' | 'default') => {
+    setMode(m);
+    const { error } = await setPrintMode(m);
+    if (error) addToast(friendlyError(error), 'error');
+    else addToast(`Print mode set to ${m === 'cloud' ? 'Cloud Print' : 'Default Browser'} for everyone`, 'success');
+  };
 
   const handleSlotChange = (slot: PrintSlot, printer: string) => {
     const val = printer || null;

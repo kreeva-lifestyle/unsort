@@ -4,12 +4,38 @@ import type { PageSize } from './qzPrint';
 
 export type { PrintSlot, PageSize };
 
-export function getPrintMode(): 'cloud' | 'default' {
-  return (localStorage.getItem('print_mode') as 'cloud' | 'default') || 'default';
+type PrintMode = 'cloud' | 'default';
+
+// Print mode is a GLOBAL setting (app_settings table) shared by all users &
+// devices. localStorage holds a synchronous cache so printOrQueue stays sync;
+// the DB is the source of truth, loaded on startup + kept live via realtime.
+export function getPrintMode(): PrintMode {
+  return (localStorage.getItem('print_mode') as PrintMode) || 'default';
 }
 
-export function setPrintMode(mode: 'cloud' | 'default'): void {
+export async function setPrintMode(mode: PrintMode): Promise<{ error: Error | null }> {
   localStorage.setItem('print_mode', mode);
+  const { error } = await supabase.from('app_settings')
+    .upsert({ key: 'print_mode', value: mode, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  return { error: error ? new Error(error.message) : null };
+}
+
+// Fetch the global mode into the localStorage cache + subscribe to live changes.
+// Call once on app startup. Returns an unsubscribe function.
+export function initGlobalPrintMode(): () => void {
+  supabase.from('app_settings').select('value').eq('key', 'print_mode').maybeSingle()
+    .then(({ data }) => {
+      const v = data?.value;
+      if (v === 'cloud' || v === 'default') localStorage.setItem('print_mode', v);
+    });
+  const chan = supabase.channel('app-settings-print-mode')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings', filter: 'key=eq.print_mode' },
+      (payload) => {
+        const v = (payload.new as { value?: unknown })?.value;
+        if (v === 'cloud' || v === 'default') localStorage.setItem('print_mode', v);
+      })
+    .subscribe();
+  return () => { supabase.removeChannel(chan); };
 }
 
 const MAX_HTML_BYTES = 1_048_576; // 1 MB
