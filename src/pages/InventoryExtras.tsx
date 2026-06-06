@@ -10,6 +10,7 @@ import { T, S } from '../lib/theme';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import SwipeRow from '../components/ui/SwipeRow';
+import { SkeletonRows } from '../components/ui/Skeleton';
 import type {
   Product,
   ProductComponent,
@@ -30,6 +31,7 @@ export default function InventoryExtras() {
   const canEdit = profile && ['admin', 'manager', 'operator'].includes(profile.role);
   const { addToast } = useNotifications();
   const [extras, setExtras] = useState<InventoryExtra[]>([]);
+  const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [search, setSearch] = useState('');
@@ -77,27 +79,33 @@ export default function InventoryExtras() {
   useEffect(() => () => { if (skuTimer.current) clearTimeout(skuTimer.current); }, []);
 
   const fetchExtras = useCallback(async () => {
-    const { data } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, location, manufacturer, quantity, notes, created_by, created_at, updated_at').gt('quantity', 0).order('updated_at', { ascending: false }).limit(EXTRAS_LIMIT);
-    setExtras(data || []);
-    // Compute match counts — check item actually has this component missing
-    const counts: Record<string, number> = {};
-    const { data: unsorted } = await supabase.from('inventory_items').select('id, serial_number, size, product_id').eq('status', 'unsorted');
-    const { data: allComps } = await supabase.from('item_components').select('inventory_item_id, component_id, status');
-    const missingMap: Record<string, Set<string>> = {};
-    type ItemCompsRow = Pick<ItemComponent, 'inventory_item_id' | 'component_id' | 'status'>;
-    (allComps as ItemCompsRow[] | null || []).forEach((ic) => { if (ic.status === 'missing' || ic.status === 'damaged') { if (!missingMap[ic.inventory_item_id]) missingMap[ic.inventory_item_id] = new Set(); missingMap[ic.inventory_item_id].add(ic.component_id); } });
-    for (const ex of (data || [])) {
-      counts[ex.id] = (unsorted || []).filter(it =>
-        it.serial_number === ex.sku && it.product_id === ex.product_id &&
-        (ex.size === 'N/A' || !ex.size || (it.size || 'N/A') === ex.size) &&
-        missingMap[it.id]?.has(ex.component_id)
-      ).length;
-    }
-    setMatchCounts(counts);
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, location, manufacturer, quantity, notes, created_by, created_at, updated_at').gt('quantity', 0).order('updated_at', { ascending: false }).limit(EXTRAS_LIMIT);
+      if (error) { addToast(friendlyError(error), 'error'); return; }
+      setExtras(data || []);
+      const counts: Record<string, number> = {};
+      const { data: unsorted, error: e2 } = await supabase.from('inventory_items').select('id, serial_number, size, product_id').eq('status', 'unsorted');
+      if (e2) { addToast(friendlyError(e2), 'error'); return; }
+      const { data: allComps, error: e3 } = await supabase.from('item_components').select('inventory_item_id, component_id, status');
+      if (e3) { addToast(friendlyError(e3), 'error'); return; }
+      const missingMap: Record<string, Set<string>> = {};
+      type ItemCompsRow = Pick<ItemComponent, 'inventory_item_id' | 'component_id' | 'status'>;
+      (allComps as ItemCompsRow[] | null || []).forEach((ic) => { if (ic.status === 'missing' || ic.status === 'damaged') { if (!missingMap[ic.inventory_item_id]) missingMap[ic.inventory_item_id] = new Set(); missingMap[ic.inventory_item_id].add(ic.component_id); } });
+      for (const ex of (data || [])) {
+        counts[ex.id] = (unsorted || []).filter(it =>
+          it.serial_number === ex.sku && it.product_id === ex.product_id &&
+          (ex.size === 'N/A' || !ex.size || (it.size || 'N/A') === ex.size) &&
+          missingMap[it.id]?.has(ex.component_id)
+        ).length;
+      }
+      setMatchCounts(counts);
+    } finally { setLoading(false); }
   }, []);
 
   const fetchProducts = useCallback(async () => {
-    const { data } = await supabase.from('products').select('id, name, sku, total_components, is_active, category, description, created_by, created_at, updated_at').eq('is_active', true).order('name');
+    const { data, error } = await supabase.from('products').select('id, name, sku, total_components, is_active, category, description, created_by, created_at, updated_at').eq('is_active', true).order('name');
+    if (error) addToast(friendlyError(error), 'error');
     setProducts(data || []);
   }, []);
 
@@ -332,6 +340,8 @@ export default function InventoryExtras() {
         {(search || catFilter !== 'all') && <button onClick={() => { setSearch(''); setCatFilter('all'); setPage(0); }} style={{ ...S.btnGhost, ...S.btnSm }}>Clear</button>}
       </div>
 
+      {loading && extras.length === 0 && <SkeletonRows rows={6} />}
+
       {/* Desktop Table */}
       <div className="inv-extra-desktop" style={{ overflowX: 'auto', borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.01)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -471,7 +481,7 @@ export default function InventoryExtras() {
             {error && <div style={{ color: T.re, fontSize: 11, marginBottom: 8 }}>{error}</div>}
             <div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
               <span onClick={() => { setShowAdd(false); setError(''); }} style={btnGhost}>Cancel</span>
-              <button type="submit" style={{ ...btn, opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving...' : 'Add'}</button>
+              <button type="submit" style={{ ...btn, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving...' : 'Add'}</button>
             </div>
           </form>
         </div>
@@ -553,7 +563,7 @@ export default function InventoryExtras() {
           {error && <div style={{ padding: '0 18px 10px', color: T.re, fontSize: 11 }}>{error}</div>}
           <div style={{ padding: '0 18px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <div onClick={() => setCompleteItem(null)} style={btnGhost}>Cancel</div>
-            <div onClick={completeWithExtra} style={{ ...btn, opacity: saving ? 0.5 : 1 }}>{saving ? 'Processing...' : 'Confirm'}</div>
+            <div onClick={completeWithExtra} style={{ ...btn, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Processing...' : 'Confirm'}</div>
           </div>
         </div>
       </div>, document.body)}

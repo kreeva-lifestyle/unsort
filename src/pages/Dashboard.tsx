@@ -59,8 +59,8 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         supabase.from('packtime_scans').select('scanned_at').gte('scanned_at', weekAgoISO),
       ]);
     } catch (e: any) {
-      console.error('Dashboard fetch failed:', e?.message || e);
-      return; // keep old data instead of crashing
+      addToast('Failed to load dashboard data', 'error');
+      return;
     }
     const challans = (challansRes.data ?? []) as ChallanRow[];
     const items = (itemsRes.data ?? []) as InventoryRow[];
@@ -120,7 +120,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     setLoaded(true);
   }, []);
 
-  const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(TASK_LIMIT).then(({ data }) => setTasks((data ?? []) as TaskRow[])); };
+  const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(TASK_LIMIT).then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); setTasks((data ?? []) as TaskRow[]); }); };
 
   const [refreshing, setRefreshing] = useState(false);
   const manualRefresh = useCallback(async () => { setRefreshing(true); await fetchAll(); fetchTasks(); setRefreshing(false); }, [fetchAll]);
@@ -183,7 +183,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>{greeting}, {profile?.full_name?.split(' ')[0] || 'there'}</h2>
           <p style={{ margin: '4px 0 0', fontSize: 14, color: T.tx2, fontWeight: 500 }}>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</p>
         </div>
-        <button onClick={manualRefresh} disabled={refreshing} title="Refresh dashboard" style={{ background: 'none', border: `1px solid ${T.bd2}`, borderRadius: 8, padding: 8, cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: T.transition, opacity: refreshing ? 0.5 : 1 }}>
+        <button onClick={manualRefresh} disabled={refreshing} title="Refresh dashboard" aria-label="Refresh dashboard" style={{ background: 'none', border: `1px solid ${T.bd2}`, borderRadius: 8, padding: 8, cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: T.transition, opacity: refreshing ? 0.5 : 1 }}>
           <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 2, animation: refreshing ? 'spin 1s linear infinite' : 'none' }}><path d="M23 4v6h-6M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" /></svg>
         </button>
       </div>

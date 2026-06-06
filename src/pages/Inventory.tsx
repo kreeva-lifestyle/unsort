@@ -18,11 +18,11 @@ import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 // Status indicator — dot + plain label. Previous pills-with-bg were noisy in the
 // list view per audit P2; reserve pill treatment for modals.
 const STATUS_DOT_COLOR: Record<string, string> = {
-  completed: '#22C55E',
-  complete: '#22C55E',
-  damaged: '#EF4444',
-  unsorted: '#F59E0B',
-  dry_clean: '#38BDF8',
+  completed: T.gr,
+  complete: T.gr,
+  damaged: T.re,
+  unsorted: T.yl,
+  dry_clean: T.bl,
 };
 const statusTag = (status: string) => ({
   display: 'inline-flex' as const,
@@ -926,7 +926,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
                     </div>
                     <div style={{ padding: '6px 0' }}>
                     {['unsorted', 'damaged', 'dry_clean', 'completed'].filter(s => s !== item.status).map(s => (
-                      <div key={s} onClick={e => { e.stopPropagation(); quickStatusChange(item.id, s); }} style={{ padding: '12px 18px', fontSize: 14, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: s === 'completed' ? T.gr : s === 'damaged' ? T.re : s === 'dry_clean' ? '#38BDF8' : T.yl }} />{s === 'dry_clean' ? 'Dry Clean' : s.charAt(0).toUpperCase() + s.slice(1)}</div>
+                      <div key={s} onClick={e => { e.stopPropagation(); quickStatusChange(item.id, s); }} style={{ padding: '12px 18px', fontSize: 14, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: s === 'completed' ? T.gr : s === 'damaged' ? T.re : s === 'dry_clean' ? T.bl : T.yl }} />{s === 'dry_clean' ? 'Dry Clean' : s.charAt(0).toUpperCase() + s.slice(1)}</div>
                     ))}
                     </div>
                     <div onClick={e => { e.stopPropagation(); setQuickStatusItem(null); }} style={{ padding: '12px 18px', fontSize: 13, color: T.tx3, cursor: 'pointer', textAlign: 'center', borderTop: `1px solid ${T.bd}` }}>Cancel</div>
@@ -1060,7 +1060,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     <span onClick={() => { setDamagedComps(new Set()); setMissingComps(new Set()); }} style={{ ...S.btnGhost, fontSize: 10, padding: '3px 10px' }}>Reset All</span>
   </div>}
   {form.status === 'dry_clean' && <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-    <span onClick={() => { setMissingComps(new Set(catComps.map((c: any) => c.id))); setDamagedComps(new Set()); }} style={{ padding: '3px 10px', borderRadius: 4, border: '1px solid rgba(125,211,252,.2)', background: 'rgba(125,211,252,.06)', color: '#38BDF8', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Send All</span>
+    <span onClick={() => { setMissingComps(new Set(catComps.map((c: any) => c.id))); setDamagedComps(new Set()); }} style={{ padding: '3px 10px', borderRadius: 4, border: '1px solid rgba(125,211,252,.2)', background: 'rgba(125,211,252,.06)', color: T.bl, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Send All</span>
     <span onClick={() => { setMissingComps(new Set()); setDamagedComps(new Set()); }} style={{ ...S.btnGhost, fontSize: 10, padding: '3px 10px' }}>Reset All</span>
   </div>}
   <div style={{ background: T.s2, border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 8 }}>{catComps.map(c => {
@@ -1083,7 +1083,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     };
     const bg = isDryClean ? (isSending ? 'rgba(125,211,252,.08)' : 'transparent') : (isDamaged ? 'rgba(248,113,113,.08)' : isMissing ? 'rgba(251,191,36,.08)' : 'transparent');
     const bdr = isDryClean ? (isSending ? 'rgba(125,211,252,.3)' : 'transparent') : (isDamaged ? 'rgba(248,113,113,.3)' : isMissing ? 'rgba(251,191,36,.3)' : 'transparent');
-    const clr = isDryClean ? (isSending ? '#38BDF8' : T.tx3) : (isDamaged ? T.re : isMissing ? T.yl : T.gr);
+    const clr = isDryClean ? (isSending ? T.bl : T.tx3) : (isDamaged ? T.re : isMissing ? T.yl : T.gr);
     const label = isDryClean ? (isSending ? 'SENDING' : 'NOT SENDING') : state.toUpperCase();
     return <div key={c.id} onClick={cycle} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 3, background: bg, border: `1px solid ${bdr}`, transition: 'all .12s' }}>
       <div style={{ width: 8, height: 8, borderRadius: '50%', background: clr, flexShrink: 0 }} />
@@ -1091,7 +1091,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       <span style={{ fontSize: 10, fontWeight: 600, color: clr, textTransform: 'uppercase' as const }}>{label}</span>
     </div>;
   })}</div>
-  {form.status === 'dry_clean' && missingComps.size > 0 && <p style={{ fontSize: 10, color: '#38BDF8', marginTop: 5 }}>{missingComps.size} component{missingComps.size > 1 ? 's' : ''} being sent for dry cleaning</p>}
+  {form.status === 'dry_clean' && missingComps.size > 0 && <p style={{ fontSize: 10, color: T.bl, marginTop: 5 }}>{missingComps.size} component{missingComps.size > 1 ? 's' : ''} being sent for dry cleaning</p>}
   {form.status === 'dry_clean' && missingComps.size === 0 && <p style={{ fontSize: 11, color: T.yl, marginTop: 5, background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, padding: '6px 10px' }}>Select at least one component to send for dry cleaning.</p>}
   {form.status !== 'dry_clean' && missingComps.size > 0 && <p style={{ fontSize: 10, color: T.yl, marginTop: 5 }}>{missingComps.size} missing</p>}
   {form.status !== 'dry_clean' && damagedComps.size > 0 && <p style={{ fontSize: 10, color: T.re, marginTop: 3 }}>{damagedComps.size} damaged</p>}
@@ -1256,14 +1256,14 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       </>}
       <ConfirmModal {...confirmModalProps} />
       {exportPdfHtml && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#060810', display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
-          <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', fontFamily: "'Sora',sans-serif" }}>Export Preview</span>
-            <button onClick={() => setExportPdfHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Close">&times;</button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+          <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd2}`, background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Export Preview</span>
+            <button onClick={() => setExportPdfHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${T.bd2}`, background: T.glass2, color: T.tx2, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Close">&times;</button>
           </div>
-          <iframe srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#060810' }} />
+          <iframe srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%', background: T.bg }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <button onClick={() => setExportPdfHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
+            <button onClick={() => setExportPdfHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: `1px solid ${T.bd2}`, background: T.glass2, color: T.tx2, fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
             <button onClick={() => printOrQueue('document', exportPdfHtml!, 'A4', 'Inventory Export', undefined, addToast)} style={{ ...S.btnPrimary, ...S.btnLg, flex: 1, maxWidth: 160 }}>Print / Share</button>
           </div>
         </div>,

@@ -110,7 +110,7 @@ export default function ChallanList(p: Props) {
             </div>
             <div>
               <label style={S.fLabel}>Per page</label>
-              <select value={p.pageSize} onChange={e => { p.onPageSizeChange(Number(e.target.value)); p.onResetPage(); }} style={{ padding: '4px 8px', fontSize: 11, height: 28, borderRadius: 6, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.05)', color: '#8896B0', cursor: 'pointer' }}>
+              <select value={p.pageSize} onChange={e => { p.onPageSizeChange(Number(e.target.value)); p.onResetPage(); }} style={{ padding: '4px 8px', fontSize: 11, height: 28, borderRadius: 6, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.05)', color: T.tx2, cursor: 'pointer' }}>
                 <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
               </select>
             </div>
@@ -204,7 +204,7 @@ export default function ChallanList(p: Props) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 10, color: T.tx3 }}>{p.totalCount} items</span>
-            <select value={p.pageSize} onChange={e => { p.onPageSizeChange(Number(e.target.value)); p.onResetPage(); }} style={{ padding: '4px 8px', fontSize: 11, height: 28, borderRadius: 6, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.05)', color: '#8896B0', cursor: 'pointer' }}>
+            <select value={p.pageSize} onChange={e => { p.onPageSizeChange(Number(e.target.value)); p.onResetPage(); }} style={{ padding: '4px 8px', fontSize: 11, height: 28, borderRadius: 6, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.05)', color: T.tx2, cursor: 'pointer' }}>
               <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
             </select>
           </div>
