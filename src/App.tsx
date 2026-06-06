@@ -51,6 +51,7 @@ import { NotificationProvider, useNotifications } from './hooks/useNotifications
 import { BreadcrumbProvider } from './hooks/useBreadcrumb';
 
 import { TAB_IDS, canAccessTab, getFirstAllowedTab } from './lib/tabs';
+import { initGlobalPrintMode } from './lib/printQueue';
 const getTabFromHash = () => {
   const h = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   return (TAB_IDS as readonly string[]).includes(h) ? h : 'dashboard';
@@ -104,6 +105,9 @@ const MainApp = () => {
 
   // Redirect to dashboard if current tab became unauthorized after profile loads
   useEffect(() => { if (profile && !checkTab(tab)) setTab(fallback()); }, [profile]);
+
+  // Load the global print mode (shared across all users) + keep it live
+  useEffect(() => { if (!profile) return; return initGlobalPrintMode(); }, [profile]);
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
