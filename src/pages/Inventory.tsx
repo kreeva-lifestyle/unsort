@@ -229,12 +229,15 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   // Open item detail from notification click
   useEffect(() => {
     if (!openItemId) return;
+    let mounted = true;
     (async () => {
       const { data: item, error: itemErr } = await supabase.from('inventory_items').select('*, products(name, sku, total_components)').eq('id', openItemId).maybeSingle();
+      if (!mounted) return;
       if (itemErr) { addToast(friendlyError(itemErr), 'error'); onItemOpened?.(); return; }
-      if (item) { setSelected(item); await fetchComps(item.id); const { data: logs, error: logsErr } = await supabase.from('activity_logs').select('*, profiles:user_id(full_name)').eq('entity_id', item.id).order('created_at', { ascending: false }).limit(20); if (logsErr) addToast(friendlyError(logsErr), 'error'); setItemLogs(logs || []); setShowCompModal(true); }
+      if (item) { setSelected(item); await fetchComps(item.id); if (!mounted) return; const { data: logs, error: logsErr } = await supabase.from('activity_logs').select('*, profiles:user_id(full_name)').eq('entity_id', item.id).order('created_at', { ascending: false }).limit(20); if (!mounted) return; if (logsErr) addToast(friendlyError(logsErr), 'error'); setItemLogs(logs || []); setShowCompModal(true); }
       onItemOpened?.();
     })();
+    return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openItemId]);
 
@@ -720,7 +723,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
                 if (filtered.length === 0) { addToast('Nothing to export — no items match the current filters', 'error'); setShowExportMenu(false); return; }
                 const csv = 'Batch,SKU,Category,Size,Status,Location,Missing,Damaged\n' + filtered.map(i => `${i.batch_number || ''},${i.serial_number || ''},"${i.products?.name || ''}",${i.size || ''},${i.status},${i.location || ''},"${(itemMissing[i.id] || []).join('; ')}","${(itemDamaged[i.id] || []).join('; ')}"`).join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
-                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Inventory_${stage}_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Inventory_${stage}_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
                 setShowExportMenu(false);
               }} style={{ padding: '12px 14px', fontSize: 12, color: T.tx, cursor: 'pointer', borderTop: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', gap: 8, minHeight: 44 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                 <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.gr, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>

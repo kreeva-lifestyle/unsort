@@ -136,8 +136,8 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
                   <div style={{ flex: 1, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.tx }}>{r.sku}</div>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                     <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 700, color: T.gr, minWidth: 30, textAlign: 'right' }}>+{r.quantity}</span>
-                    <span onClick={() => { setEditId(r.id); setEditSku(r.sku); setEditQty(String(r.quantity)); }} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', padding: '4px 8px' }}>Edit</span>
-                    <span onClick={() => remove(r.id)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', padding: '4px 8px' }}>Del</span>
+                    <span onClick={() => { setEditId(r.id); setEditSku(r.sku); setEditQty(String(r.quantity)); }} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer' }}>Edit</span>
+                    <span onClick={() => remove(r.id)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer' }}>Del</span>
                   </div>
                 </>)}
               </div>
