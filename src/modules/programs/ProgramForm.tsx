@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import SectionTitle from './components/SectionTitle';
 import FabricBreakdown from './components/FabricBreakdown';
@@ -24,6 +25,10 @@ interface Props {
 }
 
 export default function ProgramForm({ form, setField, editing, error, saving, onSave, onClose, t, initialWorkParts, initialFabricParts }: Props) {
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => { document.body.classList.remove('modal-open'); };
+  }, []);
   const isSkuError = error === 'skuRequired';
   const [workParts, setWorkParts] = useState<PricePartRow[]>(initialWorkParts?.length ? initialWorkParts : [{ ...EMPTY_WORK_PART }]);
   const [fabricParts, setFabricParts] = useState<PricePartRow[]>(initialFabricParts?.length ? initialFabricParts : [{ ...EMPTY_FABRIC_PART }]);
@@ -82,12 +87,12 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
 
   const th: React.CSSProperties = { ...S.thStyle, padding: '8px 8px', fontSize: 10 };
   const td: React.CSSProperties = { padding: '6px 6px', borderBottom: `1px solid ${T.bd}` };
-  const numIn: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.mono, fontSize: 11, padding: '6px 6px', outline: 'none', textAlign: 'right' as const, boxSizing: 'border-box' as const };
+  const numIn: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: T.r, color: T.tx, fontFamily: T.mono, fontSize: 11, padding: '6px 6px', outline: 'none', textAlign: 'right' as const, boxSizing: 'border-box' as const };
   const txtIn: React.CSSProperties = { ...numIn, textAlign: 'left' as const };
-  const selIn: React.CSSProperties = { ...numIn, textAlign: 'left' as const, appearance: 'none' as const, WebkitAppearance: 'none' as const, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%236B7890'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center', paddingRight: 18, cursor: 'pointer' };
+  const selIn: React.CSSProperties = { ...numIn, textAlign: 'left' as const, appearance: 'none' as const, WebkitAppearance: 'none' as const, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%238896B0'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center', paddingRight: 18, cursor: 'pointer' };
   const calcCell: React.CSSProperties = { ...td, fontFamily: T.mono, fontSize: 11, fontWeight: 600, color: T.ac2, textAlign: 'right' as const, background: 'rgba(255,255,255,0.02)' };
 
-  return (
+  return createPortal(
     <div className="prg-form-overlay" style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(12px)', padding: '20px 16px', overflowY: 'auto' }} onClick={onClose}>
       <div className="prg-form-modal modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 900, width: '100%', margin: '20px 0' }} onClick={e => e.stopPropagation()}>
         <div className="prg-form-head" style={{ ...S.modalHead, position: 'sticky', top: 0, zIndex: 2, background: 'rgba(14,18,30,.98)', borderRadius: '14px 14px 0 0' }}>
@@ -186,6 +191,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

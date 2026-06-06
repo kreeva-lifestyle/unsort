@@ -1,5 +1,6 @@
 /* eslint-disable */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { BarcodeDetector } from 'barcode-detector/ponyfill';
 import { supabase, SUPABASE_ANON_KEY } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
@@ -231,6 +232,12 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  useEffect(() => {
+    const open = !!confirmDeleteId || todaySummaryOpen || showComplete || confirmChangeSetup;
+    document.body.classList.toggle('modal-open', open);
+    return () => { document.body.classList.remove('modal-open'); };
+  }, [confirmDeleteId, todaySummaryOpen, showComplete, confirmChangeSetup]);
 
   // Local duplicate tracking
   const awbSetRef = useRef<Set<string>>(new Set());
@@ -764,18 +771,19 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       </div>
 
       {/* Delete confirmation modal */}
-      {confirmDeleteId && (
+      {confirmDeleteId && createPortal(
         <div style={S.modalOverlay}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }}>
-            <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg></div>
+            <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: T.yl, strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill={T.yl} /></svg></div>
             <div style={{ ...S.modalTitle, marginBottom: 4 }}>Delete Scan?</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This will permanently remove the scan from the database and Google Sheet.</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmDeleteId(null)} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Cancel</button>
-              <button onClick={() => { deleteHistoryScan(confirmDeleteId); setConfirmDeleteId(null); }} style={{ ...S.btnDanger, flex: 1, justifyContent: 'center', background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', border: 'none' }}>Delete</button>
+              <button onClick={() => { deleteHistoryScan(confirmDeleteId); setConfirmDeleteId(null); }} style={{ ...S.btnDangerSolid, flex: 1, justifyContent: 'center' }}>Delete</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Pagination */}
@@ -1010,7 +1018,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       </div>
 
       {/* Today Summary Modal */}
-      {todaySummaryOpen && (
+      {todaySummaryOpen && createPortal(
         <div style={{ ...S.modalOverlay }} onClick={() => setTodaySummaryOpen(false)}>
           <div className="modal-inner" onClick={e => e.stopPropagation()} style={{ ...S.modalBox, maxWidth: 340, padding: '18px 16px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4, textAlign: 'center' }}>Today's Summary</div>
@@ -1023,14 +1031,15 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               </div>
             ))}
             {todaySummary.length > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '0 0 8px 8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: T.glass1, borderRadius: '0 0 8px 8px' }}>
                 <span style={{ fontSize: 12, color: T.tx, fontWeight: 700, fontFamily: T.sora }}>Total</span>
                 <span style={{ fontSize: 18, fontFamily: T.mono, color: T.gr, fontWeight: 800 }}>{todaySummary.reduce((a, s) => a + s.count, 0)}</span>
               </div>
             )}
-            <button onClick={() => setTodaySummaryOpen(false)} style={{ width: '100%', marginTop: 12, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Close</button>
+            <button onClick={() => setTodaySummaryOpen(false)} style={{ ...S.btnGhost, width: '100%', marginTop: 12, justifyContent: 'center' }}>Close</button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Last Scanned + Undo */}
@@ -1135,7 +1144,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       )}
 
       {/* Complete modal */}
-      {showComplete && (
+      {showComplete && createPortal(
         <div style={{ ...S.modalOverlay }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px', textAlign: 'center' }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Session Complete</div>
@@ -1162,14 +1171,15 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               <button onClick={() => { endSession(); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.grCC}, ${T.gr88})`, color: '#fff', cursor: 'pointer' }}>End Session</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Change-setup-mid-session confirm dialog (audit P1: don't trap operator in wrong courier) */}
-      {confirmChangeSetup && (
+      {confirmChangeSetup && createPortal(
         <div style={{ ...S.modalOverlay, zIndex: 250 }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px', textAlign: 'center' }}>
-            <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 32, height: 32, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg></div>
+            <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 32, height: 32, fill: 'none', stroke: T.yl, strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill={T.yl} /></svg></div>
             <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Change setup mid-session?</div>
             <div style={{ fontSize: 12, color: T.tx3, marginBottom: 14, lineHeight: 1.5 }}>You've scanned <strong style={{ color: T.gr }}>{sessionCount}</strong> AWB{sessionCount === 1 ? '' : 's'} so far. They've already been saved to the sheet. Changing setup resets the in-app counter but does not delete the saved scans.</div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -1177,7 +1187,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               <button onClick={() => { setConfirmChangeSetup(false); endSession(); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.ylCC}, ${T.yl88})`, color: '#111', cursor: 'pointer' }}>Change setup</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
