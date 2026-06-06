@@ -16,9 +16,11 @@ export default function Settings({ profile, addToast }: { profile: any; addToast
   const isAdmin = profile?.role === 'admin';
   const isManager = profile?.role === 'manager';
   const canManage = isAdmin || isManager;
-  const tabs = [{ id: 'myprofile', label: 'My Profile' }];
+  // Printers config is per-PC (localStorage) — every print-station operator
+  // needs it regardless of role, so it lives in the base tab list.
+  const tabs = [{ id: 'myprofile', label: 'My Profile' }, { id: 'printers', label: 'Printers' }];
   if (canManage) tabs.push({ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }, { id: 'brands', label: 'Brands' });
-  if (isAdmin) tabs.push({ id: 'users', label: 'Users' }, { id: 'packtime', label: 'PackStation' }, { id: 'printers', label: 'Printers' });
+  if (isAdmin) tabs.push({ id: 'users', label: 'Users' }, { id: 'packtime', label: 'PackStation' });
   const [tab, setTab] = useState('myprofile');
   const { set: setBreadcrumb } = useBreadcrumb();
   const tabLabel = tabs.find(t => t.id === tab)?.label || '';
@@ -39,7 +41,7 @@ export default function Settings({ profile, addToast }: { profile: any; addToast
       {tab === 'users' && isAdmin && <UsersSettings addToast={addToast} profile={profile} />}
       {tab === 'brands' && canManage && <BrandsSettings addToast={addToast} />}
       {tab === 'packtime' && isAdmin && <PackStationSettings addToast={addToast} />}
-      {tab === 'printers' && isAdmin && <PrinterSettings addToast={addToast} />}
+      {tab === 'printers' && <PrinterSettings addToast={addToast} />}
     </div>
   );
 }
