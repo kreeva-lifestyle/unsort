@@ -921,13 +921,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       <div class="cut-line"> - - - - - - - - - - - - - - Cut Here - - - - - - - - - - - - - - </div>
       ${copy('Customer Copy', false)}
     </div></body></html>`;
-    const printableHtml = htmlContent.replace('</body>', `
-      <div class="no-print" style="position:fixed;bottom:0;left:0;right:0;padding:10px 16px;padding-bottom:max(10px, env(safe-area-inset-bottom));background:#f5f5f5;display:flex;gap:8px;justify-content:center;border-top:1px solid #ddd;z-index:100">
-        <button onclick="window.print()" style="flex:1;padding:12px 0;border-radius:8px;border:none;background:#6366F1;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Print / Share</button>
-      </div>
-      <style>@media print{.no-print{display:none!important}}</style>
-    </body>`);
-    setPrintHtml(printableHtml);
+    // The preview modal supplies its own Print/Share button (routes through
+    // printOrQueue → Cloud Print or browser). No embedded window.print() — that
+    // would bypass the cloud queue and force the browser dialog.
+    setPrintHtml(htmlContent);
   };
 
   // ── Export challans as CSV with item-level detail ─────────────────────────
