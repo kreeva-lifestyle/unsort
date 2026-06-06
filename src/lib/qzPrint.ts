@@ -124,6 +124,19 @@ export function setSlotPrinter(slot: PrintSlot, printerName: string | null): voi
 
 export type PageSize = { width: number; height: number } | 'A4';
 
+// Map raw QZ Tray / websocket errors to messages shop staff can act on.
+export function friendlyPrintError(msg: string | null | undefined): string {
+  const m = (msg || '').toLowerCase();
+  if (!m) return 'Print failed — please try again.';
+  if (m.includes('websocket') || m.includes('connect') || m.includes('not running')) return 'QZ Tray is not running on the print computer.';
+  if (m.includes('not found') || m.includes('unknown printer') || m.includes('no printer')) return 'Printer not found — check it is switched on and plugged in.';
+  if (m.includes('timed out') || m.includes('timeout')) return 'Print timed out — check the printer (paper, power, connection).';
+  if (m.includes('access') || m.includes('denied') || m.includes('permission')) return 'Printer access denied — check the printer is shared/available.';
+  // Fall back to a trimmed raw message
+  const raw = (msg || '').trim();
+  return raw.length > 120 ? 'Print failed — check the printer.' : raw;
+}
+
 export async function printHtml(printerName: string, html: string, pageSize: PageSize, copies = 1): Promise<void> {
   await connect();
   const qz = await loadQz();

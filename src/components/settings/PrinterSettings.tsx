@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { T, S } from '../../lib/theme';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
-import { connect, listPrinters, getSlotPrinter, setSlotPrinter, SLOT_LABELS, printHtml } from '../../lib/qzPrint';
+import { connect, listPrinters, getSlotPrinter, setSlotPrinter, SLOT_LABELS, printHtml, friendlyPrintError } from '../../lib/qzPrint';
 import { getPrintMode, setPrintMode } from '../../lib/printQueue';
 import type { PrintSlot, PrintJob } from '../../types/database';
 
@@ -65,7 +65,7 @@ export default function PrinterSettings({ addToast }: { addToast: (msg: string, 
       await printHtml(printer, `<html><body style="font-family:Arial;text-align:center;padding:20px"><h2>Test Print</h2><p>Slot: ${SLOT_LABELS[slot]}</p><p>Printer: ${printer}</p><p>${new Date().toLocaleString()}</p></body></html>`, slot === 'document' ? 'A4' : slot === 'label_large' ? { width: 4, height: 6 } : { width: 1.97, height: 2.97 });
       addToast('Test page sent to printer', 'success');
     } catch (e: any) {
-      addToast(e?.message || 'Print failed', 'error');
+      addToast(friendlyPrintError(e?.message), 'error');
     }
   };
 

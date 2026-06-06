@@ -590,7 +590,7 @@ export default function InventoryExtras() {
           <iframe srcDoc={exportHtml} style={{ flex: 1, border: 'none', width: '100%', background: T.bg }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button onClick={() => setExportHtml(null)} style={{ ...S.btnGhost, flex: 1, maxWidth: 160 }}>Close</button>
-            <button onClick={async () => { const { error } = await printOrQueue('document', exportHtml!, 'A4', 'Spare Parts Export'); if (error) addToast(error.message, 'error'); else addToast('Print job sent', 'success'); }} style={{ ...S.btnPrimary, padding: '10px 24px', fontSize: 13, flex: 1, maxWidth: 160 }}>Print / Share</button>
+            <button onClick={() => printOrQueue('document', exportHtml!, 'A4', 'Spare Parts Export', undefined, addToast)} style={{ ...S.btnPrimary, padding: '10px 24px', fontSize: 13, flex: 1, maxWidth: 160 }}>Print / Share</button>
           </div>
         </div>,
         document.body

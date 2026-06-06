@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { T, S } from '../lib/theme';
 import { supabase } from '../lib/supabase';
-import { connect, isConnected, getSlotPrinter, printHtml, SLOT_LABELS } from '../lib/qzPrint';
+import { connect, isConnected, getSlotPrinter, printHtml, SLOT_LABELS, friendlyPrintError } from '../lib/qzPrint';
 import type { PrintJob, PrintSlot } from '../types/database';
 import type { PageSize } from '../lib/qzPrint';
 
 const SLOTS: PrintSlot[] = ['label_small', 'label_large', 'document'];
 const STALE_MS = 120_000;
+const PRINT_TIMEOUT_MS = 60_000;
 
 export default function PrintStation() {
   const [connected, setConnected] = useState(false);
@@ -53,6 +54,17 @@ export default function PrintStation() {
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
+  // On (re)mount, recover this station's own jobs left mid-print by a previous
+  // tab close/refresh. Only reset ones claimed >30s ago so a sibling tab's
+  // fresh in-flight print isn't clobbered.
+  useEffect(() => {
+    const cutoff = new Date(Date.now() - 30_000).toISOString();
+    supabase.from('print_queue')
+      .update({ status: 'pending', printed_by_station: null, printed_at: null })
+      .eq('status', 'printing').eq('printed_by_station', stationName).lt('printed_at', cutoff)
+      .then(() => fetchJobs());
+  }, [stationName, fetchJobs]);
+
   useEffect(() => {
     const chan = supabase.channel('print-queue-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'print_queue' }, () => { fetchJobs(); })
@@ -80,11 +92,15 @@ export default function PrintStation() {
         ? { width: Number((job.page_size as Record<string, number>).width || (job.page_size as Record<string, number>).w),
             height: Number((job.page_size as Record<string, number>).height || (job.page_size as Record<string, number>).h) }
         : 'A4';
-      await printHtml(printer, job.html, ps, job.copies);
+      // Bound the print so one unresponsive printer can't freeze the whole queue.
+      await Promise.race([
+        printHtml(printer, job.html, ps, job.copies),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('Print timed out')), PRINT_TIMEOUT_MS)),
+      ]);
       await supabase.from('print_queue').update({ status: 'done', printed_at: new Date().toISOString() }).eq('id', job.id).eq('status', 'printing');
       setStats(s => ({ ...s, printed: s.printed + 1 }));
     } catch (e: any) {
-      await supabase.from('print_queue').update({ status: 'failed', error_message: e?.message || 'Unknown error' }).eq('id', job.id);
+      await supabase.from('print_queue').update({ status: 'failed', error_message: friendlyPrintError(e?.message) }).eq('id', job.id);
       setStats(s => ({ ...s, failed: s.failed + 1 }));
     }
 
@@ -104,7 +120,7 @@ export default function PrintStation() {
       jobs.filter(j => j.status === 'printing').forEach(j => {
         const claimedAt = j.printed_at ? new Date(j.printed_at).getTime() : new Date(j.created_at).getTime();
         if (now - claimedAt > STALE_MS) {
-          supabase.from('print_queue').update({ status: 'failed', error_message: 'Print timed out — station may have crashed', printed_by_station: null }).eq('id', j.id).eq('status', 'printing');
+          supabase.from('print_queue').update({ status: 'failed', error_message: friendlyPrintError('Print timed out — station may have crashed'), printed_by_station: null }).eq('id', j.id).eq('status', 'printing');
         }
       });
     }, 30_000);

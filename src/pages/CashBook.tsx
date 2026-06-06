@@ -372,8 +372,7 @@ export default function CashBook() {
     </div>`;
     html += `<p style="text-align:center;color:#999;font-size:9px;margin-top:30px;letter-spacing:1px;text-transform:uppercase">Powered by DailyOffice</p>`;
     html += `</body></html>`;
-    const { error } = await printOrQueue('document', html, 'A4', `Handover ${formatHandoverNo(h.handover_number)}`);
-    if (error) addToast(error.message, 'error'); else addToast('Print job sent', 'success');
+    await printOrQueue('document', html, 'A4', `Handover ${formatHandoverNo(h.handover_number)}`, undefined, addToast);
   };
 
   const confirmHandover = async () => {

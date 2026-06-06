@@ -766,7 +766,7 @@ export default function BrandTagPrinter() {
           <iframe ref={printIframeRef} title="Label print preview" srcDoc={printHtml} style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button onClick={() => setPrintHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: '#8896B0', fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
-            <button onClick={async () => { const { error } = await printOrQueue('label_small', printHtml!, { width: 1.97, height: 2.97 }, 'Brand Tags'); if (error) addToast(error.message, 'error'); else addToast('Print job sent', 'success'); }} style={{ ...S.btnPrimary, ...S.btnLg, flex: 1, maxWidth: 160 }}>Print</button>
+            <button onClick={() => printOrQueue('label_small', printHtml!, { width: 1.97, height: 2.97 }, 'Brand Tags', undefined, addToast)} style={{ ...S.btnPrimary, ...S.btnLg, flex: 1, maxWidth: 160 }}>Print</button>
           </div>
         </div>,
         document.body
