@@ -124,7 +124,7 @@ if (typeof window !== 'undefined') {
         const blob = new Blob([body], { type: 'application/json' });
         const ok = navigator.sendBeacon ? navigator.sendBeacon(EDGE_FN, blob) : false;
         if (!ok) {
-          fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body, keepalive: true }).catch(() => {});
+          fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body, keepalive: true }).catch(e => console.warn('Sheet sync failed:', e));
         }
       }
       e.returnValue = '';
@@ -531,7 +531,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     focusInput();
     // Background delete from Google Sheet + Supabase DB
     getAuthHeaders().then(headers => fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
-      .then(r => r.json()).then(() => {})).catch(() => {});
+      .then(r => r.json()).then(() => {})).catch(e => console.warn('Sheet delete failed:', e));
     supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current).then(({ error: e }) => { if (e) console.error('Scan undo failed:', e); });
   }, [lastScanned, courierSheet, focusInput]);
 

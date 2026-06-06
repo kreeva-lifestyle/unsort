@@ -65,7 +65,7 @@ export default function PrintStation() {
     supabase.from('print_queue')
       .update({ status: 'pending', printed_by_station: null, printed_at: null })
       .eq('status', 'printing').eq('printed_by_station', stationName).lt('printed_at', cutoff)
-      .then(() => fetchJobs());
+      .then(({ error }) => { if (error) console.warn('Recovery update failed:', error); fetchJobs(); });
   }, [stationName, fetchJobs]);
 
   useEffect(() => {

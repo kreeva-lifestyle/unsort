@@ -6,6 +6,8 @@ import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import { supabase } from '../../lib/supabase';
+import { friendlyError } from '../../lib/friendlyError';
+import { useNotifications } from '../../hooks/useNotifications';
 import type { CashChallan, CashChallanCustomer, AuditLog } from '../../types/database';
 
 type Challan = Omit<CashChallan, 'created_at' | 'updated_at'> & { created_at: string; updated_at: string };
@@ -73,6 +75,7 @@ export type ChallanFormProps = {
 };
 
 export default function ChallanForm(p: ChallanFormProps) {
+  const { addToast } = useNotifications();
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
   const [nextNum, setNextNum] = useState<number | null>(null);
   const [outstanding, setOutstanding] = useState(0);
@@ -80,9 +83,9 @@ export default function ChallanForm(p: ChallanFormProps) {
 
   useEffect(() => {
     if (!p.editing) {
-      supabase.rpc('get_next_challan_number').then(({ data, error }) => { if (error) console.warn('Next number fetch failed'); if (data) setNextNum(data); });
+      supabase.rpc('get_next_challan_number').then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); if (data) setNextNum(data); });
       supabase.from('cash_challans').select('customer_name, customer_id').order('created_at', { ascending: false }).limit(20).then(({ data, error }) => {
-        if (error) { console.warn('Recent customers fetch failed'); return; }
+        if (error) { addToast(friendlyError(error), 'error'); return; }
         const seen = new Set<string>();
         const recent: { name: string; id?: string }[] = [];
         (data || []).forEach(c => { if (!seen.has(c.customer_name)) { seen.add(c.customer_name); recent.push({ name: c.customer_name, id: c.customer_id }); } });
@@ -100,7 +103,7 @@ export default function ChallanForm(p: ChallanFormProps) {
   useEffect(() => {
     if (!p.customerName.trim()) { setOutstanding(0); return; }
     supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', p.customerName.trim()).in('status', ['unpaid', 'partial']).eq('is_return', false).then(({ data, error }) => {
-      if (error) { console.warn('Outstanding fetch failed'); return; }
+      if (error) { addToast(friendlyError(error), 'error'); return; }
       const total = (data || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0);
       setOutstanding(Math.round(total));
     });
@@ -162,7 +165,7 @@ export default function ChallanForm(p: ChallanFormProps) {
           {!p.editing && recentCustomers.length > 0 && !p.customerName && (
             <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
               {recentCustomers.map(c => (
-                <span key={c.name} onClick={() => { p.setCustomerName(c.name); if (c.id) { p.setSelectedCustomerId(c.id); supabase.from('cash_challan_customers').select('phone').eq('name', c.name).maybeSingle().then(({ data, error }) => { if (!error && data?.phone) p.setCustomerPhone(data.phone); }); } p.setCustomerSuggestions([]); }}
+                <span key={c.name} onClick={() => { p.setCustomerName(c.name); if (c.id) { p.setSelectedCustomerId(c.id); supabase.from('cash_challan_customers').select('phone').eq('name', c.name).maybeSingle().then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); if (data?.phone) p.setCustomerPhone(data.phone); }); } p.setCustomerSuggestions([]); }}
                   style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', background: T.ac3, border: `1px solid ${T.ac3}`, color: T.ac2, whiteSpace: 'nowrap' }}>{c.name}</span>
               ))}
             </div>

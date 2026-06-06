@@ -11,7 +11,7 @@ export default function Brands({ addToast }: { addToast: (msg: string, type?: st
   const [brands, setBrands] = useState<any[]>([]);
   const [newBrand, setNewBrand] = useState('');
   const { ask, modalProps } = useConfirm();
-  const fetchBrands = useCallback(() => { supabase.from('brands').select('id, name, is_active').order('name').then(({ data }) => setBrands(data || [])); }, []);
+  const fetchBrands = useCallback(() => { supabase.from('brands').select('id, name, is_active').order('name').then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); setBrands(data || []); }); }, [addToast]);
   const { pendingDel, scheduleDelete, undo, dismiss } = useUndoDelete('brands', fetchBrands);
   useEffect(() => { fetchBrands(); }, [fetchBrands]);
 

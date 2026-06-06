@@ -29,7 +29,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, []);
-  const fetchComps = async (id: string) => { const { data } = await supabase.from('components').select('id, name').eq('product_id', id).order('created_at', { ascending: true }); setComps(data || []); };
+  const fetchComps = async (id: string) => { const { data, error } = await supabase.from('components').select('id, name').eq('product_id', id).order('created_at', { ascending: true }); if (error) addToast(friendlyError(error), 'error'); setComps(data || []); };
 
   const generateSku = (name: string) => {
     const base = name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);

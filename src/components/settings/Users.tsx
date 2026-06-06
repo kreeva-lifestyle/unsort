@@ -9,9 +9,11 @@ import { friendlyError } from '../../lib/friendlyError';
 import { MODULE_LABELS, ALL_MODULE_KEYS } from '../../lib/tabs';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import Empty from '../ui/Empty';
+import { SkeletonRows } from '../ui/Skeleton';
 
 export default function Users({ addToast, profile }: { addToast: (msg: string, type?: string) => void; profile: any }) {
   const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', password: '', role: 'viewer' });
@@ -23,7 +25,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     return () => { document.body.classList.remove('modal-open'); };
   }, [showInvite]);
 
-  const fetchUsers = () => { supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at, module_access').order('created_at', { ascending: false }).then(({ data, error }) => { if (error) addToast('Failed to load users — ' + friendlyError(error), 'error'); setUsers(data || []); }); };
+  const fetchUsers = () => { supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at, module_access').order('created_at', { ascending: false }).then(({ data, error }) => { if (error) addToast('Failed to load users — ' + friendlyError(error), 'error'); setUsers(data || []); setLoading(false); }); };
   useEffect(() => {
     fetchUsers();
     const ch = supabase.channel('usr-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fetchUsers).subscribe();
@@ -130,6 +132,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
         <div onClick={() => setShowInvite(true)} style={S.btnPrimary}>+ Invite User</div>
       </div>
+      {loading && users.length === 0 && <SkeletonRows rows={4} />}
       <div className="desktop-only" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>{['User', 'Role', 'Status', 'Actions'].map((h) => <th key={h} style={S.thStyle}>{h}</th>)}</tr></thead>

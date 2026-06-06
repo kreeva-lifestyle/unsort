@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
+import { friendlyError } from '../../lib/friendlyError';
+import { useNotifications } from '../../hooks/useNotifications';
 import { T, S } from '../../lib/theme';
 import { SkeletonRows } from '../ui/Skeleton';
 import type { CashChallan, CashChallanItem } from '../../types/database';
@@ -26,6 +28,7 @@ interface Props {
 type TimelineEntry = { type: 'audit' | 'payment'; time: string; action?: string; details?: string; user_name?: string; changes?: Record<string, { from: unknown; to: unknown }> | null; amount?: number; payment_mode?: string; is_reversal?: boolean; notes?: string; batch_id?: string | null };
 
 export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid, onNext, onPrev, hasNext, hasPrev }: Props) {
+  const { addToast } = useNotifications();
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -57,8 +60,8 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
       supabase.from('audit_log').select('action, details, user_email, changes, created_at').eq('module', 'cash_challan').eq('record_id', c.id).order('created_at'),
       supabase.from('cash_challan_payments').select('amount, payment_mode, payment_date, paid_by, notes, is_reversal, created_at, batch_id').eq('challan_id', c.id).order('created_at'),
     ]).then(async ([auditRes, payRes]) => {
-      if (auditRes.error) console.warn('Audit timeline failed:', auditRes.error.message);
-      if (payRes.error) console.warn('Payment timeline failed:', payRes.error.message);
+      if (auditRes.error) addToast(friendlyError(auditRes.error), 'error');
+      if (payRes.error) addToast(friendlyError(payRes.error), 'error');
       const entries: TimelineEntry[] = [];
       for (const a of (auditRes.data || [])) {
         if (a.action === 'INV_TOGGLE') continue;
@@ -74,7 +77,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
       entries.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
       setTimeline(entries);
       setTimelineLoading(false);
-    }).catch(() => setTimelineLoading(false));
+    }).catch(e => { addToast(friendlyError(e), 'error'); setTimelineLoading(false); });
   }, [c.id]);
 
   const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
@@ -102,7 +105,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
       : { position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.80)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', padding: 16 }
     } onClick={onClose}>
       <div ref={scrollRef} className="challan-detail-modal" style={mobile
-        ? { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#060810', borderRadius: '16px 16px 0 0', padding: 0, maxHeight: '85vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', animation: 'slideUp .25s ease both' }
+        ? { position: 'fixed', bottom: 0, left: 0, right: 0, background: T.bg, borderRadius: '16px 16px 0 0', padding: 0, maxHeight: '85vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', animation: 'slideUp .25s ease both' }
         : { background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,.65)' }
       } onClick={e => e.stopPropagation()} onTouchStart={mobile ? onDragStart : undefined} onTouchEnd={mobile ? onDragEnd : undefined}>
 
