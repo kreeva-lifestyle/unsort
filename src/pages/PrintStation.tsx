@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { T, S } from '../lib/theme';
 import { supabase } from '../lib/supabase';
 import { connect, isConnected, getSlotPrinter, printHtml, SLOT_LABELS, friendlyPrintError } from '../lib/qzPrint';
+import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 import type { PrintJob, PrintSlot } from '../types/database';
 import type { PageSize } from '../lib/qzPrint';
 
@@ -22,8 +23,10 @@ export default function PrintStation() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [stats, setStats] = useState({ printed: 0, failed: 0 });
   const processingRef = useRef(false);
+  const { ask, modalProps } = useConfirm();
 
   const mySlots = SLOTS.filter(s => getSlotPrinter(s));
+  const activeCount = jobs.filter(j => j.status === 'pending' || j.status === 'printing').length;
 
   const tryConnect = useCallback(async () => {
     try {
@@ -132,6 +135,20 @@ export default function PrintStation() {
     if (!error) setJobs(j => j.filter(x => x.id !== id));
   };
 
+  // Emergency stop — purge every queued/in-progress job so nothing more prints.
+  const stopAll = async () => {
+    if (activeCount === 0) return;
+    const ok = await ask({
+      title: 'Stop all printing?',
+      message: `This cancels ${activeCount} queued job${activeCount !== 1 ? 's' : ''} so nothing more prints. Pages already sent to a printer can't be pulled back.`,
+      confirmLabel: 'Stop All',
+      danger: true,
+    });
+    if (!ok) return;
+    const { error } = await supabase.from('print_queue').delete().in('status', ['pending', 'printing']);
+    if (!error) setJobs(j => j.filter(x => x.status !== 'pending' && x.status !== 'printing'));
+  };
+
   const retryJob = async (id: string) => {
     await supabase.from('print_queue').update({ status: 'pending', error_message: null, printed_at: null, printed_by_station: null }).eq('id', id);
   };
@@ -192,7 +209,14 @@ export default function PrintStation() {
       )}
 
       {/* Job Queue */}
-      <div style={{ ...S.fLabel, marginBottom: 8 }}>Print Queue</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={S.fLabel}>Print Queue</span>
+        {activeCount > 0 && (
+          <button onClick={stopAll} style={{ ...S.btnDangerSolid, ...S.btnSm }}>
+            ■ Stop All ({activeCount})
+          </button>
+        )}
+      </div>
       <div style={{ background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden' }}>
         {jobs.length === 0 && (
           <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>No print jobs yet. Jobs appear here when someone prints from any device.</div>
@@ -218,6 +242,7 @@ export default function PrintStation() {
           </div>
         ))}
       </div>
+      <ConfirmModal {...modalProps} />
     </div>
   );
 }
