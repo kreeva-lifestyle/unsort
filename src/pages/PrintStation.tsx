@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { T, S } from '../lib/theme';
 import { supabase } from '../lib/supabase';
-import { connect, isConnected, listPrinters, getSlotPrinter, printHtml, SLOT_LABELS } from '../lib/qzPrint';
+import { connect, isConnected, getSlotPrinter, printHtml, SLOT_LABELS } from '../lib/qzPrint';
 import type { PrintJob, PrintSlot } from '../types/database';
 import type { PageSize } from '../lib/qzPrint';
 
@@ -27,14 +27,22 @@ export default function PrintStation() {
   const tryConnect = useCallback(async () => {
     try {
       await connect();
-      await listPrinters();
       setConnected(true);
     } catch {
       setConnected(false);
     }
   }, []);
 
-  useEffect(() => { tryConnect(); const iv = setInterval(tryConnect, 15_000); return () => clearInterval(iv); }, [tryConnect]);
+  useEffect(() => {
+    tryConnect();
+    // Only re-attempt if the socket actually dropped — calling QZ repeatedly
+    // when already connected re-triggers the trust prompt on every poll.
+    const iv = setInterval(() => {
+      if (isConnected()) setConnected(true);
+      else tryConnect();
+    }, 15_000);
+    return () => clearInterval(iv);
+  }, [tryConnect]);
 
   const fetchJobs = useCallback(async () => {
     const { data } = await supabase.from('print_queue')
