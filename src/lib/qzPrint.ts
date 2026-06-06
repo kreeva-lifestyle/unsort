@@ -1,5 +1,58 @@
 import qz from 'qz-tray';
+import { supabase, SUPABASE_ANON_KEY } from './supabase';
 import type { PrintSlot } from '../types/database';
+
+const QZ_CERTIFICATE = `-----BEGIN CERTIFICATE-----
+MIIDDTCCAfWgAwIBAgIUXb0iRIMPYTGoJ6Ro9M3gf8b0tiQwDQYJKoZIhvcNAQEL
+BQAwFjEUMBIGA1UEAwwLQXJ5YURlc2lnbnMwHhcNMjYwNjA2MDUxMjExWhcNMzYw
+NjAzMDUxMjExWjAWMRQwEgYDVQQDDAtBcnlhRGVzaWduczCCASIwDQYJKoZIhvcN
+AQEBBQADggEPADCCAQoCggEBAKT0nKnkIhjxWPDA1mQbvg495uRAY9c7i0+5amoM
+bN0BxBR4iwkWWC6yVkX6HTKO4Y7Fac+KID4IDy27o/gUt+H8qEW9ssdRGN9ppMbA
+xu/O5QBohitlWGMCAXH6a/Lh7s3AxF1vDQRcezXp0ZGpKl52qFUUY0HWSdecUO0J
+Q5OVI73WOa3+x1lzTTOP9CVX3nqv1Tb4vbVAqZy0zk7ikRtrte5XpZ1+SMJtIkp2
+8iFG2UBq1smUi6mLQXX/Kpf4lI82TKC7kW0VR0uDcOcBV36A9pyJPMleBPMQR3zE
+y21yFRdp58Eqlf8ghFzdtYWRZR2kAGNGe2ID3quSUA/Edx8CAwEAAaNTMFEwHQYD
+VR0OBBYEFBUe7n2tN+vVwq9J7Htb6vDkNQehMB8GA1UdIwQYMBaAFBUe7n2tN+vV
+wq9J7Htb6vDkNQehMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEB
+ABptvk169fjeCOgjA53/D5sldSW6HoUC5L43ScbXJ801eQXreyo94z4kaViMEPXl
+WAdje3opn+bLDjxdyBB/52Zyd/qILlPBMuqJjy2h8d5fNkLCV05a0wZLh3hg0Z/R
+e5hz7BKCB8lCKAl3UjzW1mY3Wf8Vxr4XalJb+1ktZ7L/QRDZ6dOCqBgcJUt+i5ub
+70hmBmypaHNGLPHC6k37A7I6bfSPkrJ1uFrs6Hsb2L38auKXieLPDIklGtbccRHG
+tzekJSODCKdD5VKQgT0mkaqmKKYqKcTnoJIjx6hvXGBB0SyhBGcGpzXMZXTFoKku
+R22ZoK3Fpcq7kNmDf34bDWc=
+-----END CERTIFICATE-----`;
+
+const SUPABASE_URL = 'https://ulphprdnswznfztawbvg.supabase.co';
+
+let securityConfigured = false;
+
+function setupSecurity() {
+  if (securityConfigured) return;
+  qz.security.setCertificatePromise((resolve: (cert: string) => void) => {
+    resolve(QZ_CERTIFICATE);
+  });
+  qz.security.setSignatureAlgorithm('SHA512');
+  qz.security.setSignaturePromise((toSign: string) => {
+    return (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error('Not authenticated');
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/sign-qz`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ toSign }),
+      });
+      if (!res.ok) throw new Error('Signing failed');
+      const { signature } = await res.json();
+      return signature;
+    })();
+  });
+  securityConfigured = true;
+}
 
 const SLOT_KEYS: Record<PrintSlot, string> = {
   label_small: 'qz_printer_label_small',
@@ -20,6 +73,7 @@ let connecting: Promise<void> | null = null;
 export async function connect(): Promise<void> {
   if (qz.websocket.isActive()) return;
   if (connecting) return connecting;
+  setupSecurity();
   connecting = qz.websocket.connect().finally(() => { connecting = null; });
   await connecting;
 }
