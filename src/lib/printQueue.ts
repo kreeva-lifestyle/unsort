@@ -12,6 +12,8 @@ export function setPrintMode(mode: 'cloud' | 'default'): void {
   localStorage.setItem('print_mode', mode);
 }
 
+const MAX_HTML_BYTES = 1_048_576; // 1 MB
+
 export async function submitPrintJob(
   slot: PrintSlot,
   html: string,
@@ -19,14 +21,16 @@ export async function submitPrintJob(
   title?: string,
   copies?: number,
 ): Promise<{ error: Error | null }> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  if (!user || authErr) return { error: new Error('You must be logged in to print') };
+  if (html.length > MAX_HTML_BYTES) return { error: new Error('Print content too large (max 1 MB)') };
   const row: PrintJobInsert = {
     printer_slot: slot,
     html,
     page_size: pageSize === 'A4' ? 'A4' : { width: pageSize.width, height: pageSize.height },
     copies: copies ?? 1,
     title: title ?? null,
-    created_by: user?.id ?? null,
+    created_by: user.id,
   };
   const { error } = await supabase.from('print_queue').insert(row);
   return { error: error ? new Error(error.message) : null };
