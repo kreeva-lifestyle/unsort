@@ -1,6 +1,17 @@
-import qz from 'qz-tray';
 import { supabase, SUPABASE_ANON_KEY } from './supabase';
 import type { PrintSlot } from '../types/database';
+
+// qz-tray (~33 KB) is loaded lazily — only when a printer connection is
+// actually needed, not eagerly when the Settings page mounts.
+type QzModule = typeof import('qz-tray')['default'];
+let qzPromise: Promise<QzModule> | null = null;
+let qzCached: QzModule | null = null;
+
+async function loadQz(): Promise<QzModule> {
+  if (qzCached) return qzCached;
+  if (!qzPromise) qzPromise = import('qz-tray').then(m => { qzCached = m.default; return qzCached; });
+  return qzPromise;
+}
 
 const QZ_CERTIFICATE = `-----BEGIN CERTIFICATE-----
 MIIDDTCCAfWgAwIBAgIUXb0iRIMPYTGoJ6Ro9M3gf8b0tiQwDQYJKoZIhvcNAQEL
@@ -26,7 +37,7 @@ const SUPABASE_URL = 'https://ulphprdnswznfztawbvg.supabase.co';
 
 let securityConfigured = false;
 
-function setupSecurity() {
+function setupSecurity(qz: QzModule) {
   if (securityConfigured) return;
   qz.security.setCertificatePromise((resolve: (cert: string) => void) => {
     resolve(QZ_CERTIFICATE);
@@ -71,23 +82,26 @@ export { SLOT_LABELS };
 let connecting: Promise<void> | null = null;
 
 export async function connect(): Promise<void> {
+  const qz = await loadQz();
   if (qz.websocket.isActive()) return;
   if (connecting) return connecting;
-  setupSecurity();
+  setupSecurity(qz);
   connecting = qz.websocket.connect().finally(() => { connecting = null; });
   await connecting;
 }
 
 export async function disconnect(): Promise<void> {
+  const qz = await loadQz();
   if (qz.websocket.isActive()) await qz.websocket.disconnect();
 }
 
 export function isConnected(): boolean {
-  return qz.websocket.isActive();
+  return qzCached ? qzCached.websocket.isActive() : false;
 }
 
 export async function listPrinters(): Promise<string[]> {
   await connect();
+  const qz = await loadQz();
   return qz.printers.find() as Promise<string[]>;
 }
 
@@ -104,6 +118,7 @@ export type PageSize = { width: number; height: number } | 'A4';
 
 export async function printHtml(printerName: string, html: string, pageSize: PageSize, copies = 1): Promise<void> {
   await connect();
+  const qz = await loadQz();
   const size = pageSize === 'A4' ? { width: 8.27, height: 11.69 } : pageSize;
   const config = qz.configs.create(printerName, {
     size: { width: size.width, height: size.height },
