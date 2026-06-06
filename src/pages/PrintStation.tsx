@@ -11,7 +11,13 @@ const STALE_MS = 120_000;
 export default function PrintStation() {
   const [connected, setConnected] = useState(false);
   const [jobs, setJobs] = useState<PrintJob[]>([]);
-  const [stationName] = useState(() => `Station-${Math.random().toString(36).slice(2, 6)}`);
+  const [stationName] = useState(() => {
+    const stored = localStorage.getItem('print_station_name');
+    if (stored) return stored;
+    const name = `Station-${Math.random().toString(36).slice(2, 8)}`;
+    localStorage.setItem('print_station_name', name);
+    return name;
+  });
   const [processing, setProcessing] = useState<string | null>(null);
   const [stats, setStats] = useState({ printed: 0, failed: 0 });
   const processingRef = useRef(false);
@@ -43,7 +49,8 @@ export default function PrintStation() {
     const chan = supabase.channel('print-queue-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'print_queue' }, () => { fetchJobs(); })
       .subscribe();
-    return () => { supabase.removeChannel(chan); };
+    const poll = setInterval(fetchJobs, 5000);
+    return () => { clearInterval(poll); supabase.removeChannel(chan); };
   }, [fetchJobs]);
 
   const processJob = useCallback(async (job: PrintJob) => {
@@ -54,10 +61,11 @@ export default function PrintStation() {
     processingRef.current = true;
     setProcessing(job.id);
 
-    const { error: claimErr } = await supabase.from('print_queue')
-      .update({ status: 'printing', printed_by_station: stationName })
-      .eq('id', job.id).eq('status', 'pending');
-    if (claimErr) { processingRef.current = false; setProcessing(null); return; }
+    const { data: claimed, error: claimErr } = await supabase.from('print_queue')
+      .update({ status: 'printing', printed_by_station: stationName, printed_at: new Date().toISOString() })
+      .eq('id', job.id).eq('status', 'pending')
+      .select('id').maybeSingle();
+    if (claimErr || !claimed) { processingRef.current = false; setProcessing(null); return; }
 
     try {
       const ps: PageSize = job.page_size === 'A4' ? 'A4' : typeof job.page_size === 'object' && job.page_size
@@ -65,7 +73,7 @@ export default function PrintStation() {
             height: Number((job.page_size as Record<string, number>).height || (job.page_size as Record<string, number>).h) }
         : 'A4';
       await printHtml(printer, job.html, ps, job.copies);
-      await supabase.from('print_queue').update({ status: 'done', printed_at: new Date().toISOString() }).eq('id', job.id);
+      await supabase.from('print_queue').update({ status: 'done', printed_at: new Date().toISOString() }).eq('id', job.id).eq('status', 'printing');
       setStats(s => ({ ...s, printed: s.printed + 1 }));
     } catch (e: any) {
       await supabase.from('print_queue').update({ status: 'failed', error_message: e?.message || 'Unknown error' }).eq('id', job.id);
@@ -85,15 +93,15 @@ export default function PrintStation() {
   useEffect(() => {
     const iv = setInterval(() => {
       const now = Date.now();
-      jobs.filter(j => j.status === 'printing' && j.printed_by_station === stationName).forEach(j => {
-        const age = now - new Date(j.created_at).getTime();
-        if (age > STALE_MS) {
-          supabase.from('print_queue').update({ status: 'failed', error_message: 'Print timed out' }).eq('id', j.id).eq('status', 'printing');
+      jobs.filter(j => j.status === 'printing').forEach(j => {
+        const claimedAt = j.printed_at ? new Date(j.printed_at).getTime() : new Date(j.created_at).getTime();
+        if (now - claimedAt > STALE_MS) {
+          supabase.from('print_queue').update({ status: 'failed', error_message: 'Print timed out — station may have crashed', printed_by_station: null }).eq('id', j.id).eq('status', 'printing');
         }
       });
     }, 30_000);
     return () => clearInterval(iv);
-  }, [jobs, stationName]);
+  }, [jobs]);
 
   const cancelJob = async (id: string) => {
     const { error } = await supabase.from('print_queue').delete().eq('id', id);
