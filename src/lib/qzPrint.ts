@@ -44,23 +44,31 @@ function setupSecurity(qz: QzModule) {
   });
   qz.security.setSignatureAlgorithm('SHA512');
   qz.security.setSignaturePromise((toSign: string) => {
-    return (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) throw new Error('Not authenticated');
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/sign-qz`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'apikey': SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ toSign }),
-      });
-      if (!res.ok) throw new Error('Signing failed');
-      const { signature } = await res.json();
-      return signature;
-    })();
+    // QZ Tray calls `new Promise(this)`, so we must return a (resolve, reject)
+    // executor function — not a Promise object.
+    return (resolve: (sig: string) => void, reject: (err: unknown) => void) => {
+      (async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const token = session?.access_token;
+          if (!token) throw new Error('Not authenticated');
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/sign-qz`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+              'apikey': SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({ toSign }),
+          });
+          if (!res.ok) throw new Error('Signing failed');
+          const { signature } = await res.json();
+          resolve(signature);
+        } catch (err) {
+          reject(err);
+        }
+      })();
+    };
   });
   securityConfigured = true;
 }
