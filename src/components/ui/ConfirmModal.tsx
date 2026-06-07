@@ -4,6 +4,7 @@
 //   if (await askConfirm({ title: 'Delete?', message: '...', danger: true })) { ... }
 //   <ConfirmModal {...confirmState} />
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 
 export interface ConfirmOptions {
@@ -34,18 +35,19 @@ export default function ConfirmModal({
 
   useEffect(() => {
     if (!open) return;
+    document.body.classList.add('modal-open');
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel();
       else if (e.key === 'Enter') onConfirm();
     };
     window.addEventListener('keydown', h);
     confirmRef.current?.focus();
-    return () => window.removeEventListener('keydown', h);
+    return () => { window.removeEventListener('keydown', h); document.body.classList.remove('modal-open'); };
   }, [open, onCancel, onConfirm]);
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div style={S.modalOverlay} onClick={onCancel}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 420 }} onClick={e => e.stopPropagation()}>
         <div style={{ padding: '18px 20px 14px', borderBottom: `1px solid ${T.bd}` }}>
@@ -65,7 +67,8 @@ export default function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
