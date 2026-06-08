@@ -341,11 +341,13 @@ export default function CashBook() {
       @media print{@page{margin:10mm}}
     </style></head><body>`;
     const receiptDate = h.created_at ? new Date(h.created_at).toLocaleDateString('en-IN') : '—';
-    html += `<div class="header"><h2>Arya Designs</h2><p style="margin:6px 0;color:#666;font-size:13px">CASH HANDOVER RECEIPT</p><p class="receipt-no">${formatHandoverNo(h.handover_number)} | ${receiptDate}</p></div>`;
+    const periodFromStr = h.period_from ? new Date(h.period_from).toLocaleDateString('en-IN') : '-';
+    const periodToStr = h.period_to ? new Date(h.period_to).toLocaleDateString('en-IN') : '-';
+    html += `<div class="header"><h2>Arya Designs</h2><p style="margin:6px 0;color:#666;font-size:13px">CASH HANDOVER RECEIPT</p><p class="receipt-no">${formatHandoverNo(h.handover_number)} | ${receiptDate}</p><p style="margin:8px 0 0;font-size:13px;font-weight:600;color:#222">Period: ${periodFromStr} &rarr; ${periodToStr}</p></div>`;
     html += `<div class="meta">
       <div><strong>From</strong>${esc(h.from_user_name)}</div>
       <div><strong>To</strong>${esc(h.to_user_name)}</div>
-      <div><strong>Period Covered</strong>${h.period_from ? new Date(h.period_from).toLocaleDateString('en-IN') : '-'} to ${h.period_to ? new Date(h.period_to).toLocaleDateString('en-IN') : '-'}</div>
+      <div><strong>Period Covered</strong>${periodFromStr} to ${periodToStr}</div>
       <div><strong>Status</strong><span class="status ${h.status === 'confirmed' ? 'signed' : 'pending'}">${h.status === 'confirmed' ? '✓ Signed' : 'Pending'}</span></div>
     </div>`;
     if (b) {
