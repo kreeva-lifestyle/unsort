@@ -101,8 +101,8 @@ export default function TracklyLanding({ longUrl, onImport }: Props) {
   // browser downloads the file (export?format=xlsx returns it as an attachment).
   const sheetId = longUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)?.[1];
   const downloadSheet = useCallback(() => {
-    if (!sheetId) { window.open(longUrl, '_blank'); return; }
     const a = document.createElement('a');
+    if (!sheetId) { a.href = longUrl; a.target = '_blank'; a.rel = 'noopener'; a.click(); return; }
     a.href = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx`;
     a.rel = 'noopener';
     a.click();

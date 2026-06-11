@@ -379,6 +379,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
           {topCustomers.map((c, i) => (
             <div
               key={i}
+              className="dash-cust-row"
               role={navigateTo ? 'button' : undefined}
               tabIndex={navigateTo ? 0 : undefined}
               onClick={() => { sessionStorage.setItem('challan_search', c.name); navigateTo?.('challan'); }}
@@ -409,7 +410,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
             <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: `1px solid ${T.bd}`, opacity: t.is_done ? 0.45 : 1 }}>
               <div onClick={() => toggleTask(t.id, t.is_done)} style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${t.is_done ? T.gr : T.bd2}`, background: t.is_done ? T.gr : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 700, flexShrink: 0 }}>{t.is_done && '✓'}</div>
               {editingTaskId === t.id ? (
-                <input autoFocus value={editingTaskTitle} onChange={e => setEditingTaskTitle(e.target.value)} onBlur={() => updateTask(t.id)} onKeyDown={e => { if (e.key === 'Enter') updateTask(t.id); if (e.key === 'Escape') setEditingTaskId(null); }} style={{ ...S.fInput, flex: 1, fontSize: 11, padding: '2px 6px', height: 24 }} />
+                <input autoFocus value={editingTaskTitle} onChange={e => setEditingTaskTitle(e.target.value)} onBlur={() => updateTask(t.id)} onKeyDown={e => { if (e.key === 'Enter') updateTask(t.id); if (e.key === 'Escape') setEditingTaskId(null); }} style={{ ...S.fInput, flex: 1 }} />
               ) : (
                 <span onClick={() => { setEditingTaskId(t.id); setEditingTaskTitle(t.title); }} style={{ flex: 1, fontSize: 11, color: T.tx, textDecoration: t.is_done ? 'line-through' : 'none', cursor: 'text' }}>{t.title}</span>
               )}

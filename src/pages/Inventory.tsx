@@ -702,7 +702,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
       {/* Stage toggle + subtitle (Brand Tags aesthetic) */}
       <div className="inv-top-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {!showExtras && <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, border: `1px solid ${T.bd}`, width: 'fit-content' }}>
+          {!showExtras && <div className="inv-stage-toggle" style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, border: `1px solid ${T.bd}`, width: 'fit-content' }}>
             {(['pending', 'completed'] as const).map(s => (
               <div key={s} onClick={() => { setStage(s); setPage(0); }} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 11, fontWeight: stage === s ? 600 : 400, cursor: 'pointer', background: stage === s ? `linear-gradient(135deg, ${T.ac87}, ${T.ac2cc})` : 'transparent', color: stage === s ? '#fff' : T.tx3, transition: 'all .15s' }}>{{ pending: 'Active', completed: 'Completed' }[s]}</div>
             ))}
