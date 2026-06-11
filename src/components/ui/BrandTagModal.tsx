@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import JsBarcode from 'jsbarcode';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
@@ -43,6 +44,11 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
   }, [onClose]);
 
   React.useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => document.body.classList.remove('modal-open');
+  }, []);
+
+  React.useEffect(() => {
     if (!barcodeRef.current || !form.jioCode) return;
     try {
       JsBarcode(barcodeRef.current, form.jioCode, { format: 'CODE128', width: 1.5, height: 32, displayValue: false, margin: 0 });
@@ -55,7 +61,7 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
     onSave(form);
   };
 
-  return (
+  return createPortal(
     <div style={S.modalOverlay} onClick={onClose}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 720 }} onClick={e => e.stopPropagation()}>
         {/* Header */}
@@ -118,7 +124,8 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

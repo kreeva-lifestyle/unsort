@@ -169,7 +169,7 @@ export default function PrintStation() {
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
+      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
         <div style={{ background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 8, padding: '12px 14px', textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: T.tx, fontFamily: T.mono }}>{jobs.filter(j => j.status === 'pending').length}</div>
           <div style={{ fontSize: 10, color: T.yl, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Pending</div>
