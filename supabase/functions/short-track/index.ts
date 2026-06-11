@@ -4,6 +4,7 @@
 //   GET  /:shortCode          -> 302 redirect to long_url (logs click)
 //   POST { action: 'resolve', shortCode } -> { ok, longUrl } (used by preview)
 //   POST { action: 'lookup', skus: string[] } -> { ok, results: [...] } (public SKU lookup via Google Sheet)
+//   POST { action: 'sheet' } -> { ok, sheets: [{ tab, values }] } (raw stock sheet for vendor download)
 //
 // Click metadata parsed from request headers (User-Agent, Referer, CF geo headers).
 // SKU lookup reads from a Google Sheet (READONLY scope — never writes).
@@ -310,6 +311,32 @@ async function getFullStock(): Promise<FullStock> {
   return data;
 }
 
+// ── Raw sheet values (for vendor xlsx download) ────────────────────────
+// Unprocessed per-tab values — getFullStock() explodes rows per size and
+// rewrites the SKU cell, which is wrong for a sheet download.
+type RawSheets = { tab: string; values: string[][] }[];
+let rawSheetsCache: { data: RawSheets; exp: number } | null = null;
+
+async function getRawSheets(): Promise<RawSheets> {
+  if (rawSheetsCache && rawSheetsCache.exp > Date.now()) return rawSheetsCache.data;
+  const token = await googleReadToken();
+  const ranges = STOCK_TABS.map(t => `ranges=${encodeURIComponent(`'${t}'`)}`).join('&');
+  const dataRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${STOCK_SHEET_ID}/values:batchGet?${ranges}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!dataRes.ok) throw new Error('Cannot read stock data');
+  const payload = await dataRes.json();
+  const valueRanges: any[] = payload.valueRanges || [];
+  const data: RawSheets = valueRanges.map((vr, i) => ({
+    tab: STOCK_TABS[i] || `Tab${i + 1}`,
+    values: (vr.values || []).map((row: any[]) => row.map(c => String(c ?? ''))),
+  }));
+  if (data.every(s => s.values.length === 0)) throw new Error('Stock sheet is empty');
+  rawSheetsCache = { data, exp: Date.now() + 5 * 60_000 };
+  return data;
+}
+
 function matchSku(input: string, stock: Stock): string {
   const n = norm(input);
   const { skuMap, sizeMap } = stock;
@@ -466,6 +493,17 @@ Deno.serve(async (req: Request) => {
           return json({ ok: true, headers: full.headers, inactive: inactive.map(fmtCells), nonUploaded: nonUploaded.map(fmtCells), notFound, duplicates }, req);
         } catch (e: any) {
           return fail(500, e.message || 'Compare failed', req);
+        }
+      }
+
+      // Full raw sheet values for vendor download (READONLY) — proxied through
+      // the service account so vendors don't need Google access to the sheet.
+      if (body.action === 'sheet') {
+        try {
+          const sheets = await getRawSheets();
+          return json({ ok: true, sheets }, req);
+        } catch (e: any) {
+          return fail(500, e.message || 'Sheet download failed', req);
         }
       }
 

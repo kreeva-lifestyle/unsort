@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { T } from '../../lib/theme';
+import { SUPABASE_ANON_KEY } from '../../lib/supabase';
+
+const EDGE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
 
 const CHARS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
@@ -97,16 +100,36 @@ export default function TracklyLanding({ longUrl, onImport }: Props) {
   const [show, setShow] = useState(false);
   useEffect(() => { const t = setTimeout(() => setShow(true), 600); return () => clearTimeout(t); }, []);
   const redirect = useCallback(() => window.location.replace(longUrl), [longUrl]);
-  // Convert a Google Sheets edit URL to its direct xlsx export endpoint so the
-  // browser downloads the file (export?format=xlsx returns it as an attachment).
-  const sheetId = longUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)?.[1];
-  const downloadSheet = useCallback(() => {
-    const a = document.createElement('a');
-    if (!sheetId) { a.href = longUrl; a.target = '_blank'; a.rel = 'noopener'; a.click(); return; }
-    a.href = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx`;
-    a.rel = 'noopener';
-    a.click();
-  }, [sheetId, longUrl]);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
+  // The sheet is private on Google — vendors are anonymous, so the direct
+  // export?format=xlsx endpoint returns "access denied". Instead the edge
+  // function reads the sheet with its READONLY service account and we build
+  // the xlsx in the browser.
+  const downloadSheet = useCallback(async () => {
+    if (downloading) return;
+    setDownloading(true);
+    setDownloadError('');
+    try {
+      const res = await fetch(EDGE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ action: 'sheet' }),
+      });
+      const data = await res.json();
+      if (!data.ok || !Array.isArray(data.sheets)) throw new Error(data.error || 'Could not fetch the sheet');
+      const XLSX = await import('xlsx');
+      const wb = XLSX.utils.book_new();
+      for (const s of data.sheets) {
+        if (s.values?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.values), String(s.tab).slice(0, 31));
+      }
+      if (wb.SheetNames.length === 0) throw new Error('Sheet is empty');
+      XLSX.writeFile(wb, `arya-stock-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch {
+      setDownloadError('Download failed — please try again, or use Self Import.');
+    }
+    setDownloading(false);
+  }, [downloading]);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#000', fontFamily: T.sans }}>
@@ -166,12 +189,18 @@ export default function TracklyLanding({ longUrl, onImport }: Props) {
                 style={{
                   width: '100%', padding: '13px 20px', borderRadius: 10, border: '1px solid rgba(226,232,240,0.1)',
                   background: 'rgba(226,232,240,0.04)', color: 'rgba(226,232,240,0.7)',
-                  fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 13, fontWeight: 500, cursor: downloading ? 'default' : 'pointer', fontFamily: 'inherit',
                   minHeight: 48, transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  pointerEvents: downloading ? 'none' : 'auto', opacity: downloading ? 0.5 : 1,
                 }}>
-                Download Sheet
+                {downloading ? 'Preparing…' : 'Download Sheet'}
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
               </button>
+              {downloadError && (
+                <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 12, color: '#F87171' }}>
+                  {downloadError}
+                </div>
+              )}
             </div>
           </div>
         </div>

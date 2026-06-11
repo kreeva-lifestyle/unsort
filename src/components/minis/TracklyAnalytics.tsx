@@ -15,34 +15,57 @@ interface Props {
   addToast: (msg: string, type?: string) => void;
 }
 
+// Local calendar date (not toISOString, which is UTC — in IST it returns
+// yesterday's date until 05:30 AM, hiding today's clicks by default).
+const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
   const [clicks, setClicks] = useState<LinkClick[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [from, setFrom] = useState(() => {
     const d = new Date(); d.setMonth(d.getMonth() - 3);
-    return d.toISOString().slice(0, 10);
+    return localDate(d);
   });
-  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => localDate(new Date()));
   const reqIdRef = useRef(0);
   const [page, setPage] = useState(0);
   const [perPage, setPerPage] = useState(25);
 
   const fetchClicks = useCallback(async () => {
+    if (from > to) { addToast('"From" date is after "To" date — adjust the range', 'error'); return; }
     const myReq = ++reqIdRef.current;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('link_clicks')
-      .select(CLICK_COLS)
-      .eq('link_id', link.id)
-      .gte('clicked_at', from + 'T00:00:00')
-      .lte('clicked_at', to + 'T23:59:59')
-      .order('clicked_at', { ascending: false })
-      .limit(CLICK_LIMIT);
-    if (reqIdRef.current !== myReq) return; // stale; newer fetch in flight
-    if (error) addToast(friendlyError(error), 'error');
-    setClicks(data || []);
-    setPage(0);
-    setLoading(false);
+    try {
+      // Day boundaries in the user's timezone (zone-less strings would be
+      // parsed as UTC by Postgres, shifting every boundary by 5h30m in IST).
+      const fromTs = new Date(from + 'T00:00:00').toISOString();
+      const toTs = new Date(to + 'T23:59:59.999').toISOString();
+      const [{ data, error }, { count, error: countErr }] = await Promise.all([
+        supabase
+          .from('link_clicks')
+          .select(CLICK_COLS)
+          .eq('link_id', link.id)
+          .gte('clicked_at', fromTs)
+          .lte('clicked_at', toTs)
+          .order('clicked_at', { ascending: false })
+          .limit(CLICK_LIMIT),
+        supabase
+          .from('link_clicks')
+          .select('id', { count: 'exact', head: true })
+          .eq('link_id', link.id)
+          .gte('clicked_at', fromTs)
+          .lte('clicked_at', toTs),
+      ]);
+      if (reqIdRef.current !== myReq) return; // stale; newer fetch in flight
+      if (error) addToast(friendlyError(error), 'error');
+      else if (countErr) addToast(friendlyError(countErr), 'error');
+      setClicks(data || []);
+      setTotalCount(count ?? (data?.length || 0));
+      setPage(0);
+    } finally {
+      if (reqIdRef.current === myReq) setLoading(false);
+    }
   }, [link.id, from, to, addToast]);
 
   useEffect(() => { fetchClicks(); }, [fetchClicks]);
@@ -68,7 +91,7 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
     return { deviceCounts: dev, browserCounts: br, osCounts: o, countryCounts: co, dailyEntries: dailyArr, maxDaily: maxD, hourlyCounts: hourly, maxHourly: maxH, uniqueVisitors: uniq };
   }, [clicks]);
 
-  const isTruncated = clicks.length === CLICK_LIMIT;
+  const isTruncated = totalCount > CLICK_LIMIT;
 
   return (
     <div>
@@ -95,12 +118,12 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
       {loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading analytics...</div> : <>
 
       {isTruncated && <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 11, color: T.yl, marginBottom: 10 }}>
-        Showing the latest {CLICK_LIMIT.toLocaleString('en-IN')} clicks. There may be more — narrow the date range to see older data.
+        Charts, breakdowns and the table below are based on the latest {CLICK_LIMIT.toLocaleString('en-IN')} of {totalCount.toLocaleString('en-IN')} clicks in this range — narrow the date range to cover all of it.
       </div>}
 
       {/* KPI cards */}
       <div className="trackly-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
-        <KpiCard label="Total Clicks" value={clicks.length} color={T.ac2} bg={T.ac3} bd="rgba(99,102,241,.15)" />
+        <KpiCard label="Total Clicks" value={totalCount} color={T.ac2} bg={T.ac3} bd="rgba(99,102,241,.15)" />
         <KpiCard label="Unique Visitors" value={uniqueVisitors || '—'} color={T.bl} bg="rgba(56,189,248,.06)" bd="rgba(56,189,248,.15)" />
         <KpiCard label="Devices" value={Object.keys(deviceCounts).length} color={T.gr} bg="rgba(34,197,94,.06)" bd="rgba(34,197,94,.15)" />
         <KpiCard label="Countries" value={Object.keys(countryCounts).filter(k => k !== 'Unknown').length || '—'} color={T.yl} bg="rgba(251,191,36,.06)" bd="rgba(251,191,36,.15)" />
