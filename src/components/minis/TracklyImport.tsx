@@ -54,6 +54,7 @@ export default function TracklyImport({ onBack }: { onBack: () => void }) {
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 15 * 1024 * 1024) { setError('File too large — maximum 15 MB'); e.target.value = ''; return; }
     setError(''); setMsg('');
     try {
       if (file.name.match(/\.csv$|\.txt$/i)) {
