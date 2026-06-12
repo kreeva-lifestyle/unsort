@@ -9,6 +9,10 @@ import type { PageSize } from '../lib/qzPrint';
 const SLOTS: PrintSlot[] = ['label_small', 'label_large', 'document'];
 const STALE_MS = 120_000;
 const PRINT_TIMEOUT_MS = 60_000;
+// A pending job nobody printed for this long is stale business-wise — printing
+// a challan hours after it was requested surprises everyone. Expire instead.
+const MAX_PENDING_AGE_MS = 30 * 60_000;
+const HEARTBEAT_MS = 45_000;
 
 export default function PrintStation() {
   const [connected, setConnected] = useState(false);
@@ -58,14 +62,22 @@ export default function PrintStation() {
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
   // On (re)mount, recover this station's own jobs left mid-print by a previous
-  // tab close/refresh. Only reset ones claimed >30s ago so a sibling tab's
-  // fresh in-flight print isn't clobbered.
+  // tab close/refresh. Only reset ones claimed >90s ago — a sibling tab's print
+  // can legitimately run up to PRINT_TIMEOUT_MS, so a shorter window would
+  // clobber it and double-print.
   useEffect(() => {
-    const cutoff = new Date(Date.now() - 30_000).toISOString();
+    const cutoff = new Date(Date.now() - 90_000).toISOString();
     supabase.from('print_queue')
       .update({ status: 'pending', printed_by_station: null, printed_at: null })
       .eq('status', 'printing').eq('printed_by_station', stationName).lt('printed_at', cutoff)
       .then(({ error }) => { if (error) console.warn('Recovery update failed:', error); fetchJobs(); });
+    // Housekeeping: purge old finished jobs so the table doesn't grow forever.
+    const doneCutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const failedCutoff = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    supabase.from('print_queue').delete().eq('status', 'done').lt('created_at', doneCutoff)
+      .then(({ error }) => { if (error) console.warn('Done-job cleanup failed:', error); });
+    supabase.from('print_queue').delete().eq('status', 'failed').lt('created_at', failedCutoff)
+      .then(({ error }) => { if (error) console.warn('Failed-job cleanup failed:', error); });
   }, [stationName, fetchJobs]);
 
   useEffect(() => {
@@ -73,8 +85,12 @@ export default function PrintStation() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'print_queue' }, () => { fetchJobs(); })
       .subscribe();
     const poll = setInterval(fetchJobs, 5000);
-    return () => { clearInterval(poll); supabase.removeChannel(chan); };
-  }, [fetchJobs]);
+    // Background tabs get throttled timers and may drop the websocket during
+    // sleep — catch up the moment the tab is visible again.
+    const onVisible = () => { if (document.visibilityState === 'visible') { fetchJobs(); tryConnect(); } };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(poll); supabase.removeChannel(chan); document.removeEventListener('visibilitychange', onVisible); };
+  }, [fetchJobs, tryConnect]);
 
   const processJob = useCallback(async (job: PrintJob) => {
     if (processingRef.current) return;
@@ -83,6 +99,18 @@ export default function PrintStation() {
 
     processingRef.current = true;
     setProcessing(job.id);
+
+    // Expire jobs that sat unprinted too long (station was off) — printing a
+    // challan hours after it was requested causes more harm than skipping it.
+    if (Date.now() - new Date(job.created_at).getTime() > MAX_PENDING_AGE_MS) {
+      const { error: expireErr } = await supabase.from('print_queue')
+        .update({ status: 'failed', error_message: 'Expired — queued too long without a print station. Print again if still needed.' })
+        .eq('id', job.id).eq('status', 'pending');
+      if (expireErr) console.warn('Expire update failed:', expireErr);
+      processingRef.current = false;
+      setProcessing(null);
+      return;
+    }
 
     const { data: claimed, error: claimErr } = await supabase.from('print_queue')
       .update({ status: 'printing', printed_by_station: stationName, printed_at: new Date().toISOString() })
@@ -117,13 +145,30 @@ export default function PrintStation() {
     if (pending) processJob(pending);
   }, [jobs, connected, processJob, mySlots]);
 
+  // Heartbeat — lets every other device know a working station is alive, so
+  // printOrQueue can warn immediately when nobody is around to print.
+  useEffect(() => {
+    if (!connected) return;
+    const beat = () => {
+      supabase.from('app_settings')
+        .upsert({ key: 'print_station_heartbeat', value: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: 'key' })
+        .then(({ error }) => { if (error) console.warn('Heartbeat failed:', error); });
+    };
+    beat();
+    const iv = setInterval(beat, HEARTBEAT_MS);
+    return () => clearInterval(iv);
+  }, [connected]);
+
   useEffect(() => {
     const iv = setInterval(() => {
       const now = Date.now();
       jobs.filter(j => j.status === 'printing').forEach(j => {
         const claimedAt = j.printed_at ? new Date(j.printed_at).getTime() : new Date(j.created_at).getTime();
         if (now - claimedAt > STALE_MS) {
-          supabase.from('print_queue').update({ status: 'failed', error_message: friendlyPrintError('Print timed out — station may have crashed'), printed_by_station: null }).eq('id', j.id).eq('status', 'printing');
+          // .then() is required — supabase-js queries are lazy and never
+          // execute without it (this sweep was silently a no-op before).
+          supabase.from('print_queue').update({ status: 'failed', error_message: friendlyPrintError('Print timed out — station may have crashed'), printed_by_station: null }).eq('id', j.id).eq('status', 'printing')
+            .then(({ error }) => { if (error) console.warn('Stale job reset failed:', error); });
         }
       });
     }, 30_000);
@@ -133,6 +178,7 @@ export default function PrintStation() {
   const cancelJob = async (id: string) => {
     const { error } = await supabase.from('print_queue').delete().eq('id', id);
     if (!error) setJobs(j => j.filter(x => x.id !== id));
+    else { console.warn('Cancel failed:', error); fetchJobs(); }
   };
 
   // Emergency stop — purge every queued/in-progress job so nothing more prints.
@@ -150,7 +196,9 @@ export default function PrintStation() {
   };
 
   const retryJob = async (id: string) => {
-    await supabase.from('print_queue').update({ status: 'pending', error_message: null, printed_at: null, printed_by_station: null }).eq('id', id);
+    const { error } = await supabase.from('print_queue').update({ status: 'pending', error_message: null, printed_at: null, printed_by_station: null }).eq('id', id);
+    if (error) console.warn('Retry failed:', error);
+    fetchJobs();
   };
 
   const statusColor = (s: string) => s === 'done' ? T.gr : s === 'failed' ? T.re : s === 'printing' ? T.bl : T.yl;
@@ -204,7 +252,8 @@ export default function PrintStation() {
 
       {!connected && (
         <div style={{ background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 8, padding: '14px 16px', marginBottom: 16, fontSize: 12, color: T.re, lineHeight: 1.5 }}>
-          <strong>QZ Tray is not running.</strong> Install QZ Tray on this computer and start it. Print jobs will queue and be processed once connected.
+          <strong>QZ Tray is not running.</strong> Install QZ Tray on this computer and start it. Print jobs will queue and be processed once connected.{' '}
+          <a href="https://qz.io/download/" target="_blank" rel="noopener noreferrer" style={{ color: T.ac2, fontWeight: 600 }}>Download QZ Tray ↗</a>
         </div>
       )}
 
