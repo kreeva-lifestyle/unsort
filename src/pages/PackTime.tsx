@@ -81,11 +81,12 @@ async function flushQueue() {
   if (flushing || writeQueue.length === 0) return;
   flushing = true;
   while (writeQueue.length > 0) {
-    // Batch up to 20 rows per request
     const batch: unknown[][] = [];
     const sheetName = writeQueue[0].sheetName;
+    let batchRetries = 0;
     while (writeQueue.length > 0 && writeQueue[0].sheetName === sheetName && batch.length < 20) {
       const item = writeQueue.shift()!;
+      batchRetries = Math.max(batchRetries, item.retries);
       batch.push(...item.rows);
     }
     try {
@@ -96,14 +97,12 @@ async function flushQueue() {
       });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
     } catch {
-      // Re-queue failed batch, preserve retry count
-      const retries = (writeQueue[0]?.retries || 0) + 1;
+      const retries = batchRetries + 1;
       if (retries <= 3) {
         writeQueue.unshift({ rows: batch, sheetName, retries });
         await new Promise(r => setTimeout(r, 2000));
       }
       if (retries > 3) {
-        // Batch dropped after 3 retries — notifyDropped() handles user feedback
         droppedBatches.push({ rows: batch, sheetName, ts: Date.now() });
         notifyDropped();
       }
@@ -123,15 +122,10 @@ if (typeof window !== 'undefined') {
       flushing = false;
       const pending = writeQueue.splice(0);
       for (const item of pending) {
-        // sendBeacon is purpose-built for this — non-blocking, more reliable
-        // than fetch+keepalive, and fires even during unload. Falls back to
-        // fetch+keepalive if Beacon API unavailable.
+        // sendBeacon can't send Authorization headers → edge function 401s.
+        // fetch+keepalive works during unload and sends auth; payloads are tiny.
         const body = JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName });
-        const blob = new Blob([body], { type: 'application/json' });
-        const ok = navigator.sendBeacon ? navigator.sendBeacon(EDGE_FN, blob) : false;
-        if (!ok) {
-          fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body, keepalive: true }).catch(e => console.warn('Sheet sync failed:', e));
-        }
+        fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body, keepalive: true }).catch(e => console.warn('Sheet sync failed:', e));
       }
       e.returnValue = '';
     }

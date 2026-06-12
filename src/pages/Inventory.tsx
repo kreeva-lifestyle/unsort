@@ -129,13 +129,15 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     supabase.from('products').select('id, name, sku, total_components, category').eq('is_active', true).then(({ data, error }) => { if (error) addToast('Failed to load categories — ' + friendlyError(error), 'error'); setProducts(data || []); });
     supabase.from('locations').select('id, name').order('name').then(({ data, error }) => { if (error) addToast('Failed to load locations — ' + friendlyError(error), 'error'); setLocations(data || []); });
     supabase.from('tags').select('id, name, color').order('name').then(({ data, error }) => { if (error) addToast('Failed to load tags — ' + friendlyError(error), 'error'); setTags(data || []); });
-    supabase.from('inventory_items').select('manufacturer').gt('manufacturer', '').limit(5000).then(({ data }) => { const unique = [...new Set((data || []).map(d => d.manufacturer).filter(Boolean))].sort(); setManufacturers(unique); });
-    supabase.from('item_tags').select('inventory_item_id, tag_id, tags(id, name, color)').limit(10000).then(({ data }) => {
+    supabase.from('inventory_items').select('manufacturer').gt('manufacturer', '').limit(5000).then(({ data, error }) => { if (error) { addToast('Failed to load manufacturers — ' + friendlyError(error), 'error'); return; } const unique = [...new Set((data || []).map(d => d.manufacturer).filter(Boolean))].sort(); setManufacturers(unique); });
+    supabase.from('item_tags').select('inventory_item_id, tag_id, tags(id, name, color)').limit(10000).then(({ data, error }) => {
+      if (error) { addToast('Failed to load tags — ' + friendlyError(error), 'error'); return; }
       const map: Record<string, any[]> = {};
       (data || []).forEach((it: any) => { if (!map[it.inventory_item_id]) map[it.inventory_item_id] = []; map[it.inventory_item_id].push(it.tags); });
       setItemTags(map);
     });
-    const p2 = supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').limit(10000).then(({ data }) => {
+    const p2 = supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').limit(10000).then(({ data, error }) => {
+      if (error) { addToast('Failed to load components — ' + friendlyError(error), 'error'); return; }
       const missingMap: Record<string, string[]> = {};
       const damagedMap: Record<string, string[]> = {};
       const damagedIdMap: Record<string, Set<string>> = {};
@@ -362,7 +364,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     try {
     if (selected) {
       if (selected.serial_number && selected.serial_number !== form.serial_number) {
-        const { count } = await supabase.from('inventory_extras').select('id', { count: 'exact', head: true }).eq('sku', selected.serial_number);
+        const { count, error: cntErr } = await supabase.from('inventory_extras').select('id', { count: 'exact', head: true }).eq('sku', selected.serial_number);
+        if (cntErr) { addToast('Failed to check spare parts — ' + friendlyError(cntErr), 'error'); return; }
         if ((count || 0) > 0) { addToast(`Cannot change SKU — ${count} extra(s) reference "${selected.serial_number}". Update extras first.`, 'error'); return; }
       }
       const { error } = await supabase.from('inventory_items').update(form).eq('id', selected.id);
