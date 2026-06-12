@@ -42,6 +42,11 @@ export default function PrinterSettings({ addToast }: { addToast: (msg: string, 
 
   useEffect(() => {
     if (mode !== 'cloud') return;
+    // 7-day print-log retention (owner policy) — enforced here too, so logs
+    // expire even if no Print Station tab ever opens to do the housekeeping.
+    const logCutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    supabase.from('print_queue').delete().in('status', ['done', 'failed']).lt('created_at', logCutoff)
+      .then(({ error }) => { if (error) console.warn('Print-log cleanup failed:', error); });
     supabase.from('print_queue').select('id, printer_slot, title, status, error_message, created_at, printed_at')
       .order('created_at', { ascending: false }).limit(10)
       .then(({ data }) => { if (data) setRecentJobs(data as PrintJob[]); });
