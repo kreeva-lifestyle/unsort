@@ -6,10 +6,11 @@ import type { CashChallan } from '../../types/database';
 
 type Challan = Omit<CashChallan, 'created_at' | 'updated_at'> & { created_at: string; updated_at: string };
 
-export type LedgerCustomer = { name: string; total: number; paid: number; outstanding: number; count: number; aging: { current: number; d30: number; d60: number; d90plus: number } };
+export type LedgerCustomer = { id: string | null; name: string; total: number; paid: number; outstanding: number; count: number; aging: { current: number; d30: number; d60: number; d90plus: number } };
 
 export default function ChallanLedger({
   detailName,
+  detailId,
   customers,
   detailChallans,
   search,
@@ -27,12 +28,13 @@ export default function ChallanLedger({
   onDateApply,
 }: {
   detailName: string | null;
+  detailId: string | null;
   customers: LedgerCustomer[];
   detailChallans: Challan[];
   search: string;
   onSearchChange: (v: string) => void;
   onSearchSubmit: (v: string) => void;
-  onOpenCustomer: (name: string) => void;
+  onOpenCustomer: (cust: { id: string | null; name: string }) => void;
   onOpenChallan: (c: Challan) => void;
   onExportPdf: (name: string) => void;
   onLoadMore: () => void;
@@ -45,7 +47,7 @@ export default function ChallanLedger({
 }) {
   // Detail screen
   if (detailName) {
-    const cust = customers.find(c => c.name === detailName);
+    const cust = customers.find(c => (detailId ? c.id === detailId : c.name === detailName));
     return (
       <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -148,7 +150,7 @@ export default function ChallanLedger({
       </div>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
         {customers.map(c => (
-          <div key={c.name} onClick={() => onOpenCustomer(c.name)} style={{ padding: '10px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }}>
+          <div key={c.id ?? `name:${c.name}`} onClick={() => onOpenCustomer({ id: c.id, name: c.name })} style={{ padding: '10px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, marginBottom: 2 }}>{c.name}</div>
