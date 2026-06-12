@@ -71,13 +71,11 @@ export default function PrintStation() {
       .update({ status: 'pending', printed_by_station: null, printed_at: null })
       .eq('status', 'printing').eq('printed_by_station', stationName).lt('printed_at', cutoff)
       .then(({ error }) => { if (error) console.warn('Recovery update failed:', error); fetchJobs(); });
-    // Housekeeping: purge old finished jobs so the table doesn't grow forever.
-    const doneCutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
-    const failedCutoff = new Date(Date.now() - 30 * 86_400_000).toISOString();
-    supabase.from('print_queue').delete().eq('status', 'done').lt('created_at', doneCutoff)
-      .then(({ error }) => { if (error) console.warn('Done-job cleanup failed:', error); });
-    supabase.from('print_queue').delete().eq('status', 'failed').lt('created_at', failedCutoff)
-      .then(({ error }) => { if (error) console.warn('Failed-job cleanup failed:', error); });
+    // Housekeeping: print logs are kept for 7 days only (owner policy) —
+    // anything finished (done OR failed) older than that is purged.
+    const logCutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    supabase.from('print_queue').delete().in('status', ['done', 'failed']).lt('created_at', logCutoff)
+      .then(({ error }) => { if (error) console.warn('Print-log cleanup failed:', error); });
   }, [stationName, fetchJobs]);
 
   useEffect(() => {
