@@ -1177,7 +1177,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     {draftRestored && !editing && (
       <div style={{ margin: '0 16px 8px', padding: '8px 12px', borderRadius: 6, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 10, color: T.gr, fontWeight: 600 }}>Draft restored (saved {Math.round((Date.now() - draftRestoredAt) / 60000)} min ago)</span>
-        <button onClick={() => { clearDraft(); closeModal(); }} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, cursor: 'pointer' }}>Discard</button>
+        <button onClick={() => { clearDraft(); closeModal(); }} style={{ ...S.btnGhost, ...S.btnSm }}>Discard</button>
       </div>
     )}
     <ChallanForm
@@ -1368,7 +1368,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setReminderChallan(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.ac3}`, fontSize: 11, fontWeight: 500, background: T.ac3, color: T.ac2, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={saveReminderPhone} disabled={!reminderPhone.trim()} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: reminderPhone.trim() ? `linear-gradient(135deg, ${T.gr}, ${T.grCC})` : 'rgba(255,255,255,.05)', color: '#fff', cursor: reminderPhone.trim() ? 'pointer' : 'not-allowed' }}>Send</button>
+              <button onClick={saveReminderPhone} disabled={!reminderPhone.trim()} style={{ ...S.btnSuccessSolid, flex: 1, padding: '8px 0', fontSize: 11, opacity: reminderPhone.trim() ? 1 : 0.3, cursor: reminderPhone.trim() ? 'pointer' : 'not-allowed' }}>Send</button>
             </div>
           </div>
         </div>
@@ -1393,7 +1393,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 18 }}>Reminder to manually <strong style={{ color: T.yl }}>reduce these inventory items in ERP</strong>. Cash Challan does not sync inventory automatically.</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { localStorage.setItem('ccErpReminderHidden', String(Date.now())); setShowErpReminder(false); }} style={{ flex: 1, padding: '10px', borderRadius: 8, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Don't show for a week</button>
-              <button onClick={() => setShowErpReminder(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer' }}>Got It</button>
+              <button onClick={() => setShowErpReminder(false)} style={{ ...S.btnPrimary, flex: 1, padding: '10px', justifyContent: 'center' }}>Got It</button>
             </div>
           </div>
         </div>
@@ -1413,7 +1413,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmAction(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.ac3}`, fontSize: 11, fontWeight: 500, background: T.ac3, color: T.ac2, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={async () => { const a = confirmAction; setConfirmAction(null); if (a.type === 'void') await voidChallan(a.id); }} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', cursor: 'pointer' }}>{confirmAction.type === 'void' ? 'Void' : 'Delete'}</button>
+              <button onClick={async () => { const a = confirmAction; setConfirmAction(null); if (a.type === 'void') await voidChallan(a.id); }} style={{ ...S.btnDangerSolid, flex: 1, padding: '8px 0', fontSize: 11, justifyContent: 'center' }}>{confirmAction.type === 'void' ? 'Void' : 'Delete'}</button>
             </div>
           </div>
         </div>

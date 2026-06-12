@@ -297,25 +297,25 @@ export default function InventoryExtras() {
           <div style={{ fontSize: 11, color: T.tx3 }}>{filtered.length} items{catFilter !== 'all' ? ' (filtered)' : ''}</div>
         </div>
         <div style={{ display: 'flex', gap: 6, position: 'relative' }}>
-          <div onClick={() => setShowExportMenu(v => !v)} style={btnGhost}>Export ▾</div>
+          <button onClick={() => setShowExportMenu(v => !v)} style={btnGhost} title="Export options" aria-label="Export options">Export ▾</button>
           {showExportMenu && <><div style={{ position: 'fixed', inset: 0, zIndex: 149 }} onClick={() => setShowExportMenu(false)} />
           <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'rgba(14,18,30,.97)', backdropFilter: 'blur(20px)', border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.4)', zIndex: 150, minWidth: 160, overflow: 'hidden' }}>
-            <div onClick={() => {
+            <button onClick={() => {
               if (filtered.length === 0) { addToast('No data to export', 'error'); setShowExportMenu(false); return; }
               const csv = 'SKU,Category,Component,Size,Qty\n' + filtered.map(ex => `${ex.sku},"${ex.product_name}",${ex.component_name},${ex.size},${ex.quantity}`).join('\n');
               const blob = new Blob([csv], { type: 'text/csv' });
               const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Extras_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
               setShowExportMenu(false);
-            }} style={{ padding: '12px 14px', fontSize: 12, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 44 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>CSV Download</div>
-            <div onClick={() => {
+            }} style={{ padding: '12px 14px', fontSize: 12, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, background: 'transparent', border: 'none', width: '100%', fontFamily: T.sans }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>CSV Download</button>
+            <button onClick={() => {
               setShowExportMenu(false);
             if (filtered.length === 0) return;
             const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
             const rows = filtered.map(ex => `<tr><td>${esc(ex.sku)}</td><td>${esc(ex.product_name)}</td><td>${esc(ex.component_name)}</td><td>${esc(ex.size)}</td><td>${esc(ex.location)}</td><td style="text-align:right;font-weight:600">${ex.quantity}</td></tr>`).join('');
             setExportHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spare Parts</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#060810;color:#E2E8F0;padding:16px;padding-bottom:80px;-webkit-text-size-adjust:100%}.header{margin-bottom:16px}.brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}.logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#6366F1,#38BDF8);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff}.title{font-size:15px;font-weight:700;letter-spacing:-0.3px}.sub{font-size:10px;color:#6B7890;letter-spacing:0.5px}.meta{display:flex;gap:12px;font-size:10px;color:#8896B0;margin-top:8px}.meta span{padding:3px 8px;border-radius:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}table{width:100%;border-collapse:collapse;margin-top:4px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.06)}th{background:rgba(255,255,255,.03);font-size:9px;font-weight:600;color:#6B7890;text-transform:uppercase;letter-spacing:0.8px;padding:10px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)}td{padding:9px 10px;font-size:11px;color:#8896B0;border-bottom:1px solid rgba(255,255,255,.04)}tr:nth-child(even) td{background:rgba(255,255,255,.015)}.footer{text-align:center;font-size:8px;color:#4A5568;margin-top:16px;letter-spacing:1px;text-transform:uppercase}.no-print{display:none}@page{size:A4;margin:8mm}@media print{body{background:#fff;color:#222;padding:8mm}th{background:#f5f5f5;color:#333}td{color:#444;border-color:#eee}.footer{color:#999}}</style></head><body><div class="header"><div class="brand"><div class="logo">D</div><div><div class="title">Spare Parts Report</div><div class="sub">Arya Designs</div></div></div><div class="meta"><span>${filtered.length} items</span><span>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div></div><table><thead><tr><th>SKU</th><th>Category</th><th>Component</th><th>Size</th><th>Location</th><th style="text-align:right">Qty</th></tr></thead><tbody>${rows}</tbody></table><div class="footer">Powered by DailyOffice</div></body></html>`);
-          }} style={{ padding: '12px 14px', fontSize: 12, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 44 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>Print / PDF</div>
+          }} style={{ padding: '12px 14px', fontSize: 12, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, background: 'transparent', border: 'none', width: '100%', fontFamily: T.sans }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>Print / PDF</button>
           </div></>}
-          {canEdit && <div onClick={() => setShowAdd(true)} style={btn}>+ Add</div>}
+          {canEdit && <button onClick={() => setShowAdd(true)} style={{ ...btn, border: 'none' }}>+ Add</button>}
         </div>
       </div>
 
@@ -354,15 +354,15 @@ export default function InventoryExtras() {
                 <td style={{ ...td, fontWeight: 600, color: ex.quantity > 0 ? T.gr : T.re }}>{ex.quantity}{ex.quantity < 1 && <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 3, fontSize: 8, fontWeight: 700, textTransform: 'uppercase', background: 'rgba(239,68,68,.10)', color: T.re }}>Out of stock</span>}</td>
                 <td style={td}>
                   {(matchCounts[ex.id] || 0) > 0 ? (
-                    <span onClick={() => loadMatches(ex)} style={{ color: T.yl, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                    <button onClick={() => loadMatches(ex)} style={{ color: T.yl, cursor: 'pointer', fontSize: 11, fontWeight: 600, background: 'none', border: 'none', padding: 0, fontFamily: T.sans }} title="View matching items" aria-label={`${matchCounts[ex.id]} match${matchCounts[ex.id] > 1 ? 'es' : ''}`}>
                       {matchCounts[ex.id]} match{matchCounts[ex.id] > 1 ? 'es' : ''}
-                    </span>
+                    </button>
                   ) : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
                 </td>
                 <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                  {canEdit ? <><span onClick={() => openEdit(ex)} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer' }}>Edit</span>{' '}
-                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...S.btnSuccess, ...S.btnSm, cursor: 'pointer' }}>Add</span>{' '}
-                  <span onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer' }}>Remove</span></> : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
+                  {canEdit ? <><button onClick={() => openEdit(ex)} style={{ ...S.btnGhost, ...S.btnSm }} title="Edit spare part" aria-label="Edit spare part">Edit</button>{' '}
+                  <button onClick={() => { setAdjustExtra(ex); setAdjustMode('add'); }} style={{ ...S.btnSuccess, ...S.btnSm }} title="Add quantity" aria-label="Add quantity">Add</button>{' '}
+                  <button onClick={() => { setAdjustExtra(ex); setAdjustMode('remove'); }} style={{ ...S.btnDanger, ...S.btnSm }} title="Remove quantity" aria-label="Remove quantity">Remove</button></> : <span style={{ color: T.tx3, fontSize: 10 }}>--</span>}
                 </td>
               </tr>
             ))}
@@ -400,11 +400,11 @@ export default function InventoryExtras() {
       {extras.length === EXTRAS_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {EXTRAS_LIMIT} items. Use search to find more.</div>}
 
       {/* Pagination */}
-      {totalPages > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
+      {totalPages > 1 && <div className="pager" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span onClick={() => setPage(Math.max(0, page - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }}>Prev</span>
+          <button onClick={() => setPage(Math.max(0, page - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }} aria-label="Previous page">Prev</button>
           <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
-          <span onClick={() => setPage(Math.min(totalPages - 1, page + 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }}>Next</span>
+          <button onClick={() => setPage(Math.min(totalPages - 1, page + 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">Next</button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 10, color: T.tx3 }}>{filtered.length} items</span>
@@ -475,7 +475,7 @@ export default function InventoryExtras() {
             </div>
             {error && <div style={{ color: T.re, fontSize: 11, marginBottom: 8 }}>{error}</div>}
             <div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
-              <span onClick={() => { setShowAdd(false); setError(''); }} style={btnGhost}>Cancel</span>
+              <button onClick={() => { setShowAdd(false); setError(''); }} style={btnGhost}>Cancel</button>
               <button type="submit" style={{ ...btn, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving...' : 'Add'}</button>
             </div>
           </form>
@@ -487,7 +487,7 @@ export default function InventoryExtras() {
         <div className="modal-inner" style={{ ...modal, width: 380 }} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{adjustMode === 'add' ? 'Add' : 'Remove'} Quantity</span>
-            <span onClick={() => setAdjustExtra(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16 }} aria-label="Close">&times;</span>
+            <button onClick={() => setAdjustExtra(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16, background: 'none', border: 'none' }} title="Close" aria-label="Close">&times;</button>
           </div>
           <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ fontSize: 11, color: T.tx2 }}>
@@ -499,9 +499,9 @@ export default function InventoryExtras() {
             <div><label style={label}>Reason (optional)</label>
               <input value={adjustReason} onChange={e => setAdjustReason(e.target.value)} placeholder="e.g. Found more stock" style={input} /></div>
             {error && <div style={{ color: T.re, fontSize: 11 }}>{error}</div>}
-            <div onClick={adjustQuantity} style={{ ...btn, textAlign: 'center', justifyContent: 'center', display: 'flex', background: adjustMode === 'remove' ? 'rgba(239,68,68,0.7)' : undefined, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>
+            <button onClick={adjustQuantity} style={{ ...btn, textAlign: 'center', justifyContent: 'center', display: 'flex', border: 'none', background: adjustMode === 'remove' ? 'rgba(239,68,68,0.7)' : undefined, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>
               {saving ? 'Saving…' : adjustMode === 'add' ? 'Add' : 'Remove'}
-            </div>
+            </button>
           </div>
         </div>
       </div>, document.body)}
@@ -511,7 +511,7 @@ export default function InventoryExtras() {
         <div className="modal-inner" style={{ ...modal, width: 520 }} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Matching Unsorted Items</span>
-            <span onClick={() => setMatchExtra(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16 }} aria-label="Close">&times;</span>
+            <button onClick={() => setMatchExtra(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16, background: 'none', border: 'none' }} title="Close" aria-label="Close">&times;</button>
           </div>
           <div style={{ padding: 10, fontSize: 11, color: T.tx2, borderBottom: `1px solid ${T.bd}`, background: 'rgba(245,158,11,.03)' }}>
             Extra: {matchExtra.component_name} | SKU: {matchExtra.sku} | Size: {matchExtra.size} | Qty available: <b style={{ color: T.gr }}>{matchExtra.quantity}</b>
@@ -531,8 +531,8 @@ export default function InventoryExtras() {
                     <td style={td}>{m.location || '--'}</td>
                     <td style={td}>
                       {matchExtra.quantity > 0 ? (
-                        <span onClick={() => setCompleteItem({ extra: matchExtra, item: m })}
-                          style={{ ...btn, padding: '3px 10px', fontSize: 10, cursor: 'pointer' }}>Use</span>
+                        <button onClick={() => setCompleteItem({ extra: matchExtra, item: m })}
+                          style={{ ...btn, padding: '3px 10px', fontSize: 10, border: 'none' }} title="Use this spare part" aria-label="Use spare part">Use</button>
                       ) : <span style={{ fontSize: 10, color: T.re }}>No stock</span>}
                     </td>
                   </tr>
@@ -557,8 +557,8 @@ export default function InventoryExtras() {
           </div>
           {error && <div style={{ padding: '0 18px 10px', color: T.re, fontSize: 11 }}>{error}</div>}
           <div style={{ padding: '0 18px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <div onClick={() => setCompleteItem(null)} style={btnGhost}>Cancel</div>
-            <div onClick={completeWithExtra} style={{ ...btn, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Processing...' : 'Confirm'}</div>
+            <button onClick={() => setCompleteItem(null)} style={btnGhost}>Cancel</button>
+            <button onClick={completeWithExtra} style={{ ...btn, border: 'none', opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Processing...' : 'Confirm'}</button>
           </div>
         </div>
       </div>, document.body)}
@@ -566,7 +566,7 @@ export default function InventoryExtras() {
         <div className="modal-inner" style={modal} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Edit Spare Part</span>
-            <span onClick={() => setEditingExtra(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16 }}>&times;</span>
+            <button onClick={() => setEditingExtra(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16, background: 'none', border: 'none' }} title="Close" aria-label="Close">&times;</button>
           </div>
           <div style={{ padding: 16 }}>
             {error && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: T.re, marginBottom: 10 }}>{error}</div>}
@@ -579,8 +579,8 @@ export default function InventoryExtras() {
             <div style={{ marginBottom: 10 }}><label style={label}>Manufacturer *</label><input list="mfr-edit-list" value={editForm.manufacturer} onChange={e => setEditForm({ ...editForm, manufacturer: e.target.value })} style={input} /><datalist id="mfr-edit-list">{mfrOptions.map(m => <option key={m} value={m} />)}</datalist></div>
             <div style={{ marginBottom: 12 }}><label style={label}>Notes</label><input value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} placeholder="Optional" style={input} /></div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <span onClick={() => setEditingExtra(null)} style={btnGhost}>Cancel</span>
-              <span onClick={saveEdit} style={{ ...btn, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Updating…' : 'Update'}</span>
+              <button onClick={() => setEditingExtra(null)} style={btnGhost}>Cancel</button>
+              <button onClick={saveEdit} style={{ ...btn, border: 'none', opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Updating…' : 'Update'}</button>
             </div>
           </div>
         </div>

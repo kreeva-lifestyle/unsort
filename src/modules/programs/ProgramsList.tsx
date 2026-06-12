@@ -191,11 +191,11 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="prg-pagination" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 10, alignItems: 'center' }}>
+        <div className="pager" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 10, alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }} aria-label="Previous page">{t('prev')}</span>
+            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1 }} aria-label="Previous page">{t('prev')}</button>
             <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
-            <span onClick={() => setPage(p => p + 1)} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">{t('next')}</span>
+            <button onClick={() => setPage(p => p + 1)} disabled={page >= totalPages - 1} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1 }} aria-label="Next page">{t('next')}</button>
           </div>
           <span style={{ fontSize: 10, color: T.tx3 }}>{totalCount} items</span>
         </div>

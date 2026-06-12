@@ -292,6 +292,12 @@ body.modal-open .fab { display: none !important; }
   .challan-pagination > span { width: 100% !important; text-align: center !important; }
 }
 
+/* ── Shared pagination (button audit) ──────────────────── */
+@media (max-width: 768px) {
+  .pager button { min-height: 40px !important; min-width: 56px !important; padding: 8px 12px !important; font-size: 12px !important; }
+  .inv-chip { min-height: 28px !important; font-size: 9px !important; padding: 3px 8px !important; }
+}
+
 /* ── Challan detail mobile ──────────────────────────────── */
 @media (max-width: 768px) {
   .challan-detail-modal { scrollbar-width: none !important; }
