@@ -661,10 +661,10 @@ export default function CashBook() {
         ] as const).map(t => {
           const active = tab === t.id;
           return (
-            <div key={t.id} role="button" tabIndex={0} onClick={() => setTab(t.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setTab(t.id); }} style={{ padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: active ? 700 : 500, cursor: 'pointer', background: active ? `linear-gradient(135deg, ${T.ac87}, ${T.ac2cc})` : 'transparent', color: active ? '#fff' : T.tx3, display: 'flex', alignItems: 'center', gap: 8, transition: T.transition }}>
+            <button key={t.id} tabIndex={0} onClick={() => setTab(t.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setTab(t.id); }} style={{ ...S.btnPrimary, padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: active ? 700 : 500, cursor: 'pointer', background: active ? S.btnPrimary.background : 'transparent', color: active ? '#fff' : T.tx3, boxShadow: active ? S.btnPrimary.boxShadow : 'none', display: 'flex', alignItems: 'center', gap: 8, transition: T.transition }}>
               <span>{t.label}</span>
               <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 10, background: active ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.04)', color: active ? '#fff' : T.tx3, fontFamily: T.mono, minWidth: 18, textAlign: 'center' as const }}>{t.count}</span>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -680,7 +680,7 @@ export default function CashBook() {
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{e.category}</span>
-                  <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3, fontFamily: T.mono }}>{new Date(e.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
+                  <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3, fontFamily: T.mono }}>{new Date(e.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
                 </div>
                 {e.description && <div style={{ fontSize: 10, color: T.tx3 }}>{e.description}</div>}
                 {e.profiles && <div style={{ fontSize: 9, color: T.tx3, marginTop: 1 }}>by {e.profiles.full_name}</div>}
@@ -689,7 +689,7 @@ export default function CashBook() {
               <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: Number(e.amount) < 0 ? T.gr : T.re }}>{Number(e.amount) < 0 ? '+' : '−'}₹{Math.abs(Number(e.amount)).toLocaleString('en-IN')}</div>
               {lockedExpenseIds.has(e.id) ? (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  {currentUserRole === 'admin' && <button onClick={() => { setCorrectingExpense(e); setCorrectAmount(''); setCorrectError(''); }} style={{ padding: '2px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.yl, fontSize: 9, fontWeight: 600, cursor: 'pointer' }} title="Record a correction entry — the locked original stays untouched">Correct</button>}
+                  {currentUserRole === 'admin' && <button onClick={() => { setCorrectingExpense(e); setCorrectAmount(''); setCorrectError(''); }} style={{ padding: '4px 10px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.yl, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} title="Record a correction entry — the locked original stays untouched">Correct</button>}
                   <span title="Included in a confirmed cash handover — cannot be deleted" style={{ display: 'inline-flex', alignItems: 'center', padding: 0, opacity: 0.5, color: T.tx3 }}>
                     <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
                   </span>
@@ -715,7 +715,7 @@ export default function CashBook() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>#{s.challan_number}</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{s.customer_name}</span>
-                  {s.is_return && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 600, textTransform: 'uppercase' }}>Return</span>}
+                  {s.is_return && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 600, textTransform: 'uppercase' }}>Return</span>}
                 </div>
                 <div style={{ fontSize: 9, color: T.tx3 }}>₹{Number(s.amount_paid).toLocaleString('en-IN')}{s.payment_mode ? ` · ${s.payment_mode}` : ''}{s.payment_date ? ` · ${new Date(s.payment_date + 'T00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}</div>
               </div>
@@ -728,7 +728,7 @@ export default function CashBook() {
       {/* Handovers Tab */}
       {tab === 'handovers' && <>
         {currentUserRole !== 'admin' ? (
-          <button onClick={() => setShowHandover(true)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: `linear-gradient(135deg, ${T.yl}, ${T.ylCC})`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 10 }}>+ Initiate Handover</button>
+          <button onClick={() => setShowHandover(true)} style={{ ...S.btnWarnSolid, padding: '7px 14px', borderRadius: 6, fontSize: 11, marginBottom: 10 }}>+ Initiate Handover</button>
         ) : (
           <div style={{ padding: '8px 12px', borderRadius: 6, background: T.ac3, border: `1px solid ${T.ac3}`, color: T.tx2, fontSize: 10, marginBottom: 10 }}>Admins receive handovers — users initiate them. Review pending handovers below.</div>
         )}
@@ -741,8 +741,8 @@ export default function CashBook() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 10, fontFamily: T.mono, color: T.ac2, fontWeight: 600 }}>{formatHandoverNo(h.handover_number)}</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{h.from_user_name} → {h.to_user_name}</span>
-                  <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3, fontFamily: T.mono }}>{new Date(h.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
-                  <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : h.status === 'disputed' ? 'rgba(239,68,68,.12)' : h.status === 'cancelled' ? 'rgba(255,255,255,.06)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : h.status === 'disputed' ? T.re : h.status === 'cancelled' ? T.tx3 : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓ Signed' : h.status === 'disputed' ? '✕ Rejected' : h.status === 'cancelled' ? 'Cancelled' : 'Pending'}</span>
+                  <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3, fontFamily: T.mono }}>{new Date(h.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
+                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : h.status === 'disputed' ? 'rgba(239,68,68,.12)' : h.status === 'cancelled' ? 'rgba(255,255,255,.06)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : h.status === 'disputed' ? T.re : h.status === 'cancelled' ? T.tx3 : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓ Signed' : h.status === 'disputed' ? '✕ Rejected' : h.status === 'cancelled' ? 'Cancelled' : 'Pending'}</span>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(h.amount).toLocaleString('en-IN')}</span>
               </div>
@@ -817,7 +817,7 @@ export default function CashBook() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontFamily: T.mono, color: T.tx, fontWeight: 600 }}>₹{Number(h.amount).toLocaleString('en-IN')}</span>
-                      <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓' : 'Pending'}</span>
+                      <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓' : 'Pending'}</span>
                     </div>
                   </div>
                 ))}
@@ -874,7 +874,7 @@ export default function CashBook() {
             {handError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{handError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setShowHandover(false); setHandError(''); setHandReason(''); setHandAmount(''); setHandToId(''); setHandNotes(''); setHandBreakdown(null); setExcludePaise(false); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
-              <button onClick={createHandover} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.yl}, ${T.ylCC})`, color: '#fff', cursor: 'pointer', opacity: handSaving ? 0.5 : 1, pointerEvents: handSaving ? 'none' : 'auto' }}>{handSaving ? 'Initiating…' : 'Initiate'}</button>
+              <button onClick={createHandover} style={{ ...S.btnWarnSolid, flex: 1, padding: '9px 0', borderRadius: 6, fontSize: 11, opacity: handSaving ? 0.5 : 1, pointerEvents: handSaving ? 'none' : 'auto' }}>{handSaving ? 'Initiating…' : 'Initiate'}</button>
             </div>
           </div>
         </div>,
@@ -893,10 +893,10 @@ export default function CashBook() {
               <button onClick={() => setViewingHandover(null)} style={{ padding: '3px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Close</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12, fontSize: 11 }}>
-              <div><div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>From</div><div style={{ color: T.tx, fontWeight: 600 }}>{viewingHandover.from_user_name}</div></div>
-              <div><div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>To</div><div style={{ color: T.tx, fontWeight: 600 }}>{viewingHandover.to_user_name}</div></div>
-              <div><div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>Period</div><div style={{ color: T.tx2, fontFamily: T.mono, fontSize: 10 }}>{viewingHandover.period_from ? new Date(viewingHandover.period_from).toLocaleDateString('en-IN') : '-'} → {viewingHandover.period_to ? new Date(viewingHandover.period_to).toLocaleDateString('en-IN') : '-'}</div></div>
-              <div><div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>Status</div><div style={{ color: viewingHandover.status === 'confirmed' ? T.gr : viewingHandover.status === 'disputed' ? T.re : viewingHandover.status === 'cancelled' ? T.tx3 : T.yl, fontWeight: 700, textTransform: 'uppercase', fontSize: 10 }}>{viewingHandover.status === 'confirmed' ? '✓ Signed' : viewingHandover.status === 'disputed' ? '✕ Rejected' : viewingHandover.status === 'cancelled' ? 'Cancelled' : 'Pending'}</div></div>
+              <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>From</div><div style={{ color: T.tx, fontWeight: 600 }}>{viewingHandover.from_user_name}</div></div>
+              <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>To</div><div style={{ color: T.tx, fontWeight: 600 }}>{viewingHandover.to_user_name}</div></div>
+              <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>Period</div><div style={{ color: T.tx2, fontFamily: T.mono, fontSize: 10 }}>{viewingHandover.period_from ? new Date(viewingHandover.period_from).toLocaleDateString('en-IN') : '-'} → {viewingHandover.period_to ? new Date(viewingHandover.period_to).toLocaleDateString('en-IN') : '-'}</div></div>
+              <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>Status</div><div style={{ color: viewingHandover.status === 'confirmed' ? T.gr : viewingHandover.status === 'disputed' ? T.re : viewingHandover.status === 'cancelled' ? T.tx3 : T.yl, fontWeight: 700, textTransform: 'uppercase', fontSize: 10 }}>{viewingHandover.status === 'confirmed' ? '✓ Signed' : viewingHandover.status === 'disputed' ? '✕ Rejected' : viewingHandover.status === 'cancelled' ? 'Cancelled' : 'Pending'}</div></div>
             </div>
             {viewingHandover.breakdown ? (
               <div style={{ background: T.ac3, border: `1px solid ${T.ac3}`, borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 11 }}>
@@ -919,7 +919,7 @@ export default function CashBook() {
             {viewingHandover.reason && <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl, marginBottom: 8 }}><strong>Reason:</strong> {viewingHandover.reason}</div>}
             {viewingHandover.notes && <div style={{ fontSize: 10, color: T.tx3, marginBottom: 8 }}><strong>Notes:</strong> {viewingHandover.notes}</div>}
             {viewingHandover.confirmed_at && <div style={{ fontSize: 10, color: T.gr, marginBottom: 10 }}>✓ Signed at {new Date(viewingHandover.confirmed_at).toLocaleString('en-IN')}</div>}
-            <button onClick={() => printHandoverReceipt(viewingHandover)} style={{ width: '100%', padding: '10px', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: 'pointer' }}>Print Receipt</button>
+            <button onClick={() => printHandoverReceipt(viewingHandover)} style={{ ...S.btnPrimary, width: '100%', padding: '10px', borderRadius: 6, fontSize: 11 }}>Print Receipt</button>
           </div>
         </div>,
         document.body
@@ -935,7 +935,7 @@ export default function CashBook() {
             {confirmError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{confirmError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setConfirmingHandover(null); setConfirmPin(''); setConfirmError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
-              <button onClick={confirmHandover} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.gr}, ${T.grCC})`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Confirming…' : 'Sign & Confirm'}</button>
+              <button onClick={confirmHandover} disabled={busy} style={{ ...S.btnSuccessSolid, flex: 1, padding: '9px 0', borderRadius: 6, fontSize: 11, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Confirming…' : 'Sign & Confirm'}</button>
             </div>
           </div>
         </div>,
@@ -953,7 +953,7 @@ export default function CashBook() {
             {rejectError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{rejectError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setRejectingHandover(null); setRejectReason(''); setRejectError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
-              <button onClick={submitReject} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Rejecting…' : 'Confirm Reject'}</button>
+              <button onClick={submitReject} disabled={busy} style={{ ...S.btnDangerSolid, flex: 1, padding: '9px 0', borderRadius: 6, fontSize: 11, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Rejecting…' : 'Confirm Reject'}</button>
             </div>
           </div>
         </div>,
@@ -995,7 +995,7 @@ export default function CashBook() {
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This withdraws your unsigned handover of <strong style={{ color: T.yl, fontFamily: T.mono }}>₹{Number(cancellingHandover.amount).toLocaleString('en-IN')}</strong> to <strong style={{ color: T.tx }}>{cancellingHandover.to_user_name}</strong>. The cash becomes available again and you can initiate a fresh handover.</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setCancellingHandover(null)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Keep It</button>
-              <button onClick={cancelHandover} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }}>{busy ? 'Cancelling…' : 'Cancel Handover'}</button>
+              <button onClick={cancelHandover} disabled={busy} style={{ ...S.btnDangerSolid, flex: 1, padding: '9px 0', borderRadius: 6, fontSize: 11, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }}>{busy ? 'Cancelling…' : 'Cancel Handover'}</button>
             </div>
           </div>
         </div>,
@@ -1046,14 +1046,14 @@ export default function CashBook() {
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This will permanently remove the expense.</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
-              <button onClick={() => deleteExpense(confirmDelete)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', cursor: 'pointer' }}>Delete</button>
+              <button onClick={() => deleteExpense(confirmDelete)} style={{ ...S.btnDangerSolid, flex: 1, padding: '8px 0', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>Delete</button>
             </div>
           </div>
         </div>,
         document.body
       )}
       {pendingExpDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, overflow: 'hidden', minWidth: 260 }}>
-        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: T.tx, flex: 1 }}>Expense deleted</span><span onClick={undoExpDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#fff' }}>Undo</span><span onClick={dismissExpDel} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }} aria-label="Dismiss">✕</span></div>
+        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: T.tx, flex: 1 }}>Expense deleted</span><button onClick={undoExpDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#fff' }}>Undo</button><button onClick={dismissExpDel} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14, border: 'none', background: 'none' }} aria-label="Dismiss">✕</button></div>
         <div className="undo-bar" key={pendingExpDel.id} />
       </div>}
     </div>

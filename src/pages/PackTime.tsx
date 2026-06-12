@@ -965,8 +965,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         <div style={{ margin: '0 14px 8px', padding: '10px 14px', borderRadius: 6, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', color: T.re, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.re, animation: 'subtlePulse 1.5s ease-in-out infinite' }} />
           <span style={{ flex: 1 }}>⚠ {droppedCount} scan(s) failed to sync to Google Sheets after retries — they ARE saved in the app, just missing from the sheet. Check connection, then tap Retry.</span>
-          <button onClick={() => { const batches = getDroppedBatches().slice(); clearDroppedBatches(); for (const b of batches) enqueueWrite(b.rows, b.sheetName); }} style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.12)', color: T.re, fontSize: 9, fontWeight: 700, cursor: 'pointer' }}>Retry sync</button>
-          <button onClick={() => { clearDroppedBatches(); setDroppedCount(0); }} style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid rgba(239,68,68,.3)', background: 'transparent', color: T.re, fontSize: 9, cursor: 'pointer' }}>Dismiss</button>
+          <button onClick={() => { const batches = getDroppedBatches().slice(); clearDroppedBatches(); for (const b of batches) enqueueWrite(b.rows, b.sheetName); }} style={{ ...S.btnDanger, ...S.btnSm, fontWeight: 700 }}>Retry sync</button>
+          <button onClick={() => { clearDroppedBatches(); setDroppedCount(0); }} style={{ ...S.btnGhost, ...S.btnSm, color: T.re, borderColor: 'rgba(239,68,68,.3)' }}>Dismiss</button>
         </div>
       )}
 
@@ -991,7 +991,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             <div style={{ fontSize: 11, fontWeight: 700, color: T.yl, textTransform: 'uppercase', letterSpacing: 1 }}>Sync lagging — keep scanning</div>
             <div style={{ fontSize: 11, color: T.tx2, marginTop: 2 }}>{pendingWrites} scan{pendingWrites === 1 ? '' : 's'} waiting to sync{dbFails > 0 ? `. ${dbFails} failed to save — tap Retry` : '. Retrying in the background'}.</div>
           </div>
-          {dbFails > 0 && <button onClick={retryFailedDbScans} style={{ padding: '4px 10px', borderRadius: 4, border: '1px solid rgba(245,158,11,.35)', background: 'rgba(245,158,11,.12)', color: T.yl, fontSize: 10, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Retry failed</button>}
+          {dbFails > 0 && <button onClick={retryFailedDbScans} style={{ ...S.btnWarn, ...S.btnSm, fontWeight: 700, flexShrink: 0 }}>Retry failed</button>}
         </div>
       )}
 
@@ -1166,7 +1166,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                   {s.success && s.pending && <span style={{ color: T.yl, fontWeight: 600, marginLeft: 6 }}>· syncing</span>}
                 </div>
               </div>
-              {s.success && !s.pending && i === 0 && <button type="button" onClick={(e) => { e.stopPropagation(); undoLast(); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>↩ Undo</button>}
+              {s.success && !s.pending && i === 0 && <button type="button" onClick={(e) => { e.stopPropagation(); undoLast(); }} style={{ ...S.btnGhost, ...S.btnSm, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>↩ Undo</button>}
             </div>
           ))}
         </div>}

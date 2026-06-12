@@ -80,13 +80,13 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
         {ALL_MODULE_KEYS.map(k => {
           const on = access[k] !== false;
           return (
-            <span key={k} onClick={() => toggleModule(u.id, k)}
-              style={{ padding: '3px 8px', borderRadius: 5, fontSize: 9, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', userSelect: 'none',
+            <button key={k} onClick={() => toggleModule(u.id, k)}
+              style={{ padding: '4px 9px', borderRadius: 5, fontSize: 10, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', userSelect: 'none',
                 background: on ? 'rgba(34,197,94,.08)' : 'rgba(255,255,255,.03)',
                 border: `1px solid ${on ? 'rgba(34,197,94,.2)' : T.bd}`,
                 color: on ? T.gr : T.tx3, opacity: on ? 1 : 0.5 }}>
               {on ? '✓' : '✗'} {MODULE_LABELS[k]}
-            </span>
+            </button>
           );
         })}
       </div>

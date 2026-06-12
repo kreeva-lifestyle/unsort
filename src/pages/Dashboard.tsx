@@ -144,12 +144,16 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [taskSaving, setTaskSaving] = useState(false);
   const addTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTask.trim()) return;
-    const { error } = await supabase.from('tasks').insert({ title: newTask.trim(), created_by: profile?.id });
-    if (error) { addToast(friendlyError(error), 'error'); return; }
-    setNewTask(''); fetchTasks();
+    if (!newTask.trim() || taskSaving) return;
+    setTaskSaving(true);
+    try {
+      const { error } = await supabase.from('tasks').insert({ title: newTask.trim(), created_by: profile?.id });
+      if (error) { addToast(friendlyError(error), 'error'); return; }
+      setNewTask(''); fetchTasks();
+    } finally { setTaskSaving(false); }
   };
   const toggleTask = async (id: string, done: boolean) => {
     const { error } = await supabase.from('tasks').update({ is_done: !done }).eq('id', id);
@@ -403,7 +407,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         </div>
         <form onSubmit={addTask} style={{ display: 'flex', gap: 6, padding: '8px 12px', borderBottom: `1px solid ${T.bd}` }}>
           <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Add a note..." style={{ ...S.fInput, flex: 1 }} />
-          <button type="submit" style={S.btnPrimary}>Add</button>
+          <button type="submit" disabled={taskSaving} style={{ ...S.btnPrimary, opacity: taskSaving ? 0.5 : 1, pointerEvents: taskSaving ? 'none' as const : 'auto' as const }}>{taskSaving ? 'Adding…' : 'Add'}</button>
         </form>
         <div style={{ maxHeight: 200, overflowY: 'auto' }}>
           {tasks.map(t => (

@@ -188,6 +188,22 @@ export const S = {
     transition: T.transition, whiteSpace: 'nowrap' as const,
   } as React.CSSProperties,
 
+  btnWarnSolid: {
+    padding: '8px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+    fontSize: 12, fontWeight: 600, fontFamily: T.sans,
+    background: `linear-gradient(135deg, ${oklchTint(0.58, 0.16, 80, 0.90)}, ${oklchTint(0.68, 0.14, 85, 0.80)})`,
+    color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 5,
+    boxShadow: `0 2px 10px ${oklchTint(0.58, 0.16, 80, 0.25)}`,
+    transition: T.transition, whiteSpace: 'nowrap' as const, letterSpacing: '0.02em',
+  } as React.CSSProperties,
+
+  btnIcon: {
+    width: 36, height: 36, borderRadius: 8, border: `1px solid ${T.bd2}`,
+    background: T.glass2, color: T.tx3, cursor: 'pointer', padding: 0,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    transition: T.transition, flexShrink: 0,
+  } as React.CSSProperties,
+
   btnSm: { padding: '4px 10px', fontSize: 10, borderRadius: 5 } as React.CSSProperties,
   btnLg: { padding: '10px 18px', fontSize: 13, height: 40 } as React.CSSProperties,
 
