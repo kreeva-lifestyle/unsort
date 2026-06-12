@@ -93,13 +93,14 @@ export default function CashBook() {
   const [confirmingHandover, setConfirmingHandover] = useState<Handover | null>(null);
   const [confirmPin, setConfirmPin] = useState('');
   const [confirmError, setConfirmError] = useState('');
-  // PIN lockout — exponential backoff after wrong attempts (audit P1)
-  const [pinAttempts, setPinAttempts] = useState(0);
+  // PIN lockout is enforced SERVER-SIDE inside verify_own_pin (failed-attempt
+  // tracking in the DB — can't be bypassed by closing the tab). pinLockUntil
+  // here is only a local mirror so we can show the wait time without a round
+  // trip; it is set from the RPC's retry_after, never computed client-side.
   const [pinLockUntil, setPinLockUntil] = useState<number>(() => {
     try { return Number(sessionStorage.getItem('pinLockUntil')) || 0; } catch { return 0; }
   });
   const [busy, setBusy] = useState(false); // disables critical handover/save buttons during async ops
-  // Persist lockout across modal close so user can't bypass rate limit
   useEffect(() => {
     try {
       if (pinLockUntil > 0) sessionStorage.setItem('pinLockUntil', String(pinLockUntil));
@@ -309,7 +310,11 @@ export default function CashBook() {
     // WhatsApp notification to recipient
     if (recipient.phone) {
       const msg = encodeURIComponent(`Hi ${recipient.full_name},\n${prof?.full_name || 'Sender'} has initiated cash handover ${hoNo} of ₹${amt.toLocaleString('en-IN')} for you (period ${handPeriodFrom} to ${handPeriodTo}).\nPlease open DailyOffice → Cash Book → Handovers and sign with your PIN to confirm receipt, or reject with a reason.\n— Arya Designs`);
-      window.location.href = `https://wa.me/${waPhone(recipient.phone)}?text=${msg}`;
+      // Open WhatsApp WITHOUT navigating the app away — the handover is already
+      // saved, and location.href here used to dump desktop users out of the PWA.
+      const waUrl = `https://wa.me/${waPhone(recipient.phone)}?text=${msg}`;
+      const w = window.open(waUrl, '_blank', 'noopener');
+      if (!w) window.location.href = waUrl; // popup blocked — fall back to same-tab
     }
     setHandSaving(false); setHandAmount(''); setHandToId(''); setHandNotes(''); setHandReason(''); setHandBreakdown(null); setShowHandover(false);
     fetchData();
@@ -397,21 +402,22 @@ export default function CashBook() {
       }
       const { data: hasPinSet } = await supabase.rpc('check_pin_exists');
       if (!hasPinSet) { setConfirmError('You have no PIN set. Go to Settings → My Profile to set one.'); return; }
-      const { data: pinValid } = await supabase.rpc('verify_own_pin', { pin: confirmPin.trim() });
-      if (!pinValid) {
-        const nextAttempts = pinAttempts + 1;
-        setPinAttempts(nextAttempts);
-        if (nextAttempts >= 3) {
-          const waitMs = Math.min(5000 * Math.pow(2, nextAttempts - 3), 5 * 60 * 1000);
-          setPinLockUntil(now + waitMs);
-          setConfirmError(`Incorrect PIN. Locked for ${Math.ceil(waitMs / 1000)}s (${nextAttempts} failed attempts).`);
+      const { data: pinRes, error: pinErr } = await supabase.rpc('verify_own_pin', { pin: confirmPin.trim() });
+      if (pinErr) { setConfirmError(friendlyError(pinErr)); return; }
+      const res = (pinRes && typeof pinRes === 'object' ? pinRes : { valid: pinRes === true }) as { valid?: boolean; locked?: boolean; retry_after?: number; attempts?: number; no_pin?: boolean };
+      if (!res.valid) {
+        if (res.no_pin) { setConfirmError('You have no PIN set. Go to Settings → My Profile to set one.'); return; }
+        if (res.locked && res.retry_after) {
+          setPinLockUntil(Date.now() + res.retry_after * 1000);
+          setConfirmError(`Too many failed attempts (${res.attempts ?? 0}). Locked for ${res.retry_after}s.`);
         } else {
-          setConfirmError(`Incorrect PIN. ${3 - nextAttempts} attempt${3 - nextAttempts === 1 ? '' : 's'} before lockout.`);
+          const left = Math.max(0, 3 - (res.attempts ?? 0));
+          setConfirmError(`Incorrect PIN. ${left} attempt${left === 1 ? '' : 's'} before lockout.`);
         }
         setConfirmPin('');
         return;
       }
-      setPinAttempts(0); setPinLockUntil(0);
+      setPinLockUntil(0);
       const { data: updated, error } = await supabase.from('cash_handovers').update({
         status: 'confirmed',
         confirmed_at: new Date().toISOString(),
@@ -510,7 +516,9 @@ export default function CashBook() {
   const exportCSV = () => {
     const rowsForTab = tab === 'expenses' ? expenses : tab === 'sales' ? sales : handovers;
     if (rowsForTab.length === 0) { addToast('Nothing to export in this date range', 'error'); return; }
-    const esc = (v: string) => `"${(v || '').replace(/"/g, '""')}"`;
+    // Prefix ' on leading =+-@ so Excel/Sheets never treat user-typed text as
+    // a formula (CSV injection) — same guard as the challan export.
+    const esc = (v: string) => { const s = v || ''; const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s; return `"${safe.replace(/"/g, '""')}"`; };
     let csv = '', label = '';
     if (tab === 'expenses') {
       label = 'Expenses';

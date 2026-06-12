@@ -301,7 +301,6 @@ export const S = {
 };
 
 export const CHALLAN_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  draft: { bg: oklchTint(0.77, 0.14, 230, 0.10), color: T.bl },
   paid: { bg: oklchTint(0.72, 0.19, 145, 0.10), color: T.gr },
   unpaid: { bg: oklchTint(0.63, 0.22, 25, 0.10), color: T.re },
   partial: { bg: oklchTint(0.78, 0.18, 75, 0.10), color: T.yl },

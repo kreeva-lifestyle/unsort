@@ -233,7 +233,7 @@ export default function ChallanForm(p: ChallanFormProps) {
                   <input type="number" min="1" step="1" value={it.quantity || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].quantity = Math.max(0, Math.round(Number(e.target.value))); p.setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: qtyBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'center' as const }} />
                   <input type="number" min="0" step="0.01" value={it.price || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].price = Math.max(0, Number(e.target.value)); p.setItems(n); }} placeholder="0" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: priceBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
                   <div className="challan-disc-col" style={{ display: 'flex', gap: 2, alignItems: 'center', opacity: p.isReturn && p.returnSource ? 0.6 : 1 }}>
-                    <select value={it.discount_type || 'flat'} onChange={e => { const n = [...p.items]; n[i].discount_type = e.target.value; p.setItems(n); }} disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx3, fontSize: 11, padding: '4px 6px', outline: 'none', width: 32 }}>
+                    <select value={it.discount_type || 'flat'} onChange={e => { const n = [...p.items]; n[i].discount_type = e.target.value; n[i].discount_value = 0; p.setItems(n); }} disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx3, fontSize: 11, padding: '4px 6px', outline: 'none', width: 32 }}>
                       <option value="flat">₹</option><option value="percentage">%</option>
                     </select>
                     <input
@@ -298,7 +298,6 @@ export default function ChallanForm(p: ChallanFormProps) {
                   <option value="unpaid">Unpaid</option>
                   <option value="paid">Paid</option>
                   <option value="partial">Partial</option>
-                  {(!p.editing || p.editing.status === 'draft') && <option value="draft">Draft</option>}
                 </select>
               )}
             </div>

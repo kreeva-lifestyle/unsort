@@ -55,7 +55,7 @@ export default function ChallanBulkActions(p: Props) {
       {p.bulkMode && (
         <div className="challan-bulk-toolbar" style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', background: T.ac3, border: `1px solid ${T.bd2}`, borderRadius: 6 }}>
           <span style={{ fontSize: 10, color: T.tx2, fontWeight: 600 }}>{p.selectedCount} selected</span>
-          <button onClick={p.onSelectAll} style={{ ...S.btnGhost, ...S.btnSm }}>Select All</button>
+          <button onClick={p.onSelectAll} style={{ ...S.btnGhost, ...S.btnSm }}>Select Page</button>
           <button onClick={p.onClearSelection} style={{ ...S.btnGhost, ...S.btnSm }}>Clear</button>
           <div style={{ flex: 1 }} />
           {p.payable.length > 0 && <button onClick={p.onOpenBulkPay} style={{ ...S.btnSuccess, ...S.btnSm, padding: '4px 12px' }}>Bulk Pay ({p.payable.length})</button>}
