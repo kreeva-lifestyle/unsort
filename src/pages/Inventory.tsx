@@ -129,13 +129,15 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     supabase.from('products').select('id, name, sku, total_components, category').eq('is_active', true).then(({ data, error }) => { if (error) addToast('Failed to load categories — ' + friendlyError(error), 'error'); setProducts(data || []); });
     supabase.from('locations').select('id, name').order('name').then(({ data, error }) => { if (error) addToast('Failed to load locations — ' + friendlyError(error), 'error'); setLocations(data || []); });
     supabase.from('tags').select('id, name, color').order('name').then(({ data, error }) => { if (error) addToast('Failed to load tags — ' + friendlyError(error), 'error'); setTags(data || []); });
-    supabase.from('inventory_items').select('manufacturer').gt('manufacturer', '').limit(5000).then(({ data }) => { const unique = [...new Set((data || []).map(d => d.manufacturer).filter(Boolean))].sort(); setManufacturers(unique); });
-    supabase.from('item_tags').select('inventory_item_id, tag_id, tags(id, name, color)').limit(10000).then(({ data }) => {
+    supabase.from('inventory_items').select('manufacturer').gt('manufacturer', '').limit(5000).then(({ data, error }) => { if (error) { addToast('Failed to load manufacturers — ' + friendlyError(error), 'error'); return; } const unique = [...new Set((data || []).map(d => d.manufacturer).filter(Boolean))].sort(); setManufacturers(unique); });
+    supabase.from('item_tags').select('inventory_item_id, tag_id, tags(id, name, color)').limit(10000).then(({ data, error }) => {
+      if (error) { addToast('Failed to load tags — ' + friendlyError(error), 'error'); return; }
       const map: Record<string, any[]> = {};
       (data || []).forEach((it: any) => { if (!map[it.inventory_item_id]) map[it.inventory_item_id] = []; map[it.inventory_item_id].push(it.tags); });
       setItemTags(map);
     });
-    const p2 = supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').limit(10000).then(({ data }) => {
+    const p2 = supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').limit(10000).then(({ data, error }) => {
+      if (error) { addToast('Failed to load components — ' + friendlyError(error), 'error'); return; }
       const missingMap: Record<string, string[]> = {};
       const damagedMap: Record<string, string[]> = {};
       const damagedIdMap: Record<string, Set<string>> = {};
@@ -362,7 +364,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     try {
     if (selected) {
       if (selected.serial_number && selected.serial_number !== form.serial_number) {
-        const { count } = await supabase.from('inventory_extras').select('id', { count: 'exact', head: true }).eq('sku', selected.serial_number);
+        const { count, error: cntErr } = await supabase.from('inventory_extras').select('id', { count: 'exact', head: true }).eq('sku', selected.serial_number);
+        if (cntErr) { addToast('Failed to check spare parts — ' + friendlyError(cntErr), 'error'); return; }
         if ((count || 0) > 0) { addToast(`Cannot change SKU — ${count} extra(s) reference "${selected.serial_number}". Update extras first.`, 'error'); return; }
       }
       const { error } = await supabase.from('inventory_items').update(form).eq('id', selected.id);
@@ -893,13 +896,13 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
                 style={{ cursor: 'pointer' }}
               />
             </td>}
-            <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 10, whiteSpace: 'nowrap' }}><span style={{ color: T.gr }}>{item.batch_number || '—'}</span>{isCompletedView && item.paired_with && (() => { const pair = items.find(p => p.id === item.paired_with); return pair ? <span onClick={() => scrollToPair(item.paired_with)} style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2, cursor: 'pointer' }} title="Click to find paired item"><svg viewBox="0 0 24 24" style={{ width: 9, height: 9, fill: 'none', stroke: T.ac2, strokeWidth: 2, flexShrink: 0 }}><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg><span style={{ fontSize: 9, color: T.ac2 }}>{pair.batch_number}</span></span> : null; })()}</td>
+            <td style={{ ...S.tdStyle, fontFamily: T.mono, fontSize: 10, whiteSpace: 'nowrap' }}><span style={{ color: T.gr }}>{item.batch_number || '—'}</span>{isCompletedView && item.paired_with && (() => { const pair = items.find(p => p.id === item.paired_with); return pair ? <button onClick={() => scrollToPair(item.paired_with)} style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2, cursor: 'pointer', background: 'none', border: 'none', padding: 0 }} title="Click to find paired item" aria-label="Scroll to paired item"><svg viewBox="0 0 24 24" style={{ width: 9, height: 9, fill: 'none', stroke: T.ac2, strokeWidth: 2, flexShrink: 0 }}><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg><span style={{ fontSize: 9, color: T.ac2 }}>{pair.batch_number}</span></button> : null; })()}</td>
             <td title={item.serial_number || ''} style={{ ...S.tdStyle, fontFamily: T.mono, color: T.ac2, fontSize: 10 }}>{item.serial_number || '—'}{item.link && <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 4, color: T.bl, verticalAlign: 'middle' }}><Icon name="link" size={10} /></a>}</td>
             <td title={item.products?.name || ''} style={{ ...S.tdStyle, fontSize: 11 }}><span style={{ fontWeight: 500 }}>{item.products?.name}</span></td>
             <td style={{ ...S.tdStyle, fontSize: 10, fontWeight: 500 }}>{item.size || '—'}</td>
             <td style={S.tdStyle}>{item.created_at && (() => { const d = Math.floor((Date.now() - new Date(item.created_at).getTime()) / 86400000); return <span style={{ fontSize: 10, fontWeight: 600, color: d > 30 ? T.re : d > 14 ? T.yl : T.tx3 }}>{new Date(item.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} · {d}d</span>; })()}</td>
             <td style={S.tdStyle}><div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{(itemTags[item.id] || []).map((t: any) => t && <span key={t.id} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(99,102,241,.10)', color: T.ac2 }}>{t.name}</span>)}{(itemTags[item.id] || []).length === 0 && <span style={{ color: T.tx3, fontSize: 10 }}>—</span>}</div></td>
-            <td style={{ ...S.tdStyle, fontSize: 11, maxWidth: 140 }}>{item.notes ? <span onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer' }}>{expandedNote === item.id ? item.notes : item.notes.length > 25 ? item.notes.slice(0, 25) + '...' : item.notes}</span> : <span style={{ color: T.tx3 }}>—</span>}</td>
+            <td style={{ ...S.tdStyle, fontSize: 11, maxWidth: 140 }}>{item.notes ? <button onClick={() => setExpandedNote(expandedNote === item.id ? null : item.id)} style={{ color: T.tx2, cursor: 'pointer', background: 'none', border: 'none', padding: 0, fontSize: 'inherit', fontFamily: 'inherit', textAlign: 'left' }} title="Toggle notes" aria-label="Toggle notes">{expandedNote === item.id ? item.notes : item.notes.length > 25 ? item.notes.slice(0, 25) + '...' : item.notes}</button> : <span style={{ color: T.tx3 }}>—</span>}</td>
 
             <td style={S.tdStyle}><span style={statusTag(item.status)}><span style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor', boxShadow: `0 0 4px currentColor`, flexShrink: 0 }} /><span style={{ textTransform: 'capitalize' }}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></span></td>
             <td style={S.tdStyle}>{(missing.length > 0 || damaged.length > 0) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>{missing.map((name, i) => <span key={'m'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(251,191,36,.08)', color: T.yl }}>Missing: {name}</span>)}{damaged.map((name, i) => <span key={'d'+i} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 500, background: 'rgba(248,113,113,.08)', color: T.re }}>Damaged: {name}</span>)}</div> : <span style={{ color: T.tx3, fontSize: 10 }}>{item.status === 'completed' ? 'All good' : '—'}</span>}</td>
@@ -1277,7 +1280,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
           <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd2}`, background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Export Preview</span>
-            <button onClick={() => setExportPdfHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${T.bd2}`, background: T.glass2, color: T.tx2, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Close">&times;</button>
+            <button onClick={() => setExportPdfHtml(null)} style={S.btnIcon} title="Close" aria-label="Close">&times;</button>
           </div>
           <iframe srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%', background: T.bg }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>

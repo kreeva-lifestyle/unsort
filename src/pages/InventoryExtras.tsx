@@ -590,7 +590,7 @@ export default function InventoryExtras() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
           <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Export Preview</span>
-            <button onClick={() => setExportHtml(null)} style={{ width: 44, height: 44, borderRadius: 8, border: `1px solid ${T.bd}`, background: T.glass2, color: T.tx2, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
+            <button onClick={() => setExportHtml(null)} style={S.btnIcon} title="Close" aria-label="Close">&times;</button>
           </div>
           <iframe srcDoc={exportHtml} style={{ flex: 1, border: 'none', width: '100%', background: T.bg }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 10, justifyContent: 'center' }}>

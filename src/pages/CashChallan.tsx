@@ -34,6 +34,7 @@ const ccAuditLog = async (action: string, recordId: string, details: string, cha
 import { T, S, CHALLAN_STATUS_COLORS as STATUS_COLORS } from '../lib/theme';
 
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
+const isValidPhone = (raw: string) => raw.replace(/\D/g, '').replace(/^91/, '').length >= 10;
 
 // View model: form-state representation of a cash_challan_items row.
 // Differs from DB row: `id` optional (unsaved items), no challan_id/sort_order
@@ -512,7 +513,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const saveChallan = async () => {
     if (saving) return;
     setFormError('');
-    if (editing && (editing.status === 'voided' || editing.status === 'paid')) { setFormError('Cannot edit a paid or voided challan'); return; }
+    if (editing && (editing.status === 'voided' || editing.status === 'paid')) { setFormError('Cannot edit a paid or voided challan — use ☑ Select → Unpay to revert the payment first'); return; }
     if (isReturn && !editing && !returnSource) { setFormError('Select the original invoice for this return'); return; }
     if (!customerName.trim()) { setFormError('Customer name is required'); return; }
     if (items.length === 0) { setFormError('Add at least one item'); return; }
@@ -561,7 +562,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (!paymentMode && amountPaid > 0) { setFormError('Select a payment mode when amount is paid'); return; }
     if (!paymentDate && amountPaid > 0) { setFormError('Payment date is required when amount is paid'); return; }
     if (challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(isReturn ? `Refund amount (₹${amountPaid}) must equal return total (₹${grandTotal})` : `Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
-    if (!isReturn && challanStatus === 'partial' && (amountPaid <= 0 || amountPaid >= grandTotal)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
+    if (!isReturn && challanStatus === 'partial' && (amountPaid <= 0 || amountPaid > grandTotal - 0.01)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
     if (challanStatus === 'unpaid' && amountPaid > 0) { setFormError('Status is "Unpaid" but amount is paid. Change status to "Paid" or "Partial"'); return; }
     setSaving(true);
     try {
@@ -670,7 +671,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             : '';
         const numTag = savedNumber ? ` #${savedNumber}` : '';
         const msg = encodeURIComponent(`Hi ${savedName},\nYour cash challan${numTag} of ₹${savedTotal.toLocaleString('en-IN')} (${savedItemCount} item${savedItemCount !== 1 ? 's' : ''}) has been generated.${paidLine}${outLine}\n— Arya Designs`);
-        setWhatsAppShare({ phone: savedPhone, url: `https://wa.me/${waPhone(savedPhone)}?text=${msg}` });
+        if (isValidPhone(savedPhone)) setWhatsAppShare({ phone: savedPhone, url: `https://wa.me/${waPhone(savedPhone)}?text=${msg}` });
       }
       const suppressed = localStorage.getItem('ccErpReminderHidden');
       const aWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -716,7 +717,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       fetchChallans();
       return;
     }
-    if (before.status === 'paid') { addToast('Cannot void a fully paid challan', 'error'); return; }
+    if (before.status === 'paid') { addToast('Cannot void a fully paid challan — use ☑ Select → Unpay first', 'error'); return; }
     // Challans with money recorded against them are never voided directly —
     // the payment must be explicitly removed first so cash records stay clean.
     if (Number(before.amount_paid || 0) > 0) { addToast(`Challan #${before.challan_number} has ₹${Number(before.amount_paid).toLocaleString('en-IN')} recorded. Remove the payment first (edit → set Unpaid), then void.`, 'error'); return; }
@@ -759,11 +760,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const phone = (c as any).customer_phone || null;
     if (!phone && c.customer_id) {
       const { data: cust } = await supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle();
-      if (cust?.phone) { window.location.href = `https://wa.me/${waPhone(cust.phone)}?text=${await buildReminderMsg(c)}`; return; }
+      if (cust?.phone && isValidPhone(cust.phone)) { window.location.href = `https://wa.me/${waPhone(cust.phone)}?text=${await buildReminderMsg(c)}`; return; }
     }
-    if (phone) {
+    if (phone && isValidPhone(phone)) {
       window.location.href = `https://wa.me/${waPhone(phone)}?text=${await buildReminderMsg(c)}`;
     } else {
+      if (phone && !isValidPhone(phone)) addToast('Invalid phone number — enter a valid number below', 'error');
       setReminderChallan(c);
       setReminderPhone('');
     }
@@ -771,6 +773,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   const saveReminderPhone = async () => {
     if (!reminderChallan || !reminderPhone.trim()) return;
+    if (!isValidPhone(reminderPhone)) { addToast('Enter a valid 10-digit phone number', 'error'); return; }
     if (reminderChallan.customer_id) {
       await supabase.from('cash_challan_customers').update({ phone: reminderPhone.trim() }).eq('id', reminderChallan.customer_id).then(({ error: e }) => { if (e) addToast('Phone save failed — ' + friendlyError(e), 'error'); });
     }
@@ -843,7 +846,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Open edit ──────────────────────────────────────────────────────────────
   const openEdit = async (c: Challan) => {
     if (c.status === 'voided') { addToast('Cannot edit a voided challan', 'error'); return; }
-    if (c.status === 'paid') { addToast('Cannot edit a paid challan. Change status to unpaid first.', 'error'); return; }
+    if (c.status === 'paid') { addToast('Cannot edit a paid challan — use ☑ Select → Unpay to revert the payment first', 'error'); return; }
     const [{ data: citems }, { data: cust }] = await Promise.all([
       supabase.from('cash_challan_items').select('sku, description, quantity, price, total, discount_type, discount_value, discount_amount').eq('challan_id', c.id).order('sort_order'),
       c.customer_id ? supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle() : Promise.resolve({ data: null }),
@@ -880,7 +883,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Print ──────────────────────────────────────────────────────────────────
   const printChallan = async (c: Challan) => {
-    const { data: citems } = await supabase.from('cash_challan_items').select('sku, quantity, price, total, discount_amount').eq('challan_id', c.id).order('sort_order');
+    const { data: citems, error: itemsErr } = await supabase.from('cash_challan_items').select('sku, quantity, price, total, discount_amount').eq('challan_id', c.id).order('sort_order');
+    if (itemsErr) { addToast(friendlyError(itemsErr), 'error'); return; }
     // Build one copy's inner HTML. We render it twice — top half = Office copy
     // (signed by customer, kept on file), bottom half = Customer copy. A
     // dashed cut line between them lets the user tear along the middle.
@@ -1024,7 +1028,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const received = Number(bulkReceivedAmount) || Math.abs(bulkNetTotal);
     const receiptNote = isRefund
       ? `Batch ${batchId} — settled ₹${bulkSalesOutstanding.toLocaleString('en-IN')} outstanding against ₹${bulkReturnsTotal.toLocaleString('en-IN')} returns. Refunded ₹${received.toLocaleString('en-IN')} to customer via ${bulkPayMode}`
-      : `Batch ${batchId} — received ₹${received.toLocaleString('en-IN')} against ₹${bulkNetTotal.toLocaleString('en-IN')} outstanding${received !== bulkNetTotal ? ` (${received > bulkNetTotal ? 'excess' : 'short'} ₹${Math.abs(received - bulkNetTotal).toLocaleString('en-IN')})` : ''}`;
+      : `Batch ${batchId} — received ₹${received.toLocaleString('en-IN')} against ₹${bulkNetTotal.toLocaleString('en-IN')} outstanding${Math.abs(received - bulkNetTotal) > 0.009 ? ` (${received > bulkNetTotal ? 'excess' : 'short'} ₹${Math.abs(received - bulkNetTotal).toLocaleString('en-IN')})` : ''}`;
     let failCount = 0;
     // Audit only what actually happened — a failed update must not get a
     // BULK_PAY log entry claiming money was received.
