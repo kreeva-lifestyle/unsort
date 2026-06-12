@@ -104,6 +104,12 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const [exportPdfHtml, setExportPdfHtml] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  useEffect(() => {
+    if (!showMore) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowMore(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showMore]);
   const [saving, setSaving] = useState(false);
   const [invLimit, setInvLimit] = useState(5000);
   const [invTruncated, setInvTruncated] = useState(false);
@@ -743,10 +749,10 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
               </button>
             </div></>}
           </div>}
-          {!showExtras && (!isCompletedView || profile?.module_access?.extras !== false) && <div style={{ position: 'relative' }} className="desktop-only">
+          {!showExtras && (!isCompletedView || profile?.module_access?.extras !== false) && <div style={{ position: 'relative' }}>
             <button onClick={() => setShowMore(v => !v)} style={S.btnGhost} title="More actions" aria-label="More actions">More &#8943;</button>
             {showMore && <><div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setShowMore(false)} />
-            <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 10, background: T.s2, border: `1px solid ${T.bd}`, borderRadius: 8, padding: 6, display: 'flex', flexDirection: 'column' as const, gap: 4, minWidth: 160 }}>
+            <div className="inv-more-dropdown" style={{ position: 'absolute', right: 0, top: '100%', zIndex: 10, background: T.s2, border: `1px solid ${T.bd}`, borderRadius: 8, padding: 6, display: 'flex', flexDirection: 'column' as const, gap: 4, minWidth: 160 }}>
               {!isCompletedView && <button onClick={() => { setShowMore(false); computeIntel(); }} style={{ ...S.btnGhost, width: '100%', justifyContent: 'flex-start', border: 'none', background: 'rgba(251,191,36,.05)', color: T.yl, fontWeight: 600 }} title="Find cross-size completion possibilities">Find Pairs</button>}
               {profile?.module_access?.extras !== false && <button onClick={() => { setShowMore(false); setShowExtras(true); window.history.pushState({ view: 'extras' }, ''); }} style={{ ...S.btnGhost, width: '100%', justifyContent: 'flex-start', border: 'none', background: 'linear-gradient(135deg, rgba(99,102,241,.08), rgba(56,189,248,.06))', color: T.ac2, fontWeight: 600, gap: 6 }} title="Manage spare parts">
                 <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, flexShrink: 0 }}><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" /></svg>
