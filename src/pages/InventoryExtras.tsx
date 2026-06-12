@@ -475,7 +475,7 @@ export default function InventoryExtras() {
             </div>
             {error && <div style={{ color: T.re, fontSize: 11, marginBottom: 8 }}>{error}</div>}
             <div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
-              <span onClick={() => { setShowAdd(false); setError(''); }} style={btnGhost}>Cancel</span>
+              <button onClick={() => { setShowAdd(false); setError(''); }} style={btnGhost}>Cancel</button>
               <button type="submit" style={{ ...btn, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving...' : 'Add'}</button>
             </div>
           </form>
@@ -579,8 +579,8 @@ export default function InventoryExtras() {
             <div style={{ marginBottom: 10 }}><label style={label}>Manufacturer *</label><input list="mfr-edit-list" value={editForm.manufacturer} onChange={e => setEditForm({ ...editForm, manufacturer: e.target.value })} style={input} /><datalist id="mfr-edit-list">{mfrOptions.map(m => <option key={m} value={m} />)}</datalist></div>
             <div style={{ marginBottom: 12 }}><label style={label}>Notes</label><input value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} placeholder="Optional" style={input} /></div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <span onClick={() => setEditingExtra(null)} style={btnGhost}>Cancel</span>
-              <span onClick={saveEdit} style={{ ...btn, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Updating…' : 'Update'}</span>
+              <button onClick={() => setEditingExtra(null)} style={btnGhost}>Cancel</button>
+              <button onClick={saveEdit} style={{ ...btn, border: 'none', opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Updating…' : 'Update'}</button>
             </div>
           </div>
         </div>

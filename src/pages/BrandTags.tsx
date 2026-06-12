@@ -14,7 +14,6 @@ import type { BrandTag, BrandTagInsert } from '../types/database';
 // ── Design Tokens ──────────────────────────────────────────────────────────────
 import { T, S } from '../lib/theme';
 
-const btnPrimary: React.CSSProperties = S.btnPrimary;
 const btnGhost: React.CSSProperties = S.btnGhost;
 const btnSm: React.CSSProperties = { ...S.btnGhost, ...S.btnSm };
 const inp: React.CSSProperties = {
@@ -617,7 +616,7 @@ export default function BrandTagPrinter() {
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
                     <button onClick={() => { const old = row.copies || 0; const v = Math.max(0, old - 1); setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Decrease copies">−</button>
-                    <span style={{ width: 32, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: row.copies > 0 ? T.ac2 : T.tx3, background: row.copies > 0 ? 'rgba(99,102,241,.06)' : 'transparent' }}>{row.copies || 0}</span>
+                    <span style={{ width: 32, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: row.copies > 0 ? T.ac2 : T.tx3, background: row.copies > 0 ? 'rgba(99,102,241,.06)' : 'transparent' }}>{row.copies || 0}</span>
                     <button onClick={() => { const old = row.copies || 0; const v = old + 1; setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Increase copies">+</button>
                   </div>
                 </td>
@@ -666,8 +665,8 @@ export default function BrandTagPrinter() {
               </div>
               <div style={{ display: 'flex', gap: 5 }}>
                 {missing.length === 0
-                  ? <button style={{ ...btnPrimary, ...S.btnSuccessSolid }} onClick={() => printOrderLabels(ready)}>Print All ({totalCopies})</button>
-                  : <button style={{ ...btnPrimary, ...S.btnSuccessSolid }} onClick={async () => { if (await ask({ title: `Print ${ready.length} ready label${ready.length === 1 ? '' : 's'}?`, message: `${totalCopies} cop${totalCopies === 1 ? 'y' : 'ies'} will print. ${missing.length} missing SKU${missing.length === 1 ? '' : 's'} will be skipped — resolve ${missing.length === 1 ? 'it' : 'them'} later and re-run.`, confirmLabel: 'Print' })) printOrderLabels(ready); }}>Print Ready ({totalCopies}) · Skip {missing.length}</button>
+                  ? <button style={{ ...S.btnSuccessSolid, padding: '8px 16px' }} onClick={() => printOrderLabels(ready)}>Print All ({totalCopies})</button>
+                  : <button style={{ ...S.btnSuccessSolid, padding: '8px 16px' }} onClick={async () => { if (await ask({ title: `Print ${ready.length} ready label${ready.length === 1 ? '' : 's'}?`, message: `${totalCopies} cop${totalCopies === 1 ? 'y' : 'ies'} will print. ${missing.length} missing SKU${missing.length === 1 ? '' : 's'} will be skipped — resolve ${missing.length === 1 ? 'it' : 'them'} later and re-run.`, confirmLabel: 'Print' })) printOrderLabels(ready); }}>Print Ready ({totalCopies}) · Skip {missing.length}</button>
                 }
                 <button style={btnGhost} onClick={() => {
                   const exportData = (orderRows || []).map(r => ({
@@ -709,7 +708,7 @@ export default function BrandTagPrinter() {
                 ))}</tbody>
               </table>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '8px 0', borderTop: `1px solid ${T.bd}`, fontSize: 11 }}>
+            <div className="pager" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '8px 0', borderTop: `1px solid ${T.bd}`, fontSize: 11 }}>
               <select value={orderPerPage} onChange={e => { setOrderPerPage(Number(e.target.value)); setOrderPage(0); }} style={{ ...inp, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select>
               <span style={{ color: T.tx3 }}>rows</span>
               {otp > 1 && <>
