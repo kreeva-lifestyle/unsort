@@ -81,7 +81,7 @@ export default function InventoryExtras() {
   const fetchExtras = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, location, manufacturer, quantity, notes, created_by, created_at, updated_at').gt('quantity', 0).order('updated_at', { ascending: false }).limit(EXTRAS_LIMIT);
+      const { data, error } = await supabase.from('inventory_extras').select('id, product_id, product_name, component_id, component_name, sku, size, location, manufacturer, quantity, notes, created_by, created_at, updated_at').order('updated_at', { ascending: false }).limit(EXTRAS_LIMIT);
       if (error) { addToast(friendlyError(error), 'error'); return; }
       setExtras(data || []);
       const counts: Record<string, number> = {};
@@ -93,6 +93,8 @@ export default function InventoryExtras() {
       type ItemCompsRow = Pick<ItemComponent, 'inventory_item_id' | 'component_id' | 'status'>;
       (allComps as ItemCompsRow[] | null || []).forEach((ic) => { if (ic.status === 'missing' || ic.status === 'damaged') { if (!missingMap[ic.inventory_item_id]) missingMap[ic.inventory_item_id] = new Set(); missingMap[ic.inventory_item_id].add(ic.component_id); } });
       for (const ex of (data || [])) {
+        // Out-of-stock extras can't complete anything — no matches offered
+        if (ex.quantity < 1) { counts[ex.id] = 0; continue; }
         counts[ex.id] = (unsorted || []).filter(it =>
           it.serial_number === ex.sku && it.product_id === ex.product_id &&
           (ex.size === 'N/A' || !ex.size || (it.size || 'N/A') === ex.size) &&
@@ -233,18 +235,14 @@ export default function InventoryExtras() {
     setSaving(true);
     const newQty = adjustMode === 'add' ? adjustExtra.quantity + qty : adjustExtra.quantity - qty;
     if (newQty < 0) { setSaving(false); setError('Cannot go below 0'); return; }
-    if (newQty <= 0) {
-      // Qty reached zero — delete the row entirely
-      const { error: delErr } = await supabase.from('inventory_extras').delete().eq('id', adjustExtra.id);
-      if (delErr) { setSaving(false); setError('Delete failed: ' + friendlyError(delErr)); return; }
-    } else {
-      const { data: updated, error: upErr } = await supabase.from('inventory_extras')
-        .update({ quantity: newQty, updated_at: new Date().toISOString() })
-        .eq('id', adjustExtra.id)
-        .eq('quantity', adjustExtra.quantity)
-        .select().single();
-      if (upErr || !updated) { setSaving(false); setError('Another user just updated this extra. Close and reopen to retry.'); return; }
-    }
+    // Qty 0 rows are KEPT (shown as "Out of stock") — deleting them orphaned
+    // the usage history and made completed-via-extra items unrevertable.
+    const { data: updated, error: upErr } = await supabase.from('inventory_extras')
+      .update({ quantity: newQty, updated_at: new Date().toISOString() })
+      .eq('id', adjustExtra.id)
+      .eq('quantity', adjustExtra.quantity)
+      .select().single();
+    if (upErr || !updated) { setSaving(false); setError('Another user just updated this extra. Close and reopen to retry.'); return; }
     setSaving(false); setAdjustExtra(null); setAdjustQty('1'); setAdjustReason(''); addToast('Quantity adjusted', 'success'); setPage(0); fetchExtras();
   };
 
@@ -262,12 +260,8 @@ export default function InventoryExtras() {
       p_reason: null,
     });
     if (error) { setError(friendlyError(error)); setSaving(false); return; }
-    // Check current DB quantity (not stale client value) to decide cleanup
-    const { data: current } = await supabase.from('inventory_extras').select('quantity').eq('id', extra.id).maybeSingle();
-    if (current && current.quantity <= 0) {
-      const { error: delErr } = await supabase.from('inventory_extras').delete().eq('id', extra.id);
-      if (delErr) addToast('Item completed but spare part row cleanup failed — ' + friendlyError(delErr), 'error');
-    }
+    // Qty 0 rows are kept (shown as "Out of stock") so the completion stays
+    // revertable and the usage history keeps its FK.
     setSaving(false); setCompleteItem(null); setMatchExtra(null); addToast('Item completed', 'success'); setPage(0); fetchExtras();
   };
 
@@ -357,7 +351,7 @@ export default function InventoryExtras() {
                 <td style={td}>{ex.product_name}{(() => { const p = products.find(pr => pr.id === ex.product_id); return p?.sku ? <span style={{ marginLeft: 4, fontSize: 9, color: T.tx3, fontFamily: T.mono }}>({p.sku})</span> : null; })()}</td>
                 <td style={td}>{ex.component_name}</td>
                 <td style={td}>{ex.size}</td>
-                <td style={{ ...td, fontWeight: 600, color: ex.quantity > 0 ? T.gr : T.re }}>{ex.quantity}</td>
+                <td style={{ ...td, fontWeight: 600, color: ex.quantity > 0 ? T.gr : T.re }}>{ex.quantity}{ex.quantity < 1 && <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 3, fontSize: 8, fontWeight: 700, textTransform: 'uppercase', background: 'rgba(239,68,68,.10)', color: T.re }}>Out of stock</span>}</td>
                 <td style={td}>
                   {(matchCounts[ex.id] || 0) > 0 ? (
                     <span onClick={() => loadMatches(ex)} style={{ color: T.yl, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
@@ -394,6 +388,7 @@ export default function InventoryExtras() {
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: ex.quantity > 0 ? T.gr : T.re }}>{ex.quantity}</div>
+                  {ex.quantity < 1 && <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', color: T.re, marginTop: 2 }}>Out of stock</div>}
                   {(matchCounts[ex.id] || 0) > 0 && <div style={{ fontSize: 10, color: T.yl, fontWeight: 600, marginTop: 2 }}>{matchCounts[ex.id]} match{matchCounts[ex.id] > 1 ? 'es' : ''}</div>}
                 </div>
               </div>

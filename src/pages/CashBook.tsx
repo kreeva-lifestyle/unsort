@@ -66,6 +66,13 @@ export default function CashBook() {
   const [formError, setFormError] = useState('');
   const [expSaving, setExpSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  // Admin-only correction of a LOCKED expense (inside a signed handover
+  // period): the original stays untouched — a counter-entry dated today fixes
+  // the running cash math without altering the signed record.
+  const [correctingExpense, setCorrectingExpense] = useState<ExpenseRow | null>(null);
+  const [correctAmount, setCorrectAmount] = useState('');
+  const [correctError, setCorrectError] = useState('');
+  const [correctSaving, setCorrectSaving] = useState(false);
   const [pendingExpDel, setPendingExpDel] = useState<{ id: string; timer: number } | null>(null);
   // Handover form
   const [showHandover, setShowHandover] = useState(false);
@@ -86,6 +93,7 @@ export default function CashBook() {
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
   // Reject flow
   const [rejectingHandover, setRejectingHandover] = useState<Handover | null>(null);
+  const [cancellingHandover, setCancellingHandover] = useState<Handover | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectError, setRejectError] = useState('');
   const [excludePaise, setExcludePaise] = useState(false);
@@ -125,7 +133,7 @@ export default function CashBook() {
     setSales(ch || []);
 
     // Handovers in date range
-    const { data: ho } = await supabase.from('cash_handovers').select('id, handover_number, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
+    const { data: ho } = await supabase.from('cash_handovers').select('id, handover_number, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by, cancelled_at, cancelled_by').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
     setHandovers((ho as Handover[] | null) || []);
     setLoading(false);
   }, [fromDate, toDate]);
@@ -133,10 +141,10 @@ export default function CashBook() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    const open = showHandover || !!viewingHandover || !!confirmingHandover || !!rejectingHandover || showAdd || !!confirmDelete;
+    const open = showHandover || !!viewingHandover || !!confirmingHandover || !!rejectingHandover || !!cancellingHandover || showAdd || !!confirmDelete || !!correctingExpense;
     document.body.classList.toggle('modal-open', open);
     return () => { document.body.classList.remove('modal-open'); };
-  }, [showHandover, viewingHandover, confirmingHandover, rejectingHandover, showAdd, confirmDelete]);
+  }, [showHandover, viewingHandover, confirmingHandover, rejectingHandover, cancellingHandover, showAdd, confirmDelete, correctingExpense]);
 
   // Load active users for handover recipient dropdown
   useEffect(() => {
@@ -221,6 +229,33 @@ export default function CashBook() {
     fetchData();
   };
 
+  const submitCorrection = async () => {
+    if (!correctingExpense || correctSaving) return;
+    setCorrectError('');
+    const original = Number(correctingExpense.amount);
+    const corrected = Number(correctAmount);
+    if (correctAmount.trim() === '' || isNaN(corrected) || corrected < 0) { setCorrectError('Enter the correct amount (0 if the expense never happened)'); return; }
+    const diff = Math.round((corrected - original) * 100) / 100;
+    if (diff === 0) { setCorrectError('That is the same amount — nothing to correct'); return; }
+    setCorrectSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const desc = `Correction of "${correctingExpense.category}${correctingExpense.description ? ': ' + correctingExpense.description : ''}" dated ${correctingExpense.date} — was ₹${original.toLocaleString('en-IN')}, corrected to ₹${corrected.toLocaleString('en-IN')}`;
+    // diff is negative when the original was overstated — the counter-entry
+    // puts the cash back; positive when understated. Dated TODAY so the
+    // signed handover period's snapshot stays exactly as it was signed.
+    const payload: CashExpenseInsert = { date: today, amount: diff, category: 'Adjustment', description: desc, paid_by: user?.id ?? null };
+    const { error } = await supabase.from('cash_expenses').insert(payload);
+    if (error) { setCorrectError('Save failed — ' + friendlyError(error)); setCorrectSaving(false); return; }
+    await supabase.from('audit_log').insert({
+      action: 'correct', module: 'cash_book',
+      details: desc,
+      user_id: user?.id ?? null,
+    });
+    setCorrectSaving(false); setCorrectingExpense(null); setCorrectAmount('');
+    addToast('Adjustment recorded — cash balance corrected from today', 'success');
+    fetchData();
+  };
+
   // Compute available cash for a date range (auto-calc for handover)
   const computeBreakdown = useCallback(async (from: string, to: string): Promise<Breakdown> => {
     const [balR, expR, chR, hoR] = await Promise.all([
@@ -259,7 +294,7 @@ export default function CashBook() {
         if (!handAmount) setHandAmount(String(Math.max(0, b.available)));
       });
       // Load last 5 handovers
-      supabase.from('cash_handovers').select('id, handover_number, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by').order('created_at', { ascending: false }).limit(5).then(({ data }) => setRecentHandovers((data as Handover[] | null) || []));
+      supabase.from('cash_handovers').select('id, handover_number, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by, cancelled_at, cancelled_by').order('created_at', { ascending: false }).limit(5).then(({ data }) => setRecentHandovers((data as Handover[] | null) || []));
     }
   }, [showHandover, handPeriodFrom, handPeriodTo, computeBreakdown]);
 
@@ -281,13 +316,16 @@ export default function CashBook() {
     if (amountDiffers && !handReason.trim()) { setHandError('Amount differs from available cash. Add a reason in Notes/Reason field.'); return; }
     setHandSaving(true);
     const todayDate = new Date().toISOString().slice(0, 10);
-    const { data: existing } = await supabase.from('cash_handovers').select('id, status, amount').eq('to_user_id', recipient.id).eq('date', todayDate).neq('status', 'disputed').maybeSingle();
-    if (existing) { setHandSaving(false); setHandError(`A handover already exists for ${recipient.full_name} today (₹${Number(existing.amount).toLocaleString('en-IN')}, ${existing.status}). Only one handover per recipient per day.`); return; }
-    // Prevent overlapping pending/confirmed handovers (would double-claim cash)
-    const { data: overlapping } = await supabase.from('cash_handovers').select('handover_number, status, period_from, period_to').in('status', ['confirmed', 'pending']).lte('period_from', handPeriodTo).gte('period_to', handPeriodFrom);
+    // Only an IN-FLIGHT (pending) handover blocks — its cash is claimed but
+    // unsigned. Confirmed handovers no longer hard-block: computeBreakdown
+    // already nets them out of "available", so leftover cash from a partial
+    // handover (or a too-low signed amount) can be handed over in a follow-up.
+    const { data: existing } = await supabase.from('cash_handovers').select('id, status, amount').eq('to_user_id', recipient.id).eq('date', todayDate).eq('status', 'pending').maybeSingle();
+    if (existing) { setHandSaving(false); setHandError(`A pending handover for ${recipient.full_name} already exists today (₹${Number(existing.amount).toLocaleString('en-IN')}). Cancel it or wait for them to sign before sending another.`); return; }
+    const { data: overlapping } = await supabase.from('cash_handovers').select('handover_number, status, period_from, period_to').eq('status', 'pending').lte('period_from', handPeriodTo).gte('period_to', handPeriodFrom);
     if (overlapping && overlapping.length > 0) {
       const h = overlapping[0];
-      setHandSaving(false); setHandError(`HO-${String(h.handover_number).padStart(4, '0')} (${h.status}) already covers ${h.period_from} to ${h.period_to}. Resolve or reject it before creating an overlapping handover.`);
+      setHandSaving(false); setHandError(`HO-${String(h.handover_number).padStart(4, '0')} (pending) already covers ${h.period_from} to ${h.period_to}. Wait for it to be signed, or cancel it, before creating an overlapping handover.`);
       return;
     }
     const { data: { user } } = await supabase.auth.getUser();
@@ -353,7 +391,7 @@ export default function CashBook() {
       <div><strong>From</strong>${esc(h.from_user_name)}</div>
       <div><strong>To</strong>${esc(h.to_user_name)}</div>
       <div><strong>Period Covered</strong>${periodFromStr} to ${periodToStr}</div>
-      <div><strong>Status</strong><span class="status ${h.status === 'confirmed' ? 'signed' : 'pending'}">${h.status === 'confirmed' ? '✓ Signed' : 'Pending'}</span></div>
+      <div><strong>Status</strong><span class="status ${h.status === 'confirmed' ? 'signed' : 'pending'}">${h.status === 'confirmed' ? '✓ Signed' : h.status === 'disputed' ? '✕ Rejected' : h.status === 'cancelled' ? 'Cancelled' : 'Pending'}</span></div>
     </div>`;
     if (b) {
       html += `<table><thead><tr><th>Cash Flow</th><th class="right">Amount (₹)</th></tr></thead><tbody>
@@ -458,6 +496,36 @@ export default function CashBook() {
       if (!data || data.length === 0) { setRejectError('Handover state changed — please refresh.'); return; }
       setRejectingHandover(null); setRejectReason('');
       addToast('Handover rejected', 'success');
+      fetchData();
+    } finally { setBusy(false); }
+  };
+
+  // Sender can withdraw a still-unsigned handover — without this, a recipient
+  // who never signs (left the company, lost their phone) locked the cash and
+  // the period forever. Only pending handovers can be cancelled; the DB guard
+  // (.eq status pending) closes the race with a simultaneous sign/reject.
+  const cancelHandover = async () => {
+    if (busy || !cancellingHandover) return;
+    setBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { addToast('Not logged in', 'error'); return; }
+      if (cancellingHandover.from_user_id && cancellingHandover.from_user_id !== user.id) {
+        addToast(`Only ${cancellingHandover.from_user_name} (the sender) can cancel this handover.`, 'error');
+        return;
+      }
+      const { data: updated, error } = await supabase.from('cash_handovers').update({
+        status: 'cancelled', cancelled_at: new Date().toISOString(), cancelled_by: user.id,
+      }).eq('id', cancellingHandover.id).eq('status', 'pending').select('id');
+      if (error) { addToast('Cancel failed — ' + friendlyError(error), 'error'); return; }
+      if (!updated || updated.length === 0) { addToast('This handover is no longer pending — it may have been signed or rejected.', 'error'); setCancellingHandover(null); fetchData(); return; }
+      await supabase.from('audit_log').insert({
+        action: 'cancel', module: 'cash_book',
+        details: `Handover ${formatHandoverNo(cancellingHandover.handover_number)} of ₹${Number(cancellingHandover.amount).toLocaleString('en-IN')} to ${cancellingHandover.to_user_name} cancelled by sender`,
+        user_id: user.id,
+      });
+      setCancellingHandover(null);
+      addToast('Handover cancelled — the cash is available again', 'success');
       fetchData();
     } finally { setBusy(false); }
   };
@@ -617,10 +685,14 @@ export default function CashBook() {
                 {e.description && <div style={{ fontSize: 10, color: T.tx3 }}>{e.description}</div>}
                 {e.profiles && <div style={{ fontSize: 9, color: T.tx3, marginTop: 1 }}>by {e.profiles.full_name}</div>}
               </div>
-              <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.re }}>−₹{Number(e.amount).toLocaleString('en-IN')}</div>
+              {/* Negative amount = adjustment entry putting cash back */}
+              <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: Number(e.amount) < 0 ? T.gr : T.re }}>{Number(e.amount) < 0 ? '+' : '−'}₹{Math.abs(Number(e.amount)).toLocaleString('en-IN')}</div>
               {lockedExpenseIds.has(e.id) ? (
-                <span title="Included in a confirmed cash handover — cannot be deleted" style={{ display: 'inline-flex', alignItems: 'center', padding: 0, opacity: 0.5, color: T.tx3 }}>
-                  <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  {currentUserRole === 'admin' && <button onClick={() => { setCorrectingExpense(e); setCorrectAmount(''); setCorrectError(''); }} style={{ padding: '2px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.yl, fontSize: 9, fontWeight: 600, cursor: 'pointer' }} title="Record a correction entry — the locked original stays untouched">Correct</button>}
+                  <span title="Included in a confirmed cash handover — cannot be deleted" style={{ display: 'inline-flex', alignItems: 'center', padding: 0, opacity: 0.5, color: T.tx3 }}>
+                    <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+                  </span>
                 </span>
               ) : (
                 <button onClick={() => setConfirmDelete(e.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4 }} aria-label="Delete">
@@ -670,7 +742,7 @@ export default function CashBook() {
                   <span style={{ fontSize: 10, fontFamily: T.mono, color: T.ac2, fontWeight: 600 }}>{formatHandoverNo(h.handover_number)}</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{h.from_user_name} → {h.to_user_name}</span>
                   <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3, fontFamily: T.mono }}>{new Date(h.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
-                  <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : h.status === 'disputed' ? 'rgba(239,68,68,.12)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : h.status === 'disputed' ? T.re : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓ Signed' : h.status === 'disputed' ? '✕ Rejected' : 'Pending'}</span>
+                  <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : h.status === 'disputed' ? 'rgba(239,68,68,.12)' : h.status === 'cancelled' ? 'rgba(255,255,255,.06)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : h.status === 'disputed' ? T.re : h.status === 'cancelled' ? T.tx3 : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓ Signed' : h.status === 'disputed' ? '✕ Rejected' : h.status === 'cancelled' ? 'Cancelled' : 'Pending'}</span>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(h.amount).toLocaleString('en-IN')}</span>
               </div>
@@ -679,9 +751,11 @@ export default function CashBook() {
               {h.status === 'disputed' && h.reject_reason && <div style={{ fontSize: 10, color: T.re, marginBottom: 4 }}>✕ Rejected: {h.reject_reason}</div>}
               {h.status === 'confirmed' && h.confirmed_at && <div style={{ fontSize: 9, color: T.gr, fontFamily: T.mono, marginBottom: 4 }}>Signed at {new Date(h.confirmed_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
               {h.status === 'disputed' && h.rejected_at && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono, marginBottom: 4 }}>Rejected at {new Date(h.rejected_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
+              {h.status === 'cancelled' && h.cancelled_at && <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, marginBottom: 4 }}>Cancelled by sender at {new Date(h.cancelled_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
               <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
                 {h.status === 'pending' && h.to_user_id === currentUserId && <button onClick={() => setConfirmingHandover(h)} style={{ ...S.btnSuccess, ...S.btnSm }}>Sign &amp; Confirm</button>}
                 {h.status === 'pending' && h.to_user_id === currentUserId && <button onClick={() => { setRejectingHandover(h); setRejectReason(''); setRejectError(''); }} style={{ ...S.btnDanger, ...S.btnSm }}>Reject</button>}
+                {h.status === 'pending' && h.from_user_id === currentUserId && <button onClick={() => setCancellingHandover(h)} style={{ ...S.btnDanger, ...S.btnSm }}>Cancel</button>}
                 <button onClick={() => setViewingHandover(h)} style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>View Summary</button>
                 <button onClick={() => printHandoverReceipt(h)} style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Print</button>
               </div>
@@ -822,7 +896,7 @@ export default function CashBook() {
               <div><div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>From</div><div style={{ color: T.tx, fontWeight: 600 }}>{viewingHandover.from_user_name}</div></div>
               <div><div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>To</div><div style={{ color: T.tx, fontWeight: 600 }}>{viewingHandover.to_user_name}</div></div>
               <div><div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>Period</div><div style={{ color: T.tx2, fontFamily: T.mono, fontSize: 10 }}>{viewingHandover.period_from ? new Date(viewingHandover.period_from).toLocaleDateString('en-IN') : '-'} → {viewingHandover.period_to ? new Date(viewingHandover.period_to).toLocaleDateString('en-IN') : '-'}</div></div>
-              <div><div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>Status</div><div style={{ color: viewingHandover.status === 'confirmed' ? T.gr : T.yl, fontWeight: 700, textTransform: 'uppercase', fontSize: 10 }}>{viewingHandover.status === 'confirmed' ? '✓ Signed' : 'Pending'}</div></div>
+              <div><div style={{ fontSize: 8, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>Status</div><div style={{ color: viewingHandover.status === 'confirmed' ? T.gr : viewingHandover.status === 'disputed' ? T.re : viewingHandover.status === 'cancelled' ? T.tx3 : T.yl, fontWeight: 700, textTransform: 'uppercase', fontSize: 10 }}>{viewingHandover.status === 'confirmed' ? '✓ Signed' : viewingHandover.status === 'disputed' ? '✕ Rejected' : viewingHandover.status === 'cancelled' ? 'Cancelled' : 'Pending'}</div></div>
             </div>
             {viewingHandover.breakdown ? (
               <div style={{ background: T.ac3, border: `1px solid ${T.ac3}`, borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 11 }}>
@@ -880,6 +954,48 @@ export default function CashBook() {
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setRejectingHandover(null); setRejectReason(''); setRejectError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
               <button onClick={submitReject} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Rejecting…' : 'Confirm Reject'}</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Correct Locked Expense Modal — admin-only counter-entry dated today */}
+      {correctingExpense && createPortal(
+        <div style={{ ...S.modalOverlay }}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 400, padding: '20px 18px' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Correct Locked Expense</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>"{correctingExpense.category}{correctingExpense.description ? `: ${correctingExpense.description}` : ''}" dated {new Date(correctingExpense.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} is locked inside a signed handover. The original stays untouched — an adjustment entry dated today will fix the cash balance.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Recorded Amount</label>
+                <div style={{ ...S.fInput, width: '100%', fontFamily: T.mono, display: 'flex', alignItems: 'center', color: T.tx3, background: 'rgba(255,255,255,0.02)' }}>₹{Number(correctingExpense.amount).toLocaleString('en-IN')}</div>
+              </div>
+              <div>
+                <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Correct Amount (₹)</label>
+                <input type="number" min="0" step="0.01" value={correctAmount} onKeyDown={e => numericKeyDown(e)} onChange={e => setCorrectAmount(e.target.value)} autoFocus placeholder="0.00" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
+              </div>
+            </div>
+            {correctAmount.trim() !== '' && !isNaN(Number(correctAmount)) && (() => { const d = Math.round((Number(correctAmount) - Number(correctingExpense.amount)) * 100) / 100; if (d === 0) return null; return <div style={{ fontSize: 10, color: d < 0 ? T.gr : T.yl, fontWeight: 600, marginBottom: 10 }}>{d < 0 ? `₹${Math.abs(d).toLocaleString('en-IN')} will be returned to the cash balance` : `₹${d.toLocaleString('en-IN')} more will be deducted from the cash balance`}</div>; })()}
+            {correctError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{correctError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { setCorrectingExpense(null); setCorrectAmount(''); setCorrectError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
+              <button onClick={submitCorrection} disabled={correctSaving} style={{ ...S.btnPrimary, flex: 1, padding: '9px 0', fontSize: 11, opacity: correctSaving ? 0.5 : 1, pointerEvents: correctSaving ? 'none' : 'auto' }}>{correctSaving ? 'Saving…' : 'Record Adjustment'}</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Cancel Handover Modal — only the SENDER, only while still pending */}
+      {cancellingHandover && createPortal(
+        <div style={{ ...S.modalOverlay }}>
+          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 400, padding: '20px 18px' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Cancel {formatHandoverNo(cancellingHandover.handover_number)}?</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14 }}>This withdraws your unsigned handover of <strong style={{ color: T.yl, fontFamily: T.mono }}>₹{Number(cancellingHandover.amount).toLocaleString('en-IN')}</strong> to <strong style={{ color: T.tx }}>{cancellingHandover.to_user_name}</strong>. The cash becomes available again and you can initiate a fresh handover.</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setCancellingHandover(null)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Keep It</button>
+              <button onClick={cancelHandover} disabled={busy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }}>{busy ? 'Cancelling…' : 'Cancel Handover'}</button>
             </div>
           </div>
         </div>,

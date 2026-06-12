@@ -23,6 +23,7 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
     try {
       const reason = localStorage.getItem('signOutReason');
       if (reason === 'session_expired') { setInfo('Session expired — please sign in again.'); localStorage.removeItem('signOutReason'); }
+      else if (reason === 'deactivated') { setInfo('Your access was revoked — contact your admin.'); localStorage.removeItem('signOutReason'); }
     } catch {}
   }, []);
 

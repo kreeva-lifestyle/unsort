@@ -29,6 +29,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let mounted = true;
     const timeout = setTimeout(() => { if (mounted) { setLoading(false); setReady(true); } }, 3000);
 
+    // Deactivated accounts (profiles.is_active = false) are signed out the
+    // moment their profile loads — without this, a revoked user's session
+    // (or a password reset) kept working. Returns false when revoked.
+    const enforceActive = (prof: any): boolean => {
+      if (prof && prof.is_active === false) {
+        try { localStorage.setItem('signOutReason', 'deactivated'); } catch {}
+        supabase.auth.signOut();
+        return false;
+      }
+      return true;
+    };
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
       if (session?.user) {
@@ -38,7 +50,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(refreshed.session.user);
           const { data: prof, error: profErr } = await supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at, module_access').eq('id', refreshed.session.user.id).maybeSingle();
           if (profErr) console.error('Profile load failed:', profErr.message);
-          if (mounted) setProfile(prof);
+          if (!enforceActive(prof)) { if (mounted) { setUser(null); setProfile(null); } }
+          else if (mounted) setProfile(prof);
         } else {
           setUser(null); setProfile(null);
         }
@@ -54,7 +67,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session.user);
         supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at, module_access').eq('id', session.user.id).maybeSingle().then(({ data, error }) => {
           if (error) console.error('Profile load failed:', error.message);
-          if (mounted) { setProfile(data); setLoading(false); setReady(true); }
+          if (!mounted) return;
+          if (!enforceActive(data)) { setUser(null); setProfile(null); setLoading(false); setReady(true); return; }
+          setProfile(data); setLoading(false); setReady(true);
         });
       } else {
         setUser(null); setProfile(null);

@@ -51,7 +51,16 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
       }
     }
     const { error } = await supabase.from('profiles').update({ is_active: !isActive }).eq('id', id);
-    if (error) addToast(friendlyError(error), 'error'); else { addToast(isActive ? 'Access revoked' : 'Access granted', 'success'); fetchUsers(); }
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    // Ban/unban the AUTH account too — without this the user's session keeps
+    // working and they can password-reset back in. The edge function verifies
+    // the caller is an active admin before touching auth.
+    const { error: banErr } = await supabase.functions.invoke('admin-users', {
+      body: { action: isActive ? 'deactivate' : 'reactivate', target_user_id: id },
+    });
+    if (banErr) addToast(`Profile updated, but ${isActive ? 'login ban' : 'login unban'} failed — ${friendlyError(banErr)}. Toggle again to retry.`, 'error');
+    else addToast(isActive ? 'Access revoked — user is signed out and login is blocked' : 'Access granted', 'success');
+    fetchUsers();
   };
 
   const toggleModule = async (userId: string, modKey: string) => {
