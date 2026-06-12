@@ -71,6 +71,12 @@ const notifyDropped = () => { droppedListeners.forEach(fn => { try { fn(); } cat
 function getDroppedBatches() { return droppedBatches; }
 function clearDroppedBatches() { droppedBatches.length = 0; notifyDropped(); }
 
+// Scans whose DB insert failed twice — parked here so the operator can retry
+// from the banner. Previously they lived only in component memory (lost on
+// refresh) while the banner falsely claimed background retries continued.
+type FailedDbScan = { scanRow: PackTimeScanInsert; sheetRow: unknown[]; sheetName: string };
+const failedDbScans: FailedDbScan[] = [];
+
 async function flushQueue() {
   if (flushing || writeQueue.length === 0) return;
   flushing = true;
@@ -493,12 +499,19 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           if (lastScanned === trimmed) setLastScanned('');
           return;
         }
-        // DB insert failed — increment dbFails counter, retry once after 2s
+        // DB insert failed — retry once after 2s; if that fails too, park the
+        // scan in failedDbScans for the banner's "Retry" button. (The old code
+        // double-counted dbFails and never sent the sheet row on retry success.)
         setDbFails(p => p + 1);
         setTimeout(() => {
           supabase.from('packtime_scans').insert(scanRow).then(({ error: e2 }) => {
-            if (!e2 || e2.code === '23505') setDbFails(p => Math.max(0, p - 1));
-            else setDbFails(p => p + 1);
+            if (!e2 || e2.code === '23505') {
+              setDbFails(p => Math.max(0, p - 1));
+              enqueueWrite([row], courierSheet);
+              setPendingWrites(p => p + 1);
+            } else {
+              failedDbScans.push({ scanRow, sheetRow: row, sheetName: courierSheet });
+            }
           });
         }, 2000);
         return;
@@ -511,6 +524,24 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     focusInput();
   }, [camera, courier, courierSheet, courierBrand, focusInput]);
 
+  // Re-attempt every parked DB-failed scan (banner "Retry" button). Successes
+  // also get their sheet row enqueued — they never made it that far before.
+  const retryFailedDbScans = useCallback(() => {
+    const pending = failedDbScans.splice(0);
+    if (pending.length === 0) return;
+    for (const f of pending) {
+      supabase.from('packtime_scans').insert(f.scanRow).then(({ error }) => {
+        if (!error || error.code === '23505') {
+          setDbFails(p => Math.max(0, p - 1));
+          enqueueWrite([f.sheetRow], f.sheetName);
+          setPendingWrites(p => p + 1);
+        } else {
+          failedDbScans.push(f); // still failing — keep for the next retry
+        }
+      });
+    }
+  }, []);
+
   // Keep submitRef in sync for camera callback
   useEffect(() => { submitRef.current = submitAwb; }, [submitAwb]);
 
@@ -518,7 +549,10 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── Undo last scan (removes from local + Google Sheet) ──────────────────────
   const undoLast = useCallback(() => {
-    if (!lastScanned || writeQueue.length > 0) return;
+    if (!lastScanned) return;
+    // Undoing while the sheet write is still in flight would race the append —
+    // tell the operator instead of silently ignoring the tap.
+    if (writeQueue.length > 0) { addToast('Still syncing the last scan — try Undo again in a few seconds', 'error'); return; }
     const awb = lastScanned;
     const key = awb.toUpperCase();
     awbSetRef.current.delete(key);
@@ -533,7 +567,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     getAuthHeaders().then(headers => fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
       .then(r => r.json()).then(() => {})).catch(e => console.warn('Sheet delete failed:', e));
     supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current).then(({ error: e }) => { if (e) console.error('Scan undo failed:', e); });
-  }, [lastScanned, courierSheet, focusInput]);
+  }, [lastScanned, courierSheet, focusInput, addToast]);
 
 
   // ── Fetch today's summary across all couriers ──────────────────────────────
@@ -589,6 +623,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   const deleteHistoryScan = async (id: string) => {
     const record = historyData.find(r => r.id === id);
+    let sheetDeleted = true;
     if (record && record.sheet_name) {
       try {
         const headers = await getAuthHeaders();
@@ -597,12 +632,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           body: JSON.stringify({ action: 'delete', awb: record.awb, sheetName: record.sheet_name }),
         });
         const result = await resp.json();
-        if (!result.ok) { /* sheet delete failed — non-critical */ }
-      } catch { /* sheet delete error — non-critical */ }
+        if (!result.ok) sheetDeleted = false;
+      } catch { sheetDeleted = false; }
     }
     const { error: delErr } = await supabase.from('packtime_scans').delete().eq('id', id);
     if (delErr) { addToast(friendlyError(delErr), 'error'); return; }
-    addToast('Scan deleted', 'success');
+    // Don't claim full success when the Google Sheet copy is still there.
+    if (sheetDeleted) addToast('Scan deleted', 'success');
+    else addToast('Deleted from app records — couldn\'t remove it from the Google Sheet, delete it there manually', 'error');
     fetchHistory();
   };
 
@@ -927,7 +964,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {droppedCount > 0 && started && (
         <div style={{ margin: '0 14px 8px', padding: '10px 14px', borderRadius: 6, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', color: T.re, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.re, animation: 'subtlePulse 1.5s ease-in-out infinite' }} />
-          <span style={{ flex: 1 }}>⚠ {droppedCount} scan(s) failed to sync to Google Sheets after retries — these are saved locally but missing from the sheet. Check connection and re-scan or contact admin.</span>
+          <span style={{ flex: 1 }}>⚠ {droppedCount} scan(s) failed to sync to Google Sheets after retries — they ARE saved in the app, just missing from the sheet. Check connection, then tap Retry.</span>
+          <button onClick={() => { const batches = getDroppedBatches().slice(); clearDroppedBatches(); for (const b of batches) enqueueWrite(b.rows, b.sheetName); }} style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.12)', color: T.re, fontSize: 9, fontWeight: 700, cursor: 'pointer' }}>Retry sync</button>
           <button onClick={() => { clearDroppedBatches(); setDroppedCount(0); }} style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid rgba(239,68,68,.3)', background: 'transparent', color: T.re, fontSize: 9, cursor: 'pointer' }}>Dismiss</button>
         </div>
       )}
@@ -951,8 +989,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <span style={{ fontSize: 16 }}>⏳</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: T.yl, textTransform: 'uppercase', letterSpacing: 1 }}>Sync lagging — keep scanning</div>
-            <div style={{ fontSize: 11, color: T.tx2, marginTop: 2 }}>{pendingWrites} scan{pendingWrites === 1 ? '' : 's'} waiting to sync{dbFails > 0 ? `, ${dbFails} failed` : ''}. Retrying in the background.</div>
+            <div style={{ fontSize: 11, color: T.tx2, marginTop: 2 }}>{pendingWrites} scan{pendingWrites === 1 ? '' : 's'} waiting to sync{dbFails > 0 ? `. ${dbFails} failed to save — tap Retry` : '. Retrying in the background'}.</div>
           </div>
+          {dbFails > 0 && <button onClick={retryFailedDbScans} style={{ padding: '4px 10px', borderRadius: 4, border: '1px solid rgba(245,158,11,.35)', background: 'rgba(245,158,11,.12)', color: T.yl, fontSize: 10, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Retry failed</button>}
         </div>
       )}
 
