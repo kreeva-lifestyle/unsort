@@ -254,7 +254,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
             <button onClick={onPrint} style={btnBase}>Print</button>
             {canRemind && <button onClick={onRemind} style={{ ...S.btnSuccess, padding: '8px 16px' }}>Remind</button>}
             {canReturn && <button onClick={onReturn} style={{ ...S.btnDanger, padding: '8px 16px' }}>Return</button>}
-            {!isVoided && c.status !== 'paid' && <button onClick={onVoid} style={btnBase}>Void</button>}
+            {!isVoided && (isRet || c.status !== 'paid') && <button onClick={onVoid} style={btnBase}>Void</button>}
           </div>
         </div>
       </div>

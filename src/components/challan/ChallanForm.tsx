@@ -269,13 +269,13 @@ export default function ChallanForm(p: ChallanFormProps) {
             {!(p.isReturn && p.returnSource) && <button onClick={() => p.setItems([...p.items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: T.ac3, color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item (or press Enter on last row)</button>}
           </div>
 
-          {/* Shipping + Tags + Notes */}
-          <div className="challan-form-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
-            <div>
+          {/* Shipping + Tags + Notes — returns never carry shipping charges */}
+          <div className="challan-form-grid-3" style={{ display: 'grid', gridTemplateColumns: p.isReturn ? '1fr 1fr' : '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+            {!p.isReturn && <div>
               <label style={lbl}>Shipping/Porter</label>
               <input type="number" min="0" value={p.shippingCharges || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setShippingCharges(Math.max(0, Number(e.target.value)))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11, border: p.shippingCharges < 0 ? `1px solid ${T.reAA}` : `1px solid ${T.bd}` }} />
               {p.shippingCharges < 0 && <div style={{ fontSize: 10, color: T.re, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>⚠ Cannot be negative</div>}
-            </div>
+            </div>}
             <div>
               <label style={lbl}>Tags <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0, fontSize: 7 }}>comma separated</span></label>
               <input value={p.tags} onChange={e => p.setTags(e.target.value)} placeholder="vip, urgent" style={{ ...inp, fontSize: 11 }} />
@@ -323,7 +323,7 @@ export default function ChallanForm(p: ChallanFormProps) {
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${p.grandTotal < 0 ? 'rgba(239,68,68,.35)' : T.bd}`, borderRadius: 10, padding: '12px 16px', marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, marginBottom: 4 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{p.subtotal.toFixed(2)}</span></div>
           {p.totalDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Item Discounts{p.totalDiscount > p.subtotal ? ' ⚠' : ''}</span><span style={{ fontFamily: T.mono }}>-₹{p.totalDiscount.toFixed(2)}</span></div>}
-          {p.shippingCharges > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.bl, marginBottom: 4 }}><span>Shipping/Porter</span><span style={{ fontFamily: T.mono }}>+₹{p.shippingCharges.toFixed(2)}</span></div>}
+          {!p.isReturn && p.shippingCharges > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.bl, marginBottom: 4 }}><span>Shipping/Porter</span><span style={{ fontFamily: T.mono }}>+₹{p.shippingCharges.toFixed(2)}</span></div>}
           {p.roundOff !== 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx3, marginBottom: 4 }}><span>Round Off</span><span style={{ fontFamily: T.mono }}>{p.roundOff > 0 ? '+' : ''}₹{p.roundOff.toFixed(2)}</span></div>}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: p.grandTotal < 0 ? T.re : T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}><span>Total</span><span>{p.grandTotal < 0 ? '−' : ''}₹{Math.abs(p.grandTotal).toLocaleString('en-IN')}</span></div>
           {p.grandTotal < 0 && <div style={{ marginTop: 6, fontSize: 10, color: T.re, display: 'flex', alignItems: 'center', gap: 4 }}>⚠ Total is negative — reduce discount or add items before saving.</div>}

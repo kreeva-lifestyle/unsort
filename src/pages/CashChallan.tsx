@@ -134,9 +134,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // Ledger
   const [showLedger, setShowLedger] = useState(false);
   const [showCashBook, setShowCashBook] = useState(false);
-  const [ledgerCustomers, setLedgerCustomers] = useState<{ name: string; total: number; paid: number; outstanding: number; count: number; aging: { current: number; d30: number; d60: number; d90plus: number } }[]>([]);
+  const [ledgerCustomers, setLedgerCustomers] = useState<{ id: string | null; name: string; total: number; paid: number; outstanding: number; count: number; aging: { current: number; d30: number; d60: number; d90plus: number } }[]>([]);
   const [ledgerFetchLimit, setLedgerFetchLimit] = useState(100);
-  const [ledgerDetail, setLedgerDetail] = useState<string | null>(null);
+  const [ledgerDetail, setLedgerDetail] = useState<{ id: string | null; name: string } | null>(null);
   const [ledgerChallans, setLedgerChallans] = useState<Challan[]>([]);
   const [ledgerSearch, setLedgerSearch] = useState('');
   const [ledgerFrom, setLedgerFrom] = useState('');
@@ -197,7 +197,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // Total = subtotal - discount + shipping (can go negative while editing).
   const subtotal = Math.round(items.reduce((s, i) => s + computeItemLineTotal(i), 0) * 100) / 100;
   const totalDiscount = Math.round(items.reduce((s, i) => s + computeItemDiscount(i), 0) * 100) / 100;
-  const clampedShipping = Math.max(0, shippingCharges);
+  // Returns never carry shipping/porter charges (owner policy) — the field is
+  // hidden in return mode and any lingering value is ignored here.
+  const clampedShipping = isReturn ? 0 : Math.max(0, shippingCharges);
   const afterAll = Math.round((subtotal - totalDiscount + clampedShipping) * 100) / 100;
   const roundOff = Math.round((Math.round(afterAll) - afterAll) * 100) / 100;
   const grandTotal = Math.round(afterAll);
@@ -208,14 +210,18 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     let query = supabase.from('cash_challans').select('*, cash_challan_items(sku, quantity, price, discount_amount, total)', { count: 'estimated' });
     if (debouncedSearch) {
       const s = debouncedSearch.replace(/[%_,().]/g, '');
+      // Numeric input searches BOTH challan number and names containing it,
+      // so customers like "7 Star Traders" stay findable.
       const num = parseInt(s);
-      if (!isNaN(num)) query = query.eq('challan_number', num);
+      if (!isNaN(num)) query = query.or(`challan_number.eq.${num},customer_name.ilike.%${s.trim()}%`);
       else if (s.trim()) query = query.ilike('customer_name', `%${s}%`);
     }
     if (statusFilter) query = query.eq('status', statusFilter);
     if (tagFilter) query = query.contains('tags', [tagFilter]);
-    if (dateFrom) query = query.gte('created_at', dateFrom + 'T00:00:00');
-    if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59');
+    // Local-midnight → ISO instant so day boundaries are IST, not UTC
+    // (same pattern as fetchAnalytics; bare 'T00:00:00' was read as UTC).
+    if (dateFrom) query = query.gte('created_at', new Date(dateFrom + 'T00:00:00').toISOString());
+    if (dateTo) query = query.lte('created_at', new Date(dateTo + 'T23:59:59').toISOString());
     if (invFilter === 'yes') query = query.eq('inventory_deducted', true);
     else if (invFilter === 'no') query = query.eq('inventory_deducted', false);
     query = query.order('created_at', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
@@ -387,16 +393,24 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     type AnalyticsRow = Pick<CashChallan, 'total' | 'payment_mode' | 'status' | 'is_return'>;
     const fromIso = fromDt.toISOString(); const toIso = toDt.toISOString();
     const fromDate = analyticsFrom; const toDate = analyticsTo;
-    const [{ data }, { count: voidedCount }, { data: prevData }, { data: paidInPeriod }] = await Promise.all([
+    const [{ data }, { count: voidedCount }, { data: prevData }, { data: paymentsInPeriod }] = await Promise.all([
       supabase.from('cash_challans').select('total, payment_mode, status, is_return').gte('created_at', fromIso).lte('created_at', toIso).neq('status', 'voided'),
       supabase.from('cash_challans').select('id', { count: 'estimated', head: true }).gte('created_at', fromIso).lte('created_at', toIso).eq('status', 'voided'),
       supabase.from('cash_challans').select('total, is_return').gte('created_at', prevFromDt.toISOString()).lte('created_at', prevToDt.toISOString()).neq('status', 'voided'),
-      supabase.from('cash_challans').select('total, payment_mode, is_return').gte('payment_date', fromDate).lte('payment_date', toDate).in('status', ['paid', 'partial']).neq('status', 'voided'),
+      // Mode breakup from the payments ledger, not challan totals — a partial
+      // challan only counts what was actually collected, reversals subtract,
+      // and refunds on returns count as money out.
+      supabase.from('cash_challan_payments').select('amount, payment_mode, is_reversal, challan:cash_challans(is_return)').gte('payment_date', fromDate).lte('payment_date', toDate),
     ]);
     const rows = (data as AnalyticsRow[] | null) || [];
     const totalRevenue = rows.reduce((s, r) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
     const byMode: Record<string, number> = {};
-    ((paidInPeriod as AnalyticsRow[] | null) || []).forEach((r) => { const m = r.payment_mode || 'Unset'; byMode[m] = (byMode[m] || 0) + (r.is_return ? -1 : 1) * Number(r.total); });
+    type PayRow = { amount: number; payment_mode: string | null; is_reversal: boolean | null; challan: { is_return: boolean | null } | null };
+    ((paymentsInPeriod as unknown as PayRow[] | null) || []).forEach((r) => {
+      const m = r.payment_mode || 'Unset';
+      const sign = (r.is_reversal ? -1 : 1) * (r.challan?.is_return ? -1 : 1);
+      byMode[m] = (byMode[m] || 0) + sign * Number(r.amount);
+    });
     const salesCount = rows.filter((r) => !r.is_return).length;
     const returnsCount = rows.filter((r) => r.is_return).length;
     const prevRows = (prevData as Pick<CashChallan, 'total' | 'is_return'>[] | null) || [];
@@ -406,29 +420,33 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   }, [analyticsFrom, analyticsTo]);
 
   // ── Fetch ledger (recent 10 customers) ──────────────────────────────────────
+  // Ledger aggregation keys on customer_id (name fallback for legacy rows
+  // without one) — keying on the display name merged different customers who
+  // share a name and split a customer across renames.
+  const ledgerKey = (id: string | null, name: string) => id || `name:${name}`;
   const fetchLedger = useCallback(async (limit = ledgerFetchLimit) => {
-    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return, created_at, status').neq('status', 'voided').order('created_at', { ascending: false }).limit(limit);
-    type LedgerRow = Pick<CashChallan, 'customer_name' | 'total' | 'amount_paid' | 'is_return' | 'created_at' | 'status'>;
+    const { data } = await supabase.from('cash_challans').select('customer_id, customer_name, total, amount_paid, is_return, created_at, status').neq('status', 'voided').order('created_at', { ascending: false }).limit(limit);
+    type LedgerRow = Pick<CashChallan, 'customer_id' | 'customer_name' | 'total' | 'amount_paid' | 'is_return' | 'created_at' | 'status'>;
     const now = Date.now();
     const daysSince = (d: string) => Math.floor((now - new Date(d).getTime()) / 86400000);
-    const map: Record<string, { total: number; paid: number; count: number; latest: string; aging: { current: number; d30: number; d60: number; d90plus: number } }> = {};
+    const map: Record<string, { id: string | null; name: string; total: number; paid: number; count: number; latest: string; aging: { current: number; d30: number; d60: number; d90plus: number } }> = {};
     ((data as LedgerRow[] | null) || []).forEach((r) => {
-      const name = r.customer_name;
+      const key = ledgerKey(r.customer_id, r.customer_name);
       const sign = r.is_return ? -1 : 1;
-      if (!map[name]) map[name] = { total: 0, paid: 0, count: 0, latest: r.created_at ?? '', aging: { current: 0, d30: 0, d60: 0, d90plus: 0 } };
-      map[name].total += sign * Number(r.total);
-      map[name].paid += sign * Number(r.amount_paid || 0);
-      map[name].count++;
+      if (!map[key]) map[key] = { id: r.customer_id, name: r.customer_name, total: 0, paid: 0, count: 0, latest: r.created_at ?? '', aging: { current: 0, d30: 0, d60: 0, d90plus: 0 } };
+      map[key].total += sign * Number(r.total);
+      map[key].paid += sign * Number(r.amount_paid || 0);
+      map[key].count++;
       const outstanding = Number(r.total) - Number(r.amount_paid || 0);
       if (!r.is_return && outstanding > 0 && r.status !== 'paid') {
         const days = daysSince(r.created_at ?? '');
-        if (days <= 30) map[name].aging.current += outstanding;
-        else if (days <= 60) map[name].aging.d30 += outstanding;
-        else if (days <= 90) map[name].aging.d60 += outstanding;
-        else map[name].aging.d90plus += outstanding;
+        if (days <= 30) map[key].aging.current += outstanding;
+        else if (days <= 60) map[key].aging.d30 += outstanding;
+        else if (days <= 90) map[key].aging.d60 += outstanding;
+        else map[key].aging.d90plus += outstanding;
       }
     });
-    const list = Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count, aging: v.aging }));
+    const list = Object.values(map).map((v) => ({ id: v.id, name: v.name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count, aging: v.aging }));
     list.sort((a, b) => {
       if (a.outstanding > 0 && b.outstanding <= 0) return -1;
       if (a.outstanding <= 0 && b.outstanding > 0) return 1;
@@ -440,28 +458,28 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   const searchLedgerCustomer = useCallback(async (q: string) => {
     if (!q.trim()) { fetchLedger(); return; }
-    const { data } = await supabase.from('cash_challans').select('customer_name, total, amount_paid, is_return, created_at, status').neq('status', 'voided').ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
-    type LedgerSearchRow = Pick<CashChallan, 'customer_name' | 'total' | 'amount_paid' | 'is_return' | 'created_at' | 'status'>;
+    const { data } = await supabase.from('cash_challans').select('customer_id, customer_name, total, amount_paid, is_return, created_at, status').neq('status', 'voided').ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
+    type LedgerSearchRow = Pick<CashChallan, 'customer_id' | 'customer_name' | 'total' | 'amount_paid' | 'is_return' | 'created_at' | 'status'>;
     const now = Date.now();
     const daysSince = (d: string) => Math.floor((now - new Date(d).getTime()) / 86400000);
-    const map: Record<string, { total: number; paid: number; count: number; aging: { current: number; d30: number; d60: number; d90plus: number } }> = {};
+    const map: Record<string, { id: string | null; name: string; total: number; paid: number; count: number; aging: { current: number; d30: number; d60: number; d90plus: number } }> = {};
     ((data as LedgerSearchRow[] | null) || []).forEach((r) => {
-      const name = r.customer_name;
+      const key = ledgerKey(r.customer_id, r.customer_name);
       const sign = r.is_return ? -1 : 1;
-      if (!map[name]) map[name] = { total: 0, paid: 0, count: 0, aging: { current: 0, d30: 0, d60: 0, d90plus: 0 } };
-      map[name].total += sign * Number(r.total);
-      map[name].paid += sign * Number(r.amount_paid || 0);
-      map[name].count++;
+      if (!map[key]) map[key] = { id: r.customer_id, name: r.customer_name, total: 0, paid: 0, count: 0, aging: { current: 0, d30: 0, d60: 0, d90plus: 0 } };
+      map[key].total += sign * Number(r.total);
+      map[key].paid += sign * Number(r.amount_paid || 0);
+      map[key].count++;
       const outstanding = Number(r.total) - Number(r.amount_paid || 0);
       if (!r.is_return && outstanding > 0 && r.status !== 'paid') {
         const days = daysSince(r.created_at ?? '');
-        if (days <= 30) map[name].aging.current += outstanding;
-        else if (days <= 60) map[name].aging.d30 += outstanding;
-        else if (days <= 90) map[name].aging.d60 += outstanding;
-        else map[name].aging.d90plus += outstanding;
+        if (days <= 30) map[key].aging.current += outstanding;
+        else if (days <= 60) map[key].aging.d30 += outstanding;
+        else if (days <= 90) map[key].aging.d60 += outstanding;
+        else map[key].aging.d90plus += outstanding;
       }
     });
-    const list = Object.entries(map).map(([name, v]) => ({ name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count, aging: v.aging }));
+    const list = Object.values(map).map((v) => ({ id: v.id, name: v.name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count, aging: v.aging }));
     list.sort((a, b) => {
       if (a.outstanding > 0 && b.outstanding <= 0) return -1;
       if (a.outstanding <= 0 && b.outstanding > 0) return 1;
@@ -471,20 +489,22 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setLedgerCustomers(list);
   }, [fetchLedger]);
 
-  const fetchLedgerDetailWithRange = useCallback(async (name: string, from: string, to: string) => {
-    let q = supabase.from('cash_challans').select('id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, created_at, updated_at').ilike('customer_name', name.replace(/[%_]/g, '\\$&')).neq('status', 'voided').order('created_at', { ascending: false });
-    if (from) q = q.gte('created_at', from + 'T00:00:00');
-    if (to) q = q.lte('created_at', to + 'T23:59:59');
+  const fetchLedgerDetailWithRange = useCallback(async (cust: { id: string | null; name: string }, from: string, to: string) => {
+    let q = supabase.from('cash_challans').select('id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, created_at, updated_at').neq('status', 'voided').order('created_at', { ascending: false });
+    q = cust.id ? q.eq('customer_id', cust.id) : q.ilike('customer_name', cust.name.replace(/[%_]/g, '\\$&'));
+    // Local-midnight → ISO instant so the day boundary is IST, not UTC
+    if (from) q = q.gte('created_at', new Date(from + 'T00:00:00').toISOString());
+    if (to) q = q.lte('created_at', new Date(to + 'T23:59:59').toISOString());
     const { data } = await q.limit(500);
     setLedgerChallans((data as Challan[] | null) || []);
   }, []);
 
-  const fetchLedgerDetail = useCallback(async (name: string) => {
-    setLedgerDetail(name);
+  const fetchLedgerDetail = useCallback(async (cust: { id: string | null; name: string }) => {
+    setLedgerDetail(cust);
     setLedgerFrom('');
     setLedgerTo('');
     window.history.pushState({ view: 'ledger-detail' }, '');
-    await fetchLedgerDetailWithRange(name, '', '');
+    await fetchLedgerDetailWithRange(cust, '', '');
   }, [fetchLedgerDetailWithRange]);
 
   // ── Save challan ───────────────────────────────────────────────────────────
@@ -507,7 +527,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       const err = itemValidationError(items[i]);
       if (err) { setFormError(`Row ${i + 1} (${items[i].sku || '—'}): ${err}`); return; }
     }
-    if (shippingCharges < 0) { setFormError('Shipping/Porter charges cannot be negative'); return; }
+    if (!isReturn && shippingCharges < 0) { setFormError('Shipping/Porter charges cannot be negative'); return; }
+    // Owner policy (2026-06): every return must be linked to its source
+    // invoice — free-form returns skipped all quantity validation.
+    if (isReturn && !returnSource && !editing) { setFormError('Select the source invoice for this return'); return; }
     if (isReturn && returnSource) {
       const sourceItems = returnSource.cash_challan_items || [];
       // Check cumulative returns — fetch all previous returns for this source
@@ -669,10 +692,31 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Void challan ───────────────────────────────────────────────────────────
   const voidChallan = async (id: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total, amount_paid, status, payment_mode, inventory_deducted').eq('id', id).maybeSingle();
+    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total, amount_paid, status, payment_mode, inventory_deducted, is_return').eq('id', id).maybeSingle();
     if (!before) return;
-    if (before.status === 'paid') { addToast('Cannot void a fully paid challan', 'error'); return; }
     if (before.status === 'voided') { addToast('Already voided', 'error'); return; }
+    if (before.is_return) {
+      // Returns are always 'paid' (refund recorded), so the sales rules below
+      // would make a mistaken return permanently unfixable. Voiding a return
+      // means the refund comes back — record that on its payment trail.
+      const { data: updated, error: voidErr } = await supabase.from('cash_challans').update({ status: 'voided', voided_by: user?.id, voided_at: new Date().toISOString() }).eq('id', id).neq('status', 'voided').select('id');
+      if (voidErr) { addToast(friendlyError(voidErr), 'error'); return; }
+      if (!updated || updated.length === 0) { addToast('Return was already voided', 'error'); fetchChallans(); return; }
+      if (Number(before.amount_paid || 0) > 0) {
+        const { error: revErr } = await supabase.from('cash_challan_payments').insert({
+          challan_id: id, amount: Number(before.amount_paid), payment_mode: before.payment_mode || 'Cash',
+          payment_date: new Date().toISOString().slice(0, 10), paid_by: user?.id,
+          notes: `Return #${before.challan_number} voided — refund of ₹${before.amount_paid} received back`, is_reversal: true,
+        });
+        if (revErr) addToast('Refund reversal record failed — ' + friendlyError(revErr), 'error');
+      }
+      await ccAuditLog('VOID', id, `Return #${before.challan_number} (${before.customer_name}) voided — refund ₹${before.total} reversed`, { status: { from: before.status, to: 'voided' } });
+      addToast(`Return #${before.challan_number} voided`, 'success');
+      if (before.inventory_deducted) addToast(`⚠ Inventory was updated for this return — please reverse the inventory transaction manually`, 'error');
+      fetchChallans();
+      return;
+    }
+    if (before.status === 'paid') { addToast('Cannot void a fully paid challan', 'error'); return; }
     // Challans with money recorded against them are never voided directly —
     // the payment must be explicitly removed first so cash records stay clean.
     if (Number(before.amount_paid || 0) > 0) { addToast(`Challan #${before.challan_number} has ₹${Number(before.amount_paid).toLocaleString('en-IN')} recorded. Remove the payment first (edit → set Unpaid), then void.`, 'error'); return; }
@@ -927,11 +971,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const exportChallansCSV = async () => {
     if (!dateFrom || !dateTo) { addToast('Select a date range in Filters before exporting', 'error'); setShowFilters(true); return; }
     let q = supabase.from('cash_challans').select('challan_number, customer_name, status, subtotal, discount_amount, shipping_charges, round_off, total, amount_paid, payment_mode, payment_date, is_return, notes, tags, created_at, cash_challan_items(sku, description, quantity, price, discount_type, discount_value, discount_amount, total)').neq('status', 'voided');
-    if (search) { const s = search.replace(/[%_,().]/g, ''); const num = parseInt(s); if (!isNaN(num)) q = q.eq('challan_number', num); else if (s.trim()) q = q.ilike('customer_name', `%${s}%`); }
+    if (search) { const s = search.replace(/[%_,().]/g, ''); const num = parseInt(s); if (!isNaN(num)) q = q.or(`challan_number.eq.${num},customer_name.ilike.%${s.trim()}%`); else if (s.trim()) q = q.ilike('customer_name', `%${s}%`); }
     if (statusFilter) q = q.eq('status', statusFilter);
     if (tagFilter) q = q.contains('tags', [tagFilter]);
-    if (dateFrom) q = q.gte('created_at', dateFrom + 'T00:00:00');
-    if (dateTo) q = q.lte('created_at', dateTo + 'T23:59:59');
+    // IST day boundaries (see fetchChallans)
+    if (dateFrom) q = q.gte('created_at', new Date(dateFrom + 'T00:00:00').toISOString());
+    if (dateTo) q = q.lte('created_at', new Date(dateTo + 'T23:59:59').toISOString());
     q = q.order('created_at', { ascending: false }).limit(5000);
     const { data } = await q;
     if (!data || data.length === 0) { addToast('No challans to export', 'error'); return; }
@@ -1101,7 +1146,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Ledger (list + detail) — extracted to components/challan/ChallanLedger.tsx ──
   if (showLedger) return (
     <>{pdfModal}<ChallanLedger
-      detailName={ledgerDetail}
+      detailName={ledgerDetail?.name ?? null}
+      detailId={ledgerDetail?.id ?? null}
       customers={ledgerCustomers}
       detailChallans={ledgerChallans as any}
       search={ledgerSearch}
