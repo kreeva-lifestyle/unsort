@@ -1237,10 +1237,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       {/* Header — Programs-style: subtitle left, action buttons right */}
       <div className="challan-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 12, color: T.tx3 }}>{totalCount} challan{totalCount === 1 ? '' : 's'} · invoicing, payments, returns</div>
+        {/* Full-size ghost buttons (matches Inventory/Programs toolbars — the
+            btnSm pills looked undersized next to the primary CTA). Order runs
+            plain views → tinted sibling module → primary action. */}
         <div className="challan-nav-btns" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          {profile?.module_access?.cashbook !== false && <button onClick={() => { setShowCashBook(true); window.history.pushState({ view: 'cashbook' }, ''); }} style={{ ...S.btnGhost, ...S.btnSm, color: T.gr, borderColor: 'rgba(34,197,94,.25)', background: 'rgba(34,197,94,.06)' }}>Cash Book</button>}
-          <button onClick={() => { fetchLedger(); setShowLedger(true); window.history.pushState({ view: 'ledger' }, ''); }} style={{ ...S.btnGhost, ...S.btnSm }}>Ledger</button>
-          <button onClick={() => { fetchAnalytics(); setShowAnalytics(true); window.history.pushState({ view: 'analytics' }, ''); }} style={{ ...S.btnGhost, ...S.btnSm }}>Analytics</button>
+          <button onClick={() => { fetchAnalytics(); setShowAnalytics(true); window.history.pushState({ view: 'analytics' }, ''); }} style={S.btnGhost}>Analytics</button>
+          <button onClick={() => { fetchLedger(); setShowLedger(true); window.history.pushState({ view: 'ledger' }, ''); }} style={S.btnGhost}>Ledger</button>
+          {profile?.module_access?.cashbook !== false && <button onClick={() => { setShowCashBook(true); window.history.pushState({ view: 'cashbook' }, ''); }} style={{ ...S.btnGhost, color: T.gr, borderColor: 'rgba(34,197,94,.25)', background: 'rgba(34,197,94,.06)' }}>Cash Book</button>}
           <button onClick={() => { setShowModal(true); window.history.pushState({ view: 'challan-new' }, ''); }} style={S.btnPrimary} className="desktop-only">+ New Challan</button>
         </div>
       </div>

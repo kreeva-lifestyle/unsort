@@ -34,12 +34,17 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
     const cleaned = phoneInput.replace(/\D/g, '');
     if (cleaned.length !== 10) { addToast('Phone must be 10 digits', 'error'); return; }
     setPhoneSaving(true);
-    const { error } = await supabase.from('profiles').update({ phone: cleaned }).eq('id', profile.id);
-    setPhoneSaving(false);
-    if (error) { addToast('Save failed — ' + friendlyError(error), 'error'); return; }
-    setMyPhone(cleaned);
-    setPhoneEditing(false);
-    addToast('Phone saved', 'success');
+    // finally guarantees the button unfreezes even if the request THROWS
+    // (offline rejection) rather than returning an error object.
+    try {
+      const { error } = await supabase.from('profiles').update({ phone: cleaned }).eq('id', profile.id);
+      if (error) { addToast('Save failed — ' + friendlyError(error), 'error'); return; }
+      setMyPhone(cleaned);
+      setPhoneEditing(false);
+      addToast('Phone saved', 'success');
+    } catch {
+      addToast('Network error — please try again', 'error');
+    } finally { setPhoneSaving(false); }
   };
 
   const saveMyPin = async () => {
@@ -48,12 +53,15 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
     if (!/^\d+$/.test(newPin)) { setPinError('PIN must be digits only'); return; }
     if (newPin !== confirmPin) { setPinError('PINs do not match'); return; }
     setPinSaving(true);
-    const { error } = await supabase.rpc('set_own_pin', { pin: newPin });
-    setPinSaving(false);
-    if (error) { setPinError('Save failed — ' + friendlyError(error)); return; }
-    setNewPin(''); setConfirmPin(''); setEditingPin(false);
-    await loadPin();
-    addToast('Cash PIN saved successfully', 'success');
+    try {
+      const { error } = await supabase.rpc('set_own_pin', { pin: newPin });
+      if (error) { setPinError('Save failed — ' + friendlyError(error)); return; }
+      setNewPin(''); setConfirmPin(''); setEditingPin(false);
+      await loadPin();
+      addToast('Cash PIN saved successfully', 'success');
+    } catch {
+      setPinError('Network error — please try again');
+    } finally { setPinSaving(false); }
   };
 
   const removePin = async () => {

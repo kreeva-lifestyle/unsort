@@ -68,12 +68,12 @@ export default function ChallanList(p: Props) {
           <input type="text" value={p.search} onChange={e => { p.onSearchChange(e.target.value); p.onResetPage(); }} placeholder="Search name or #..." style={{ ...S.fSearch, background: 'transparent', border: 'none', width: '100%' }} />
         </div>
         <div className="challan-filter-btns" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button onClick={p.onToggleFilters} style={{ ...S.btnGhost, ...S.btnSm, color: p.showFilters || filterActive ? T.ac2 : T.tx3, borderColor: p.showFilters || filterActive ? T.ac3 : T.bd2, background: p.showFilters ? T.ac3 : 'rgba(255,255,255,0.03)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
+          <button onClick={p.onToggleFilters} style={{ ...S.btnGhost, color: p.showFilters || filterActive ? T.ac2 : T.tx3, borderColor: p.showFilters || filterActive ? T.ac3 : T.bd2, background: p.showFilters ? T.ac3 : 'rgba(255,255,255,0.03)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
             Filters{filterActive ? ` (${[p.statusFilter, p.tagFilter, p.dateFrom, p.dateTo, p.invFilter].filter(Boolean).length})` : ''}
           </button>
-          <button className="desktop-only" onClick={p.onExport} style={{ ...S.btnGhost, ...S.btnSm, color: T.gr, borderColor: 'rgba(34,197,94,.25)', background: 'rgba(34,197,94,.06)' }}>Export</button>
-          <button className="desktop-only" onClick={p.onToggleBulkMode} style={{ ...S.btnGhost, ...S.btnSm, color: p.bulkMode ? T.ac2 : T.tx3, borderColor: p.bulkMode ? T.ac3 : T.bd2, background: p.bulkMode ? T.ac3 : 'rgba(255,255,255,0.03)' }}>{p.bulkMode ? 'Cancel' : '☑ Select'}</button>
+          <button className="desktop-only" onClick={p.onExport} style={{ ...S.btnGhost, color: T.gr, borderColor: 'rgba(34,197,94,.25)', background: 'rgba(34,197,94,.06)' }}>Export</button>
+          <button className="desktop-only" onClick={p.onToggleBulkMode} style={{ ...S.btnGhost, color: p.bulkMode ? T.ac2 : T.tx3, borderColor: p.bulkMode ? T.ac3 : T.bd2, background: p.bulkMode ? T.ac3 : 'rgba(255,255,255,0.03)' }}>{p.bulkMode ? 'Cancel' : '☑ Select'}</button>
         </div>
       </div>
 
