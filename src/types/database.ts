@@ -19,7 +19,7 @@
  * Do NOT redefine these types inline in feature files — import from here.
  */
 
-// ─── profiles (9 cols) ───────────────────────────────────────────────────
+// ─── profiles (11 cols) ──────────────────────────────────────────────────
 
 export interface Profile {
   id: string;
@@ -32,6 +32,10 @@ export interface Profile {
   cash_pin: string | null;
   phone: string | null;
   module_access: Record<string, boolean> | null;
+  // PIN brute-force tracking — written only by the verify_own_pin RPC
+  // (SECURITY DEFINER); not client-readable, present here for completeness.
+  pin_failed_attempts: number;
+  pin_locked_until: string | null;
 }
 
 export type ProfileInsert = {
@@ -45,6 +49,8 @@ export type ProfileInsert = {
   cash_pin?: string | null;
   phone?: string | null;
   module_access?: Record<string, boolean> | null;
+  pin_failed_attempts?: number;
+  pin_locked_until?: string | null;
 };
 
 // ─── products (10 cols) ──────────────────────────────────────────────────
@@ -408,7 +414,7 @@ export interface CashChallan {
   customer_id: string | null;
   customer_name: string;
   customer_phone: string | null;
-  status: 'draft' | 'paid' | 'unpaid' | 'partial' | 'voided';
+  status: 'paid' | 'unpaid' | 'partial' | 'voided';
   subtotal: number;
   discount_type: 'flat' | 'percentage' | null;
   discount_value: number | null;
@@ -439,7 +445,7 @@ export type CashChallanInsert = {
   customer_id?: string | null;
   customer_name: string;
   customer_phone?: string | null;
-  status: 'draft' | 'paid' | 'unpaid' | 'partial' | 'voided';
+  status: 'paid' | 'unpaid' | 'partial' | 'voided';
   subtotal: number;
   discount_type?: 'flat' | 'percentage' | null;
   discount_value?: number | null;
@@ -722,7 +728,7 @@ export const COMPONENT_STATUSES: ComponentStatus[] = ['missing', 'present', 'dam
 export const DAMAGE_REPORT_STATUSES: DamageReportStatus[] = ['open', 'investigating', 'resolved', 'closed'];
 export const DAMAGE_SEVERITIES: DamageSeverity[] = ['minor', 'moderate', 'severe', 'critical'];
 export const USER_ROLES: UserRole[] = ['admin', 'manager', 'operator', 'viewer'];
-export const CASH_CHALLAN_STATUSES: CashChallanStatus[] = ['draft', 'paid', 'unpaid', 'partial', 'voided'];
+export const CASH_CHALLAN_STATUSES: CashChallanStatus[] = ['paid', 'unpaid', 'partial', 'voided'];
 export const CASH_HANDOVER_STATUSES: CashHandoverStatus[] = ['pending', 'confirmed', 'disputed'];
 
 // ─── address_labels (10 cols) ───────────────────────────────────────────

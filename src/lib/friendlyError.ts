@@ -15,6 +15,7 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   if (code === '23505' || l.includes('duplicate key')) return 'A record with these details already exists.';
   if (code === '23503' || l.includes('foreign key')) return 'Cannot complete — this item is still referenced elsewhere.';
   if (l.includes('cash handover period') || l.includes('confirmed and is a permanent') || l.includes('permanent financial record') || l.includes('period start of a confirmed or pending')) return msg; // Pass through specific lock-period errors
+  if (l.includes('chk_challan_status')) return 'Invalid challan status — Draft challans are no longer supported. Refresh the app to get the latest version.';
   if (code === '23514' || l.includes('check constraint')) return 'One of the values is outside the allowed range.';
   if (code === '23502' || l.includes('not null')) return 'A required field is missing.';
 

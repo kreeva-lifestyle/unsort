@@ -51,7 +51,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
       // can render as soon as it resolves — no second sequential hop gating `loaded`.
       [scansRes, challansRes, itemsRes, expensesRes, handoversRes, balancesRes, scanTrendRes] = await Promise.all([
         supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).gte('scanned_at', todayISO),
-        supabase.from('cash_challans').select('total, amount_paid, status, is_return, customer_name, created_at, payment_date').neq('status', 'voided').neq('status', 'draft'),
+        supabase.from('cash_challans').select('total, amount_paid, status, is_return, customer_name, created_at, payment_date').neq('status', 'voided'),
         supabase.from('inventory_items').select('status, status_changed_at'),
         supabase.from('cash_expenses').select('amount').gte('date', monthStartStr),
         supabase.from('cash_handovers').select('handover_number, amount, status, date, from_user_name, created_at'),

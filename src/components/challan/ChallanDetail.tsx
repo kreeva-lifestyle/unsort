@@ -86,7 +86,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
   const isVoided = c.status === 'voided';
   const due = Number(c.total) - Number(c.amount_paid || 0);
   const canRemind = !isRet && (c.status === 'unpaid' || c.status === 'partial');
-  const canReturn = !isRet && !isVoided && c.status !== 'draft';
+  const canReturn = !isRet && !isVoided;
 
   const btnBase: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx2, transition: 'all .15s' };
 

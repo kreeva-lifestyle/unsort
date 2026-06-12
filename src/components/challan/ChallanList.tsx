@@ -83,7 +83,7 @@ export default function ChallanList(p: Props) {
             <div>
               <label style={S.fLabel}>Status</label>
               <select value={p.statusFilter} onChange={e => { p.onStatusFilterChange(e.target.value); p.onResetPage(); }} style={S.fInput}>
-                <option value="">All</option><option value="draft">Draft</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option><option value="partial">Partial</option><option value="voided">Voided</option>
+                <option value="">All</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option><option value="partial">Partial</option><option value="voided">Voided</option>
               </select>
             </div>
             {p.allTags.length > 0 && (
@@ -134,7 +134,7 @@ export default function ChallanList(p: Props) {
           const pendingDays = (!c.is_return && (c.status === 'unpaid' || c.status === 'partial')) ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : 0;
           const isRet = !!c.is_return;
           const isSelected = p.selectedIds.has(c.id);
-          const canSelect = c.status !== 'voided' && c.status !== 'draft';
+          const canSelect = c.status !== 'voided';
           const rowBg = isSelected ? 'rgba(99,102,241,.08)' : isRet ? 'rgba(239,68,68,.04)' : undefined;
           const swipeActions = [
             { label: 'Print', color: '#3B82F6', onClick: () => p.onPrint(c) },
@@ -180,7 +180,7 @@ export default function ChallanList(p: Props) {
                 {(c.status === 'unpaid' || c.status === 'partial') && <button onClick={e => { e.stopPropagation(); p.onRemind(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.6 }} title="Send WhatsApp reminder">
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.yl, strokeWidth: 2 }}><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
                 </button>}
-                {!isRet && c.status !== 'voided' && c.status !== 'draft' && <button onClick={e => { e.stopPropagation(); p.onCreateReturn(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.6 }} title="Create return for this challan">
+                {!isRet && c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); p.onCreateReturn(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.6 }} title="Create return for this challan">
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M9 14L4 9l5-5M4 9h11a5 5 0 015 5v0a5 5 0 01-5 5H8" /></svg>
                 </button>}
                 {c.status !== 'voided' && c.status !== 'paid' && <button onClick={e => { e.stopPropagation(); p.onVoid(c); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.4 }} title="Void">

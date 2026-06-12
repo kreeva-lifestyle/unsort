@@ -326,7 +326,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       setPaymentMode(d.paymentMode || '');
       setPaymentDate(d.paymentDate || '');
       setAmountPaid(d.amountPaid || 0);
-      setChallanStatus(d.challanStatus || 'unpaid');
+      // Coerce stale pre-removal 'draft' autosaves — that status no longer exists.
+      setChallanStatus(d.challanStatus && d.challanStatus !== 'draft' ? d.challanStatus : 'unpaid');
       setIsReturn(!!d.isReturn);
       setDraftRestored(true);
       setDraftRestoredAt(d.savedAt);
@@ -419,7 +420,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       map[name].paid += sign * Number(r.amount_paid || 0);
       map[name].count++;
       const outstanding = Number(r.total) - Number(r.amount_paid || 0);
-      if (!r.is_return && outstanding > 0 && r.status !== 'paid' && r.status !== 'draft') {
+      if (!r.is_return && outstanding > 0 && r.status !== 'paid') {
         const days = daysSince(r.created_at ?? '');
         if (days <= 30) map[name].aging.current += outstanding;
         else if (days <= 60) map[name].aging.d30 += outstanding;
@@ -452,7 +453,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       map[name].paid += sign * Number(r.amount_paid || 0);
       map[name].count++;
       const outstanding = Number(r.total) - Number(r.amount_paid || 0);
-      if (!r.is_return && outstanding > 0 && r.status !== 'paid' && r.status !== 'draft') {
+      if (!r.is_return && outstanding > 0 && r.status !== 'paid') {
         const days = daysSince(r.created_at ?? '');
         if (days <= 30) map[name].aging.current += outstanding;
         else if (days <= 60) map[name].aging.d30 += outstanding;
@@ -536,10 +537,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (amountPaid > grandTotal) { setFormError(`Amount paid (₹${amountPaid}) cannot exceed total (₹${grandTotal})`); return; }
     if (!paymentMode && amountPaid > 0) { setFormError('Select a payment mode when amount is paid'); return; }
     if (!paymentDate && amountPaid > 0) { setFormError('Payment date is required when amount is paid'); return; }
-    if (editing && editing.status !== 'draft' && challanStatus === 'draft') { setFormError('Cannot revert to Draft once saved'); return; }
     if (challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(isReturn ? `Refund amount (₹${amountPaid}) must equal return total (₹${grandTotal})` : `Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
     if (!isReturn && challanStatus === 'partial' && (amountPaid <= 0 || amountPaid >= grandTotal)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
-    if (challanStatus === 'draft' && amountPaid > 0) { setFormError('Draft challans cannot have payment. Change status first.'); return; }
     if (challanStatus === 'unpaid' && amountPaid > 0) { setFormError('Status is "Unpaid" but amount is paid. Change status to "Paid" or "Partial"'); return; }
     setSaving(true);
     try {
@@ -598,7 +597,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         const { error: upErr } = await supabase.rpc('update_challan_with_items', {
           p_challan_id: editing.id,
           p_challan: { ...challanData, tags: challanData.tags || null },
-          p_items: items.map((it) => ({ sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100 })),
+          p_items: items.map((it) => ({ sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: computeItemDiscount(it) })),
           p_payment: payDiff !== 0 ? { payment_mode: paymentMode || 'Cash', payment_date: paymentDate || today, paid_by: user?.id } : null,
         });
         if (upErr) throw new Error(upErr.message);
@@ -610,7 +609,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       } else {
         const rpcPayload = {
           p_challan: { ...challanData, created_by: user?.id, source_challan_id: isReturn && returnSource ? returnSource.id : null },
-          p_items: items.map((it) => ({ sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: Math.round((it.quantity * it.price - computeItemTotal(it)) * 100) / 100 })),
+          p_items: items.map((it) => ({ sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: computeItemDiscount(it) })),
           p_payment: amountPaid > 0 ? { amount: amountPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || new Date().toISOString().slice(0, 10), paid_by: user?.id } : null,
         };
         const { data: newChallan, error: crErr } = await supabase.rpc('create_challan_with_items', rpcPayload);
@@ -674,18 +673,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (!before) return;
     if (before.status === 'paid') { addToast('Cannot void a fully paid challan', 'error'); return; }
     if (before.status === 'voided') { addToast('Already voided', 'error'); return; }
-    const { data: updated, error: voidErr } = await supabase.from('cash_challans').update({ status: 'voided', voided_by: user?.id, voided_at: new Date().toISOString() }).eq('id', id).neq('status', 'voided').select('id');
+    // Challans with money recorded against them are never voided directly —
+    // the payment must be explicitly removed first so cash records stay clean.
+    if (Number(before.amount_paid || 0) > 0) { addToast(`Challan #${before.challan_number} has ₹${Number(before.amount_paid).toLocaleString('en-IN')} recorded. Remove the payment first (edit → set Unpaid), then void.`, 'error'); return; }
+    const { data: updated, error: voidErr } = await supabase.from('cash_challans').update({ status: 'voided', voided_by: user?.id, voided_at: new Date().toISOString() }).eq('id', id).or('amount_paid.is.null,amount_paid.eq.0').neq('status', 'voided').select('id');
     if (voidErr) { addToast(friendlyError(voidErr), 'error'); return; }
-    if (!updated || updated.length === 0) { addToast('Challan was already voided', 'error'); fetchChallans(); return; }
-    if (Number(before.amount_paid || 0) > 0) {
-      const { error: revErr } = await supabase.from('cash_challan_payments').insert({
-        challan_id: id, amount: Number(before.amount_paid), payment_mode: before.payment_mode || 'Cash',
-        payment_date: new Date().toISOString().slice(0, 10), paid_by: user?.id,
-        notes: `Reversal — challan #${before.challan_number} voided`, is_reversal: true,
-      });
-      if (revErr) addToast('Void reversal record failed — ' + friendlyError(revErr), 'error');
-    }
-    await ccAuditLog('VOID', id, `Challan #${before.challan_number} (${before.customer_name}) voided — was ₹${before.total}`, { status: { from: before.status, to: 'voided' }, amount_paid: { from: before.amount_paid, to: 0 } });
+    if (!updated || updated.length === 0) { addToast('Challan changed since you opened it (voided or paid elsewhere) — refresh and retry', 'error'); fetchChallans(); return; }
+    await ccAuditLog('VOID', id, `Challan #${before.challan_number} (${before.customer_name}) voided — was ₹${before.total}`, { status: { from: before.status, to: 'voided' } });
     addToast(`Challan #${before.challan_number} voided`, 'success');
     if (before.inventory_deducted) addToast(`⚠ Inventory was deducted for this challan — please reverse the inventory transaction manually`, 'error');
     fetchChallans();
@@ -693,7 +687,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Audit trail for a challan ──────────────────────────────────────────────
   const loadAuditTrail = async (challanNumber: number) => {
-    const { data, error: auditErr } = await supabase.from('audit_log').select('id, action, module, record_id, details, user_id, user_email, created_at, changes').eq('module', 'cash_challan').ilike('details', `%#${challanNumber} %`).order('created_at', { ascending: false });
+    // Match "#N " mid-string OR "#N" at end — the trailing space alone missed
+    // entries whose details end with the number (and still can't match #N1…).
+    const { data, error: auditErr } = await supabase.from('audit_log').select('id, action, module, record_id, details, user_id, user_email, created_at, changes').eq('module', 'cash_challan').or(`details.ilike.%#${challanNumber} %,details.ilike.%#${challanNumber}`).order('created_at', { ascending: false });
     if (auditErr) { addToast(friendlyError(auditErr), 'error'); return; }
     setAuditTrail(data || []);
   };
@@ -845,8 +841,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // (signed by customer, kept on file), bottom half = Customer copy. A
     // dashed cut line between them lets the user tear along the middle.
     const statusLabel = c.is_return ? 'Refunded' : c.status.charAt(0).toUpperCase() + c.status.slice(1);
-    const statusColor = c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : c.status === 'draft' ? '#0c5460' : '#721c24';
-    const statusBg = c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : c.status === 'draft' ? '#d1ecf1' : '#f8d7da';
+    const statusColor = c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : '#721c24';
+    const statusBg = c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : '#f8d7da';
     const dateStr = new Date(c.created_at).toLocaleDateString('en-IN');
     const docType = c.is_return ? 'Return Challan' : 'Cash Challan';
 
@@ -859,7 +855,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (c.status === 'voided' && Number(c.amount_paid) > 0) paymentLine = `<span style="font-size:10px;color:${statusColor}">Was ₹${Number(c.amount_paid).toFixed(2)} — reversed. Net: ₹0</span>`;
     else if (Number(c.amount_paid) > 0) paymentLine = `<span style="font-size:10px;color:${statusColor}">${c.is_return ? 'Refunded' : 'Paid'}: ₹${Number(c.amount_paid).toFixed(2)}${c.payment_mode ? ' (' + escHtml(c.payment_mode) + ')' : ''}${c.payment_date ? ' on ' + new Date(c.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}</span>`;
     let dueLine = '';
-    if (c.status !== 'paid' && c.status !== 'draft' && !c.is_return) {
+    if (c.status !== 'paid' && !c.is_return) {
       const due = Number(c.total) - Number(c.amount_paid || 0);
       dueLine = `<span style="font-size:10px;color:#721c24;font-weight:600">Due: ₹${due.toFixed(2)}</span>`;
     }
@@ -939,7 +935,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     q = q.order('created_at', { ascending: false }).limit(5000);
     const { data } = await q;
     if (!data || data.length === 0) { addToast('No challans to export', 'error'); return; }
-    const esc = (v: string) => `"${(v || '').replace(/"/g, '""')}"`;
+    // Prefix ' on leading =+-@ so Excel/Sheets never treat customer-typed
+    // text as a formula (CSV injection) — same guard as TracklyImport.
+    const esc = (v: string) => { const s = v || ''; const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s; return `"${safe.replace(/"/g, '""')}"`; };
     const header = 'Challan #,Date,Customer,Type,Status,SKU,Description,Qty,Price,Disc Type,Disc Value,Disc Amount,Item Total,Subtotal,Total Discount,Shipping,Round Off,Grand Total,Amount Paid,Payment Mode,Payment Date,Notes,Tags';
     const rows: string[] = [];
     for (const c of data as any[]) {
@@ -965,7 +963,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const bulkNetTotal = bulkSalesOutstanding - bulkReturnsTotal;
 
   const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const selectAll = () => setSelectedIds(new Set(challans.filter(c => c.status !== 'voided' && c.status !== 'draft').map(c => c.id)));
+  const selectAll = () => setSelectedIds(new Set(challans.filter(c => c.status !== 'voided').map(c => c.id)));
   const clearSelection = () => { setSelectedIds(new Set()); };
   const exitBulkMode = () => { setBulkMode(false); clearSelection(); };
 
@@ -983,22 +981,26 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       ? `Batch ${batchId} — settled ₹${bulkSalesOutstanding.toLocaleString('en-IN')} outstanding against ₹${bulkReturnsTotal.toLocaleString('en-IN')} returns. Refunded ₹${received.toLocaleString('en-IN')} to customer via ${bulkPayMode}`
       : `Batch ${batchId} — received ₹${received.toLocaleString('en-IN')} against ₹${bulkNetTotal.toLocaleString('en-IN')} outstanding${received !== bulkNetTotal ? ` (${received > bulkNetTotal ? 'excess' : 'short'} ₹${Math.abs(received - bulkNetTotal).toLocaleString('en-IN')})` : ''}`;
     let failCount = 0;
+    // Audit only what actually happened — a failed update must not get a
+    // BULK_PAY log entry claiming money was received.
+    const paidOk: Challan[] = [];
     for (const c of bulkPayable) {
       const outstanding = Number(c.total) - Number(c.amount_paid || 0);
       const { data: updated, error: upErr } = await supabase.from('cash_challans').update({
         status: 'paid', amount_paid: Number(c.total), payment_mode: bulkPayMode,
         payment_date: today, modified_by: user?.id, updated_at: new Date().toISOString(),
       }).eq('id', c.id).in('status', ['unpaid', 'partial']).select('id');
-      if (upErr) { failCount++; continue; }
-      if (updated && updated.length > 0 && outstanding > 0) {
+      if (upErr || !updated || updated.length === 0) { failCount++; continue; }
+      if (outstanding > 0) {
         const { error: payErr } = await supabase.from('cash_challan_payments').insert({
           challan_id: c.id, amount: outstanding, payment_mode: bulkPayMode,
           payment_date: today, paid_by: user?.id, notes: receiptNote, batch_id: batchId, is_reversal: false,
         });
         if (payErr) { failCount++; }
       }
+      paidOk.push(c);
     }
-    for (const c of bulkPayable) await ccAuditLog(isRefund ? 'SETTLE_REFUND' : 'BULK_PAY', c.id, `${isRefund ? 'Settled against returns' : 'Bulk paid'} (${batchId}) — ₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} via ${bulkPayMode}`, { status: { from: c.status, to: 'paid' }, amount_paid: { from: c.amount_paid, to: c.total }, ...(isRefund ? { refunded: { from: 0, to: received } } : { received_amount: { from: Math.abs(bulkNetTotal), to: received } }) });
+    for (const c of paidOk) await ccAuditLog(isRefund ? 'SETTLE_REFUND' : 'BULK_PAY', c.id, `${isRefund ? 'Settled against returns' : 'Bulk paid'} (${batchId}) — ₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} via ${bulkPayMode}`, { status: { from: c.status, to: 'paid' }, amount_paid: { from: c.amount_paid, to: c.total }, ...(isRefund ? { refunded: { from: 0, to: received } } : { received_amount: { from: Math.abs(bulkNetTotal), to: received } }) });
     setLastBatch({ id: batchId, count: ids.length, mode: bulkPayMode });
     setShowBulkPay(false); setBulkPayMode(''); setBulkReceivedAmount(''); exitBulkMode(); fetchChallans();
     if (failCount > 0) addToast(`${ids.length - failCount} of ${ids.length} challans paid — ${failCount} failed (${batchId})`, 'error');
@@ -1035,6 +1037,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (ids.length === 0) { setShowBulkUnpay(false); setBulkBusy(false); return; }
     const undoBatchId = `BU-${Date.now().toString(36).toUpperCase()}`;
     let unpayFails = 0;
+    // Same rule as bulk pay: audit entries only for rows that actually changed.
+    const unpaidOk: Challan[] = [];
     for (const c of bulkUnpayable) {
       const { error: upErr } = await supabase.from('cash_challans').update({
         status: 'unpaid', amount_paid: 0, payment_mode: null, payment_date: null,
@@ -1046,8 +1050,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         payment_date: today, paid_by: user?.id, notes: 'Bulk unpay reversal', is_reversal: true, batch_id: undoBatchId,
       });
       if (revErr) { unpayFails++; addToast('Reversal record failed — ' + friendlyError(revErr), 'error'); }
+      unpaidOk.push(c);
     }
-    for (const c of bulkUnpayable) await ccAuditLog('BULK_UNPAY', c.id, `Bulk unpaid (${undoBatchId}) — was ₹${Number(c.amount_paid || c.total).toLocaleString('en-IN')}`, { status: { from: 'paid', to: 'unpaid' }, amount_paid: { from: c.amount_paid, to: 0 } });
+    for (const c of unpaidOk) await ccAuditLog('BULK_UNPAY', c.id, `Bulk unpaid (${undoBatchId}) — was ₹${Number(c.amount_paid || c.total).toLocaleString('en-IN')}`, { status: { from: 'paid', to: 'unpaid' }, amount_paid: { from: c.amount_paid, to: 0 } });
     setShowBulkUnpay(false); exitBulkMode(); fetchChallans(); setBulkBusy(false);
     if (unpayFails > 0) addToast(`${ids.length - unpayFails} of ${ids.length} reverted — ${unpayFails} failed`, 'error');
     else addToast(`${ids.length} challans reverted to unpaid`, 'success');

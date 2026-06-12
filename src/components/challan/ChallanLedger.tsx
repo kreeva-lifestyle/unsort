@@ -102,7 +102,7 @@ export default function ChallanLedger({
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: isRet ? T.re : T.tx }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
                   {Number(c.amount_paid || 0) > 0 && <div style={{ fontSize: 9, color: T.gr, fontFamily: T.mono }}>₹{Number(c.amount_paid).toLocaleString('en-IN')} paid</div>}
-                  {!isRet && Number(c.total) - Number(c.amount_paid || 0) > 0 && c.status !== 'draft' && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono }}>₹{(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} due</div>}
+                  {!isRet && Number(c.total) - Number(c.amount_paid || 0) > 0 && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono }}>₹{(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} due</div>}
                 </div>
               </div>
             );
