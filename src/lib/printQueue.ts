@@ -105,8 +105,9 @@ async function watchPrintJob(jobId: string, addToast: AddToast) {
       addToast('No print station picked this up — check the print computer.', 'error');
     }
   }, 25_000);
-  // Hard cap so we never leak a subscription.
-  const capTimer = setTimeout(finish, 90_000);
+  // Hard cap so we never leak a subscription. 5 min covers a station that
+  // comes back online a few minutes after the job was queued.
+  const capTimer = setTimeout(finish, 300_000);
   const chan = supabase.channel(`print-job-${jobId}`)
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'print_queue', filter: `id=eq.${jobId}` },
       (payload) => { const n = payload.new as { status?: string; error_message?: string | null }; handle(n?.status, n?.error_message); })
@@ -114,6 +115,20 @@ async function watchPrintJob(jobId: string, addToast: AddToast) {
   // Catch the case where it already resolved before the subscription attached.
   const { data } = await supabase.from('print_queue').select('status, error_message').eq('id', jobId).maybeSingle();
   if (data) handle(data.status, data.error_message);
+}
+
+// Print Stations beat this app_settings key every 45s while QZ is connected.
+// If nobody has beaten recently, the submitter deserves an immediate warning
+// instead of discovering it via the 25s pending check.
+const HEARTBEAT_STALE_MS = 3 * 60_000;
+async function warnIfStationOffline(addToast: AddToast) {
+  try {
+    const { data } = await supabase.from('app_settings').select('value').eq('key', 'print_station_heartbeat').maybeSingle();
+    const last = data?.value ? new Date(data.value as string).getTime() : 0;
+    if (Date.now() - last > HEARTBEAT_STALE_MS) {
+      addToast('Print station appears offline — the job is queued and will print when it comes back on.', 'error');
+    }
+  } catch { /* heartbeat check is best-effort; the 25s watcher still covers it */ }
 }
 
 function browserPrint(html: string): void {
@@ -144,7 +159,11 @@ export async function printOrQueue(
     const { error, jobId } = await submitPrintJob(slot, html, pageSize, title, copies);
     if (addToast) {
       if (error) addToast(error.message, 'error');
-      else { addToast('Print job sent', 'success'); if (jobId) watchPrintJob(jobId, addToast); }
+      else {
+        addToast('Print job sent', 'success');
+        if (jobId) watchPrintJob(jobId, addToast);
+        warnIfStationOffline(addToast);
+      }
     }
     return { error };
   }

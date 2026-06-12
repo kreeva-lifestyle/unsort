@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { connect, listPrinters, getSlotPrinter, setSlotPrinter, SLOT_LABELS, printHtml, friendlyPrintError } from '../../lib/qzPrint';
 import { getPrintMode, setPrintMode } from '../../lib/printQueue';
+import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import type { PrintSlot, PrintJob } from '../../types/database';
 
 const SLOTS: PrintSlot[] = ['label_small', 'label_large', 'document'];
@@ -19,6 +20,7 @@ export default function PrinterSettings({ addToast }: { addToast: (msg: string, 
     document: getSlotPrinter('document'),
   });
   const [recentJobs, setRecentJobs] = useState<PrintJob[]>([]);
+  const { ask, modalProps } = useConfirm();
 
   const refreshPrinters = useCallback(async () => {
     setLoading(true);
@@ -46,6 +48,15 @@ export default function PrinterSettings({ addToast }: { addToast: (msg: string, 
   }, [mode]);
 
   const handleModeChange = async (m: 'cloud' | 'default') => {
+    if (m === mode) return;
+    const ok = await ask({
+      title: `Switch to ${m === 'cloud' ? 'Cloud Print' : 'Default Browser'}?`,
+      message: 'This changes how printing works for ALL users and devices — not just yours. ' +
+        (m === 'cloud' ? 'Every print will queue to a Print Station, so one must be running with QZ Tray.' : 'Every print will open the browser print dialog on the user’s own device.'),
+      confirmLabel: 'Switch for everyone',
+      danger: false,
+    });
+    if (!ok) return;
     setMode(m);
     const { error } = await setPrintMode(m);
     if (error) addToast(friendlyError(error), 'error');
@@ -113,6 +124,7 @@ export default function PrinterSettings({ addToast }: { addToast: (msg: string, 
             <span style={{ fontSize: 12, color: connected ? T.gr : T.re, fontWeight: 600 }}>
               {connected ? 'QZ Tray Connected' : 'QZ Tray Not Running'}
             </span>
+            {!connected && <a href="https://qz.io/download/" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: T.ac2, fontWeight: 600 }}>Download QZ Tray ↗</a>}
             <button onClick={refreshPrinters} disabled={loading} style={{ ...S.btnGhost, ...S.btnSm, marginLeft: 'auto', opacity: loading ? 0.5 : 1 }}>
               {loading ? 'Scanning…' : 'Refresh Printers'}
             </button>
@@ -158,6 +170,7 @@ export default function PrinterSettings({ addToast }: { addToast: (msg: string, 
           )}
         </>
       )}
+      <ConfirmModal {...modalProps} />
     </div>
   );
 }
