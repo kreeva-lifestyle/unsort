@@ -616,9 +616,9 @@ export default function BrandTagPrinter() {
                 <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11, color: T.tx3 }}>{row.jioCode}</td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-                    <button onClick={() => { const old = row.copies || 0; const v = Math.max(0, old - 1); setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Decrease copies">−</button>
+                    <button onClick={() => { const old = row.copies || 0; const v = Math.max(0, old - 1); setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Decrease copies">−</button>
                     <span style={{ width: 32, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: row.copies > 0 ? T.ac2 : T.tx3, background: row.copies > 0 ? 'rgba(99,102,241,.06)' : 'transparent' }}>{row.copies || 0}</span>
-                    <button onClick={() => { const old = row.copies || 0; const v = old + 1; setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Increase copies">+</button>
+                    <button onClick={() => { const old = row.copies || 0; const v = old + 1; setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Increase copies">+</button>
                   </div>
                 </td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }} className="bt-actions-col">
@@ -633,12 +633,12 @@ export default function BrandTagPrinter() {
           </tbody>
         </table>
       </div>
-      <div className="bt-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 10, fontSize: 11 }}>
+      <div className="pager" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 10, fontSize: 11 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {totalPages > 1 && <>
-            <span onClick={() => setBtPage(Math.max(0, btPage - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: btPage === 0 ? 0.3 : 1, pointerEvents: btPage === 0 ? 'none' : 'auto' }} aria-label="Previous page">Prev</span>
+            <button onClick={() => setBtPage(Math.max(0, btPage - 1))} disabled={btPage === 0} style={{ ...S.btnGhost, ...S.btnSm, opacity: btPage === 0 ? 0.3 : 1 }} aria-label="Previous page">Prev</button>
             <span style={{ fontSize: 10, color: T.tx3 }}>{btPage + 1} / {totalPages}</span>
-            <span onClick={() => setBtPage(Math.min(totalPages - 1, btPage + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: btPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: btPage >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">Next</span>
+            <button onClick={() => setBtPage(Math.min(totalPages - 1, btPage + 1))} disabled={btPage >= totalPages - 1} style={{ ...S.btnGhost, ...S.btnSm, opacity: btPage >= totalPages - 1 ? 0.3 : 1 }} aria-label="Next page">Next</button>
           </>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -666,8 +666,8 @@ export default function BrandTagPrinter() {
               </div>
               <div style={{ display: 'flex', gap: 5 }}>
                 {missing.length === 0
-                  ? <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.grCC},${T.gr88})` }} onClick={() => printOrderLabels(ready)}>Print All ({totalCopies})</button>
-                  : <button style={{ ...btnPrimary, background: `linear-gradient(135deg,${T.grCC},${T.gr88})` }} onClick={async () => { if (await ask({ title: `Print ${ready.length} ready label${ready.length === 1 ? '' : 's'}?`, message: `${totalCopies} cop${totalCopies === 1 ? 'y' : 'ies'} will print. ${missing.length} missing SKU${missing.length === 1 ? '' : 's'} will be skipped — resolve ${missing.length === 1 ? 'it' : 'them'} later and re-run.`, confirmLabel: 'Print' })) printOrderLabels(ready); }}>Print Ready ({totalCopies}) · Skip {missing.length}</button>
+                  ? <button style={{ ...btnPrimary, ...S.btnSuccessSolid }} onClick={() => printOrderLabels(ready)}>Print All ({totalCopies})</button>
+                  : <button style={{ ...btnPrimary, ...S.btnSuccessSolid }} onClick={async () => { if (await ask({ title: `Print ${ready.length} ready label${ready.length === 1 ? '' : 's'}?`, message: `${totalCopies} cop${totalCopies === 1 ? 'y' : 'ies'} will print. ${missing.length} missing SKU${missing.length === 1 ? '' : 's'} will be skipped — resolve ${missing.length === 1 ? 'it' : 'them'} later and re-run.`, confirmLabel: 'Print' })) printOrderLabels(ready); }}>Print Ready ({totalCopies}) · Skip {missing.length}</button>
                 }
                 <button style={btnGhost} onClick={() => {
                   const exportData = (orderRows || []).map(r => ({
@@ -681,7 +681,7 @@ export default function BrandTagPrinter() {
                   XLSX.utils.book_append_sheet(wb, ws, 'Order Preview');
                   XLSX.writeFile(wb, 'order-preview.xlsx');
                 }}>Export</button>
-                <span onClick={() => setOrderRows(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }} aria-label="Close">✕</span>
+                <button onClick={() => setOrderRows(null)} style={S.btnIcon} aria-label="Close">✕</button>
               </div>
             </div>
             {missing.length > 0 && <div style={{ padding: '8px 14px', background: 'rgba(248,113,113,.05)', borderBottom: `1px solid rgba(248,113,113,.12)`, display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 10, color: T.re, lineHeight: 1.5 }}>
@@ -713,9 +713,9 @@ export default function BrandTagPrinter() {
               <select value={orderPerPage} onChange={e => { setOrderPerPage(Number(e.target.value)); setOrderPage(0); }} style={{ ...inp, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select>
               <span style={{ color: T.tx3 }}>rows</span>
               {otp > 1 && <>
-                <span onClick={() => setOrderPage(Math.max(0, orderPage - 1))} style={{ ...btnSm, opacity: orderPage === 0 ? 0.3 : 1 }} aria-label="Previous page">Prev</span>
+                <button onClick={() => setOrderPage(Math.max(0, orderPage - 1))} disabled={orderPage === 0} style={{ ...btnSm, opacity: orderPage === 0 ? 0.3 : 1 }} aria-label="Previous page">Prev</button>
                 <span style={{ color: T.tx3 }}>{orderPage + 1} / {otp}</span>
-                <span onClick={() => setOrderPage(Math.min(otp - 1, orderPage + 1))} style={{ ...btnSm, opacity: orderPage >= otp - 1 ? 0.3 : 1 }} aria-label="Next page">Next</span>
+                <button onClick={() => setOrderPage(Math.min(otp - 1, orderPage + 1))} disabled={orderPage >= otp - 1} style={{ ...btnSm, opacity: orderPage >= otp - 1 ? 0.3 : 1 }} aria-label="Next page">Next</button>
               </>}
             </div>
           </div>
@@ -731,7 +731,7 @@ export default function BrandTagPrinter() {
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14, fontFamily: T.mono }}>{confirmDel.sku || '(empty SKU)'}</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmDel(null)} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Cancel</button>
-              <button onClick={actuallyDelete} style={{ ...S.btnDanger, flex: 1, justifyContent: 'center', background: `linear-gradient(135deg, ${T.re}, ${T.reCC})`, color: '#fff', border: 'none' }}>Delete</button>
+              <button onClick={actuallyDelete} style={{ ...S.btnDangerSolid, flex: 1, justifyContent: 'center' }}>Delete</button>
             </div>
           </div>
         </div>
@@ -761,7 +761,7 @@ export default function BrandTagPrinter() {
               <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: "'Sora',sans-serif" }}>Label Print Preview</span>
               <div style={{ fontSize: 10, color: T.tx3 }}>{printCount} label{printCount === 1 ? '' : 's'}</div>
             </div>
-            <button onClick={() => setPrintHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: T.tx2, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Close">&times;</button>
+            <button onClick={() => setPrintHtml(null)} style={S.btnIcon} aria-label="Close">&times;</button>
           </div>
           <iframe ref={printIframeRef} title="Label print preview" srcDoc={printHtml} style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>

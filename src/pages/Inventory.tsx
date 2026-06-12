@@ -713,7 +713,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {!showExtras && <div className="inv-stage-toggle" style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, border: `1px solid ${T.bd}`, width: 'fit-content' }}>
             {(['pending', 'completed'] as const).map(s => (
-              <div key={s} onClick={() => { setStage(s); setPage(0); }} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 11, fontWeight: stage === s ? 600 : 400, cursor: 'pointer', background: stage === s ? `linear-gradient(135deg, ${T.ac87}, ${T.ac2cc})` : 'transparent', color: stage === s ? '#fff' : T.tx3, transition: 'all .15s' }}>{{ pending: 'Active', completed: 'Completed' }[s]}</div>
+              <button key={s} onClick={() => { setStage(s); setPage(0); }} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 11, fontWeight: stage === s ? 600 : 400, cursor: 'pointer', background: stage === s ? `linear-gradient(135deg, ${T.ac87}, ${T.ac2cc})` : 'transparent', color: stage === s ? '#fff' : T.tx3, transition: 'all .15s', border: 'none', fontFamily: T.sans }}>{{ pending: 'Active', completed: 'Completed' }[s]}</button>
             ))}
           </div>}
           {!showExtras && <div style={{ fontSize: 12, color: T.tx3 }}>{filtered.length !== items.filter(i => isCompletedView ? i.status === 'completed' : i.status !== 'completed').length ? `${filtered.length} of ` : ''}{filtered.length} item{filtered.length === 1 ? '' : 's'} · {isCompletedView ? 'completed batches' : 'active SKUs by status'}</div>}
@@ -944,10 +944,10 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
                     </div>
                     <div style={{ padding: '6px 0' }}>
                     {['unsorted', 'damaged', 'dry_clean', 'completed'].filter(s => s !== item.status).map(s => (
-                      <div key={s} onClick={e => { e.stopPropagation(); quickStatusChange(item.id, s); }} style={{ padding: '12px 18px', fontSize: 14, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: s === 'completed' ? T.gr : s === 'damaged' ? T.re : s === 'dry_clean' ? T.bl : T.yl }} />{s === 'dry_clean' ? 'Dry Clean' : s.charAt(0).toUpperCase() + s.slice(1)}</div>
+                      <button key={s} onClick={e => { e.stopPropagation(); quickStatusChange(item.id, s); }} style={{ padding: '12px 18px', fontSize: 14, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', width: '100%', fontFamily: T.sans }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: s === 'completed' ? T.gr : s === 'damaged' ? T.re : s === 'dry_clean' ? T.bl : T.yl }} />{s === 'dry_clean' ? 'Dry Clean' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
                     ))}
                     </div>
-                    <div onClick={e => { e.stopPropagation(); setQuickStatusItem(null); }} style={{ padding: '12px 18px', fontSize: 13, color: T.tx3, cursor: 'pointer', textAlign: 'center', borderTop: `1px solid ${T.bd}` }}>Cancel</div>
+                    <button onClick={e => { e.stopPropagation(); setQuickStatusItem(null); }} style={{ padding: '12px 18px', fontSize: 13, color: T.tx3, cursor: 'pointer', textAlign: 'center', borderTop: `1px solid ${T.bd}`, background: 'none', border: 'none', width: '100%', fontFamily: T.sans }}>Cancel</button>
                   </div>
                 </>)}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
