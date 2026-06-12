@@ -527,8 +527,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const handleDelete = async (itemId: string) => {
     const item = items.find(i => i.id === itemId);
     if (!item) return;
-    if (item.paired_with) { addToast('Cannot delete — item is paired. Unpair first.', 'error'); return; }
-    if (item.status === 'completed') { addToast('Cannot delete a completed item.', 'error'); return; }
+    if (item.paired_with) { addToast('Cannot delete — item is part of a completed pair. Revert the pair (Completed tab → Revert), then delete.', 'error'); return; }
+    if (item.status === 'completed') { addToast('Cannot delete a completed item. Revert it to Inventory first (Completed tab → Revert).', 'error'); return; }
     const snapshot = item;
     setItems(prev => prev.filter(i => i.id !== itemId));
     const timer = window.setTimeout(async () => {
@@ -579,9 +579,17 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   };
 
   const handleCancelCompletion = async (itemId: string) => {
-    // Check if completed via extra — cannot revert
+    // Completed via a spare part? Use the dedicated RPC that also returns the
+    // spare to stock and un-fills the component — atomically.
     const { count: extraUsed } = await supabase.from('inventory_extras_history').select('id', { count: 'exact', head: true }).eq('related_inventory_item_id', itemId).eq('action', 'used');
-    if ((extraUsed || 0) > 0) { addToast('Cannot revert — item was completed using an extra. Extra quantity was already decremented.', 'error'); return; }
+    if ((extraUsed || 0) > 0) {
+      const { error } = await supabase.rpc('revert_item_with_extra', { p_item_id: itemId });
+      if (error) { addToast(friendlyError(error), 'error'); return; }
+      setItems(prev => prev.map(i => i.id === itemId ? { ...i, status: 'unsorted' } : i));
+      addToast('Item moved back to Inventory — spare part returned to stock', 'success');
+      fetchData();
+      return;
+    }
     const item = items.find(i => i.id === itemId);
     const pairedId = item?.paired_with;
     const { error } = await supabase.rpc('revert_inventory_pair', { p_a: itemId, p_b: pairedId || null });

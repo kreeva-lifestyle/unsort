@@ -356,10 +356,11 @@ export type CashExpenseInsert = {
   created_at?: string | null;
 };
 
-// ─── cash_handovers (18 cols) ────────────────────────────────────────────
-// Immutable once confirmed — no updated_at column.
-// 'disputed' status is set by recipient via Reject flow;
-// reject_reason + rejected_at + rejected_by enforced by CHECK.
+// ─── cash_handovers (20 cols) ────────────────────────────────────────────
+// Immutable once confirmed — no updated_at column (trigger
+// prevent_confirmed_handover_mutation enforces it).
+// 'disputed' is set by the recipient via Reject; 'cancelled' by the sender
+// while still pending. Completeness of both enforced by CHECK constraints.
 
 export interface CashHandover {
   id: string;
@@ -371,7 +372,7 @@ export interface CashHandover {
   to_user_id: string | null;
   to_user_name: string;
   notes: string | null;
-  status: 'pending' | 'confirmed' | 'disputed';
+  status: 'pending' | 'confirmed' | 'disputed' | 'cancelled';
   confirmed_at: string | null;
   created_at: string | null;
   period_from: string | null;
@@ -382,6 +383,8 @@ export interface CashHandover {
   reject_reason: string | null;
   rejected_at: string | null;
   rejected_by: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
 }
 
 export type CashHandoverInsert = {
@@ -394,7 +397,7 @@ export type CashHandoverInsert = {
   to_user_id?: string | null;
   to_user_name: string;
   notes?: string | null;
-  status: 'pending' | 'confirmed' | 'disputed';
+  status: 'pending' | 'confirmed' | 'disputed' | 'cancelled';
   confirmed_at?: string | null;
   created_at?: string | null;
   period_from?: string | null;
@@ -404,6 +407,8 @@ export type CashHandoverInsert = {
   reject_reason?: string | null;
   rejected_at?: string | null;
   rejected_by?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
 };
 
 // ─── cash_challans (25 cols) ─────────────────────────────────────────────
