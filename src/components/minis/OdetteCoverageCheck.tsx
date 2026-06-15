@@ -7,10 +7,24 @@ import { friendlyError } from '../../lib/friendlyError';
 const ODETTE_EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
 
 interface ReconcileResult {
-  missing: string[];
+  columns: string[];
+  missing: Record<string, string>[];
   counts: { active: number; odette: number; missing: number };
   tabsRead: { name: string; count: number }[];
   warnings?: string[];
+}
+
+// Normalize old (missing: string[]) and new (missing: object[] + columns)
+// response shapes so the UI is safe regardless of edge-deploy order.
+function toResult(data: any): ReconcileResult {
+  if (Array.isArray(data.columns)) return data as ReconcileResult;
+  return {
+    columns: ['SKU', 'Status'],
+    missing: (data.missing || []).map((s: string) => ({ SKU: s, Status: 'Not on Odette' })),
+    counts: data.counts,
+    tabsRead: data.tabsRead || [],
+    warnings: data.warnings,
+  };
 }
 
 // Coverage Check — active (master) SKUs that aren't on the Odette ARYA STOCK
@@ -31,7 +45,7 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
       });
       const data = await resp.json();
       if (!resp.ok || !data.ok) { addToast(friendlyError(data.details || data.error || 'Reconcile failed'), 'error'); setLoading(false); return; }
-      setResult(data as ReconcileResult);
+      setResult(toResult(data));
       setSearch('');
       (data.warnings || []).forEach((w: string) => addToast(w, 'info'));
       addToast(`${data.counts.missing} active SKU${data.counts.missing === 1 ? '' : 's'} not on Odette (of ${data.counts.active} active)`, 'success');
@@ -41,14 +55,14 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
 
   const exportXls = () => {
     if (!result || result.missing.length === 0) { addToast('Nothing to export', 'error'); return; }
-    const data = result.missing.map(sku => ({ SKU: sku, Status: 'Not on Odette' }));
-    const ws = XLSX.utils.json_to_sheet(data);
+    const ws = XLSX.utils.json_to_sheet(result.missing, { header: result.columns });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Missing from Odette');
     XLSX.writeFile(wb, `Odette_Missing_${new Date().toISOString().slice(0, 10)}.xls`);
   };
 
-  const filtered = result ? result.missing.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())) : [];
+  const q = search.toLowerCase();
+  const filtered = result ? result.missing.filter(r => !q || Object.values(r).some(v => String(v).toLowerCase().includes(q))) : [];
 
   return (
     <div style={{ animation: 'fi .15s ease' }}>
@@ -79,16 +93,17 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
         ) : <>
           <div style={{ position: 'relative', marginBottom: 10, maxWidth: 280 }}>
             <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, strokeLinecap: 'round' as const, opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SKU…" style={{ ...S.fSearch, width: '100%' }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" style={{ ...S.fSearch, width: '100%' }} />
           </div>
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}` }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 300 }}>
-              <thead><tr><th style={S.thStyle}>SKU</th><th style={S.thStyle}>Status</th></tr></thead>
+              <thead><tr>{result.columns.map(c => <th key={c} style={{ ...S.thStyle, whiteSpace: 'nowrap' as const }}>{c}</th>)}</tr></thead>
               <tbody>
-                {filtered.map((sku, i) => (
-                  <tr key={`${sku}-${i}`}>
-                    <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{sku}</td>
-                    <td style={S.tdStyle}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: T.re, background: `${T.re}18` }}>Not on Odette</span></td>
+                {filtered.map((row, i) => (
+                  <tr key={i}>
+                    {result.columns.map(c => (
+                      <td key={c} style={{ ...S.tdStyle, whiteSpace: 'nowrap' as const, ...(/sku/i.test(c) ? { fontFamily: T.mono, fontWeight: 600 } : {}) }}>{row[c] ?? ''}</td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
