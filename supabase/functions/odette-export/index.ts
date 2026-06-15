@@ -194,9 +194,11 @@ Deno.serve(async (req) => {
             // Only Active rows (Inactive/discontinued excluded)
             const active = statusIdx < 0 || String(row[statusIdx] ?? '').trim().toLowerCase() === 'active';
             if (!active) continue;
-            // Semi-stitched / unstitched products aren't size-split on Odette — skip
+            // Semi-stitched / unstitched products aren't size-split on Odette — skip.
+            // Match "stit" so abbreviations (SEMI-STIT) are caught too; no real
+            // size value contains "stit".
             const sizeRaw = sizeIdx < 0 ? '' : String(row[sizeIdx] ?? '');
-            if (/stitch/i.test(sizeRaw)) { skipped++; continue; }
+            if (/stit/i.test(sizeRaw)) { skipped++; continue; }
             tabCount++;
             // Expand to expected Odette SKUs: one per real size, else the bare base
             const sizes = sizeRaw.split(/[,/|]/).map(t => t.trim().toUpperCase()).filter(t => SIZE_TOKENS.has(t));
