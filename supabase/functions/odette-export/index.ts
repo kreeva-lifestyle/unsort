@@ -174,10 +174,16 @@ Deno.serve(async (req) => {
           const headers = rows[0].map(h => String(h ?? '').trim());
           for (const h of headers) if (h && !colSet.has(h)) { colSet.add(h); columns.push(h); }
           const skuIdx = skuColIndex(headers);
+          // Only "Active" rows count — the master sheet flags discontinued
+          // products as Inactive in a STOCK STATUS column.
+          const statusIdx = headers.findIndex(h => h.toLowerCase().includes('status'));
+          if (statusIdx < 0) warnings.push(`No STOCK STATUS column in "${tab}" — counting all rows as active`);
           let tabCount = 0;
           for (const row of rows.slice(1)) {
             const sku = normSku(row[skuIdx]);
             if (!sku) continue;
+            const active = statusIdx < 0 || String(row[statusIdx] ?? '').trim().toLowerCase() === 'active';
+            if (!active) continue;
             tabCount++;
             activeSet.add(sku);
             if (odetteSet.has(sku) || missingSeen.has(sku)) continue;
