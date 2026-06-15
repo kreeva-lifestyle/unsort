@@ -76,6 +76,33 @@ function getSheetId(): string {
   return id;
 }
 
+function getMasterSheetId(): string {
+  const id = Deno.env.get('MASTER_SHEET_ID');
+  if (!id) throw new Error('Missing MASTER_SHEET_ID secret');
+  return id;
+}
+
+// Master "active catalog" lives across these tabs of the OFFLINE MASTER SHEET.
+const MASTER_TABS = ['ARYA', 'DRESSTIVE'];
+
+const normSku = (v: unknown) => String(v ?? '').trim().toUpperCase();
+
+// Read a single column of SKUs from a sheet tab. Detects the SKU column from
+// the header row (any header containing "sku"); falls back to column A.
+async function readSkuColumn(sheetId: string, tab: string): Promise<string[]> {
+  const token = await getGoogleToken();
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(tab)}`;
+  const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error?.message || `read ${r.status}`);
+  const rows: string[][] = data.values || [];
+  if (rows.length === 0) return [];
+  const header = rows[0].map(h => String(h ?? '').toLowerCase());
+  let col = header.findIndex(h => h.includes('sku'));
+  if (col < 0) col = 0;
+  return rows.slice(1).map(row => normSku(row[col])).filter(Boolean);
+}
+
 async function sheetsClear(sheetName: string): Promise<void> {
   const token = await getGoogleToken();
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${getSheetId()}/values/${encodeURIComponent(sheetName)}:clear`;
@@ -110,13 +137,50 @@ Deno.serve(async (req) => {
   let body: any;
   try { body = await req.json(); } catch { return fail(400, 'Invalid JSON body', req); }
   const action = body?.action;
-  const sheetName = body?.sheetName;
-  if (!action || !sheetName) return fail(400, 'Missing action or sheetName', req);
+  if (!action) return fail(400, 'Missing action', req);
 
-  const ALLOWED_TABS = ['ARYA STOCK'];
-  if (!ALLOWED_TABS.includes(sheetName)) return fail(400, `Sheet tab "${sheetName}" not allowed`, req);
+  const ODETTE_TAB = 'ARYA STOCK';
 
   try {
+    // ── Reconcile: which active (master) SKUs are NOT on the Odette sheet ──
+    if (action === 'reconcile') {
+      // Odette set — SKUs already listed on the ARYA STOCK tab (col A)
+      const odetteSkus = await readSkuColumn(getSheetId(), ODETTE_TAB);
+      const odetteSet = new Set(odetteSkus);
+
+      // Active set — union of the master sheet's catalog tabs
+      const masterId = getMasterSheetId();
+      const activeSet = new Set<string>();
+      const tabsRead: { name: string; count: number }[] = [];
+      const warnings: string[] = [];
+      for (const tab of MASTER_TABS) {
+        try {
+          const skus = await readSkuColumn(masterId, tab);
+          skus.forEach(s => activeSet.add(s));
+          tabsRead.push({ name: tab, count: skus.length });
+        } catch (e) {
+          warnings.push(`Cannot read master "${tab}" — is the sheet shared with the service account? (${(e as Error).message})`);
+        }
+      }
+      if (tabsRead.length === 0) {
+        return fail(502, 'Could not read any master tab', req, warnings.join(' | '));
+      }
+
+      const missing = [...activeSet].filter(s => !odetteSet.has(s)).sort();
+      return json({
+        ok: true,
+        missing,
+        counts: { active: activeSet.size, odette: odetteSet.size, missing: missing.length },
+        tabsRead,
+        warnings: warnings.length ? warnings : undefined,
+      }, req);
+    }
+
+    const sheetName = body?.sheetName;
+    if (!sheetName) return fail(400, 'Missing sheetName', req);
+    const ALLOWED_TABS = [ODETTE_TAB];
+    if (!ALLOWED_TABS.includes(sheetName)) return fail(400, `Sheet tab "${sheetName}" not allowed`, req);
+
     if (action === 'push') {
       const rows = body.rows;
       if (!Array.isArray(rows) || rows.length === 0) return fail(400, 'rows missing or empty', req);

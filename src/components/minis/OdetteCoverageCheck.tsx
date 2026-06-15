@@ -1,0 +1,103 @@
+import { useState } from 'react';
+import * as XLSX from 'xlsx';
+import { T, S } from '../../lib/theme';
+import { SUPABASE_ANON_KEY } from '../../lib/supabase';
+import { friendlyError } from '../../lib/friendlyError';
+
+const ODETTE_EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
+
+interface ReconcileResult {
+  missing: string[];
+  counts: { active: number; odette: number; missing: number };
+  tabsRead: { name: string; count: number }[];
+  warnings?: string[];
+}
+
+// Coverage Check — active (master) SKUs that aren't on the Odette ARYA STOCK
+// sheet yet. The edge function reads both Google Sheets server-side and diffs;
+// this component is just the button + results. No file upload.
+export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: string, type?: string) => void }) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<ReconcileResult | null>(null);
+  const [search, setSearch] = useState('');
+
+  const reconcile = async () => {
+    setLoading(true);
+    try {
+      const resp = await fetch(ODETTE_EDGE_FN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ action: 'reconcile' }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) { addToast(friendlyError(data.details || data.error || 'Reconcile failed'), 'error'); setLoading(false); return; }
+      setResult(data as ReconcileResult);
+      setSearch('');
+      (data.warnings || []).forEach((w: string) => addToast(w, 'info'));
+      addToast(`${data.counts.missing} active SKU${data.counts.missing === 1 ? '' : 's'} not on Odette (of ${data.counts.active} active)`, 'success');
+    } catch (e: any) { addToast(friendlyError(e), 'error'); }
+    setLoading(false);
+  };
+
+  const exportXls = () => {
+    if (!result || result.missing.length === 0) { addToast('Nothing to export', 'error'); return; }
+    const data = result.missing.map(sku => ({ SKU: sku, Status: 'Not on Odette' }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Missing from Odette');
+    XLSX.writeFile(wb, `Odette_Missing_${new Date().toISOString().slice(0, 10)}.xls`);
+  };
+
+  const filtered = result ? result.missing.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())) : [];
+
+  return (
+    <div style={{ animation: 'fi .15s ease' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button onClick={reconcile} disabled={loading} style={{ ...S.btnPrimary, opacity: loading ? 0.5 : 1, pointerEvents: loading ? 'none' : 'auto' }}>{loading ? 'Checking…' : 'Reconcile vs Odette'}</button>
+        {result && result.missing.length > 0 && <button onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)' }}>Export {result.missing.length}</button>}
+        {result && result.tabsRead.map(t => (
+          <span key={t.name} style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 500, background: 'rgba(255,255,255,.04)', color: T.tx2, border: `1px solid ${T.bd}` }}>{t.name}: {t.count}</span>
+        ))}
+      </div>
+
+      {result && <>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          {([
+            { label: 'Active', count: result.counts.active, color: T.ac2 },
+            { label: 'On Odette', count: result.counts.odette, color: T.gr },
+            { label: 'Not on Odette', count: result.counts.missing, color: T.re },
+          ]).map(s => (
+            <div key={s.label} style={{ padding: '8px 14px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, textAlign: 'center', minWidth: 90 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.mono, color: s.color }}>{s.count}</div>
+              <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {result.missing.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: T.gr, fontSize: 12 }}>All active SKUs are on Odette 🎉</div>
+        ) : <>
+          <div style={{ position: 'relative', marginBottom: 10, maxWidth: 280 }}>
+            <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, strokeLinecap: 'round' as const, opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SKU…" style={{ ...S.fSearch, width: '100%' }} />
+          </div>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}` }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 300 }}>
+              <thead><tr><th style={S.thStyle}>SKU</th><th style={S.thStyle}>Status</th></tr></thead>
+              <tbody>
+                {filtered.map((sku, i) => (
+                  <tr key={`${sku}-${i}`}>
+                    <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{sku}</td>
+                    <td style={S.tdStyle}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: T.re, background: `${T.re}18` }}>Not on Odette</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>}
+      </>}
+
+      {!result && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Click "Reconcile vs Odette" to find active SKUs missing from the Odette sheet.</div>}
+    </div>
+  );
+}
