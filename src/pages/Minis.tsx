@@ -8,6 +8,7 @@ import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import AddressPrinter from '../components/minis/AddressPrinter';
 import CbazaarImport from '../components/minis/CbazaarImport';
 import OdetteImport from '../components/minis/OdetteImport';
+import OdetteCoverageCheck from '../components/minis/OdetteCoverageCheck';
 import VirtualStock from '../components/minis/VirtualStock';
 import Trackly from '../components/minis/Trackly';
 import ReturnLabels from '../components/minis/ReturnLabels';
@@ -280,6 +281,11 @@ export default function Minis() {
       <div style={{ marginBottom: 14 }}>{back}</div>
       <VirtualStock stock={virtualStock} setStock={setVirtualStock} addToast={addToast} />
       <OdetteImport addToast={addToast} virtualStock={virtualStock} />
+      <div style={{ margin: '20px 0 12px', paddingTop: 16, borderTop: `1px solid ${T.bd}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 2 }}>Coverage Check</div>
+        <div style={{ fontSize: 11, color: T.tx3 }}>Active SKUs not yet on the Odette sheet</div>
+      </div>
+      <OdetteCoverageCheck addToast={addToast} />
     </div>
   );
 
