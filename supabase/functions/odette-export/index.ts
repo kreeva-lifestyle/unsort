@@ -87,6 +87,12 @@ const MASTER_TABS = ['ARYA', 'DRESSTIVE'];
 
 const normSku = (v: unknown) => String(v ?? '').trim().toUpperCase();
 
+// Size convention mirrors the app (src/pages/Minis.tsx baseSku + Inventory SIZES).
+// Odette SKUs are `<base>-<SIZE>` (e.g. DRS43-XL); the master lists base SKUs
+// plus a SIZE column ("S, M, L, XL" or "Semi-Stitched").
+const SIZE_TOKENS = new Set(['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']);
+const baseSku = (sku: string) => sku.replace(/[-\s]?(XXXL|XXL|XL|XXS|XS|S|M|L)$/i, '');
+
 // Raw values of a whole sheet tab (row 0 = headers).
 async function readSheetRaw(sheetId: string, tab: string): Promise<string[][]> {
   const token = await getGoogleToken();
@@ -150,22 +156,24 @@ Deno.serve(async (req) => {
   const ODETTE_TAB = 'ARYA STOCK';
 
   try {
-    // ── Reconcile: active (master) SKUs NOT on the Odette sheet, with full
-    //    master-row detail for each missing SKU. ──
+    // ── Reconcile: per-size — which active master size-variants are NOT on the
+    //    Odette sheet. Master lists base SKUs + a SIZE column; Odette lists
+    //    `<base>-<size>` rows. Each missing (product, size) → one detail row. ──
     if (action === 'reconcile') {
-      // Odette set — SKUs already listed on the ARYA STOCK tab (col A)
+      // Odette set — raw size-variant SKUs on the ARYA STOCK tab (col A)
       const odetteSet = new Set(await readSkuColumn(getSheetId(), ODETTE_TAB));
 
-      // Active rows — union of the master sheet's catalog tabs, full columns
       const masterId = getMasterSheetId();
       const SOURCE_COL = 'Source Tab';
+      const MISSING_SIZE_COL = 'Missing Size';
+      const EXPECTED_COL = 'Expected Odette SKU';
       const columns: string[] = [];           // ordered, union of tab headers
       const colSet = new Set<string>();
-      const activeSet = new Set<string>();     // unique active SKUs (for count)
-      const missingSeen = new Set<string>();   // dedupe missing across tabs
+      const expectedSeen = new Set<string>(); // dedupe expected variants globally
       const missing: Record<string, string>[] = [];
       const tabsRead: { name: string; count: number }[] = [];
       const warnings: string[] = [];
+      let activeVariants = 0, presentVariants = 0, skipped = 0;
 
       for (const tab of MASTER_TABS) {
         try {
@@ -174,24 +182,39 @@ Deno.serve(async (req) => {
           const headers = rows[0].map(h => String(h ?? '').trim());
           for (const h of headers) if (h && !colSet.has(h)) { colSet.add(h); columns.push(h); }
           const skuIdx = skuColIndex(headers);
-          // Only "Active" rows count — the master sheet flags discontinued
-          // products as Inactive in a STOCK STATUS column.
           const statusIdx = headers.findIndex(h => h.toLowerCase().includes('status'));
+          let sizeIdx = headers.findIndex(h => h.toLowerCase() === 'size');
+          if (sizeIdx < 0) sizeIdx = headers.findIndex(h => h.toLowerCase().includes('size'));
           if (statusIdx < 0) warnings.push(`No STOCK STATUS column in "${tab}" — counting all rows as active`);
+          if (sizeIdx < 0) warnings.push(`No SIZE column in "${tab}" — matching base SKU only`);
           let tabCount = 0;
           for (const row of rows.slice(1)) {
-            const sku = normSku(row[skuIdx]);
-            if (!sku) continue;
+            const base = baseSku(normSku(row[skuIdx]));
+            if (!base) continue;
+            // Only Active rows (Inactive/discontinued excluded)
             const active = statusIdx < 0 || String(row[statusIdx] ?? '').trim().toLowerCase() === 'active';
             if (!active) continue;
+            // Semi-stitched / unstitched products aren't size-split on Odette — skip
+            const sizeRaw = sizeIdx < 0 ? '' : String(row[sizeIdx] ?? '');
+            if (/stitch/i.test(sizeRaw)) { skipped++; continue; }
             tabCount++;
-            activeSet.add(sku);
-            if (odetteSet.has(sku) || missingSeen.has(sku)) continue;
-            missingSeen.add(sku);
-            const obj: Record<string, string> = {};
-            headers.forEach((h, i) => { if (h) obj[h] = String(row[i] ?? ''); });
-            obj[SOURCE_COL] = tab;
-            missing.push(obj);
+            // Expand to expected Odette SKUs: one per real size, else the bare base
+            const sizes = sizeRaw.split(/[,/|]/).map(t => t.trim().toUpperCase()).filter(t => SIZE_TOKENS.has(t));
+            const expected = sizes.length
+              ? sizes.map(s => ({ size: s, sku: normSku(`${base}-${s}`) }))
+              : [{ size: '', sku: base }];
+            for (const e of expected) {
+              if (expectedSeen.has(e.sku)) continue;
+              expectedSeen.add(e.sku);
+              activeVariants++;
+              if (odetteSet.has(e.sku)) { presentVariants++; continue; }
+              const obj: Record<string, string> = {};
+              headers.forEach((h, i) => { if (h) obj[h] = String(row[i] ?? ''); });
+              obj[MISSING_SIZE_COL] = e.size || '(no size)';
+              obj[EXPECTED_COL] = e.sku;
+              obj[SOURCE_COL] = tab;
+              missing.push(obj);
+            }
           }
           tabsRead.push({ name: tab, count: tabCount });
         } catch (e) {
@@ -201,13 +224,13 @@ Deno.serve(async (req) => {
       if (colSet.size === 0) {
         return fail(502, 'Could not read any master tab', req, warnings.join(' | ') || 'No data in master tabs');
       }
-      columns.push(SOURCE_COL);
+      columns.push(MISSING_SIZE_COL, EXPECTED_COL, SOURCE_COL);
 
       return json({
         ok: true,
         columns,
         missing,
-        counts: { active: activeSet.size, odette: odetteSet.size, missing: missing.length },
+        counts: { active: activeVariants, odette: presentVariants, missing: missing.length, skipped },
         tabsRead,
         warnings: warnings.length ? warnings : undefined,
       }, req);
