@@ -851,87 +851,132 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     </div>
   );
 
-  // ── Setup Screen ────────────────────────────────────────────────────────────
+  // ── Setup Screen (mobile-first, matches reference design) ──────────────────
+  const dotColors = [T.ac2, T.re, T.bl, '#C084FC'];
+  const readyToStart = !!selectedBrand && !!courier && !!camera && !verifying;
   if (!started) return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80 }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 14 }}>
+      {/* Header — date + title + history icon */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 600, color: T.tx3, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>{dateStr}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Scan</div>
+        </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {dbFails > 0 && <span style={{ fontSize: 9, color: T.re, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)' }}>{dbFails} DB save failed</span>}
-          <button onClick={() => { const d = new Date(); setHistoryDateTo(d.toISOString().slice(0,10)); d.setDate(d.getDate()-6); setHistoryDateFrom(d.toISOString().slice(0,10)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
+          <button onClick={() => { const d = new Date(); setHistoryDateTo(d.toISOString().slice(0,10)); d.setDate(d.getDate()-6); setHistoryDateFrom(d.toISOString().slice(0,10)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} aria-label="History" style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.tx3 }}>
+            <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+          </button>
         </div>
       </div>
 
       <div style={{ maxWidth: 420, margin: '0 auto' }}>
-        <div style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '22px 20px', boxShadow: '0 4px 24px rgba(0,0,0,.2)' }}>
-          {/* Recent shortcuts */}
-          {shortcuts.length > 0 && <div style={{ marginBottom: 18 }}>
-            <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Recent</label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {shortcuts.map(s => (
+        {/* Hero — scan icon + subtitle */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ width: 56, height: 56, margin: '0 auto 12px', borderRadius: 14, background: `linear-gradient(135deg, ${T.ac}22, ${T.ac2}18)`, border: `1px solid ${T.ac}33`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: T.ac2, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }}><path d="M7 2H4a2 2 0 00-2 2v3m6-5h10a2 2 0 012 2v3m0 10v3a2 2 0 01-2 2H7m-5-5v3a2 2 0 002 2h3" /></svg>
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 4 }}>Start a packing session</div>
+          <div style={{ fontSize: 12, color: T.tx3 }}>Choose courier · brand · camera</div>
+        </div>
+
+        {/* Recent shortcuts */}
+        {shortcuts.length > 0 && <div style={{ marginBottom: 22 }}>
+          <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Recent</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {shortcuts.map(s => {
+              const active = courier === s.courier && camera === s.camera && selectedBrand === s.brand;
+              return (
                 <button key={s.id} onClick={() => { setCourier(s.courier); setCamera(s.camera); setSelectedBrand(s.brand); }}
-                  style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: courier === s.courier && camera === s.camera && selectedBrand === s.brand ? T.ac3 : 'rgba(255,255,255,0.03)', color: T.tx2, fontSize: 10, cursor: 'pointer', fontFamily: T.mono, transition: 'all .15s' }}>
+                  style={{ padding: '8px 14px', borderRadius: 20, border: `1px solid ${active ? T.ac + '44' : T.bd2}`, background: active ? T.ac3 : 'rgba(255,255,255,0.03)', color: active ? T.ac2 : T.tx2, fontSize: 11, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans, transition: 'all .15s' }}>
                   {s.courier} · {s.camera} · {s.brand}
                 </button>
-              ))}
-            </div>
-          </div>}
-
-          {/* Brand */}
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: T.tx2, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 7 }}>Brand Name</label>
-            <select value={selectedBrand} onChange={e => setSelectedBrand(e.target.value)} style={{ ...S.fInput, height: 44, fontSize: 14, cursor: 'pointer', border: `1px solid ${T.bd2}` }}>
-              <option value="">Select brand...</option>
-              {brands.map(b => <option key={b} value={b}>{b}</option>)}
-            </select>
+              );
+            })}
           </div>
+        </div>}
 
-          {/* Courier */}
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: T.tx2, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 7 }}>Courier Company</label>
-            <select value={courier} onChange={e => setCourier(e.target.value)} style={{ ...S.fInput, height: 44, fontSize: 14, cursor: 'pointer', border: `1px solid ${T.bd2}` }}>
-              <option value="">Select courier...</option>
-              {couriers.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-            </select>
-            {couriers.length === 0 && <div style={{ fontSize: 11, color: T.yl, marginTop: 6 }}>No couriers configured. Add in Settings → PackStation.</div>}
+        {/* COURIER — glass card grid */}
+        <div style={{ marginBottom: 22 }}>
+          <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Courier</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+            {couriers.map((c, i) => {
+              const sel = courier === c.name;
+              return (
+                <button key={c.id} onClick={() => setCourier(c.name)} style={{ padding: '14px 16px', borderRadius: 12, border: `1px solid ${sel ? T.ac + '55' : T.bd2}`, background: sel ? 'rgba(99,102,241,.06)' : 'rgba(255,255,255,0.025)', cursor: 'pointer', textAlign: 'left', transition: 'all .15s', boxShadow: sel ? `0 0 0 1px ${T.ac}33 inset` : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 4, background: dotColors[i % dotColors.length], flexShrink: 0 }} />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: sel ? T.tx : T.tx, fontFamily: T.sans }}>{c.name}</span>
+                  </div>
+                  {c.brand && <div style={{ fontSize: 11, color: T.tx3, paddingLeft: 14 }}>{c.brand}</div>}
+                </button>
+              );
+            })}
           </div>
-
-          {/* Camera */}
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: T.tx2, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 7 }}>Camera Number</label>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(cameras.length, 4)}, 1fr)`, gap: 10 }}>
-              {cameras.map(c => (
-                <div key={c.id} onClick={() => setCamera(c.number)} style={{ padding: '14px 0', borderRadius: 10, textAlign: 'center', fontSize: 18, fontWeight: 700, fontFamily: T.mono, cursor: 'pointer', transition: 'all .2s', background: camera === c.number ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.04)', color: camera === c.number ? '#fff' : T.tx2, border: `1px solid ${camera === c.number ? T.ac + '55' : T.bd2}`, boxShadow: camera === c.number ? `0 6px 20px ${T.ac44}` : 'none' }}>{c.number}</div>
-              ))}
-            </div>
-            {cameras.length === 0 && <div style={{ fontSize: 11, color: T.yl, marginTop: 6 }}>No cameras configured. Add in Settings → PackStation.</div>}
-          </div>
-
-          <button onClick={handleStart} disabled={!selectedBrand || !courier || !camera || verifying} style={{ width: '100%', padding: '16px 0', borderRadius: 12, border: 'none', fontSize: 16, fontWeight: 700, fontFamily: T.sora, cursor: selectedBrand && courier && camera && !verifying ? 'pointer' : 'not-allowed', background: selectedBrand && courier && camera && !verifying ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.06)', color: selectedBrand && courier && camera ? '#fff' : T.tx3, boxShadow: selectedBrand && courier && camera && !verifying ? `0 6px 24px ${T.ac44}` : 'none', transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, letterSpacing: 0.3 }}>
-            {verifying && <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'btnSpin .6s linear infinite' }} />}
-            {verifying ? 'Verifying Sheet...' : 'Start Scanning'}
-          </button>
-
-          {/* Verify error — with retry (audit P1) */}
-          {verifyResult && !verifyResult.ok && (
-            <div style={{ marginTop: 12, background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.18)', borderRadius: 8, padding: 12, animation: 'fi .2s ease' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: T.re, marginBottom: 4 }}>Connection Failed</div>
-              <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5 }}>{verifyResult.error}</div>
-              {verifyResult.details && <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, marginTop: 4, lineHeight: 1.5 }}>{verifyResult.details}</div>}
-              <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re44}`, background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>↻ Retry</button>
-            </div>
-          )}
-          {verifyResult && verifyResult.ok && verifyResult.columnsOk === false && (
-            <div style={{ marginTop: 12, background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.18)', borderRadius: 8, padding: 12, animation: 'fi .2s ease' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: T.re, marginBottom: 4 }}>Column Mismatch</div>
-              <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.6, marginBottom: 6 }}>{verifyResult.columnsInfo}</div>
-              <div style={{ fontSize: 10, color: T.tx3, lineHeight: 1.6, background: 'rgba(0,0,0,.2)', borderRadius: 6, padding: '8px 10px' }}>
-                Please fix the sheet columns before scanning. Expected order:<br/>
-                <strong style={{ color: T.tx }}>A:</strong> Count &nbsp; <strong style={{ color: T.tx }}>B:</strong> AWB &nbsp; <strong style={{ color: T.tx }}>C:</strong> Timestamp &nbsp; <strong style={{ color: T.tx }}>D:</strong> Camera Number
-              </div>
-              <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re44}`, background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>↻ Re-check sheet</button>
-            </div>
-          )}
+          {couriers.length === 0 && <div style={{ fontSize: 11, color: T.yl, marginTop: 6 }}>No couriers configured. Add in Settings → PackStation.</div>}
         </div>
+
+        {/* BRAND — pill chips */}
+        <div style={{ marginBottom: 22 }}>
+          <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Brand</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {brands.map(b => {
+              const sel = selectedBrand === b;
+              return (
+                <button key={b} onClick={() => setSelectedBrand(b)} style={{ padding: '10px 22px', borderRadius: 20, border: sel ? 'none' : `1px solid ${T.bd2}`, background: sel ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.03)', color: sel ? '#fff' : T.tx2, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: T.sans, transition: 'all .15s', boxShadow: sel ? `0 4px 16px ${T.ac44}` : 'none' }}>
+                  {b}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* CAMERA / STATION — pill chips */}
+        <div style={{ marginBottom: 28 }}>
+          <label style={{ display: 'block', fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Camera / Station</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {cameras.map(c => {
+              const sel = camera === c.number;
+              return (
+                <button key={c.id} onClick={() => setCamera(c.number)} style={{ padding: '10px 22px', borderRadius: 20, border: sel ? 'none' : `1px solid ${T.bd2}`, background: sel ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.03)', color: sel ? '#fff' : T.tx2, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: T.mono, transition: 'all .15s', boxShadow: sel ? `0 4px 16px ${T.ac44}` : 'none' }}>
+                  {c.number}
+                </button>
+              );
+            })}
+          </div>
+          {cameras.length === 0 && <div style={{ fontSize: 11, color: T.yl, marginTop: 6 }}>No cameras configured. Add in Settings → PackStation.</div>}
+        </div>
+
+        {/* Start scanning CTA */}
+        <button onClick={handleStart} disabled={!readyToStart} style={{ width: '100%', padding: '18px 0', borderRadius: 16, border: 'none', fontSize: 16, fontWeight: 700, fontFamily: T.sora, cursor: readyToStart ? 'pointer' : 'not-allowed', background: readyToStart ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.06)', color: readyToStart ? '#fff' : T.tx3, boxShadow: readyToStart ? `0 6px 24px ${T.ac44}` : 'none', transition: 'all .2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, letterSpacing: 0.3 }}>
+          {verifying ? (
+            <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'btnSpin .6s linear infinite' }} />
+          ) : (
+            <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }}><path d="M7 2H4a2 2 0 00-2 2v3m6-5h10a2 2 0 012 2v3m0 10v3a2 2 0 01-2 2H7m-5-5v3a2 2 0 002 2h3" /></svg>
+          )}
+          {verifying ? 'Verifying Sheet...' : 'Start scanning'}
+        </button>
+
+        {/* Verify error — with retry */}
+        {verifyResult && !verifyResult.ok && (
+          <div style={{ marginTop: 12, background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.18)', borderRadius: 8, padding: 12, animation: 'fi .2s ease' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: T.re, marginBottom: 4 }}>Connection Failed</div>
+            <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5 }}>{verifyResult.error}</div>
+            {verifyResult.details && <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, marginTop: 4, lineHeight: 1.5 }}>{verifyResult.details}</div>}
+            <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re44}`, background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>↻ Retry</button>
+          </div>
+        )}
+        {verifyResult && verifyResult.ok && verifyResult.columnsOk === false && (
+          <div style={{ marginTop: 12, background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.18)', borderRadius: 8, padding: 12, animation: 'fi .2s ease' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: T.re, marginBottom: 4 }}>Column Mismatch</div>
+            <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.6, marginBottom: 6 }}>{verifyResult.columnsInfo}</div>
+            <div style={{ fontSize: 10, color: T.tx3, lineHeight: 1.6, background: 'rgba(0,0,0,.2)', borderRadius: 6, padding: '8px 10px' }}>
+              Please fix the sheet columns before scanning. Expected order:<br/>
+              <strong style={{ color: T.tx }}>A:</strong> Count &nbsp; <strong style={{ color: T.tx }}>B:</strong> AWB &nbsp; <strong style={{ color: T.tx }}>C:</strong> Timestamp &nbsp; <strong style={{ color: T.tx }}>D:</strong> Camera Number
+            </div>
+            <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re44}`, background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>↻ Re-check sheet</button>
+          </div>
+        )}
       </div>
     </div>
   );
