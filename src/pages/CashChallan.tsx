@@ -1132,12 +1132,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Cash Book Screen ───────────────────────────────────────────────────────
   if (showCashBook && profile?.module_access?.cashbook !== false) return (
-    <div>{pdfModal}<CashBook /></div>
+    <div>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { setShowCashBook(false); window.history.back(); }} style={S.btnGhost}>← Back</button></div><CashBook /></div>
   );
 
   // ── Analytics Screen ───────────────────────────────────────────────────────
   if (showAnalytics) return (
-    <>{pdfModal}<ChallanAnalytics
+    <>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { setShowAnalytics(false); window.history.back(); }} style={S.btnGhost}>← Back</button></div><ChallanAnalytics
       analytics={analytics}
       from={analyticsFrom}
       to={analyticsTo}
@@ -1149,7 +1149,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Ledger (list + detail) — extracted to components/challan/ChallanLedger.tsx ──
   if (showLedger) return (
-    <>{pdfModal}<ChallanLedger
+    <>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { setShowLedger(false); setLedgerSearch(''); window.history.back(); }} style={S.btnGhost}>← Back</button></div><ChallanLedger
       detailName={ledgerDetail?.name ?? null}
       detailId={ledgerDetail?.id ?? null}
       customers={ledgerCustomers}

@@ -762,7 +762,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           </div>}
         </div>
       </div>
-      {showExtras && profile?.module_access?.extras !== false ? <InventoryExtras /> : <>
+      {showExtras && profile?.module_access?.extras !== false ? <><div style={{ marginBottom: 10 }}><button onClick={() => { setShowExtras(false); window.history.back(); }} style={S.btnGhost}>← Back to Inventory</button></div><InventoryExtras /></> : <>
       {/* Preset chips + search + Filters popover — Brand Tags glass-card aesthetic */}
       <div className="filter-bar" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: activeFilterCount > 0 ? 10 : 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {/* Search */}

@@ -264,9 +264,9 @@ export default function Minis() {
     }
   };
 
-  const back = <span onClick={() => setViewState('home')} style={{ ...S.btnGhost, padding: '6px 10px', cursor: 'pointer' }}>
+  const back = <button onClick={() => { setViewState('home'); window.history.back(); }} style={{ ...S.btnGhost, padding: '6px 10px' }} aria-label="Back">
     <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
-  </span>;
+  </button>;
 
   if (view === 'cbazaar') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
