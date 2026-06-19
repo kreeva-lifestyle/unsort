@@ -215,7 +215,7 @@ export default function ChallanList(p: Props) {
       </div>}
 
       {/* ── Mobile cards ──────────────────────────────────────────────── */}
-      {!p.loading && p.challans.length > 0 && <div className="mobile-only" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {!p.loading && p.challans.length > 0 && <div className="mobile-only" style={{ flexDirection: 'column', gap: 8 }}>
         {p.challans.map((c, i) => {
           const sc = p.statusColors[c.status] || p.statusColors.unpaid;
           const items = c.cash_challan_items || [];
