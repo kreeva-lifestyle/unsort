@@ -215,7 +215,7 @@ export default function ChallanList(p: Props) {
       </div>}
 
       {/* ── Mobile cards ──────────────────────────────────────────────── */}
-      {!p.loading && p.challans.length > 0 && <div className="mobile-only" style={{ flexDirection: 'column', gap: 8 }}>
+      {!p.loading && p.challans.length > 0 && <div className="mobile-only" style={{ flexDirection: 'column', gap: 10, width: '100%' }}>
         {p.challans.map((c, i) => {
           const sc = p.statusColors[c.status] || p.statusColors.unpaid;
           const items = c.cash_challan_items || [];
@@ -232,34 +232,37 @@ export default function ChallanList(p: Props) {
           ];
           return (
             <SwipeRow key={c.id} actions={swipeActions} hint={i === 0} hintKey="challan">
-              <div onClick={() => { if (p.bulkMode) { if (canSelect) p.onToggleSelect(c.id); } else p.onOpenDetail(c); }} style={{ background: isSelected ? 'rgba(99,102,241,.08)' : 'rgba(255,255,255,0.025)', border: `1px solid ${isSelected ? T.ac + '44' : T.bd2}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 4 }}>
+              <div onClick={() => { if (p.bulkMode) { if (canSelect) p.onToggleSelect(c.id); } else p.onOpenDetail(c); }} style={{ background: isSelected ? 'rgba(99,102,241,.08)' : 'rgba(255,255,255,0.025)', border: `1px solid ${isSelected ? T.ac + '44' : T.bd2}`, borderRadius: 12, padding: '16px', cursor: 'pointer', width: '100%', boxSizing: 'border-box' as const }}>
+                {/* Top: number + name left, total + status right */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 6 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {p.bulkMode && <div onClick={e => { e.stopPropagation(); if (canSelect) p.onToggleSelect(c.id); }} style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${canSelect ? (isSelected ? T.ac : T.bd2) : T.bd}`, background: isSelected ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: canSelect ? 'pointer' : 'not-allowed', opacity: canSelect ? 1 : 0.3 }}>{isSelected && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><polyline points="20 6 9 17 4 12" /></svg>}</div>}
-                      <span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2, fontWeight: 600 }}>#{c.challan_number}</span>
+                      {p.bulkMode && <div onClick={e => { e.stopPropagation(); if (canSelect) p.onToggleSelect(c.id); }} style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${canSelect ? (isSelected ? T.ac : T.bd2) : T.bd}`, background: isSelected ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: canSelect ? 'pointer' : 'not-allowed', opacity: canSelect ? 1 : 0.3 }}>{isSelected && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><polyline points="20 6 9 17 4 12" /></svg>}</div>}
+                      <span style={{ fontSize: 12, fontFamily: T.mono, color: T.ac2, fontWeight: 600 }}>#{c.challan_number}</span>
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.customer_name}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.customer_name}</div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.mono, color: c.status === 'voided' ? T.tx3 : isRet ? T.re : T.tx, textDecoration: c.status === 'voided' ? 'line-through' : 'none' }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 12, background: sc.bg, color: sc.color, marginTop: 4 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: sc.color }} />
+                    <div style={{ fontSize: 18, fontWeight: 700, fontFamily: T.mono, color: c.status === 'voided' ? T.tx3 : isRet ? T.re : T.tx, textDecoration: c.status === 'voided' ? 'line-through' : 'none' }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 14, background: sc.bg, color: sc.color, marginTop: 4 }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: sc.color }} />
                       {c.status === 'paid' ? 'Paid' : c.status === 'unpaid' ? 'Unpaid' : c.status === 'partial' ? 'Partial' : 'Voided'}
                     </span>
                   </div>
                 </div>
-                <div style={{ fontSize: 11, color: T.tx3, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                {/* Meta: items · age · payment mode */}
+                <div style={{ fontSize: 12, color: T.tx3, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span>{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
                   <span>·</span>
                   <span>{(() => { const d = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000); return d === 0 ? 'Today' : d === 1 ? '1d ago' : `${d}d ago`; })()}</span>
                   {c.payment_mode && c.status !== 'voided' && <><span>·</span><span>{c.payment_mode}</span></>}
-                  {isRet && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>Return</span>}
+                  {isRet && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', marginLeft: 2 }}>Return</span>}
                 </div>
+                {/* Balance due */}
                 {due > 0 && c.status !== 'voided' && (
-                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, color: T.tx3 }}>Balance due</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.re }}>₹{due.toLocaleString('en-IN')}</span>
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: T.tx3 }}>Balance due</span>
+                    <span style={{ fontSize: 15, fontWeight: 700, fontFamily: T.mono, color: T.re }}>₹{due.toLocaleString('en-IN')}</span>
                   </div>
                 )}
               </div>
