@@ -15,9 +15,26 @@ if ('serviceWorker' in navigator) {
       if (reg) setInterval(() => reg.update(), 60_000);
     }).catch(e => console.error('SW registration failed:', e));
   });
+  // Only logged-in users should see the "Update Available" prompt — showing it
+  // over the login/loading screen is confusing and looks like a stuck load.
+  // Not-logged-in: the new SW already controls the page (skipWaiting+claim), so
+  // fresh assets load on the next navigation — no overlay needed.
+  const isLoggedIn = () => {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('sb-') && k.endsWith('-auth-token')) {
+          const v = localStorage.getItem(k);
+          if (v && v !== 'null' && JSON.parse(v)?.access_token) return true;
+        }
+      }
+    } catch { /* private mode / parse error */ }
+    return false;
+  };
   navigator.serviceWorker.addEventListener('message', (e) => {
     if (e.data?.type === 'SW_UPDATED') {
       if (window.location.hash.startsWith('#/s/')) return;
+      if (!isLoggedIn()) return;
       const overlay = document.createElement('div');
       overlay.setAttribute('style', 'position:fixed;inset:0;z-index:99999;background:rgba(6,8,16,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,-apple-system,sans-serif');
       overlay.innerHTML = `
