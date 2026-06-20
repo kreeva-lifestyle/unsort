@@ -184,7 +184,7 @@ export default function ChallanList(p: Props) {
                     </div>
                   </td>
                   <td style={S.tdStyle}>
-                    <span style={{ fontSize: 12, color: T.tx2 }}>{itemCount} item{itemCount !== 1 ? 's' : ''} · {totalQty} qty</span>
+                    <span style={{ fontSize: 12, color: T.tx2 }}>{itemCount} item{itemCount !== 1 ? 's' : ''}{totalQty > itemCount ? ` · ${totalQty} qty` : ''}</span>
                     {skuPreview && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{skuPreview}</div>}
                   </td>
                   <td style={S.tdStyle}>
