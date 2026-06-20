@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useAuth } from '../../hooks/useAuth';
 import { T, S } from '../../lib/theme';
 import { SkeletonRows } from '../ui/Skeleton';
 import type { CashChallan, CashChallanItem } from '../../types/database';
@@ -29,8 +30,28 @@ type TimelineEntry = { type: 'audit' | 'payment'; time: string; action?: string;
 
 export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid, onNext, onPrev, hasNext, hasPrev }: Props) {
   const { addToast } = useNotifications();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(true);
+  const [editSkuIdx, setEditSkuIdx] = useState<number | null>(null);
+  const [editSkuVal, setEditSkuVal] = useState('');
+  const [savingSku, setSavingSku] = useState(false);
+
+  const saveSkuEdit = async (item: Partial<CashChallanItem>, oldSku: string) => {
+    const newSku = editSkuVal.trim();
+    if (!newSku || newSku === oldSku) { setEditSkuIdx(null); return; }
+    setSavingSku(true);
+    try {
+      const { error } = await supabase.from('cash_challan_items').update({ sku: newSku }).eq('id', item.id);
+      if (error) { addToast(friendlyError(error), 'error'); setSavingSku(false); return; }
+      await supabase.from('audit_log').insert({ module: 'cash_challan', record_id: c.id, action: 'SKU_EDIT', details: `SKU changed: ${oldSku} → ${newSku} (challan #${c.challan_number})`, user_email: profile?.email, changes: { sku: { from: oldSku, to: newSku } } }).then(({ error: ae }) => { if (ae) console.warn('Audit log failed:', ae.message); });
+      (item as any).sku = newSku;
+      addToast(`SKU updated: ${oldSku} → ${newSku}`, 'success');
+    } catch (e: any) { addToast(friendlyError(e), 'error'); }
+    setSavingSku(false);
+    setEditSkuIdx(null);
+  };
   const scrollRef = useRef<HTMLDivElement>(null);
   const swipeStartX = useRef(0);
   const swipeLocked = useRef(false);
@@ -145,7 +166,22 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
                 <tbody>
                   {items.map((it, i) => (
                     <tr key={i} style={{ borderBottom: i < items.length - 1 ? `1px solid ${T.bd}` : 'none' }}>
-                      <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx, fontWeight: 500 }}>{it.sku || '—'}</td>
+                      <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx, fontWeight: 500 }}>
+                        {editSkuIdx === i ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <input autoFocus value={editSkuVal} onChange={e => setEditSkuVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveSkuEdit(it, it.sku || ''); if (e.key === 'Escape') setEditSkuIdx(null); }} style={{ ...S.fInput, fontFamily: T.mono, fontSize: 11, padding: '4px 8px', height: 28, width: 100 }} disabled={savingSku} />
+                            <button onClick={() => saveSkuEdit(it, it.sku || '')} disabled={savingSku} style={{ ...S.btnPrimary, padding: '4px 8px', fontSize: 10, borderRadius: 5, opacity: savingSku ? 0.5 : 1 }}>{savingSku ? '…' : '✓'}</button>
+                            <button onClick={() => setEditSkuIdx(null)} style={{ ...S.btnGhost, padding: '4px 8px', fontSize: 10, borderRadius: 5 }}>✕</button>
+                          </div>
+                        ) : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                            {it.sku || '—'}
+                            {isAdmin && <button onClick={e => { e.stopPropagation(); setEditSkuIdx(i); setEditSkuVal(it.sku || ''); }} title="Edit SKU (admin)" aria-label="Edit SKU" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.4, display: 'inline-flex' }}>
+                              <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.ac2, strokeWidth: 2 }}><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                            </button>}
+                          </span>
+                        )}
+                      </td>
                       <td style={{ ...S.tdStyle, textAlign: 'right', color: T.tx }}>{it.quantity ?? 0}</td>
                       <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono, color: T.tx2 }}>₹{Number(it.price || 0).toLocaleString('en-IN')}</td>
                       <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono, color: Number(it.discount_amount || 0) > 0 ? T.re : T.tx3 }}>{Number(it.discount_amount || 0) > 0 ? `-₹${Number(it.discount_amount).toLocaleString('en-IN')}` : '—'}</td>
