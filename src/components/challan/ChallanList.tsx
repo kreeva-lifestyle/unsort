@@ -138,6 +138,7 @@ export default function ChallanList(p: Props) {
             <th style={S.thStyle}>Customer</th>
             <th style={S.thStyle}>Items</th>
             <th style={S.thStyle}>Age</th>
+            <th style={S.thStyle}>INV</th>
             <th style={{ ...S.thStyle, textAlign: 'right' }}>Total</th>
             <th style={{ ...S.thStyle, textAlign: 'right' }}>Balance</th>
             <th style={S.thStyle}>Status</th>
@@ -176,6 +177,9 @@ export default function ChallanList(p: Props) {
                   </td>
                   <td style={S.tdStyle}>
                     <span style={{ fontSize: 12, color: T.tx2 }}>{(() => { const d = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000); return d === 0 ? 'Today' : d === 1 ? '1d ago' : `${d}d ago`; })()}</span>
+                  </td>
+                  <td style={S.tdStyle}>
+                    {c.status !== 'voided' && <span className="inv-chip" onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 4, background: c.inventory_deducted ? 'rgba(34,197,94,.10)' : 'rgba(239,68,68,.08)', color: c.inventory_deducted ? T.gr : T.re, fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>{c.inventory_deducted ? '✓' : '✗'}</span>}
                   </td>
                   <td style={{ ...S.tdStyle, textAlign: 'right' }}>
                     <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: c.status === 'voided' ? T.tx3 : isRet ? T.re : T.tx, textDecoration: c.status === 'voided' ? 'line-through' : 'none' }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
@@ -250,12 +254,13 @@ export default function ChallanList(p: Props) {
                     </span>
                   </div>
                 </div>
-                {/* Meta: items · age · payment mode */}
+                {/* Meta: items · age · payment mode · INV */}
                 <div style={{ fontSize: 12, color: T.tx3, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span>{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
                   <span>·</span>
                   <span>{(() => { const d = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000); return d === 0 ? 'Today' : d === 1 ? '1d ago' : `${d}d ago`; })()}</span>
                   {c.payment_mode && c.status !== 'voided' && <><span>·</span><span>{c.payment_mode}</span></>}
+                  {c.status !== 'voided' && <><span>·</span><span className="inv-chip" onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: c.inventory_deducted ? 'rgba(34,197,94,.10)' : 'rgba(239,68,68,.08)', color: c.inventory_deducted ? T.gr : T.re, fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>{c.inventory_deducted ? 'INV ✓' : 'INV ✗'}</span></>}
                   {isRet && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', marginLeft: 2 }}>Return</span>}
                 </div>
                 {/* Balance due */}
