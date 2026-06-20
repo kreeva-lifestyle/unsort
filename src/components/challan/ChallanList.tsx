@@ -178,8 +178,11 @@ export default function ChallanList(p: Props) {
                   <td style={S.tdStyle}>
                     <span style={{ fontSize: 12, color: T.tx2 }}>{(() => { const d = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000); return d === 0 ? 'Today' : d === 1 ? '1d ago' : `${d}d ago`; })()}</span>
                   </td>
-                  <td style={S.tdStyle}>
-                    {c.status !== 'voided' && <span className="inv-chip" onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 4, background: c.inventory_deducted ? 'rgba(34,197,94,.10)' : 'rgba(239,68,68,.08)', color: c.inventory_deducted ? T.gr : T.re, fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>{c.inventory_deducted ? '✓' : '✗'}</span>}
+                  <td style={{ ...S.tdStyle, textAlign: 'center' }}>
+                    {c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, border: `1px solid ${c.inventory_deducted ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}`, background: c.inventory_deducted ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.06)', color: c.inventory_deducted ? T.gr : T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', letterSpacing: 0.3 }} aria-label={c.inventory_deducted ? 'Inventory deducted' : 'Inventory not deducted'}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.inventory_deducted ? T.gr : T.re }} />
+                      {c.inventory_deducted ? 'Deducted' : 'Pending'}
+                    </button>}
                   </td>
                   <td style={{ ...S.tdStyle, textAlign: 'right' }}>
                     <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: c.status === 'voided' ? T.tx3 : isRet ? T.re : T.tx, textDecoration: c.status === 'voided' ? 'line-through' : 'none' }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
@@ -260,7 +263,7 @@ export default function ChallanList(p: Props) {
                   <span>·</span>
                   <span>{(() => { const d = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000); return d === 0 ? 'Today' : d === 1 ? '1d ago' : `${d}d ago`; })()}</span>
                   {c.payment_mode && c.status !== 'voided' && <><span>·</span><span>{c.payment_mode}</span></>}
-                  {c.status !== 'voided' && <><span>·</span><span className="inv-chip" onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: c.inventory_deducted ? 'rgba(34,197,94,.10)' : 'rgba(239,68,68,.08)', color: c.inventory_deducted ? T.gr : T.re, fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>{c.inventory_deducted ? 'INV ✓' : 'INV ✗'}</span></>}
+                  {c.status !== 'voided' && <><span>·</span><button className="inv-chip" onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, border: `1px solid ${c.inventory_deducted ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}`, background: c.inventory_deducted ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.06)', color: c.inventory_deducted ? T.gr : T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} aria-label={c.inventory_deducted ? 'Inventory deducted' : 'Inventory not deducted'}><span style={{ width: 5, height: 5, borderRadius: '50%', background: c.inventory_deducted ? T.gr : T.re }} />{c.inventory_deducted ? 'Deducted' : 'Pending'}</button></>}
                   {isRet && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', marginLeft: 2 }}>Return</span>}
                 </div>
                 {/* Balance due */}
