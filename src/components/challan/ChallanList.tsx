@@ -131,18 +131,30 @@ export default function ChallanList(p: Props) {
       {/* ── Desktop table ────────────────────────────────────────────── */}
       {!p.loading && p.challans.length > 0 && <div className="desktop-only" style={{ border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960, tableLayout: 'fixed' }}>
+          <colgroup>
+            {p.bulkMode && <col style={{ width: 36 }} />}
+            <col style={{ width: '7%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '7%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: 80 }} />
+          </colgroup>
           <thead><tr style={{ borderBottom: `1px solid ${T.bd}` }}>
-            {p.bulkMode && <th style={{ ...S.thStyle, width: 36, padding: '11px 8px' }} />}
+            {p.bulkMode && <th style={{ ...S.thStyle, padding: '11px 8px' }} />}
             <th style={S.thStyle}>#</th>
             <th style={S.thStyle}>Customer</th>
             <th style={S.thStyle}>Items</th>
             <th style={S.thStyle}>Age</th>
-            <th style={S.thStyle}>INV</th>
+            <th style={{ ...S.thStyle, textAlign: 'center' }}>Inv</th>
             <th style={{ ...S.thStyle, textAlign: 'right' }}>Total</th>
             <th style={{ ...S.thStyle, textAlign: 'right' }}>Balance</th>
-            <th style={S.thStyle}>Status</th>
-            <th style={{ ...S.thStyle, width: 60 }} />
+            <th style={{ ...S.thStyle, textAlign: 'center' }}>Status</th>
+            <th style={S.thStyle} />
           </tr></thead>
           <tbody>
             {p.challans.map(c => {
@@ -173,7 +185,7 @@ export default function ChallanList(p: Props) {
                   </td>
                   <td style={S.tdStyle}>
                     <span style={{ fontSize: 12, color: T.tx2 }}>{itemCount} item{itemCount !== 1 ? 's' : ''} · {totalQty} qty</span>
-                    {skuPreview && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{skuPreview}</div>}
+                    {skuPreview && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{skuPreview}</div>}
                   </td>
                   <td style={S.tdStyle}>
                     <span style={{ fontSize: 12, color: T.tx2 }}>{(() => { const d = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000); return d === 0 ? 'Today' : d === 1 ? '1d ago' : `${d}d ago`; })()}</span>
@@ -191,7 +203,7 @@ export default function ChallanList(p: Props) {
                   <td style={{ ...S.tdStyle, textAlign: 'right' }}>
                     {due > 0 && c.status !== 'voided' ? <span style={{ fontFamily: T.mono, fontSize: 13, fontWeight: 600, color: T.re }}>₹{due.toLocaleString('en-IN')}</span> : c.status === 'paid' ? <span style={{ fontSize: 11, color: T.gr, fontWeight: 500 }}>Settled</span> : null}
                   </td>
-                  <td style={S.tdStyle}>
+                  <td style={{ ...S.tdStyle, textAlign: 'center' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color, whiteSpace: 'nowrap' }}>
                       <span style={{ width: 7, height: 7, borderRadius: '50%', background: sc.color }} />
                       {c.status === 'paid' ? 'Paid' : c.status === 'unpaid' ? 'Unpaid' : c.status === 'partial' ? 'Partial' : 'Voided'}
@@ -222,7 +234,7 @@ export default function ChallanList(p: Props) {
       </div>}
 
       {/* ── Mobile cards ──────────────────────────────────────────────── */}
-      {!p.loading && p.challans.length > 0 && <div className="mobile-only" style={{ flexDirection: 'column', gap: 10, width: '100%' }}>
+      {!p.loading && p.challans.length > 0 && <div className="mobile-only" style={{ flexDirection: 'column', gap: 6, width: '100%' }}>
         {p.challans.map((c, i) => {
           const sc = p.statusColors[c.status] || p.statusColors.unpaid;
           const items = c.cash_challan_items || [];
@@ -239,26 +251,26 @@ export default function ChallanList(p: Props) {
           ];
           return (
             <SwipeRow key={c.id} actions={swipeActions} hint={i === 0} hintKey="challan">
-              <div onClick={() => { if (p.bulkMode) { if (canSelect) p.onToggleSelect(c.id); } else p.onOpenDetail(c); }} style={{ background: isSelected ? 'rgba(99,102,241,.08)' : 'rgba(255,255,255,0.025)', border: `1px solid ${isSelected ? T.ac + '44' : T.bd2}`, borderRadius: 12, padding: '16px', cursor: 'pointer', width: '100%', boxSizing: 'border-box' as const }}>
+              <div onClick={() => { if (p.bulkMode) { if (canSelect) p.onToggleSelect(c.id); } else p.onOpenDetail(c); }} style={{ background: isSelected ? 'rgba(99,102,241,.08)' : 'rgba(255,255,255,0.025)', border: `1px solid ${isSelected ? T.ac + '44' : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', width: '100%', boxSizing: 'border-box' as const }}>
                 {/* Top: number + name left, total + status right */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {p.bulkMode && <div onClick={e => { e.stopPropagation(); if (canSelect) p.onToggleSelect(c.id); }} style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${canSelect ? (isSelected ? T.ac : T.bd2) : T.bd}`, background: isSelected ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: canSelect ? 'pointer' : 'not-allowed', opacity: canSelect ? 1 : 0.3 }}>{isSelected && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><polyline points="20 6 9 17 4 12" /></svg>}</div>}
-                      <span style={{ fontSize: 12, fontFamily: T.mono, color: T.ac2, fontWeight: 600 }}>#{c.challan_number}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      {p.bulkMode && <div onClick={e => { e.stopPropagation(); if (canSelect) p.onToggleSelect(c.id); }} style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${canSelect ? (isSelected ? T.ac : T.bd2) : T.bd}`, background: isSelected ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: canSelect ? 'pointer' : 'not-allowed', opacity: canSelect ? 1 : 0.3 }}>{isSelected && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><polyline points="20 6 9 17 4 12" /></svg>}</div>}
+                      <span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2, fontWeight: 600 }}>#{c.challan_number}</span>
                     </div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.customer_name}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.customer_name}</div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 18, fontWeight: 700, fontFamily: T.mono, color: c.status === 'voided' ? T.tx3 : isRet ? T.re : T.tx, textDecoration: c.status === 'voided' ? 'line-through' : 'none' }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 14, background: sc.bg, color: sc.color, marginTop: 4 }}>
-                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: sc.color }} />
+                    <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.mono, color: c.status === 'voided' ? T.tx3 : isRet ? T.re : T.tx, textDecoration: c.status === 'voided' ? 'line-through' : 'none' }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 12, background: sc.bg, color: sc.color, marginTop: 3 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: sc.color }} />
                       {c.status === 'paid' ? 'Paid' : c.status === 'unpaid' ? 'Unpaid' : c.status === 'partial' ? 'Partial' : 'Voided'}
                     </span>
                   </div>
                 </div>
                 {/* Meta: items · age · payment mode · INV */}
-                <div style={{ fontSize: 12, color: T.tx3, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ fontSize: 11, color: T.tx3, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span>{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
                   <span>·</span>
                   <span>{(() => { const d = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000); return d === 0 ? 'Today' : d === 1 ? '1d ago' : `${d}d ago`; })()}</span>
@@ -268,9 +280,9 @@ export default function ChallanList(p: Props) {
                 </div>
                 {/* Balance due */}
                 {due > 0 && c.status !== 'voided' && (
-                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 12, color: T.tx3 }}>Balance due</span>
-                    <span style={{ fontSize: 15, fontWeight: 700, fontFamily: T.mono, color: T.re }}>₹{due.toLocaleString('en-IN')}</span>
+                  <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: T.tx3 }}>Balance due</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.re }}>₹{due.toLocaleString('en-IN')}</span>
                   </div>
                 )}
               </div>
