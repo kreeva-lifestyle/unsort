@@ -670,20 +670,20 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── History Screen ─────────────────────────────────────────────────────────
   if (showHistory) return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
-        <div>
+    <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx }}>
+      {/* Header — Back + subtitle */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 14, gap: 12, flexWrap: 'wrap', minHeight: 44 }}>
+        <div style={{ flex: 1 }}>
           <div style={{ fontSize: 11, color: T.tx3 }}>{historyDateFrom && historyDateTo ? `${historyTotal} records · ${historyDateFrom} to ${historyDateTo}` : 'Pick a date range to view scans'}</div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button onClick={() => { setShowHistory(false); window.history.back(); }} style={S.btnGhost}>← Back</button>
-          <button className="desktop-only" onClick={() => { setExporting(true); exportHistory().finally(() => setExporting(false)); }} disabled={exporting || !historyDateFrom || !historyDateTo} title={!historyDateFrom || !historyDateTo ? 'Select a date range first' : 'Export filtered records to CSV'} style={{ ...S.btnGhost, opacity: exporting || !historyDateFrom || !historyDateTo ? 0.4 : 1, cursor: exporting || !historyDateFrom || !historyDateTo ? 'not-allowed' : 'pointer', pointerEvents: exporting || !historyDateFrom || !historyDateTo ? 'none' : 'auto' }}>{exporting ? 'Exporting...' : 'Export'}</button>
+          <button onClick={() => { setShowHistory(false); window.history.back(); }} style={{ ...S.btnGhost, minHeight: 44 }}>← Back</button>
+          <button className="desktop-only" onClick={() => { setExporting(true); exportHistory().finally(() => setExporting(false)); }} disabled={exporting || !historyDateFrom || !historyDateTo} title={!historyDateFrom || !historyDateTo ? 'Select a date range first' : 'Export filtered records to CSV'} style={{ ...S.btnGhost, minHeight: 44, opacity: exporting || !historyDateFrom || !historyDateTo ? 0.4 : 1, cursor: exporting || !historyDateFrom || !historyDateTo ? 'not-allowed' : 'pointer', pointerEvents: exporting || !historyDateFrom || !historyDateTo ? 'none' : 'auto' }}>{exporting ? 'Exporting...' : 'Export'}</button>
         </div>
       </div>
 
       {/* Date range filter */}
-      <div className="scan-date-range" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px', marginBottom: 12, display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+      <div className="scan-date-range" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', marginBottom: 12, display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>From</div>
           <input type="date" value={historyDateFrom} max={historyDateTo || undefined} onChange={e => { setHistoryDateFrom(e.target.value); setHistoryPage(0); }} style={S.fDate} />
@@ -703,18 +703,18 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       </div>
 
       {/* Stat strip */}
-      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', position: 'relative', overflow: 'hidden' }}>
+      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 12 }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.ac87}, ${T.ac22})` }} />
           <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Total Scans</div>
           <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.ac2 }}>{historyTotal}</div>
         </div>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.grCC}, ${T.gr22})` }} />
           <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Today</div>
           <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.gr }}>{historyData.filter(r => r.scanned_at && new Date(r.scanned_at).toDateString() === new Date().toDateString()).length}</div>
         </div>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.ylCC}, ${T.yl22})` }} />
           <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Couriers</div>
           <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.yl }}>{new Set(historyData.map(r => r.courier)).size}</div>
@@ -722,26 +722,26 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       </div>
 
       {/* Filter bar */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', marginTop: 20, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ position: 'relative' }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
           <input type="text" value={historySearch} onChange={e => { setHistorySearch(e.target.value); setHistoryPage(0); }} placeholder="Search AWB..."
             style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
         </div>
-        <div className="scan-courier-pills" style={{ display: 'flex', gap: 4, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div className="scan-courier-pills" style={{ display: 'flex', gap: 4, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingRight: 24 }}>
           <button onClick={() => { setHistoryFilterCourier(''); setHistoryPage(0); }} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${!historyFilterCourier ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: !historyFilterCourier ? 'rgba(99,102,241,.08)' : 'transparent', color: !historyFilterCourier ? T.ac2 : T.tx2, fontFamily: T.sans, whiteSpace: 'nowrap', flexShrink: 0 }}>All</button>
           {couriers.map(c => (
             <button key={c.id} onClick={() => { setHistoryFilterCourier(historyFilterCourier === c.name ? '' : c.name); setHistoryPage(0); }} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${historyFilterCourier === c.name ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: historyFilterCourier === c.name ? 'rgba(99,102,241,.08)' : 'transparent', color: historyFilterCourier === c.name ? T.ac2 : T.tx2, fontFamily: T.sans, whiteSpace: 'nowrap', flexShrink: 0 }}>{c.name}</button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
           <select value={historyFilterBrand} onChange={e => { setHistoryFilterBrand(e.target.value); setHistoryPage(0); }}
             style={{ ...S.fInput, flex: 1, cursor: 'pointer' }}>
             <option value="">All Brands</option>
             {brands.map(b => <option key={b} value={b}>{b}</option>)}
           </select>
           <select value={historyPageSize} onChange={e => { setHistoryPageSize(Number(e.target.value)); setHistoryPage(0); }}
-            style={{ ...S.fInput, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}>
+            style={{ ...S.fInput, minWidth: 72, width: 'auto', padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}>
           <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
         </select>
         </div>
