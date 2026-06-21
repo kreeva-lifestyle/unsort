@@ -84,7 +84,7 @@ export default function TracklyRedirect({ shortCode }: { shortCode: string }) {
   if (status === 'import') return <TracklyImport onBack={() => setStatus('landing')} />;
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: T.bg, color: T.tx, fontFamily: T.sans, padding: 20, textAlign: 'center' as const }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: T.bg, color: T.tx, fontFamily: T.sans, padding: 20, textAlign: 'center' as const }}>
       {status === 'loading' && (
         <div>
           <div style={{ width: 32, height: 32, border: `3px solid ${T.bd2}`, borderTopColor: '#22C55E', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />

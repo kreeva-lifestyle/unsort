@@ -13,7 +13,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: an
   state = { error: null as any };
   static getDerivedStateFromError(error: any) { return { error }; }
   render() {
-    if (this.state.error) return <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' as const, gap: 14, padding: 20, position: 'relative' }}>
+    if (this.state.error) return <div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' as const, gap: 14, padding: 20, position: 'relative' }}>
       <div style={{ position: 'absolute', top: '30%', left: '40%', width: 300, height: 300, background: `radial-gradient(circle, ${T.ac3} 0%, transparent 70%)`, pointerEvents: 'none' }} />
       <div style={{ position: 'relative', zIndex: 1, background: T.s, backdropFilter: 'blur(24px)', border: `1px solid ${T.bd}`, borderRadius: T.rXl, padding: '28px 32px', textAlign: 'center' as const, maxWidth: 380, boxShadow: '0 16px 48px rgba(0,0,0,.4)' }}>
         <p style={{ color: T.tx, fontSize: 14, fontWeight: 600, fontFamily: T.sora, marginBottom: 6 }}>Something went wrong</p>
@@ -142,16 +142,16 @@ const MainApp = () => {
   });
   useEffect(() => { try { localStorage.setItem('sidebarOpen', sidebarOpen ? '1' : '0'); } catch { /* private mode */ } }, [sidebarOpen]);
 
-  return (<div style={{ minHeight: '100vh', background: T.bg, width: '100%', overflowX: 'hidden', position: 'relative' }}>
+  return (<div style={{ minHeight: '100dvh', background: T.bg, width: '100%', overflowX: 'hidden', position: 'relative' }}>
     <div className="app-glows" aria-hidden="true" />
     <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setNotifItemId(null); setMobileMenu(false); }} profile={profile} collapsed={!sidebarOpen} />
     {/* Mobile overlay */}
     <div className="mobile-overlay" onClick={() => setMobileMenu(false)} style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 98, opacity: mobileMenu ? 1 : 0, pointerEvents: mobileMenu ? 'auto' : 'none', transition: 'opacity .25s ease', backdropFilter: 'blur(2px)' }} />
     {/* Mobile sidebar drawer */}
-    <div className="mobile-drawer" style={{ display: 'none', position: 'fixed', top: 0, left: 0, width: 260, height: 'calc(100vh - 60px)', zIndex: 101, transform: mobileMenu ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform .3s cubic-bezier(.4,0,.2,1)', boxShadow: mobileMenu ? '4px 0 24px rgba(0,0,0,.4)' : 'none' }}>
+    <div className="mobile-drawer" style={{ display: 'none', position: 'fixed', top: 0, left: 0, width: 260, height: 'calc(100dvh - 60px)', zIndex: 101, transform: mobileMenu ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform .3s cubic-bezier(.4,0,.2,1)', boxShadow: mobileMenu ? '4px 0 24px rgba(0,0,0,.4)' : 'none' }}>
       <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setNotifItemId(null); setMobileMenu(false); }} profile={profile} />
     </div>
-    <div className="main-area" style={{ marginLeft: sidebarOpen ? 220 : 0, display: 'flex', flexDirection: 'column', height: '100vh', maxWidth: '100vw', transition: 'margin-left .25s cubic-bezier(.4,0,.2,1)' }}>
+    <div className="main-area" style={{ marginLeft: sidebarOpen ? 220 : 0, display: 'flex', flexDirection: 'column', maxWidth: '100vw', transition: 'margin-left .25s cubic-bezier(.4,0,.2,1)' }}>
       {/* Mobile bottom nav */}
       <div className="mobile-hamburger" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 102, background: T.s, borderTop: `1px solid ${T.bd}`, padding: '8px 0', paddingBottom: 'max(8px, env(safe-area-inset-bottom))', justifyContent: 'space-around' }}>
         {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Inventory' }, { id: 'packtime', icon: 'scan', label: 'PackStation' }, { id: 'challan', icon: 'file', label: 'Challan' }].filter(t => checkTab(t.id)).map(t => (
@@ -213,7 +213,7 @@ export default function App() {
   if (shortMatch) {
     return (
       <ErrorBoundary>
-        <Suspense fallback={<div style={{ minHeight: '100vh', background: '#000' }} />}>
+        <Suspense fallback={<div style={{ minHeight: '100dvh', background: '#000' }} />}>
           <LazyTracklyRedirect shortCode={shortMatch[1]} />
         </Suspense>
       </ErrorBoundary>
@@ -228,12 +228,12 @@ const AppContent = () => {
   // Public share route — no auth required, rendered before login gate
   const hash = window.location.hash;
   const shareMatch = hash.match(/^#\/share\/program\/([a-f0-9]+)$/);
-  if (shareMatch) return <Suspense fallback={<div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyPublicShareView shareToken={shareMatch[1]} /></Suspense>;
+  if (shareMatch) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyPublicShareView shareToken={shareMatch[1]} /></Suspense>;
 
   const shortMatch = hash.match(/^#\/s\/([a-zA-Z0-9_-]{3,32})$/);
-  if (shortMatch) return <Suspense fallback={<div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyTracklyRedirect shortCode={shortMatch[1]} /></Suspense>;
+  if (shortMatch) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyTracklyRedirect shortCode={shortMatch[1]} /></Suspense>;
 
-  if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100vh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}><div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>DailyOffice</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase' }}>LOADING</p></div>;
+  if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100dvh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}><div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>DailyOffice</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase' }}>LOADING</p></div>;
   if (!auth?.user) return <Login signIn={auth.signIn} />;
   return <NotificationProvider><BreadcrumbProvider><MainApp /></BreadcrumbProvider></NotificationProvider>;
 };
