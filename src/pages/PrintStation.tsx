@@ -202,7 +202,7 @@ export default function PrintStation() {
   const statusColor = (s: string) => s === 'done' ? T.gr : s === 'failed' ? T.re : s === 'printing' ? T.bl : T.yl;
 
   return (
-    <div className="page-pad" style={{ padding: '14px 16px', fontFamily: T.sans, color: T.tx, minHeight: '100vh' }}>
+    <div className="page-pad" style={{ padding: '14px 16px', fontFamily: T.sans, color: T.tx, minHeight: '100dvh' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 700, fontFamily: T.sora }}>Print Station</div>

@@ -136,7 +136,7 @@ export default function TracklyLanding({ longUrl, onImport }: Props) {
       <MatrixCanvas />
       <div style={{
         position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center',
-        justifyContent: 'center', minHeight: '100vh', padding: '24px 16px',
+        justifyContent: 'center', minHeight: '100dvh', padding: '24px 16px',
       }}>
         <div style={{
           opacity: show ? 1 : 0, transform: show ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.96)',

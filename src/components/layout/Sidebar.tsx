@@ -22,7 +22,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
   };
 
   return (
-    <div className="sidebar" style={{ width: 220, height: '100vh', background: 'rgba(8,11,20,0.95)', backdropFilter: 'blur(36px)', WebkitBackdropFilter: 'blur(36px)', borderRight: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, zIndex: 100, overflowY: 'auto', transform: collapsed ? 'translateX(-220px)' : 'translateX(0)', transition: 'transform .25s cubic-bezier(.4,0,.2,1)' }}>
+    <div className="sidebar" style={{ width: 220, height: '100dvh', background: 'rgba(8,11,20,0.95)', backdropFilter: 'blur(36px)', WebkitBackdropFilter: 'blur(36px)', borderRight: `1px solid ${T.bd}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, zIndex: 100, overflowY: 'auto', transform: collapsed ? 'translateX(-220px)' : 'translateX(0)', transition: 'transform .25s cubic-bezier(.4,0,.2,1)' }}>
 
       {/* User profile header */}
       <div style={{ padding: '20px 18px 16px', borderBottom: `1px solid ${T.bd}` }}>

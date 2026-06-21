@@ -44,8 +44,8 @@ export default function PublicShareView({ shareToken }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  if (loading) return <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.tx3 }}><div className="spinner" style={{ marginRight: 8 }} /> {t('loading')}</div>;
-  if (error || !data) return <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10, color: T.tx3 }}><div style={{ fontSize: 28 }}>🔗</div><div style={{ fontSize: 13 }}>{error || t('notFound')}</div></div>;
+  if (loading) return <div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.tx3 }}><div className="spinner" style={{ marginRight: 8 }} /> {t('loading')}</div>;
+  if (error || !data) return <div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10, color: T.tx3 }}><div style={{ fontSize: 28 }}>🔗</div><div style={{ fontSize: 13 }}>{error || t('notFound')}</div></div>;
 
   const program = data.program;
   const matchings = data.matchings || [];
@@ -59,7 +59,7 @@ export default function PublicShareView({ shareToken }: Props) {
   const tdS: React.CSSProperties = { padding: '8px 10px', fontSize: 12, borderBottom: `1px solid ${T.bd}`, color: T.tx2 };
 
   return (
-    <div style={{ minHeight: '100vh', background: T.bg, color: T.tx, fontFamily: T.sans }}>
+    <div style={{ minHeight: '100dvh', background: T.bg, color: T.tx, fontFamily: T.sans }}>
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '30px 16px' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{ fontFamily: T.sora, fontSize: 16, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>DailyOffice</div>
