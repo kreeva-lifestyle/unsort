@@ -853,7 +853,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── Setup Screen ────────────────────────────────────────────────────────────
   if (!started) return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80 }}>
+    <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {dbFails > 0 && <span style={{ fontSize: 9, color: T.re, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)' }}>{dbFails} DB save failed</span>}
@@ -938,7 +938,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── Scanning Screen ─────────────────────────────────────────────────────────
   return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px', paddingBottom: 80, minHeight: '100%', position: 'relative' }} onClick={focusInput}>
+    <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, minHeight: '100%', position: 'relative' }} onClick={focusInput}>
 
       {/* Scan counter badge */}
       {recentScans.length > 0 && <div style={{ position: 'fixed', top: 52, right: 16, zIndex: 200, background: T.gr, color: '#fff', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, boxShadow: '0 2px 10px rgba(34,197,94,.4)' }}>{successScans.length} scanned</div>}

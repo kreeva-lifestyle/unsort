@@ -59,6 +59,11 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [c.id]);
 
   useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => document.body.classList.remove('modal-open');
+  }, []);
+
+  useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const onStart = (e: TouchEvent) => { swipeStartX.current = e.touches[0].clientX; swipeLocked.current = false; };

@@ -181,7 +181,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
   const statusColors: Record<string, string> = { unsorted: T.yl, damaged: T.re, dry_clean: T.bl, completed: T.gr };
 
   return (
-    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease', paddingBottom: 80 }}>
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>{greeting}, {profile?.full_name?.split(' ')[0] || 'there'}</h2>

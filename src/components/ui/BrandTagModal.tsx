@@ -30,18 +30,13 @@ const fSelect: React.CSSProperties = { ...fInput, cursor: 'pointer' };
 export default function BrandTagModal({ mode, initial, onSave, onClose, brandOptions, productOptions, sizeOptions, colorOptions, qtyOptions, validateRow }: Props) {
   const [form, setForm] = React.useState<BrandTagRow>({ ...initial });
   const [error, setError] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
   const barcodeRef = React.useRef<SVGSVGElement>(null);
   const set = (k: keyof BrandTagRow, v: string | number) => { setError(''); setForm(p => ({ ...p, [k]: v })); };
 
   const brand = form.brand.replace(/^BRAND NAME:\s*/i, '').trim();
   const product = form.product.replace(/^PRODUCT DESC:\s*/i, '').trim();
   const mrpStr = '₹' + (form.mrp || 0).toLocaleString('en-IN');
-
-  React.useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [onClose]);
 
   React.useEffect(() => {
     document.body.classList.add('modal-open');
@@ -56,10 +51,21 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
   }, [form.jioCode, form.sku]);
 
   const handleSave = () => {
+    if (saving) return;
     const bad = validateRow(form);
     if (bad) { setError(`"${bad}" is required.`); return; }
+    setSaving(true);
     onSave(form);
   };
+
+  React.useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave();
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  });
 
   return createPortal(
     <div style={S.modalOverlay} onClick={onClose}>
@@ -118,9 +124,9 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
         {error && <div style={{ ...S.errorBox, margin: '0 20px 12px' }}>{error}</div>}
         <div style={{ padding: '12px 20px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={S.btnGhost}>Cancel</button>
-          <button onClick={handleSave} style={{ ...S.btnPrimary, gap: 6 }}>
+          <button onClick={handleSave} disabled={saving} style={{ ...S.btnPrimary, gap: 6, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
             <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M20 6L9 17l-5-5" /></svg>
-            {mode === 'add' ? 'Create tag' : 'Save changes'}
+            {saving ? 'Saving…' : mode === 'add' ? 'Create tag' : 'Save changes'}
           </button>
         </div>
       </div>
