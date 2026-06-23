@@ -360,6 +360,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setReturnSearchQ('');
     setCustomerName(challan.customer_name);
     setSelectedCustomerId(challan.customer_id);
+    setCustomerPhone(challan.customer_phone || '');
     const sourceItems: ChallanItem[] = (challan.cash_challan_items || []).map((it) => ({
       sku: it.sku ?? '', description: it.description ?? '', quantity: it.quantity ?? 0, price: Number(it.price ?? 0),
       total: Number(it.total ?? 0), discount_type: it.discount_type || 'flat', discount_value: Number(it.discount_value || 0), discount_amount: Number(it.discount_amount || 0),
@@ -854,7 +855,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setEditing(c);
     setCustomerName(c.customer_name);
     setSelectedCustomerId(c.customer_id);
-    setCustomerPhone(cust?.phone || '');
+    setCustomerPhone(c.customer_phone || cust?.phone || '');
     setIsReturn(!!c.is_return);
     setItems((citems || []).map(i => ({ sku: i.sku || '', description: i.description, quantity: i.quantity, price: Number(i.price), total: Number(i.total), discount_type: i.discount_type || 'flat', discount_value: Number(i.discount_value || 0), discount_amount: Number(i.discount_amount || 0) })));
     setShippingCharges(Number(c.shipping_charges || 0));
@@ -1194,7 +1195,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       returnResults={returnResults}
       searchReturnSource={searchReturnSource}
       selectReturnSource={selectReturnSource}
-      onClearReturnSource={() => { setReturnSource(null); setCustomerName(''); setSelectedCustomerId(null); setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]); }}
+      onClearReturnSource={() => { setReturnSource(null); setCustomerName(''); setSelectedCustomerId(null); setCustomerPhone(''); setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]); }}
       customerName={customerName}
       setCustomerName={setCustomerName}
       customerPhone={customerPhone}
