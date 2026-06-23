@@ -60,6 +60,8 @@ interface Props {
 
 export default function ChallanList(p: Props) {
   const filterActive = p.statusFilter || p.tagFilter || p.dateFrom || p.dateTo || p.invFilter;
+  const idToNum = new Map(p.challans.map(c => [c.id, c.challan_number]));
+  const srcNum = (c: Challan) => c.source_challan_id ? idToNum.get(c.source_challan_id) ?? null : null;
   return (
     <>
       <div className="challan-filters" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -178,9 +180,10 @@ export default function ChallanList(p: Props) {
                   <td style={S.tdStyle}>
                     <div style={{ fontWeight: 600, fontSize: 13, color: T.tx }}>{c.customer_name}</div>
                     {c.customer_phone && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>+91 {c.customer_phone.replace(/^91/, '').replace(/(\d{5})(\d{5})/, '$1 $2')}</div>}
-                    <div style={{ display: 'flex', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
-                      {isRet && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>Return</span>}
+                    <div style={{ display: 'flex', gap: 4, marginTop: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {isRet && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>Return{srcNum(c) ? ` of #${srcNum(c)}` : ''}</span>}
                       {(c.tags || []).map(t => <span key={t} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: T.ac3, color: T.ac2, fontWeight: 600 }}>{t}</span>)}
+                      {c.notes && <span title={c.notes} style={{ display: 'inline-flex', alignItems: 'center', opacity: 0.4 }}><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.tx3, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg></span>}
                     </div>
                   </td>
                   <td style={S.tdStyle}>
@@ -276,7 +279,8 @@ export default function ChallanList(p: Props) {
                   <span>{(() => { const d = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000); return d === 0 ? 'Today' : d === 1 ? '1d ago' : `${d}d ago`; })()}</span>
                   {c.payment_mode && c.status !== 'voided' && <><span>·</span><span>{c.payment_mode}</span></>}
                   {c.status !== 'voided' && <><span>·</span><button className="inv-chip" onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, border: `1px solid ${c.inventory_deducted ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}`, background: c.inventory_deducted ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.06)', color: c.inventory_deducted ? T.gr : T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} aria-label={c.inventory_deducted ? 'Inventory deducted' : 'Inventory not deducted'}><span style={{ width: 5, height: 5, borderRadius: '50%', background: c.inventory_deducted ? T.gr : T.re }} />{c.inventory_deducted ? 'Deducted' : 'Pending'}</button></>}
-                  {isRet && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', marginLeft: 2 }}>Return</span>}
+                  {isRet && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', marginLeft: 2 }}>Return{srcNum(c) ? ` of #${srcNum(c)}` : ''}</span>}
+                  {c.notes && <span style={{ display: 'inline-flex', alignItems: 'center', opacity: 0.4, marginLeft: 2 }} title={c.notes}><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.tx3, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg></span>}
                 </div>
                 {/* Balance due */}
                 {due > 0 && c.status !== 'voided' && (
