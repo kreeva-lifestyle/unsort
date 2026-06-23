@@ -1,6 +1,7 @@
 /* eslint-disable */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { numericKeyDown } from '../lib/numericInput';
 import { printOrQueue } from '../lib/printQueue';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
@@ -244,6 +245,7 @@ export default function BrandTagPrinter() {
   const [orderLoadMsg, setOrderLoadMsg] = useState('');
   const [orderPage, setOrderPage] = useState(0);
   const [orderPerPage, setOrderPerPage] = useState(10);
+  const [confirmDel, setConfirmDel] = useState<{ id: string; sku: string } | null>(null);
   const [btPage, setBtPage] = useState(0);
   const [btPerPage, setBtPerPage] = useState(10);
 
@@ -266,10 +268,10 @@ export default function BrandTagPrinter() {
 
   // Lock body scroll when any modal/popup is open
   useEffect(() => {
-    const hasModal = !!modalRow || !!orderRows;
+    const hasModal = !!modalRow || !!orderRows || !!confirmDel;
     document.body.classList.toggle('modal-open', hasModal);
     return () => { document.body.classList.remove('modal-open'); };
-  }, [modalRow, orderRows]);
+  }, [modalRow, orderRows, confirmDel]);
 
   // Smart realtime: apply individual row changes without re-fetching entire page
   useEffect(() => {
@@ -437,8 +439,6 @@ export default function BrandTagPrinter() {
 
   // ── Row Mutations ──
 
-  // Delete SKU — confirms via in-app modal instead of window.confirm (audit P0)
-  const [confirmDel, setConfirmDel] = useState<{ id: string; sku: string } | null>(null);
   const deleteRow = useCallback((id: string, sku: string) => {
     setConfirmDel({ id, sku });
   }, []);
@@ -702,7 +702,7 @@ export default function BrandTagPrinter() {
                     <td style={tdS}>{r.found ? r.masterData?.color : '—'}</td>
                     <td style={tdS}>{r.found ? r.masterData?.size : '—'}</td>
                     <td style={{ ...tdS, whiteSpace: 'nowrap' }}>{r.found ? fmtMrp(r.masterData?.mrp || 0) : '—'}</td>
-                    <td style={tdS}><input type="number" min={0} value={r.copies} onChange={e => updateOrderCopies(r.sku, r.brand, Number(e.target.value))} style={{ ...inp, width: 40, textAlign: 'center', padding: '2px', fontSize: 12 }} /></td>
+                    <td style={tdS}><input type="number" min={0} value={r.copies} onKeyDown={e => numericKeyDown(e)} onChange={e => updateOrderCopies(r.sku, r.brand, Number(e.target.value))} style={{ ...inp, width: 40, textAlign: 'center', padding: '4px', fontSize: 12 }} /></td>
                     <td style={tdS}>{r.found ? <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(52,211,153,.12)', color: T.gr }}>Ready</span> : <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500, background: 'rgba(248,113,113,.12)', color: T.re }}>Missing</span>}</td>
                   </tr>
                 ))}</tbody>
@@ -722,10 +722,10 @@ export default function BrandTagPrinter() {
       })()}
 
       {/* ── Delete confirm modal (replaces window.confirm per audit P0) ── */}
-      {confirmDel && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)', padding: 16 }}>
+      {confirmDel && createPortal(
+        <div style={S.modalOverlay}>
           <div className="modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: '20px 18px', textAlign: 'center' as const, maxWidth: 340, width: '100%' }}>
-            <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg></div>
+            <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: T.yl, strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill={T.yl} /></svg></div>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Delete this SKU?</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 14, fontFamily: T.mono }}>{confirmDel.sku || '(empty SKU)'}</div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -733,7 +733,8 @@ export default function BrandTagPrinter() {
               <button onClick={actuallyDelete} style={{ ...S.btnDangerSolid, flex: 1, justifyContent: 'center' }}>Delete</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Add / Edit Modal ── */}
