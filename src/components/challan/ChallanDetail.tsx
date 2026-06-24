@@ -336,7 +336,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
               </div>
             ) : (
               <span style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'flex-start', gap: 5 }} onClick={() => { setEditNotesVal(c.notes || ''); setEditingNotes(true); }}>
-                {c.notes ? <><span style={{ color: T.tx3, fontSize: 9, fontWeight: 600, letterSpacing: 0.5 }}>NOTES: </span>{c.notes}</> : <span style={{ color: T.tx3, fontSize: 10, opacity: 0.5 }}>+ Add notes</span>}
+                {c.notes ? <><span style={{ color: T.tx3, fontSize: 9, fontWeight: 600, letterSpacing: 0.5 }}>NOTES: </span>{c.notes}</> : <span style={{ color: T.ac2, fontSize: 11, fontWeight: 500 }}>+ Add notes</span>}
                 <svg viewBox="0 0 24 24" style={{ width: 10, height: 10, fill: 'none', stroke: T.tx3, strokeWidth: 2, opacity: 0.3, flexShrink: 0, marginTop: 2 }}><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
               </span>
             )}
