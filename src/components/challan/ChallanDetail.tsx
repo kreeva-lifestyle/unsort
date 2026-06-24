@@ -358,7 +358,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
   );
 
   const qrModal = showQrShare && qrUrl ? createPortal(
-    <div style={S.modalOverlay} onClick={() => setShowQrShare(false)}>
+    <div style={{ ...S.modalOverlay, zIndex: 10001 }} onClick={() => setShowQrShare(false)}>
       <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
         <div style={{ ...S.modalHead, borderBottom: 'none', padding: '0 0 12px' }}>
           <div style={S.modalTitle}>Share Payment QR</div>
