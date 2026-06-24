@@ -49,9 +49,11 @@ export default function PaymentQR({ addToast }: { addToast: (msg: string, type: 
       <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 4 }}>Payment QR Code</div>
       <div style={{ fontSize: 11, color: T.tx3, marginBottom: 16, lineHeight: 1.5 }}>Upload your UPI QR code image. This will be shared via WhatsApp when you click "Share QR" on a challan.</div>
 
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16, marginBottom: 16, textAlign: 'center' }}>
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 20, marginBottom: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
         {qrUrl ? (
-          <img src={qrUrl} alt="Payment QR" style={{ width: '100%', maxWidth: 200, borderRadius: 8, marginBottom: 12 }} />
+          <div style={{ width: 180, height: 180, borderRadius: 10, overflow: 'hidden', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src={qrUrl} alt="Payment QR" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          </div>
         ) : (
           <div style={{ padding: '30px 16px', color: T.tx3, fontSize: 11 }}>No QR code uploaded yet</div>
         )}
