@@ -127,6 +127,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [printHtml, setPrintHtml] = useState<string | null>(null);
   const printIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [viewingChallan, setViewingChallan] = useState<Challan | null>(null);
+  const [paymentQrUrl, setPaymentQrUrl] = useState<string | null>(null);
+  const [paymentUpiId, setPaymentUpiId] = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number>; returnsCount?: number; voidedCount?: number; prevRevenue?: number; prevCount?: number }>({ totalRevenue: 0, count: 0, byMode: {} });
   const [analyticsFrom, setAnalyticsFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; });
@@ -158,6 +160,16 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     else setBreadcrumb(null);
     return () => setBreadcrumb(null);
   }, [showCashBook, showLedger, showAnalytics, viewingChallan, setBreadcrumb]);
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('app_settings').select('value').eq('key', 'payment_qr_url').maybeSingle(),
+      supabase.from('app_settings').select('value').eq('key', 'payment_upi_id').maybeSingle(),
+    ]).then(([qr, upi]) => {
+      if (qr.data?.value) setPaymentQrUrl(qr.data.value as string);
+      if (upi.data?.value) setPaymentUpiId(upi.data.value as string);
+    });
+  }, []);
 
   // ── Computed values (per-item discount) ─────────────────────────────────
   // Honest math throughout — no silent clamping. If the user enters an
@@ -211,11 +223,15 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     let query = supabase.from('cash_challans').select('*, cash_challan_items(sku, quantity, price, discount_amount, total)', { count: 'estimated' });
     if (debouncedSearch) {
       const s = debouncedSearch.replace(/[%_,().]/g, '');
-      // Numeric input searches BOTH challan number and names containing it,
-      // so customers like "7 Star Traders" stay findable.
       const num = parseInt(s);
-      if (!isNaN(num)) query = query.or(`challan_number.eq.${num},customer_name.ilike.%${s.trim()}%`);
-      else if (s.trim()) query = query.ilike('customer_name', `%${s}%`);
+      if (!isNaN(num)) {
+        query = query.or(`challan_number.eq.${num},customer_name.ilike.%${s.trim()}%`);
+      } else if (s.trim()) {
+        const { data: skuIds } = await supabase.rpc('search_challan_ids', { q: s.trim() });
+        const ids = (skuIds as string[] | null) || [];
+        if (ids.length > 0) query = query.or(`customer_name.ilike.%${s}%,id.in.(${ids.join(',')})`);
+        else query = query.ilike('customer_name', `%${s}%`);
+      }
     }
     if (statusFilter) query = query.eq('status', statusFilter);
     if (tagFilter) query = query.contains('tags', [tagFilter]);
@@ -1359,6 +1375,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         hasPrev={idx > 0}
         onNext={() => { if (idx < challans.length - 1) setViewingChallan(challans[idx + 1]); }}
         onPrev={() => { if (idx > 0) setViewingChallan(challans[idx - 1]); }}
+        qrUrl={paymentQrUrl}
+        upiId={paymentUpiId}
       />; })()}
 
       {/* WhatsApp Phone Prompt Modal */}

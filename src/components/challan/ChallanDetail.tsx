@@ -24,11 +24,15 @@ interface Props {
   onPrev?: () => void;
   hasNext?: boolean;
   hasPrev?: boolean;
+  qrUrl?: string | null;
+  upiId?: string | null;
 }
+
+const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
 
 type TimelineEntry = { type: 'audit' | 'payment'; time: string; action?: string; details?: string; user_name?: string; changes?: Record<string, { from: unknown; to: unknown }> | null; amount?: number; payment_mode?: string; is_reversal?: boolean; notes?: string; batch_id?: string | null };
 
-export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid, onNext, onPrev, hasNext, hasPrev }: Props) {
+export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid, onNext, onPrev, hasNext, hasPrev, qrUrl, upiId }: Props) {
   const { addToast } = useNotifications();
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
@@ -37,6 +41,41 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
   const [editSkuIdx, setEditSkuIdx] = useState<number | null>(null);
   const [editSkuVal, setEditSkuVal] = useState('');
   const [savingSku, setSavingSku] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [editNotesVal, setEditNotesVal] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  const [showQrShare, setShowQrShare] = useState(false);
+  const [qrPhone, setQrPhone] = useState('');
+
+  const sendQrWhatsApp = () => {
+    const phone = qrPhone.trim();
+    if (!phone || phone.replace(/\D/g, '').length < 10) { return; }
+    const due = Math.max(0, Number(c.total) - Number(c.amount_paid || 0));
+    const amt = due > 0 ? due : Number(c.total);
+    let msg = `Payment for Challan #${c.challan_number} — ₹${amt.toLocaleString('en-IN')}\n\n`;
+    if (upiId) msg += `Pay via UPI ID: ${upiId}\n`;
+    if (qrUrl) msg += `Scan QR: ${qrUrl}\n`;
+    msg += `\nArya Designs`;
+    window.location.href = `https://wa.me/${waPhone(phone)}?text=${encodeURIComponent(msg)}`;
+    setShowQrShare(false);
+  };
+
+  const saveNotes = async () => {
+    const newNotes = editNotesVal.trim() || null;
+    const oldNotes = c.notes || null;
+    if (newNotes === oldNotes) { setEditingNotes(false); return; }
+    setSavingNotes(true);
+    try {
+      const { error } = await supabase.from('cash_challans').update({ notes: newNotes }).eq('id', c.id);
+      if (error) { addToast(friendlyError(error), 'error'); setSavingNotes(false); return; }
+      await supabase.from('audit_log').insert({ module: 'cash_challan', record_id: c.id, action: 'NOTES_EDIT', details: `Notes ${newNotes ? 'updated' : 'removed'} on challan #${c.challan_number}`, user_email: profile?.email, changes: { notes: { from: oldNotes, to: newNotes } } }).then(({ error: ae }) => { if (ae) console.warn('Audit log failed:', ae.message); });
+      (c as any).notes = newNotes;
+      addToast('Notes updated', 'success');
+    } catch (e: any) { addToast(friendlyError(e), 'error'); }
+    setSavingNotes(false);
+    setEditingNotes(false);
+  };
 
   const saveSkuEdit = async (item: Partial<CashChallanItem>, oldSku: string) => {
     const newSku = editSkuVal.trim();
@@ -286,13 +325,29 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
           )}
 
           {/* ── Notes + Tags ── */}
-          {c.notes && <div style={{ fontSize: 11, color: T.tx2, marginBottom: 8, lineHeight: 1.5 }}><span style={{ color: T.tx3, fontSize: 9, fontWeight: 600, letterSpacing: 0.5 }}>NOTES: </span>{c.notes}</div>}
+          <div style={{ fontSize: 11, color: T.tx2, marginBottom: 8, lineHeight: 1.5 }}>
+            {editingNotes ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <textarea autoFocus value={editNotesVal} onChange={e => setEditNotesVal(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') setEditingNotes(false); }} rows={3} style={{ ...S.fInput, height: 'auto', resize: 'vertical', fontSize: 11 }} disabled={savingNotes} placeholder="Add a note…" />
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button onClick={saveNotes} disabled={savingNotes} style={{ ...S.btnPrimary, padding: '4px 10px', fontSize: 10, borderRadius: 5, opacity: savingNotes ? 0.5 : 1 }}>{savingNotes ? 'Saving…' : 'Save'}</button>
+                  <button onClick={() => setEditingNotes(false)} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 10, borderRadius: 5 }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <span style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'flex-start', gap: 5 }} onClick={() => { setEditNotesVal(c.notes || ''); setEditingNotes(true); }}>
+                {c.notes ? <><span style={{ color: T.tx3, fontSize: 9, fontWeight: 600, letterSpacing: 0.5 }}>NOTES: </span>{c.notes}</> : <span style={{ color: T.tx3, fontSize: 10, opacity: 0.5 }}>+ Add notes</span>}
+                <svg viewBox="0 0 24 24" style={{ width: 10, height: 10, fill: 'none', stroke: T.tx3, strokeWidth: 2, opacity: 0.3, flexShrink: 0, marginTop: 2 }}><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+              </span>
+            )}
+          </div>
           {c.tags && c.tags.length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 14 }}>{c.tags.map(t => <span key={t} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 4, background: T.ac3, color: T.ac2, fontWeight: 500 }}>{t}</span>)}</div>}
 
           {/* ── Action buttons ── */}
           <div className="challan-detail-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: `1px solid ${T.bd}`, paddingTop: 14 }}>
             {!isVoided && c.status !== 'paid' && <button onClick={onEdit} style={{ ...S.btnPrimary, padding: '8px 16px' }}>Edit</button>}
             <button onClick={onPrint} style={btnBase}>Print</button>
+            {qrUrl && <button onClick={() => { setQrPhone(c.customer_phone || ''); setShowQrShare(true); }} style={btnBase}>Share QR</button>}
             {canRemind && <button onClick={onRemind} style={{ ...S.btnSuccess, padding: '8px 16px' }}>Remind</button>}
             {canReturn && <button onClick={onReturn} style={{ ...S.btnDanger, padding: '8px 16px' }}>Return</button>}
             {!isVoided && (isRet || c.status !== 'paid') && <button onClick={onVoid} style={{ ...S.btnDanger, padding: '8px 16px' }}>Void</button>}
@@ -302,5 +357,29 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
     </div>
   );
 
-  return createPortal(content, document.body);
+  const qrModal = showQrShare && qrUrl ? createPortal(
+    <div style={S.modalOverlay} onClick={() => setShowQrShare(false)}>
+      <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
+        <div style={{ ...S.modalHead, borderBottom: 'none', padding: '0 0 12px' }}>
+          <div style={S.modalTitle}>Share Payment QR</div>
+          <span onClick={() => setShowQrShare(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18 }}>&times;</span>
+        </div>
+        <div style={{ textAlign: 'center', marginBottom: 14 }}>
+          <img src={qrUrl} alt="Payment QR" style={{ width: '100%', maxWidth: 220, borderRadius: 10, margin: '0 auto' }} />
+          {upiId && <div style={{ fontSize: 11, color: T.tx3, fontFamily: T.mono, marginTop: 8 }}>{upiId}</div>}
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={S.fLabel}>Phone number</label>
+          <input type="tel" value={qrPhone} onChange={e => setQrPhone(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') sendQrWhatsApp(); }} placeholder="9876543210" style={{ ...S.fInput, fontFamily: T.mono }} />
+        </div>
+        <button onClick={sendQrWhatsApp} style={{ ...S.btnPrimary, width: '100%', justifyContent: 'center', gap: 6 }}>
+          <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
+          Send via WhatsApp
+        </button>
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
+  return <>{createPortal(content, document.body)}{qrModal}</>;
 }
