@@ -37,6 +37,7 @@ export default function InventoryExtras() {
   const [search, setSearch] = useState('');
   const skuTimer = useRef<ReturnType<typeof setTimeout>>();
   const [catFilter, setCatFilter] = useState('all');
+  const [compFilter, setCompFilter] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
   const [exportHtml, setExportHtml] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -235,8 +236,12 @@ export default function InventoryExtras() {
     setSaving(true);
     const newQty = adjustMode === 'add' ? adjustExtra.quantity + qty : adjustExtra.quantity - qty;
     if (newQty < 0) { setSaving(false); setError('Cannot go below 0'); return; }
-    // Qty 0 rows are KEPT (shown as "Out of stock") — deleting them orphaned
-    // the usage history and made completed-via-extra items unrevertable.
+    if (newQty === 0) {
+      const { error: delErr } = await supabase.from('inventory_extras').delete().eq('id', adjustExtra.id).eq('quantity', adjustExtra.quantity);
+      if (delErr) { setSaving(false); setError(friendlyError(delErr)); return; }
+      setSaving(false); setAdjustExtra(null); setAdjustQty('1'); setAdjustReason(''); addToast('Spare part removed (qty reached 0)', 'success'); setPage(0); fetchExtras();
+      return;
+    }
     const { data: updated, error: upErr } = await supabase.from('inventory_extras')
       .update({ quantity: newQty, updated_at: new Date().toISOString() })
       .eq('id', adjustExtra.id)
@@ -270,6 +275,7 @@ export default function InventoryExtras() {
   const [perPage, setPerPage] = useState(25);
   const filtered = extras.filter(ex => {
     if (catFilter !== 'all' && ex.product_id !== catFilter) return false;
+    if (compFilter !== 'all' && ex.component_name !== compFilter) return false;
     if (search) {
       const q = search.toLowerCase();
       return ex.sku.toLowerCase().includes(q) || ex.product_name.toLowerCase().includes(q) || ex.component_name.toLowerCase().includes(q);
@@ -331,7 +337,12 @@ export default function InventoryExtras() {
           <option value="all">All Categories</option>
           {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
         </select>
-        {(search || catFilter !== 'all') && <button onClick={() => { setSearch(''); setCatFilter('all'); setPage(0); }} style={{ ...S.btnGhost, ...S.btnSm }}>Clear</button>}
+        <select value={compFilter} onChange={e => { setCompFilter(e.target.value); setPage(0); }}
+          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', outline: 'none', cursor: 'pointer', flexShrink: 0 }}>
+          <option value="all">All Components</option>
+          {[...new Set(extras.map(ex => ex.component_name))].sort().map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        {(search || catFilter !== 'all' || compFilter !== 'all') && <button onClick={() => { setSearch(''); setCatFilter('all'); setCompFilter('all'); setPage(0); }} style={{ ...S.btnGhost, ...S.btnSm }}>Clear</button>}
       </div>
 
       {loading && extras.length === 0 && <SkeletonRows rows={6} />}
