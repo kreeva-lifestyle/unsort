@@ -38,6 +38,7 @@ export default function InventoryExtras() {
   const skuTimer = useRef<ReturnType<typeof setTimeout>>();
   const [catFilter, setCatFilter] = useState('all');
   const [compFilter, setCompFilter] = useState('all');
+  const [matchFilter, setMatchFilter] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
   const [exportHtml, setExportHtml] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -276,6 +277,8 @@ export default function InventoryExtras() {
   const filtered = extras.filter(ex => {
     if (catFilter !== 'all' && ex.product_id !== catFilter) return false;
     if (compFilter !== 'all' && ex.component_name !== compFilter) return false;
+    if (matchFilter === 'has' && !(matchCounts[ex.id] > 0)) return false;
+    if (matchFilter === 'none' && (matchCounts[ex.id] || 0) > 0) return false;
     if (search) {
       const q = search.toLowerCase();
       return ex.sku.toLowerCase().includes(q) || ex.product_name.toLowerCase().includes(q) || ex.component_name.toLowerCase().includes(q);
@@ -342,7 +345,13 @@ export default function InventoryExtras() {
           <option value="all">All Components</option>
           {[...new Set(extras.map(ex => ex.component_name))].sort().map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        {(search || catFilter !== 'all' || compFilter !== 'all') && <button onClick={() => { setSearch(''); setCatFilter('all'); setCompFilter('all'); setPage(0); }} style={{ ...S.btnGhost, ...S.btnSm }}>Clear</button>}
+        <select value={matchFilter} onChange={e => { setMatchFilter(e.target.value); setPage(0); }}
+          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', outline: 'none', cursor: 'pointer', flexShrink: 0 }}>
+          <option value="all">All Matches</option>
+          <option value="has">Has Matches</option>
+          <option value="none">No Matches</option>
+        </select>
+        {(search || catFilter !== 'all' || compFilter !== 'all' || matchFilter !== 'all') && <button onClick={() => { setSearch(''); setCatFilter('all'); setCompFilter('all'); setMatchFilter('all'); setPage(0); }} style={{ ...S.btnGhost, ...S.btnSm }}>Clear</button>}
       </div>
 
       {loading && extras.length === 0 && <SkeletonRows rows={6} />}
