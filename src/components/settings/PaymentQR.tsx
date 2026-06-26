@@ -17,7 +17,7 @@ export default function PaymentQR({ addToast }: { addToast: (msg: string, type: 
     ]).then(([qr, upi]) => {
       if (qr.data?.value) setQrUrl(qr.data.value as string);
       if (upi.data?.value) setUpiId(upi.data.value as string);
-    });
+    }).catch(() => {});
   }, []);
 
   const uploadQr = async (file: File) => {
