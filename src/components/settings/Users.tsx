@@ -69,7 +69,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     access[modKey] = !access[modKey];
     const { error } = await supabase.from('profiles').update({ module_access: access }).eq('id', userId);
     if (error) addToast('Failed to update access — ' + friendlyError(error), 'error');
-    else fetchUsers();
+    else { addToast(`${MODULE_LABELS[modKey]} ${access[modKey] ? 'enabled' : 'disabled'}`, 'success'); fetchUsers(); }
   };
 
   const ROLE_COLORS: Record<string, string> = { admin: T.yl, manager: T.ac2, operator: T.bl, viewer: T.tx3 };
