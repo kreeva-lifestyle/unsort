@@ -9,15 +9,18 @@ if (window.location.hash.startsWith('#/s/')) {
 }
 
 // Error boundary to prevent blank screen crashes
-class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: any }> {
-  state = { error: null as any };
-  static getDerivedStateFromError(error: any) { return { error }; }
+class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: unknown }> {
+  state = { error: null as unknown };
+  static getDerivedStateFromError(error: unknown) { return { error }; }
+  componentDidCatch(error: unknown, errorInfo: React.ErrorInfo) {
+    logError(error, 'boundary', { componentStack: errorInfo.componentStack || undefined });
+  }
   render() {
     if (this.state.error) return <div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' as const, gap: 14, padding: 20, position: 'relative' }}>
       <div style={{ position: 'absolute', top: '30%', left: '40%', width: 300, height: 300, background: `radial-gradient(circle, ${T.ac3} 0%, transparent 70%)`, pointerEvents: 'none' }} />
       <div style={{ position: 'relative', zIndex: 1, background: T.s, backdropFilter: 'blur(24px)', border: `1px solid ${T.bd}`, borderRadius: T.rXl, padding: '28px 32px', textAlign: 'center' as const, maxWidth: 380, boxShadow: '0 16px 48px rgba(0,0,0,.4)' }}>
         <p style={{ color: T.tx, fontSize: 14, fontWeight: 600, fontFamily: T.sora, marginBottom: 6 }}>Something went wrong</p>
-        <p style={{ color: T.tx3, fontSize: 11, marginBottom: 16, lineHeight: 1.5 }}>{String(this.state.error?.message || this.state.error)}</p>
+        <p style={{ color: T.tx3, fontSize: 11, marginBottom: 16, lineHeight: 1.5 }}>{this.state.error instanceof Error ? this.state.error.message : String(this.state.error)}</p>
         <button onClick={() => window.location.reload()} style={{ ...S.btnPrimary, padding: '7px 18px', fontSize: 11 }}>Reload</button>
       </div>
     </div>;
@@ -74,6 +77,7 @@ import { BreadcrumbProvider } from './hooks/useBreadcrumb';
 
 import { TAB_IDS, canAccessTab, getFirstAllowedTab } from './lib/tabs';
 import { initGlobalPrintMode } from './lib/printQueue';
+import { logError } from './lib/errorLogger';
 const getTabFromHash = () => {
   const h = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   return (TAB_IDS as readonly string[]).includes(h) ? h : 'dashboard';

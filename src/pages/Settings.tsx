@@ -10,6 +10,7 @@ import BrandsSettings from '../components/settings/Brands';
 import PackStationSettings from '../components/settings/PackStation';
 import PrinterSettings from '../components/settings/PrinterSettings';
 import PaymentQR from '../components/settings/PaymentQR';
+import ErrorLogs from '../components/settings/ErrorLogs';
 
 const TAB_ICONS: Record<string, string> = { myprofile: 'user', categories: 'grid', locations: 'pin', brands: 'tag', users: 'users', packtime: 'scan', printers: 'print' };
 
@@ -21,7 +22,7 @@ export default function Settings({ profile, addToast }: { profile: any; addToast
   // needs it regardless of role, so it lives in the base tab list.
   const tabs = [{ id: 'myprofile', label: 'My Profile' }, { id: 'printers', label: 'Printers' }];
   if (canManage) tabs.push({ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }, { id: 'brands', label: 'Brands' });
-  if (isAdmin) tabs.push({ id: 'users', label: 'Users' }, { id: 'packtime', label: 'PackStation' }, { id: 'payment', label: 'Payment QR' });
+  if (isAdmin) tabs.push({ id: 'users', label: 'Users' }, { id: 'packtime', label: 'PackStation' }, { id: 'payment', label: 'Payment QR' }, { id: 'errorlogs', label: 'Error Logs' });
   const [tab, setTab] = useState('myprofile');
   const { set: setBreadcrumb } = useBreadcrumb();
   const tabLabel = tabs.find(t => t.id === tab)?.label || '';
@@ -44,6 +45,7 @@ export default function Settings({ profile, addToast }: { profile: any; addToast
       {tab === 'packtime' && isAdmin && <PackStationSettings addToast={addToast} />}
       {tab === 'printers' && <PrinterSettings addToast={addToast} />}
       {tab === 'payment' && isAdmin && <PaymentQR addToast={addToast} />}
+      {tab === 'errorlogs' && isAdmin && <ErrorLogs addToast={addToast} />}
     </div>
   );
 }
