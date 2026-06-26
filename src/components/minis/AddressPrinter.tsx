@@ -59,13 +59,14 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
     setFormError('');
     if (!form.name.trim() || !form.phone.trim() || !form.address.trim() || !form.city.trim() || !form.state.trim() || !form.pincode.trim()) { setFormError('All fields are required'); return; }
     setSaving(true);
+    const upper = { name: form.name.trim().toUpperCase(), phone: form.phone.trim(), address: form.address.trim().toUpperCase(), city: form.city.trim().toUpperCase(), state: form.state.trim().toUpperCase(), pincode: form.pincode.trim() };
     const { data: { user } } = await supabase.auth.getUser();
     if (editingId) {
-      const { error } = await supabase.from('address_labels').update({ ...form, updated_at: new Date().toISOString() }).eq('id', editingId);
+      const { error } = await supabase.from('address_labels').update({ ...upper, updated_at: new Date().toISOString() }).eq('id', editingId);
       if (error) { addToast('Update failed — ' + friendlyError(error), 'error'); setSaving(false); return; }
       addToast('Address updated', 'success');
     } else {
-      const { error } = await supabase.from('address_labels').insert({ ...form, created_by: user?.id });
+      const { error } = await supabase.from('address_labels').insert({ ...upper, created_by: user?.id });
       if (error) { addToast('Save failed — ' + friendlyError(error), 'error'); setSaving(false); return; }
       addToast('Address saved', 'success');
     }
