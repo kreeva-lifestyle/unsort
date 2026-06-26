@@ -600,6 +600,7 @@ export default function CashBook() {
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `CashBook_${label}_${fromDate}_to_${toDate}.csv`; a.click(); URL.revokeObjectURL(url);
+    addToast(`Exported ${rowsForTab.length} ${label.toLowerCase()}`, 'success');
   };
 
   return (

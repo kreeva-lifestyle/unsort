@@ -434,6 +434,7 @@ export default function BrandTagPrinter() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Brand Tags');
     XLSX.writeFile(wb, 'brand_tags_export.xlsx');
+    addToast(`Exported ${rows.length} brand tag${rows.length !== 1 ? 's' : ''}`, 'success');
   }, [rows, addToast]);
 
   // ── Row Mutations ──

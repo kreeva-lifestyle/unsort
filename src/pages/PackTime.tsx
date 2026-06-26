@@ -662,6 +662,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `PackStation_History_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
+    addToast(`Exported ${allData.length} scan${allData.length !== 1 ? 's' : ''}`, 'success');
   };
 
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });

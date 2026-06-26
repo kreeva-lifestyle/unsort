@@ -123,7 +123,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
   const fetchTasks = () => { supabase.from('tasks').select('id, title, is_done, created_at').order('created_at', { ascending: false }).limit(TASK_LIMIT).then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); setTasks((data ?? []) as TaskRow[]); }); };
 
   const [refreshing, setRefreshing] = useState(false);
-  const manualRefresh = useCallback(async () => { setRefreshing(true); await fetchAll(); fetchTasks(); setRefreshing(false); }, [fetchAll]);
+  const manualRefresh = useCallback(async () => { setRefreshing(true); await fetchAll(); fetchTasks(); setRefreshing(false); addToast('Dashboard refreshed', 'success'); }, [fetchAll, addToast]);
 
   // Dashboard shows aggregate counts — a 2s lag is imperceptible.
   const { debounced: debouncedFetchAll } = useDebouncedFetch(fetchAll, 2000);
