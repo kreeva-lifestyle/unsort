@@ -19,6 +19,11 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
   const [phoneEditing, setPhoneEditing] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneSaving, setPhoneSaving] = useState(false);
+  const [changingPwd, setChangingPwd] = useState(false);
+  const [pwd, setPwd] = useState('');
+  const [pwdConfirm, setPwdConfirm] = useState('');
+  const [pwdError, setPwdError] = useState('');
+  const [pwdSaving, setPwdSaving] = useState(false);
 
   const loadPin = useCallback(async () => {
     if (!profile?.id) return;
@@ -148,6 +153,36 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
             <div style={{ display: 'flex', gap: 6 }}>
               <button onClick={saveMyPin} disabled={pinSaving} style={{ ...S.btnPrimary, opacity: pinSaving ? 0.6 : 1 }}>{pinSaving ? 'Saving...' : 'Save PIN'}</button>
               <button onClick={() => { setEditingPin(false); setNewPin(''); setConfirmPin(''); setPinError(''); }} style={S.btnGhost}>Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+      {/* Change Password */}
+      <div style={{ background: 'rgba(99,102,241,.05)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: T.ac2, fontFamily: T.sora, marginBottom: 4 }}>Change Password</div>
+        <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10 }}>Update your login password.</div>
+        {!changingPwd ? (
+          <button onClick={() => { setChangingPwd(true); setPwd(''); setPwdConfirm(''); setPwdError(''); }} style={S.btnPrimary}>Change Password</button>
+        ) : (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }} className="two-col">
+              <div><label style={{ ...S.fLabel, marginBottom: 3 }}>New Password</label><input type="password" value={pwd} onChange={e => { setPwd(e.target.value); setPwdError(''); }} placeholder="Min 8 characters" autoFocus style={S.fInput} /></div>
+              <div><label style={{ ...S.fLabel, marginBottom: 3 }}>Confirm</label><input type="password" value={pwdConfirm} onChange={e => { setPwdConfirm(e.target.value); setPwdError(''); }} placeholder="Re-enter" style={S.fInput} /></div>
+            </div>
+            {pwdError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '5px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{pwdError}</div>}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={async () => {
+                setPwdError('');
+                if (pwd.length < 8) { setPwdError('Password must be at least 8 characters'); return; }
+                if (pwd !== pwdConfirm) { setPwdError('Passwords do not match'); return; }
+                setPwdSaving(true);
+                const { error } = await supabase.auth.updateUser({ password: pwd });
+                setPwdSaving(false);
+                if (error) { setPwdError(error.message || 'Failed to update password'); return; }
+                addToast('Password updated', 'success');
+                setChangingPwd(false); setPwd(''); setPwdConfirm('');
+              }} disabled={pwdSaving} style={{ ...S.btnPrimary, opacity: pwdSaving ? 0.6 : 1 }}>{pwdSaving ? 'Saving…' : 'Update Password'}</button>
+              <button onClick={() => { setChangingPwd(false); setPwd(''); setPwdConfirm(''); setPwdError(''); }} style={S.btnGhost}>Cancel</button>
             </div>
           </div>
         )}

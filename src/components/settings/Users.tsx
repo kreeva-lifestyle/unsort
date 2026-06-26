@@ -18,6 +18,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
   const [inviting, setInviting] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', password: '', role: 'viewer' });
   const [inviteResult, setInviteResult] = useState<{ email: string; password: string } | null>(null);
+  const [resetResult, setResetResult] = useState<{ name: string; password: string } | null>(null);
   const { ask, modalProps } = useConfirm();
 
   useEffect(() => {
@@ -61,6 +62,15 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     if (banErr) addToast(`Profile updated, but ${isActive ? 'login ban' : 'login unban'} failed — ${friendlyError(banErr)}. Toggle again to retry.`, 'error');
     else addToast(isActive ? 'Access revoked — user is signed out and login is blocked' : 'Access granted', 'success');
     fetchUsers();
+  };
+
+  const resetPassword = async (u: any) => {
+    if (!await ask({ title: `Reset password for ${u.full_name || u.email}?`, message: 'A new password will be generated. Share it with the user.', confirmLabel: 'Reset' })) return;
+    const pwd = generatePassword();
+    const { error } = await supabase.functions.invoke('admin-users', { body: { action: 'reset_password', target_user_id: u.id, new_password: pwd } });
+    if (error) { addToast('Password reset failed — ' + friendlyError(error), 'error'); return; }
+    setResetResult({ name: u.full_name || u.email, password: pwd });
+    addToast('Password reset successfully', 'success');
   };
 
   const toggleModule = async (userId: string, modKey: string) => {
@@ -184,6 +194,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 20, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', ...(u.is_active ? { background: 'rgba(45,212,160,.10)', color: T.gr } : { background: 'rgba(245,87,92,.10)', color: T.re }) }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', boxShadow: '0 0 6px currentColor' }} />{u.is_active ? 'Active' : 'Inactive'}
                   </span>
+                  {!isYou && <button onClick={() => resetPassword(u)} style={{ ...S.btnGhost, ...S.btnSm, fontSize: 10 }}>Reset Pwd</button>}
                   {!isYou && <Toggle on={u.is_active} onToggle={() => toggleActive(u.id, u.is_active)} size="sm" />}
                 </div>
               </div>
@@ -231,6 +242,16 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
             </div>
           </form>
         )}
+      </div></div>)}
+      {resetResult && (<div style={S.modalOverlay} onClick={() => setResetResult(null)}><div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Password Reset</div>
+        <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>New password for <strong style={{ color: T.tx }}>{resetResult.name}</strong>. Share this with the user:</div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: 12, marginBottom: 12 }}>
+          <p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 3 }}>New Password</p>
+          <p style={{ fontSize: 14, fontFamily: T.mono, color: T.ac, margin: 0, userSelect: 'all' as const, fontWeight: 600 }}>{resetResult.password}</p>
+        </div>
+        <div style={{ fontSize: 10, color: T.tx3, marginBottom: 14, textAlign: 'center' as const }}>The user should change their password after signing in.</div>
+        <button onClick={() => setResetResult(null)} style={{ ...S.btnPrimary, width: '100%', justifyContent: 'center' }}>Done</button>
       </div></div>)}
       <ConfirmModal {...modalProps} />
     </div>
