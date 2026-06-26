@@ -168,7 +168,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     ]).then(([qr, upi]) => {
       if (qr.data?.value) setPaymentQrUrl(qr.data.value as string);
       if (upi.data?.value) setPaymentUpiId(upi.data.value as string);
-    });
+    }).catch(() => {});
   }, []);
 
   // ── Computed values (per-item discount) ─────────────────────────────────
