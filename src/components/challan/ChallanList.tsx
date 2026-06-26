@@ -169,7 +169,7 @@ export default function ChallanList(p: Props) {
               const isSelected = p.selectedIds.has(c.id);
               const canSelect = c.status !== 'voided';
               const paid = Number(c.amount_paid || 0);
-              const due = Math.max(0, Number(c.total) - paid);
+              const due = Math.max(0, Number(c.total || 0) - paid);
               return (
                 <tr key={c.id} onClick={() => { if (p.bulkMode) { if (canSelect) p.onToggleSelect(c.id); } else p.onOpenDetail(c); }} style={{ borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: isSelected ? 'rgba(99,102,241,.06)' : 'transparent', transition: 'background .1s' }} onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,.03)'; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(99,102,241,.06)' : 'transparent'; }}>
                   {p.bulkMode && <td style={{ ...S.tdStyle, padding: '11px 8px' }}><div onClick={e => { e.stopPropagation(); if (canSelect) p.onToggleSelect(c.id); }} style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${canSelect ? (isSelected ? T.ac : T.bd2) : T.bd}`, background: isSelected ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: canSelect ? 'pointer' : 'not-allowed', opacity: canSelect ? 1 : 0.3 }}>{isSelected && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><polyline points="20 6 9 17 4 12" /></svg>}</div></td>}
@@ -246,7 +246,7 @@ export default function ChallanList(p: Props) {
           const isSelected = p.selectedIds.has(c.id);
           const canSelect = c.status !== 'voided';
           const paid = Number(c.amount_paid || 0);
-          const due = Math.max(0, Number(c.total) - paid);
+          const due = Math.max(0, Number(c.total || 0) - paid);
           const swipeActions = [
             { label: 'Print', color: '#3B82F6', onClick: () => p.onPrint(c) },
             ...((c.status === 'unpaid' || c.status === 'partial') ? [{ label: 'Remind', color: '#22C55E', onClick: () => p.onRemind(c) }] : []),

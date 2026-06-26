@@ -182,7 +182,10 @@ Deno.serve(async (req) => {
           const headers = rows[0].map(h => String(h ?? '').trim());
           for (const h of headers) if (h && !colSet.has(h)) { colSet.add(h); columns.push(h); }
           const skuIdx = skuColIndex(headers);
-          const statusIdx = headers.findIndex(h => h.toLowerCase().includes('status'));
+          // Prefer "STOCK STATUS" — a tab may also have "ORDER STATUS" etc.,
+          // so a bare includes('status') could pick the wrong column.
+          let statusIdx = headers.findIndex(h => h.toLowerCase().includes('stock') && h.toLowerCase().includes('status'));
+          if (statusIdx < 0) statusIdx = headers.findIndex(h => h.toLowerCase().includes('status'));
           let sizeIdx = headers.findIndex(h => h.toLowerCase() === 'size');
           if (sizeIdx < 0) sizeIdx = headers.findIndex(h => h.toLowerCase().includes('size'));
           if (statusIdx < 0) warnings.push(`No STOCK STATUS column in "${tab}" — counting all rows as active`);
@@ -201,7 +204,7 @@ Deno.serve(async (req) => {
             if (/stit/i.test(sizeRaw)) { skipped++; continue; }
             tabCount++;
             // Expand to expected Odette SKUs: one per real size, else the bare base
-            const sizes = sizeRaw.split(/[,/|]/).map(t => t.trim().toUpperCase()).filter(t => SIZE_TOKENS.has(t));
+            const sizes = sizeRaw.split(/[,/|\s]+/).map(t => t.trim().toUpperCase()).filter(t => SIZE_TOKENS.has(t));
             const expected = sizes.length
               ? sizes.map(s => ({ size: s, sku: normSku(`${base}-${s}`) }))
               : [{ size: '', sku: base }];
