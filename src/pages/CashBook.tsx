@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
