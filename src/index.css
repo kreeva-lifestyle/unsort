@@ -205,6 +205,9 @@ body.modal-open .fab { display: none !important; }
   .bt-actions-col { display: none !important; }
   .settings-tabs { flex-direction: column !important; width: 100% !important; }
   .settings-tabs > div { justify-content: flex-start !important; }
+  .user-card { padding: 14px !important; }
+  .user-card-controls { width: 100% !important; justify-content: space-between !important; margin-top: 2px !important; }
+  .user-card-controls select { flex: 1 !important; min-width: 0 !important; }
   .inv-action-btns { justify-content: flex-end !important; }
   .inv-more-fields { display: block !important; }
   .inv-more-content { display: none !important; }
