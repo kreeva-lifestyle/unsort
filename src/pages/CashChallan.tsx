@@ -361,7 +361,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const searchReturnSource = useCallback(async (q: string) => {
     if (!q.trim()) { setReturnResults([]); return; }
     const num = parseInt(q);
-    let query = supabase.from('cash_challans').select('*, cash_challan_items(*)').eq('is_return', false).neq('status', 'voided');
+    let query = supabase.from('cash_challans').select('*, cash_challan_items(sku, description, quantity, price, total, discount_type, discount_value, discount_amount)').eq('is_return', false).neq('status', 'voided');
     if (num && !isNaN(num)) query = query.eq('challan_number', num);
     else query = query.ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
     const { data } = await query.order('created_at', { ascending: false }).limit(10);

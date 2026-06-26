@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { numericKeyDown } from '../lib/numericInput';
@@ -276,7 +275,7 @@ export default function BrandTagPrinter() {
   // Smart realtime: apply individual row changes without re-fetching entire page
   useEffect(() => {
     const mapRow = (d: BrandTag): BrandTagRow => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies });
-    let debounceTimer: any;
+    let debounceTimer: ReturnType<typeof setTimeout>;
     const debounced = (fn: () => void) => { clearTimeout(debounceTimer); debounceTimer = setTimeout(fn, 1500); };
     const ch = supabase.channel('bt-smart')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'brand_tags' }, (payload) => {

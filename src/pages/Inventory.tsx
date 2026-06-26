@@ -131,31 +131,32 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
 
   const fetchData = () => {
     setLoading(true);
-    const p1 = supabase.from('inventory_items').select('*, products(name, sku, total_components)').order('created_at', { ascending: false }).limit(invLimit).then(({ data, error }) => { if (error) addToast('Failed to load inventory — ' + friendlyError(error), 'error'); setItems(data || []); setInvTruncated((data || []).length >= invLimit); });
+    const p1 = supabase.from('inventory_items').select('id, batch_number, serial_number, product_id, size, status, location, manufacturer, notes, order_id, marketplace, ticket_id, link, status_changed_at, created_at, updated_at, products(name, sku, total_components)').order('created_at', { ascending: false }).limit(invLimit).then(({ data, error }) => { if (error) addToast('Failed to load inventory — ' + friendlyError(error), 'error'); setItems(data || []); setInvTruncated((data || []).length >= invLimit); });
     supabase.from('products').select('id, name, sku, total_components, category').eq('is_active', true).then(({ data, error }) => { if (error) addToast('Failed to load categories — ' + friendlyError(error), 'error'); setProducts(data || []); });
     supabase.from('locations').select('id, name').order('name').then(({ data, error }) => { if (error) addToast('Failed to load locations — ' + friendlyError(error), 'error'); setLocations(data || []); });
     supabase.from('tags').select('id, name, color').order('name').then(({ data, error }) => { if (error) addToast('Failed to load tags — ' + friendlyError(error), 'error'); setTags(data || []); });
     supabase.from('inventory_items').select('manufacturer').gt('manufacturer', '').limit(5000).then(({ data, error }) => { if (error) { addToast('Failed to load manufacturers — ' + friendlyError(error), 'error'); return; } const unique = [...new Set((data || []).map(d => d.manufacturer).filter(Boolean))].sort(); setManufacturers(unique); });
-    supabase.from('item_tags').select('inventory_item_id, tag_id, tags(id, name, color)').limit(10000).then(({ data, error }) => {
+    supabase.from('item_tags').select('inventory_item_id, tag_id, tags(id, name, color)').limit(5000).then(({ data, error }) => {
       if (error) { addToast('Failed to load tags — ' + friendlyError(error), 'error'); return; }
-      const map: Record<string, any[]> = {};
-      (data || []).forEach((it: any) => { if (!map[it.inventory_item_id]) map[it.inventory_item_id] = []; map[it.inventory_item_id].push(it.tags); });
+      const map: Record<string, { id: string; name: string; color: string }[]> = {};
+      (data || []).forEach((it) => { if (!map[it.inventory_item_id]) map[it.inventory_item_id] = []; map[it.inventory_item_id].push(it.tags as unknown as { id: string; name: string; color: string }); });
       setItemTags(map);
     });
-    const p2 = supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').limit(10000).then(({ data, error }) => {
+    const p2 = supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').limit(5000).then(({ data, error }) => {
       if (error) { addToast('Failed to load components — ' + friendlyError(error), 'error'); return; }
       const missingMap: Record<string, string[]> = {};
       const damagedMap: Record<string, string[]> = {};
       const damagedIdMap: Record<string, Set<string>> = {};
       const presentMap: Record<string, Set<string>> = {};
-      (data || []).forEach((ic: any) => {
+      (data || []).forEach((ic) => {
+        const comp = ic.components as unknown as { name: string } | null;
         if (ic.status === 'missing') {
           if (!missingMap[ic.inventory_item_id]) missingMap[ic.inventory_item_id] = [];
-          if (ic.components?.name) missingMap[ic.inventory_item_id].push(ic.components.name);
+          if (comp?.name) missingMap[ic.inventory_item_id].push(comp.name);
         }
         if (ic.status === 'damaged') {
           if (!damagedMap[ic.inventory_item_id]) damagedMap[ic.inventory_item_id] = [];
-          if (ic.components?.name) damagedMap[ic.inventory_item_id].push(ic.components.name);
+          if (comp?.name) damagedMap[ic.inventory_item_id].push(comp.name);
           if (!damagedIdMap[ic.inventory_item_id]) damagedIdMap[ic.inventory_item_id] = new Set();
           damagedIdMap[ic.inventory_item_id].add(ic.component_id);
         }
@@ -209,7 +210,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   }, [items, itemMissing, itemPresent, itemDamagedIds]);
   useEffect(() => {
     fetchData();
-    let debounceTimer: any;
+    let debounceTimer: ReturnType<typeof setTimeout>;
     const debouncedFetch = () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(fetchData, 500); };
     const immFetch = () => fetchData();
     const ch = supabase.channel('inv-sync-' + instanceId.replace(/:/g, ''))
