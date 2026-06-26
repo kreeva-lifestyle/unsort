@@ -15,7 +15,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then(reg => {
-      if (reg) setInterval(() => reg.update(), 60_000);
+      // reg.update() can reject transiently (network blip, or sw.js 404 mid-
+      // deploy) — swallow it so these harmless update-check failures don't
+      // surface as unhandled rejections in the error log. The existing worker
+      // keeps running; the next tick retries.
+      if (reg) setInterval(() => { reg.update().catch(() => {}); }, 60_000);
     }).catch(e => console.error('SW registration failed:', e));
   });
   // Only logged-in users should see the "Update Available" prompt — showing it
