@@ -26,9 +26,9 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { action, target_user_id } = await req.json();
-    if ((action !== 'deactivate' && action !== 'reactivate') || typeof target_user_id !== 'string' || !target_user_id) {
-      return json({ error: 'Expected { action: "deactivate" | "reactivate", target_user_id }' }, 400);
+    const { action, target_user_id, new_password } = await req.json();
+    if (!['deactivate', 'reactivate', 'reset_password'].includes(action) || typeof target_user_id !== 'string' || !target_user_id) {
+      return json({ error: 'Expected { action: "deactivate" | "reactivate" | "reset_password", target_user_id }' }, 400);
     }
 
     const url = Deno.env.get('SUPABASE_URL')!;
@@ -51,6 +51,16 @@ Deno.serve(async (req: Request) => {
     }
 
     const admin = createClient(url, serviceKey);
+
+    if (action === 'reset_password') {
+      if (typeof new_password !== 'string' || new_password.length < 8) {
+        return json({ error: 'Password must be at least 8 characters' }, 400);
+      }
+      const { error } = await admin.auth.admin.updateUserById(target_user_id, { password: new_password });
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true });
+    }
+
     // ~100 years; 'none' lifts the ban
     const { error } = await admin.auth.admin.updateUserById(target_user_id, {
       ban_duration: action === 'deactivate' ? '876600h' : 'none',

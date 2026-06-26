@@ -64,6 +64,7 @@ const Minis = retryImport(() => import('./pages/Minis'));
 const PrintStation = retryImport(() => import('./pages/PrintStation'));
 const LazyPublicShareView = retryImport(() => import('./modules/programs/PublicShareView'));
 const LazyTracklyRedirect = retryImport(() => import('./components/minis/TracklyRedirect'));
+const LazyPasswordReset = retryImport(() => import('./pages/PasswordReset'));
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import SidebarComponent from './components/layout/Sidebar';
@@ -229,8 +230,11 @@ export default function App() {
 const AppContent = () => {
   const auth = useAuth();
 
-  // Public share route — no auth required, rendered before login gate
+  // Password recovery callback — Supabase redirects with #access_token=...&type=recovery
   const hash = window.location.hash;
+  if (hash.includes('type=recovery')) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyPasswordReset /></Suspense>;
+
+  // Public share route — no auth required, rendered before login gate
   const shareMatch = hash.match(/^#\/share\/program\/([a-f0-9]+)$/);
   if (shareMatch) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyPublicShareView shareToken={shareMatch[1]} /></Suspense>;
 
