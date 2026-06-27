@@ -4,6 +4,10 @@ import { supabase } from '../lib/supabase';
 import { printOrQueue } from '../lib/printQueue';
 
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
+// Local (IST) calendar date — NOT toISOString() which is UTC and shifts the day
+// boundary 5.5h, so a late-evening expense lands on the wrong day and falls
+// outside the default today filter (same fix already applied in CashChallan).
+const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 import { friendlyError } from '../lib/friendlyError';
 import { numericKeyDown } from '../lib/numericInput';
 import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
@@ -44,7 +48,7 @@ type CashSaleRow = Pick<CashChallan, 'id' | 'challan_number' | 'customer_name' |
 
 export default function CashBook() {
   const { addToast } = useNotifications();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
   // Single 'date' for new expense/handover input — defaults to today
@@ -314,7 +318,7 @@ export default function CashBook() {
     const amountDiffers = Math.abs(amt - handBreakdown.available) > 0.01;
     if (amountDiffers && !handReason.trim()) { setHandError('Amount differs from available cash. Add a reason in Notes/Reason field.'); return; }
     setHandSaving(true);
-    const todayDate = new Date().toISOString().slice(0, 10);
+    const todayDate = localToday();
     // Only an IN-FLIGHT (pending) handover blocks — its cash is claimed but
     // unsigned. Confirmed handovers no longer hard-block: computeBreakdown
     // already nets them out of "available", so leftover cash from a partial
