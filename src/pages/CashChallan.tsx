@@ -1348,7 +1348,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       />
 
       {/* Audit Trail Modal */}
-      {auditTrail && (
+      {auditTrail && createPortal((
         <div style={{ ...S.modalOverlay }} onClick={() => setAuditTrail(null)}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 420, padding: '18px 16px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -1367,7 +1367,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             ))}
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* Challan Detail View — read-only, opens before edit */}
       {viewingChallan && (() => { const idx = challans.findIndex(ch => ch.id === viewingChallan.id); return <ChallanDetail
@@ -1387,7 +1387,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       />; })()}
 
       {/* WhatsApp Phone Prompt Modal */}
-      {reminderChallan && (
+      {reminderChallan && createPortal((
         <div style={S.modalOverlay} onClick={() => setReminderChallan(null)}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Add Customer Phone</div>
@@ -1402,7 +1402,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* WhatsApp Share Bar */}
       {whatsAppShare && (
@@ -1415,7 +1415,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       )}
 
       {/* ERP Reminder Modal */}
-      {showErpReminder && (
+      {showErpReminder && createPortal((
         <div style={{ ...S.modalOverlay }} onClick={() => setShowErpReminder(false)}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380, padding: '24px 22px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <div style={{ marginBottom: 10 }}><svg viewBox="0 0 24 24" style={{ width: 36, height: 36, fill: 'none', stroke: '#6366F1', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' }}><rect x="6" y="3" width="12" height="18" rx="2" /><rect x="9" y="1" width="6" height="4" rx="1" /><path d="M9 10h6M9 13h4M9 16h5" opacity=".5" /></svg></div>
@@ -1427,10 +1427,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* Confirm Action Modal */}
-      {confirmAction && (
+      {confirmAction && createPortal((
         <div style={{ ...S.modalOverlay }} onClick={() => setConfirmAction(null)}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg></div>
@@ -1447,7 +1447,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
 
       {printHtml && createPortal(
