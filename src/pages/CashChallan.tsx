@@ -35,6 +35,10 @@ import { T, S, CHALLAN_STATUS_COLORS as STATUS_COLORS } from '../lib/theme';
 
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
 const isValidPhone = (raw: string) => raw.replace(/\D/g, '').replace(/^91/, '').length >= 10;
+// Local (IST) calendar date — NOT toISOString() which is UTC and shifts the day
+// boundary 5.5h, so a payment entered 00:00–05:30 IST lands on the previous day
+// and drops out of the Cash Book / analytics for that day.
+const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 // View model: form-state representation of a cash_challan_items row.
 // Differs from DB row: `id` optional (unsaved items), no challan_id/sort_order
@@ -132,7 +136,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number>; returnsCount?: number; voidedCount?: number; prevRevenue?: number; prevCount?: number }>({ totalRevenue: 0, count: 0, byMode: {} });
   const [analyticsFrom, setAnalyticsFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; });
-  const [analyticsTo, setAnalyticsTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [analyticsTo, setAnalyticsTo] = useState(() => localToday());
 
   // Ledger
   const [showLedger, setShowLedger] = useState(false);
@@ -443,7 +447,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // share a name and split a customer across renames.
   const ledgerKey = (id: string | null, name: string) => id || `name:${name}`;
   const fetchLedger = useCallback(async (limit = ledgerFetchLimit) => {
-    const { data } = await supabase.from('cash_challans').select('customer_id, customer_name, total, amount_paid, is_return, created_at, status').neq('status', 'voided').order('created_at', { ascending: false }).limit(limit);
+    const { data, error } = await supabase.from('cash_challans').select('customer_id, customer_name, total, amount_paid, is_return, created_at, status').neq('status', 'voided').order('created_at', { ascending: false }).limit(limit);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
     type LedgerRow = Pick<CashChallan, 'customer_id' | 'customer_name' | 'total' | 'amount_paid' | 'is_return' | 'created_at' | 'status'>;
     const now = Date.now();
     const daysSince = (d: string) => Math.floor((now - new Date(d).getTime()) / 86400000);
@@ -476,7 +481,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   const searchLedgerCustomer = useCallback(async (q: string) => {
     if (!q.trim()) { fetchLedger(); return; }
-    const { data } = await supabase.from('cash_challans').select('customer_id, customer_name, total, amount_paid, is_return, created_at, status').neq('status', 'voided').ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
+    const { data, error } = await supabase.from('cash_challans').select('customer_id, customer_name, total, amount_paid, is_return, created_at, status').neq('status', 'voided').ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
     type LedgerSearchRow = Pick<CashChallan, 'customer_id' | 'customer_name' | 'total' | 'amount_paid' | 'is_return' | 'created_at' | 'status'>;
     const now = Date.now();
     const daysSince = (d: string) => Math.floor((now - new Date(d).getTime()) / 86400000);
@@ -632,7 +638,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           addToast(msg, 'error');
           return;
         }
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localToday();
         const prevPaid = Number(editing.amount_paid || 0);
         const payDiff = amountPaid - prevPaid;
         const { error: upErr } = await supabase.rpc('update_challan_with_items', {
@@ -651,7 +657,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         const rpcPayload = {
           p_challan: { ...challanData, created_by: user?.id, source_challan_id: isReturn && returnSource ? returnSource.id : null },
           p_items: items.map((it) => ({ sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: computeItemDiscount(it) })),
-          p_payment: amountPaid > 0 ? { amount: amountPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || new Date().toISOString().slice(0, 10), paid_by: user?.id } : null,
+          p_payment: amountPaid > 0 ? { amount: amountPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || localToday(), paid_by: user?.id } : null,
         };
         const { data: newChallan, error: crErr } = await supabase.rpc('create_challan_with_items', rpcPayload);
         if (crErr || !newChallan?.id || !newChallan?.challan_number) throw new Error(crErr?.message || 'Failed to create challan — missing response data');
@@ -677,9 +683,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         let outQ = supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', savedName).in('status', ['unpaid', 'partial']).eq('is_return', false);
         if (createdId) outQ = outQ.neq('id', createdId);
         if (custId) outQ = outQ.eq('customer_id', custId);
-        const { data: outData } = await outQ;
+        const { data: outData, error: outErr } = await outQ;
+        if (outErr) addToast('Could not fetch outstanding balance — figure omitted from message', 'error');
         const totalOutstanding = Math.round((outData || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0));
-        const outLine = totalOutstanding > 0 ? `\nTotal outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}` : '';
+        const outLine = !outErr && totalOutstanding > 0 ? `\nTotal outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}` : '';
         const modeStr = paymentMode ? ` via ${paymentMode}` : '';
         const paidLine = challanStatus === 'paid'
           ? `\nPayment of ₹${amountPaid.toLocaleString('en-IN')}${modeStr} received — thank you!`
@@ -723,7 +730,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       if (Number(before.amount_paid || 0) > 0) {
         const { error: revErr } = await supabase.from('cash_challan_payments').insert({
           challan_id: id, amount: Number(before.amount_paid), payment_mode: before.payment_mode || 'Cash',
-          payment_date: new Date().toISOString().slice(0, 10), paid_by: user?.id,
+          payment_date: localToday(), paid_by: user?.id,
           notes: `Return #${before.challan_number} voided — refund of ₹${before.amount_paid} received back`, is_reversal: true,
         });
         if (revErr) addToast('Refund reversal record failed — ' + friendlyError(revErr), 'error');
@@ -763,7 +770,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const partialNote = paidSoFar > 0 ? `\n₹${paidSoFar.toLocaleString('en-IN')} received so far.` : '';
     let totalOutQ = supabase.from('cash_challans').select('total, amount_paid, is_return').eq('customer_name', c.customer_name).in('status', ['unpaid', 'partial']);
     if (c.customer_id) totalOutQ = totalOutQ.eq('customer_id', c.customer_id);
-    const { data: allChallans } = await totalOutQ;
+    const { data: allChallans, error: outErr } = await totalOutQ;
+    if (outErr) addToast(friendlyError(outErr), 'error');
     const unpaidSum = (allChallans || []).filter(r => !r.is_return).reduce((s, r) => s + (Number(r.total) - Number(r.amount_paid || 0)), 0);
     const returnSum = (allChallans || []).filter(r => r.is_return).reduce((s, r) => s + (Number(r.total) - Number(r.amount_paid || 0)), 0);
     const totalOutstanding = Math.max(0, Math.round(unpaidSum - returnSum));
@@ -803,7 +811,6 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const exportLedgerPDF = (customerName: string) => {
     if (ledgerChallans.length === 0) return;
     const safeName = escHtml(customerName);
-    const cust = ledgerCustomers.find(c => c.name === customerName);
     const netTotal = ledgerChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total), 0);
     const totalPaid = ledgerChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
     const outstanding = Math.round((netTotal - totalPaid) * 100) / 100;
@@ -843,7 +850,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       <div class="sub">${safeName} | Generated: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
       <div class="stats">
         <div class="stat"><div class="label">Total Billed</div><div class="val" style="color:#6366f1">₹${totalBilled.toLocaleString('en-IN')}</div></div>
-        <div class="stat"><div class="label">Paid</div><div class="val" style="color:#38a169">₹${(cust?.paid || totalPaid).toLocaleString('en-IN')}</div></div>
+        <div class="stat"><div class="label">Paid</div><div class="val" style="color:#38a169">₹${totalPaid.toLocaleString('en-IN')}</div></div>
         <div class="stat"><div class="label">Outstanding</div><div class="val" style="color:${outstanding > 0 ? '#e53e3e' : '#38a169'}">₹${outstanding.toLocaleString('en-IN')}</div></div>
       </div>
       <table><thead><tr><th>Challan</th><th>Date</th><th>Type</th><th style="text-align:right">Amount</th><th style="text-align:right">Paid</th><th style="text-align:right">Balance</th><th>Status</th></tr></thead>
@@ -1036,7 +1043,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const executeBulkPay = async () => {
     if (!bulkPayMode || bulkBusy) return;
     setBulkBusy(true);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localToday();
     const { data: { user } } = await supabase.auth.getUser();
     const ids = bulkPayable.map(c => c.id);
     if (ids.length === 0) { setShowBulkPay(false); setBulkBusy(false); return; }
@@ -1077,7 +1084,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const undoBatch = async (batchId: string) => {
     const { data: batchPayments } = await supabase.from('cash_challan_payments').select('challan_id, amount, payment_mode').eq('batch_id', batchId).eq('is_reversal', false);
     if (!batchPayments || batchPayments.length === 0) { addToast('No payments found for this batch', 'error'); return; }
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localToday();
     const { data: { user } } = await supabase.auth.getUser();
     const undoBatchId = `BU-${Date.now().toString(36).toUpperCase()}`;
     let undoFails = 0;
@@ -1097,7 +1104,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const executeBulkUnpay = async () => {
     if (bulkBusy) return;
     setBulkBusy(true);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localToday();
     const { data: { user } } = await supabase.auth.getUser();
     const ids = bulkUnpayable.map(c => c.id);
     if (ids.length === 0) { setShowBulkUnpay(false); setBulkBusy(false); return; }

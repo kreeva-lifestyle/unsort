@@ -126,7 +126,8 @@ export default function CashBook() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     // Opening balance — uses From date
-    const { data: bal } = await supabase.from('cash_book_balances').select('opening_balance').eq('date', fromDate).maybeSingle();
+    const { data: bal, error: balErr } = await supabase.from('cash_book_balances').select('opening_balance').eq('date', fromDate).maybeSingle();
+    if (balErr) addToast('Failed to load opening balance — ' + friendlyError(balErr), 'error');
     setOpeningBalance(Number(bal?.opening_balance || 0));
     setOpeningInput(String(bal?.opening_balance || 0));
 
@@ -136,12 +137,14 @@ export default function CashBook() {
     setExpenses((exp || []) as unknown as ExpenseRow[]);
 
     // Cash sales — filter by payment_date (when cash actually moved), not created_at
-    const { data: ch } = await supabase.from('cash_challans').select('id, challan_number, customer_name, total, amount_paid, status, is_return, payment_mode, payment_date, created_at')
+    const { data: ch, error: chErr } = await supabase.from('cash_challans').select('id, challan_number, customer_name, total, amount_paid, status, is_return, payment_mode, payment_date, created_at')
       .in('status', ['paid', 'partial']).gte('payment_date', fromDate).lte('payment_date', toDate).order('payment_date', { ascending: false });
+    if (chErr) addToast('Failed to load cash sales — ' + friendlyError(chErr), 'error');
     setSales(ch || []);
 
     // Handovers in date range
-    const { data: ho } = await supabase.from('cash_handovers').select('id, handover_number, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by, cancelled_at, cancelled_by').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
+    const { data: ho, error: hoErr } = await supabase.from('cash_handovers').select('id, handover_number, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by, cancelled_at, cancelled_by').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }).order('created_at', { ascending: false });
+    if (hoErr) addToast('Failed to load handovers — ' + friendlyError(hoErr), 'error');
     setHandovers((ho as Handover[] | null) || []);
     setLoading(false);
   }, [fromDate, toDate, addToast]);
