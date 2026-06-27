@@ -102,12 +102,14 @@ export default function ChallanForm(p: ChallanFormProps) {
 
   useEffect(() => {
     if (!p.customerName.trim()) { setOutstanding(0); return; }
-    supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', p.customerName.trim()).in('status', ['unpaid', 'partial']).eq('is_return', false).then(({ data, error }) => {
+    let q = supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', p.customerName.trim()).in('status', ['unpaid', 'partial']).eq('is_return', false);
+    if (p.selectedCustomerId) q = q.eq('customer_id', p.selectedCustomerId);
+    q.then(({ data, error }) => {
       if (error) { addToast(friendlyError(error), 'error'); return; }
       const total = (data || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0);
       setOutstanding(Math.round(total));
     });
-  }, [p.customerName]);
+  }, [p.customerName, p.selectedCustomerId]);
   const lbl: React.CSSProperties = { ...S.fLabel, marginBottom: 4 };
   const inp: React.CSSProperties = { ...S.fInput, width: '100%' };
 
