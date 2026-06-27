@@ -13,11 +13,14 @@ const SESSION_CAP = 50;
 let sessionCount = 0;
 
 // Browser noise that isn't actionable: cross-origin script errors, benign
-// ResizeObserver warnings, and extension-injected failures.
+// ResizeObserver warnings, extension-injected failures, and the QZ Tray
+// print-bridge WebSocket closing in the background (print station quit / PC
+// slept) — a real print attempt already surfaces "QZ Tray is not running".
 const NOISE = [
   'ResizeObserver loop',
   'Script error.',
   'Non-Error promise rejection captured',
+  'Connection closed before response received',
 ];
 
 function isNoise(message: string): boolean {
