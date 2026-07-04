@@ -288,36 +288,44 @@ export default function ChallanForm(p: ChallanFormProps) {
             </div>
           </div>
 
-          {/* Status + Payment */}
-          <div className="challan-form-grid-4" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
-            <div>
-              <label style={lbl}>Status</label>
-              {p.isReturn ? (
-                // Refunds are instant — no dropdown, always 'paid' (=Refunded).
-                <div style={{ ...inp, fontSize: 11, display: 'flex', alignItems: 'center', color: T.re, fontWeight: 600, cursor: 'default' }}>Refunded</div>
-              ) : (
+          {/* Status + Payment. Returns are credits (no cash) — the return reduces
+              the customer's balance, so no refund mode/amount/date is collected. */}
+          {p.isReturn ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8, alignItems: 'end' }}>
+              <div>
+                <label style={lbl}>Status</label>
+                <div style={{ ...inp, fontSize: 11, display: 'flex', alignItems: 'center', color: T.re, fontWeight: 600, cursor: 'default' }}>Credit</div>
+              </div>
+              <div style={{ background: 'rgba(239,68,68,.06)', border: `1px solid ${T.reAA || 'rgba(239,68,68,.2)'}`, borderRadius: T.rSm, padding: '8px 10px', fontSize: 11, color: T.tx2, lineHeight: 1.4 }}>
+                Credit note — reduces the customer's outstanding balance. No cash is refunded.
+              </div>
+            </div>
+          ) : (
+            <div className="challan-form-grid-4" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+              <div>
+                <label style={lbl}>Status</label>
                 <select value={p.challanStatus} onChange={e => p.setChallanStatus(e.target.value)} style={{ ...inp, fontSize: 11 }}>
                   <option value="unpaid">Unpaid</option>
                   <option value="paid">Paid</option>
                   <option value="partial">Partial</option>
                 </select>
-              )}
+              </div>
+              <div>
+                <label style={lbl}>Payment Mode</label>
+                <select value={p.paymentMode} onChange={e => p.setPaymentMode(e.target.value)} style={{ ...inp, fontSize: 11 }}>
+                  <option value="">Select...</option>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>Amount Paid</label>
+                <input type="number" min="0" value={p.amountPaid || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setAmountPaid(Math.max(0, Number(e.target.value)))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
+              </div>
+              <div>
+                <label style={lbl}>Payment Date</label>
+                <input type="date" value={p.paymentDate} onChange={e => p.setPaymentDate(e.target.value)} style={inp} />
+              </div>
             </div>
-            <div>
-              <label style={lbl}>{p.isReturn ? 'Refund Mode' : 'Payment Mode'}</label>
-              <select value={p.paymentMode} onChange={e => p.setPaymentMode(e.target.value)} style={{ ...inp, fontSize: 11 }}>
-                <option value="">Select...</option>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={lbl}>{p.isReturn ? 'Refund Amount' : 'Amount Paid'}</label>
-              <input type="number" min="0" value={p.amountPaid || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setAmountPaid(Math.max(0, Number(e.target.value)))} placeholder="0" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
-            </div>
-            <div>
-              <label style={lbl}>{p.isReturn ? 'Refund Date' : 'Payment Date'}</label>
-              <input type="date" value={p.paymentDate} onChange={e => p.setPaymentDate(e.target.value)} style={inp} />
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Totals card — honest math. Totals go red when negative so the

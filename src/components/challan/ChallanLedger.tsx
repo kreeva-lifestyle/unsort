@@ -48,12 +48,18 @@ export default function ChallanLedger({
   // Detail screen
   if (detailName) {
     const cust = customers.find(c => (detailId ? c.id === detailId : c.name === detailName));
+    // When a date range is applied, scope the KPI figures to the in-range
+    // challans (credit model: a return reduces net billed, never counts as paid).
+    const filtered = !!(dateFrom || dateTo);
+    const total = filtered ? detailChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total), 0) : (cust?.total ?? 0);
+    const paid = filtered ? detailChallans.reduce((s, c) => s + (c.is_return ? 0 : Number(c.amount_paid || 0)), 0) : (cust?.paid ?? 0);
+    const outstanding = filtered ? Math.round((total - paid) * 100) / 100 : (cust?.outstanding ?? 0);
     return (
       <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div>
             <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>{detailName}</span>
-            {cust && <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{dateFrom || dateTo ? `${detailChallans.length} in range` : `${cust.count} challans`} | Outstanding: <span style={{ color: cust.outstanding > 0 ? T.re : T.gr, fontWeight: 600 }}>₹{cust.outstanding.toLocaleString('en-IN')}</span></div>}
+            {cust && <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{filtered ? `${detailChallans.length} in range` : `${cust.count} challans`} | Outstanding: <span style={{ color: outstanding > 0 ? T.re : T.gr, fontWeight: 600 }}>₹{outstanding.toLocaleString('en-IN')}</span></div>}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={() => onExportPdf(detailName)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer', fontFamily: T.sans }}>Export PDF</button>
@@ -75,15 +81,15 @@ export default function ChallanLedger({
           <div className="challan-ledger-kpis" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
             <div style={{ background: T.ac3, border: `1px solid ${T.bd2}`, borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
               <div style={{ fontSize: 7, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 2 }}>Total Billed</div>
-              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>₹{cust.total.toLocaleString('en-IN')}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>₹{total.toLocaleString('en-IN')}</div>
             </div>
             <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.12)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
               <div style={{ fontSize: 7, color: T.gr, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 2 }}>Paid</div>
-              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: T.gr }}>₹{cust.paid.toLocaleString('en-IN')}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: T.gr }}>₹{paid.toLocaleString('en-IN')}</div>
             </div>
-            <div style={{ background: cust.outstanding > 0 ? 'rgba(239,68,68,.06)' : 'rgba(34,197,94,.06)', border: `1px solid ${cust.outstanding > 0 ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)'}`, borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
-              <div style={{ fontSize: 7, color: cust.outstanding > 0 ? T.re : T.gr, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 2 }}>Outstanding</div>
-              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: cust.outstanding > 0 ? T.re : T.gr }}>₹{cust.outstanding.toLocaleString('en-IN')}</div>
+            <div style={{ background: outstanding > 0 ? 'rgba(239,68,68,.06)' : 'rgba(34,197,94,.06)', border: `1px solid ${outstanding > 0 ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)'}`, borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
+              <div style={{ fontSize: 7, color: outstanding > 0 ? T.re : T.gr, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 2 }}>Outstanding</div>
+              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: outstanding > 0 ? T.re : T.gr }}>₹{outstanding.toLocaleString('en-IN')}</div>
             </div>
           </div>
         )}
@@ -103,7 +109,7 @@ export default function ChallanLedger({
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: isRet ? T.re : T.tx }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
-                  {Number(c.amount_paid || 0) > 0 && <div style={{ fontSize: 9, color: T.gr, fontFamily: T.mono }}>₹{Number(c.amount_paid).toLocaleString('en-IN')} paid</div>}
+                  {!isRet && Number(c.amount_paid || 0) > 0 && <div style={{ fontSize: 9, color: T.gr, fontFamily: T.mono }}>₹{Number(c.amount_paid).toLocaleString('en-IN')} paid</div>}
                   {!isRet && Number(c.total) - Number(c.amount_paid || 0) > 0 && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono }}>₹{(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} due</div>}
                 </div>
               </div>

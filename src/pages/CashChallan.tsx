@@ -121,13 +121,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // Analytics
   const [showErpReminder, setShowErpReminder] = useState(false);
+  const [erpReminderReturn, setErpReminderReturn] = useState(false);
   const [whatsAppShare, setWhatsAppShare] = useState<{ phone: string; url: string } | null>(null);
   // Ledger PDF preview — rendered in an in-app iframe (audit: no popup).
   const [ledgerPdfHtml, setLedgerPdfHtml] = useState<string | null>(null);
   const [ledgerPdfTitle, setLedgerPdfTitle] = useState('');
   const ledgerPdfIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [userName, setUserName] = useState('there');
-  const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number; inventoryDeducted?: boolean } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number; inventoryDeducted?: boolean; isReturn?: boolean } | null>(null);
   const [printHtml, setPrintHtml] = useState<string | null>(null);
   const printIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [viewingChallan, setViewingChallan] = useState<Challan | null>(null);
@@ -165,15 +166,19 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     return () => setBreadcrumb(null);
   }, [showCashBook, showLedger, showAnalytics, viewingChallan, setBreadcrumb]);
 
-  useEffect(() => {
+  // Payment QR/UPI live from app_settings. Re-read on mount AND every time a
+  // challan detail opens, so a freshly uploaded QR/UPI shows without a reload.
+  const loadPaymentSettings = useCallback(() => {
     Promise.all([
       supabase.from('app_settings').select('value').eq('key', 'payment_qr_url').maybeSingle(),
       supabase.from('app_settings').select('value').eq('key', 'payment_upi_id').maybeSingle(),
     ]).then(([qr, upi]) => {
-      if (qr.data?.value) setPaymentQrUrl(qr.data.value as string);
-      if (upi.data?.value) setPaymentUpiId(upi.data.value as string);
+      setPaymentQrUrl((qr.data?.value as string) ?? null);
+      setPaymentUpiId((upi.data?.value as string) ?? null);
     }).catch(() => {});
   }, []);
+  useEffect(() => { loadPaymentSettings(); }, [loadPaymentSettings]);
+  useEffect(() => { if (viewingChallan) loadPaymentSettings(); }, [viewingChallan?.id, loadPaymentSettings]);
 
   // ── Computed values (per-item discount) ─────────────────────────────────
   // Honest math throughout — no silent clamping. If the user enters an
@@ -458,7 +463,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       const sign = r.is_return ? -1 : 1;
       if (!map[key]) map[key] = { id: r.customer_id, name: r.customer_name, total: 0, paid: 0, count: 0, latest: r.created_at ?? '', aging: { current: 0, d30: 0, d60: 0, d90plus: 0 } };
       map[key].total += sign * Number(r.total);
-      map[key].paid += sign * Number(r.amount_paid || 0);
+      // Returns are credits, never cash — a return reduces net billed (via
+      // sign*total above) but is never counted as a payment received.
+      map[key].paid += r.is_return ? 0 : Number(r.amount_paid || 0);
       map[key].count++;
       const outstanding = Number(r.total) - Number(r.amount_paid || 0);
       if (!r.is_return && outstanding > 0 && r.status !== 'paid') {
@@ -492,7 +499,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       const sign = r.is_return ? -1 : 1;
       if (!map[key]) map[key] = { id: r.customer_id, name: r.customer_name, total: 0, paid: 0, count: 0, aging: { current: 0, d30: 0, d60: 0, d90plus: 0 } };
       map[key].total += sign * Number(r.total);
-      map[key].paid += sign * Number(r.amount_paid || 0);
+      // Returns are credits, never cash — a return reduces net billed (via
+      // sign*total above) but is never counted as a payment received.
+      map[key].paid += r.is_return ? 0 : Number(r.amount_paid || 0);
       map[key].count++;
       const outstanding = Number(r.total) - Number(r.amount_paid || 0);
       if (!r.is_return && outstanding > 0 && r.status !== 'paid') {
@@ -584,7 +593,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (amountPaid > grandTotal) { setFormError(`Amount paid (₹${amountPaid}) cannot exceed total (₹${grandTotal})`); return; }
     if (!paymentMode && amountPaid > 0) { setFormError('Select a payment mode when amount is paid'); return; }
     if (!paymentDate && amountPaid > 0) { setFormError('Payment date is required when amount is paid'); return; }
-    if (challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(isReturn ? `Refund amount (₹${amountPaid}) must equal return total (₹${grandTotal})` : `Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
+    // Returns are credits (no cash), so 'paid' status with amount_paid 0 is valid.
+    if (!isReturn && challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(`Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
     if (!isReturn && challanStatus === 'partial' && (amountPaid <= 0 || amountPaid > grandTotal - 0.01)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
     if (challanStatus === 'unpaid' && amountPaid > 0) { setFormError('Status is "Unpaid" but amount is paid. Change status to "Paid" or "Partial"'); return; }
     setSaving(true);
@@ -617,12 +627,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     }
 
     const challanData = {
-      // Returns are always 'paid' (=Refunded) — refunds are instant.
+      // Returns are credits (no cash): status 'paid' = closed, amount_paid 0, no payment row.
       customer_id: custId, customer_name: customerName.trim(), customer_phone: trimmedPhone, status: isReturn ? 'paid' : challanStatus,
       subtotal, discount_type: null, discount_value: 0,
       discount_amount: totalDiscount, shipping_charges: clampedShipping, round_off: roundOff, total: grandTotal,
-      amount_paid: amountPaid, payment_mode: paymentMode || null,
-      payment_date: paymentDate || null, notes, tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : null,
+      amount_paid: isReturn ? 0 : amountPaid, payment_mode: isReturn ? null : (paymentMode || null),
+      payment_date: isReturn ? null : (paymentDate || null), notes, tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : null,
       is_return: isReturn,
       modified_by: user?.id,
     };
@@ -657,7 +667,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         const rpcPayload = {
           p_challan: { ...challanData, created_by: user?.id, source_challan_id: isReturn && returnSource ? returnSource.id : null },
           p_items: items.map((it) => ({ sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: computeItemDiscount(it) })),
-          p_payment: amountPaid > 0 ? { amount: amountPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || localToday(), paid_by: user?.id } : null,
+          p_payment: (!isReturn && amountPaid > 0) ? { amount: amountPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || localToday(), paid_by: user?.id } : null,
         };
         const { data: newChallan, error: crErr } = await supabase.rpc('create_challan_with_items', rpcPayload);
         if (crErr || !newChallan?.id || !newChallan?.challan_number) throw new Error(crErr?.message || 'Failed to create challan — missing response data');
@@ -699,7 +709,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       }
       const suppressed = localStorage.getItem('ccErpReminderHidden');
       const aWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      if (!suppressed || Number(suppressed) < aWeekAgo) setShowErpReminder(true);
+      if (!suppressed || Number(suppressed) < aWeekAgo) { setErpReminderReturn(isReturn); setShowErpReminder(true); }
     }
     } finally { setSaving(false); }
   };
@@ -710,8 +720,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setChallans(cs => cs.map(c => c.id === id ? { ...c, inventory_deducted: value } : c));
     const { error } = await supabase.from('cash_challans').update({ inventory_deducted: value }).eq('id', id);
     if (error) { addToast(friendlyError(error), 'error'); setChallans(cs => cs.map(c => c.id === id ? { ...c, inventory_deducted: !value } : c)); return; }
-    addToast(value ? 'Inventory deducted' : 'Inventory restored', 'success');
-    await ccAuditLog('INV_TOGGLE', id, `Challan #${prev?.challan_number || '?'} — inventory ${value ? 'deducted' : 'restored'}`, { inventory_deducted: { from: !value, to: value } });
+    // Direction depends on challan type: a sale deducts stock, a return adds it back.
+    const isRet = !!prev?.is_return;
+    const doneMsg = isRet ? 'Inventory added back' : 'Inventory deducted';
+    const undoMsg = isRet ? 'Addition reverted' : 'Inventory restored';
+    const auditVerb = value ? (isRet ? 'added back' : 'deducted') : (isRet ? 'addition reverted' : 'restored');
+    addToast(value ? doneMsg : undoMsg, 'success');
+    await ccAuditLog('INV_TOGGLE', id, `Challan #${prev?.challan_number || '?'} — inventory ${auditVerb}`, { inventory_deducted: { from: !value, to: value } });
   };
 
   // ── Void challan ───────────────────────────────────────────────────────────
@@ -811,21 +826,24 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const exportLedgerPDF = (customerName: string) => {
     if (ledgerChallans.length === 0) return;
     const safeName = escHtml(customerName);
-    const netTotal = ledgerChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total), 0);
-    const totalPaid = ledgerChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
-    const outstanding = Math.round((netTotal - totalPaid) * 100) / 100;
+    // Credit model: a return reduces net billed but is never a payment.
     const totalBilled = ledgerChallans.filter(c => !c.is_return).reduce((s, c) => s + Number(c.total), 0);
     const totalReturns = ledgerChallans.filter(c => c.is_return).reduce((s, c) => s + Number(c.total), 0);
+    const netTotal = Math.round((totalBilled - totalReturns) * 100) / 100;
+    const totalPaid = ledgerChallans.reduce((s, c) => s + (c.is_return ? 0 : Number(c.amount_paid || 0)), 0);
+    const outstanding = Math.round((netTotal - totalPaid) * 100) / 100;
     const rows = ledgerChallans.map(c => {
       const isRet = c.is_return;
-      const sign = isRet ? -1 : 1;
+      // Return: 0 cash, whole amount is a credit against balance. Sale: cash paid + balance due.
+      const paidCell = isRet ? '₹0' : `₹${Number(c.amount_paid || 0).toLocaleString('en-IN')}`;
+      const balanceCell = isRet ? `−₹${Number(c.total).toLocaleString('en-IN')}` : `₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')}`;
       return `<tr>
         <td>#${escHtml(c.challan_number)}</td>
         <td>${new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
         <td>${isRet ? '<span style="color:#e53e3e">Return</span>' : 'Sale'}</td>
         <td style="text-align:right">${isRet ? '−' : ''}₹${Number(c.total).toLocaleString('en-IN')}</td>
-        <td style="text-align:right">₹${(sign * Number(c.amount_paid || 0)).toLocaleString('en-IN')}</td>
-        <td style="text-align:right">₹${(sign * (Number(c.total) - Number(c.amount_paid || 0))).toLocaleString('en-IN')}</td>
+        <td style="text-align:right">${paidCell}</td>
+        <td style="text-align:right">${balanceCell}</td>
         <td><span style="padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;background:${c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : '#f8d7da'};color:${c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : '#721c24'}">${escHtml(c.status)}</span></td>
       </tr>`;
     }).join('');
@@ -849,16 +867,17 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       <h2>Customer Ledger</h2>
       <div class="sub">${safeName} | Generated: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
       <div class="stats">
-        <div class="stat"><div class="label">Total Billed</div><div class="val" style="color:#6366f1">₹${totalBilled.toLocaleString('en-IN')}</div></div>
-        <div class="stat"><div class="label">Paid</div><div class="val" style="color:#38a169">₹${totalPaid.toLocaleString('en-IN')}</div></div>
+        <div class="stat"><div class="label">Net Billed</div><div class="val" style="color:#6366f1">₹${netTotal.toLocaleString('en-IN')}</div></div>
+        <div class="stat"><div class="label">Received</div><div class="val" style="color:#38a169">₹${totalPaid.toLocaleString('en-IN')}</div></div>
         <div class="stat"><div class="label">Outstanding</div><div class="val" style="color:${outstanding > 0 ? '#e53e3e' : '#38a169'}">₹${outstanding.toLocaleString('en-IN')}</div></div>
       </div>
       <table><thead><tr><th>Challan</th><th>Date</th><th>Type</th><th style="text-align:right">Amount</th><th style="text-align:right">Paid</th><th style="text-align:right">Balance</th><th>Status</th></tr></thead>
       <tbody>${rows}</tbody></table>
       <div class="totals">
-        <div><span>Total Billed</span><span>₹${totalBilled.toLocaleString('en-IN')}</span></div>
-        ${totalReturns > 0 ? `<div><span>Returns</span><span style="color:#e53e3e">−₹${totalReturns.toLocaleString('en-IN')}</span></div>` : ''}
-        <div><span>Total Paid</span><span style="color:#38a169">₹${totalPaid.toLocaleString('en-IN')}</span></div>
+        <div><span>Gross Billed</span><span>₹${totalBilled.toLocaleString('en-IN')}</span></div>
+        ${totalReturns > 0 ? `<div><span>Returns (credit)</span><span style="color:#e53e3e">−₹${totalReturns.toLocaleString('en-IN')}</span></div>` : ''}
+        ${totalReturns > 0 ? `<div><span>Net Billed</span><span>₹${netTotal.toLocaleString('en-IN')}</span></div>` : ''}
+        <div><span>Received</span><span style="color:#38a169">₹${totalPaid.toLocaleString('en-IN')}</span></div>
         <div class="final"><span>Outstanding</span><span>₹${outstanding.toLocaleString('en-IN')}</span></div>
       </div>
       <div class="footer">Powered by DailyOffice</div>
@@ -1211,7 +1230,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     <ChallanForm
       editing={editing}
       isReturn={isReturn}
-      setIsReturn={(v) => { setIsReturn(v); if (v) setChallanStatus('paid'); }}
+      setIsReturn={(v) => { setIsReturn(v); if (v) { setChallanStatus('paid'); setAmountPaid(0); setPaymentMode(''); setPaymentDate(''); } }}
       returnSource={returnSource}
       returnSearchQ={returnSearchQ}
       setReturnSearchQ={setReturnSearchQ}
@@ -1310,8 +1329,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         onOpenDetail={(c) => { setViewingChallan(c); window.history.pushState({ view: 'challan-detail' }, ''); }}
         onPrint={printChallan}
         onRemind={sendReminder}
-        onCreateReturn={(c) => { setIsReturn(true); setChallanStatus('paid'); selectReturnSource(c); setShowModal(true); }}
-        onVoid={(c) => setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number, inventoryDeducted: !!c.inventory_deducted })}
+        onCreateReturn={(c) => { setIsReturn(true); setChallanStatus('paid'); setAmountPaid(0); setPaymentMode(''); setPaymentDate(''); selectReturnSource(c); setShowModal(true); }}
+        onVoid={(c) => setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number, inventoryDeducted: !!c.inventory_deducted, isReturn: !!c.is_return })}
         page={page}
         totalPages={totalPages}
         onPageChange={setPage}
@@ -1376,8 +1395,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         onEdit={() => { const c = viewingChallan; setViewingChallan(null); openEdit(c); }}
         onPrint={() => printChallan(viewingChallan)}
         onRemind={() => { const c = viewingChallan; setViewingChallan(null); sendReminder(c); }}
-        onReturn={() => { const c = viewingChallan; setViewingChallan(null); setIsReturn(true); setChallanStatus('paid'); selectReturnSource(c); setShowModal(true); }}
-        onVoid={() => { const c = viewingChallan; setViewingChallan(null); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number, inventoryDeducted: !!c.inventory_deducted }); }}
+        onReturn={() => { const c = viewingChallan; setViewingChallan(null); setIsReturn(true); setChallanStatus('paid'); setAmountPaid(0); setPaymentMode(''); setPaymentDate(''); selectReturnSource(c); setShowModal(true); }}
+        onVoid={() => { const c = viewingChallan; setViewingChallan(null); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number, inventoryDeducted: !!c.inventory_deducted, isReturn: !!c.is_return }); }}
         hasNext={idx < challans.length - 1}
         hasPrev={idx > 0}
         onNext={() => { if (idx < challans.length - 1) setViewingChallan(challans[idx + 1]); }}
@@ -1420,7 +1439,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380, padding: '24px 22px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <div style={{ marginBottom: 10 }}><svg viewBox="0 0 24 24" style={{ width: 36, height: 36, fill: 'none', stroke: '#6366F1', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' }}><rect x="6" y="3" width="12" height="18" rx="2" /><rect x="9" y="1" width="6" height="4" rx="1" /><path d="M9 10h6M9 13h4M9 16h5" opacity=".5" /></svg></div>
             <div style={{ fontSize: 15, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Hi {userName}!</div>
-            <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 18 }}>Reminder to manually <strong style={{ color: T.yl }}>reduce these inventory items in ERP</strong>. Cash Challan does not sync inventory automatically.</div>
+            <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 18 }}>Reminder to manually <strong style={{ color: T.yl }}>{erpReminderReturn ? 'add these returned items back to inventory in ERP' : 'reduce these inventory items in ERP'}</strong>. Cash Challan does not sync inventory automatically.</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { localStorage.setItem('ccErpReminderHidden', String(Date.now())); setShowErpReminder(false); }} style={{ flex: 1, padding: '10px', borderRadius: 8, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Don't show for a week</button>
               <button onClick={() => setShowErpReminder(false)} style={{ ...S.btnPrimary, flex: 1, padding: '10px', justifyContent: 'center' }}>Got It</button>
@@ -1438,7 +1457,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: confirmAction.type === 'void' && confirmAction.inventoryDeducted ? 8 : 14 }}>{confirmAction.type === 'void' ? `Challan #${confirmAction.challanNumber} will be marked voided. This cannot be undone.` : `Challan #${confirmAction.challanNumber} will be permanently deleted.`}</div>
             {confirmAction.type === 'void' && confirmAction.inventoryDeducted && (
               <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl, marginBottom: 14, textAlign: 'left' as const }}>
-                Inventory was deducted for this challan. After voiding, you'll need to reverse the inventory deduction manually.
+                Inventory was {confirmAction.isReturn ? 'added back' : 'deducted'} for this challan. After voiding, you'll need to reverse the inventory {confirmAction.isReturn ? 'addition' : 'deduction'} manually.
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>

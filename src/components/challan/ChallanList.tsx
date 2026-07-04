@@ -105,7 +105,7 @@ export default function ChallanList(p: Props) {
               <input type="date" value={p.dateTo} onChange={e => { p.onDateToChange(e.target.value); p.onResetPage(); }} style={{ ...S.fDate, width: '100%' }} />
             </div>
             <div>
-              <label style={S.fLabel}>Inv. Deducted</label>
+              <label style={S.fLabel}>Inventory</label>
               <select value={p.invFilter} onChange={e => { p.onInvFilterChange(e.target.value); p.onResetPage(); }} style={S.fInput}>
                 <option value="">All</option><option value="yes">Yes</option><option value="no">No</option>
               </select>
@@ -194,9 +194,9 @@ export default function ChallanList(p: Props) {
                     <span style={{ fontSize: 12, color: T.tx2 }}>{(() => { const d = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000); return d === 0 ? 'Today' : d === 1 ? '1d ago' : `${d}d ago`; })()}</span>
                   </td>
                   <td style={{ ...S.tdStyle, textAlign: 'center' }}>
-                    {c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, border: `1px solid ${c.inventory_deducted ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}`, background: c.inventory_deducted ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.06)', color: c.inventory_deducted ? T.gr : T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', letterSpacing: 0.3 }} aria-label={c.inventory_deducted ? 'Inventory deducted' : 'Inventory not deducted'}>
+                    {c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, border: `1px solid ${c.inventory_deducted ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}`, background: c.inventory_deducted ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.06)', color: c.inventory_deducted ? T.gr : T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', letterSpacing: 0.3 }} aria-label={c.inventory_deducted ? (c.is_return ? 'Inventory added back' : 'Inventory deducted') : 'Inventory pending'}>
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.inventory_deducted ? T.gr : T.re }} />
-                      {c.inventory_deducted ? 'Deducted' : 'Pending'}
+                      {c.inventory_deducted ? (c.is_return ? 'Added' : 'Deducted') : 'Pending'}
                     </button>}
                   </td>
                   <td style={{ ...S.tdStyle, textAlign: 'right' }}>
@@ -278,7 +278,7 @@ export default function ChallanList(p: Props) {
                   <span>·</span>
                   <span>{(() => { const d = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000); return d === 0 ? 'Today' : d === 1 ? '1d ago' : `${d}d ago`; })()}</span>
                   {c.payment_mode && c.status !== 'voided' && <><span>·</span><span>{c.payment_mode}</span></>}
-                  {c.status !== 'voided' && <><span>·</span><button className="inv-chip" onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, border: `1px solid ${c.inventory_deducted ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}`, background: c.inventory_deducted ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.06)', color: c.inventory_deducted ? T.gr : T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} aria-label={c.inventory_deducted ? 'Inventory deducted' : 'Inventory not deducted'}><span style={{ width: 5, height: 5, borderRadius: '50%', background: c.inventory_deducted ? T.gr : T.re }} />{c.inventory_deducted ? 'Deducted' : 'Pending'}</button></>}
+                  {c.status !== 'voided' && <><span>·</span><button className="inv-chip" onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, border: `1px solid ${c.inventory_deducted ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}`, background: c.inventory_deducted ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.06)', color: c.inventory_deducted ? T.gr : T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} aria-label={c.inventory_deducted ? (c.is_return ? 'Inventory added back' : 'Inventory deducted') : 'Inventory pending'}><span style={{ width: 5, height: 5, borderRadius: '50%', background: c.inventory_deducted ? T.gr : T.re }} />{c.inventory_deducted ? (c.is_return ? 'Added' : 'Deducted') : 'Pending'}</button></>}
                   {isRet && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', marginLeft: 2 }}>Return{srcNum(c) ? ` of #${srcNum(c)}` : ''}</span>}
                   {c.notes && <span style={{ display: 'inline-flex', alignItems: 'center', opacity: 0.4, marginLeft: 2 }} title={c.notes}><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.tx3, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg></span>}
                 </div>
