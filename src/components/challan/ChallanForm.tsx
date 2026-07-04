@@ -7,6 +7,7 @@ import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
+import { fetchCustomerOutstanding } from '../../lib/customerOutstanding';
 import { useNotifications } from '../../hooks/useNotifications';
 import type { CashChallan, CashChallanCustomer, AuditLog } from '../../types/database';
 
@@ -102,12 +103,9 @@ export default function ChallanForm(p: ChallanFormProps) {
 
   useEffect(() => {
     if (!p.customerName.trim()) { setOutstanding(0); return; }
-    let q = supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', p.customerName.trim()).in('status', ['unpaid', 'partial']).eq('is_return', false);
-    if (p.selectedCustomerId) q = q.eq('customer_id', p.selectedCustomerId);
-    q.then(({ data, error }) => {
+    fetchCustomerOutstanding({ name: p.customerName.trim(), customerId: p.selectedCustomerId }).then(({ value, error }) => {
       if (error) { addToast(friendlyError(error), 'error'); return; }
-      const total = (data || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0);
-      setOutstanding(Math.round(total));
+      setOutstanding(value);
     });
   }, [p.customerName, p.selectedCustomerId]);
   const lbl: React.CSSProperties = { ...S.fLabel, marginBottom: 4 };

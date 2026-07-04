@@ -13,6 +13,7 @@ import ChallanDetail from '../components/challan/ChallanDetail';
 import ChallanList from '../components/challan/ChallanList';
 import ChallanBulkActions from '../components/challan/ChallanBulkActions';
 import { friendlyError } from '../lib/friendlyError';
+import { fetchCustomerOutstanding } from '../lib/customerOutstanding';
 import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
 import type {
   CashChallan,
@@ -528,9 +529,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // Local-midnight → ISO instant so the day boundary is IST, not UTC
     if (from) q = q.gte('created_at', new Date(from + 'T00:00:00').toISOString());
     if (to) q = q.lte('created_at', new Date(to + 'T23:59:59').toISOString());
-    const { data } = await q.limit(500);
+    const { data, error } = await q.limit(500);
+    // Early-return before setState so a transient failure doesn't blank an
+    // already-loaded list (and silently no-op the PDF export).
+    if (error) { addToast(friendlyError(error), 'error'); return; }
     setLedgerChallans((data as Challan[] | null) || []);
-  }, []);
+  }, [addToast]);
 
   const fetchLedgerDetail = useCallback(async (cust: { id: string | null; name: string }) => {
     setLedgerDetail(cust);
@@ -589,10 +593,15 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (!customerPhone.trim()) { setFormError('Phone number is required'); return; }
     if (customerPhone.replace(/\D/g, '').length < 10) { setFormError('Enter a valid 10-digit phone number'); return; }
     if (grandTotal < 0) { setFormError('Total cannot be negative. Check item discounts.'); return; }
-    if (amountPaid < 0) { setFormError('Amount paid cannot be negative'); return; }
-    if (amountPaid > grandTotal) { setFormError(`Amount paid (₹${amountPaid}) cannot exceed total (₹${grandTotal})`); return; }
-    if (!paymentMode && amountPaid > 0) { setFormError('Select a payment mode when amount is paid'); return; }
-    if (!paymentDate && amountPaid > 0) { setFormError('Payment date is required when amount is paid'); return; }
+    // Returns are credits — payment fields are ignored at save (challanData
+    // forces amount_paid 0), so validate against the effective value. Guards
+    // against stale state (e.g. a pre-credit-model draft) erroring on fields
+    // the return form no longer renders.
+    const effPaid = isReturn ? 0 : amountPaid;
+    if (effPaid < 0) { setFormError('Amount paid cannot be negative'); return; }
+    if (effPaid > grandTotal) { setFormError(`Amount paid (₹${effPaid}) cannot exceed total (₹${grandTotal})`); return; }
+    if (!paymentMode && effPaid > 0) { setFormError('Select a payment mode when amount is paid'); return; }
+    if (!paymentDate && effPaid > 0) { setFormError('Payment date is required when amount is paid'); return; }
     // Returns are credits (no cash), so 'paid' status with amount_paid 0 is valid.
     if (!isReturn && challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(`Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
     if (!isReturn && challanStatus === 'partial' && (amountPaid <= 0 || amountPaid > grandTotal - 0.01)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
@@ -690,12 +699,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (wasNew) {
       addToast('Challan created!', 'success');
       if (savedPhone && !isReturn) {
-        let outQ = supabase.from('cash_challans').select('total, amount_paid').eq('customer_name', savedName).in('status', ['unpaid', 'partial']).eq('is_return', false);
-        if (createdId) outQ = outQ.neq('id', createdId);
-        if (custId) outQ = outQ.eq('customer_id', custId);
-        const { data: outData, error: outErr } = await outQ;
+        const { value: totalOutstanding, error: outErr } = await fetchCustomerOutstanding({ name: savedName, customerId: custId, excludeId: createdId });
         if (outErr) addToast('Could not fetch outstanding balance — figure omitted from message', 'error');
-        const totalOutstanding = Math.round((outData || []).reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0));
         const outLine = !outErr && totalOutstanding > 0 ? `\nTotal outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}` : '';
         const modeStr = paymentMode ? ` via ${paymentMode}` : '';
         const paidLine = challanStatus === 'paid'
@@ -783,13 +788,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const challanDue = Number(c.total) - Number(c.amount_paid || 0);
     const paidSoFar = Number(c.amount_paid || 0);
     const partialNote = paidSoFar > 0 ? `\n₹${paidSoFar.toLocaleString('en-IN')} received so far.` : '';
-    let totalOutQ = supabase.from('cash_challans').select('total, amount_paid, is_return').eq('customer_name', c.customer_name).in('status', ['unpaid', 'partial']);
-    if (c.customer_id) totalOutQ = totalOutQ.eq('customer_id', c.customer_id);
-    const { data: allChallans, error: outErr } = await totalOutQ;
+    const { value: totalOutstanding, error: outErr } = await fetchCustomerOutstanding({ name: c.customer_name, customerId: c.customer_id });
     if (outErr) addToast(friendlyError(outErr), 'error');
-    const unpaidSum = (allChallans || []).filter(r => !r.is_return).reduce((s, r) => s + (Number(r.total) - Number(r.amount_paid || 0)), 0);
-    const returnSum = (allChallans || []).filter(r => r.is_return).reduce((s, r) => s + (Number(r.total) - Number(r.amount_paid || 0)), 0);
-    const totalOutstanding = Math.max(0, Math.round(unpaidSum - returnSum));
     const outLine = totalOutstanding > challanDue ? `\nTotal outstanding across all challans: ₹${totalOutstanding.toLocaleString('en-IN')}` : '';
     return encodeURIComponent(`Hi ${c.customer_name},\nGentle reminder — your Cash Challan #${c.challan_number} dated ${new Date(c.created_at).toLocaleDateString('en-IN')} for ₹${Number(c.total).toLocaleString('en-IN')} is pending.${partialNote}\nOutstanding: ₹${challanDue.toLocaleString('en-IN')}${outLine}\nPlease arrange payment at your earliest convenience.\n— Arya Designs`);
   };
