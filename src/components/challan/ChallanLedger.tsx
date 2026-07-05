@@ -20,6 +20,7 @@ export default function ChallanLedger({
   onOpenChallan,
   onExportPdf,
   onLoadMore,
+  truncated,
   statusColors,
   dateFrom,
   dateTo,
@@ -38,6 +39,7 @@ export default function ChallanLedger({
   onOpenChallan: (c: Challan) => void;
   onExportPdf: (name: string) => void;
   onLoadMore: () => void;
+  truncated?: boolean;
   statusColors: Record<string, { bg: string; color: string }>;
   dateFrom: string;
   dateTo: string;
@@ -179,6 +181,11 @@ export default function ChallanLedger({
         ))}
         {customers.length === 0 && <div style={{ padding: 24, textAlign: 'center' as const, color: T.tx3, fontSize: 12 }}>No customers found. Search by name below.</div>}
       </div>
+      {truncated && (
+        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', fontSize: 10, color: T.yl, lineHeight: 1.4 }}>
+          Totals are aggregated from the most recent challans only — older unpaid balances may be missing. Tap Load More to include older history, or search a customer by name for their complete figures.
+        </div>
+      )}
       <button onClick={onLoadMore} style={{ width: '100%', padding: '12px', marginTop: 8, marginBottom: 20, border: 'none', background: T.ac3, color: T.ac2, fontSize: 11, fontWeight: 600, cursor: 'pointer', borderRadius: 8 }}>Load More Customers</button>
     </div>
   );
