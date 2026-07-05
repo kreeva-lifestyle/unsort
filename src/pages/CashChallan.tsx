@@ -35,7 +35,9 @@ const ccAuditLog = async (action: string, recordId: string, details: string, cha
 import { T, S, CHALLAN_STATUS_COLORS as STATUS_COLORS } from '../lib/theme';
 
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
-const isValidPhone = (raw: string) => raw.replace(/\D/g, '').replace(/^91/, '').length >= 10;
+// Strip the country code only when it IS a country code (>10 digits) — a
+// genuine 10-digit mobile starting with 91 must not lose its first digits.
+const isValidPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return (d.startsWith('91') && d.length > 10 ? d.slice(2) : d).length >= 10; };
 // Local (IST) calendar date — NOT toISOString() which is UTC and shifts the day
 // boundary 5.5h, so a payment entered 00:00–05:30 IST lands on the previous day
 // and drops out of the Cash Book / analytics for that day.
@@ -129,7 +131,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [ledgerPdfTitle, setLedgerPdfTitle] = useState('');
   const ledgerPdfIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [userName, setUserName] = useState('there');
-  const [confirmAction, setConfirmAction] = useState<{ type: 'void' | 'delete'; id: string; challanNumber?: number; inventoryDeducted?: boolean; isReturn?: boolean } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'void'; id: string; challanNumber?: number; inventoryDeducted?: boolean; isReturn?: boolean } | null>(null);
   const [printHtml, setPrintHtml] = useState<string | null>(null);
   const printIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [viewingChallan, setViewingChallan] = useState<Challan | null>(null);
@@ -145,6 +147,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [showCashBook, setShowCashBook] = useState(false);
   const [ledgerCustomers, setLedgerCustomers] = useState<{ id: string | null; name: string; total: number; paid: number; outstanding: number; count: number; aging: { current: number; d30: number; d60: number; d90plus: number } }[]>([]);
   const [ledgerFetchLimit, setLedgerFetchLimit] = useState(100);
+  const [ledgerTruncated, setLedgerTruncated] = useState(false);
   const [ledgerDetail, setLedgerDetail] = useState<{ id: string | null; name: string } | null>(null);
   const [ledgerChallans, setLedgerChallans] = useState<Challan[]>([]);
   const [ledgerSearch, setLedgerSearch] = useState('');
@@ -421,14 +424,18 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     type AnalyticsRow = Pick<CashChallan, 'total' | 'payment_mode' | 'status' | 'is_return'>;
     const fromIso = fromDt.toISOString(); const toIso = toDt.toISOString();
     const fromDate = analyticsFrom; const toDate = analyticsTo;
+    // Explicit high row cap — without .limit() PostgREST silently truncates
+    // at its server default (~1000 rows) and the figures would understate
+    // with no warning. At the cap we flag `truncated` for the UI.
+    const CAP = 10000;
     const [{ data }, { count: voidedCount }, { data: prevData }, { data: paymentsInPeriod }] = await Promise.all([
-      supabase.from('cash_challans').select('total, payment_mode, status, is_return').gte('created_at', fromIso).lte('created_at', toIso).neq('status', 'voided'),
+      supabase.from('cash_challans').select('total, payment_mode, status, is_return').gte('created_at', fromIso).lte('created_at', toIso).neq('status', 'voided').limit(CAP),
       supabase.from('cash_challans').select('id', { count: 'estimated', head: true }).gte('created_at', fromIso).lte('created_at', toIso).eq('status', 'voided'),
-      supabase.from('cash_challans').select('total, is_return').gte('created_at', prevFromDt.toISOString()).lte('created_at', prevToDt.toISOString()).neq('status', 'voided'),
+      supabase.from('cash_challans').select('total, is_return').gte('created_at', prevFromDt.toISOString()).lte('created_at', prevToDt.toISOString()).neq('status', 'voided').limit(CAP),
       // Mode breakup from the payments ledger, not challan totals — a partial
       // challan only counts what was actually collected, reversals subtract,
       // and refunds on returns count as money out.
-      supabase.from('cash_challan_payments').select('amount, payment_mode, is_reversal, challan:cash_challans(is_return)').gte('payment_date', fromDate).lte('payment_date', toDate),
+      supabase.from('cash_challan_payments').select('amount, payment_mode, is_reversal, challan:cash_challans(is_return)').gte('payment_date', fromDate).lte('payment_date', toDate).limit(CAP),
     ]);
     const rows = (data as AnalyticsRow[] | null) || [];
     const totalRevenue = rows.reduce((s, r) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
@@ -444,8 +451,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const prevRows = (prevData as Pick<CashChallan, 'total' | 'is_return'>[] | null) || [];
     const prevRevenue = prevRows.reduce((s, r) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
     const prevCount = prevRows.filter(r => !r.is_return).length;
+    if (rows.length >= CAP || prevRows.length >= CAP || ((paymentsInPeriod as unknown[] | null) || []).length >= CAP) {
+      addToast(`Analytics computed from the first ${CAP.toLocaleString('en-IN')} rows — narrow the date range for exact figures`, 'error');
+    }
     setAnalytics({ totalRevenue, count: salesCount, byMode, returnsCount, voidedCount: voidedCount || 0, prevRevenue, prevCount } as typeof analytics);
-  }, [analyticsFrom, analyticsTo]);
+  }, [analyticsFrom, analyticsTo, addToast]);
 
   // ── Fetch ledger (recent 10 customers) ──────────────────────────────────────
   // Ledger aggregation keys on customer_id (name fallback for legacy rows
@@ -455,6 +465,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const fetchLedger = useCallback(async (limit = ledgerFetchLimit) => {
     const { data, error } = await supabase.from('cash_challans').select('customer_id, customer_name, total, amount_paid, is_return, created_at, status').neq('status', 'voided').order('created_at', { ascending: false }).limit(limit);
     if (error) { addToast(friendlyError(error), 'error'); return; }
+    // At the cap, older challans are missing from the aggregates — tell the
+    // user instead of silently understating balances.
+    setLedgerTruncated(((data as unknown[] | null) || []).length >= limit);
     type LedgerRow = Pick<CashChallan, 'customer_id' | 'customer_name' | 'total' | 'amount_paid' | 'is_return' | 'created_at' | 'status'>;
     const now = Date.now();
     const daysSince = (d: string) => Math.floor((now - new Date(d).getTime()) / 86400000);
@@ -521,6 +534,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       return 0;
     });
     setLedgerCustomers(list);
+    setLedgerTruncated(false); // search has no row cap — results are complete
   }, [fetchLedger]);
 
   const fetchLedgerDetailWithRange = useCallback(async (cust: { id: string | null; name: string }, from: string, to: string) => {
@@ -533,6 +547,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // Early-return before setState so a transient failure doesn't blank an
     // already-loaded list (and silently no-op the PDF export).
     if (error) { addToast(friendlyError(error), 'error'); return; }
+    if (((data as unknown[] | null) || []).length >= 500) addToast('Showing the most recent 500 challans — KPIs and PDF cover only these; narrow the date range for exact figures', 'error');
     setLedgerChallans((data as Challan[] | null) || []);
   }, [addToast]);
 
@@ -569,9 +584,16 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // invoice — free-form returns skipped all quantity validation.
     if (isReturn && !returnSource && !editing) { setFormError('Select the source invoice for this return'); return; }
     if (isReturn && returnSource) {
-      const sourceItems = returnSource.cash_challan_items || [];
-      // Check cumulative returns — fetch all previous returns for this source
-      const { data: prevReturns } = await supabase.from('cash_challans').select('id').eq('source_challan_id', returnSource.id).eq('is_return', true).neq('status', 'voided');
+      // Validate against FRESH source items, not the snapshot captured when
+      // the invoice was selected — the source can be edited by another user
+      // between selection and save. Also fetch cumulative previous returns.
+      const [{ data: freshItems, error: srcErr }, { data: prevReturns }] = await Promise.all([
+        supabase.from('cash_challan_items').select('sku, quantity').eq('challan_id', returnSource.id),
+        supabase.from('cash_challans').select('id').eq('source_challan_id', returnSource.id).eq('is_return', true).neq('status', 'voided'),
+      ]);
+      if (srcErr) { setFormError('Could not verify the source invoice — ' + friendlyError(srcErr)); return; }
+      type SrcItemRow = Pick<DbCashChallanItem, 'sku' | 'quantity'>;
+      const sourceItems = (freshItems as SrcItemRow[] | null) || [];
       type IdRow = Pick<CashChallan, 'id'>;
       const prevReturnIds = ((prevReturns as IdRow[] | null) || []).map((r) => r.id).filter((id) => !editing || id !== editing.id);
       const prevQtyMap: Record<string, number> = {};
@@ -581,8 +603,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         ((prevItems as PrevItemRow[] | null) || []).forEach((pi) => { const key = pi.sku ?? ''; prevQtyMap[key] = (prevQtyMap[key] || 0) + pi.quantity; });
       }
       for (const it of items) {
-        const src = sourceItems.find((s: Partial<DbCashChallanItem>) => s.sku === it.sku);
-        if (!src) continue;
+        const src = sourceItems.find((s) => s.sku === it.sku);
+        // An unmatched SKU must fail, not skip validation — otherwise any
+        // quantity could be returned against an item the invoice never had.
+        if (!src) { setFormError(`"${it.sku}" is not on invoice #${returnSource.challan_number} — a return can only contain the source invoice's items`); return; }
         const srcQty = src.quantity ?? 0;
         const alreadyReturned = prevQtyMap[it.sku] || 0;
         const remaining = srcQty - alreadyReturned;
@@ -1055,6 +1079,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     q = q.order('created_at', { ascending: false }).limit(5000);
     const { data } = await q;
     if (!data || data.length === 0) { addToast('No challans to export', 'error'); return; }
+    if (data.length >= 5000) addToast('Export capped at the most recent 5,000 challans — narrow the date range for a complete file', 'error');
     // Prefix ' on leading =+-@ so Excel/Sheets never treat customer-typed
     // text as a formula (CSV injection) — same guard as TracklyImport.
     const esc = (v: string) => { const s = v || ''; const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s; return `"${safe.replace(/"/g, '""')}"`; };
@@ -1146,24 +1171,22 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setBulkBusy(false);
   };
 
+  // Atomic undo via RPC: the old client loop reset every challan to
+  // unpaid/₹0 while reversing only the batch payment, wiping any payment
+  // that existed BEFORE the batch. undo_challan_batch restores the exact
+  // pre-batch state (partial with the prior amount, or unpaid) in one
+  // transaction, which the DB's payments-sync trigger now enforces.
   const undoBatch = async (batchId: string) => {
-    const { data: batchPayments } = await supabase.from('cash_challan_payments').select('challan_id, amount, payment_mode').eq('batch_id', batchId).eq('is_reversal', false);
-    if (!batchPayments || batchPayments.length === 0) { addToast('No payments found for this batch', 'error'); return; }
-    const today = localToday();
-    const { data: { user } } = await supabase.auth.getUser();
     const undoBatchId = `BU-${Date.now().toString(36).toUpperCase()}`;
-    let undoFails = 0;
-    for (const p of batchPayments) {
-      const { error: upErr } = await supabase.from('cash_challans').update({ status: 'unpaid', amount_paid: 0, payment_mode: null, payment_date: null, modified_by: user?.id, updated_at: new Date().toISOString() }).eq('id', p.challan_id).eq('status', 'paid');
-      if (upErr) { undoFails++; addToast('Undo failed for a challan — ' + friendlyError(upErr), 'error'); continue; }
-      const { error: revErr } = await supabase.from('cash_challan_payments').insert({ challan_id: p.challan_id, amount: Number(p.amount), payment_mode: p.payment_mode, payment_date: today, paid_by: user?.id, notes: `Undo ${batchId}`, is_reversal: true, batch_id: undoBatchId });
-      if (revErr) { undoFails++; addToast('Reversal record failed — ' + friendlyError(revErr), 'error'); }
-      await ccAuditLog('BATCH_UNDO', p.challan_id, `Undo batch ${batchId} (reversal ${undoBatchId})`, { status: { from: 'paid', to: 'unpaid' }, amount_paid: { from: p.amount, to: 0 } });
-    }
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: results, error: undoErr } = await supabase.rpc('undo_challan_batch', { p_batch_id: batchId, p_undo_batch_id: undoBatchId, p_user: user?.id });
+    if (undoErr) { addToast(friendlyError(undoErr), 'error'); return; }
+    const rows = ((results as { challan_id: string; challan_number: number; prev_paid: number; remaining: number }[] | null) || []);
+    if (rows.length === 0) { addToast('Nothing to undo — the batch was not found or its challans changed since', 'error'); return; }
+    for (const r of rows) await ccAuditLog('BATCH_UNDO', r.challan_id, `Undo batch ${batchId} (reversal ${undoBatchId}) — ₹${(Number(r.prev_paid) - Number(r.remaining)).toLocaleString('en-IN')} reversed on #${r.challan_number}`, { status: { from: 'paid', to: Number(r.remaining) > 0 ? 'partial' : 'unpaid' }, amount_paid: { from: r.prev_paid, to: r.remaining } });
     setLastBatch(null);
     fetchChallans();
-    if (undoFails > 0) addToast(`Batch ${batchId} partially reversed — ${undoFails} failed`, 'error');
-    else addToast(`Batch ${batchId} reversed — ${batchPayments.length} challans unpaid`, 'success');
+    addToast(`Batch ${batchId} reversed — ${rows.length} challan${rows.length !== 1 ? 's' : ''} reverted`, 'success');
   };
 
   const executeBulkUnpay = async () => {
@@ -1250,6 +1273,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       onOpenChallan={openEdit}
       onExportPdf={exportLedgerPDF}
       onLoadMore={() => { const newLimit = ledgerFetchLimit + 500; setLedgerFetchLimit(newLimit); fetchLedger(newLimit); }}
+      truncated={ledgerTruncated}
       statusColors={STATUS_COLORS}
       dateFrom={ledgerFrom}
       dateTo={ledgerTo}
@@ -1499,16 +1523,16 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         <div style={{ ...S.modalOverlay }} onClick={() => setConfirmAction(null)}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg></div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>{confirmAction.type === 'void' ? 'Void Challan?' : 'Delete Challan?'}</div>
-            <div style={{ fontSize: 11, color: T.tx3, marginBottom: confirmAction.type === 'void' && confirmAction.inventoryDeducted ? 8 : 14 }}>{confirmAction.type === 'void' ? `Challan #${confirmAction.challanNumber} will be marked voided. This cannot be undone.` : `Challan #${confirmAction.challanNumber} will be permanently deleted.`}</div>
-            {confirmAction.type === 'void' && confirmAction.inventoryDeducted && (
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Void Challan?</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: confirmAction.inventoryDeducted ? 8 : 14 }}>{`Challan #${confirmAction.challanNumber} will be marked voided. This cannot be undone.`}</div>
+            {confirmAction.inventoryDeducted && (
               <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl, marginBottom: 14, textAlign: 'left' as const }}>
                 Inventory was {confirmAction.isReturn ? 'added back' : 'deducted'} for this challan. After voiding, you'll need to reverse the inventory {confirmAction.isReturn ? 'addition' : 'deduction'} manually.
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setConfirmAction(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.ac3}`, fontSize: 11, fontWeight: 500, background: T.ac3, color: T.ac2, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={async () => { const a = confirmAction; setConfirmAction(null); if (a.type === 'void') await voidChallan(a.id); }} style={{ ...S.btnDangerSolid, flex: 1, padding: '8px 0', fontSize: 11, justifyContent: 'center' }}>{confirmAction.type === 'void' ? 'Void' : 'Delete'}</button>
+              <button onClick={async () => { const a = confirmAction; setConfirmAction(null); await voidChallan(a.id); }} style={{ ...S.btnDangerSolid, flex: 1, padding: '8px 0', fontSize: 11, justifyContent: 'center' }}>Void</button>
             </div>
           </div>
         </div>
