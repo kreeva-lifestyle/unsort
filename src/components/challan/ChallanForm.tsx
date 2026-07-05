@@ -83,9 +83,11 @@ export default function ChallanForm(p: ChallanFormProps) {
   const [recentCustomers, setRecentCustomers] = useState<{ name: string; phone?: string; id?: string }[]>([]);
 
   useEffect(() => {
+    let stale = false;
     if (!p.editing) {
-      supabase.rpc('get_next_challan_number').then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); if (data) setNextNum(data); });
+      supabase.rpc('get_next_challan_number').then(({ data, error }) => { if (stale) return; if (error) addToast(friendlyError(error), 'error'); if (data) setNextNum(data); });
       supabase.from('cash_challans').select('customer_name, customer_id').order('created_at', { ascending: false }).limit(20).then(({ data, error }) => {
+        if (stale) return;
         if (error) { addToast(friendlyError(error), 'error'); return; }
         const seen = new Set<string>();
         const recent: { name: string; id?: string }[] = [];
@@ -93,20 +95,26 @@ export default function ChallanForm(p: ChallanFormProps) {
         setRecentCustomers(recent.slice(0, 5));
       });
     }
-    return () => { clearTimeout(searchTimeout.current); };
+    return () => { stale = true; clearTimeout(searchTimeout.current); };
   }, [p.editing]);
 
-  useEffect(() => {
-    document.body.classList.toggle('modal-open', !!p.auditTrail);
-    return () => { document.body.classList.remove('modal-open'); };
-  }, [p.auditTrail]);
+  // NOTE: no modal-open toggle here — the parent (CashChallan) owns that body
+  // class for the whole modal stack, including the audit-trail view.
 
   useEffect(() => {
     if (!p.customerName.trim()) { setOutstanding(0); return; }
-    fetchCustomerOutstanding({ name: p.customerName.trim(), customerId: p.selectedCustomerId }).then(({ value, error }) => {
-      if (error) { addToast(friendlyError(error), 'error'); return; }
-      setOutstanding(value);
-    });
+    // Debounced + latest-wins: un-debounced per-keystroke fetches raced, and
+    // a slower prefix-name response ("Ra…" → ₹0) could overwrite the final
+    // name's real figure.
+    let stale = false;
+    const t = setTimeout(() => {
+      fetchCustomerOutstanding({ name: p.customerName.trim(), customerId: p.selectedCustomerId }).then(({ value, error }) => {
+        if (stale) return;
+        if (error) { addToast(friendlyError(error), 'error'); return; }
+        setOutstanding(value);
+      });
+    }, 300);
+    return () => { stale = true; clearTimeout(t); };
   }, [p.customerName, p.selectedCustomerId]);
   const lbl: React.CSSProperties = { ...S.fLabel, marginBottom: 4 };
   const inp: React.CSSProperties = { ...S.fInput, width: '100%' };

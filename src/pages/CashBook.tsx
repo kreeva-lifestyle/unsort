@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { printOrQueue } from '../lib/printQueue';
@@ -166,9 +166,19 @@ export default function CashBook() {
         const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
         setCurrentUserRole(((me as { role?: string } | null)?.role) || '');
       }
-      const { data } = await supabase.from('profiles').select('id, full_name, email, phone, role').eq('is_active', true).order('full_name');
+      // has_pin comes from a SECURITY DEFINER RPC — cash_pin itself is not
+      // selectable, and hardcoding true made the "no PIN" pre-flight dead code.
+      const [{ data, error: usersErr }, { data: pinRows, error: pinErr }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, email, phone, role').eq('is_active', true).order('full_name'),
+        supabase.rpc('get_profiles_pin_status'),
+      ]);
+      if (usersErr) addToast('Failed to load users — ' + friendlyError(usersErr), 'error');
+      if (pinErr) addToast('Failed to load PIN status — ' + friendlyError(pinErr), 'error');
+      const pinMap = new Map(((pinRows as { id: string; has_pin: boolean }[] | null) || []).map(r => [r.id, r.has_pin]));
       type UserRow = Pick<Profile, 'id' | 'full_name' | 'email' | 'phone' | 'role'>;
-      setUsers((data as UserRow[] | null || []).map((u) => ({ id: u.id, full_name: u.full_name ?? '', email: u.email, has_pin: true, phone: u.phone, role: u.role ?? '' })));
+      // On RPC failure fall back to permissive (the pre-flight is advisory —
+      // the PIN check at confirm time is the real gate).
+      setUsers((data as UserRow[] | null || []).map((u) => ({ id: u.id, full_name: u.full_name ?? '', email: u.email, has_pin: pinMap.get(u.id) ?? !!pinErr, phone: u.phone, role: u.role ?? '' })));
     })();
   }, []);
 
@@ -305,7 +315,7 @@ export default function CashBook() {
         if (!handAmount) setHandAmount(String(Math.max(0, b.available)));
       });
       // Load last 5 handovers
-      supabase.from('cash_handovers').select('id, handover_number, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by, cancelled_at, cancelled_by').order('created_at', { ascending: false }).limit(5).then(({ data }) => setRecentHandovers((data as Handover[] | null) || []));
+      supabase.from('cash_handovers').select('id, handover_number, date, amount, from_user_name, to_user_name, status, confirmed_at, created_at, period_from, period_to, breakdown, reason, from_user_id, to_user_id, notes, reject_reason, rejected_at, rejected_by, cancelled_at, cancelled_by').order('created_at', { ascending: false }).limit(5).then(({ data, error }) => { if (error) addToast('Failed to load recent handovers — ' + friendlyError(error), 'error'); setRecentHandovers((data as Handover[] | null) || []); });
     }
   }, [showHandover, handPeriodFrom, handPeriodTo, computeBreakdown]);
 
@@ -331,16 +341,21 @@ export default function CashBook() {
     // unsigned. Confirmed handovers no longer hard-block: computeBreakdown
     // already nets them out of "available", so leftover cash from a partial
     // handover (or a too-low signed amount) can be handed over in a follow-up.
-    const { data: existing } = await supabase.from('cash_handovers').select('id, status, amount').eq('to_user_id', recipient.id).eq('date', todayDate).eq('status', 'pending').maybeSingle();
+    // Both guards FAIL CLOSED: if the duplicate/overlap check itself errors,
+    // creating the handover anyway is exactly the double-claim they prevent.
+    const { data: existing, error: existErr } = await supabase.from('cash_handovers').select('id, status, amount').eq('to_user_id', recipient.id).eq('date', todayDate).eq('status', 'pending').maybeSingle();
+    if (existErr) { setHandSaving(false); setHandError('Could not verify pending handovers — ' + friendlyError(existErr)); return; }
     if (existing) { setHandSaving(false); setHandError(`A pending handover for ${recipient.full_name} already exists today (₹${Number(existing.amount).toLocaleString('en-IN')}). Cancel it or wait for them to sign before sending another.`); return; }
-    const { data: overlapping } = await supabase.from('cash_handovers').select('handover_number, status, period_from, period_to').eq('status', 'pending').lte('period_from', handPeriodTo).gte('period_to', handPeriodFrom);
+    const { data: overlapping, error: overlapErr } = await supabase.from('cash_handovers').select('handover_number, status, period_from, period_to').eq('status', 'pending').lte('period_from', handPeriodTo).gte('period_to', handPeriodFrom);
+    if (overlapErr) { setHandSaving(false); setHandError('Could not verify overlapping handovers — ' + friendlyError(overlapErr)); return; }
     if (overlapping && overlapping.length > 0) {
       const h = overlapping[0];
       setHandSaving(false); setHandError(`HO-${String(h.handover_number).padStart(4, '0')} (pending) already covers ${h.period_from} to ${h.period_to}. Wait for it to be signed, or cancel it, before creating an overlapping handover.`);
       return;
     }
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user?.id).maybeSingle();
+    const { data: prof, error: profErr } = await supabase.from('profiles').select('full_name').eq('id', user?.id).maybeSingle();
+    if (profErr) addToast('Could not load your profile name — using email on the handover', 'error');
     const handoverPayload: CashHandoverInsert = {
       date: todayDate, amount: amt,
       from_user_id: user?.id ?? null, from_user_name: prof?.full_name || user?.email || 'Unknown',
@@ -578,6 +593,18 @@ export default function CashBook() {
     setPendingExpDel({ id, timer });
   };
   const undoExpDel = () => { if (pendingExpDel) { clearTimeout(pendingExpDel.timer); setPendingExpDel(null); fetchData(); } };
+  // Unmount during the 5s undo window: clear the timer (it would fire against
+  // an unmounted component) and commit the delete immediately — the user
+  // asked for it and the undo affordance is gone.
+  const pendingExpDelRef = useRef(pendingExpDel);
+  pendingExpDelRef.current = pendingExpDel;
+  useEffect(() => () => {
+    const p = pendingExpDelRef.current;
+    if (p) {
+      clearTimeout(p.timer);
+      supabase.from('cash_expenses').delete().eq('id', p.id).then(() => {});
+    }
+  }, []);
   const dismissExpDel = async () => {
     if (!pendingExpDel) return;
     clearTimeout(pendingExpDel.timer);
@@ -593,7 +620,9 @@ export default function CashBook() {
   const filteredHandovers = sq ? handovers.filter(h => (h.from_user_name || '').toLowerCase().includes(sq) || (h.to_user_name || '').toLowerCase().includes(sq) || (h.notes || '').toLowerCase().includes(sq)) : handovers;
 
   const exportCSV = () => {
-    const rowsForTab = tab === 'expenses' ? expenses : tab === 'sales' ? sales : handovers;
+    // Export what's on screen: the filtered arrays, so an active search and
+    // the file agree (previously exported the unfiltered range).
+    const rowsForTab = tab === 'expenses' ? filteredExpenses : tab === 'sales' ? filteredSales : filteredHandovers;
     if (rowsForTab.length === 0) { addToast('Nothing to export in this date range', 'error'); return; }
     // Prefix ' on leading =+-@ so Excel/Sheets never treat user-typed text as
     // a formula (CSV injection) — same guard as the challan export.
@@ -601,13 +630,13 @@ export default function CashBook() {
     let csv = '', label = '';
     if (tab === 'expenses') {
       label = 'Expenses';
-      csv = 'Date,Amount,Category,Description\n' + expenses.map(e => `${e.date},${e.amount},${esc(e.category)},${esc(e.description || '')}`).join('\n');
+      csv = 'Date,Amount,Category,Description\n' + filteredExpenses.map(e => `${e.date},${e.amount},${esc(e.category)},${esc(e.description || '')}`).join('\n');
     } else if (tab === 'sales') {
       label = 'CashSales';
-      csv = 'Challan#,Customer,Amount Paid,Payment Mode,Payment Date,Return\n' + sales.map(s => `${s.challan_number},${esc(s.customer_name)},${s.amount_paid},${esc(s.payment_mode || '')},${s.payment_date || ''},${s.is_return ? 'Yes' : 'No'}`).join('\n');
+      csv = 'Challan#,Customer,Amount Paid,Payment Mode,Payment Date,Return\n' + filteredSales.map(s => `${s.challan_number},${esc(s.customer_name)},${s.amount_paid},${esc(s.payment_mode || '')},${s.payment_date || ''},${s.is_return ? 'Yes' : 'No'}`).join('\n');
     } else {
       label = 'Handovers';
-      csv = 'Handover#,Date,From,To,Amount,Status\n' + handovers.map(h => `${h.handover_number},${h.date},${esc(h.from_user_name)},${esc(h.to_user_name)},${h.amount},${h.status}`).join('\n');
+      csv = 'Handover#,Date,From,To,Amount,Status\n' + filteredHandovers.map(h => `${h.handover_number},${h.date},${esc(h.from_user_name)},${esc(h.to_user_name)},${h.amount},${h.status}`).join('\n');
     }
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);

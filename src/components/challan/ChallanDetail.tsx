@@ -120,11 +120,16 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
   }, [hasNext, hasPrev, onNext, onPrev]);
 
   useEffect(() => {
+    // Stale-response guard: next/prev navigation changes c.id rapidly; an
+    // older challan's slower response must not overwrite the current one's
+    // timeline (or set state after the modal closed).
+    let stale = false;
     setTimelineLoading(true);
     Promise.all([
       supabase.from('audit_log').select('action, details, user_email, changes, created_at').eq('module', 'cash_challan').eq('record_id', c.id).order('created_at'),
       supabase.from('cash_challan_payments').select('amount, payment_mode, payment_date, paid_by, notes, is_reversal, created_at, batch_id').eq('challan_id', c.id).order('created_at'),
     ]).then(async ([auditRes, payRes]) => {
+      if (stale) return;
       if (auditRes.error) addToast(friendlyError(auditRes.error), 'error');
       if (payRes.error) addToast(friendlyError(payRes.error), 'error');
       const entries: TimelineEntry[] = [];
@@ -140,9 +145,11 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
         for (const p of payData) entries.push({ type: 'payment', time: p.created_at || '', amount: Number(p.amount), payment_mode: p.payment_mode, is_reversal: p.is_reversal, user_name: p.paid_by ? nameMap[p.paid_by] || 'User' : undefined, notes: p.notes || undefined, batch_id: p.batch_id });
       }
       entries.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+      if (stale) return;
       setTimeline(entries);
       setTimelineLoading(false);
-    }).catch(e => { addToast(friendlyError(e), 'error'); setTimelineLoading(false); });
+    }).catch(e => { if (!stale) { addToast(friendlyError(e), 'error'); setTimelineLoading(false); } });
+    return () => { stale = true; };
   }, [c.id]);
 
   const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;

@@ -150,7 +150,11 @@ export default function ChallanLedger({
         {dueCount > 0 && (
           <button onClick={() => {
             const due = customers.filter(c => c.outstanding > 0);
-            const csv = 'Customer,Billed,Paid,Outstanding,Challans\n' + due.map(c => `"${c.name}",${c.total},${c.paid},${c.outstanding},${c.count}`).join('\n');
+            // Same guard as every other export: prefix ' on leading =+-@ so a
+            // customer name never executes as a spreadsheet formula, and
+            // double quotes so names with " can't break the columns.
+            const esc = (v: string) => { const s = v || ''; const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s; return `"${safe.replace(/"/g, '""')}"`; };
+            const csv = 'Customer,Billed,Paid,Outstanding,Challans\n' + due.map(c => `${esc(c.name)},${c.total},${c.paid},${c.outstanding},${c.count}`).join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Outstanding_Customers_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
           }} style={{ width: '100%', marginTop: 10, padding: '7px', borderRadius: 6, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.04)', color: T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Export Outstanding ({dueCount})</button>
