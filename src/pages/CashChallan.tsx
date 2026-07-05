@@ -694,8 +694,22 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const savedPhone = customerPhone.trim();
     const savedItemCount = items.length;
     const savedNumber = editing ? editing.challan_number : createdNumber;
+    // Payment recorded during this edit (0 for new challans — those use the
+    // creation message below, which already covers the payment).
+    const paidDelta = editing ? amountPaid - Number(editing.amount_paid || 0) : 0;
     closeModal();
     fetchChallans();
+    if (!wasNew && !isReturn && paidDelta > 0 && isValidPhone(savedPhone)) {
+      const line = amountPaid >= savedTotal
+        ? `Challan #${savedNumber} — fully settled`
+        : `Challan #${savedNumber} — balance ₹${Math.max(0, savedTotal - amountPaid).toLocaleString('en-IN')}`;
+      const msg = await buildReceiptMsg({
+        name: savedName, customerId: custId,
+        lead: `Payment received — thank you!\n₹${paidDelta.toLocaleString('en-IN')} via ${paymentMode || 'Cash'} on ${receiptDate(paymentDate || localToday())}`,
+        lines: [line],
+      });
+      setWhatsAppShare({ phone: savedPhone, url: `https://wa.me/${waPhone(savedPhone)}?text=${msg}` });
+    }
     if (wasNew) {
       addToast('Challan created!', 'success');
       if (savedPhone && !isReturn) {
@@ -782,6 +796,20 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (auditErr) { addToast(friendlyError(auditErr), 'error'); return; }
     setAuditTrail(data || []);
   };
+
+  // ── WhatsApp payment receipt ───────────────────────────────────────────────
+  // One receipt format for both flows (add-payment on edit, bulk pay): lead
+  // line with amount/mode/date, per-challan settlement lines, and the
+  // customer's updated total outstanding (credit-model, same as the ledger).
+  const buildReceiptMsg = async (opts: { name: string; customerId: string | null; lead: string; lines: string[] }) => {
+    const { value: totalOutstanding, error: outErr } = await fetchCustomerOutstanding({ name: opts.name, customerId: opts.customerId });
+    if (outErr) addToast('Could not fetch outstanding balance — figure omitted from receipt', 'error');
+    const outLine = outErr ? '' : totalOutstanding > 0
+      ? `\nTotal outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}`
+      : '\nAll challans settled — no balance pending.';
+    return encodeURIComponent(`Hi ${opts.name},\n${opts.lead}\n${opts.lines.join('\n')}${outLine}\n— Arya Designs`);
+  };
+  const receiptDate = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
   // ── WhatsApp payment reminder ──────────────────────────────────────────────
   const buildReminderMsg = async (c: Challan) => {
@@ -1097,6 +1125,24 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setShowBulkPay(false); setBulkPayMode(''); setBulkReceivedAmount(''); exitBulkMode(); fetchChallans();
     if (failCount > 0) addToast(`${ids.length - failCount} of ${ids.length} challans paid — ${failCount} failed (${batchId})`, 'error');
     else addToast(isRefund ? `Settled ${ids.length} challans, refunded ₹${received.toLocaleString('en-IN')} (${batchId})` : `${ids.length} challans marked as paid (${batchId})`, 'success');
+    // Offer a WhatsApp receipt when the whole batch belongs to one customer
+    // (the common per-customer settlement case). Mixed selections: skip.
+    if (paidOk.length > 0) {
+      const custKeys = new Set(paidOk.map(c => c.customer_id || `name:${c.customer_name}`));
+      const phone = String((paidOk[0] as any).customer_phone || '').trim();
+      if (custKeys.size === 1 && isValidPhone(phone)) {
+        const nums = paidOk.map(c => `#${c.challan_number}`);
+        const numsStr = nums.length > 6 ? `${nums.slice(0, 6).join(', ')} +${nums.length - 6} more` : nums.join(', ');
+        const lead = isRefund
+          ? `Settlement recorded — ₹${received.toLocaleString('en-IN')} refunded via ${bulkPayMode} on ${receiptDate(today)}`
+          : `Payment received — thank you!\n₹${received.toLocaleString('en-IN')} via ${bulkPayMode} on ${receiptDate(today)}`;
+        const msg = await buildReceiptMsg({
+          name: paidOk[0].customer_name, customerId: paidOk[0].customer_id,
+          lead, lines: [`Challan${paidOk.length > 1 ? 's' : ''} ${numsStr} — fully settled`],
+        });
+        setWhatsAppShare({ phone, url: `https://wa.me/${waPhone(phone)}?text=${msg}` });
+      }
+    }
     setBulkBusy(false);
   };
 
