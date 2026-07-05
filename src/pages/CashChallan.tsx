@@ -75,6 +75,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
   const updateSearch = (val: string) => { setSearch(val); clearTimeout(searchTimer.current); searchTimer.current = setTimeout(() => setDebouncedSearch(val), 400); };
+  useEffect(() => () => clearTimeout(searchTimer.current), []);
   const [statusFilter, setStatusFilter] = useState('');
   const [tagFilter, setTagFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -209,6 +210,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const p = Number(it.price) || 0;
     const d = Number(it.discount_value) || 0;
     if (q < 0) return 'Quantity cannot be negative';
+    // DB column is integer — the RPC's numeric cast would silently round 1.5 → 2.
+    if (!Number.isInteger(q)) return 'Quantity must be a whole number';
     if (p < 0) return 'Price cannot be negative';
     if (d < 0) return 'Discount cannot be negative';
     if (it.discount_type === 'percentage' && d > 100) return 'Discount cannot exceed 100%';
@@ -1189,34 +1192,24 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     addToast(`Batch ${batchId} reversed — ${rows.length} challan${rows.length !== 1 ? 's' : ''} reverted`, 'success');
   };
 
+  // Atomic via RPC: the DB now only allows paid → unpaid inside an
+  // RPC-marked transaction (guarantees the reversal payment row is written
+  // alongside the header), so the old two-step client loop is rejected.
   const executeBulkUnpay = async () => {
     if (bulkBusy) return;
     setBulkBusy(true);
-    const today = localToday();
     const { data: { user } } = await supabase.auth.getUser();
     const ids = bulkUnpayable.map(c => c.id);
     if (ids.length === 0) { setShowBulkUnpay(false); setBulkBusy(false); return; }
     const undoBatchId = `BU-${Date.now().toString(36).toUpperCase()}`;
-    let unpayFails = 0;
-    // Same rule as bulk pay: audit entries only for rows that actually changed.
-    const unpaidOk: Challan[] = [];
-    for (const c of bulkUnpayable) {
-      const { error: upErr } = await supabase.from('cash_challans').update({
-        status: 'unpaid', amount_paid: 0, payment_mode: null, payment_date: null,
-        modified_by: user?.id, updated_at: new Date().toISOString(),
-      }).eq('id', c.id).eq('status', 'paid');
-      if (upErr) { unpayFails++; addToast('Unpay failed — ' + friendlyError(upErr), 'error'); continue; }
-      const { error: revErr } = await supabase.from('cash_challan_payments').insert({
-        challan_id: c.id, amount: Number(c.amount_paid || c.total), payment_mode: c.payment_mode || 'Cash',
-        payment_date: today, paid_by: user?.id, notes: 'Bulk unpay reversal', is_reversal: true, batch_id: undoBatchId,
-      });
-      if (revErr) { unpayFails++; addToast('Reversal record failed — ' + friendlyError(revErr), 'error'); }
-      unpaidOk.push(c);
-    }
-    for (const c of unpaidOk) await ccAuditLog('BULK_UNPAY', c.id, `Bulk unpaid (${undoBatchId}) — was ₹${Number(c.amount_paid || c.total).toLocaleString('en-IN')}`, { status: { from: 'paid', to: 'unpaid' }, amount_paid: { from: c.amount_paid, to: 0 } });
+    const { data: results, error: unpayErr } = await supabase.rpc('unpay_challan_batch', { p_ids: ids, p_undo_batch_id: undoBatchId, p_user: user?.id });
+    if (unpayErr) { addToast(friendlyError(unpayErr), 'error'); setBulkBusy(false); return; }
+    const rows = ((results as { challan_id: string; challan_number: number; prev_paid: number }[] | null) || []);
+    for (const r of rows) await ccAuditLog('BULK_UNPAY', r.challan_id, `Bulk unpaid (${undoBatchId}) — was ₹${Number(r.prev_paid).toLocaleString('en-IN')} on #${r.challan_number}`, { status: { from: 'paid', to: 'unpaid' }, amount_paid: { from: r.prev_paid, to: 0 } });
     setShowBulkUnpay(false); exitBulkMode(); fetchChallans(); setBulkBusy(false);
-    if (unpayFails > 0) addToast(`${ids.length - unpayFails} of ${ids.length} reverted — ${unpayFails} failed`, 'error');
-    else addToast(`${ids.length} challans reverted to unpaid`, 'success');
+    if (rows.length === 0) addToast('Nothing to revert — the selected challans changed since', 'error');
+    else if (rows.length < ids.length) addToast(`${rows.length} of ${ids.length} reverted — the rest changed since selection`, 'error');
+    else addToast(`${rows.length} challans reverted to unpaid`, 'success');
   };
 
   const totalPages = Math.ceil(totalCount / pageSize);
