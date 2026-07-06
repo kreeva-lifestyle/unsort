@@ -155,6 +155,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
   const sc = STATUS_COLORS[c.status] || STATUS_COLORS.unpaid;
   const items = c.cash_challan_items || [];
   const isRet = !!c.is_return;
+  const hoNum = (c as { handover?: { handover_number?: number } }).handover?.handover_number;
   const isVoided = c.status === 'voided';
   const due = Number(c.total) - Number(c.amount_paid || 0);
   const canRemind = !isRet && (c.status === 'unpaid' || c.status === 'partial');
@@ -190,6 +191,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: mobile ? 16 : 18, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>#{c.challan_number}</span>
               <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 4, background: sc.bg, color: sc.color, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{isRet ? 'Return' : c.status}</span>
+              {c.handover_id && <span title="This cash was included in a signed handover" style={{ fontSize: 9, padding: '3px 8px', borderRadius: 4, background: 'rgba(56,189,248,.12)', color: T.bl, fontWeight: 700, letterSpacing: 0.3 }}>{hoNum ? `Handed over · HO-${String(hoNum).padStart(4, '0')}` : 'Handed over'}</span>}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{c.customer_name}</span>

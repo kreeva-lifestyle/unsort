@@ -236,7 +236,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Fetch challans ─────────────────────────────────────────────────────────
   const fetchChallans = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    let query = supabase.from('cash_challans').select('*, cash_challan_items(sku, quantity, price, discount_amount, total)', { count: 'estimated' });
+    let query = supabase.from('cash_challans').select('*, cash_challan_items(sku, quantity, price, discount_amount, total), handover:cash_handovers!handover_id(handover_number)', { count: 'estimated' });
     if (debouncedSearch) {
       const s = debouncedSearch.replace(/[%_,().]/g, '');
       const num = parseInt(s);
