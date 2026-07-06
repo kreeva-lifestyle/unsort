@@ -364,6 +364,7 @@ const ICON_PATHS: Record<string, string> = {
   layers:   'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
   sparkles: 'M12 3l1.9 5.7L20 11l-6.1 2.3L12 19l-1.9-5.7L4 11l6.1-2.3L12 3zM19 3v4M21 5h-4M5 17v4M7 19H3',
   print:    'M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z',
+  clock:    'M12 22a10 10 0 100-20 10 10 0 000 20zM12 6v6l4 2',
 };
 
 export const Icon = ({ name, size = 16 }: { name: string; size?: number }) => {
