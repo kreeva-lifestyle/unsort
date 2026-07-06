@@ -31,7 +31,7 @@ export default function Attendance() {
     setEmployees((data as AttEmployee[]) || []);
   }, [addToast]);
 
-  const fetchMonth = useCallback(async (m: string) => {
+  const fetchMonth = useCallback(async (m: string, isCurrent: () => boolean = () => true) => {
     setLoading(true);
     const from = monthFirstDay(m);
     const [y, mo] = m.split('-').map(Number);
@@ -41,6 +41,9 @@ export default function Attendance() {
       supabase.from('attendance_penalties').select('id, employee_id, month, amount, reason').eq('month', from),
       supabase.from('attendance_salaries').select('id, employee_id, month, days_in_month, work_days, sundays, leave_days, total_worked_minutes, per_day_salary, per_hour_salary, earned, sunday_pay, gross, penalty_total, final_salary, computed_at').eq('month', from),
     ]);
+    // A newer month may have been requested while these were in flight — drop
+    // superseded responses so Salary never computes/saves the wrong month.
+    if (!isCurrent()) return;
     const err = en.error || pe.error || sa.error;
     if (err) addToast(friendlyError(err), 'error');
     setEntries((en.data as AttEntry[]) || []);
@@ -50,7 +53,7 @@ export default function Attendance() {
   }, [addToast]);
 
   useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
-  useEffect(() => { fetchMonth(month); }, [month, fetchMonth]);
+  useEffect(() => { let active = true; fetchMonth(month, () => active); return () => { active = false; }; }, [month, fetchMonth]);
 
   const tabBtn = (id: typeof view, label: string) => (
     <button key={id} onClick={() => setView(id)} style={{ padding: '7px 14px', borderRadius: 8, border: view === id ? `1px solid ${T.ac}44` : `1px solid ${T.bd}`, background: view === id ? T.ac3 : 'rgba(255,255,255,0.02)', color: view === id ? T.ac2 : T.tx3, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: T.sans }}>{label}</button>

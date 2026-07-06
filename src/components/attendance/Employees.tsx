@@ -87,12 +87,12 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
             <div style={{ padding: 16 }}>
               <div style={{ marginBottom: 10 }}>
                 <label style={S.fLabel}>Employee Name</label>
-                <input value={name} onChange={e => setName(e.target.value)} placeholder="DHARA JADAV" autoFocus style={{ ...S.fInput, width: '100%' }} />
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Ramesh Patel" autoFocus style={{ ...S.fInput, width: '100%' }} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
                 <div>
                   <label style={S.fLabel}>Employee ID</label>
-                  <input value={code} onChange={e => setCode(e.target.value)} placeholder="AARTI-1" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
+                  <input value={code} onChange={e => setCode(e.target.value)} placeholder="e.g. EMP-01" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
                 </div>
                 <div>
                   <label style={S.fLabel}>Monthly Salary (₹)</label>
