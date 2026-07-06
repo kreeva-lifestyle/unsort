@@ -145,17 +145,27 @@ export const computeMonthlySalary = (
 // ── Excel import parsing ─────────────────────────────────────────────────────
 // Handles both raw Excel cell types (date serials, time fractions) and the
 // display strings from the owner's sheet ("01/06/2026", "9:52").
+// Build a validated ISO date — rejects out-of-range (month>12, day>31) and
+// impossible (Feb 30) dates by round-tripping, so a bad cell becomes a
+// skipped row with a reason instead of poisoning the whole upsert batch.
+const toISO = (y: number, mo: number, d: number): string | null => {
+  if (!Number.isInteger(y) || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null;
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+};
+
 export const excelCellToDateISO = (v: unknown): string | null => {
   if (v == null || v === '') return null;
   if (typeof v === 'number' && v > 20000) {
     const d = new Date(Math.round((v - 25569) * 86400 * 1000));
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+    return toISO(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
   }
   const s = String(v).trim();
   let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); // dd/mm/yyyy (Indian sheets)
-  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  if (m) return toISO(Number(m[3]), Number(m[2]), Number(m[1]));
   m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  if (m) return toISO(Number(m[1]), Number(m[2]), Number(m[3]));
   return null;
 };
 

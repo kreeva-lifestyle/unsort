@@ -12,6 +12,23 @@ import { AttEmployee, excelCellToDateISO, excelCellToTime } from '../../lib/atte
 
 type Result = { inserted: number; employeesCreated: number; skipped: { row: number; reason: string }[] } | null;
 
+// Minimal RFC-4180 CSV → string cells (quotes, embedded commas/newlines).
+// Cells stay strings so dd/mm dates are not date-guessed (see handleFile).
+const parseCSV = (text: string): string[][] => {
+  const rows: string[][] = []; let row: string[] = [], cell = '', q = false;
+  const t = text.replace(/^﻿/, '');
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (q) { if (c === '"') { if (t[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+    else if (c !== '\r') cell += c;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+};
+
 // Match a header cell to a canonical field (case/space/punct tolerant).
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '');
 const HEADER_ALIASES: Record<string, string[]> = {
@@ -41,10 +58,18 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
   const handleFile = async (file: File) => {
     setBusy(true); setResult(null); setFileName(file.name);
     try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+      // CSV is parsed as raw text — SheetJS's CSV reader coerces "01/06/2026"
+      // (dd/mm) into a US mm/dd date serial at read time, silently swapping
+      // day↔month for days 1–12. Keeping cells as strings lets
+      // excelCellToDateISO apply the correct dd/mm rule. XLSX/XLS keep true
+      // locale-independent serials, so those go through SheetJS.
+      let rows: unknown[][];
+      if (/\.csv$/i.test(file.name)) {
+        rows = parseCSV(await file.text());
+      } else {
+        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+        rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null });
+      }
       if (rows.length < 2) { addToast('Sheet has no data rows', 'error'); setBusy(false); return; }
 
       // Resolve columns from the header row.
@@ -58,49 +83,78 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
       const get = (r: unknown[], f: string) => (col[f] >= 0 ? r[col[f]] : null);
       const skipped: { row: number; reason: string }[] = [];
 
-      // Build the set of names → resolve/create employees first.
-      const nameByLower = new Map(employees.map(e => [e.name.trim().toLowerCase(), e]));
+      // Employee resolution keys on the Employee ID (stable across renames)
+      // first, then falls back to name. Names shared by >1 employee are
+      // ambiguous and can only be resolved by code.
+      const byCode = new Map(employees.filter(e => e.employee_code).map(e => [e.employee_code!.trim().toLowerCase(), e]));
+      const nameByLower = new Map<string, AttEmployee>();
+      const ambiguousNames = new Set<string>();
+      for (const e of employees) {
+        const k = e.name.trim().toLowerCase();
+        if (nameByLower.has(k)) ambiguousNames.add(k); else nameByLower.set(k, e);
+      }
+      const resolve = (code: string, nm: string): AttEmployee | null => {
+        const c = code.trim().toLowerCase();
+        if (c && byCode.has(c)) return byCode.get(c)!;
+        const n = nm.trim().toLowerCase();
+        if (n && !ambiguousNames.has(n) && nameByLower.has(n)) return nameByLower.get(n)!;
+        return null;
+      };
+
+      // Create employees for rows that resolve to no existing record — keyed
+      // by code (or name when code-less) so one person is never created twice.
       let employeesCreated = 0;
       const toCreate = new Map<string, { name: string; code: string | null }>();
       for (let i = 1; i < rows.length; i++) {
         const nm = String(get(rows[i], 'name') ?? '').trim();
+        const code = String(get(rows[i], 'code') ?? '').trim();
         if (!nm) continue;
-        const key = nm.toLowerCase();
-        if (!nameByLower.has(key) && !toCreate.has(key)) {
-          toCreate.set(key, { name: nm, code: (String(get(rows[i], 'code') ?? '').trim() || null) });
-        }
+        if (resolve(code, nm)) continue;
+        const key = (code || nm).toLowerCase();
+        if (!toCreate.has(key)) toCreate.set(key, { name: nm, code: code || null });
       }
       if (toCreate.size > 0) {
         const { data: created, error: cErr } = await supabase.from('attendance_employees')
           .insert([...toCreate.values()].map(v => ({ name: v.name, employee_code: v.code, salary: 0, fix_time_minutes: 510 })))
           .select('id, employee_code, name, salary, fix_time_minutes, is_active');
         if (cErr) { addToast('Could not create new employees — ' + friendlyError(cErr), 'error'); setBusy(false); return; }
-        (created as AttEmployee[] || []).forEach(e => nameByLower.set(e.name.trim().toLowerCase(), e));
+        (created as AttEmployee[] || []).forEach(e => {
+          if (e.employee_code) byCode.set(e.employee_code.trim().toLowerCase(), e);
+          const k = e.name.trim().toLowerCase();
+          if (!nameByLower.has(k)) nameByLower.set(k, e); // fresh creates are unique by construction
+        });
         employeesCreated = created?.length || 0;
       }
 
-      // Build entry rows.
-      type EntryRow = { employee_id: string; date: string; day: string | null; shift_id: string | null; in_time: string | null; out_time: string | null; location_in: string | null; location_out: string | null; status: string | null; remarks: string | null; manager_remarks: string | null };
+      // Only write columns actually present in the sheet, so re-importing a
+      // sheet that omits a column can't null out existing values on conflict.
+      const optionalFields: [keyof EntryRow, string, 'str' | 'time'][] = [
+        ['day', 'day', 'str'], ['shift_id', 'shift', 'str'], ['in_time', 'in', 'time'], ['out_time', 'out', 'time'],
+        ['location_in', 'locIn', 'str'], ['location_out', 'locOut', 'str'], ['status', 'status', 'str'],
+        ['remarks', 'remarks', 'str'], ['manager_remarks', 'mgr', 'str'],
+      ];
+      type EntryRow = { employee_id: string; date: string; day?: string | null; shift_id?: string | null; in_time?: string | null; out_time?: string | null; location_in?: string | null; location_out?: string | null; status?: string | null; remarks?: string | null; manager_remarks?: string | null };
       const seen = new Set<string>();
       const toUpsert: EntryRow[] = [];
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
         const nm = String(get(r, 'name') ?? '').trim();
+        const code = String(get(r, 'code') ?? '').trim();
         if (!nm && !(r || []).some(c => c != null && c !== '')) continue; // wholly blank row
-        const emp = nameByLower.get(nm.toLowerCase());
-        if (!emp) { skipped.push({ row: i + 1, reason: 'no employee name' }); continue; }
+        const emp = resolve(code, nm);
+        if (!emp) { skipped.push({ row: i + 1, reason: nm && ambiguousNames.has(nm.toLowerCase()) ? `name "${nm}" is shared by multiple employees — add the Employee ID column` : 'no matching employee (name/ID)' }); continue; }
         const dateISO = excelCellToDateISO(get(r, 'date'));
         if (!dateISO) { skipped.push({ row: i + 1, reason: `unreadable date "${String(get(r, 'date') ?? '')}"` }); continue; }
         const key = `${emp.id}|${dateISO}`;
         if (seen.has(key)) { skipped.push({ row: i + 1, reason: 'duplicate employee+date in file' }); continue; }
         seen.add(key);
         const str = (f: string) => { const v = get(r, f); const s = v == null ? '' : String(v).trim(); return s || null; };
-        toUpsert.push({
-          employee_id: emp.id, date: dateISO, day: str('day'), shift_id: str('shift'),
-          in_time: excelCellToTime(get(r, 'in')), out_time: excelCellToTime(get(r, 'out')),
-          location_in: str('locIn'), location_out: str('locOut'), status: str('status'),
-          remarks: str('remarks'), manager_remarks: str('mgr'),
-        });
+        const row: EntryRow = { employee_id: emp.id, date: dateISO };
+        for (const [field, srcKey, kind] of optionalFields) {
+          if (col[srcKey] < 0) continue; // column absent → don't clobber on conflict
+          (row as Record<string, string | null>)[field] = kind === 'time' ? excelCellToTime(get(r, srcKey)) : str(srcKey);
+        }
+        toUpsert.push(row);
       }
 
       // Upsert in batches of 500 on the (employee_id, date) unique key.

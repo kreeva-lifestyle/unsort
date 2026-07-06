@@ -23,6 +23,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
   const [penAmt, setPenAmt] = useState('');
   const [penReason, setPenReason] = useState('');
   const [saving, setSaving] = useState(false);
+  const [savingPen, setSavingPen] = useState(false);
   const [q, setQ] = useState('');
 
   const monthLabel = new Date(month + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
@@ -54,11 +55,13 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
 
   // ── Penalty ────────────────────────────────────────────────────────────────
   const savePenalty = async () => {
-    if (!penFor) return;
+    if (!penFor || savingPen) return;
     const amt = Number(penAmt);
     if (!Number.isFinite(amt) || amt <= 0) { addToast('Enter a penalty amount greater than 0', 'error'); return; }
+    setSavingPen(true);
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from('attendance_penalties').insert({ employee_id: penFor.id, month: monthFirstDay(month), amount: amt, reason: penReason.trim() || null, created_by: user?.id });
+    setSavingPen(false);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     addToast(`Penalty ${inr(amt)} added for ${penFor.name}`, 'success');
     setPenFor(null); setPenAmt(''); setPenReason(''); onChanged();
@@ -104,7 +107,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
     const penRows = pens.map(p => `<div style="display:flex;justify-content:space-between"><span>Penalty${p.reason ? ' — ' + esc(p.reason) : ''}</span><span style="color:#c0392b">− ${esc(inr2(Number(p.amount)))}</span></div>`).join('');
     return `<div class="slip">
       <div class="head"><div><div class="nm">${esc(s.name)}</div><div class="sub">${esc(emp?.employee_code || '')} · ${esc(monthLabel)}</div></div>
-        <div class="final"><div class="fl">Net Salary</div><div class="fv">${esc(inr(s.finalSalary))}</div></div></div>
+        <div class="final"><div class="fl">Net Salary</div><div class="fv" style="color:${s.finalSalary < 0 ? '#c0392b' : '#1a7f37'}">${esc(inr(s.finalSalary))}</div></div></div>
       <div class="basis">Monthly salary ${esc(inr(s.salary))} · Fix time ${esc(minutesToHM(s.fixTimeMinutes))}/day · Days in month ${s.daysInMonth} (calendar) · Per-day ${esc(inr2(s.perDaySalary))} · Per-hour ${esc(inr2(s.perHourSalary))}</div>
       <table class="days"><thead><tr><th>Date</th><th>Day</th><th>In</th><th>Out</th><th>Worked</th><th>+/− vs fix</th><th>Day Pay</th><th>St</th></tr></thead><tbody>${dayRows}</tbody></table>
       <div class="totals">
@@ -117,7 +120,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
         <div class="rule"><span>Gross</span><span>${esc(inr2(s.gross))}</span></div>
         ${penRows}
         ${s.penaltyTotal > 0 ? `<div><span>Total penalties</span><span style="color:#c0392b">− ${esc(inr2(s.penaltyTotal))}</span></div>` : ''}
-        <div class="final-row"><span>Net Salary (rounded)</span><span>${esc(inr(s.finalSalary))}</span></div>
+        <div class="final-row" style="color:${s.finalSalary < 0 ? '#c0392b' : '#1a7f37'}"><span>Net Salary (rounded)</span><span>${esc(inr(s.finalSalary))}</span></div>
       </div>
     </div>`;
   };
@@ -197,7 +200,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5 }}>Net Salary</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.gr }}>{inr(s.finalSalary)}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: s.finalSalary < 0 ? T.re : T.gr }}>{inr(s.finalSalary)}</div>
                   {s.penaltyTotal > 0 && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono }}>gross {inr(s.gross)} − {inr(s.penaltyTotal)}</div>}
                 </div>
               </div>
@@ -228,7 +231,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => setPenFor(null)} style={{ ...S.btnGhost, flex: 1 }}>Cancel</button>
-                <button onClick={savePenalty} style={{ ...S.btnDanger, flex: 1 }}>Add Penalty</button>
+                <button onClick={savePenalty} disabled={savingPen} style={{ ...S.btnDanger, flex: 1, pointerEvents: savingPen ? 'none' : 'auto', opacity: savingPen ? 0.5 : 1 }}>{savingPen ? 'Adding…' : 'Add Penalty'}</button>
               </div>
             </div>
           </div>
