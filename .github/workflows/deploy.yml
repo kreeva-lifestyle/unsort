@@ -11,8 +11,12 @@ permissions:
   id-token: write
 
 concurrency:
+  # Queue Pages deploys instead of cancelling in-flight ones. Cancelling a
+  # deployment mid-flight leaves GitHub Pages with a stuck "pending" state,
+  # which makes the NEXT deploy fail with "Deployment failed, try again later."
+  # This matches GitHub's official Pages workflow (cancel-in-progress: false).
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
