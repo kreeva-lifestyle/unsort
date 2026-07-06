@@ -442,6 +442,7 @@ export interface CashChallan {
   is_return: boolean | null;
   source_challan_id: string | null;
   inventory_deducted: boolean;
+  handover_id: string | null;
 }
 
 export type CashChallanInsert = {

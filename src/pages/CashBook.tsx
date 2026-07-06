@@ -93,6 +93,7 @@ export default function CashBook() {
   const [handError, setHandError] = useState('');
   const [handSaving, setHandSaving] = useState(false);
   const [viewingHandover, setViewingHandover] = useState<Handover | null>(null);
+  const [handoverItems, setHandoverItems] = useState<{ challan_number: number; customer_name: string; amount_paid: number; payment_date: string | null; is_return: boolean }[]>([]);
   // Users list (for recipient dropdown)
   const [users, setUsers] = useState<{ id: string; full_name: string; email: string; has_pin: boolean; phone: string | null; role: string }[]>([]);
   const [recentHandovers, setRecentHandovers] = useState<Handover[]>([]);
@@ -205,6 +206,20 @@ export default function CashBook() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData, debouncedFetch]);
 
+  // Load the exact challans stamped to the handover being viewed (per-challan
+  // handover tracking) — the real itemised contents, not an inferred list.
+  useEffect(() => {
+    if (!viewingHandover?.id) { setHandoverItems([]); return; }
+    let stale = false;
+    supabase.from('cash_challans').select('challan_number, customer_name, amount_paid, payment_date, is_return')
+      .eq('handover_id', viewingHandover.id).order('payment_date', { ascending: true }).then(({ data, error }) => {
+        if (stale) return;
+        if (error) { addToast('Could not load handover items — ' + friendlyError(error), 'error'); return; }
+        setHandoverItems((data as typeof handoverItems) || []);
+      });
+    return () => { stale = true; };
+  }, [viewingHandover?.id, addToast]);
+
   const { cashInSales, cashOutReturns, totalExpenses, totalHandovers, closingBalance } = useMemo(() => {
     const cIn = sales.filter(s => !s.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
     const cOut = sales.filter(s => s.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
@@ -282,30 +297,26 @@ export default function CashBook() {
 
   // Compute available cash for a date range (auto-calc for handover)
   const computeBreakdown = useCallback(async (from: string, to: string): Promise<Breakdown> => {
-    const [balR, expR, chR, hoR] = await Promise.all([
+    // Only UN-HANDED cash counts as available: challans/expenses already
+    // stamped with a handover_id can't be handed over again. This per-item
+    // exclusion replaces the old "subtract overlapping handover amounts"
+    // heuristic — precise, and robust to edited payment dates / backdated sales.
+    const [balR, expR, chR] = await Promise.all([
       supabase.from('cash_book_balances').select('opening_balance').eq('date', from).maybeSingle(),
-      supabase.from('cash_expenses').select('amount').gte('date', from).lte('date', to),
-      supabase.from('cash_challans').select('amount_paid, is_return, status').in('status', ['paid', 'partial']).gte('payment_date', from).lte('payment_date', to),
-      supabase.from('cash_handovers').select('amount, status, period_from, period_to, date').in('status', ['confirmed', 'pending']).limit(500),
+      supabase.from('cash_expenses').select('amount').is('handover_id', null).gte('date', from).lte('date', to),
+      supabase.from('cash_challans').select('amount_paid, is_return, status').is('handover_id', null).in('status', ['paid', 'partial']).gte('payment_date', from).lte('payment_date', to),
     ]);
-    const fetchErr = balR.error || expR.error || chR.error || hoR.error;
+    const fetchErr = balR.error || expR.error || chR.error;
     if (fetchErr) addToast('Cash flow calculation may be incomplete: ' + friendlyError(fetchErr), 'error');
-    const bal = balR.data; const exp = expR.data; const ch = chR.data; const ho = hoR.data;
+    const bal = balR.data; const exp = expR.data; const ch = chR.data;
     const opening = Number(bal?.opening_balance || 0);
     const openingIsSet = bal !== null && bal !== undefined;
     type ChRow = Pick<CashChallan, 'amount_paid' | 'is_return' | 'status'>;
     type ExpRow = Pick<CashExpense, 'amount'>;
-    type HoRow = Pick<CashHandover, 'amount' | 'status' | 'period_from' | 'period_to' | 'date'>;
     const cashSales = ((ch as ChRow[] | null) || []).filter((r) => !r.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
     const cashReturns = ((ch as ChRow[] | null) || []).filter((r) => r.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
     const expensesTotal = ((exp as ExpRow[] | null) || []).reduce((s, r) => s + Number(r.amount), 0);
-    // Previous handovers that overlap this range — include PENDING so a second
-    // handover can't claim cash that's already locked in a pending one
-    const previousHandovers = ((ho as HoRow[] | null) || []).filter((h) => {
-      const hFrom = h.period_from || h.date;
-      const hTo = h.period_to || h.date;
-      return hFrom && hTo && hFrom <= to && hTo >= from;
-    }).reduce((s, h) => s + Number(h.amount), 0);
+    const previousHandovers = 0; // superseded by the handover_id exclusion above
     const available = opening + cashSales - cashReturns - expensesTotal - previousHandovers;
     return { opening, openingIsSet, cashSales, cashReturns, expenses: expensesTotal, previousHandovers, available, periodFrom: from, periodTo: to };
   }, [addToast]);
@@ -963,6 +974,27 @@ export default function CashBook() {
             {viewingHandover.reason && <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl, marginBottom: 8 }}><strong>Reason:</strong> {viewingHandover.reason}</div>}
             {viewingHandover.notes && <div style={{ fontSize: 10, color: T.tx3, marginBottom: 8 }}><strong>Notes:</strong> {viewingHandover.notes}</div>}
             {viewingHandover.confirmed_at && <div style={{ fontSize: 10, color: T.gr, marginBottom: 10 }}>✓ Signed at {new Date(viewingHandover.confirmed_at).toLocaleString('en-IN')}</div>}
+            {viewingHandover.status === 'confirmed' && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Challans in this handover ({handoverItems.length})</div>
+                {handoverItems.length === 0 ? (
+                  <div style={{ fontSize: 10, color: T.tx3, fontStyle: 'italic' }}>No individual challans linked.</div>
+                ) : (
+                  <div style={{ maxHeight: 180, overflowY: 'auto', border: `1px solid ${T.bd}`, borderRadius: 6 }}>
+                    {handoverItems.map((it, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: i < handoverItems.length - 1 ? `1px solid ${T.bd}` : 'none', fontSize: 11 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <span style={{ fontFamily: T.mono, color: T.tx3 }}>#{it.challan_number}</span>
+                          <span style={{ color: T.tx2, marginLeft: 8 }}>{it.customer_name}</span>
+                          {it.is_return && <span style={{ fontSize: 8, color: T.re, marginLeft: 6, fontWeight: 700 }}>RET</span>}
+                        </div>
+                        <span style={{ fontFamily: T.mono, color: it.is_return ? T.re : T.gr, fontWeight: 600, flexShrink: 0 }}>{it.is_return ? '−' : ''}₹{Number(it.amount_paid).toLocaleString('en-IN')}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <button onClick={() => printHandoverReceipt(viewingHandover)} style={{ ...S.btnPrimary, width: '100%', padding: '10px', borderRadius: 6, fontSize: 11 }}>Print Receipt</button>
           </div>
         </div>,
