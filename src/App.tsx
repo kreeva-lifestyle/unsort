@@ -57,6 +57,7 @@ const retryImport = (fn: () => Promise<any>) => lazy(() =>
 const BrandTagPrinter = retryImport(() => import('./pages/BrandTags'));
 const PackTime = retryImport(() => import('./pages/PackTime'));
 const CashChallan = retryImport(() => import('./pages/CashChallan'));
+const Attendance = retryImport(() => import('./pages/Attendance'));
 const SettingsPage = retryImport(() => import('./pages/Settings'));
 const Inventory = retryImport(() => import('./pages/Inventory'));
 const ProgramsModule = retryImport(() => import('./modules/programs'));
@@ -179,6 +180,7 @@ const MainApp = () => {
         {mounted.has('brandtag') && checkTab('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
         {mounted.has('packtime') && checkTab('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime active={tab === 'packtime'} /></div>}
         {mounted.has('challan') && checkTab('challan') && <div style={{ display: tab === 'challan' ? 'block' : 'none' }}><CashChallan active={tab === 'challan'} /></div>}
+        {mounted.has('attendance') && checkTab('attendance') && <div style={{ display: tab === 'attendance' ? 'block' : 'none' }}><Attendance /></div>}
         {mounted.has('programs') && checkTab('programs') && <div style={{ display: tab === 'programs' ? 'block' : 'none' }}><ProgramsModule /></div>}
         {mounted.has('minis') && checkTab('minis') && <div style={{ display: tab === 'minis' ? 'block' : 'none' }}><Minis /></div>}
         {mounted.has('printstation') && checkTab('printstation') && <div style={{ display: tab === 'printstation' ? 'block' : 'none' }}><PrintStation /></div>}

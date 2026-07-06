@@ -10,6 +10,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
     { id: 'brandtag', icon: 'tag', label: 'Brand Tags' },
     { id: 'packtime', icon: 'scan', label: 'PackStation' },
     { id: 'challan', icon: 'file', label: 'Cash Challan' },
+    { id: 'attendance', icon: 'clock', label: 'Attendance' },
     { id: 'programs', icon: 'layers', label: 'Programs' },
     { id: 'minis', icon: 'sparkles', label: 'Minis' },
     { id: 'printstation', icon: 'print', label: 'Print Station' },
