@@ -210,7 +210,10 @@ export default function CashBook() {
     const cOut = sales.filter(s => s.is_return).reduce((s, r) => s + Number(r.amount_paid || 0), 0);
     const tExp = expenses.reduce((s, e) => s + Number(e.amount), 0);
     const tHand = handovers.filter(h => h.status === 'confirmed').reduce((s, h) => s + Number(h.amount), 0);
-    return { cashInSales: cIn, cashOutReturns: cOut, totalExpenses: tExp, totalHandovers: tHand, closingBalance: openingBalance + cIn - cOut - tExp - tHand };
+    // Handovers are internal transfers (staff → admin) — the cash stays with
+    // the business, so it is NOT deducted from cash on hand. It's shown as an
+    // informational line below the closing balance instead.
+    return { cashInSales: cIn, cashOutReturns: cOut, totalExpenses: tExp, totalHandovers: tHand, closingBalance: openingBalance + cIn - cOut - tExp };
   }, [sales, expenses, handovers, openingBalance]);
 
   const saveOpening = async () => {
@@ -684,12 +687,12 @@ export default function CashBook() {
           </>}
           <span style={{ color: T.re }}>− Expenses</span>
           <span style={{ fontFamily: T.mono, color: T.re, fontWeight: 600 }}>−₹{totalExpenses.toLocaleString('en-IN')}</span>
-          {totalHandovers > 0 && <>
-            <span style={{ color: T.yl }}>− Cash Handovers (signed)</span>
-            <span style={{ fontFamily: T.mono, color: T.yl, fontWeight: 600 }}>−₹{totalHandovers.toLocaleString('en-IN')}</span>
-          </>}
-          <div style={{ display: 'flex', alignItems: 'center', color: T.tx, fontWeight: 700, fontFamily: T.sora, fontSize: 14, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4, gridColumn: '1 / 2' }}>= Closing Balance</div>
+          <div style={{ display: 'flex', alignItems: 'center', color: T.tx, fontWeight: 700, fontFamily: T.sora, fontSize: 14, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4, gridColumn: '1 / 2' }}>= Cash on Hand</div>
           <div style={{ fontFamily: T.mono, color: closingBalance >= 0 ? T.gr : T.re, fontWeight: 800, fontSize: 16, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}>₹{closingBalance.toLocaleString('en-IN')}</div>
+          {totalHandovers > 0 && <>
+            <span style={{ color: T.tx3, fontSize: 11, gridColumn: '1 / 2' }}>Cash handed to admin (signed, internal)</span>
+            <span style={{ fontFamily: T.mono, color: T.tx3, fontWeight: 600, fontSize: 11 }}>₹{totalHandovers.toLocaleString('en-IN')}</span>
+          </>}
         </div>
       </div>
 
