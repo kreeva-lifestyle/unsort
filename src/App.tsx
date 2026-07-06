@@ -242,6 +242,6 @@ const AppContent = () => {
   if (shortMatch) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyTracklyRedirect shortCode={shortMatch[1]} /></Suspense>;
 
   if (!auth?.ready && auth?.loading) return <div style={{ minHeight: '100dvh', width: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}><div style={{ fontSize: 20, fontWeight: 700, fontFamily: T.sora, letterSpacing: -0.5, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>DailyOffice</div><div className="spinner" /><p style={{ color: T.tx3, fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase' }}>LOADING</p></div>;
-  if (!auth?.user) return <Login signIn={auth.signIn} />;
+  if (!auth?.user || auth.locked) return <Login signIn={auth.signIn} locked={auth.locked} unlockWithFaceId={auth.unlockWithFaceId} />;
   return <NotificationProvider><BreadcrumbProvider><MainApp /></BreadcrumbProvider></NotificationProvider>;
 };

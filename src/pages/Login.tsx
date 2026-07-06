@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { T, S } from '../lib/theme';
 import { supabase } from '../lib/supabase';
+import { getFaceIdEnrollment } from '../lib/faceId';
 
 const friendlyAuthError = (raw: string): string => {
   const m = (raw || '').toLowerCase();
@@ -11,13 +12,32 @@ const friendlyAuthError = (raw: string): string => {
   return raw || 'Sign-in failed. Please try again.';
 };
 
-export default function Login({ signIn }: { signIn: (email: string, password: string) => Promise<{ error: any }> }) {
+export default function Login({ signIn, locked, unlockWithFaceId }: {
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  locked?: boolean;
+  unlockWithFaceId?: () => Promise<{ error?: string }>;
+}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [forgotMsg, setForgotMsg] = useState('');
   const [info, setInfo] = useState('');
+  // Two-option entry: when Face ID is enrolled on this device the user picks
+  // how to sign in; otherwise straight to the email form.
+  const enrollment = getFaceIdEnrollment();
+  const faceIdOffered = !!enrollment && !!unlockWithFaceId;
+  const [mode, setMode] = useState<'choose' | 'email'>(faceIdOffered ? 'choose' : 'email');
+  const [faceBusy, setFaceBusy] = useState(false);
+
+  const handleFaceId = async () => {
+    if (!unlockWithFaceId || faceBusy) return;
+    setError(''); setFaceBusy(true);
+    const res = await unlockWithFaceId();
+    // On success the app unlocks instantly (no navigation needed here).
+    if (res.error) setError(res.error);
+    setFaceBusy(false);
+  };
 
   useEffect(() => {
     try {
@@ -83,14 +103,37 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
 
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 22, fontWeight: 700, fontFamily: T.sora, color: T.tx, letterSpacing: -0.3 }}>Welcome back</div>
-            <div style={{ fontSize: 13, color: T.tx3, marginTop: 4 }}>Sign in to your workspace</div>
+            <div style={{ fontSize: 13, color: T.tx3, marginTop: 4 }}>
+              {mode === 'choose'
+                ? (locked && enrollment?.email ? `Locked — ${enrollment.email}` : 'Choose how to sign in')
+                : 'Sign in to your workspace'}
+            </div>
           </div>
 
           {info && <div style={{ background: 'rgba(56,189,248,.10)', border: '1px solid rgba(56,189,248,.3)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: T.bl, marginBottom: 14 }}>{info}</div>}
           {error && <div style={{ background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: T.re, marginBottom: 14, animation: 'loginShake .4s ease' }}>{error}</div>}
           {forgotMsg && <div style={{ background: 'rgba(34,197,94,.10)', border: '1px solid rgba(34,197,94,.3)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: T.gr, marginBottom: 14 }}>{forgotMsg}</div>}
 
-          <form onSubmit={handleSubmit}>
+          {mode === 'choose' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button type="button" onClick={handleFaceId} disabled={faceBusy} style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', cursor: faceBusy ? 'default' : 'pointer', fontSize: 15, fontWeight: 600, fontFamily: T.sora, color: '#fff', background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, boxShadow: `0 8px 24px ${T.ac44}`, transition: 'all .2s', filter: faceBusy ? 'brightness(0.7)' : 'none', letterSpacing: 0.3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: 'none', stroke: '#fff', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' }}>
+                  <path d="M3 8V6a3 3 0 013-3h2M16 3h2a3 3 0 013 3v2M21 16v2a3 3 0 01-3 3h-2M8 21H6a3 3 0 01-3-3v-2" />
+                  <path d="M9 9.5v1M15 9.5v1M12 9.5v3.2a.8.8 0 01-.8.8" />
+                  <path d="M9 15.2a4.2 4.2 0 006 0" />
+                </svg>
+                {faceBusy ? 'Waiting for Face ID…' : 'Login with Face ID'}
+              </button>
+              <button type="button" onClick={() => { setError(''); setMode('email'); }} style={{ width: '100%', padding: 15, borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: T.sora, color: T.tx2, background: 'rgba(255,255,255,.04)', transition: 'all .2s', letterSpacing: 0.3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' }}>
+                  <rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" />
+                </svg>
+                Login via Email
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} style={{ display: mode === 'email' ? 'block' : 'none' }}>
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 12, color: T.tx2, fontWeight: 500, marginBottom: 6 }}>Email</label>
               <input type="email" autoComplete="username" placeholder="you@company.com" value={email} onChange={e => setEmail(e.target.value)} required style={inp} />
@@ -102,7 +145,10 @@ export default function Login({ signIn }: { signIn: (email: string, password: st
             <button type="submit" disabled={loading} style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', cursor: loading ? 'default' : 'pointer', fontSize: 15, fontWeight: 600, fontFamily: T.sora, color: '#fff', background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, boxShadow: `0 8px 24px ${T.ac44}`, transition: 'all .2s', filter: loading ? 'brightness(0.7)' : 'none', letterSpacing: 0.3 }}>
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
-            <div style={{ marginTop: 16, textAlign: 'center' }}>
+            <div style={{ marginTop: 16, textAlign: 'center', display: 'flex', justifyContent: 'center', gap: 6 }}>
+              {faceIdOffered && (
+                <button type="button" onClick={() => { setError(''); setMode('choose'); }} style={{ background: 'transparent', border: 'none', color: T.tx3, fontSize: 12, cursor: 'pointer', padding: '6px 10px', fontFamily: T.sans, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.color = T.tx2)} onMouseLeave={e => (e.currentTarget.style.color = T.tx3)}>← Face ID</button>
+              )}
               <button type="button" onClick={handleForgotPassword} style={{ background: 'transparent', border: 'none', color: T.tx3, fontSize: 12, cursor: 'pointer', padding: '6px 10px', fontFamily: T.sans, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.color = T.tx2)} onMouseLeave={e => (e.currentTarget.style.color = T.tx3)}>Forgot password?</button>
             </div>
           </form>

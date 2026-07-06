@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
+import { faceIdSupported, getFaceIdEnrollment, enrollFaceId, disableFaceId } from '../../lib/faceId';
 
 export default function MyProfile({ addToast, profile }: { addToast: (msg: string, type?: string) => void; profile: any }) {
   const { ask, modalProps } = useConfirm();
@@ -19,6 +20,10 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
   const [phoneEditing, setPhoneEditing] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneSaving, setPhoneSaving] = useState(false);
+  const [faceSupported, setFaceSupported] = useState(false);
+  const [faceEnrolled, setFaceEnrolled] = useState(() => { const e = getFaceIdEnrollment(); return !!e && e.userId === profile?.id; });
+  const [faceEnrolledAt, setFaceEnrolledAt] = useState(() => getFaceIdEnrollment()?.enrolledAt || '');
+  const [faceBusy, setFaceBusy] = useState(false);
   const [changingPwd, setChangingPwd] = useState(false);
   const [pwd, setPwd] = useState('');
   const [pwdConfirm, setPwdConfirm] = useState('');
@@ -34,6 +39,25 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
   }, [profile?.id]);
 
   useEffect(() => { loadPin(); }, [loadPin]);
+  useEffect(() => { faceIdSupported().then(setFaceSupported); }, []);
+
+  const handleEnableFaceId = async () => {
+    if (faceBusy) return;
+    setFaceBusy(true);
+    const res = await enrollFaceId({ id: profile.id, email: profile.email, full_name: profile.full_name });
+    setFaceBusy(false);
+    if (!res.ok) { addToast(res.error || 'Face ID setup failed', 'error'); return; }
+    setFaceEnrolled(true);
+    setFaceEnrolledAt(getFaceIdEnrollment()?.enrolledAt || new Date().toISOString());
+    addToast('Face ID enabled — you can now unlock with Face ID on this device', 'success');
+  };
+
+  const handleDisableFaceId = async () => {
+    if (!await ask({ title: 'Disable Face ID?', message: 'Signing out will fully log you out again, and the login page will only offer email sign-in on this device.', confirmLabel: 'Disable', danger: true })) return;
+    disableFaceId();
+    setFaceEnrolled(false);
+    addToast('Face ID disabled on this device', 'success');
+  };
 
   const savePhone = async () => {
     const cleaned = phoneInput.replace(/\D/g, '');
@@ -157,6 +181,36 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
           </div>
         )}
       </div>
+      {/* Face ID — device-local biometric unlock */}
+      <div style={{ background: 'rgba(56,189,248,.05)', border: '1px solid rgba(56,189,248,.15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: T.bl, fontFamily: T.sora }}>Face ID Login</div>
+          {faceEnrolled ? (
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,.12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>✓ Enabled</span>
+          ) : (
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,.06)', color: T.tx3, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Off</span>
+          )}
+        </div>
+        <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10 }}>Unlock the app instantly with Face ID / fingerprint on this device. Signing out keeps your session locked behind Face ID instead of logging you out fully.</div>
+
+        {faceEnrolled ? (
+          <div>
+            <div style={{ background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.gr, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: T.gr, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', flexShrink: 0 }}>
+                <path d="M3 8V6a3 3 0 013-3h2M16 3h2a3 3 0 013 3v2M21 16v2a3 3 0 01-3 3h-2M8 21H6a3 3 0 01-3-3v-2" />
+                <path d="M9 9.5v1M15 9.5v1M9 15.2a4.2 4.2 0 006 0" />
+              </svg>
+              Face ID is enabled on this device{faceEnrolledAt ? ` — since ${new Date(faceEnrolledAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : ''}. The login page now offers Face ID.
+            </div>
+            <button onClick={handleDisableFaceId} style={S.btnDanger}>Disable Face ID</button>
+          </div>
+        ) : faceSupported ? (
+          <button onClick={handleEnableFaceId} disabled={faceBusy} style={{ ...S.btnPrimary, opacity: faceBusy ? 0.6 : 1 }}>{faceBusy ? 'Waiting for Face ID…' : 'Enable Face ID'}</button>
+        ) : (
+          <div style={{ fontSize: 11, color: T.tx3, fontStyle: 'italic' as const }}>Not available on this device or browser. Requires Face ID, Touch ID or Windows Hello.</div>
+        )}
+      </div>
+
       {/* Change Password */}
       <div style={{ background: 'rgba(99,102,241,.05)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: T.ac2, fontFamily: T.sora, marginBottom: 4 }}>Change Password</div>
