@@ -258,6 +258,12 @@ export default function CashBook() {
     if (!amt || amt <= 0) { setFormError('Amount must be greater than 0'); return; }
     if (!category) { setFormError('Category is required'); return; }
     if (entryDate > today) { setFormError('Cannot add future expenses'); return; }
+    // Mirror the DB backdated-expense lock: a past date inside a signed/pending
+    // handover period is closed for new entries. Block cleanly before the insert.
+    if (entryDate < today) {
+      const h = handoverCovering(entryDate);
+      if (h) { setFormError(`This date is locked — ${formatHandoverNo(h.handover_number)} (${h.period_from} → ${h.period_to}) already covers it. Record it as a correction on the handover instead.`); return; }
+    }
     setExpSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
     const payload: CashExpenseInsert = { date: entryDate, amount: amt, category, description: description.trim() || null, paid_by: user?.id ?? null };
@@ -574,13 +580,28 @@ export default function CashBook() {
   // deleting them would silently change the numbers that a signed handover
   // was based on. We hide the delete button for these rows and refuse at
   // the handler level as a second line of defense.
+  // A date is locked if it sits inside a confirmed OR pending handover period
+  // — mirrors the DB triggers (prevent_backdated_expense_insert /
+  // prevent_locked_expense_mutation) so the UI never offers an action the DB
+  // will refuse. Returns the covering handover, or null.
+  const handoverCovering = useCallback((d: string): Handover | null => {
+    if (!d) return null;
+    for (const h of handovers) {
+      if (h.status !== 'confirmed' && h.status !== 'pending') continue;
+      const hFrom = h.period_from || h.date;
+      const hTo = h.period_to || h.date;
+      if (hFrom && hTo && d >= hFrom && d <= hTo) return h;
+    }
+    return null;
+  }, [handovers]);
+
   const lockedExpenseIds = useMemo(() => {
     const locked = new Set<string>();
-    const confirmed = handovers.filter(h => h.status === 'confirmed');
-    if (confirmed.length === 0) return locked;
+    const active = handovers.filter(h => h.status === 'confirmed' || h.status === 'pending');
+    if (active.length === 0) return locked;
     for (const e of expenses) {
       const eDate = e.date; // 'YYYY-MM-DD'
-      for (const h of confirmed) {
+      for (const h of active) {
         const hFrom = h.period_from || h.date;
         const hTo = h.period_to || h.date;
         if (eDate && hFrom && hTo && eDate >= hFrom && eDate <= hTo) { locked.add(e.id); break; }
@@ -588,6 +609,9 @@ export default function CashBook() {
     }
     return locked;
   }, [expenses, handovers]);
+
+  // Handover covering the currently-picked Add-Expense date (locked if past).
+  const addLockH = entryDate < today ? handoverCovering(entryDate) : null;
 
   const deleteExpense = async (id: string) => {
     if (lockedExpenseIds.has(id)) {
@@ -1083,16 +1107,17 @@ export default function CashBook() {
         <div style={{ ...S.modalOverlay }}>
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380, padding: '20px 18px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 14 }}>Add Expense</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: addLockH ? 6 : 10 }}>
               <div>
                 <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Date</label>
-                <input type="date" value={entryDate} max={today} onChange={e => setEntryDate(e.target.value)} style={{ ...S.fDate, width: '100%' }} />
+                <input type="date" value={entryDate} max={today} onChange={e => setEntryDate(e.target.value)} style={{ ...S.fDate, width: '100%', ...(addLockH ? { borderColor: 'rgba(245,158,11,.5)' } : {}) }} />
               </div>
               <div>
                 <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Amount (₹)</label>
                 <input type="number" min="0.01" step="0.01" value={amount} onKeyDown={e => numericKeyDown(e)} onChange={e => setAmount(e.target.value)} autoFocus placeholder="0.00" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
               </div>
             </div>
+            {addLockH && <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.yl, marginBottom: 10 }}>This date is inside {formatHandoverNo(addLockH.handover_number)} ({addLockH.period_from} → {addLockH.period_to}) — the period is handed over and locked. Pick a later date, or record it as a correction on the handover.</div>}
             <div style={{ marginBottom: 10 }}>
               <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Category</label>
               <select value={category} onChange={e => setCategory(e.target.value)} style={{ ...S.fInput, width: '100%', cursor: 'pointer' }}>
@@ -1106,7 +1131,7 @@ export default function CashBook() {
             {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{formError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setShowAdd(false); setFormError(''); setExpSaving(false); }} style={{ ...S.btnGhost, flex: 1, padding: '9px 0', fontSize: 11 }}>Cancel</button>
-              <button onClick={addExpense} disabled={expSaving} style={{ ...S.btnPrimary, flex: 1, padding: '9px 0', fontSize: 11, opacity: expSaving ? 0.5 : 1, pointerEvents: expSaving ? 'none' : 'auto' }}>{expSaving ? 'Saving…' : 'Add'}</button>
+              <button onClick={addExpense} disabled={expSaving || !!addLockH} style={{ ...S.btnPrimary, flex: 1, padding: '9px 0', fontSize: 11, opacity: (expSaving || addLockH) ? 0.5 : 1, pointerEvents: (expSaving || addLockH) ? 'none' : 'auto' }}>{expSaving ? 'Saving…' : addLockH ? 'Date Locked' : 'Add'}</button>
             </div>
           </div>
         </div>,
