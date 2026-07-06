@@ -1,15 +1,19 @@
 // Auth state hook + provider
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '../lib/supabase';
+import { isFaceIdEnrolledFor, isAppLocked, lockApp, unlockApp, verifyFaceId, getFaceIdEnrollment } from '../lib/faceId';
 
 interface AuthContextValue {
   user: any;
   profile: any;
   loading: boolean;
   ready: boolean;
+  locked: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  lockNow: () => void;
+  unlockWithFaceId: () => Promise<{ error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -24,6 +28,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(false);
+  // Face ID lock: the session survives on-device; the UI gates on `locked`
+  // until the platform authenticator verifies the user (or email re-auth).
+  const [locked, setLocked] = useState(() => isAppLocked() && !!getFaceIdEnrollment());
 
   useEffect(() => {
     let mounted = true;
@@ -82,6 +89,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // A full email re-auth always clears the biometric lock.
+    if (!error) { unlockApp(); setLocked(false); }
     return { error };
   };
 
@@ -90,14 +99,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return { error };
   };
 
-  const signOut = async () => { await supabase.auth.signOut(); };
+  // With Face ID enrolled for this user, "sign out" LOCKS the app (session
+  // stays on-device so biometric unlock is instant). Disabling Face ID in
+  // Profile settings restores the full sign-out behavior.
+  const signOut = async () => {
+    if (user && isFaceIdEnrolledFor(user.id)) { lockApp(); setLocked(true); return; }
+    await supabase.auth.signOut();
+  };
 
-  // Session timeout — auto-logout after 30 min of inactivity.
-  // Reason flag is read by Login.tsx to show "session expired" toast.
+  const lockNow = () => { lockApp(); setLocked(true); };
+
+  // Blazing-fast path: one OS biometric prompt, zero network. The kept
+  // session must still exist — if it evaporated, fail closed to email login.
+  const unlockWithFaceId = async (): Promise<{ error?: string }> => {
+    if (!user || !isFaceIdEnrolledFor(user.id)) {
+      return { error: 'Session ended — sign in with email once to re-enable Face ID.' };
+    }
+    const res = await verifyFaceId();
+    if (!res.ok) return { error: res.error };
+    unlockApp(); setLocked(false);
+    return {};
+  };
+
+  // Session timeout after 30 min of inactivity: lock when Face ID is
+  // enrolled (one-tap resume), full sign-out otherwise.
   useEffect(() => {
-    if (!user) return;
+    if (!user || locked) return;
     let timer: any;
     const expire = () => {
+      if (isFaceIdEnrolledFor(user.id)) { lockApp(); setLocked(true); return; }
       try { localStorage.setItem('signOutReason', 'session_expired'); } catch {}
       supabase.auth.signOut();
     };
@@ -106,7 +136,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }));
     resetTimer();
     return () => { clearTimeout(timer); events.forEach(e => window.removeEventListener(e, resetTimer)); };
-  }, [user]);
+  }, [user, locked]);
 
-  return <AuthContext.Provider value={{ user, profile, loading, ready, signIn, signUp, signOut }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, profile, loading, ready, locked, signIn, signUp, signOut, lockNow, unlockWithFaceId }}>{children}</AuthContext.Provider>;
 };
