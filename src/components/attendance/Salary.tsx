@@ -4,26 +4,31 @@
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
-import { T, S } from '../../lib/theme';
+import { T, S, Pill } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { numericKeyDown } from '../../lib/numericInput';
-import { AttEmployee, AttEntry, AttPenalty, MonthlySalary, computeMonthlySalary, minutesToHM, monthFirstDay } from '../../lib/attendance';
+import { useAuth } from '../../hooks/useAuth';
+import { AttEmployee, AttEntry, AttPenalty, AttSalaryPayment, MonthlySalary, computeMonthlySalary, minutesToHM, monthFirstDay } from '../../lib/attendance';
+import SalaryPaymentFlow from './SalaryPaymentFlow';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
 const inr = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
 const inr2 = (n: number) => '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function AttendanceSalary({ employees, entries, penalties, savedSalaries, month, onChanged, addToast }: {
+export default function AttendanceSalary({ employees, entries, penalties, savedSalaries, payments, month, onChanged, addToast }: {
   employees: AttEmployee[]; entries: AttEntry[]; penalties: AttPenalty[];
-  savedSalaries: Record<string, unknown>[]; month: string;
+  savedSalaries: Record<string, unknown>[]; payments: AttSalaryPayment[]; month: string;
   onChanged: () => void; addToast: (m: string, t?: string) => void;
 }) {
+  const { profile } = useAuth();
+  const canPay = ['admin', 'manager', 'operator'].includes(profile?.role);
   const [pdfHtml, setPdfHtml] = useState<string | null>(null);
   const [penFor, setPenFor] = useState<AttEmployee | null>(null);
   const [penAmt, setPenAmt] = useState('');
   const [penReason, setPenReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [savingPen, setSavingPen] = useState(false);
+  const [payFlow, setPayFlow] = useState(false);
   const [q, setQ] = useState('');
 
   const monthLabel = new Date(month + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
@@ -39,6 +44,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
     return m;
   }, [penalties]);
   const savedByEmp = useMemo(() => new Map(savedSalaries.map(s => [s.employee_id as string, s])), [savedSalaries]);
+  const paidByEmp = useMemo(() => new Map(payments.map(p => [p.employee_id, p])), [payments]);
 
   const salaries: MonthlySalary[] = useMemo(() =>
     activeEmployees.map(e => computeMonthlySalary(e, entriesByEmp.get(e.id) || [], month, pensByEmp.get(e.id) || [])),
@@ -51,7 +57,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
 
   const totalFinal = shown.reduce((s, x) => s + x.finalSalary, 0);
 
-  useEffect(() => { document.body.classList.toggle('modal-open', !!penFor || !!pdfHtml); return () => document.body.classList.remove('modal-open'); }, [penFor, pdfHtml]);
+  useEffect(() => { document.body.classList.toggle('modal-open', !!penFor || !!pdfHtml || payFlow); return () => document.body.classList.remove('modal-open'); }, [penFor, pdfHtml, payFlow]);
 
   // ── Penalty ────────────────────────────────────────────────────────────────
   const savePenalty = async () => {
@@ -158,18 +164,31 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="att-filters" style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 150 }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search employee…" style={{ ...S.fSearch, width: '100%' }} />
         </div>
-        <button onClick={exportCombined} disabled={shown.length === 0} style={{ ...S.btnGhost, opacity: shown.length === 0 ? 0.4 : 1 }}>Export All (PDF)</button>
-        <button onClick={saveMonth} disabled={saving || salaries.length === 0} style={{ ...S.btnPrimary, pointerEvents: saving ? 'none' : 'auto', opacity: saving || salaries.length === 0 ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save Month'}</button>
+        <div className="att-filter-actions" style={{ display: 'flex', gap: 6 }}>
+          <button onClick={exportCombined} disabled={shown.length === 0} style={{ ...S.btnGhost, opacity: shown.length === 0 ? 0.4 : 1 }}>Export All (PDF)</button>
+          {canPay && <button onClick={() => setPayFlow(true)} disabled={salaries.length === 0} style={{ ...S.btnSuccessSolid, opacity: salaries.length === 0 ? 0.5 : 1, pointerEvents: salaries.length === 0 ? 'none' : 'auto' }}>Pay Salaries</button>}
+          <button onClick={saveMonth} disabled={saving || salaries.length === 0} style={{ ...S.btnPrimary, pointerEvents: saving ? 'none' : 'auto', opacity: saving || salaries.length === 0 ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save Month'}</button>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx3, marginBottom: 8 }}>
-        <span>{monthLabel} · {shown.length} employee{shown.length !== 1 ? 's' : ''}</span>
-        <span>Total net: <strong style={{ color: T.tx, fontFamily: T.mono }}>{inr(totalFinal)}</strong></span>
+      <div className="att-kpis" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
+          <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Employees</div>
+          <div style={{ fontSize: 17, fontWeight: 800, fontFamily: T.sora, color: T.tx, marginTop: 2 }}>{shown.length}</div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
+          <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Total Net</div>
+          <div style={{ fontSize: 17, fontWeight: 800, fontFamily: T.sora, color: T.gr, marginTop: 2 }}>{inr(totalFinal)}</div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
+          <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Month</div>
+          <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, color: T.tx2, marginTop: 4 }}>{monthLabel}</div>
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -184,6 +203,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: T.tx, display: 'flex', alignItems: 'center', gap: 8 }}>
                     {s.name}
+                    {paidByEmp.has(s.employeeId) && <Pill tone="gr" dot>Paid</Pill>}
                     {saved && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: drift ? 'rgba(245,158,11,.14)' : 'rgba(34,197,94,.12)', color: drift ? T.yl : T.gr, fontWeight: 700, textTransform: 'uppercase' }}>{drift ? 'Saved (changed)' : 'Saved'}</span>}
                     {s.salary <= 0 && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: 'rgba(239,68,68,.14)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>No salary set</span>}
                   </div>
@@ -204,7 +224,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
                   {s.penaltyTotal > 0 && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono }}>gross {inr(s.gross)} − {inr(s.penaltyTotal)}</div>}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+              <div className="att-salary-actions" style={{ display: 'flex', gap: 6, marginTop: 10 }}>
                 <button onClick={() => { setPenFor(employees.find(e => e.id === s.employeeId) || null); setPenAmt(''); setPenReason(''); }} style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 11, color: T.re }}>+ Penalty</button>
                 <button onClick={() => exportSingle(s)} style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 11 }}>Payslip PDF</button>
               </div>
@@ -251,6 +271,18 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
           <iframe id="att-pdf-frame" title="Salary PDF" srcDoc={pdfHtml} style={{ flex: 1, border: 'none', background: '#fff' }} />
         </div>
       ), document.body)}
+
+      {/* Mobile "Pay" FAB */}
+      {canPay && salaries.length > 0 && (
+        <button className="fab mobile-only" onClick={() => setPayFlow(true)} aria-label="Pay salaries"
+          style={{ background: 'linear-gradient(135deg, #16A34A, #22C55E)', fontSize: 12, fontWeight: 700, fontFamily: T.sans }}>Pay</button>
+      )}
+
+      {/* Salary payment kiosk */}
+      {payFlow && (
+        <SalaryPaymentFlow employees={activeEmployees} salaries={salaries} payments={payments} month={month}
+          onClose={() => { setPayFlow(false); onChanged(); }} addToast={addToast} />
+      )}
     </div>
   );
 }
