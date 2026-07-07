@@ -12,6 +12,7 @@
 export type AttEmployee = {
   id: string; employee_code: string | null; name: string;
   salary: number; fix_time_minutes: number; is_active: boolean;
+  qr_image_url: string | null;
 };
 
 export type AttEntry = {
@@ -22,6 +23,9 @@ export type AttEntry = {
 };
 
 export type AttPenalty = { id: string; employee_id: string; month: string; amount: number; reason: string | null };
+
+// One flag row per employee per month = "salary paid". month is first-of-month.
+export type AttSalaryPayment = { id: string; employee_id: string; month: string; paid_at: string; paid_by: string | null };
 
 export type DayBreakdown = {
   date: string; day: string; in_time: string | null; out_time: string | null;
