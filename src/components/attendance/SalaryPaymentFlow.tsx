@@ -3,7 +3,7 @@
 // and that month's net amount; "Mark Paid" records the employee-month as paid
 // (attendance_salary_payments) and auto-advances to the next person. Paying is
 // independent of "Save Month" — the amount comes from the live salary engine.
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S, Icon, Pill } from '../../lib/theme';
@@ -23,34 +23,42 @@ export default function SalaryPaymentFlow({ employees, salaries, payments, month
   const [index, setIndex] = useState(0);
   const [paid, setPaid] = useState<Map<string, string>>(() => new Map(payments.map(p => [p.employee_id, p.paid_at])));
   const [busy, setBusy] = useState(false);
+  const [confirmUnmark, setConfirmUnmark] = useState(false);
+  // Ref guard closes the double-tap race the `busy` state can't: two synchronous
+  // taps both read the stale `busy=false` before React re-renders the disabled
+  // button, which would advance twice and silently skip an employee.
+  const busyRef = useRef(false);
 
   useEffect(() => { document.body.classList.add('modal-open'); return () => document.body.classList.remove('modal-open'); }, []);
 
-  const advance = () => setIndex(i => Math.min(i + 1, order.length));
-  const back = () => setIndex(i => Math.max(i - 1, 0));
+  const advance = () => { setConfirmUnmark(false); setIndex(i => Math.min(i + 1, order.length)); };
+  const back = () => { setConfirmUnmark(false); setIndex(i => Math.max(i - 1, 0)); };
 
   const markPaid = async (emp: AttEmployee) => {
-    if (busy) return;
-    setBusy(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from('attendance_salary_payments')
-      .upsert({ employee_id: emp.id, month: monthFirstDay(month), paid_by: user?.id }, { onConflict: 'employee_id,month', ignoreDuplicates: true });
-    setBusy(false);
-    if (error) { addToast(friendlyError(error), 'error'); return; }
-    setPaid(prev => { const m = new Map(prev); m.set(emp.id, new Date().toISOString()); return m; });
-    addToast(`${emp.name} marked paid`, 'success');
-    advance();
+    if (busyRef.current) return;
+    busyRef.current = true; setBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from('attendance_salary_payments')
+        .upsert({ employee_id: emp.id, month: monthFirstDay(month), paid_by: user?.id }, { onConflict: 'employee_id,month', ignoreDuplicates: true });
+      if (error) { addToast(friendlyError(error), 'error'); return; }
+      setPaid(prev => { const m = new Map(prev); m.set(emp.id, new Date().toISOString()); return m; });
+      addToast(`${emp.name} marked paid`, 'success');
+      advance();
+    } finally { busyRef.current = false; setBusy(false); }
   };
 
   const unmark = async (emp: AttEmployee) => {
-    if (busy) return;
-    setBusy(true);
-    const { error } = await supabase.from('attendance_salary_payments')
-      .delete().eq('employee_id', emp.id).eq('month', monthFirstDay(month));
-    setBusy(false);
-    if (error) { addToast(friendlyError(error), 'error'); return; }
-    setPaid(prev => { const m = new Map(prev); m.delete(emp.id); return m; });
-    addToast(`${emp.name} unmarked`, 'success');
+    if (busyRef.current) return;
+    busyRef.current = true; setBusy(true);
+    try {
+      const { error } = await supabase.from('attendance_salary_payments')
+        .delete().eq('employee_id', emp.id).eq('month', monthFirstDay(month));
+      if (error) { addToast(friendlyError(error), 'error'); return; }
+      setPaid(prev => { const m = new Map(prev); m.delete(emp.id); return m; });
+      setConfirmUnmark(false);
+      addToast(`${emp.name} unmarked`, 'success');
+    } finally { busyRef.current = false; setBusy(false); }
   };
 
   const paidCount = order.reduce((n, e) => n + (paid.has(e.id) ? 1 : 0), 0);
@@ -58,6 +66,7 @@ export default function SalaryPaymentFlow({ employees, salaries, payments, month
   const emp = done ? null : order[index];
   const sal: MonthlySalary | undefined = emp ? salaryByEmp.get(emp.id) : undefined;
   const isPaid = emp ? paid.has(emp.id) : false;
+  const noSalary = !!sal && sal.salary <= 0;
   const btnBusy = { pointerEvents: busy ? 'none' as const : 'auto' as const, opacity: busy ? 0.5 : 1 };
 
   return createPortal((
@@ -95,8 +104,9 @@ export default function SalaryPaymentFlow({ employees, salaries, payments, month
                 : <div style={{ padding: 20, color: T.tx3, fontSize: 12, lineHeight: 1.5 }}>No payment QR uploaded.<br />Add one in Employees.</div>}
             </div>
             <div style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Net Salary</div>
-            <div style={{ fontSize: 34, fontWeight: 800, fontFamily: T.sora, color: sal && sal.finalSalary < 0 ? T.re : T.tx, lineHeight: 1.1, marginTop: 2 }}>{sal ? inr(sal.finalSalary) : '—'}</div>
+            <div style={{ fontSize: 34, fontWeight: 800, fontFamily: T.sora, color: noSalary ? T.yl : (sal && sal.finalSalary < 0 ? T.re : T.tx), lineHeight: 1.1, marginTop: 2 }}>{sal ? inr(sal.finalSalary) : '—'}</div>
             {sal && sal.penaltyTotal > 0 && <div style={{ fontSize: 10, color: T.re, fontFamily: T.mono, marginTop: 3 }}>gross {inr(sal.gross)} − {inr(sal.penaltyTotal)}</div>}
+            {noSalary && <div style={{ fontSize: 11, color: T.yl, marginTop: 8, background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 6, padding: '6px 10px' }}>No monthly salary set for this employee — set it in Employees before paying.</div>}
           </div>
         )}
       </div>
@@ -104,19 +114,29 @@ export default function SalaryPaymentFlow({ employees, salaries, payments, month
       {/* Footer actions */}
       {!done && order.length > 0 && (
         <div style={{ padding: '12px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))', borderTop: `1px solid ${T.bd2}`, background: 'rgba(8,11,20,.95)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {isPaid ? (
-              <>
-                <button onClick={() => unmark(emp!)} disabled={busy} style={{ ...S.btnGhost, flex: 1, color: T.re, ...btnBusy }}>Unmark</button>
-                <button onClick={advance} disabled={busy} style={{ ...S.btnPrimary, flex: 2, ...btnBusy }}>Next</button>
-              </>
-            ) : (
-              <>
-                <button onClick={advance} disabled={busy} style={{ ...S.btnGhost, flex: 1, ...btnBusy }}>Skip</button>
-                <button onClick={() => markPaid(emp!)} disabled={busy} style={{ ...S.btnSuccessSolid, flex: 2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, ...btnBusy }}><Icon name="check" size={17} />Mark Paid</button>
-              </>
-            )}
-          </div>
+          {confirmUnmark && isPaid ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 12, color: T.tx2, textAlign: 'center' }}>Remove the paid record for {emp!.name} ({monthLabel})?</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setConfirmUnmark(false)} disabled={busy} style={{ ...S.btnGhost, flex: 1, ...btnBusy }}>Keep</button>
+                <button onClick={() => unmark(emp!)} disabled={busy} style={{ ...S.btnDanger, flex: 1, ...btnBusy }}>{busy ? 'Removing…' : 'Unmark'}</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {isPaid ? (
+                <>
+                  <button onClick={() => setConfirmUnmark(true)} disabled={busy} style={{ ...S.btnGhost, flex: 1, color: T.re, ...btnBusy }}>Unmark</button>
+                  <button onClick={advance} disabled={busy} style={{ ...S.btnPrimary, flex: 2, ...btnBusy }}>Next</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={advance} disabled={busy} style={{ ...S.btnGhost, flex: 1, ...btnBusy }}>Skip</button>
+                  <button onClick={() => markPaid(emp!)} disabled={busy || noSalary} title={noSalary ? 'Set a monthly salary first' : undefined} style={{ ...S.btnSuccessSolid, flex: 2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, pointerEvents: (busy || noSalary) ? 'none' : 'auto', opacity: (busy || noSalary) ? 0.5 : 1 }}><Icon name="check" size={17} />Mark Paid</button>
+                </>
+              )}
+            </div>
+          )}
           {index > 0 && <button onClick={back} disabled={busy} style={{ background: 'none', border: 'none', color: T.tx3, fontSize: 11, cursor: 'pointer', padding: 2, ...btnBusy }}>← Previous</button>}
         </div>
       )}

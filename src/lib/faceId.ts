@@ -40,7 +40,9 @@ export const getFaceIdEnrollment = (): FaceIdEnrollment | null => {
     const raw = localStorage.getItem(CRED_KEY);
     if (!raw) return null;
     const e = JSON.parse(raw);
-    return e && e.credId && e.userId ? e as FaceIdEnrollment : null;
+    // credId may be '' for the InvalidStateError (already-registered) path —
+    // verifyFaceId then uses the platform resident key. Require only userId.
+    return e && e.userId ? e as FaceIdEnrollment : null;
   } catch { return null; }
 };
 

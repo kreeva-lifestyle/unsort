@@ -130,7 +130,16 @@ export const computeMonthlySalary = (
     });
   }
 
-  const sundayPay = sundays * perDay;
+  // Weekly-offs (Sundays) are paid only if the employee actually worked at
+  // least one day that month. Otherwise a fully-absent (or newly-added,
+  // no-attendance) employee would be paid for every Sunday despite doing no
+  // work. When unpaid, zero the per-day Sunday amounts too so the payslip
+  // breakdown stays consistent with the total.
+  let sundayPay = sundays * perDay;
+  if (workDays === 0) {
+    sundayPay = 0;
+    for (const d of days) if (d.isSunday) d.dayPay = 0;
+  }
   const gross = earned + sundayPay;
   const penaltyTotal = penalties.reduce((s, p) => s + Number(p.amount), 0);
   const finalSalary = Math.round(gross - penaltyTotal); // rounded to the rupee

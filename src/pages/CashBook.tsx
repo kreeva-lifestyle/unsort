@@ -478,36 +478,31 @@ export default function CashBook() {
         setConfirmError(`Too many wrong attempts. Try again in ${secs}s.`);
         return;
       }
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setConfirmError('Not logged in'); return; }
-      if (confirmingHandover.to_user_id && confirmingHandover.to_user_id !== user.id) {
-        setConfirmError(`This handover is meant for ${confirmingHandover.to_user_name}. Only they can sign it.`);
-        return;
-      }
-      const { data: hasPinSet } = await supabase.rpc('check_pin_exists');
-      if (!hasPinSet) { setConfirmError('You have no PIN set. Go to Settings → My Profile to set one.'); return; }
-      const { data: pinRes, error: pinErr } = await supabase.rpc('verify_own_pin', { pin: confirmPin.trim() });
-      if (pinErr) { setConfirmError(friendlyError(pinErr)); return; }
-      const res = (pinRes && typeof pinRes === 'object' ? pinRes : { valid: pinRes === true }) as { valid?: boolean; locked?: boolean; retry_after?: number; attempts?: number; no_pin?: boolean };
-      if (!res.valid) {
-        if (res.no_pin) { setConfirmError('You have no PIN set. Go to Settings → My Profile to set one.'); return; }
-        if (res.locked && res.retry_after) {
-          setPinLockUntil(Date.now() + res.retry_after * 1000);
-          setConfirmError(`Too many failed attempts (${res.attempts ?? 0}). Locked for ${res.retry_after}s.`);
+      // Confirm is now a single SECURITY DEFINER RPC: it verifies the PIN,
+      // enforces recipient == caller, and flips the status inside one
+      // transaction. The browser can no longer skip the PIN and PATCH the
+      // status directly.
+      const { data: res, error } = await supabase.rpc('confirm_handover', { p_id: confirmingHandover.id, p_pin: confirmPin.trim() });
+      if (error) { setConfirmError(friendlyError(error)); return; }
+      const r = (res && typeof res === 'object' ? res : {}) as { valid?: boolean; locked?: boolean; retry_after?: number; attempts?: number; no_pin?: boolean; error?: string };
+      if (!r.valid) {
+        if (r.no_pin) { setConfirmError('You have no PIN set. Go to Settings → My Profile to set one.'); return; }
+        if (r.error === 'not_recipient') { setConfirmError(`This handover is meant for ${confirmingHandover.to_user_name}. Only they can sign it.`); return; }
+        if (r.error === 'not_pending' || r.error === 'not_found' || r.error === 'state_changed') {
+          addToast('This handover is no longer pending. It may have been rejected or already confirmed.', 'error');
+          setConfirmingHandover(null); setConfirmPin(''); fetchData(); return;
+        }
+        if (r.locked && r.retry_after) {
+          setPinLockUntil(Date.now() + r.retry_after * 1000);
+          setConfirmError(`Too many failed attempts (${r.attempts ?? 0}). Locked for ${r.retry_after}s.`);
         } else {
-          const left = Math.max(0, 3 - (res.attempts ?? 0));
+          const left = Math.max(0, 3 - (r.attempts ?? 0));
           setConfirmError(`Incorrect PIN. ${left} attempt${left === 1 ? '' : 's'} before lockout.`);
         }
         setConfirmPin('');
         return;
       }
       setPinLockUntil(0);
-      const { data: updated, error } = await supabase.from('cash_handovers').update({
-        status: 'confirmed',
-        confirmed_at: new Date().toISOString(),
-      }).eq('id', confirmingHandover.id).eq('status', 'pending').select('id');
-      if (error) { addToast('Confirm failed — ' + friendlyError(error), 'error'); return; }
-      if (!updated || updated.length === 0) { addToast('This handover is no longer pending. It may have been rejected or already confirmed.', 'error'); setConfirmingHandover(null); setConfirmPin(''); fetchData(); return; }
       setConfirmingHandover(null); setConfirmPin('');
       addToast('Handover confirmed', 'success');
       fetchData();
@@ -525,21 +520,14 @@ export default function CashBook() {
       if (!rejectingHandover) return;
       const reason = rejectReason.trim();
       if (!reason) { setRejectError('Please explain why you are rejecting this handover.'); return; }
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setRejectError('Not logged in'); return; }
-      if (rejectingHandover.to_user_id && rejectingHandover.to_user_id !== user.id) {
-        setRejectError(`Only ${rejectingHandover.to_user_name} can reject this handover.`);
-        return;
-      }
-      if (rejectingHandover.status !== 'pending') {
-        setRejectError(`This handover is already ${rejectingHandover.status} and cannot be rejected.`);
-        return;
-      }
-      const { error, data } = await supabase.from('cash_handovers').update({
-        status: 'disputed', reject_reason: reason, rejected_at: new Date().toISOString(), rejected_by: user.id,
-      }).eq('id', rejectingHandover.id).eq('status', 'pending').select('id');
+      const { data: res, error } = await supabase.rpc('reject_handover', { p_id: rejectingHandover.id, p_reason: reason });
       if (error) { setRejectError(friendlyError(error)); return; }
-      if (!data || data.length === 0) { setRejectError('Handover state changed — please refresh.'); return; }
+      const r = (res && typeof res === 'object' ? res : {}) as { ok?: boolean; error?: string };
+      if (!r.ok) {
+        if (r.error === 'not_recipient') { setRejectError(`Only ${rejectingHandover.to_user_name} can reject this handover.`); return; }
+        if (r.error === 'reason_required') { setRejectError('Please explain why you are rejecting this handover.'); return; }
+        setRejectError('This handover is no longer pending — please refresh.'); return;
+      }
       setRejectingHandover(null); setRejectReason('');
       addToast('Handover rejected', 'success');
       fetchData();
@@ -556,15 +544,14 @@ export default function CashBook() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { addToast('Not logged in', 'error'); return; }
-      if (cancellingHandover.from_user_id && cancellingHandover.from_user_id !== user.id) {
-        addToast(`Only ${cancellingHandover.from_user_name} (the sender) can cancel this handover.`, 'error');
-        return;
-      }
-      const { data: updated, error } = await supabase.from('cash_handovers').update({
-        status: 'cancelled', cancelled_at: new Date().toISOString(), cancelled_by: user.id,
-      }).eq('id', cancellingHandover.id).eq('status', 'pending').select('id');
+      const { data: res, error } = await supabase.rpc('cancel_handover', { p_id: cancellingHandover.id });
       if (error) { addToast('Cancel failed — ' + friendlyError(error), 'error'); return; }
-      if (!updated || updated.length === 0) { addToast('This handover is no longer pending — it may have been signed or rejected.', 'error'); setCancellingHandover(null); fetchData(); return; }
+      const r = (res && typeof res === 'object' ? res : {}) as { ok?: boolean; error?: string };
+      if (!r.ok) {
+        if (r.error === 'not_sender') { addToast(`Only ${cancellingHandover.from_user_name} (the sender) can cancel this handover.`, 'error'); return; }
+        addToast('This handover is no longer pending — it may have been signed or rejected.', 'error');
+        setCancellingHandover(null); fetchData(); return;
+      }
       await supabase.from('audit_log').insert({
         action: 'cancel', module: 'cash_book',
         details: `Handover ${formatHandoverNo(cancellingHandover.handover_number)} of ₹${Number(cancellingHandover.amount).toLocaleString('en-IN')} to ${cancellingHandover.to_user_name} cancelled by sender`,
