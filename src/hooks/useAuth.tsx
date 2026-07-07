@@ -1,7 +1,7 @@
 // Auth state hook + provider
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '../lib/supabase';
-import { isFaceIdEnrolledFor, isAppLocked, lockApp, unlockApp, verifyFaceId, getFaceIdEnrollment } from '../lib/faceId';
+import { isFaceIdEnrolledFor, isAppLocked, lockApp, unlockApp, verifyFaceId, getFaceIdEnrollment, disableFaceId } from '../lib/faceId';
 
 interface AuthContextValue {
   user: any;
@@ -90,7 +90,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     // A full email re-auth always clears the biometric lock.
-    if (!error) { unlockApp(); setLocked(false); }
+    if (!error) {
+      unlockApp(); setLocked(false);
+      // If a DIFFERENT user's Face ID enrollment is still on this device, drop
+      // it — otherwise the login screen keeps offering a stranger's Face ID.
+      try {
+        const { data: { user: u } } = await supabase.auth.getUser();
+        const enr = getFaceIdEnrollment();
+        if (u && enr && enr.userId !== u.id) disableFaceId();
+      } catch { /* non-fatal */ }
+    }
     return { error };
   };
 
@@ -109,14 +118,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const lockNow = () => { lockApp(); setLocked(true); };
 
-  // Blazing-fast path: one OS biometric prompt, zero network. The kept
-  // session must still exist — if it evaporated, fail closed to email login.
+  // One OS biometric prompt, then a single server round-trip to re-validate
+  // before lifting the lock. The biometric alone is not enough: a session that
+  // expired, or an account DEACTIVATED while the app sat locked, must fail
+  // closed to email login rather than unlock back into live data.
   const unlockWithFaceId = async (): Promise<{ error?: string }> => {
     if (!user || !isFaceIdEnrolledFor(user.id)) {
       return { error: 'Session ended — sign in with email once to re-enable Face ID.' };
     }
     const res = await verifyFaceId();
     if (!res.ok) return { error: res.error };
+    // Re-validate the kept session server-side.
+    const failClosed = async (reason: string, msg: string) => {
+      try { localStorage.setItem('signOutReason', reason); } catch {}
+      await supabase.auth.signOut();
+      unlockApp(); setLocked(false);
+      return { error: msg };
+    };
+    const { data: refreshed, error: refErr } = await supabase.auth.refreshSession();
+    if (refErr || !refreshed?.session?.user) {
+      return failClosed('session_expired', 'Your session has expired — sign in with email to continue.');
+    }
+    const { data: prof } = await supabase.from('profiles').select('is_active').eq('id', refreshed.session.user.id).maybeSingle();
+    if (prof && prof.is_active === false) {
+      return failClosed('deactivated', 'This account has been deactivated.');
+    }
     unlockApp(); setLocked(false);
     return {};
   };
