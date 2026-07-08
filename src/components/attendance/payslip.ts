@@ -31,7 +31,7 @@ export const payslipBody = (s: MonthlySalary, emp: AttEmployee | undefined, pens
     <table class="days"><thead><tr><th>Date</th><th>Day</th><th class="c">In</th><th class="c">Out</th><th class="c">Worked</th><th class="c">+/− vs fix</th><th class="r">Day Pay</th><th class="c">St</th></tr></thead><tbody>${dayRows}</tbody></table>
     <div class="totals">
       <div><span>Worked days</span><span>${s.workDays}</span></div>
-      <div><span>Paid Sundays</span><span>${s.sundays} × ${esc(inr2(s.perDaySalary))} = ${esc(inr2(s.sundayPay))}</span></div>
+      <div><span>Paid Sundays</span><span>${s.paidSundays} of ${s.sundays} × ${esc(inr2(s.perDaySalary))} = ${esc(inr2(s.sundayPay))}</span></div>
       <div><span>Leave days (unpaid)</span><span>${s.leaveDays}</span></div>
       <div><span>Total worked hours</span><span>${esc(minutesToHM(s.totalWorkedMinutes))}</span></div>
       ${s.extraMinutes > 0 ? `<div><span>Extra time worked (paid in day pay)</span><span style="color:${GREEN};font-weight:600">+${esc(minutesToHM(s.extraMinutes))}</span></div>` : ''}
@@ -47,7 +47,7 @@ export const payslipBody = (s: MonthlySalary, emp: AttEmployee | undefined, pens
 };
 
 export const combinedSummary = (shown: MonthlySalary[], monthLabel: string, totalFinal: number): string => {
-  const rowsHtml = shown.map(s => `<tr><td>${esc(s.name)}</td><td class="c">${s.workDays}</td><td class="c">${s.sundays}</td><td class="c">${s.leaveDays}</td><td class="c">${esc(minutesToHM(s.totalWorkedMinutes))}</td><td class="c" style="color:${s.extraMinutes > 0 ? GREEN : '#888'};font-weight:600">${s.extraMinutes > 0 ? '+' + esc(minutesToHM(s.extraMinutes)) : '—'}</td><td style="text-align:right">${esc(inr2(s.gross))}</td><td style="text-align:right;color:${RED}">${s.penaltyTotal > 0 ? '− ' + esc(inr2(s.penaltyTotal)) : '—'}</td><td style="text-align:right;font-weight:800">${esc(inr(s.finalSalary))}</td></tr>`).join('');
+  const rowsHtml = shown.map(s => `<tr><td>${esc(s.name)}</td><td class="c">${s.workDays}</td><td class="c">${s.paidSundays}</td><td class="c">${s.leaveDays}</td><td class="c">${esc(minutesToHM(s.totalWorkedMinutes))}</td><td class="c" style="color:${s.extraMinutes > 0 ? GREEN : '#888'};font-weight:600">${s.extraMinutes > 0 ? '+' + esc(minutesToHM(s.extraMinutes)) : '—'}</td><td style="text-align:right">${esc(inr2(s.gross))}</td><td style="text-align:right;color:${RED}">${s.penaltyTotal > 0 ? '− ' + esc(inr2(s.penaltyTotal)) : '—'}</td><td style="text-align:right;font-weight:800">${esc(inr(s.finalSalary))}</td></tr>`).join('');
   return `<h1>Salary Summary</h1><div class="muted">${esc(monthLabel)} · ${shown.length} employees · Total net ${esc(inr(totalFinal))}</div>
     <table class="days" style="font-size:11px"><thead><tr><th>Employee</th><th class="c">Work</th><th class="c">Sun</th><th class="c">Leave</th><th class="c">Worked hrs</th><th class="c">Extra</th><th class="r">Gross</th><th class="r">Penalty</th><th class="r">Net</th></tr></thead><tbody>${rowsHtml}
     <tr style="border-top:2px solid #2d3748;font-weight:800"><td>Total</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="text-align:right">${esc(inr(totalFinal))}</td></tr></tbody></table>
