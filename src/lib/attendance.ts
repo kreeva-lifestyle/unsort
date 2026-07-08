@@ -38,7 +38,7 @@ export type DayBreakdown = {
 
 export type MonthlySalary = {
   employeeId: string; name: string; salary: number; fixTimeMinutes: number;
-  daysInMonth: number; workDays: number; sundays: number; leaveDays: number;
+  daysInMonth: number; workDays: number; sundays: number; paidSundays: number; leaveDays: number;
   totalWorkedMinutes: number; perDaySalary: number; perHourSalary: number;
   // extraMinutes / shortMinutes: month totals of time worked beyond / below
   // the fixed day, summed separately (a +2h day and a −2h day are both
@@ -108,6 +108,7 @@ export const computeMonthlySalary = (
   const byDate = new Map(entries.map(e => [e.date, e]));
   const [y, m] = monthISO.split('-').map(Number);
   const days: DayBreakdown[] = [];
+  const workedDayNums = new Set<number>(); // day-of-month numbers actually worked
   let workDays = 0, totalWorkedMinutes = 0, earned = 0, extraMinutes = 0, shortMinutes = 0;
 
   for (let d = 1; d <= dim; d++) {
@@ -121,9 +122,9 @@ export const computeMonthlySalary = (
     let status = e?.status || (isSunday ? 'WO' : (inMin !== null && outMin !== null ? 'P' : 'A'));
 
     if (isSunday) {
-      // Paid weekly off — hours on a Sunday are not paid on top (matches the
-      // original script, which skipped Sunday rows after counting them).
-      dayPay = perDay;
+      // Weekly off. Whether it is PAID is decided in a second pass below, from
+      // how many of that week's 6 working days (Mon–Sat) were actually worked.
+      dayPay = 0;
       status = e?.status || 'WO';
     } else if (inMin !== null && outMin !== null && outMin > inMin) {
       workedMin = outMin - inMin;
@@ -131,6 +132,7 @@ export const computeMonthlySalary = (
       workDays++;
       totalWorkedMinutes += workedMin;
       earned += dayPay;
+      workedDayNums.add(d);
       const diff = workedMin - fixMin;
       if (diff > 0) extraMinutes += diff; else shortMinutes += -diff;
     }
@@ -143,16 +145,21 @@ export const computeMonthlySalary = (
     });
   }
 
-  // Weekly-offs (Sundays) are paid only if the employee actually worked at
-  // least one day that month. Otherwise a fully-absent (or newly-added,
-  // no-attendance) employee would be paid for every Sunday despite doing no
-  // work. When unpaid, zero the per-day Sunday amounts too so the payslip
-  // breakdown stays consistent with the total.
-  let sundayPay = sundays * perDay;
-  if (workDays === 0) {
-    sundayPay = 0;
-    for (const d of days) if (d.isSunday) d.dayPay = 0;
+  // Paid weekly-off rule (6-day work week): a Sunday is paid only if the
+  // employee worked MORE THAN 3 of that week's 6 working days — i.e. the six
+  // calendar days (Mon–Sat) immediately preceding the Sunday. A Sunday whose
+  // week straddles the previous month is judged on this month's days only.
+  const SUNDAY_MIN_ATTENDANCE = 3; // must work strictly more than this (>= 4)
+  let paidSundays = 0;
+  for (const day of days) {
+    if (!day.isSunday) continue;
+    const dNum = Number(day.date.slice(8, 10));
+    let workedInWeek = 0;
+    for (let k = 1; k <= 6; k++) if (workedDayNums.has(dNum - k)) workedInWeek++;
+    if (workedInWeek > SUNDAY_MIN_ATTENDANCE) { day.dayPay = perDay; paidSundays++; }
   }
+
+  const sundayPay = paidSundays * perDay;
   const gross = earned + sundayPay;
   const penaltyTotal = penalties.reduce((s, p) => s + Number(p.amount), 0);
   const finalSalary = Math.round(gross - penaltyTotal); // rounded to the rupee
@@ -160,7 +167,7 @@ export const computeMonthlySalary = (
 
   return {
     employeeId: emp.id, name: emp.name, salary: emp.salary, fixTimeMinutes: fixMin,
-    daysInMonth: dim, workDays, sundays, leaveDays, totalWorkedMinutes, extraMinutes, shortMinutes,
+    daysInMonth: dim, workDays, sundays, paidSundays, leaveDays, totalWorkedMinutes, extraMinutes, shortMinutes,
     perDaySalary: Math.round(perDay * 100) / 100, perHourSalary: Math.round(perHour * 100) / 100,
     earned: Math.round(earned * 100) / 100, sundayPay: Math.round(sundayPay * 100) / 100,
     gross: Math.round(gross * 100) / 100, penaltyTotal: Math.round(penaltyTotal * 100) / 100,

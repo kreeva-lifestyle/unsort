@@ -156,7 +156,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
                     {s.salary <= 0 && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: 'rgba(239,68,68,.14)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>No salary set</span>}
                   </div>
                   <div style={{ fontSize: 10, color: T.tx3, marginTop: 3, fontFamily: T.mono }}>
-                    {s.workDays}W · {s.sundays}Sun · {s.leaveDays}L · {minutesToHM(s.totalWorkedMinutes)}h · ₹{s.perDaySalary.toLocaleString('en-IN')}/day · ₹{s.perHourSalary.toLocaleString('en-IN')}/hr
+                    {s.workDays}W · {s.paidSundays}/{s.sundays}Sun · {s.leaveDays}L · {minutesToHM(s.totalWorkedMinutes)}h · ₹{s.perDaySalary.toLocaleString('en-IN')}/day · ₹{s.perHourSalary.toLocaleString('en-IN')}/hr
                     {s.extraMinutes > 0 && <span style={{ color: T.gr, fontWeight: 700 }}> · +{minutesToHM(s.extraMinutes)}h extra</span>}
                   </div>
                   {pens.length > 0 && (
