@@ -3,7 +3,7 @@
 // employee / status / text filters.
 import { useState, useMemo } from 'react';
 import { T, S } from '../../lib/theme';
-import { AttEmployee, AttEntry, timeToMinutes, minutesToHM } from '../../lib/attendance';
+import { AttEmployee, AttEntry, timeToMinutes, minutesToHM, fmtDiffHM } from '../../lib/attendance';
 
 export default function AttendanceTimesheet({ employees, entries, month }: {
   employees: AttEmployee[]; entries: AttEntry[]; month: string;
@@ -30,13 +30,14 @@ export default function AttendanceTimesheet({ employees, entries, month }: {
       .sort((a, b) => (empById.get(a.employee_id)?.name || '').localeCompare(empById.get(b.employee_id)?.name || '') || a.date.localeCompare(b.date));
   }, [entries, empFilter, statusFilter, q, empById]);
 
-  const dur = (e: AttEntry): { txt: string; short: boolean } | null => {
+  const dur = (e: AttEntry): { txt: string; short: boolean; diffMin: number } | null => {
     const i = timeToMinutes(e.in_time), o = timeToMinutes(e.out_time);
     if (i === null || o === null || o <= i) return null;
     const worked = o - i;
     const fix = fixById.get(e.employee_id) ?? 510;
-    return { txt: minutesToHM(worked), short: worked < fix };
+    return { txt: minutesToHM(worked), short: worked < fix, diffMin: worked - fix };
   };
+  const diffColor = (m: number) => (m > 0 ? T.gr : m < 0 ? T.re : T.tx3);
 
   const monthLabel = new Date(month + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 
@@ -61,10 +62,10 @@ export default function AttendanceTimesheet({ employees, entries, month }: {
 
       {/* Desktop table */}
       <div className="desktop-only" style={{ border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 780 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 840 }}>
           <thead>
             <tr>
-              {['Employee', 'Date', 'Day', 'In', 'Out', 'Duration', 'Status', 'Remarks', "Mgr's Remarks"].map(h => (
+              {['Employee', 'Date', 'Day', 'In', 'Out', 'Duration', '+/− vs Fix', 'Status', 'Remarks', "Mgr's Remarks"].map(h => (
                 <th key={h} style={{ ...S.thStyle, padding: '9px 12px', textAlign: 'left', position: 'sticky', top: 0, background: T.s2, whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
@@ -81,13 +82,14 @@ export default function AttendanceTimesheet({ employees, entries, month }: {
                   <td style={{ ...S.tdStyle, fontFamily: T.mono }}>{e.in_time || '—'}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono }}>{e.out_time || '—'}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, color: d ? (d.short ? T.re : T.gr) : T.tx3, fontWeight: 600 }}>{d ? d.txt : '—'}</td>
+                  <td style={{ ...S.tdStyle, fontFamily: T.mono, color: d ? diffColor(d.diffMin) : T.tx3, fontWeight: 600 }}>{d ? fmtDiffHM(d.diffMin) : '—'}</td>
                   <td style={S.tdStyle}><span style={{ fontSize: 10, fontWeight: 600, color: e.status === 'A' ? T.re : e.status === 'WO' ? T.tx3 : T.tx2 }}>{e.status || '—'}</span></td>
                   <td style={{ ...S.tdStyle, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.remarks || ''}>{e.remarks || ''}</td>
                   <td style={{ ...S.tdStyle, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.manager_remarks || ''}>{e.manager_remarks || ''}</td>
                 </tr>
               );
             })}
-            {rows.length === 0 && <tr><td colSpan={9} style={{ ...S.tdStyle, textAlign: 'center', color: T.tx3, padding: 30 }}>No entries for {monthLabel}. Use Import Excel to add the timesheet.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={10} style={{ ...S.tdStyle, textAlign: 'center', color: T.tx3, padding: 30 }}>No entries for {monthLabel}. Use Import Excel to add the timesheet.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -111,6 +113,7 @@ export default function AttendanceTimesheet({ employees, entries, month }: {
                 <span style={{ background: 'rgba(255,255,255,0.03)', padding: '2px 8px', borderRadius: 5 }}>In {e.in_time || '—'}</span>
                 <span style={{ background: 'rgba(255,255,255,0.03)', padding: '2px 8px', borderRadius: 5 }}>Out {e.out_time || '—'}</span>
                 <span style={{ marginLeft: 'auto', color: d ? (d.short ? T.re : T.gr) : T.tx3, fontWeight: 700 }}>{d ? d.txt : '—'}</span>
+                {d && d.diffMin !== 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: `${diffColor(d.diffMin)}22`, color: diffColor(d.diffMin) }}>{fmtDiffHM(d.diffMin)}</span>}
               </div>
               {(e.remarks || e.manager_remarks) && (
                 <div style={{ fontSize: 10, color: T.tx3, marginTop: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[e.remarks, e.manager_remarks].filter(Boolean).join(' · ')}</div>

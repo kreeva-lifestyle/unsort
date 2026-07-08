@@ -1,6 +1,7 @@
 // Salary view — runs the engine per active employee for the month, lets the
-// owner add penalties (time-passing deductions), stores the month's results,
-// and exports in-depth PDF payslips (single or combined).
+// owner add penalties (each with a mandatory note so the employee knows what
+// the deduction is for), stores the month's results, and exports in-depth PDF
+// payslips (single or combined; HTML builders live in payslip.ts).
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
@@ -9,11 +10,8 @@ import { friendlyError } from '../../lib/friendlyError';
 import { numericKeyDown } from '../../lib/numericInput';
 import { useAuth } from '../../hooks/useAuth';
 import { AttEmployee, AttEntry, AttPenalty, AttSalaryPayment, MonthlySalary, computeMonthlySalary, minutesToHM, monthFirstDay } from '../../lib/attendance';
+import { payslipBody, combinedSummary, wrapPdf, inr } from './payslip';
 import SalaryPaymentFlow from './SalaryPaymentFlow';
-
-const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
-const inr = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
-const inr2 = (n: number) => '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function AttendanceSalary({ employees, entries, penalties, savedSalaries, payments, month, onChanged, addToast }: {
   employees: AttEmployee[]; entries: AttEntry[]; penalties: AttPenalty[];
@@ -56,6 +54,8 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
   }, [salaries, q]);
 
   const totalFinal = shown.reduce((s, x) => s + x.finalSalary, 0);
+  const totalExtraMin = shown.reduce((s, x) => s + x.extraMinutes, 0);
+  const totalPenalty = shown.reduce((s, x) => s + x.penaltyTotal, 0);
 
   useEffect(() => { document.body.classList.toggle('modal-open', !!penFor || !!pdfHtml || payFlow); return () => document.body.classList.remove('modal-open'); }, [penFor, pdfHtml, payFlow]);
 
@@ -64,6 +64,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
     if (!penFor || savingPen) return;
     const amt = Number(penAmt);
     if (!Number.isFinite(amt) || amt <= 0) { addToast('Enter a penalty amount greater than 0', 'error'); return; }
+    if (!penReason.trim()) { addToast('Add a note — the employee should know what this deduction is for', 'error'); return; }
     setSavingPen(true);
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from('attendance_penalties').insert({ employee_id: penFor.id, month: monthFirstDay(month), amount: amt, reason: penReason.trim() || null, created_by: user?.id });
@@ -96,71 +97,10 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
     addToast(`Saved ${rows.length} salary record(s) for ${monthLabel}`, 'success'); onChanged();
   };
 
-  // ── PDF ────────────────────────────────────────────────────────────────────
-  const payslipBody = (s: MonthlySalary): string => {
-    const emp = employees.find(e => e.id === s.employeeId);
-    const pens = pensByEmp.get(s.employeeId) || [];
-    const dayRows = s.days.map(d => `<tr${d.isSunday ? ' style="background:#f1f5ff"' : (d.status === 'A' ? ' style="background:#fdeaea"' : '')}>
-      <td>${esc(new Date(d.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }))}</td>
-      <td>${esc(d.day)}</td>
-      <td style="text-align:center">${esc(d.in_time || '—')}</td>
-      <td style="text-align:center">${esc(d.out_time || '—')}</td>
-      <td style="text-align:center">${d.workedMin > 0 ? esc(minutesToHM(d.workedMin)) : (d.isSunday ? 'WO' : '—')}</td>
-      <td style="text-align:center;color:${d.diffMin < 0 ? '#c0392b' : d.diffMin > 0 ? '#1a7f37' : '#888'}">${d.workedMin > 0 ? esc(minutesToHM(d.diffMin)) : '—'}</td>
-      <td style="text-align:right">${d.dayPay > 0 ? esc(inr2(d.dayPay)) : '—'}</td>
-      <td style="text-align:center">${esc(d.status)}</td>
-    </tr>`).join('');
-    const penRows = pens.map(p => `<div style="display:flex;justify-content:space-between"><span>Penalty${p.reason ? ' — ' + esc(p.reason) : ''}</span><span style="color:#c0392b">− ${esc(inr2(Number(p.amount)))}</span></div>`).join('');
-    return `<div class="slip">
-      <div class="head"><div><div class="nm">${esc(s.name)}</div><div class="sub">${esc(emp?.employee_code || '')} · ${esc(monthLabel)}</div></div>
-        <div class="final"><div class="fl">Net Salary</div><div class="fv" style="color:${s.finalSalary < 0 ? '#c0392b' : '#1a7f37'}">${esc(inr(s.finalSalary))}</div></div></div>
-      <div class="basis">Monthly salary ${esc(inr(s.salary))} · Fix time ${esc(minutesToHM(s.fixTimeMinutes))}/day · Days in month ${s.daysInMonth} (calendar) · Per-day ${esc(inr2(s.perDaySalary))} · Per-hour ${esc(inr2(s.perHourSalary))}</div>
-      <table class="days"><thead><tr><th>Date</th><th>Day</th><th>In</th><th>Out</th><th>Worked</th><th>+/− vs fix</th><th>Day Pay</th><th>St</th></tr></thead><tbody>${dayRows}</tbody></table>
-      <div class="totals">
-        <div><span>Worked days</span><span>${s.workDays}</span></div>
-        <div><span>Paid Sundays</span><span>${s.sundays} × ${esc(inr2(s.perDaySalary))} = ${esc(inr2(s.sundayPay))}</span></div>
-        <div><span>Leave days (unpaid)</span><span>${s.leaveDays}</span></div>
-        <div><span>Total worked hours</span><span>${esc(minutesToHM(s.totalWorkedMinutes))}</span></div>
-        <div class="rule"><span>Earned (worked)</span><span>${esc(inr2(s.earned))}</span></div>
-        <div><span>Sunday pay</span><span>+ ${esc(inr2(s.sundayPay))}</span></div>
-        <div class="rule"><span>Gross</span><span>${esc(inr2(s.gross))}</span></div>
-        ${penRows}
-        ${s.penaltyTotal > 0 ? `<div><span>Total penalties</span><span style="color:#c0392b">− ${esc(inr2(s.penaltyTotal))}</span></div>` : ''}
-        <div class="final-row" style="color:${s.finalSalary < 0 ? '#c0392b' : '#1a7f37'}"><span>Net Salary (rounded)</span><span>${esc(inr(s.finalSalary))}</span></div>
-      </div>
-    </div>`;
-  };
-
-  const wrap = (body: string, title: string) => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
-    *{box-sizing:border-box} body{font-family:'Inter',Arial,sans-serif;color:#1a202c;font-size:12px;margin:0;padding:20px;background:#fff}
-    h1{font-size:18px;margin:0 0 2px} .muted{color:#718096;font-size:11px;margin-bottom:14px}
-    .slip{page-break-inside:avoid;margin-bottom:26px;border:1px solid #e2e8f0;border-radius:10px;padding:16px}
-    .head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
-    .nm{font-size:16px;font-weight:800} .sub{color:#718096;font-size:11px;margin-top:2px}
-    .final{text-align:right} .fl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#a0aec0}
-    .fv{font-size:22px;font-weight:800;color:#1a7f37}
-    .basis{background:#f7fafc;border-radius:6px;padding:8px 10px;font-size:10.5px;color:#4a5568;margin-bottom:10px}
-    table.days{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:10px}
-    table.days th{background:#f1f5f9;text-align:left;padding:5px 7px;border-bottom:1px solid #cbd5e0;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#64748b}
-    table.days td{padding:4px 7px;border-bottom:1px solid #edf2f7}
-    .totals{max-width:360px;margin-left:auto;font-size:11.5px}
-    .totals div{display:flex;justify-content:space-between;padding:3px 0}
-    .totals .rule{border-top:1px solid #cbd5e0;margin-top:3px;padding-top:5px;font-weight:600}
-    .totals .final-row{border-top:2px solid #2d3748;margin-top:5px;padding-top:6px;font-weight:800;font-size:14px;color:#1a7f37}
-    .foot{margin-top:14px;text-align:center;color:#a0aec0;font-size:9px}
-    @media print{body{padding:8px}@page{margin:12mm}}
-  </style></head><body>${body}<div class="foot">Arya Designs · Generated ${esc(new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }))} · Powered by DailyOffice</div></body></html>`;
-
-  const exportSingle = (s: MonthlySalary) => setPdfHtml(wrap(`<h1>Salary Slip</h1><div class="muted">${esc(monthLabel)}</div>${payslipBody(s)}`, `Salary — ${s.name}`));
-  const exportCombined = () => {
-    const rowsHtml = shown.map(s => `<tr><td>${esc(s.name)}</td><td style="text-align:center">${s.workDays}</td><td style="text-align:center">${s.sundays}</td><td style="text-align:center">${s.leaveDays}</td><td style="text-align:center">${esc(minutesToHM(s.totalWorkedMinutes))}</td><td style="text-align:right">${esc(inr2(s.gross))}</td><td style="text-align:right;color:#c0392b">${s.penaltyTotal > 0 ? '− ' + esc(inr2(s.penaltyTotal)) : '—'}</td><td style="text-align:right;font-weight:800">${esc(inr(s.finalSalary))}</td></tr>`).join('');
-    const summary = `<h1>Salary Summary</h1><div class="muted">${esc(monthLabel)} · ${shown.length} employees · Total net ${esc(inr(totalFinal))}</div>
-      <table class="days" style="font-size:11px"><thead><tr><th>Employee</th><th>Work</th><th>Sun</th><th>Leave</th><th>Worked hrs</th><th style="text-align:right">Gross</th><th style="text-align:right">Penalty</th><th style="text-align:right">Net</th></tr></thead><tbody>${rowsHtml}
-      <tr style="border-top:2px solid #2d3748;font-weight:800"><td>Total</td><td></td><td></td><td></td><td></td><td></td><td></td><td style="text-align:right">${esc(inr(totalFinal))}</td></tr></tbody></table>
-      <div style="page-break-after:always"></div>`;
-    const detail = shown.map(payslipBody).join('');
-    setPdfHtml(wrap(summary + detail, `Salary Summary — ${monthLabel}`));
-  };
+  // ── PDF (builders in payslip.ts) ───────────────────────────────────────────
+  const slip = (s: MonthlySalary) => payslipBody(s, employees.find(e => e.id === s.employeeId), pensByEmp.get(s.employeeId) || [], monthLabel);
+  const exportSingle = (s: MonthlySalary) => setPdfHtml(wrapPdf(`<h1>Salary Slip</h1><div class="muted">${monthLabel}</div>${slip(s)}`, `Salary — ${s.name}`));
+  const exportCombined = () => setPdfHtml(wrapPdf(combinedSummary(shown, monthLabel, totalFinal) + shown.map(slip).join(''), `Salary Summary — ${monthLabel}`));
 
   return (
     <div>
@@ -176,7 +116,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
         </div>
       </div>
 
-      <div className="att-kpis" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+      <div className="att-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8, marginBottom: 10 }}>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
           <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Employees</div>
           <div style={{ fontSize: 17, fontWeight: 800, fontFamily: T.sora, color: T.tx, marginTop: 2 }}>{shown.length}</div>
@@ -184,6 +124,14 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
           <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Total Net</div>
           <div style={{ fontSize: 17, fontWeight: 800, fontFamily: T.sora, color: T.gr, marginTop: 2 }}>{inr(totalFinal)}</div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
+          <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Extra Time</div>
+          <div style={{ fontSize: 17, fontWeight: 800, fontFamily: T.sora, color: totalExtraMin > 0 ? T.gr : T.tx3, marginTop: 2 }}>{totalExtraMin > 0 ? `+${minutesToHM(totalExtraMin)}h` : '—'}</div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
+          <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Penalties</div>
+          <div style={{ fontSize: 17, fontWeight: 800, fontFamily: T.sora, color: totalPenalty > 0 ? T.re : T.tx3, marginTop: 2 }}>{totalPenalty > 0 ? `− ${inr(totalPenalty)}` : '—'}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
           <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Month</div>
@@ -209,6 +157,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
                   </div>
                   <div style={{ fontSize: 10, color: T.tx3, marginTop: 3, fontFamily: T.mono }}>
                     {s.workDays}W · {s.sundays}Sun · {s.leaveDays}L · {minutesToHM(s.totalWorkedMinutes)}h · ₹{s.perDaySalary.toLocaleString('en-IN')}/day · ₹{s.perHourSalary.toLocaleString('en-IN')}/hr
+                    {s.extraMinutes > 0 && <span style={{ color: T.gr, fontWeight: 700 }}> · +{minutesToHM(s.extraMinutes)}h extra</span>}
                   </div>
                   {pens.length > 0 && (
                     <div style={{ marginTop: 5, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
@@ -246,8 +195,9 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
                 <input type="number" min="1" value={penAmt} onKeyDown={e => numericKeyDown(e)} onChange={e => setPenAmt(e.target.value)} placeholder="500" autoFocus style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
               </div>
               <div style={{ marginBottom: 12 }}>
-                <label style={S.fLabel}>Reason (optional)</label>
-                <input value={penReason} onChange={e => setPenReason(e.target.value)} placeholder="Late / idle during shift" style={{ ...S.fInput, width: '100%' }} />
+                <label style={S.fLabel}>Note — what is this deduction for?</label>
+                <input value={penReason} onChange={e => setPenReason(e.target.value)} placeholder="e.g. Late 3 days / idle during shift" style={{ ...S.fInput, width: '100%' }} />
+                <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>Required — shown on the payslip and pay screen so the employee understands the deduction.</div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => setPenFor(null)} style={{ ...S.btnGhost, flex: 1 }}>Cancel</button>
@@ -281,7 +231,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
       {/* Salary payment kiosk */}
       {payFlow && (
         <SalaryPaymentFlow employees={activeEmployees} salaries={salaries} payments={payments} month={month}
-          onClose={() => { setPayFlow(false); onChanged(); }} addToast={addToast} />
+          penaltiesByEmp={pensByEmp} onClose={() => { setPayFlow(false); onChanged(); }} addToast={addToast} />
       )}
     </div>
   );
