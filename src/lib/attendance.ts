@@ -5,6 +5,9 @@
 //     missing Sunday row can no longer silently drop a paid holiday
 //   • manual penalties subtract from the gross
 //   • the final salary is rounded to the rupee
+//   • extra/short time vs the fixed day is totalled per month (extraMinutes /
+//     shortMinutes) so overtime is visible on the timesheet, salary cards,
+//     payslips and the pay screen — the hourly dayPay already pays for it
 // Core math unchanged: perDay = salary / daysInMonth,
 // perHour = perDay / fixedHours, each worked day pays perHour × workedHours,
 // every Sunday pays perDay, leaves (absent non-Sundays) pay nothing.
@@ -37,6 +40,11 @@ export type MonthlySalary = {
   employeeId: string; name: string; salary: number; fixTimeMinutes: number;
   daysInMonth: number; workDays: number; sundays: number; leaveDays: number;
   totalWorkedMinutes: number; perDaySalary: number; perHourSalary: number;
+  // extraMinutes / shortMinutes: month totals of time worked beyond / below
+  // the fixed day, summed separately (a +2h day and a −2h day are both
+  // visible instead of cancelling out). Pay is hourly, so these are already
+  // reflected in `earned` — they exist so extra time can be shown everywhere.
+  extraMinutes: number; shortMinutes: number;
   earned: number; sundayPay: number; gross: number; penaltyTotal: number;
   finalSalary: number; days: DayBreakdown[];
 };
@@ -56,6 +64,9 @@ export const minutesToHM = (min: number): string => {
   const neg = min < 0; const v = Math.abs(Math.round(min));
   return `${neg ? '−' : ''}${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
 };
+
+// Signed H:MM for worked-vs-fix diffs: "+1:30", "−0:45", "0:00".
+export const fmtDiffHM = (min: number): string => (min > 0 ? '+' : '') + minutesToHM(min);
 
 // "8:30" / "8:30:00" (the FIX TIME column) → minutes; also accepts plain hours ("8.5").
 export const fixTimeToMinutes = (v: string): number | null => {
@@ -97,7 +108,7 @@ export const computeMonthlySalary = (
   const byDate = new Map(entries.map(e => [e.date, e]));
   const [y, m] = monthISO.split('-').map(Number);
   const days: DayBreakdown[] = [];
-  let workDays = 0, totalWorkedMinutes = 0, earned = 0;
+  let workDays = 0, totalWorkedMinutes = 0, earned = 0, extraMinutes = 0, shortMinutes = 0;
 
   for (let d = 1; d <= dim; d++) {
     const dateISO = `${monthISO}-${String(d).padStart(2, '0')}`;
@@ -120,6 +131,8 @@ export const computeMonthlySalary = (
       workDays++;
       totalWorkedMinutes += workedMin;
       earned += dayPay;
+      const diff = workedMin - fixMin;
+      if (diff > 0) extraMinutes += diff; else shortMinutes += -diff;
     }
     days.push({
       date: dateISO,
@@ -147,7 +160,7 @@ export const computeMonthlySalary = (
 
   return {
     employeeId: emp.id, name: emp.name, salary: emp.salary, fixTimeMinutes: fixMin,
-    daysInMonth: dim, workDays, sundays, leaveDays, totalWorkedMinutes,
+    daysInMonth: dim, workDays, sundays, leaveDays, totalWorkedMinutes, extraMinutes, shortMinutes,
     perDaySalary: Math.round(perDay * 100) / 100, perHourSalary: Math.round(perHour * 100) / 100,
     earned: Math.round(earned * 100) / 100, sundayPay: Math.round(sundayPay * 100) / 100,
     gross: Math.round(gross * 100) / 100, penaltyTotal: Math.round(penaltyTotal * 100) / 100,
