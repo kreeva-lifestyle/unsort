@@ -99,7 +99,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
 
   // ── PDF (builders in payslip.ts) ───────────────────────────────────────────
   const slip = (s: MonthlySalary) => payslipBody(s, employees.find(e => e.id === s.employeeId), pensByEmp.get(s.employeeId) || [], monthLabel);
-  const exportSingle = (s: MonthlySalary) => setPdfHtml(wrapPdf(`<h1>Salary Slip</h1><div class="muted">${monthLabel}</div>${slip(s)}`, `Salary — ${s.name}`));
+  const exportSingle = (s: MonthlySalary) => setPdfHtml(wrapPdf(slip(s), `Salary — ${s.name}`));
   const exportCombined = () => setPdfHtml(wrapPdf(combinedSummary(shown, monthLabel, totalFinal) + shown.map(slip).join(''), `Salary Summary — ${monthLabel}`));
 
   return (

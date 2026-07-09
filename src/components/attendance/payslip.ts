@@ -55,23 +55,24 @@ export const combinedSummary = (shown: MonthlySalary[], monthLabel: string, tota
 };
 
 export const wrapPdf = (body: string, title: string) => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
-  *{box-sizing:border-box} body{font-family:'Inter',Arial,sans-serif;color:#1a202c;font-size:12px;margin:0 auto;padding:20px;background:#fff;max-width:780px}
-  h1{font-size:18px;margin:0 0 2px} .muted{color:#718096;font-size:11px;margin-bottom:14px}
-  .slip{page-break-inside:avoid;margin-bottom:26px;border:1px solid #e2e8f0;border-radius:10px;padding:16px}
-  .head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
-  .nm{font-size:16px;font-weight:800} .sub{color:#718096;font-size:11px;margin-top:2px}
-  .final{text-align:right} .fl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#a0aec0}
-  .fv{font-size:22px;font-weight:800;color:#1a7f37}
-  .basis{background:#f7fafc;border-radius:6px;padding:8px 10px;font-size:10.5px;color:#4a5568;margin-bottom:10px}
-  table.days{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:10px}
-  table.days th{background:#f1f5f9;text-align:left;padding:5px 7px;border-bottom:1px solid #cbd5e0;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#64748b}
+  *{box-sizing:border-box} body{font-family:'Inter',Arial,sans-serif;color:#1a202c;font-size:12px;margin:0 auto;padding:16px;background:#fff;max-width:780px}
+  h1{font-size:17px;margin:0 0 2px} .muted{color:#718096;font-size:11px;margin-bottom:10px}
+  /* A single payslip is tuned to fit one A4: dense day table + small margins. */
+  .slip{page-break-inside:avoid;margin-bottom:16px;border:1px solid #e2e8f0;border-radius:10px;padding:12px}
+  .head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+  .nm{font-size:15px;font-weight:800} .sub{color:#718096;font-size:10.5px;margin-top:2px}
+  .final{text-align:right} .fl{font-size:8.5px;text-transform:uppercase;letter-spacing:1px;color:#a0aec0}
+  .fv{font-size:20px;font-weight:800;color:#1a7f37;line-height:1.1}
+  .basis{background:#f7fafc;border-radius:6px;padding:6px 9px;font-size:9.5px;color:#4a5568;margin-bottom:8px}
+  table.days{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:9px}
+  table.days th{background:#f1f5f9;text-align:left;padding:3px 6px;border-bottom:1px solid #cbd5e0;font-size:8px;text-transform:uppercase;letter-spacing:.3px;color:#64748b}
   table.days th.c{text-align:center} table.days th.r{text-align:right} table.days td.c{text-align:center}
-  table.days td{padding:4px 7px;border-bottom:1px solid #edf2f7}
-  .totals{max-width:360px;margin-left:auto;font-size:11.5px}
-  .totals div{display:flex;justify-content:space-between;padding:3px 0}
-  .totals .pen{background:#fdf3f3;border-radius:4px;padding:3px 6px;margin:1px 0}
-  .totals .rule{border-top:1px solid #cbd5e0;margin-top:3px;padding-top:5px;font-weight:600}
-  .totals .final-row{border-top:2px solid #2d3748;margin-top:5px;padding-top:6px;font-weight:800;font-size:14px;color:#1a7f37}
-  .foot{margin-top:14px;text-align:center;color:#a0aec0;font-size:9px}
-  @media print{body{padding:8px}@page{margin:12mm}}
+  table.days td{padding:2px 6px;border-bottom:1px solid #edf2f7;line-height:1.25}
+  .totals{max-width:360px;margin-left:auto;font-size:11px}
+  .totals div{display:flex;justify-content:space-between;padding:2px 0}
+  .totals .pen{background:#fdf3f3;border-radius:4px;padding:2px 6px;margin:1px 0}
+  .totals .rule{border-top:1px solid #cbd5e0;margin-top:2px;padding-top:4px;font-weight:600}
+  .totals .final-row{border-top:2px solid #2d3748;margin-top:4px;padding-top:5px;font-weight:800;font-size:13px;color:#1a7f37}
+  .foot{margin-top:10px;text-align:center;color:#a0aec0;font-size:9px}
+  @media print{body{padding:0}@page{margin:8mm}}
 </style></head><body>${body}<div class="foot">Arya Designs · Generated ${esc(new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }))} · Powered by DailyOffice</div></body></html>`;
