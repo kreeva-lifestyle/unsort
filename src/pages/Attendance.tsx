@@ -79,7 +79,8 @@ export default function Attendance() {
       {loading ? (
         <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}><div className="spinner" /></div>
       ) : view === 'timesheet' ? (
-        <AttendanceTimesheet employees={employees} entries={entries} month={month} />
+        <AttendanceTimesheet employees={employees} entries={entries} month={month}
+          onChanged={() => fetchMonth(month)} addToast={addToast} />
       ) : view === 'salary' ? (
         <AttendanceSalary employees={employees} entries={entries} penalties={penalties} savedSalaries={savedSalaries} payments={payments} month={month}
           onChanged={() => fetchMonth(month)} addToast={addToast} />

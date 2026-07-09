@@ -4,13 +4,18 @@
 import { useState, useMemo } from 'react';
 import { T, S } from '../../lib/theme';
 import { AttEmployee, AttEntry, timeToMinutes, minutesToHM, fmtDiffHM } from '../../lib/attendance';
+import AttendanceEntryModal from './EntryModal';
 
-export default function AttendanceTimesheet({ employees, entries, month }: {
+export default function AttendanceTimesheet({ employees, entries, month, onChanged, addToast }: {
   employees: AttEmployee[]; entries: AttEntry[]; month: string;
+  onChanged: () => void; addToast: (m: string, t?: string) => void;
 }) {
   const [empFilter, setEmpFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [q, setQ] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<AttEntry | null>(null);
+  const closeModal = () => { setAdding(false); setEditing(null); };
 
   const empById = useMemo(() => new Map(employees.map(e => [e.id, e])), [employees]);
   const fixById = useMemo(() => new Map(employees.map(e => [e.id, e.fix_time_minutes])), [employees]);
@@ -56,6 +61,7 @@ export default function AttendanceTimesheet({ employees, entries, month }: {
           <option value="">All status</option>
           {statuses.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
+        <button onClick={() => setAdding(true)} className="desktop-only" style={{ ...S.btnPrimary }}>+ Add Entry</button>
       </div>
 
       <div style={{ fontSize: 10, color: T.tx3, marginBottom: 8 }}>{monthLabel} · {rows.length} row{rows.length !== 1 ? 's' : ''}</div>
@@ -75,7 +81,7 @@ export default function AttendanceTimesheet({ employees, entries, month }: {
               const d = dur(e);
               const emp = empById.get(e.employee_id);
               return (
-                <tr key={e.id} style={{ borderTop: `1px solid ${T.bd}` }}>
+                <tr key={e.id} onClick={() => setEditing(e)} title="Click to edit" style={{ borderTop: `1px solid ${T.bd}`, cursor: 'pointer' }}>
                   <td style={{ ...S.tdStyle, whiteSpace: 'nowrap' }}>{emp?.name || '—'}{emp?.employee_code ? <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, marginLeft: 6 }}>{emp.employee_code}</span> : null}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, whiteSpace: 'nowrap' }}>{new Date(e.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
                   <td style={S.tdStyle}>{e.day || new Date(e.date).toLocaleDateString('en-IN', { weekday: 'short' })}</td>
@@ -89,7 +95,7 @@ export default function AttendanceTimesheet({ employees, entries, month }: {
                 </tr>
               );
             })}
-            {rows.length === 0 && <tr><td colSpan={10} style={{ ...S.tdStyle, textAlign: 'center', color: T.tx3, padding: 30 }}>No entries for {monthLabel}. Use Import Excel to add the timesheet.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={10} style={{ ...S.tdStyle, textAlign: 'center', color: T.tx3, padding: 30 }}>No entries for {monthLabel}. Use Import Excel, or “+ Add Entry”, to add the timesheet.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -101,7 +107,7 @@ export default function AttendanceTimesheet({ employees, entries, month }: {
           const emp = empById.get(e.employee_id);
           const stColor = e.status === 'A' ? T.re : e.status === 'WO' ? T.tx3 : T.gr;
           return (
-            <div key={e.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '11px 13px' }}>
+            <div key={e.id} onClick={() => setEditing(e)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '11px 13px', cursor: 'pointer' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 7 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emp?.name || '—'}</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -121,8 +127,16 @@ export default function AttendanceTimesheet({ employees, entries, month }: {
             </div>
           );
         })}
-        {rows.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 12 }}>No entries for {monthLabel}.</div>}
+        {rows.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 12 }}>No entries for {monthLabel}. Tap + to add one.</div>}
       </div>
+
+      {/* Mobile add FAB */}
+      <button className="fab mobile-only" onClick={() => setAdding(true)} aria-label="Add attendance entry">+</button>
+
+      {(adding || editing) && (
+        <AttendanceEntryModal employees={employees} month={month} editing={editing}
+          onClose={closeModal} onSaved={() => { closeModal(); onChanged(); }} addToast={addToast} />
+      )}
     </div>
   );
 }
