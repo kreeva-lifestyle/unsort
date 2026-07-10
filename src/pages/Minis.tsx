@@ -283,7 +283,7 @@ export default function Minis() {
       <OdetteImport addToast={addToast} virtualStock={virtualStock} />
       <div style={{ margin: '20px 0 12px', paddingTop: 16, borderTop: `1px solid ${T.bd}` }}>
         <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 2 }}>Coverage Check</div>
-        <div style={{ fontSize: 11, color: T.tx3 }}>Active SKUs not yet on the Odette sheet</div>
+        <div style={{ fontSize: 11, color: T.tx3 }}>Active size variants (SKU × size) not yet on the Odette sheet — one row per missing size</div>
       </div>
       <OdetteCoverageCheck addToast={addToast} />
     </div>

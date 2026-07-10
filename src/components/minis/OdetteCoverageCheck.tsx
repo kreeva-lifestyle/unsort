@@ -48,7 +48,7 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
       setResult(toResult(data));
       setSearch('');
       (data.warnings || []).forEach((w: string) => addToast(w, 'info'));
-      addToast(`${data.counts.missing} active SKU${data.counts.missing === 1 ? '' : 's'} not on Odette (of ${data.counts.active} active)`, 'success');
+      addToast(`${data.counts.missing} size variant${data.counts.missing === 1 ? '' : 's'} not on Odette (of ${data.counts.active} active variants)`, 'success');
     } catch (e: any) { addToast(friendlyError(e), 'error'); }
     setLoading(false);
   };
