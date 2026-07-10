@@ -20,6 +20,7 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
   const [fixTime, setFixTime] = useState('8:30');
   const [qrUrl, setQrUrl] = useState('');
   const [qrBusy, setQrBusy] = useState(false);
+  const [qrZoom, setQrZoom] = useState(false);
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -124,7 +125,7 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
               <div style={{ marginBottom: 12 }}>
                 <label style={S.fLabel}>Payment QR</label>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <div style={{ width: 72, height: 72, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: qrUrl ? '#fff' : 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div onClick={() => qrUrl && setQrZoom(true)} title={qrUrl ? 'Click to zoom' : undefined} style={{ width: 72, height: 72, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: qrUrl ? '#fff' : 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: qrUrl ? 'zoom-in' : 'default' }}>
                     {qrUrl ? <img src={qrUrl} alt="Payment QR" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 9, color: T.tx3, textAlign: 'center', padding: 4 }}>No QR</span>}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -142,6 +143,16 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
               </div>
             </div>
           </div>
+        </div>
+      ), document.body)}
+
+      {/* QR lightbox — tap anywhere to close */}
+      {qrZoom && qrUrl && createPortal((
+        <div onClick={() => setQrZoom(false)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(4,6,12,.88)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, cursor: 'zoom-out', padding: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 14, maxWidth: 'min(86vw, 480px)', maxHeight: '76vh', display: 'flex' }}>
+            <img src={qrUrl} alt="Payment QR" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          </div>
+          <div style={{ fontSize: 11, color: T.tx3 }}>Tap anywhere to close</div>
         </div>
       ), document.body)}
     </div>
