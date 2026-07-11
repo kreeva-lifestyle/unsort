@@ -1,8 +1,9 @@
 // Image Link Check — scans the OFFLINE MASTER SHEET's IMAGE links (active
-// products), lists SKUs with dead/empty links, and can AUTO-FIX them: the edge
-// function finds the SKU's folder under the tab's Dropbox root (subfolders
-// included), creates/reuses a VIEW-ONLY share link, and writes it into the
-// sheet cell. Dropbox creds + per-tab roots live in the server vault.
+// products) and repairs them in TWO steps, per the owner's rule: first "Find
+// Correct Links" (dry run — shows exactly which folder/link would be used,
+// writes nothing), then "Replace N links" applies only the confirmed matches.
+// The server refuses to touch a row when the right folder isn't found or is
+// ambiguous (catalog-aware matching). Creds live in the server vault.
 import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../../lib/theme';
@@ -13,15 +14,13 @@ import { useAuth } from '../../hooks/useAuth';
 const FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
 // The Dropbox app key (a public OAuth client id — the secret stays server-side)
 // comes from dropbox_status at runtime, so swapping the Dropbox app in the
-// vault never requires a frontend deploy. sharing.write lets the auto-fix
-// create view-only share links.
+// vault never requires a frontend deploy.
 const authUrl = (appKey: string) => `https://www.dropbox.com/oauth2/authorize?client_id=${appKey}&response_type=code&token_access_type=offline&scope=${encodeURIComponent('account_info.read files.metadata.read sharing.read sharing.write')}`;
 
-type Problem = { sku: string; tab: string; row: number; url?: string; problem: string; fixed?: boolean };
+type Problem = { sku: string; tab: string; row: number; url?: string; problem: string; fixed?: boolean; willUse?: boolean; folder?: string };
 
-// The edge function authorises per action against the CALLER's login (connect
-// = admin, fix = operator+, scan = any signed-in user), so send the user's
-// session token — the bare anon key is rejected for those actions.
+// Sensitive actions are authorised per caller role server-side, so send the
+// user's session token (the bare anon key is rejected for them).
 const call = async (body: object) => {
   const { data: { session } } = await supabase.auth.getSession();
   const jwt = session?.access_token || SUPABASE_ANON_KEY;
@@ -67,56 +66,59 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
       let offset = 0;
       for (;;) {
         const { status, data } = await call({ action: 'linkcheck', offset, limit: 100 });
-        if (data?.error === 'dropbox_not_connected') { setConnected(false); addToast('Dropbox is not connected yet — follow the connect step above', 'error'); setScanning(false); return; }
+        if (data?.error === 'dropbox_not_connected') { setConnected(false); addToast('Dropbox is not connected yet', 'error'); setScanning(false); return; }
         if (!data.ok) { addToast(friendlyError(data.details || data.error || `Link check failed (${status})`), 'error'); break; }
         if (offset === 0) (data.noLink || []).forEach((n: Problem) => acc.push({ ...n, problem: 'No / invalid link in sheet' }));
         acc.push(...(data.broken || []));
         (data.warnings || []).forEach((w: string) => addToast(w, 'info'));
         setProblems([...acc].sort((a, b) => a.tab.localeCompare(b.tab) || a.row - b.row));
-        const done = data.nextOffset ?? data.totalLinks;
-        setProgress({ done, total: data.totalLinks });
+        setProgress({ done: data.nextOffset ?? data.totalLinks, total: data.totalLinks });
         if (data.nextOffset == null) break;
         offset = data.nextOffset;
       }
-      addToast(acc.length === 0 ? 'All image links are healthy 🎉' : `${acc.length} problem link${acc.length === 1 ? '' : 's'} found — you can Auto-Fix them`, acc.length === 0 ? 'success' : 'error');
+      addToast(acc.length === 0 ? 'All image links are healthy 🎉' : `${acc.length} problem link${acc.length === 1 ? '' : 's'} found — press "Find Correct Links" to see the fixes`, acc.length === 0 ? 'success' : 'error');
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setScanning(false);
   };
 
-  const autoFix = async () => {
+  // Phase 1 (dry=true): find + SHOW the correct folder/link per row, write
+  // NOTHING. Phase 2 (dry=false): replace only the rows phase 1 confirmed.
+  const runFix = async (dry: boolean) => {
     if (fixing || scanning || !problems) return;
-    const todo = problems.filter(p => !p.fixed);
+    const todo = problems.filter(p => !p.fixed && (dry || p.willUse));
     if (todo.length === 0) return;
     setFixing(true); setProgress({ done: 0, total: todo.length });
-    let fixedCount = 0;
+    let good = 0;
     try {
       for (let i = 0; i < todo.length; i += 15) {
         const batch = todo.slice(i, i + 15).map(p => ({ sku: p.sku, tab: p.tab, row: p.row }));
-        const { data } = await call({ action: 'linkfix', items: batch });
+        const { data } = await call({ action: 'linkfix', items: batch, dryRun: dry });
         if (data?.error === 'dropbox_not_connected') { setConnected(false); addToast('Dropbox is not connected — reconnect above', 'error'); break; }
-        if (!data.ok) { addToast(friendlyError(data.details || data.error || 'Auto-fix failed'), 'error'); break; }
+        if (!data.ok) { addToast(friendlyError(data.details || data.error || 'Failed'), 'error'); break; }
         for (const r of data.results || []) {
           const idx = problems.findIndex(p => p.tab === r.tab && p.row === r.row);
           if (idx < 0) continue;
-          if (r.fixed) { fixedCount++; problems[idx] = { ...problems[idx], fixed: true, url: r.url, problem: 'Fixed — new link inserted in sheet' }; }
-          else problems[idx] = { ...problems[idx], problem: r.reason || 'Could not fix' };
+          if (dry) {
+            if (r.willUse) { good++; problems[idx] = { ...problems[idx], willUse: true, folder: r.folder, url: r.url || problems[idx].url, problem: `Will replace with ${r.folder}` }; }
+            else problems[idx] = { ...problems[idx], willUse: false, problem: r.reason || 'Could not match — not changed' };
+          } else if (r.fixed) { good++; problems[idx] = { ...problems[idx], fixed: true, willUse: false, url: r.url, problem: 'Replaced — new link in sheet' }; }
+          else problems[idx] = { ...problems[idx], willUse: false, problem: r.reason || 'Could not fix — not changed' };
         }
         setProblems([...problems]);
         setProgress({ done: Math.min(i + 15, todo.length), total: todo.length });
-        if (data.needsReconnect) {
-          setConnected(false);
-          addToast('Dropbox needs one more permission (sharing.write). Tick it in the Dropbox console, press Submit, then reconnect above.', 'error');
-          break;
-        }
+        if (data.needsReconnect) { setConnected(false); addToast('Dropbox needs the sharing.write permission — reconnect above.', 'error'); break; }
       }
-      addToast(`Auto-fix done — ${fixedCount} link${fixedCount === 1 ? '' : 's'} repaired${fixedCount < todo.length ? `, ${todo.length - fixedCount} need attention` : ''}`, fixedCount > 0 ? 'success' : 'error');
+      addToast(dry
+        ? `${good} correct link${good === 1 ? '' : 's'} found — review the list, then press "Replace ${good}"`
+        : `${good} link${good === 1 ? '' : 's'} replaced${good < todo.length ? `, ${todo.length - good} left unchanged` : ''}`,
+        good > 0 ? 'success' : 'error');
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setFixing(false);
   };
 
   const exportXls = () => {
     if (!problems || problems.length === 0) { addToast('Nothing to export', 'error'); return; }
-    const rows = problems.map(p => ({ SKU: p.sku, 'Source Tab': p.tab, 'Sheet Row': p.row, Status: p.problem, Link: p.url || '' }));
+    const rows = problems.map(p => ({ SKU: p.sku, 'Source Tab': p.tab, 'Sheet Row': p.row, Status: p.problem, 'Matched Folder': p.folder || '', Link: p.url || '' }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Broken Links');
     XLSX.writeFile(wb, `Broken_Image_Links_${new Date().toISOString().slice(0, 10)}.xls`);
@@ -124,6 +126,8 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
 
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
   const pending = problems ? problems.filter(p => !p.fixed).length : 0;
+  const replaceable = problems ? problems.filter(p => p.willUse && !p.fixed).length : 0;
+  const statusColor = (p: Problem) => p.fixed ? T.gr : p.willUse ? T.gr : /empty|deleted|wrong|no \//i.test(p.problem) ? T.re : T.yl;
 
   return (
     <div style={{ animation: 'fi .15s ease' }}>
@@ -150,12 +154,15 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
           {scanning ? `Checking… ${progress.done}/${progress.total || '…'} (${pct}%)` : 'Find Broken Links'}
         </button>
         {pending > 0 && !scanning && canFix && (
-          <button onClick={autoFix} disabled={fixing} style={{ ...S.btnSuccessSolid, opacity: fixing ? 0.6 : 1, pointerEvents: fixing ? 'none' : 'auto' }}>
-            {fixing ? `Fixing… ${progress.done}/${progress.total}` : `Auto-Fix ${pending} from Dropbox`}
+          <button onClick={() => runFix(true)} disabled={fixing} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.25)', background: 'rgba(34,197,94,.06)', opacity: fixing ? 0.6 : 1, pointerEvents: fixing ? 'none' : 'auto' }}>
+            {fixing ? `Working… ${progress.done}/${progress.total}` : `Find Correct Links (${pending})`}
           </button>
         )}
+        {replaceable > 0 && !scanning && !fixing && canFix && (
+          <button onClick={() => runFix(false)} style={S.btnSuccessSolid}>Replace {replaceable} link{replaceable === 1 ? '' : 's'}</button>
+        )}
         {problems && problems.length > 0 && <button onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)' }}>Export {problems.length}</button>}
-        {connected === true && !scanning && problems === null && <span style={{ fontSize: 10, color: T.tx3 }}>Dropbox connected ✓ — checks every active product's image link</span>}
+        {connected === true && !scanning && problems === null && <span style={{ fontSize: 10, color: T.tx3 }}>Dropbox connected ✓ — checks dead, empty and WRONG links on every active product</span>}
         {connected === true && !scanning && canConnect && <button onClick={() => setConnected(false)} style={{ background: 'none', border: 'none', color: T.tx3, fontSize: 10, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>Reconnect</button>}
       </div>
 
@@ -171,7 +178,7 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
 
       {problems && problems.length > 0 && (
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}` }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
             <thead><tr>{['SKU', 'Tab', 'Sheet Row', 'Status', 'Link'].map(c => <th key={c} style={{ ...S.thStyle, whiteSpace: 'nowrap' as const }}>{c}</th>)}</tr></thead>
             <tbody>
               {problems.map((p, i) => (
@@ -179,7 +186,7 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600, whiteSpace: 'nowrap' as const }}>{p.sku}</td>
                   <td style={S.tdStyle}>{p.tab}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono }}>{p.row}</td>
-                  <td style={{ ...S.tdStyle, color: p.fixed ? T.gr : /empty|deleted|no \//i.test(p.problem) ? T.re : T.yl, fontWeight: 600 }}>{p.fixed ? '✅ ' : ''}{p.problem}</td>
+                  <td style={{ ...S.tdStyle, color: statusColor(p), fontWeight: 600 }}>{p.fixed ? '✅ ' : p.willUse ? '🟢 ' : ''}{p.problem}</td>
                   <td style={S.tdStyle}>{p.url ? <a href={p.url} target="_blank" rel="noreferrer" style={{ color: T.bl }}>Open</a> : '—'}</td>
                 </tr>
               ))}
