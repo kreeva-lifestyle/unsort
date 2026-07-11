@@ -287,11 +287,6 @@ export default function Minis() {
         <div style={{ fontSize: 11, color: T.tx3 }}>Active size variants (SKU × size) not yet on the Odette sheet — one row per missing size</div>
       </div>
       <OdetteCoverageCheck addToast={addToast} />
-      <div style={{ margin: '20px 0 12px', paddingTop: 16, borderTop: `1px solid ${T.bd}` }}>
-        <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 2 }}>Image Link Check</div>
-        <div style={{ fontSize: 11, color: T.tx3 }}>Find broken, deleted or empty Dropbox image links on the master sheet (active products) — with the exact sheet row to fix</div>
-      </div>
-      <MasterLinkCheck addToast={addToast} />
     </div>
   );
 
@@ -305,6 +300,11 @@ export default function Minis() {
   if (view === 'trackly') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <Trackly addToast={addToast} onBack={() => setViewState('home')} />
+      <div style={{ margin: '20px 0 12px', paddingTop: 16, borderTop: `1px solid ${T.bd}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 2 }}>Image Link Check</div>
+        <div style={{ fontSize: 11, color: T.tx3 }}>Find broken, deleted or empty Dropbox image links on the master sheet (active products) — with the exact sheet row to fix</div>
+      </div>
+      <MasterLinkCheck addToast={addToast} />
     </div>
   );
 
