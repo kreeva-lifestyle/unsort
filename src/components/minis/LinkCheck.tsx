@@ -6,8 +6,9 @@
 import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../../lib/theme';
-import { SUPABASE_ANON_KEY } from '../../lib/supabase';
+import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
+import { useAuth } from '../../hooks/useAuth';
 
 const FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
 // The Dropbox app key (a public OAuth client id — the secret stays server-side)
@@ -18,16 +19,25 @@ const authUrl = (appKey: string) => `https://www.dropbox.com/oauth2/authorize?cl
 
 type Problem = { sku: string; tab: string; row: number; url?: string; problem: string; fixed?: boolean };
 
+// The edge function authorises per action against the CALLER's login (connect
+// = admin, fix = operator+, scan = any signed-in user), so send the user's
+// session token — the bare anon key is rejected for those actions.
 const call = async (body: object) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  const jwt = session?.access_token || SUPABASE_ANON_KEY;
   const r = await fetch(FN, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SUPABASE_ANON_KEY}`, apikey: SUPABASE_ANON_KEY },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}`, apikey: SUPABASE_ANON_KEY },
     body: JSON.stringify(body),
   });
   return { status: r.status, data: await r.json().catch(() => ({} as any)) };
 };
 
 export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, type?: string) => void }) {
+  const { profile } = useAuth();
+  const role = profile?.role as string | undefined;
+  const canConnect = role === 'admin';
+  const canFix = ['admin', 'manager', 'operator'].includes(role || '');
   const [connected, setConnected] = useState<boolean | null>(null);
   const [appKey, setAppKey] = useState('');
   const [code, setCode] = useState('');
@@ -117,9 +127,12 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
 
   return (
     <div style={{ animation: 'fi .15s ease' }}>
-      {connected === false && (
+      {connected === false && !canConnect && (
+        <div style={{ fontSize: 11, color: T.tx3, padding: '10px 0', marginBottom: 8 }}>Dropbox is not connected — ask an admin to connect it (one-time setup).</div>
+      )}
+      {connected === false && canConnect && (
         <div style={{ background: 'rgba(56,189,248,.05)', border: '1px solid rgba(56,189,248,.2)', borderRadius: 10, padding: 14, marginBottom: 12, maxWidth: 560 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: T.bl, marginBottom: 8 }}>Connect Dropbox</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: T.bl, marginBottom: 8 }}>Connect Dropbox (one-time, admin)</div>
           <ol style={{ margin: '0 0 10px 16px', padding: 0, fontSize: 11.5, color: T.tx2, lineHeight: 1.9 }}>
             <li>{appKey ? <a href={authUrl(appKey)} target="_blank" rel="noreferrer" style={{ color: T.bl, fontWeight: 600 }}>Click here to open Dropbox</a> : <span style={{ color: T.tx3 }}>Loading…</span>} and press <b>Allow</b>.</li>
             <li>Dropbox will show an <b>access code</b> — copy it.</li>
@@ -136,14 +149,14 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
         <button onClick={scan} disabled={scanning || fixing || connected !== true} style={{ ...S.btnPrimary, opacity: scanning || fixing || connected !== true ? 0.5 : 1, pointerEvents: scanning || fixing ? 'none' : 'auto' }}>
           {scanning ? `Checking… ${progress.done}/${progress.total || '…'} (${pct}%)` : 'Find Broken Links'}
         </button>
-        {pending > 0 && !scanning && (
+        {pending > 0 && !scanning && canFix && (
           <button onClick={autoFix} disabled={fixing} style={{ ...S.btnSuccessSolid, opacity: fixing ? 0.6 : 1, pointerEvents: fixing ? 'none' : 'auto' }}>
             {fixing ? `Fixing… ${progress.done}/${progress.total}` : `Auto-Fix ${pending} from Dropbox`}
           </button>
         )}
         {problems && problems.length > 0 && <button onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)' }}>Export {problems.length}</button>}
         {connected === true && !scanning && problems === null && <span style={{ fontSize: 10, color: T.tx3 }}>Dropbox connected ✓ — checks every active product's image link</span>}
-        {connected === true && !scanning && <button onClick={() => setConnected(false)} style={{ background: 'none', border: 'none', color: T.tx3, fontSize: 10, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>Reconnect</button>}
+        {connected === true && !scanning && canConnect && <button onClick={() => setConnected(false)} style={{ background: 'none', border: 'none', color: T.tx3, fontSize: 10, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>Reconnect</button>}
       </div>
 
       {(scanning || fixing) && progress.total > 0 && (
