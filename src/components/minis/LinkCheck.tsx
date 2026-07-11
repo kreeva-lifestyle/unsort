@@ -10,10 +10,11 @@ import { SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 
 const FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
-// The app key is a public OAuth client id (the secret stays server-side).
-const DROPBOX_APP_KEY = 'g09clfz7dgze0re';
-// sharing.write lets the auto-fix create view-only share links.
-const AUTH_URL = `https://www.dropbox.com/oauth2/authorize?client_id=${DROPBOX_APP_KEY}&response_type=code&token_access_type=offline&scope=${encodeURIComponent('account_info.read files.metadata.read sharing.read sharing.write')}`;
+// The Dropbox app key (a public OAuth client id — the secret stays server-side)
+// comes from dropbox_status at runtime, so swapping the Dropbox app in the
+// vault never requires a frontend deploy. sharing.write lets the auto-fix
+// create view-only share links.
+const authUrl = (appKey: string) => `https://www.dropbox.com/oauth2/authorize?client_id=${appKey}&response_type=code&token_access_type=offline&scope=${encodeURIComponent('account_info.read files.metadata.read sharing.read sharing.write')}`;
 
 type Problem = { sku: string; tab: string; row: number; url?: string; problem: string; fixed?: boolean };
 
@@ -28,6 +29,7 @@ const call = async (body: object) => {
 
 export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, type?: string) => void }) {
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [appKey, setAppKey] = useState('');
   const [code, setCode] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -35,7 +37,7 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [problems, setProblems] = useState<Problem[] | null>(null);
 
-  useEffect(() => { call({ action: 'dropbox_status' }).then(({ data }) => setConnected(!!data.connected)).catch(() => setConnected(false)); }, []);
+  useEffect(() => { call({ action: 'dropbox_status' }).then(({ data }) => { setConnected(!!data.connected); setAppKey(data.appKey || ''); }).catch(() => setConnected(false)); }, []);
 
   const connect = async () => {
     if (connecting || !code.trim()) return;
@@ -119,7 +121,7 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
         <div style={{ background: 'rgba(56,189,248,.05)', border: '1px solid rgba(56,189,248,.2)', borderRadius: 10, padding: 14, marginBottom: 12, maxWidth: 560 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: T.bl, marginBottom: 8 }}>Connect Dropbox</div>
           <ol style={{ margin: '0 0 10px 16px', padding: 0, fontSize: 11.5, color: T.tx2, lineHeight: 1.9 }}>
-            <li><a href={AUTH_URL} target="_blank" rel="noreferrer" style={{ color: T.bl, fontWeight: 600 }}>Click here to open Dropbox</a> and press <b>Allow</b>.</li>
+            <li>{appKey ? <a href={authUrl(appKey)} target="_blank" rel="noreferrer" style={{ color: T.bl, fontWeight: 600 }}>Click here to open Dropbox</a> : <span style={{ color: T.tx3 }}>Loading…</span>} and press <b>Allow</b>.</li>
             <li>Dropbox will show an <b>access code</b> — copy it.</li>
             <li>Paste the code below and press Connect.</li>
           </ol>
