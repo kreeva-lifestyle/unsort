@@ -9,6 +9,7 @@ import AddressPrinter from '../components/minis/AddressPrinter';
 import CbazaarImport from '../components/minis/CbazaarImport';
 import OdetteImport from '../components/minis/OdetteImport';
 import OdetteCoverageCheck from '../components/minis/OdetteCoverageCheck';
+import MasterLinkCheck from '../components/minis/LinkCheck';
 import VirtualStock from '../components/minis/VirtualStock';
 import Trackly from '../components/minis/Trackly';
 import ReturnLabels from '../components/minis/ReturnLabels';
@@ -286,6 +287,11 @@ export default function Minis() {
         <div style={{ fontSize: 11, color: T.tx3 }}>Active size variants (SKU × size) not yet on the Odette sheet — one row per missing size</div>
       </div>
       <OdetteCoverageCheck addToast={addToast} />
+      <div style={{ margin: '20px 0 12px', paddingTop: 16, borderTop: `1px solid ${T.bd}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 2 }}>Image Link Check</div>
+        <div style={{ fontSize: 11, color: T.tx3 }}>Find broken, deleted or empty Dropbox image links on the master sheet (active products) — with the exact sheet row to fix</div>
+      </div>
+      <MasterLinkCheck addToast={addToast} />
     </div>
   );
 
