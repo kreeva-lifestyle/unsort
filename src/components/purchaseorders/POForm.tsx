@@ -11,13 +11,13 @@ import { numericKeyDown } from '../../lib/numericInput';
 import { poAuditLog } from './poAudit';
 import VendorPicker from './VendorPicker';
 import { PO_TYPES, PO_TYPE_LABELS } from '../../types/database';
-import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
+import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderType } from '../../types/database';
 
-type FormItem = { item_name: string; quantity: string; unit: string; rate: string };
+type FormItem = { sku: string; item_name: string; quantity: string; unit: string; rate: string };
 export type EditingPO = PurchaseOrder & { items?: PurchaseOrderItem[] };
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const blankItem = (): FormItem => ({ item_name: '', quantity: '1', unit: '', rate: '' });
+const blankItem = (): FormItem => ({ sku: '', item_name: '', quantity: '1', unit: '', rate: '' });
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
 
 export default function POForm({ editing, duplicateFrom, onClose, onSaved, addToast }: {
@@ -29,13 +29,13 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
 }) {
   const src = editing || duplicateFrom || null;
   const [vendor, setVendor] = useState<{ id: string | null; name: string; phone: string }>({ id: src?.vendor_id ?? null, name: src?.vendor_name ?? '', phone: src?.vendor_phone ?? '' });
-  const [poType, setPoType] = useState(src?.po_type ?? 'material');
+  const [poType, setPoType] = useState<PurchaseOrderType | ''>(src?.po_type ?? '');
   const [poDate, setPoDate] = useState(editing?.po_date ?? localToday());
   const [expectedDate, setExpectedDate] = useState(src?.expected_date ?? '');
   const [paymentTerms, setPaymentTerms] = useState(src?.payment_terms ?? '');
   const [notes, setNotes] = useState(src?.notes ?? '');
   const [items, setItems] = useState<FormItem[]>(
-    src?.items?.length ? src.items.map(it => ({ item_name: it.item_name, quantity: String(it.quantity), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()]
+    src?.items?.length ? src.items.map(it => ({ sku: it.sku ?? '', item_name: it.item_name, quantity: String(it.quantity), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()]
   );
   const [showCharges, setShowCharges] = useState(!!(src?.discount_value || src?.tax_percent || src?.other_charges));
   const [discountType, setDiscountType] = useState(src?.discount_type ?? 'flat');
@@ -62,10 +62,13 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
     if (saving) return;
     setError('');
     if (!vendor.name.trim()) { setError('Select or enter a vendor'); return; }
-    const clean = items.filter(it => it.item_name.trim() || num(it.quantity) > 0 || it.rate);
+    if (!poType) { setError('Select a PO type — Fabric, Job Work, or Material'); return; }
+    const clean = items.filter(it => it.sku.trim() || it.item_name.trim() || num(it.quantity) > 0 || it.rate);
     if (clean.length === 0) { setError('Add at least one item'); return; }
+    const skuRequired = poType === 'fabric' || poType === 'material';
     for (let i = 0; i < clean.length; i++) {
       if (!clean[i].item_name.trim()) { setError(`Row ${i + 1}: item name is required`); return; }
+      if (skuRequired && !clean[i].sku.trim()) { setError(`Row ${i + 1} (${clean[i].item_name}): SKU is required for Fabric / Material items`); return; }
       if (num(clean[i].quantity) <= 0) { setError(`Row ${i + 1} (${clean[i].item_name}): quantity must be greater than 0`); return; }
       if (clean[i].rate && num(clean[i].rate) < 0) { setError(`Row ${i + 1} (${clean[i].item_name}): rate cannot be negative`); return; }
     }
@@ -80,7 +83,7 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
         tax_percent: showCharges ? num(taxPercent) : 0,
         other_charges: showCharges ? num(otherCharges) : 0,
       };
-      const p_items = clean.map(it => ({ item_name: it.item_name.trim(), quantity: num(it.quantity), unit: it.unit.trim() || null, rate: it.rate === '' ? null : num(it.rate) }));
+      const p_items = clean.map(it => ({ item_name: it.item_name.trim(), sku: it.sku.trim() || null, quantity: num(it.quantity), unit: it.unit.trim() || null, rate: it.rate === '' ? null : num(it.rate) }));
       if (editing) {
         const { error: e } = await supabase.rpc('update_po_with_items', { p_po_id: editing.id, p_po, p_items });
         if (e) throw new Error(e.message);
@@ -110,8 +113,9 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
               <VendorPicker value={vendor.name} phone={vendor.phone} onPick={setVendor} addToast={addToast} />
             </div>
             <div>
-              <label style={S.fLabel}>Type</label>
-              <select value={poType} onChange={e => setPoType(e.target.value as typeof poType)} style={S.fInput}>
+              <label style={S.fLabel}>Type *</label>
+              <select value={poType} onChange={e => setPoType(e.target.value as PurchaseOrderType | '')} style={{ ...S.fInput, color: poType ? T.tx : T.tx3 }}>
+                <option value="" disabled>Select type…</option>
                 {PO_TYPES.map(t => <option key={t} value={t}>{PO_TYPE_LABELS[t]}</option>)}
               </select>
             </div>
@@ -135,7 +139,8 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
               const amt = num(it.quantity) * num(it.rate);
               return (
                 <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <input value={it.item_name} onChange={e => setItem(i, { item_name: e.target.value })} placeholder="Item name *" style={{ ...S.fInput, flex: '2 1 160px', minWidth: 120 }} />
+                  <input value={it.sku} onChange={e => setItem(i, { sku: e.target.value })} placeholder={poType === 'fabric' || poType === 'material' ? 'SKU *' : 'SKU'} style={{ ...S.fInput, flex: '1 1 90px', minWidth: 72, fontFamily: T.mono }} />
+                  <input value={it.item_name} onChange={e => setItem(i, { item_name: e.target.value })} placeholder="Item name *" style={{ ...S.fInput, flex: '2 1 140px', minWidth: 110 }} />
                   <input value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Qty" style={{ ...S.fInput, flex: '1 1 60px', minWidth: 56, fontFamily: T.mono }} />
                   <input value={it.unit} onChange={e => setItem(i, { unit: e.target.value })} placeholder="Unit" style={{ ...S.fInput, flex: '1 1 60px', minWidth: 56 }} />
                   <input value={it.rate} onChange={e => setItem(i, { rate: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Rate" style={{ ...S.fInput, flex: '1 1 70px', minWidth: 60, fontFamily: T.mono }} />

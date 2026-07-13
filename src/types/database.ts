@@ -936,6 +936,7 @@ export interface PurchaseOrderItem {
   id: string;
   po_id: string;
   item_name: string;
+  sku: string | null;
   quantity: number;
   unit: string | null;
   rate: number | null;
@@ -959,6 +960,7 @@ export interface PurchaseOrderReceipt {
 // Payloads passed to the create/update RPCs (money left to the server).
 export type POItemInput = {
   item_name: string;
+  sku?: string | null;
   quantity: number;
   unit?: string | null;
   rate?: number | null;

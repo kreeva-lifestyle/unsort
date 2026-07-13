@@ -9,10 +9,12 @@ const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN', { minimumFrac
 const fmtDate = (d: string | null | undefined) => d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 export function buildPoPdf(po: PurchaseOrder, items: PurchaseOrderItem[]): string {
+  const hasSku = items.some(it => it.sku);
   const rows = items.map((it, i) => {
     const rate = it.rate == null ? '—' : inr(it.rate);
     const amt = it.amount == null ? '—' : inr(it.amount);
-    return `<tr><td>${i + 1}</td><td>${escHtml(it.item_name)}</td><td class="r">${Number(it.quantity)}</td><td>${escHtml(it.unit || '—')}</td><td class="r">${rate}</td><td class="r">${amt}</td></tr>`;
+    const skuCell = hasSku ? `<td>${escHtml(it.sku || '—')}</td>` : '';
+    return `<tr><td>${i + 1}</td>${skuCell}<td>${escHtml(it.item_name)}</td><td class="r">${Number(it.quantity)}</td><td>${escHtml(it.unit || '—')}</td><td class="r">${rate}</td><td class="r">${amt}</td></tr>`;
   }).join('');
 
   const money = (label: string, val: unknown, sign = '') =>
@@ -78,7 +80,7 @@ export function buildPoPdf(po: PurchaseOrder, items: PurchaseOrderItem[]): strin
     </div>
   </div>
   <table>
-    <thead><tr><th>#</th><th>Item</th><th class="r">Qty</th><th>Unit</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead>
+    <thead><tr><th>#</th>${hasSku ? '<th>SKU</th>' : ''}<th>Item</th><th class="r">Qty</th><th>Unit</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <div class="totals"><table>${totalRows}<tr class="grand"><td>Grand Total</td><td class="r">₹${inr(po.grand_total)}</td></tr></table></div>
