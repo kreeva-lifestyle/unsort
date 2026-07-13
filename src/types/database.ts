@@ -851,3 +851,22 @@ export type PrintJobInsert = Pick<PrintJob, 'printer_slot' | 'html' | 'page_size
   title?: string | null;
   created_by?: string | null;
 };
+
+// ─── link_check_approvals (6 cols) ──────────────────────────────────────
+
+// Owner-approved (sku, url) pairs the Link Check scan must not flag as
+// WRONG LINK. Keyed to the exact url: a changed link re-flags, and
+// DELETED/EMPTY problems are never suppressed.
+export interface LinkCheckApproval {
+  id: string;
+  sku: string;
+  url: string;
+  tab: string | null;
+  approved_by: string | null;
+  created_at: string;
+}
+
+export type LinkCheckApprovalInsert = Pick<LinkCheckApproval, 'sku' | 'url'> & {
+  tab?: string | null;
+  approved_by?: string | null;
+};

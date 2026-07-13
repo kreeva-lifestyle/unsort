@@ -10,14 +10,11 @@ import { T, S } from '../../lib/theme';
 import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { useAuth } from '../../hooks/useAuth';
+import ConnectDropboxCard from './ConnectDropboxCard';
 
 const FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
-// The Dropbox app key (a public OAuth client id — the secret stays server-side)
-// comes from dropbox_status at runtime, so swapping the Dropbox app in the
-// vault never requires a frontend deploy.
-const authUrl = (appKey: string) => `https://www.dropbox.com/oauth2/authorize?client_id=${appKey}&response_type=code&token_access_type=offline&scope=${encodeURIComponent('account_info.read files.metadata.read sharing.read sharing.write')}`;
 
-type Problem = { sku: string; tab: string; row: number; url?: string; problem: string; fixed?: boolean; willUse?: boolean; folder?: string };
+type Problem = { sku: string; tab: string; row: number; url?: string; problem: string; fixed?: boolean; willUse?: boolean; folder?: string; approved?: boolean };
 
 // Sensitive actions are authorised per caller role server-side, so send the
 // user's session token (the bare anon key is rejected for them).
@@ -39,24 +36,12 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
   const canFix = ['admin', 'manager', 'operator'].includes(role || '');
   const [connected, setConnected] = useState<boolean | null>(null);
   const [appKey, setAppKey] = useState('');
-  const [code, setCode] = useState('');
-  const [connecting, setConnecting] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [fixing, setFixing] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [problems, setProblems] = useState<Problem[] | null>(null);
 
   useEffect(() => { call({ action: 'dropbox_status' }).then(({ data }) => { setConnected(!!data.connected); setAppKey(data.appKey || ''); }).catch(() => setConnected(false)); }, []);
-
-  const connect = async () => {
-    if (connecting || !code.trim()) return;
-    setConnecting(true);
-    const { data } = await call({ action: 'dropbox_exchange', code: code.trim() });
-    setConnecting(false);
-    if (!data.ok) { addToast(friendlyError(data.details || data.error || 'Connect failed'), 'error'); return; }
-    setConnected(true); setCode('');
-    addToast('Dropbox connected', 'success');
-  };
 
   const scan = async () => {
     if (scanning || fixing) return;
@@ -116,6 +101,19 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
     setFixing(false);
   };
 
+  // "This link IS correct for this SKU" — remember the exact (sku, url) pair
+  // so future scans stop flagging it as WRONG LINK. If the sheet's link ever
+  // changes, or the target gets deleted/emptied, it flags again.
+  const markCorrect = async (p: Problem, undo: boolean) => {
+    if (!p.url) return;
+    const { error } = undo
+      ? await supabase.from('link_check_approvals').delete().match({ sku: p.sku, url: p.url })
+      : await supabase.from('link_check_approvals').insert({ sku: p.sku, url: p.url, tab: p.tab, approved_by: (await supabase.auth.getUser()).data.user?.id });
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    setProblems(prev => prev ? prev.map(q => q.tab === p.tab && q.row === p.row ? { ...q, approved: !undo, problem: undo ? q.problem.replace(/^✓.*$/, 'WRONG LINK — re-check on next scan') : `✓ Marked correct — won't be flagged again` } : q) : prev);
+    addToast(undo ? `${p.sku} will be checked again on the next scan` : `${p.sku} remembered as correct`, 'success');
+  };
+
   const exportXls = () => {
     if (!problems || problems.length === 0) { addToast('Nothing to export', 'error'); return; }
     const rows = problems.map(p => ({ SKU: p.sku, 'Source Tab': p.tab, 'Sheet Row': p.row, Status: p.problem, 'Matched Folder': p.folder || '', Link: p.url || '' }));
@@ -127,7 +125,7 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
   const pending = problems ? problems.filter(p => !p.fixed).length : 0;
   const replaceable = problems ? problems.filter(p => p.willUse && !p.fixed).length : 0;
-  const statusColor = (p: Problem) => p.fixed ? T.gr : p.willUse ? T.gr : /empty|deleted|wrong|no \//i.test(p.problem) ? T.re : T.yl;
+  const statusColor = (p: Problem) => p.fixed || p.approved ? T.gr : p.willUse ? T.gr : /empty|deleted|wrong|no \//i.test(p.problem) ? T.re : T.yl;
 
   return (
     <div style={{ animation: 'fi .15s ease' }}>
@@ -135,18 +133,7 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
         <div style={{ fontSize: 11, color: T.tx3, padding: '10px 0', marginBottom: 8 }}>Dropbox is not connected — ask an admin to connect it (one-time setup).</div>
       )}
       {connected === false && canConnect && (
-        <div style={{ background: 'rgba(56,189,248,.05)', border: '1px solid rgba(56,189,248,.2)', borderRadius: 10, padding: 14, marginBottom: 12, maxWidth: 560 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: T.bl, marginBottom: 8 }}>Connect Dropbox (one-time, admin)</div>
-          <ol style={{ margin: '0 0 10px 16px', padding: 0, fontSize: 11.5, color: T.tx2, lineHeight: 1.9 }}>
-            <li>{appKey ? <a href={authUrl(appKey)} target="_blank" rel="noreferrer" style={{ color: T.bl, fontWeight: 600 }}>Click here to open Dropbox</a> : <span style={{ color: T.tx3 }}>Loading…</span>} and press <b>Allow</b>.</li>
-            <li>Dropbox will show an <b>access code</b> — copy it.</li>
-            <li>Paste the code below and press Connect.</li>
-          </ol>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input value={code} onChange={e => setCode(e.target.value)} placeholder="Paste the Dropbox code here" style={{ ...S.fInput, flex: 1, fontFamily: T.mono }} onKeyDown={e => { if (e.key === 'Enter') connect(); }} />
-            <button onClick={connect} disabled={connecting || !code.trim()} style={{ ...S.btnPrimary, pointerEvents: connecting ? 'none' : 'auto', opacity: connecting || !code.trim() ? 0.5 : 1 }}>{connecting ? 'Connecting…' : 'Connect'}</button>
-          </div>
-        </div>
+        <ConnectDropboxCard appKey={appKey} call={call} addToast={addToast} onConnected={() => setConnected(true)} />
       )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -186,7 +173,15 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600, whiteSpace: 'nowrap' as const }}>{p.sku}</td>
                   <td style={S.tdStyle}>{p.tab}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono }}>{p.row}</td>
-                  <td style={{ ...S.tdStyle, color: statusColor(p), fontWeight: 600 }}>{p.fixed ? '✅ ' : p.willUse ? '🟢 ' : ''}{p.problem}</td>
+                  <td style={{ ...S.tdStyle, color: statusColor(p), fontWeight: 600 }}>
+                    {p.fixed ? '✅ ' : p.willUse ? '🟢 ' : ''}{p.problem}
+                    {canFix && p.url && !p.fixed && /^WRONG LINK/.test(p.problem) && !p.approved && (
+                      <button onClick={() => markCorrect(p, false)} title="This link IS correct for this SKU — stop flagging it" style={{ ...S.btnGhost, display: 'block', marginTop: 5, padding: '3px 9px', fontSize: 10, color: T.gr, border: '1px solid rgba(34,197,94,.3)', background: 'rgba(34,197,94,.06)' }}>Correct ✓ — don't show again</button>
+                    )}
+                    {p.approved && (
+                      <button onClick={() => markCorrect(p, true)} style={{ background: 'none', border: 'none', color: T.tx3, fontSize: 10, cursor: 'pointer', textDecoration: 'underline', padding: 0, display: 'block', marginTop: 4 }}>Undo</button>
+                    )}
+                  </td>
                   <td style={S.tdStyle}>{p.url ? <a href={p.url} target="_blank" rel="noreferrer" style={{ color: T.bl }}>Open</a> : '—'}</td>
                 </tr>
               ))}
