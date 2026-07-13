@@ -40,9 +40,17 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   useEffect(() => () => clearTimeout(searchTimer.current), []);
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [creatorFilter, setCreatorFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [users, setUsers] = useState<{ id: string; full_name: string }[]>([]);
+
+  // Active users for the "Created By" filter dropdown (pattern from CashBook).
+  useEffect(() => {
+    supabase.from('profiles').select('id, full_name').eq('is_active', true).order('full_name')
+      .then(({ data }) => setUsers((data as { id: string; full_name: string }[] | null) || []));
+  }, []);
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<EditingPO | null>(null);
@@ -59,11 +67,19 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     if (debouncedSearch) {
       const s = debouncedSearch.replace(/[%_,().]/g, '').trim();
       const num = parseInt(s);
-      if (!isNaN(num)) q = q.or(`po_number.eq.${num},vendor_name.ilike.%${s}%`);
-      else if (s) q = q.ilike('vendor_name', `%${s}%`);
+      if (!isNaN(num)) {
+        q = q.or(`po_number.eq.${num},vendor_name.ilike.%${s}%`);
+      } else if (s) {
+        // Match vendor name OR any PO whose line-item SKU matches (search_po_ids).
+        const { data: idRows } = await supabase.rpc('search_po_ids', { q: s });
+        const ids = (idRows as string[] | null) || [];
+        if (ids.length > 0) q = q.or(`vendor_name.ilike.%${s}%,id.in.(${ids.join(',')})`);
+        else q = q.ilike('vendor_name', `%${s}%`);
+      }
     }
     if (statusFilter) q = q.eq('status', statusFilter);
     if (typeFilter) q = q.eq('po_type', typeFilter);
+    if (creatorFilter) q = q.eq('created_by', creatorFilter);
     if (dateFrom) q = q.gte('po_date', dateFrom);
     if (dateTo) q = q.lte('po_date', dateTo);
     q = q.order('po_number', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
@@ -72,7 +88,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     setPos((data as PORow[] | null) || []);
     setTotalCount(count || 0);
     if (!silent) setLoading(false);
-  }, [debouncedSearch, statusFilter, typeFilter, dateFrom, dateTo, page, pageSize, addToast]);
+  }, [debouncedSearch, statusFilter, typeFilter, creatorFilter, dateFrom, dateTo, page, pageSize, addToast]);
 
   useEffect(() => { fetchPos(); }, [fetchPos]);
 
@@ -92,7 +108,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   // Load full items + receipts + audit for a PO, then open the detail panel.
   const openDetail = useCallback(async (poRow: PurchaseOrder) => {
     const [{ data: items }, { data: receipts }, { data: audit }] = await Promise.all([
-      supabase.from('purchase_order_items').select('id, po_id, item_name, quantity, unit, rate, amount, received_qty, sort_order, created_at').eq('po_id', poRow.id).order('sort_order'),
+      supabase.from('purchase_order_items').select('id, po_id, item_name, sku, quantity, unit, rate, amount, received_qty, sort_order, created_at').eq('po_id', poRow.id).order('sort_order'),
       supabase.from('purchase_order_receipts').select('id, po_id, po_item_id, received_qty, receipt_date, remarks, received_by, created_at').eq('po_id', poRow.id).order('created_at', { ascending: false }),
       supabase.from('audit_log').select('id, action, module, record_id, details, user_id, user_email, created_at, changes').eq('module', 'purchase_order').eq('record_id', poRow.id).order('created_at', { ascending: false }).limit(30),
     ]);
@@ -102,7 +118,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const openPrint = useCallback(async (poRow: PurchaseOrder, preItems?: PurchaseOrderItem[]) => {
     let items = preItems;
     if (!items) {
-      const { data } = await supabase.from('purchase_order_items').select('id, po_id, item_name, quantity, unit, rate, amount, received_qty, sort_order, created_at').eq('po_id', poRow.id).order('sort_order');
+      const { data } = await supabase.from('purchase_order_items').select('id, po_id, item_name, sku, quantity, unit, rate, amount, received_qty, sort_order, created_at').eq('po_id', poRow.id).order('sort_order');
       items = (data as PurchaseOrderItem[] | null) || [];
     }
     setPrintHtml(buildPoPdf(poRow, items));
@@ -130,9 +146,10 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
         showFilters={showFilters} onToggleFilters={() => setShowFilters(f => !f)}
         statusFilter={statusFilter} onStatusFilterChange={setStatusFilter}
         typeFilter={typeFilter} onTypeFilterChange={setTypeFilter}
+        creatorFilter={creatorFilter} onCreatorFilterChange={setCreatorFilter} users={users}
         dateFrom={dateFrom} onDateFromChange={setDateFrom} dateTo={dateTo} onDateToChange={setDateTo}
         pageSize={pageSize} onPageSizeChange={setPageSize}
-        onClearFilters={() => { setStatusFilter(''); setTypeFilter(''); setDateFrom(''); setDateTo(''); setPage(0); }}
+        onClearFilters={() => { setStatusFilter(''); setTypeFilter(''); setCreatorFilter(''); setDateFrom(''); setDateTo(''); setPage(0); }}
         onResetPage={() => setPage(0)}
         onOpenEmpty={() => { setEditing(null); setDuplicating(null); setShowForm(true); }} canCreate={canCreate}
         onOpenDetail={openDetail} onPrint={(po) => openPrint(po)}

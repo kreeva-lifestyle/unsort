@@ -22,6 +22,9 @@ interface Props {
   onStatusFilterChange: (v: string) => void;
   typeFilter: string;
   onTypeFilterChange: (v: string) => void;
+  creatorFilter: string;
+  onCreatorFilterChange: (v: string) => void;
+  users: { id: string; full_name: string }[];
   dateFrom: string;
   onDateFromChange: (v: string) => void;
   dateTo: string;
@@ -54,17 +57,17 @@ const progress = (po: PORow) => {
 };
 
 export default function POList(p: Props) {
-  const filterActive = p.statusFilter || p.typeFilter || p.dateFrom || p.dateTo;
+  const filterActive = p.statusFilter || p.typeFilter || p.creatorFilter || p.dateFrom || p.dateTo;
   return (
     <>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><path d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
-          <input type="text" value={p.search} onChange={e => { p.onSearchChange(e.target.value); p.onResetPage(); }} placeholder="Search vendor or PO #..." style={{ ...S.fSearch, background: 'transparent', border: 'none', width: '100%' }} />
+          <input type="text" value={p.search} onChange={e => { p.onSearchChange(e.target.value); p.onResetPage(); }} placeholder="Search vendor, PO #, or SKU…" style={{ ...S.fSearch, background: 'transparent', border: 'none', width: '100%' }} />
         </div>
         <button onClick={p.onToggleFilters} style={{ ...S.btnGhost, color: p.showFilters || filterActive ? T.ac2 : T.tx3, borderColor: p.showFilters || filterActive ? T.ac3 : T.bd2, background: p.showFilters ? T.ac3 : 'rgba(255,255,255,0.03)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
-          Filters{filterActive ? ` (${[p.statusFilter, p.typeFilter, p.dateFrom, p.dateTo].filter(Boolean).length})` : ''}
+          Filters{filterActive ? ` (${[p.statusFilter, p.typeFilter, p.creatorFilter, p.dateFrom, p.dateTo].filter(Boolean).length})` : ''}
         </button>
       </div>
 
@@ -81,6 +84,12 @@ export default function POList(p: Props) {
               <label style={S.fLabel}>Type</label>
               <select value={p.typeFilter} onChange={e => { p.onTypeFilterChange(e.target.value); p.onResetPage(); }} style={S.fInput}>
                 <option value="">All</option>{(Object.keys(PO_TYPE_LABELS) as (keyof typeof PO_TYPE_LABELS)[]).map(t => <option key={t} value={t}>{PO_TYPE_LABELS[t]}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={S.fLabel}>Created By</label>
+              <select value={p.creatorFilter} onChange={e => { p.onCreatorFilterChange(e.target.value); p.onResetPage(); }} style={S.fInput}>
+                <option value="">Anyone</option>{p.users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
               </select>
             </div>
             <div><label style={S.fLabel}>From</label><input type="date" value={p.dateFrom} onChange={e => { p.onDateFromChange(e.target.value); p.onResetPage(); }} style={{ ...S.fDate, width: '100%' }} /></div>
