@@ -48,13 +48,19 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
     setScanning(true); setProblems(null); setProgress({ done: 0, total: 0 });
     const acc: Problem[] = [];
     try {
+      // Belt-and-braces: the server also suppresses approved (sku, url) pairs —
+      // filter locally too so a server hiccup can never resurface them.
+      const { data: apprRows, error: apprErr } = await supabase.from('link_check_approvals').select('sku, url');
+      if (apprErr) addToast(friendlyError(apprErr), 'error');
+      const apprSet = new Set((apprRows || []).map(a => `${a.sku}|${a.url}`));
+      const notApproved = (b: Problem) => !(b.url && /^WRONG LINK/.test(b.problem) && apprSet.has(`${b.sku}|${b.url}`));
       let offset = 0;
       for (;;) {
         const { status, data } = await call({ action: 'linkcheck', offset, limit: 100 });
         if (data?.error === 'dropbox_not_connected') { setConnected(false); addToast('Dropbox is not connected yet', 'error'); setScanning(false); return; }
         if (!data.ok) { addToast(friendlyError(data.details || data.error || `Link check failed (${status})`), 'error'); break; }
         if (offset === 0) (data.noLink || []).forEach((n: Problem) => acc.push({ ...n, problem: 'No / invalid link in sheet' }));
-        acc.push(...(data.broken || []));
+        acc.push(...(data.broken || []).filter(notApproved));
         (data.warnings || []).forEach((w: string) => addToast(w, 'info'));
         setProblems([...acc].sort((a, b) => a.tab.localeCompare(b.tab) || a.row - b.row));
         setProgress({ done: data.nextOffset ?? data.totalLinks, total: data.totalLinks });
