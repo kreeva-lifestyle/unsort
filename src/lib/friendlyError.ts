@@ -18,6 +18,15 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   if (l.includes('cash handover period') || l.includes('confirmed and is a permanent') || l.includes('permanent financial record') || l.includes('period start of a confirmed or pending')) return msg; // Pass through specific lock-period errors
   if (l.includes('chk_challan_status')) return 'Invalid challan status — Draft challans are no longer supported. Refresh the app to get the latest version.';
   if (l.includes('chk_return_requires_source')) return 'Returns must be linked to a source invoice.';
+
+  // Purchase Orders
+  if ((code === '23505' || l.includes('duplicate key')) && l.includes('po_number')) return 'That PO number is already taken — please refresh and try again.';
+  if ((code === '23505' || l.includes('duplicate key')) && l.includes('po_vendors')) return 'A vendor with this name and phone already exists.';
+  if (l.includes('chk_po_status')) return 'Invalid purchase order status. Refresh the app to get the latest version.';
+  if (l.includes('chk_po_type')) return 'Invalid purchase order type — choose Fabric, Job Work, or Material.';
+  if (l.includes('approved purchase orders cannot be edited')) return 'This purchase order is approved and can no longer be edited — cancel it and create a new one.';
+  if (l.includes('exceeds ordered') || (l.includes('received') && l.includes('ordered'))) return 'You can\'t receive more than the ordered quantity.';
+  if (l.includes('at least one item') || l.includes('item_name')) return 'Add at least one item with a name and quantity.';
   if (code === '23514' || l.includes('check constraint')) return 'One of the values is outside the allowed range.';
   if (code === '23502' || l.includes('not null')) return 'A required field is missing.';
 

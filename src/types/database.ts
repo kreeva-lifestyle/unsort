@@ -870,3 +870,123 @@ export type LinkCheckApprovalInsert = Pick<LinkCheckApproval, 'sku' | 'url'> & {
   tab?: string | null;
   approved_by?: string | null;
 };
+
+// ─── Purchase Orders ────────────────────────────────────────────────────
+// Vendor master (only name + phone are mandatory).
+export interface POVendor {
+  id: string;
+  name: string;
+  phone: string;
+  gstin: string | null;
+  address: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export type POVendorInsert = {
+  id?: string;
+  name: string;
+  phone: string;
+  gstin?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  is_active?: boolean;
+};
+
+export type PurchaseOrderStatus =
+  | 'draft' | 'approved' | 'sent' | 'partially_received' | 'completed' | 'cancelled';
+export type PurchaseOrderType = 'fabric' | 'job_work' | 'material';
+
+// purchase_orders header. Money fields are recomputed server-side in the RPCs.
+export interface PurchaseOrder {
+  id: string;
+  po_number: number;
+  vendor_id: string | null;
+  vendor_name: string;
+  vendor_phone: string | null;
+  po_type: PurchaseOrderType;
+  status: PurchaseOrderStatus;
+  po_date: string | null;
+  expected_date: string | null;
+  payment_terms: string | null;
+  notes: string | null;
+  subtotal: number | null;
+  discount_type: 'flat' | 'percentage' | null;
+  discount_value: number | null;
+  discount_amount: number | null;
+  tax_percent: number | null;
+  tax_amount: number | null;
+  other_charges: number | null;
+  round_off: number | null;
+  grand_total: number | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  cancelled_by: string | null;
+  cancelled_at: string | null;
+  created_by: string | null;
+  modified_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface PurchaseOrderItem {
+  id: string;
+  po_id: string;
+  item_name: string;
+  quantity: number;
+  unit: string | null;
+  rate: number | null;
+  amount: number | null;
+  received_qty: number;
+  sort_order: number | null;
+  created_at: string | null;
+}
+
+export interface PurchaseOrderReceipt {
+  id: string;
+  po_id: string;
+  po_item_id: string;
+  received_qty: number;
+  receipt_date: string | null;
+  remarks: string | null;
+  received_by: string | null;
+  created_at: string | null;
+}
+
+// Payloads passed to the create/update RPCs (money left to the server).
+export type POItemInput = {
+  item_name: string;
+  quantity: number;
+  unit?: string | null;
+  rate?: number | null;
+  sort_order?: number;
+};
+
+export type POHeaderInput = {
+  vendor_id?: string | null;
+  vendor_name: string;
+  vendor_phone?: string | null;
+  po_type?: PurchaseOrderType;
+  po_date?: string | null;
+  expected_date?: string | null;
+  payment_terms?: string | null;
+  notes?: string | null;
+  discount_type?: 'flat' | 'percentage' | null;
+  discount_value?: number | null;
+  tax_percent?: number | null;
+  other_charges?: number | null;
+  round_off?: number | null;
+};
+
+export const PO_STATUSES: PurchaseOrderStatus[] =
+  ['draft', 'approved', 'sent', 'partially_received', 'completed', 'cancelled'];
+export const PO_TYPES: PurchaseOrderType[] = ['fabric', 'job_work', 'material'];
+export const PO_TYPE_LABELS: Record<PurchaseOrderType, string> =
+  { fabric: 'Fabric', job_work: 'Job Work', material: 'Material' };
+export const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
+  draft: 'Draft', approved: 'Approved', sent: 'Sent',
+  partially_received: 'Partially Received', completed: 'Completed', cancelled: 'Cancelled',
+};

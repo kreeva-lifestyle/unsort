@@ -57,6 +57,7 @@ const retryImport = (fn: () => Promise<any>) => lazy(() =>
 const BrandTagPrinter = retryImport(() => import('./pages/BrandTags'));
 const PackTime = retryImport(() => import('./pages/PackTime'));
 const CashChallan = retryImport(() => import('./pages/CashChallan'));
+const PurchaseOrders = retryImport(() => import('./pages/PurchaseOrders'));
 const Attendance = retryImport(() => import('./pages/Attendance'));
 const SettingsPage = retryImport(() => import('./pages/Settings'));
 const Inventory = retryImport(() => import('./pages/Inventory'));
@@ -139,7 +140,7 @@ const MainApp = () => {
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', programs: 'Programs', minis: 'Minis', printstation: 'Print Station', settings: 'Settings' };
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', purchaseorders: 'Purchase Orders', programs: 'Programs', minis: 'Minis', printstation: 'Print Station', settings: 'Settings' };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
@@ -180,6 +181,7 @@ const MainApp = () => {
         {mounted.has('brandtag') && checkTab('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
         {mounted.has('packtime') && checkTab('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime active={tab === 'packtime'} /></div>}
         {mounted.has('challan') && checkTab('challan') && <div style={{ display: tab === 'challan' ? 'block' : 'none' }}><CashChallan active={tab === 'challan'} /></div>}
+        {mounted.has('purchaseorders') && checkTab('purchaseorders') && <div style={{ display: tab === 'purchaseorders' ? 'block' : 'none' }}><PurchaseOrders active={tab === 'purchaseorders'} /></div>}
         {mounted.has('attendance') && checkTab('attendance') && <div style={{ display: tab === 'attendance' ? 'block' : 'none' }}><Attendance /></div>}
         {mounted.has('programs') && checkTab('programs') && <div style={{ display: tab === 'programs' ? 'block' : 'none' }}><ProgramsModule /></div>}
         {mounted.has('minis') && checkTab('minis') && <div style={{ display: tab === 'minis' ? 'block' : 'none' }}><Minis /></div>}

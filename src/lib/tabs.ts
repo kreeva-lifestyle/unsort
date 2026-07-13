@@ -1,15 +1,15 @@
-export const TAB_IDS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'attendance', 'programs', 'minis', 'printstation', 'settings'] as const;
+export const TAB_IDS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'purchaseorders', 'attendance', 'programs', 'minis', 'printstation', 'settings'] as const;
 export type TabId = typeof TAB_IDS[number];
 
 const TAB_TO_MODULE: Record<string, string> = {
   dashboard: 'dashboard', inventory: 'inventory', brandtag: 'brandtag',
-  packtime: 'packtime', challan: 'challan', attendance: 'attendance', programs: 'programs', minis: 'minis', printstation: 'printstation',
+  packtime: 'packtime', challan: 'challan', purchaseorders: 'purchaseorders', attendance: 'attendance', programs: 'programs', minis: 'minis', printstation: 'printstation',
 };
 
 export const MODULE_LABELS: Record<string, string> = {
   dashboard: 'Dashboard', inventory: 'Inventory', extras: 'Spare Parts',
   packtime: 'PackStation', brandtag: 'Brand Tags', challan: 'Cash Challan',
-  cashbook: 'Cash Book', attendance: 'Attendance', programs: 'Programs', minis: 'Minis', printstation: 'Print Station',
+  cashbook: 'Cash Book', purchaseorders: 'Purchase Orders', attendance: 'Attendance', programs: 'Programs', minis: 'Minis', printstation: 'Print Station',
 };
 
 export const ALL_MODULE_KEYS = Object.keys(MODULE_LABELS);

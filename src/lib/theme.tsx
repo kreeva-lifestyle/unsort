@@ -323,6 +323,17 @@ export const CHALLAN_STATUS_COLORS: Record<string, { bg: string; color: string }
   voided: { bg: 'oklch(1 0 0 / 0.10)', color: T.tx3 },
 };
 
+// Purchase Order lifecycle colours — draft→grey, approved→indigo, sent→blue,
+// partially_received→amber, completed→green, cancelled→red.
+export const PO_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  draft: { bg: 'oklch(1 0 0 / 0.06)', color: T.tx3 },
+  approved: { bg: T.ac3, color: T.ac2 },
+  sent: { bg: oklchTint(0.77, 0.14, 230, 0.10), color: T.bl },
+  partially_received: { bg: oklchTint(0.78, 0.18, 75, 0.10), color: T.yl },
+  completed: { bg: oklchTint(0.72, 0.19, 145, 0.10), color: T.gr },
+  cancelled: { bg: oklchTint(0.63, 0.22, 25, 0.10), color: T.re },
+};
+
 // ─── Pill (status / aging / attention chip) ─────────────────────────────
 // Reusable chip used in dashboard alerts, status badges, ledger aging.
 // Existing inline status badges keep working — Pill is opt-in for new code.
@@ -365,6 +376,7 @@ const ICON_PATHS: Record<string, string> = {
   sparkles: 'M12 3l1.9 5.7L20 11l-6.1 2.3L12 19l-1.9-5.7L4 11l6.1-2.3L12 3zM19 3v4M21 5h-4M5 17v4M7 19H3',
   print:    'M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z',
   clock:    'M12 22a10 10 0 100-20 10 10 0 000 20zM12 6v6l4 2',
+  receipt:  'M5 2l1.5 1.5L8 2l1.5 1.5L11 2l1.5 1.5L14 2l1.5 1.5L17 2l1.5 1.5L20 2v20l-1.5-1.5L17 22l-1.5-1.5L14 22l-1.5-1.5L11 22l-1.5-1.5L8 22l-1.5-1.5L5 22V2zM8 8h8M8 12h8M8 16h5',
 };
 
 export const Icon = ({ name, size = 16 }: { name: string; size?: number }) => {
