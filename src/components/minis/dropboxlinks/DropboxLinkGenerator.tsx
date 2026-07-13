@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
-import { call, GenResult, GenLink } from './api';
+import { call, thumbUrl, GenResult, GenLink } from './api';
 import RootSettings from './RootSettings';
 
 type Mode = 'combine' | 'separate';
@@ -154,6 +154,11 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
           ))}
           {(result.links || []).map((l, i) => (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 0', borderTop: i > 0 ? `1px solid ${T.bd}` : 'none' }}>
+              {l.url && /\.(jpe?g|png|webp|heic|heif|gif|bmp|tiff?)$/i.test(l.name) && (
+                <img src={thumbUrl(l.url)} alt="" loading="lazy"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', flexShrink: 0 }} />
+              )}
               <span style={{ flex: 1, fontSize: 11, color: T.tx2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
               {l.url ? <>
                 <button onClick={() => copy(l.url)} style={{ ...S.btnGhost, ...{ padding: '4px 10px', fontSize: 10 } }}>Copy</button>

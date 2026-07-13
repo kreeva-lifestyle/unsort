@@ -51,10 +51,12 @@ export default function ChallanLedger({
   if (detailName) {
     const cust = customers.find(c => (detailId ? c.id === detailId : c.name === detailName));
     // When a date range is applied, scope the KPI figures to the in-range
-    // challans (credit model: a return reduces net billed, never counts as paid).
+    // challans. Credit model: a return reduces net billed; amount_paid on a
+    // return = credit already refunded to the customer (cash OUT, so it counts
+    // NEGATIVE in paid and the balance owed goes back up).
     const filtered = !!(dateFrom || dateTo);
     const total = filtered ? detailChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total), 0) : (cust?.total ?? 0);
-    const paid = filtered ? detailChallans.reduce((s, c) => s + (c.is_return ? 0 : Number(c.amount_paid || 0)), 0) : (cust?.paid ?? 0);
+    const paid = filtered ? detailChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.amount_paid || 0), 0) : (cust?.paid ?? 0);
     const outstanding = filtered ? Math.round((total - paid) * 100) / 100 : (cust?.outstanding ?? 0);
     return (
       <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
@@ -113,6 +115,9 @@ export default function ChallanLedger({
                   <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: isRet ? T.re : T.tx }}>{isRet ? '−' : ''}₹{Number(c.total).toLocaleString('en-IN')}</div>
                   {!isRet && Number(c.amount_paid || 0) > 0 && <div style={{ fontSize: 9, color: T.gr, fontFamily: T.mono }}>₹{Number(c.amount_paid).toLocaleString('en-IN')} paid</div>}
                   {!isRet && Number(c.total) - Number(c.amount_paid || 0) > 0 && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono }}>₹{(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} due</div>}
+                  {isRet && (Number(c.total) - Number(c.amount_paid || 0) > 0.009
+                    ? <div style={{ fontSize: 9, color: T.yl, fontFamily: T.mono }}>credit ₹{(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} unused</div>
+                    : <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>credit settled ✓</div>)}
                 </div>
               </div>
             );

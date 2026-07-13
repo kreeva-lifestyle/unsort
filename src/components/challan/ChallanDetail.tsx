@@ -20,6 +20,7 @@ interface Props {
   onRemind: () => void;
   onReturn: () => void;
   onVoid: () => void;
+  onSettled?: () => void;
   onNext?: () => void;
   onPrev?: () => void;
   hasNext?: boolean;
@@ -32,7 +33,7 @@ const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91'
 
 type TimelineEntry = { type: 'audit' | 'payment'; time: string; action?: string; details?: string; user_name?: string; changes?: Record<string, { from: unknown; to: unknown }> | null; amount?: number; payment_mode?: string; is_reversal?: boolean; notes?: string; batch_id?: string | null };
 
-export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid, onNext, onPrev, hasNext, hasPrev, qrUrl, upiId }: Props) {
+export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid, onSettled, onNext, onPrev, hasNext, hasPrev, qrUrl, upiId }: Props) {
   const { addToast } = useNotifications();
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
@@ -47,6 +48,24 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
 
   const [showQrShare, setShowQrShare] = useState(false);
   const [qrPhone, setQrPhone] = useState('');
+  const [settleArm, setSettleArm] = useState(false);
+  const [settling, setSettling] = useState(false);
+
+  // Record that this return's credit was refunded to the customer in cash —
+  // the RPC raises amount_paid to total + writes the payment row atomically,
+  // so the return stops offsetting the customer's outstanding.
+  const settleRefund = async () => {
+    if (settling) return;
+    setSettling(true);
+    const { data, error } = await supabase.rpc('settle_return_refund', { p_challan_id: c.id, p_mode: 'Cash' });
+    setSettling(false);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    const refunded = Number((data as { refunded?: number } | null)?.refunded ?? 0);
+    addToast(`₹${refunded.toLocaleString('en-IN')} cash refund recorded — this return no longer reduces the customer's outstanding`, 'success');
+    setSettleArm(false);
+    onSettled?.();
+    onClose();
+  };
 
   const sendQrWhatsApp = () => {
     const phone = qrPhone.trim();
@@ -160,6 +179,9 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
   const due = Number(c.total) - Number(c.amount_paid || 0);
   const canRemind = !isRet && (c.status === 'unpaid' || c.status === 'partial');
   const canReturn = !isRet && !isVoided;
+  // A return's credit still open = total − amount_paid (amount_paid on a
+  // return records the credit already refunded to the customer in cash).
+  const creditLeft = isRet && !isVoided ? Math.max(0, Number(c.total) - Number(c.amount_paid || 0)) : 0;
 
   const btnBase: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx2, transition: 'all .15s' };
 
@@ -269,13 +291,37 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
           {!isVoided && (
             <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
               <div style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '10px 14px' }}>
-                <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}>Total Paid</div>
+                <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}>{isRet ? 'Refunded' : 'Total Paid'}</div>
                 <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: Number(c.amount_paid) > 0 ? T.gr : T.tx3 }}>₹{Number(c.amount_paid || 0).toLocaleString('en-IN')}</div>
               </div>
               {due > 0 && !isRet && (
                 <div style={{ flex: 1, background: 'rgba(239,68,68,.04)', border: '1px solid rgba(239,68,68,.12)', borderRadius: 8, padding: '10px 14px' }}>
                   <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}>Outstanding</div>
                   <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: T.re }}>₹{due.toLocaleString('en-IN')}</div>
+                </div>
+              )}
+              {isRet && (
+                <div style={{ flex: 1, background: creditLeft > 0 ? 'rgba(251,191,36,.05)' : 'rgba(34,197,94,.05)', border: `1px solid ${creditLeft > 0 ? 'rgba(251,191,36,.18)' : 'rgba(34,197,94,.12)'}`, borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}>Credit</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: creditLeft > 0 ? T.yl : T.gr }}>{creditLeft > 0 ? `₹${creditLeft.toLocaleString('en-IN')} unused` : 'Settled ✓'}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Return credit settlement (in-app confirm, financial action) ── */}
+          {creditLeft > 0 && (
+            <div style={{ background: 'rgba(251,191,36,.04)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5, marginBottom: 8 }}>
+                This return currently reduces the customer's outstanding by ₹{creditLeft.toLocaleString('en-IN')}. If you handed that amount back in cash instead, record it here so the credit stops counting.
+              </div>
+              {!settleArm ? (
+                <button onClick={() => setSettleArm(true)} style={{ ...S.btnGhost, color: T.yl, border: '1px solid rgba(251,191,36,.3)', background: 'rgba(251,191,36,.08)' }}>Refunded in Cash — settle credit</button>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: T.tx }}>Record ₹{creditLeft.toLocaleString('en-IN')} cash refund?</span>
+                  <button onClick={settleRefund} disabled={settling} style={{ ...S.btnPrimary, pointerEvents: settling ? 'none' : 'auto', opacity: settling ? 0.5 : 1 }}>{settling ? 'Recording…' : 'Yes, refunded'}</button>
+                  <button onClick={() => setSettleArm(false)} style={S.btnGhost}>Cancel</button>
                 </div>
               )}
             </div>
