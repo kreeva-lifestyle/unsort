@@ -6,7 +6,6 @@ import { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
-import { useAuth } from '../../../hooks/useAuth';
 import { call, GenResult, GenLink } from './api';
 import RootSettings from './RootSettings';
 
@@ -14,8 +13,6 @@ type Mode = 'combine' | 'separate';
 interface BulkRow { sku: string; status: 'pending' | 'ok' | 'error'; message?: string; links: GenLink[] }
 
 export default function DropboxLinkGenerator({ addToast }: { addToast: (m: string, t?: string) => void }) {
-  const { profile } = useAuth();
-  const isAdmin = profile?.role === 'admin';
   const [mode, setMode] = useState<Mode>('combine');
   const [sku, setSku] = useState('');
   const [busy, setBusy] = useState(false);
@@ -34,18 +31,24 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
 
   const explain = (data: any, status: number): string => {
     if (data?.error === 'dropbox_not_connected') return 'Dropbox is not connected — an admin can connect it in Trackly → Image Link Check.';
-    if (data?.error === 'no_roots') return isAdmin ? 'No search folders configured — open Settings below and add one.' : 'No search folders configured — ask an admin to add them in this tool’s Settings.';
-    return friendlyError(data?.details || data?.error || `Failed (${status})`);
+    if (data?.error === 'no_roots') return 'No search folders configured — open Settings and add the Dropbox folder link(s) to search inside.';
+    // Server messages are already human-written ("No folder named…", "Found in
+    // 2 places…") — show them VERBATIM; friendlyError only for the unknown.
+    const server = String(data?.details || data?.error || '').trim();
+    if (server) return server;
+    return friendlyError(`Failed (${status})`);
   };
 
-  const genOne = async () => {
-    const s = sku.trim().toUpperCase();
+  const genOne = async (folderPath?: string) => {
+    const s = (folderPath ? result?.sku || sku : sku).trim().toUpperCase();
     if (busy || !s) return;
-    setBusy(true); setResult(null);
+    setBusy(true); if (!folderPath) setResult(null);
     try {
-      const { status, data } = await call({ action: 'linkgen', sku: s, mode });
-      if (!data.ok) { setResult({ ok: false, sku: s, error: explain(data, status), folder: data.folder }); addToast(explain(data, status), 'error'); }
-      else {
+      const { status, data } = await call({ action: 'linkgen', sku: s, mode, folder: folderPath || undefined });
+      if (!data.ok) {
+        setResult({ ok: false, sku: s, error: explain(data, status), folder: data.folder, candidates: data.candidates });
+        addToast(data.candidates?.length ? `${s} found in ${data.candidates.length} places — tap the folder you want` : explain(data, status), data.candidates?.length ? 'info' : 'error');
+      } else {
         setResult(data);
         if (data.note) addToast(data.note, 'info');
         addToast(`${(data.links || []).filter((l: GenLink) => l.url).length} link${(data.links || []).length === 1 ? '' : 's'} ready for ${s}`, 'success');
@@ -117,17 +120,17 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
         {modeBtn('combine', 'Combine', 'One link for the whole SKU folder')}
         {modeBtn('separate', 'Separate', 'A link for every image inside the SKU folder')}
         <span style={{ fontSize: 10, color: T.tx3 }}>{mode === 'combine' ? 'One link per SKU (whole folder)' : 'One link per image in the folder'}</span>
-        {isAdmin && <button onClick={() => setShowSettings(s => !s)} style={{ ...S.btnGhost, marginLeft: 'auto' }}>{showSettings ? 'Close Settings' : 'Settings'}</button>}
+        <button onClick={() => setShowSettings(s => !s)} style={{ ...S.btnGhost, marginLeft: 'auto' }}>{showSettings ? 'Close Settings' : 'Settings'}</button>
       </div>
       {rootCount === 0 && (
         <div style={{ background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 11, color: T.tx2 }}>
-          No search folders configured yet — {isAdmin ? 'open Settings and add the Dropbox folder link(s) to search inside.' : 'ask an admin to add them in this tool’s Settings.'}
+          No search folders configured yet — open Settings and add the Dropbox folder link(s) to search inside.
         </div>
       )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <input value={sku} onChange={e => setSku(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') genOne(); }} placeholder="Enter SKU e.g. 15003" style={{ ...S.fInput, width: 200, fontFamily: T.mono }} />
-        <button onClick={genOne} disabled={busy || !sku.trim()} style={{ ...S.btnPrimary, pointerEvents: busy ? 'none' : 'auto', opacity: busy || !sku.trim() ? 0.5 : 1 }}>{busy ? 'Generating…' : 'Generate Link'}</button>
+        <button onClick={() => genOne()} disabled={busy || !sku.trim()} style={{ ...S.btnPrimary, pointerEvents: busy ? 'none' : 'auto', opacity: busy || !sku.trim() ? 0.5 : 1 }}>{busy ? 'Generating…' : 'Generate Link'}</button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) importBulk(f); e.target.value = ''; }} />
         <button onClick={() => fileRef.current?.click()} disabled={bulkBusy} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)', pointerEvents: bulkBusy ? 'none' : 'auto', opacity: bulkBusy ? 0.5 : 1 }}>{bulkBusy ? `Bulk… ${progress.done}/${progress.total}` : 'Bulk from Excel'}</button>
         {bulk && bulk.length > 0 && !bulkBusy && <button onClick={exportBulk} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export {bulk.length}</button>}
@@ -142,7 +145,13 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${result.ok ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}`, borderRadius: 10, padding: 14, marginBottom: 12, maxWidth: 720 }}>
           <div style={{ fontSize: 12, fontWeight: 700, fontFamily: T.mono, color: T.tx, marginBottom: 2 }}>{result.sku}</div>
           {result.folder && <div style={{ fontSize: 10, color: T.tx3, marginBottom: 8 }}>{result.folder}</div>}
-          {!result.ok && <div style={{ fontSize: 11, color: T.re }}>{result.error}</div>}
+          {!result.ok && <div style={{ fontSize: 11, color: result.candidates?.length ? T.yl : T.re, lineHeight: 1.6 }}>{result.error}</div>}
+          {(result.candidates || []).map((c, i) => (
+            <button key={i} onClick={() => genOne(c.path)} disabled={busy}
+              style={{ ...S.btnGhost, display: 'block', width: '100%', textAlign: 'left', marginTop: 8, padding: '9px 12px', fontSize: 11, fontFamily: T.mono, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>
+              📁 {c.display}
+            </button>
+          ))}
           {(result.links || []).map((l, i) => (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 0', borderTop: i > 0 ? `1px solid ${T.bd}` : 'none' }}>
               <span style={{ flex: 1, fontSize: 11, color: T.tx2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
@@ -177,7 +186,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
       )}
       {!result && !bulk && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Enter a SKU and press Generate — or import an Excel with SKUs in column A for bulk links.</div>}
 
-      {isAdmin && showSettings && <RootSettings addToast={addToast} onChanged={refreshRoots} />}
+      {showSettings && <RootSettings addToast={addToast} onChanged={refreshRoots} />}
     </div>
   );
 }

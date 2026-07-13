@@ -38,7 +38,7 @@ export default function RootSettings({ addToast, onChanged }: { addToast: (m: st
 
   return (
     <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 14, marginTop: 12 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 2 }}>Search Folders (admin)</div>
+      <div style={{ fontSize: 12, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 2 }}>Search Folders</div>
       <div style={{ fontSize: 10.5, color: T.tx3, marginBottom: 10 }}>Paste Dropbox folder links — SKU folders are searched inside the enabled ones. Changes apply on Save.</div>
       {loading && <div style={{ fontSize: 11, color: T.tx3, padding: '8px 0' }}>Loading…</div>}
       {!loading && roots.map((r, i) => (

@@ -6,7 +6,8 @@ import { supabase, SUPABASE_ANON_KEY } from '../../../lib/supabase';
 export const FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
 
 export interface GenLink { name: string; url: string; error?: string }
-export interface GenResult { ok: boolean; sku: string; mode?: string; folder?: string; links?: GenLink[]; note?: string; error?: string; needsReconnect?: boolean }
+export interface GenCandidate { name: string; path: string; display: string }
+export interface GenResult { ok: boolean; sku: string; mode?: string; folder?: string; links?: GenLink[]; note?: string; error?: string; needsReconnect?: boolean; candidates?: GenCandidate[] }
 export interface GenRoot { label: string; url: string; enabled: boolean; resolved?: boolean | null; error?: string; path?: string }
 
 export const call = async (body: object): Promise<{ status: number; data: any }> => {
