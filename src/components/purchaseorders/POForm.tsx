@@ -18,6 +18,7 @@ export type EditingPO = PurchaseOrder & { items?: PurchaseOrderItem[] };
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const blankItem = (): FormItem => ({ sku: '', item_name: '', quantity: '1', unit: '', rate: '' });
+const UNIT_OPTIONS = ['Meter', 'Piece'];
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
 
 export default function POForm({ editing, duplicateFrom, onClose, onSaved, addToast }: {
@@ -142,7 +143,11 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
                   <input value={it.sku} onChange={e => setItem(i, { sku: e.target.value })} placeholder={poType === 'fabric' || poType === 'material' ? 'SKU *' : 'SKU'} style={{ ...S.fInput, flex: '1 1 90px', minWidth: 72, fontFamily: T.mono }} />
                   <input value={it.item_name} onChange={e => setItem(i, { item_name: e.target.value })} placeholder="Item name *" style={{ ...S.fInput, flex: '2 1 140px', minWidth: 110 }} />
                   <input value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Qty" style={{ ...S.fInput, flex: '1 1 60px', minWidth: 56, fontFamily: T.mono }} />
-                  <input value={it.unit} onChange={e => setItem(i, { unit: e.target.value })} placeholder="Unit" style={{ ...S.fInput, flex: '1 1 60px', minWidth: 56 }} />
+                  <select value={it.unit} onChange={e => setItem(i, { unit: e.target.value })} style={{ ...S.fInput, flex: '1 1 74px', minWidth: 66, color: it.unit ? T.tx : T.tx3 }}>
+                    <option value="">Unit</option>
+                    {it.unit && !UNIT_OPTIONS.includes(it.unit) && <option value={it.unit}>{it.unit}</option>}
+                    {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
                   <input value={it.rate} onChange={e => setItem(i, { rate: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Rate" style={{ ...S.fInput, flex: '1 1 70px', minWidth: 60, fontFamily: T.mono }} />
                   <span style={{ flex: '1 1 70px', minWidth: 60, textAlign: 'right', fontSize: 12, fontFamily: T.mono, color: amt > 0 ? T.tx2 : T.tx3 }}>{amt > 0 ? `₹${amt.toLocaleString('en-IN')}` : '—'}</span>
                   <button onClick={() => removeRow(i)} disabled={items.length === 1} style={{ border: 'none', background: 'none', cursor: items.length === 1 ? 'not-allowed' : 'pointer', color: T.re, opacity: items.length === 1 ? 0.25 : 0.7, fontSize: 18, padding: '0 4px', lineHeight: 1 }} aria-label="Remove item">&times;</button>
