@@ -2,6 +2,7 @@
 // god-component split (audit P0). Parent owns the data fetch; this
 // component just renders.
 import { T, S } from '../../lib/theme';
+import DateInput from '../ui/DateInput';
 import type { CashChallan } from '../../types/database';
 
 type Challan = Omit<CashChallan, 'created_at' | 'updated_at'> & { created_at: string; updated_at: string };
@@ -72,11 +73,11 @@ export default function ChallanLedger({
         <div className="challan-ledger-dates" style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <label style={{ fontSize: 8, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase' }}>From</label>
-            <input type="date" value={dateFrom} onChange={e => onDateFromChange(e.target.value)} style={S.fDate} />
+            <DateInput value={dateFrom} onChange={e => onDateFromChange(e.target.value)} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <label style={{ fontSize: 8, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase' }}>To</label>
-            <input type="date" value={dateTo} onChange={e => onDateToChange(e.target.value)} style={S.fDate} />
+            <DateInput value={dateTo} onChange={e => onDateToChange(e.target.value)} />
           </div>
           <button onClick={() => onDateApply()} style={{ ...S.btnPrimary, whiteSpace: 'nowrap' as const }}>Apply</button>
           {(dateFrom || dateTo) && <button onClick={() => { onDateFromChange(''); onDateToChange(''); onDateApply('', ''); }} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 12, cursor: 'pointer', height: 36 }}>Clear</button>}

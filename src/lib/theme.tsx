@@ -207,10 +207,17 @@ export const S = {
   btnSm: { padding: '4px 10px', fontSize: 10, borderRadius: 5 } as React.CSSProperties,
   btnLg: { padding: '10px 18px', fontSize: 13, height: 40 } as React.CSSProperties,
 
+  // Date/time input recipe. Includes the iOS-WebKit normalization (appearance
+  // none + min/max-width) so a bare `S.fDate` never overflows or renders the
+  // grey segmented native control. `width` is intentionally NOT set — call
+  // sites choose full-width vs. compact inline; the global CSS in index.css
+  // guarantees no overflow either way.
   fDate: {
+    minWidth: 0, maxWidth: '100%',
     background: T.glass2, border: `1px solid ${T.bd}`,
-    borderRadius: 8, color: T.tx, fontSize: 13, padding: '8px 12px',
+    borderRadius: 8, color: T.tx, fontFamily: T.sans, fontSize: 13, padding: '8px 12px',
     outline: 'none', height: 36, boxSizing: 'border-box' as const,
+    WebkitAppearance: 'none' as const, appearance: 'none' as const,
   } as React.CSSProperties,
 
   modalOverlay: {

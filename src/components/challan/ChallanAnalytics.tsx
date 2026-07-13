@@ -1,6 +1,7 @@
 // Analytics panel extracted from CashChallan.tsx (audit P0 — split 1100-line god-component).
 // Consumes state from the parent so date range stays in sync with the URL/app state.
 import { T, S } from '../../lib/theme';
+import DateInput from '../ui/DateInput';
 
 export type AnalyticsData = {
   totalRevenue: number;
@@ -35,9 +36,9 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
   return (
     <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div className="challan-analytics-dates" style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12 }}>
-        <input type="date" value={from} onChange={e => onFromChange(e.target.value)} style={S.fDate} />
+        <DateInput value={from} onChange={e => onFromChange(e.target.value)} />
         <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
-        <input type="date" value={to} onChange={e => onToChange(e.target.value)} style={S.fDate} />
+        <DateInput value={to} onChange={e => onToChange(e.target.value)} />
         <button onClick={onApply} style={S.btnPrimary}>Apply</button>
       </div>
       <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>

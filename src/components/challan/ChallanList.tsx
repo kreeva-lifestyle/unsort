@@ -3,6 +3,7 @@
 import { T, S } from '../../lib/theme';
 import Empty from '../ui/Empty';
 import SwipeRow from '../ui/SwipeRow';
+import DateInput from '../ui/DateInput';
 import { SkeletonRows } from '../ui/Skeleton';
 import type { CashChallan, CashChallanItem as DbCashChallanItem } from '../../types/database';
 
@@ -98,11 +99,11 @@ export default function ChallanList(p: Props) {
             )}
             <div>
               <label style={S.fLabel}>From</label>
-              <input type="date" value={p.dateFrom} onChange={e => { p.onDateFromChange(e.target.value); p.onResetPage(); }} style={{ ...S.fDate, width: '100%' }} />
+              <DateInput value={p.dateFrom} onChange={e => { p.onDateFromChange(e.target.value); p.onResetPage(); }} style={{ width: '100%' }} />
             </div>
             <div>
               <label style={S.fLabel}>To</label>
-              <input type="date" value={p.dateTo} onChange={e => { p.onDateToChange(e.target.value); p.onResetPage(); }} style={{ ...S.fDate, width: '100%' }} />
+              <DateInput value={p.dateTo} onChange={e => { p.onDateToChange(e.target.value); p.onResetPage(); }} style={{ width: '100%' }} />
             </div>
             <div>
               <label style={S.fLabel}>Inventory</label>

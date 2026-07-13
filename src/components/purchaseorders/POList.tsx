@@ -3,6 +3,7 @@
 import { T, S } from '../../lib/theme';
 import Empty from '../ui/Empty';
 import SwipeRow from '../ui/SwipeRow';
+import DateInput from '../ui/DateInput';
 import { SkeletonRows } from '../ui/Skeleton';
 import { PO_TYPE_LABELS, PO_STATUS_LABELS, PO_STATUSES } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
@@ -92,8 +93,8 @@ export default function POList(p: Props) {
                 <option value="">Anyone</option>{p.users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
               </select>
             </div>
-            <div><label style={S.fLabel}>From</label><input type="date" value={p.dateFrom} onChange={e => { p.onDateFromChange(e.target.value); p.onResetPage(); }} style={{ ...S.fDate, width: '100%' }} /></div>
-            <div><label style={S.fLabel}>To</label><input type="date" value={p.dateTo} onChange={e => { p.onDateToChange(e.target.value); p.onResetPage(); }} style={{ ...S.fDate, width: '100%' }} /></div>
+            <div><label style={S.fLabel}>From</label><DateInput value={p.dateFrom} onChange={e => { p.onDateFromChange(e.target.value); p.onResetPage(); }} style={{ width: '100%' }} /></div>
+            <div><label style={S.fLabel}>To</label><DateInput value={p.dateTo} onChange={e => { p.onDateToChange(e.target.value); p.onResetPage(); }} style={{ width: '100%' }} /></div>
           </div>
           {filterActive && <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}><button onClick={p.onClearFilters} style={{ ...S.btnGhost, ...S.btnSm, color: T.tx3, border: `1px solid ${T.bd2}`, background: T.glass1 }}>Clear filters</button></div>}
         </div>

@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
+import DateInput from '../ui/DateInput';
 import { friendlyError } from '../../lib/friendlyError';
 import { AttEmployee, AttEntry } from '../../lib/attendance';
 
@@ -95,18 +96,18 @@ export default function AttendanceEntryModal({ employees, month, editing, preset
             </div>
             <div>
               <label style={lbl}>Date</label>
-              <input type="date" value={date} min={monthMin} max={monthMax} disabled={!!editing} onChange={e => setDate(e.target.value)} style={{ ...S.fDate, width: '100%', opacity: editing ? 0.6 : 1 }} />
+              <DateInput value={date} min={monthMin} max={monthMax} disabled={!!editing} onChange={e => setDate(e.target.value)} style={{ width: '100%', opacity: editing ? 0.6 : 1 }} />
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
               <label style={lbl}>In</label>
-              <input type="time" value={inT} onChange={e => setInT(e.target.value)} style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
+              <DateInput type="time" value={inT} onChange={e => setInT(e.target.value)} style={{ width: '100%', fontFamily: T.mono }} />
             </div>
             <div>
               <label style={lbl}>Out</label>
-              <input type="time" value={outT} onChange={e => setOutT(e.target.value)} style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
+              <DateInput type="time" value={outT} onChange={e => setOutT(e.target.value)} style={{ width: '100%', fontFamily: T.mono }} />
             </div>
             <div>
               <label style={lbl}>Status</label>

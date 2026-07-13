@@ -9,6 +9,7 @@ import { friendlyError } from '../lib/friendlyError';
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
 
 import { T, S } from '../lib/theme';
+import DateInput from '../components/ui/DateInput';
 import { SkeletonRows } from '../components/ui/Skeleton';
 import SwipeRow from '../components/ui/SwipeRow';
 import type {
@@ -686,11 +687,11 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       <div className="scan-date-range" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', marginBottom: 12, display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>From</div>
-          <input type="date" value={historyDateFrom} max={historyDateTo || undefined} onChange={e => { setHistoryDateFrom(e.target.value); setHistoryPage(0); }} style={S.fDate} />
+          <DateInput value={historyDateFrom} max={historyDateTo || undefined} onChange={e => { setHistoryDateFrom(e.target.value); setHistoryPage(0); }} />
         </div>
         <div>
           <div style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>To</div>
-          <input type="date" value={historyDateTo} min={historyDateFrom || undefined} max={new Date().toISOString().slice(0, 10)} onChange={e => { setHistoryDateTo(e.target.value); setHistoryPage(0); }} style={S.fDate} />
+          <DateInput value={historyDateTo} min={historyDateFrom || undefined} max={new Date().toISOString().slice(0, 10)} onChange={e => { setHistoryDateTo(e.target.value); setHistoryPage(0); }} />
         </div>
         {[
           { label: 'Today', from: 0 },
