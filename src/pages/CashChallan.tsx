@@ -480,9 +480,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       const sign = r.is_return ? -1 : 1;
       if (!map[key]) map[key] = { id: r.customer_id, name: r.customer_name, total: 0, paid: 0, count: 0, latest: r.created_at ?? '', aging: { current: 0, d30: 0, d60: 0, d90plus: 0 } };
       map[key].total += sign * Number(r.total);
-      // Returns are credits, never cash — a return reduces net billed (via
-      // sign*total above) but is never counted as a payment received.
-      map[key].paid += r.is_return ? 0 : Number(r.amount_paid || 0);
+      // Returns are credits — a return reduces net billed (via sign*total).
+      // amount_paid on a return = credit already refunded to the customer in
+      // cash (settle_return_refund / old refund model): money handed back, so
+      // it counts NEGATIVE in paid and the balance owed goes back up.
+      map[key].paid += r.is_return ? -Number(r.amount_paid || 0) : Number(r.amount_paid || 0);
       map[key].count++;
       const outstanding = Number(r.total) - Number(r.amount_paid || 0);
       if (!r.is_return && outstanding > 0 && r.status !== 'paid') {
@@ -516,9 +518,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       const sign = r.is_return ? -1 : 1;
       if (!map[key]) map[key] = { id: r.customer_id, name: r.customer_name, total: 0, paid: 0, count: 0, aging: { current: 0, d30: 0, d60: 0, d90plus: 0 } };
       map[key].total += sign * Number(r.total);
-      // Returns are credits, never cash — a return reduces net billed (via
-      // sign*total above) but is never counted as a payment received.
-      map[key].paid += r.is_return ? 0 : Number(r.amount_paid || 0);
+      // Returns are credits — a return reduces net billed (via sign*total).
+      // amount_paid on a return = credit already refunded to the customer in
+      // cash (settle_return_refund / old refund model): money handed back, so
+      // it counts NEGATIVE in paid and the balance owed goes back up.
+      map[key].paid += r.is_return ? -Number(r.amount_paid || 0) : Number(r.amount_paid || 0);
       map[key].count++;
       const outstanding = Number(r.total) - Number(r.amount_paid || 0);
       if (!r.is_return && outstanding > 0 && r.status !== 'paid') {
@@ -881,17 +885,18 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const exportLedgerPDF = (customerName: string) => {
     if (ledgerChallans.length === 0) return;
     const safeName = escHtml(customerName);
-    // Credit model: a return reduces net billed but is never a payment.
+    // Credit model: a return reduces net billed; amount_paid on a return is
+    // credit already refunded to the customer (cash OUT → negative paid).
     const totalBilled = ledgerChallans.filter(c => !c.is_return).reduce((s, c) => s + Number(c.total), 0);
     const totalReturns = ledgerChallans.filter(c => c.is_return).reduce((s, c) => s + Number(c.total), 0);
     const netTotal = Math.round((totalBilled - totalReturns) * 100) / 100;
-    const totalPaid = ledgerChallans.reduce((s, c) => s + (c.is_return ? 0 : Number(c.amount_paid || 0)), 0);
+    const totalPaid = ledgerChallans.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.amount_paid || 0), 0);
     const outstanding = Math.round((netTotal - totalPaid) * 100) / 100;
     const rows = ledgerChallans.map(c => {
       const isRet = c.is_return;
-      // Return: 0 cash, whole amount is a credit against balance. Sale: cash paid + balance due.
-      const paidCell = isRet ? '₹0' : `₹${Number(c.amount_paid || 0).toLocaleString('en-IN')}`;
-      const balanceCell = isRet ? `−₹${Number(c.total).toLocaleString('en-IN')}` : `₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')}`;
+      // Return: paid = refund handed back (−); balance = unsettled credit only.
+      const paidCell = isRet ? `−₹${Number(c.amount_paid || 0).toLocaleString('en-IN')}` : `₹${Number(c.amount_paid || 0).toLocaleString('en-IN')}`;
+      const balanceCell = isRet ? `−₹${Math.max(0, Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')}` : `₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')}`;
       return `<tr>
         <td>#${escHtml(c.challan_number)}</td>
         <td>${new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
@@ -1107,7 +1112,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const bulkUnpayable = selectedChallans.filter(c => !c.is_return && c.status === 'paid');
   const bulkReturns = selectedChallans.filter(c => c.is_return);
   const bulkSalesOutstanding = bulkPayable.reduce((s, c) => s + (Number(c.total) - Number(c.amount_paid || 0)), 0);
-  const bulkReturnsTotal = bulkReturns.reduce((s, c) => s + Number(c.total), 0);
+  // A return's usable credit is what has NOT been refunded yet (amount_paid on
+  // a return = credit already handed back in cash via settle_return_refund).
+  const bulkReturnsTotal = bulkReturns.reduce((s, c) => s + Math.max(0, Number(c.total) - Number(c.amount_paid || 0)), 0);
   const bulkNetTotal = bulkSalesOutstanding - bulkReturnsTotal;
 
   const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -1121,7 +1128,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const today = localToday();
     const { data: { user } } = await supabase.auth.getUser();
     const ids = bulkPayable.map(c => c.id);
-    if (ids.length === 0) { setShowBulkPay(false); setBulkBusy(false); return; }
+    const settleableReturns = bulkReturns.filter(c => Number(c.total) - Number(c.amount_paid || 0) > 0.009);
+    if (ids.length === 0 && settleableReturns.length === 0) { setShowBulkPay(false); setBulkBusy(false); return; }
     const batchId = `BP-${Date.now().toString(36).toUpperCase()}`;
     const isRefund = bulkNetTotal < 0;
     const received = Number(bulkReceivedAmount) || Math.abs(bulkNetTotal);
@@ -1149,6 +1157,17 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       paidOk.push(c);
     }
     for (const c of paidOk) await ccAuditLog(isRefund ? 'SETTLE_REFUND' : 'BULK_PAY', c.id, `${isRefund ? 'Settled against returns' : 'Bulk paid'} (${batchId}) — ₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} via ${bulkPayMode}`, { status: { from: c.status, to: 'paid' }, amount_paid: { from: c.amount_paid, to: c.total }, ...(isRefund ? { refunded: { from: 0, to: received } } : { received_amount: { from: Math.abs(bulkNetTotal), to: received } }) });
+    // Consume the credit of every selected return: its amount_paid rises to
+    // total (settle_return_refund), so it stops offsetting outstanding and the
+    // negative payment row nets the cash book against the sale payments above.
+    // Note: batch Undo restores the SALES only — a consumed credit stays
+    // consumed (settle again is impossible; the RPC refuses double-settling).
+    for (const c of settleableReturns) {
+      const remaining = Number(c.total) - Number(c.amount_paid || 0);
+      const { error: settleErr } = await supabase.rpc('settle_return_refund', { p_challan_id: c.id, p_mode: bulkPayMode });
+      if (settleErr) { addToast(`Return #${c.challan_number}: ${friendlyError(settleErr)}`, 'error'); failCount++; continue; }
+      await ccAuditLog('RETURN_SETTLED', c.id, `Return credit ₹${remaining.toLocaleString('en-IN')} consumed in batch ${batchId} via ${bulkPayMode}`, { amount_paid: { from: c.amount_paid, to: c.total } });
+    }
     setLastBatch({ id: batchId, count: ids.length, mode: bulkPayMode });
     setShowBulkPay(false); setBulkPayMode(''); setBulkReceivedAmount(''); exitBulkMode(); fetchChallans();
     if (failCount > 0) addToast(`${ids.length - failCount} of ${ids.length} challans paid — ${failCount} failed (${batchId})`, 'error');
@@ -1460,6 +1479,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         onRemind={() => { const c = viewingChallan; setViewingChallan(null); sendReminder(c); }}
         onReturn={() => { const c = viewingChallan; setViewingChallan(null); setIsReturn(true); setChallanStatus('paid'); setAmountPaid(0); setPaymentMode(''); setPaymentDate(''); selectReturnSource(c); setShowModal(true); }}
         onVoid={() => { const c = viewingChallan; setViewingChallan(null); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number, inventoryDeducted: !!c.inventory_deducted, isReturn: !!c.is_return }); }}
+        onSettled={() => { fetchChallans(); }}
         hasNext={idx < challans.length - 1}
         hasPrev={idx > 0}
         onNext={() => { if (idx < challans.length - 1) setViewingChallan(challans[idx + 1]); }}
@@ -1546,7 +1566,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         </div>,
         document.body
       )}
-      {!viewingChallan && !showLedger && !showAnalytics && !showCashBook && !showModal && <button className="fab" aria-label="Add new challan" onClick={() => { setShowModal(true); window.history.pushState({ view: 'challan-new' }, ''); }}>+</button>}
+      {/* FAB is portaled to <body> so it floats against the viewport. Rendered
+          inside the page it sits within <main overflow:auto>, and iOS Safari
+          anchors position:fixed children to the scroll box, dropping the FAB
+          into the content (it landed on the pagination bar). */}
+      {active !== false && !viewingChallan && !showLedger && !showAnalytics && !showCashBook && !showModal && createPortal(
+        <button className="fab" aria-label="Add new challan" onClick={() => { setShowModal(true); window.history.pushState({ view: 'challan-new' }, ''); }}>+</button>,
+        document.body,
+      )}
     </div>
   );
 }

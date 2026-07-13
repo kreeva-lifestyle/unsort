@@ -10,6 +10,10 @@ export interface GenCandidate { name: string; path: string; display: string }
 export interface GenResult { ok: boolean; sku: string; mode?: string; folder?: string; links?: GenLink[]; note?: string; error?: string; needsReconnect?: boolean; candidates?: GenCandidate[] }
 export interface GenRoot { label: string; url: string; enabled: boolean; resolved?: boolean | null; error?: string; path?: string }
 
+// Fast, storage-free thumbnails: the edge fn streams Dropbox's pre-generated
+// 256px JPEG for a public shared file link (GET, browser-cached for a day).
+export const thumbUrl = (link: string) => `${FN}?thumb=${encodeURIComponent(link)}&k=${SUPABASE_ANON_KEY}`;
+
 export const call = async (body: object): Promise<{ status: number; data: any }> => {
   const { data: { session } } = await supabase.auth.getSession();
   const jwt = session?.access_token || SUPABASE_ANON_KEY;
