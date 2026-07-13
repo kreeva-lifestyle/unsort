@@ -5,10 +5,11 @@ import { useState } from 'react';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 
-// files.content.read is needed for the Link Generator's thumbnail proxy
-// (files/get_thumbnail_v2) — tokens minted before it was added can't serve
-// thumbnails until the admin reconnects once.
-const authUrl = (appKey: string) => `https://www.dropbox.com/oauth2/authorize?client_id=${appKey}&response_type=code&token_access_type=offline&scope=${encodeURIComponent('account_info.read files.metadata.read files.content.read sharing.read sharing.write')}`;
+// files.content.read → Link Generator thumbnail proxy (get_thumbnail_v2).
+// files.content.write → Forward→Dropbox document uploads (files/upload).
+// Tokens minted before a scope was added can't use that feature until the
+// admin reconnects once.
+const authUrl = (appKey: string) => `https://www.dropbox.com/oauth2/authorize?client_id=${appKey}&response_type=code&token_access_type=offline&scope=${encodeURIComponent('account_info.read files.metadata.read files.content.read files.content.write sharing.read sharing.write')}`;
 
 export default function ConnectDropboxCard({ appKey, call, addToast, onConnected }: {
   appKey: string;
