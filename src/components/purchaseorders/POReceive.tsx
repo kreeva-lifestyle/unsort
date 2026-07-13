@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { numericKeyDown } from '../../lib/numericInput';
+import DateInput from '../ui/DateInput';
 import { poAuditLog } from './poAudit';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 
@@ -89,7 +90,7 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
             })}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10, marginTop: 12 }}>
-            <div><label style={S.fLabel}>Receipt date</label><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...S.fDate, width: '100%' }} /></div>
+            <div><label style={S.fLabel}>Receipt date</label><DateInput value={date} onChange={e => setDate(e.target.value)} style={{ width: '100%' }} /></div>
             <div><label style={S.fLabel}>Remarks</label><input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Optional (e.g. courier, invoice #)" style={S.fInput} /></div>
           </div>
           {error && <div style={{ marginTop: 12, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
+import DateInput from '../ui/DateInput';
 import { copyToClipboard } from '../../lib/clipboard';
 import type { ShortLink, LinkClick } from '../../types/database';
 
@@ -109,9 +110,9 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
 
       {/* Date filter */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
-        <input type="date" value={from} onChange={e => setFrom(e.target.value)} style={S.fDate} />
+        <DateInput value={from} onChange={e => setFrom(e.target.value)} />
         <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
-        <input type="date" value={to} onChange={e => setTo(e.target.value)} style={S.fDate} />
+        <DateInput value={to} onChange={e => setTo(e.target.value)} />
         <button onClick={fetchClicks} style={S.btnPrimary}>Apply</button>
       </div>
 

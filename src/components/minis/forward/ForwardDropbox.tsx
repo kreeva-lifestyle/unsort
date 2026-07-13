@@ -97,12 +97,16 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
 
   const doUpload = async (id: string, name: string, ds: string, dataUrl: string) => {
     const { data } = await call({ action: 'fwd_upload', dataUrl, dateStr: ds });
-    setItems(prev => prev.map(it => {
-      if (it.id !== id) return it;
-      if (data?.ok) return { ...it, status: 'ok', name: data.name || name, message: data.path };
-      const err = data?.error === 'no_folder' ? 'No upload folder set — open Settings' : data?.error === 'dropbox_not_connected' ? 'Dropbox not connected — ask an admin' : data?.error === 'needs_write_scope' ? 'Dropbox needs reconnecting for uploads' : (data?.details || data?.error || 'Upload failed — tap to retry');
-      return { ...it, status: 'err', message: err };
-    }));
+    if (data?.ok) {
+      setItems(prev => prev.map(it => it.id === id ? { ...it, status: 'ok', name: data.name || name, message: data.path } : it));
+      addToast('Uploaded to Dropbox', 'success');
+      return;
+    }
+    // Terminal failure — flip the thumbnail to red (tap-to-retry) AND surface a
+    // clear toast so the user never assumes a silent success.
+    const err = data?.error === 'no_folder' ? 'No upload folder set — open Settings' : data?.error === 'dropbox_not_connected' ? 'Dropbox not connected — ask an admin' : data?.error === 'needs_write_scope' ? 'Dropbox needs reconnecting for uploads' : (data?.details || data?.error || 'Upload failed — tap the photo to retry');
+    setItems(prev => prev.map(it => it.id === id ? { ...it, status: 'err', message: err } : it));
+    addToast(err, 'error');
   };
 
   const upload = () => {
@@ -111,7 +115,7 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
     const name = `${dateStr}.jpg`;
     setItems(prev => [{ id, name, dateStr, dataUrl: pending.dataUrl, status: 'up' as UpStatus }, ...prev]);
     const url = pending.dataUrl; setPending(null); setMode('camera');
-    doUpload(id, name, dateStr, url).catch(() => setItems(prev => prev.map(x => x.id === id ? { ...x, status: 'err', message: 'Upload failed — tap to retry' } : x)));
+    doUpload(id, name, dateStr, url).catch(() => { setItems(prev => prev.map(x => x.id === id ? { ...x, status: 'err', message: 'Upload failed — tap the photo to retry' } : x)); addToast('Upload failed — check your connection and tap the photo to retry', 'error'); });
   };
   const retry = (it: Item) => { setItems(prev => prev.map(x => x.id === it.id ? { ...x, status: 'up', message: undefined } : x)); doUpload(it.id, it.name, it.dateStr, it.dataUrl).catch(() => {}); };
   const openDate = () => { const el = dateInputRef.current as any; if (el?.showPicker) { try { el.showPicker(); return; } catch { /* fall through */ } } el?.click(); };
@@ -140,7 +144,9 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
           <div onClick={openDate} style={{ flex: 1, textAlign: 'center', padding: '4px 2px', cursor: 'pointer', position: 'relative' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{fmtDate(dateStr)}</div>
             <div style={{ fontSize: 8, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.55)' }}>{dateStr === localToday() ? 'Today · tap to change' : 'tap to change'}</div>
-            <input ref={dateInputRef} type="date" value={dateStr} max={localToday()} onChange={e => e.target.value && setDateStr(e.target.value)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, pointerEvents: 'none' }} />
+            {/* Transparent native date input laid over the label — a single tap
+                anywhere on the chip opens the native picker (no segment-tapping). */}
+            <input ref={dateInputRef} type="date" value={dateStr} max={localToday()} onChange={e => e.target.value && setDateStr(e.target.value)} aria-label="Change date" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', WebkitAppearance: 'none', appearance: 'none' }} />
           </div>
           <div onClick={nextDay} style={{ width: 36, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 17, cursor: atToday ? 'default' : 'pointer', opacity: atToday ? 0.3 : 1 }}>›</div>
         </div>

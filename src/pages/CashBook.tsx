@@ -16,6 +16,7 @@ import Empty from '../components/ui/Empty';
 import { SkeletonRows } from '../components/ui/Skeleton';
 
 import { T, S } from '../lib/theme';
+import DateInput from '../components/ui/DateInput';
 import type {
   CashExpense,
   CashExpenseInsert,
@@ -673,9 +674,9 @@ export default function CashBook() {
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={S.fDate} />
+          <DateInput value={fromDate} onChange={e => setFromDate(e.target.value)} />
           <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
-          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={S.fDate} />
+          <DateInput value={toDate} onChange={e => setToDate(e.target.value)} />
           {(search || fromDate !== today || toDate !== today) && <button onClick={() => { setSearch(''); setFromDate(today); setToDate(today); }} style={{ ...S.btnGhost, ...S.btnSm }}>Clear</button>}
           <button className="desktop-only" onClick={exportCSV} style={{ ...S.btnGhost, height: 36 }}>Export</button>
         </div>
@@ -841,11 +842,11 @@ export default function CashBook() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
               <div>
                 <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Period From</label>
-                <input type="date" value={handPeriodFrom} onChange={e => { setHandPeriodFrom(e.target.value); setHandAmount(''); }} style={{ ...S.fDate, width: '100%' }} />
+                <DateInput value={handPeriodFrom} onChange={e => { setHandPeriodFrom(e.target.value); setHandAmount(''); }} style={{ width: '100%' }} />
               </div>
               <div>
                 <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Period To</label>
-                <input type="date" value={handPeriodTo} onChange={e => { setHandPeriodTo(e.target.value); setHandAmount(''); }} style={{ ...S.fDate, width: '100%' }} />
+                <DateInput value={handPeriodTo} onChange={e => { setHandPeriodTo(e.target.value); setHandAmount(''); }} style={{ width: '100%' }} />
               </div>
             </div>
 
@@ -1097,7 +1098,7 @@ export default function CashBook() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: addLockH ? 6 : 10 }}>
               <div>
                 <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Date</label>
-                <input type="date" value={entryDate} max={today} onChange={e => setEntryDate(e.target.value)} style={{ ...S.fDate, width: '100%', ...(addLockH ? { borderColor: 'rgba(245,158,11,.5)' } : {}) }} />
+                <DateInput value={entryDate} max={today} onChange={e => setEntryDate(e.target.value)} style={{ width: '100%', ...(addLockH ? { borderColor: 'rgba(245,158,11,.5)' } : {}) }} />
               </div>
               <div>
                 <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Amount (₹)</label>

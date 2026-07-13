@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { T, S } from '../lib/theme';
+import DateInput from '../components/ui/DateInput';
 import { friendlyError } from '../lib/friendlyError';
 import { useNotifications } from '../hooks/useNotifications';
 import { AttEmployee, AttEntry, AttPenalty, AttSalaryPayment, monthFirstDay } from '../lib/attendance';
@@ -71,7 +72,7 @@ export default function Attendance() {
           {tabBtn('employees', 'Employees')}
         </div>
         <div className="att-controls" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <input type="month" value={month} onChange={e => e.target.value && setMonth(e.target.value)} style={S.fDate} aria-label="Month" />
+          <DateInput type="month" value={month} onChange={e => e.target.value && setMonth(e.target.value)} aria-label="Month" />
           <button onClick={() => setShowImport(true)} style={S.btnPrimary}>Import Excel</button>
         </div>
       </div>

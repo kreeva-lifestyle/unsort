@@ -42,10 +42,16 @@ main { -webkit-overflow-scrolling: touch; overflow-y: auto !important; }
 .page-pad, main > div > div { animation: pageIn 220ms cubic-bezier(.2,.9,.3,1) both; }
 @keyframes pageIn { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
 
-/* Prevent iOS zoom on input focus — force 16px minimum on mobile */
+/* Prevent iOS zoom on input focus — force 16px minimum on mobile.
+   `input:not([type])` catches bare <input> elements (React inputs with no
+   `type` prop, e.g. the Purchase Order item rows) which the type-specific
+   selectors below would otherwise miss and let iOS zoom on focus. Date/time
+   types are included so they never zoom either. */
 @media (max-width: 768px) {
-  select, input[type="text"], input[type="email"], input[type="password"],
-  input[type="number"], input[type="search"], textarea {
+  select, textarea, input:not([type]),
+  input[type="text"], input[type="email"], input[type="password"],
+  input[type="number"], input[type="search"], input[type="tel"], input[type="url"],
+  input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"], input[type="week"] {
     font-size: 16px !important;
   }
 }
@@ -95,6 +101,39 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
 /* Firefox doesn't have ::calendar-picker-indicator — color the input itself */
 input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"] {
   color-scheme: dark;
+}
+
+/* ─── Global date/time input normalization — the iOS WebKit fix ───────────────
+   On iOS Safari/Chrome, <input type="date|time|month|…"> is a NATIVE control
+   with `min-width: auto` intrinsic sizing, so it refuses to shrink in flex/grid
+   and OVERFLOWS its parent; it also keeps the grey segmented spinner chrome and
+   right/centre-aligns its value element. This one rule normalizes every date/
+   time input in the app (recipe-based or not, now or future) so they render as
+   plain boxes that fill and shrink correctly on iOS, Android, and desktop. */
+input[type="date"], input[type="time"], input[type="datetime-local"],
+input[type="month"], input[type="week"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;            /* iOS default is min-width:auto → won't shrink in flex */
+  max-width: 100%;         /* never overflow the parent, whatever the intrinsic width */
+  box-sizing: border-box;
+}
+/* The value/segments element: kill default margins + centre/right alignment
+   that cause the "split into strange segments" / clipped look on WebKit. */
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value,
+input[type="month"]::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+input[type="date"]::-webkit-datetime-edit,
+input[type="time"]::-webkit-datetime-edit,
+input[type="datetime-local"]::-webkit-datetime-edit,
+input[type="month"]::-webkit-datetime-edit {
+  padding: 0;
 }
 
 /* Subtle row hover for HTML tables — applies to Inventory, Cash Challan,
@@ -200,7 +239,6 @@ body.modal-open .fab { display: none !important; }
   .desktop-only { display: none !important; }
   .mobile-only { display: flex !important; }
   .fab { display: flex !important; position: fixed !important; bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important; right: 16px !important; width: 52px !important; height: 52px !important; border-radius: 50% !important; background: linear-gradient(135deg, oklch(0.55 0.22 265), oklch(0.65 0.18 270)) !important; color: #fff !important; align-items: center !important; justify-content: center !important; font-size: 24px !important; font-weight: 300 !important; box-shadow: 0 6px 24px rgba(99,102,241,.45) !important; z-index: 103 !important; cursor: pointer !important; border: none !important; animation: fi .2s ease !important; }
-  input[type="date"] { -webkit-appearance: textfield !important; appearance: textfield !important; min-height: 0 !important; }
   .challan-row-actions { display: none !important; }
   .bt-actions-col { display: none !important; }
   .settings-tabs { flex-direction: column !important; width: 100% !important; }

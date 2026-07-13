@@ -10,6 +10,7 @@ import { friendlyError } from '../../lib/friendlyError';
 import { numericKeyDown } from '../../lib/numericInput';
 import { poAuditLog } from './poAudit';
 import VendorPicker from './VendorPicker';
+import DateInput from '../ui/DateInput';
 import { PO_TYPES, PO_TYPE_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderType } from '../../types/database';
 
@@ -122,11 +123,11 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
             </div>
             <div>
               <label style={S.fLabel}>PO Date</label>
-              <input type="date" value={poDate} onChange={e => setPoDate(e.target.value)} style={{ ...S.fDate, width: '100%' }} />
+              <DateInput value={poDate} onChange={e => setPoDate(e.target.value)} style={{ width: '100%' }} />
             </div>
             <div>
               <label style={S.fLabel}>Expected</label>
-              <input type="date" value={expectedDate} onChange={e => setExpectedDate(e.target.value)} style={{ ...S.fDate, width: '100%' }} />
+              <DateInput value={expectedDate} onChange={e => setExpectedDate(e.target.value)} style={{ width: '100%' }} />
             </div>
             <div>
               <label style={S.fLabel}>Payment terms</label>

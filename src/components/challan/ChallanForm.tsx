@@ -5,6 +5,7 @@ import { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
+import DateInput from '../ui/DateInput';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { fetchCustomerOutstanding } from '../../lib/customerOutstanding';
@@ -328,7 +329,7 @@ export default function ChallanForm(p: ChallanFormProps) {
               </div>
               <div>
                 <label style={lbl}>Payment Date</label>
-                <input type="date" value={p.paymentDate} onChange={e => p.setPaymentDate(e.target.value)} style={inp} />
+                <DateInput value={p.paymentDate} onChange={e => p.setPaymentDate(e.target.value)} style={{ width: '100%' }} />
               </div>
             </div>
           )}
