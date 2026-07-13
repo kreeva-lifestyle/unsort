@@ -53,7 +53,6 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
       try {
         const p = parseRateSheet(ev.target?.result as ArrayBuffer);
         setParsed(p); setExcelName(f.name); setResult(null);
-        p.warnings.forEach(w => addToast(w, 'info'));
         addToast(`${p.rows.length} design${p.rows.length === 1 ? '' : 's'} imported (${p.columns.join(', ')})`, 'success');
       } catch (e) { addToast(friendlyError(e), 'error'); }
     };
@@ -72,6 +71,7 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
       const canvas = document.createElement('canvas');
       await renderRateCard(canvas, {
         heroImg, logoImg, catalogName: catalogName.trim(), rows: parsed.rows, columns: parsed.columns,
+        skuCol: parsed.skuCol, priceCol: parsed.priceCol,
         disclaimer, stats: parsed.stats, scriptFont: scriptReady ? 'Great Vibes' : 'Sora',
       });
       const blob = await new Promise<Blob>((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('Could not create the image')), 'image/jpeg', 0.92));
@@ -124,6 +124,15 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
             {parsed.stats.designs} designs{parsed.stats.total > 0 ? ` · avg RS.${parsed.stats.avg.toLocaleString('en-IN')} · total RS.${parsed.stats.total.toLocaleString('en-IN')}` : ''}
           </div>
         )}
+        {/* smart checks — GST slab autocorrect, duplicate SKUs, price/rounding notes */}
+        {parsed && (parsed.warnings.length > 0 ? (
+          <div style={{ background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: T.yl, marginBottom: 4, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Smart checks — {parsed.warnings.length} note{parsed.warnings.length === 1 ? '' : 's'}</div>
+            {parsed.warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: T.tx2, lineHeight: 1.6 }}>• {w}</div>)}
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: T.gr, marginBottom: 10 }}>✓ Smart checks passed — GST slabs, SKUs and totals all look right</div>
+        ))}
         <div style={{ marginBottom: 12 }}>
           <label style={S.fLabel}>Bottom Note</label>
           <input value={disclaimer} onChange={e => { setDisclaimer(e.target.value); setResult(null); }} style={{ ...S.fInput, width: '100%' }} />

@@ -3,7 +3,13 @@
 // preview pixel-for-pixel — CSS backdrop-filter can't be rasterized, so the
 // frosted glass is a downscale→upscale blur of the background snapshot,
 // which works on every browser (no ctx.filter, which Safari lacks).
+//
+// Layout intelligence: columns whose value is identical on every row
+// (fabric, size, work…) are lifted out of the table into a "collection
+// details" band under the heading — shown once, elegantly, instead of
+// repeated down a column. The table keeps only what varies per design.
 import { RateRow } from './parseRateSheet';
+import { GOLD, font, rr, coverDraw, wrapText, uniformSize, makeBlur, drawMasthead, MeasuredCell } from './canvasKit';
 
 export interface RateCardOpts {
   heroImg: HTMLImageElement;
@@ -11,78 +17,66 @@ export interface RateCardOpts {
   catalogName: string;
   rows: RateRow[];
   columns: string[];
+  skuCol: string;
+  priceCol: string | null;
   disclaimer: string;
   stats: { designs: number; avg: number; total: number } | null;
   scriptFont: string; // 'Great Vibes' when loaded, else Sora fallback
 }
 
 const W = 1440, M = 56, HERO_H = 1280;
-const COL_WEIGHT: Record<string, number> = { SKU: 11, 'MAIN COLOR': 13, FABRIC: 12, SIZE: 16, INCLUDES: 14, WORK: 15, PRICE: 19 };
-const GOLD = '#EFDFB4', GOLD_DEEP = '#D9BC7E';
 const inr = (n: number) => `RS.${n.toLocaleString('en-IN')}/-`;
-const font = (weight: number, size: number) => `${weight} ${size}px 'Inter', sans-serif`;
-
-const rr = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-};
-
-// object-fit: cover for drawImage
-const coverDraw = (ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) => {
-  const s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
-  const sw = w / s, sh = h / s;
-  ctx.drawImage(img, (img.naturalWidth - sw) / 2, (img.naturalHeight - sh) / 2, sw, sh, x, y, w, h);
-};
-
-const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] => {
-  const words = text.split(/\s+/).filter(Boolean);
-  if (words.length === 0) return ['—'];
-  const lines: string[] = [];
-  let cur = '';
-  for (const wd of words) {
-    const next = cur ? `${cur} ${wd}` : wd;
-    if (ctx.measureText(next).width <= maxW || !cur) cur = next; else { lines.push(cur); cur = wd; }
-  }
-  lines.push(cur);
-  return lines;
-};
-
-// ONE font size for the whole group (all header cells / all body cells):
-// the largest size at which every word of every cell fits its column.
-// Uniform sizing reads as designed; per-cell shrinking reads as broken.
-interface MeasuredCell { text: string; maxW: number; weight: number }
-const uniformSize = (ctx: CanvasRenderingContext2D, cells: MeasuredCell[], base: number, min: number): number => {
-  for (let size = base; size > min; size--) {
-    if (cells.every(c => {
-      ctx.font = font(c.weight, size);
-      return c.text.split(/\s+/).every(wd => ctx.measureText(wd).width <= c.maxW);
-    })) return size;
-  }
-  return min;
-};
 
 export async function renderRateCard(canvas: HTMLCanvasElement, o: RateCardOpts): Promise<void> {
-  const cols = o.columns.filter(c => COL_WEIGHT[c]);
-  const totalWeight = cols.reduce((a, c) => a + COL_WEIGHT[c], 0);
   const panelW = W - 2 * M;
-  const colW = cols.map(c => (COL_WEIGHT[c] / totalWeight) * panelW);
-  const cellWeight = (c: string) => (c === 'PRICE' || c === 'SKU' ? 600 : 400);
-
-  // ---- measure pass (scratch ctx) to size the canvas before drawing ----
   const scratch = document.createElement('canvas').getContext('2d')!;
+  const cellWeight = (c: string) => (c === o.priceCol || c === o.skuCol ? 600 : 400);
+  const val = (r: RateRow, c: string) => (r[c] || '—').toUpperCase();
+
+  // ---- split: identical-on-every-row columns become "collection details" ----
+  const shared = o.columns.filter(c => c !== o.skuCol && c !== o.priceCol && o.rows.length > 1
+    && (o.rows[0][c] || '') !== '' && o.rows.every(r => r[c] === o.rows[0][c]));
+  const cols = o.columns.filter(c => !shared.includes(c));
+  const specs: [string, string][] = shared.map(c => [c, val(o.rows[0], c)]);
+
+  // ---- measure: collection-details band (2-column grid of label + value) ----
+  const specCols = specs.length > 1 ? 2 : 1;
+  const specCellW = (panelW - 56 * 2 - (specCols - 1) * 44) / specCols;
+  scratch.font = font(500, 27);
+  const specLines = specs.map(([, v]) => wrapText(scratch, v, specCellW));
+  const specEntryH = specLines.map(l => 26 + 10 + l.length * 36);
+  const specRowH: number[] = [];
+  for (let i = 0; i < specs.length; i += specCols) specRowH.push(Math.max(...specEntryH.slice(i, i + specCols)));
+  const specsH = specs.length ? specRowH.reduce((a, b) => a + b, 0) + (specRowH.length - 1) * 22 + 56 : 0;
+
+  // ---- measure: table (generic column widths from content) ----
+  const need = cols.map(c => {
+    scratch.font = font(600, 28);
+    let maxWord = Math.max(...c.split(/\s+/).map(wd => scratch.measureText(wd).width));
+    let maxFull = 0;
+    for (const r of o.rows) {
+      scratch.font = font(cellWeight(c), 28);
+      const t = val(r, c);
+      maxFull = Math.max(maxFull, scratch.measureText(t).width);
+      for (const wd of t.split(/\s+/)) maxWord = Math.max(maxWord, scratch.measureText(wd).width);
+    }
+    return Math.min(Math.max(maxWord + 34, Math.min(maxFull + 34, 380), 132), 560);
+  });
+  const needSum = need.reduce((a, b) => a + b, 0);
+  const colW = need.map(n => (n / needSum) * panelW);
   const headSize = uniformSize(scratch, cols.map((c, i) => ({ text: c, maxW: colW[i] - 28, weight: 600 })), 24, 17);
-  const bodyCells: MeasuredCell[] = o.rows.flatMap(r => cols.map((c, i) => ({ text: (r[c] || '—').toUpperCase(), maxW: colW[i] - 30, weight: cellWeight(c) })));
+  const bodyCells: MeasuredCell[] = o.rows.flatMap(r => cols.map((c, i) => ({ text: val(r, c), maxW: colW[i] - 30, weight: cellWeight(c) })));
   const bodySize = uniformSize(scratch, bodyCells, 29, 20);
   const headLineH = headSize + 10, bodyLineH = bodySize + 12;
   const headLines = cols.map((c, i) => { scratch.font = font(600, headSize); return wrapText(scratch, c, colW[i] - 28); });
   const headH = Math.max(66, Math.max(...headLines.map(l => l.length)) * headLineH + 34);
-  const rowLines = o.rows.map(r => cols.map((c, i) => { scratch.font = font(cellWeight(c), bodySize); return wrapText(scratch, (r[c] || '—').toUpperCase(), colW[i] - 30); }));
+  const rowLines = o.rows.map(r => cols.map((c, i) => { scratch.font = font(cellWeight(c), bodySize); return wrapText(scratch, val(r, c), colW[i] - 30); }));
   const rowH = rowLines.map(cells => Math.max(76, Math.max(...cells.map(l => l.length)) * bodyLineH + 34));
   const tableH = headH + rowH.reduce((a, b) => a + b, 0) + 16;
-  const tableY = HERO_H + 30;
+
+  // ---- measure: footer ----
+  const specsY = HERO_H + 30;
+  const tableY = specsY + (specsH ? specsH + 24 : 0);
   const chips: [string, string][] = o.stats ? [
     ['TOTAL DESIGNS', `${o.stats.designs} PCS`],
     ...(o.stats.total > 0 ? [['AVERAGE RATE', inr(o.stats.avg)], ['TOTAL AMOUNT', inr(o.stats.total)]] as [string, string][] : []),
@@ -103,18 +97,7 @@ export async function renderRateCard(canvas: HTMLCanvasElement, o: RateCardOpts)
   ctx.fillStyle = 'rgba(7,9,14,0.62)';
   ctx.fillRect(0, 0, W, H);
 
-  // frosted-glass source: the darkened background, blurred via multi-step
-  // downscale→upscale (single-step 16× upscaling leaves blocky artifacts)
-  const step = (src: HTMLCanvasElement, w: number, h: number) => {
-    const c = document.createElement('canvas');
-    c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h));
-    const cc = c.getContext('2d')!;
-    cc.imageSmoothingEnabled = true;
-    cc.drawImage(src, 0, 0, c.width, c.height);
-    return c;
-  };
-  let blur = step(step(step(canvas, W / 4, H / 4), W / 16, H / 16), W / 4, H / 4);
-  blur = step(step(blur, W / 16, H / 16), W / 4, H / 4); // second cycle ≈ double radius
+  const blur = makeBlur(canvas, W, H);
 
   const glassPanel = (x: number, y: number, w: number, h: number, r: number) => {
     ctx.save();
@@ -127,42 +110,32 @@ export async function renderRateCard(canvas: HTMLCanvasElement, o: RateCardOpts)
     rr(ctx, x + 1, y + 1, w - 2, h - 2, r);
     ctx.strokeStyle = 'rgba(255,255,255,0.17)'; ctx.lineWidth = 2; ctx.stroke();
   };
+  const tracked = (on: boolean) => { try { (ctx as any).letterSpacing = on ? '3px' : '0px'; } catch { /* noop */ } };
 
-  // ---- hero block: sharp cover crop fading into the frosted lower half ----
-  ctx.save();
-  ctx.beginPath(); ctx.rect(0, 0, W, HERO_H); ctx.clip();
-  coverDraw(ctx, o.heroImg, 0, 0, W, HERO_H);
-  const top = ctx.createLinearGradient(0, 0, 0, 240);
-  top.addColorStop(0, 'rgba(0,0,0,0.38)'); top.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = top; ctx.fillRect(0, 0, W, 240);
-  const fade = ctx.createLinearGradient(0, HERO_H - 320, 0, HERO_H);
-  fade.addColorStop(0, 'rgba(7,9,14,0)'); fade.addColorStop(1, 'rgba(7,9,14,0.92)');
-  ctx.fillStyle = fade; ctx.fillRect(0, HERO_H - 320, W, 320);
-  ctx.restore();
+  drawMasthead(ctx, { W, M, heroH: HERO_H, heroImg: o.heroImg, logoImg: o.logoImg, name: o.catalogName.trim(), scriptFont: o.scriptFont });
 
-  // ---- masthead: logo top-right, then the catalog name as the hero heading
-  // (large gold-gradient script) with a letter-spaced RATE LIST kicker ----
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 3;
-  let logoBottom = M + 10;
-  if (o.logoImg) {
-    const lw = 300, lh = lw * (o.logoImg.naturalHeight / o.logoImg.naturalWidth);
-    ctx.drawImage(o.logoImg, W - M - lw, M + 6, lw, lh);
-    logoBottom = M + 6 + lh;
+  // ---- collection details band: the specs shared by every design ----
+  if (specs.length) {
+    glassPanel(M, specsY, panelW, specsH, 26);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    specs.forEach(([label,], i) => {
+      const row = Math.floor(i / specCols), col = i % specCols;
+      const isLastOdd = specCols === 2 && i === specs.length - 1 && specs.length % 2 === 1;
+      const cx = isLastOdd ? W / 2 : M + 56 + col * (specCellW + 44) + specCellW / 2;
+      const cy = specsY + 30 + specRowH.slice(0, row).reduce((a, b) => a + b, 0) + row * 22;
+      tracked(true);
+      ctx.font = font(600, 19); ctx.fillStyle = 'rgba(239,223,180,0.9)';
+      ctx.fillText(label, cx, cy + 12);
+      tracked(false);
+      ctx.font = font(500, 27); ctx.fillStyle = 'rgba(255,255,255,0.94)';
+      specLines[i].forEach((ln, li) => ctx.fillText(ln, cx, cy + 52 + li * 36));
+    });
+    // divider between the two grid columns
+    if (specCols === 2 && specs.length > 1) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(W / 2, specsY + 24); ctx.lineTo(W / 2, specsY + specsH - 24); ctx.stroke();
+    }
   }
-  const name = o.catalogName.trim();
-  let size = 210;
-  do { ctx.font = `400 ${size}px '${o.scriptFont}', cursive`; size -= 6; } while (size > 84 && ctx.measureText(name).width > W - 2 * M - 40);
-  const nameBase = Math.min(logoBottom + 60 + size * 0.9, HERO_H - 190);
-  const grad = ctx.createLinearGradient(0, nameBase - size, 0, nameBase + size * 0.25);
-  grad.addColorStop(0, GOLD); grad.addColorStop(1, GOLD_DEEP);
-  ctx.fillStyle = grad; ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
-  ctx.fillText(name, W - M - 10, nameBase);
-  try { (ctx as any).letterSpacing = '10px'; } catch { /* older browsers: skip tracking */ }
-  ctx.font = font(600, 24); ctx.fillStyle = 'rgba(245,238,220,0.78)';
-  ctx.fillText('RATE LIST', W - M - 10, nameBase + 64);
-  try { (ctx as any).letterSpacing = '0px'; } catch { /* noop */ }
-  ctx.restore();
 
   // ---- table on one glass panel: header band, zebra rows, uniform fonts ----
   glassPanel(M, tableY, panelW, tableH, 26);
@@ -190,7 +163,7 @@ export async function renderRateCard(canvas: HTMLCanvasElement, o: RateCardOpts)
   let y = tableY + headH;
   rowLines.forEach((cells, ri) => {
     cells.forEach((lines, ci) => {
-      ctx.fillStyle = cols[ci] === 'PRICE' ? GOLD : 'rgba(255,255,255,0.92)';
+      ctx.fillStyle = cols[ci] === o.priceCol ? GOLD : 'rgba(255,255,255,0.92)';
       drawLines(lines, cellWeight(cols[ci]), bodySize, bodyLineH, colX[ci] + colW[ci] / 2, y + rowH[ri] / 2);
     });
     y += rowH[ri];
@@ -207,10 +180,10 @@ export async function renderRateCard(canvas: HTMLCanvasElement, o: RateCardOpts)
       const cx = M + i * (cw + gap);
       glassPanel(cx, chipsY, cw, chipH, 20);
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      try { (ctx as any).letterSpacing = '3px'; } catch { /* noop */ }
+      tracked(true);
       ctx.font = font(600, 20); ctx.fillStyle = 'rgba(255,255,255,0.6)';
       ctx.fillText(label, cx + cw / 2, chipsY + 38);
-      try { (ctx as any).letterSpacing = '0px'; } catch { /* noop */ }
+      tracked(false);
       ctx.font = font(700, 34); ctx.fillStyle = i === 0 ? '#fff' : GOLD;
       ctx.fillText(value, cx + cw / 2, chipsY + chipH - 38);
     });
