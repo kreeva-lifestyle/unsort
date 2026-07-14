@@ -28,11 +28,32 @@ export async function compressCanvas(src: HTMLCanvasElement, maxEdge = 1600, qua
   return { dataUrl, blob, kb: Math.round(blob.size / 1024) };
 }
 
-// Grab the current video frame at native resolution, then compress it.
+// Capture exactly what the user framed. The live preview uses `object-fit:
+// cover`, so it shows a centre-crop of the sensor frame at the on-screen
+// (usually portrait) aspect ratio. Grabbing the raw sensor frame instead gave a
+// different aspect/orientation than the preview — the captured photo looked
+// shifted/rotated on the review screen. Here we crop the sensor frame to the
+// preview's visible region so the review matches the preview 1:1.
 export async function captureFrame(video: HTMLVideoElement, maxEdge = 1600, quality = 0.72): Promise<Compressed> {
+  const vw = video.videoWidth || 1280;
+  const vh = video.videoHeight || 720;
+  // Displayed size of the <video> element (the framed viewport). Fall back to
+  // the sensor frame if it hasn't laid out yet.
+  const dw = video.clientWidth || vw;
+  const dh = video.clientHeight || vh;
+  const targetAspect = dw / dh;
+  const frameAspect = vw / vh;
+  let sx = 0, sy = 0, sWidth = vw, sHeight = vh;
+  if (frameAspect > targetAspect) {          // sensor wider than viewport → crop the sides
+    sWidth = Math.round(vh * targetAspect);
+    sx = Math.round((vw - sWidth) / 2);
+  } else {                                    // sensor taller than viewport → crop top/bottom
+    sHeight = Math.round(vw / targetAspect);
+    sy = Math.round((vh - sHeight) / 2);
+  }
   const grab = document.createElement('canvas');
-  grab.width = video.videoWidth || 1280;
-  grab.height = video.videoHeight || 720;
-  grab.getContext('2d')!.drawImage(video, 0, 0, grab.width, grab.height);
+  grab.width = sWidth;
+  grab.height = sHeight;
+  grab.getContext('2d')!.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
   return compressCanvas(grab, maxEdge, quality);
 }
