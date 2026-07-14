@@ -61,11 +61,12 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
     v.autoplay = true; v.muted = true; v.playsInline = true; v.setAttribute('playsinline', 'true'); v.setAttribute('webkit-playsinline', 'true');
     v.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
     c.appendChild(v); videoRef.current = v;
-    // Request a PORTRAIT frame (tall) — the phone is held upright and documents
-    // are portrait. Asking for landscape (1920×1080) let iOS hand back a
-    // sideways sensor frame that captured rotated; a portrait request keeps most
-    // captures upright. The Rotate button in review fixes any that still aren't.
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1080 }, height: { ideal: 1920 } } })
+    // Request the WIDE (full-sensor) frame — asking for a portrait resolution
+    // made iOS crop a tall slice out of the landscape sensor, narrowing the
+    // field of view (the camera looked "zoomed in"). The full-sensor request
+    // keeps the widest view; the review Rotate button handles any frame iOS
+    // hands back sideways, so we no longer force portrait at the camera level.
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } })
       .then(stream => {
         if (!videoRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream; v.srcObject = stream;
