@@ -65,27 +65,38 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
     setError('');
     if (!vendor.name.trim()) { setError('Select or enter a vendor'); return; }
     if (!poType) { setError('Select a PO type — Fabric, Job Work, or Material'); return; }
-    const clean = items.filter(it => it.sku.trim() || it.item_name.trim() || num(it.quantity) > 0 || it.rate);
+    // A row counts as "touched" only if the user typed something into it — the
+    // default quantity of '1' alone must not keep an untouched "+ Add item" row
+    // alive (it would then fail "item name is required" for a row the user
+    // never used). Keep the ORIGINAL index so errors point at the visual row.
+    const clean = items.map((it, idx) => ({ it, idx })).filter(({ it }) => it.sku.trim() || it.item_name.trim() || it.unit.trim() || it.rate.trim());
     if (clean.length === 0) { setError('Add at least one item'); return; }
     const skuRequired = poType === 'fabric' || poType === 'material';
-    for (let i = 0; i < clean.length; i++) {
-      if (!clean[i].item_name.trim()) { setError(`Row ${i + 1}: item name is required`); return; }
-      if (skuRequired && !clean[i].sku.trim()) { setError(`Row ${i + 1} (${clean[i].item_name}): SKU is required for Fabric / Material items`); return; }
-      if (num(clean[i].quantity) <= 0) { setError(`Row ${i + 1} (${clean[i].item_name}): quantity must be greater than 0`); return; }
-      if (clean[i].rate && num(clean[i].rate) < 0) { setError(`Row ${i + 1} (${clean[i].item_name}): rate cannot be negative`); return; }
+    for (const { it, idx } of clean) {
+      if (!it.item_name.trim()) { setError(`Row ${idx + 1}: item name is required`); return; }
+      if (skuRequired && !it.sku.trim()) { setError(`Row ${idx + 1} (${it.item_name}): SKU is required for Fabric / Material items`); return; }
+      if (num(it.quantity) <= 0) { setError(`Row ${idx + 1} (${it.item_name}): quantity must be greater than 0`); return; }
+      if (it.rate && num(it.rate) < 0) { setError(`Row ${idx + 1} (${it.item_name}): rate cannot be negative`); return; }
     }
+    if (discountType === 'percentage' && num(discountValue) > 100) { setError('Discount cannot exceed 100%'); return; }
+    if (discountType === 'flat' && num(discountValue) > subtotal) { setError('Discount cannot exceed the subtotal'); return; }
+    if (num(taxPercent) > 100) { setError('Tax % cannot exceed 100'); return; }
     setSaving(true);
     try {
       const p_po = {
         vendor_id: vendor.id, vendor_name: vendor.name.trim(), vendor_phone: vendor.phone.trim() || null,
         po_type: poType, po_date: poDate || null, expected_date: expectedDate || null,
         payment_terms: paymentTerms.trim() || null, notes: notes.trim() || null,
-        discount_type: showCharges && num(discountValue) > 0 ? discountType : null,
-        discount_value: showCharges ? num(discountValue) : 0,
-        tax_percent: showCharges ? num(taxPercent) : 0,
-        other_charges: showCharges ? num(otherCharges) : 0,
+        // Always send the values held in state — the Grand Total preview
+        // includes them whether or not the charges section is expanded, so
+        // collapsing the section must never silently strip an existing
+        // discount/tax from the saved PO.
+        discount_type: num(discountValue) > 0 ? discountType : null,
+        discount_value: num(discountValue),
+        tax_percent: num(taxPercent),
+        other_charges: num(otherCharges),
       };
-      const p_items = clean.map(it => ({ item_name: it.item_name.trim(), sku: it.sku.trim() || null, quantity: num(it.quantity), unit: it.unit.trim() || null, rate: it.rate === '' ? null : num(it.rate) }));
+      const p_items = clean.map(({ it }) => ({ item_name: it.item_name.trim(), sku: it.sku.trim() || null, quantity: num(it.quantity), unit: it.unit.trim() || null, rate: it.rate === '' ? null : num(it.rate) }));
       if (editing) {
         const { error: e } = await supabase.rpc('update_po_with_items', { p_po_id: editing.id, p_po, p_items });
         if (e) throw new Error(e.message);

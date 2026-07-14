@@ -9,7 +9,7 @@ export const FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-
 export interface GenLink { name: string; url: string; error?: string }
 export interface GenCandidate { name: string; path: string; display: string }
 export interface GenResult { ok: boolean; sku: string; mode?: string; folder?: string; links?: GenLink[]; note?: string; error?: string; needsReconnect?: boolean; candidates?: GenCandidate[] }
-export interface WriteResult { ok: boolean; error?: string; count?: number; written?: { sku: string; tab: string; cell: string }[]; notFound?: string[] }
+export interface WriteResult { ok: boolean; error?: string; count?: number; skuCount?: number; written?: { sku: string; tab: string; cell: string }[]; notFound?: string[]; ambiguous?: string[] }
 
 // Shared, human-first error text for a linkgen response. Server messages are
 // already written for people ("No folder named…", "Found in 2 places…") — show

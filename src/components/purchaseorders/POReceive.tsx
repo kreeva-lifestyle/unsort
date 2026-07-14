@@ -1,7 +1,10 @@
 // Receive goods against a PO — the "payments" analog. Per line item shows
 // Ordered / Received / Remaining and an input for the qty arriving now
-// (defaults to remaining, capped at remaining). One shared date + remarks.
-// Calls receive_po_items, which validates cumulative ≤ ordered server-side.
+// (defaults to remaining; over-receipt is ALLOWED — a 54 m order may deliver
+// 57 m, shown as "+N extra"). One shared date + remarks → receive_po_items.
+// Before writing we re-check the server's received totals: if another user
+// recorded a receipt while this modal was open, the pre-filled quantities are
+// stale and confirming would silently double the tally.
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
@@ -22,8 +25,12 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
   onReceived: () => void;
   addToast: (m: string, t?: string) => void;
 }) {
-  const remainingOf = (it: PurchaseOrderItem) => Math.max(0, Number(it.quantity) - Number(it.received_qty || 0));
-  const [qty, setQty] = useState<Record<string, string>>(() => Object.fromEntries(items.map(it => [it.id, String(remainingOf(it))])));
+  // Live received totals — starts from the snapshot passed in, refreshed from
+  // the server just before submit (see the stale-receipt guard below).
+  const [liveRecvd, setLiveRecvd] = useState<Record<string, number>>(() => Object.fromEntries(items.map(it => [it.id, Number(it.received_qty || 0)])));
+  const recvdOf = (it: PurchaseOrderItem) => liveRecvd[it.id] ?? Number(it.received_qty || 0);
+  const remainingOf = (it: PurchaseOrderItem) => Math.max(0, Number(it.quantity) - recvdOf(it));
+  const [qty, setQty] = useState<Record<string, string>>(() => Object.fromEntries(items.map(it => [it.id, String(Math.max(0, Number(it.quantity) - Number(it.received_qty || 0)))])));
   const [date, setDate] = useState(localToday());
   const [remarks, setRemarks] = useState('');
   const [error, setError] = useState('');
@@ -41,6 +48,21 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
     if (receipts.length === 0) { setError('Enter a received quantity for at least one item'); return; }
     // Over-receipt is allowed — a 54 m order may deliver 57 m. No remaining cap.
     setSaving(true);
+    // Stale-receipt guard: if someone else received against this PO while the
+    // modal was open, the pre-filled "remaining" quantities would double-count.
+    // Refresh the totals and make the user confirm against the fresh numbers.
+    try {
+      const { data: fresh, error: fe } = await supabase.from('purchase_order_items').select('id, received_qty').eq('po_id', po.id);
+      if (fe) throw new Error(fe.message);
+      const freshMap = Object.fromEntries(((fresh as { id: string; received_qty: number }[] | null) || []).map(r => [r.id, Number(r.received_qty || 0)]));
+      const changed = items.some(it => (freshMap[it.id] ?? 0) !== recvdOf(it));
+      if (changed) {
+        setLiveRecvd(freshMap);
+        setError('Received totals just changed — someone else recorded a receipt on this PO. The numbers above are now up to date; review your quantities and confirm again.');
+        setSaving(false);
+        return;
+      }
+    } catch (e) { setError(friendlyError(e)); setSaving(false); return; }
     try {
       const p_receipts = receipts.map(r => ({ ...r, receipt_date: date || null, remarks: remarks.trim() || null }));
       const { error: e } = await supabase.rpc('receive_po_items', { p_po_id: po.id, p_receipts });
@@ -64,7 +86,7 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {items.map(it => {
               const rem = remainingOf(it);
-              const recvd = Number(it.received_qty || 0);
+              const recvd = recvdOf(it);
               const over = recvd - Number(it.quantity);
               return (
                 <div key={it.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 8 }}>

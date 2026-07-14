@@ -18,7 +18,10 @@ export function parseSkuFile(buf: ArrayBuffer): string[] {
   const wb = XLSX.read(buf, { type: 'array' });
   const grid = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null });
   let skus = grid.map(r => String(r?.[0] ?? '').trim().toUpperCase()).filter(Boolean);
-  if (skus.length && /SKU|DESIGN|CODE|STYLE/.test(skus[0])) skus = skus.slice(1);
+  // Header row heuristic: drop the first cell only when it looks like a label
+  // ("SKU", "DESIGN CODE"), never when it contains digits — a real first SKU
+  // like "STYLE-101" must not be silently swallowed.
+  if (skus.length && /SKU|DESIGN|CODE|STYLE/.test(skus[0]) && !/\d/.test(skus[0])) skus = skus.slice(1);
   return [...new Set(skus)];
 }
 

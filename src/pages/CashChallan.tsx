@@ -90,7 +90,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkPayMode, setBulkPayMode] = useState('');
   const [bulkReceivedAmount, setBulkReceivedAmount] = useState('');
-  const [lastBatch, setLastBatch] = useState<{ id: string; count: number; mode: string } | null>(null);
+  const [lastBatch, setLastBatch] = useState<{ id: string; count: number; mode: string; settled: number } | null>(null);
   const [undoingBatch, setUndoingBatch] = useState(false);
 
   // Draft auto-save
@@ -1162,16 +1162,25 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // negative payment row nets the cash book against the sale payments above.
     // Note: batch Undo restores the SALES only — a consumed credit stays
     // consumed (settle again is impossible; the RPC refuses double-settling).
+    // Settle failures are counted SEPARATELY from sale failures so the summary
+    // toast never reports a failed settle as a failed sale payment.
+    let settleFail = 0, settledCount = 0;
     for (const c of settleableReturns) {
       const remaining = Number(c.total) - Number(c.amount_paid || 0);
       const { error: settleErr } = await supabase.rpc('settle_return_refund', { p_challan_id: c.id, p_mode: bulkPayMode });
-      if (settleErr) { addToast(`Return #${c.challan_number}: ${friendlyError(settleErr)}`, 'error'); failCount++; continue; }
+      if (settleErr) { addToast(`Return #${c.challan_number}: ${friendlyError(settleErr)}`, 'error'); settleFail++; continue; }
+      settledCount++;
       await ccAuditLog('RETURN_SETTLED', c.id, `Return credit ₹${remaining.toLocaleString('en-IN')} consumed in batch ${batchId} via ${bulkPayMode}`, { amount_paid: { from: c.amount_paid, to: c.total } });
     }
-    setLastBatch({ id: batchId, count: ids.length, mode: bulkPayMode });
+    setLastBatch({ id: batchId, count: ids.length, mode: bulkPayMode, settled: settledCount });
     setShowBulkPay(false); setBulkPayMode(''); setBulkReceivedAmount(''); exitBulkMode(); fetchChallans();
-    if (failCount > 0) addToast(`${ids.length - failCount} of ${ids.length} challans paid — ${failCount} failed (${batchId})`, 'error');
-    else addToast(isRefund ? `Settled ${ids.length} challans, refunded ₹${received.toLocaleString('en-IN')} (${batchId})` : `${ids.length} challans marked as paid (${batchId})`, 'success');
+    if (failCount > 0 || settleFail > 0) {
+      const parts = [];
+      if (ids.length > 0) parts.push(`${paidOk.length} of ${ids.length} challans paid${failCount > 0 ? ` (${failCount} failed)` : ''}`);
+      if (settleableReturns.length > 0) parts.push(`${settledCount} of ${settleableReturns.length} return credits settled${settleFail > 0 ? ` (${settleFail} failed)` : ''}`);
+      addToast(`${parts.join(' · ')} (${batchId})`, 'error');
+    }
+    else addToast(isRefund ? `Settled ${ids.length} challans, refunded ₹${received.toLocaleString('en-IN')} (${batchId})` : `${ids.length > 0 ? `${ids.length} challans marked as paid` : `${settledCount} return credit${settledCount === 1 ? '' : 's'} settled`} (${batchId})`, 'success');
     // Offer a WhatsApp receipt when the whole batch belongs to one customer
     // (the common per-customer settlement case). Mixed selections: skip.
     if (paidOk.length > 0) {

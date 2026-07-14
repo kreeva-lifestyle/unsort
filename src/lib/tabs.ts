@@ -28,6 +28,9 @@ export const canAccessTab = (role: string | null | undefined, tab: string, modul
   const modKey = TAB_TO_MODULE[tab];
   if (modKey && moduleAccess && moduleAccess[modKey] === false) return false;
   if (role === 'manager') return true;
-  if (role === 'operator') return !['brandtag', 'challan', 'attendance', 'programs', 'minis'].includes(tab);
+  // Operators are excluded from finance-adjacent modules by default (an admin
+  // can still grant access per-user via module_access) — purchase orders carry
+  // vendor rates and order values, same sensitivity as the challan book.
+  if (role === 'operator') return !['brandtag', 'challan', 'attendance', 'programs', 'minis', 'purchaseorders'].includes(tab);
   return ['dashboard', 'inventory', 'settings'].includes(tab);
 };

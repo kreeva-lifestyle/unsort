@@ -23,12 +23,17 @@ export default function ConnectDropboxCard({ appKey, call, addToast, onConnected
   const connect = async () => {
     if (connecting || !code.trim()) return;
     setConnecting(true);
-    const { data } = await call({ action: 'dropbox_exchange', code: code.trim() });
-    setConnecting(false);
-    if (!data.ok) { addToast(friendlyError(data.details || data.error || 'Connect failed'), 'error'); return; }
-    setCode('');
-    addToast('Dropbox connected', 'success');
-    onConnected();
+    try {
+      const { data } = await call({ action: 'dropbox_exchange', code: code.trim() });
+      if (!data.ok) { addToast(friendlyError(data.details || data.error || 'Connect failed'), 'error'); return; }
+      setCode('');
+      addToast('Dropbox connected', 'success');
+      onConnected();
+    } catch (e) {
+      // A network throw (flaky mobile right after the Dropbox tab) must not
+      // leave the button locked on "Connecting…" forever.
+      addToast(friendlyError(e), 'error');
+    } finally { setConnecting(false); }
   };
 
   return (
