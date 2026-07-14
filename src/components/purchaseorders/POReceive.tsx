@@ -39,10 +39,7 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
       .filter(({ q }) => q > 0)
       .map(({ it, q }) => ({ po_item_id: it.id, received_qty: q }));
     if (receipts.length === 0) { setError('Enter a received quantity for at least one item'); return; }
-    for (const it of items) {
-      const q = num(qty[it.id] || '');
-      if (q > remainingOf(it) + 0.0001) { setError(`${it.item_name}: only ${remainingOf(it)} remaining`); return; }
-    }
+    // Over-receipt is allowed — a 54 m order may deliver 57 m. No remaining cap.
     setSaving(true);
     try {
       const p_receipts = receipts.map(r => ({ ...r, receipt_date: date || null, remarks: remarks.trim() || null }));
@@ -67,13 +64,16 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {items.map(it => {
               const rem = remainingOf(it);
-              const done = rem <= 0;
+              const recvd = Number(it.received_qty || 0);
+              const over = recvd - Number(it.quantity);
               return (
                 <div key={it.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 8 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.item_name}</div>
                     <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 2 }}>
-                      Ordered {Number(it.quantity)}{it.unit ? ` ${it.unit}` : ''} · Received {Number(it.received_qty || 0)} · <span style={{ color: done ? T.gr : T.yl }}>Remaining {rem}</span>
+                      Ordered {Number(it.quantity)}{it.unit ? ` ${it.unit}` : ''} · Received {recvd} · {over > 0
+                        ? <span style={{ color: T.yl }}>+{over} extra</span>
+                        : <span style={{ color: rem <= 0 ? T.gr : T.yl }}>Remaining {rem}</span>}
                     </div>
                   </div>
                   <input
@@ -81,9 +81,8 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
                     onChange={e => setQty(m => ({ ...m, [it.id]: e.target.value }))}
                     onKeyDown={e => numericKeyDown(e)}
                     inputMode="decimal"
-                    disabled={done}
                     placeholder="0"
-                    style={{ ...S.fInput, width: 80, fontFamily: T.mono, textAlign: 'right', opacity: done ? 0.4 : 1 }}
+                    style={{ ...S.fInput, width: 80, fontFamily: T.mono, textAlign: 'right' }}
                   />
                 </div>
               );
