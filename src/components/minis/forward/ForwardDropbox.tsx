@@ -8,7 +8,7 @@ import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { useAuth } from '../../../hooks/useAuth';
 import { call } from '../dropboxlinks/api';
-import { captureFrame, Compressed } from './compressImage';
+import { captureFrame, rotate90, Compressed } from './compressImage';
 import FwdSettings from './FwdSettings';
 import ConnectDropboxCard from '../ConnectDropboxCard';
 
@@ -61,7 +61,11 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
     v.autoplay = true; v.muted = true; v.playsInline = true; v.setAttribute('playsinline', 'true'); v.setAttribute('webkit-playsinline', 'true');
     v.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
     c.appendChild(v); videoRef.current = v;
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } })
+    // Request a PORTRAIT frame (tall) — the phone is held upright and documents
+    // are portrait. Asking for landscape (1920×1080) let iOS hand back a
+    // sideways sensor frame that captured rotated; a portrait request keeps most
+    // captures upright. The Rotate button in review fixes any that still aren't.
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1080 }, height: { ideal: 1920 } } })
       .then(stream => {
         if (!videoRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream; v.srcObject = stream;
@@ -106,6 +110,15 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
     if (!videoRef.current) return;
     try { const c = await captureFrame(videoRef.current); stopCam(); setPending(c); setMode('review'); }
     catch (e) { addToast(friendlyError(e), 'error'); }
+  };
+
+  const [rotating, setRotating] = useState(false);
+  const rotate = async () => {
+    if (!pending || rotating) return;
+    setRotating(true);
+    try { setPending(await rotate90(pending.dataUrl)); }
+    catch (e) { addToast(friendlyError(e), 'error'); }
+    setRotating(false);
   };
 
   const doUpload = async (id: string, name: string, ds: string, dataUrl: string) => {
@@ -218,8 +231,8 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
         </>
       ) : (
         <>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0d15', overflow: 'hidden' }}>
-            {pending && <img src={pending.dataUrl} alt="Captured document" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />}
+          <div style={{ flex: 1, minHeight: 0, position: 'relative', background: '#0a0d15', overflow: 'hidden' }}>
+            {pending && <img src={pending.dataUrl} alt="Captured document" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain' }} />}
           </div>
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 6, padding: '14px 14px calc(16px + env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 10, background: 'linear-gradient(0deg, rgba(5,7,12,.97), rgba(5,7,12,.75) 70%, transparent)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
@@ -236,6 +249,7 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setPending(null); setMode('camera'); }} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Retake</button>
+              <button onClick={rotate} disabled={rotating} aria-label="Rotate photo" title="Rotate" style={{ ...S.btnGhost, justifyContent: 'center', minWidth: 46, padding: '8px 12px', pointerEvents: rotating ? 'none' : 'auto', opacity: rotating ? 0.5 : 1, fontSize: 17 }}>↻</button>
               <button onClick={upload} style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center' }}>Upload to Dropbox</button>
             </div>
           </div>
