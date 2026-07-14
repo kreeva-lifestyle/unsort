@@ -6,9 +6,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
+import { useAuth } from '../../../hooks/useAuth';
 import { call } from '../dropboxlinks/api';
 import { captureFrame, Compressed } from './compressImage';
 import FwdSettings from './FwdSettings';
+import ConnectDropboxCard from '../ConnectDropboxCard';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
@@ -20,12 +22,20 @@ interface Item { id: string; name: string; dateStr: string; dataUrl: string; sta
 
 export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: string, t?: string) => void; onBack: () => void }) {
   const mobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   const [mode, setMode] = useState<'camera' | 'review'>('camera');
   const [dateStr, setDateStr] = useState(localToday());
   const [pending, setPending] = useState<Compressed | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [cameraError, setCameraError] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  // Reconnect flow: when an upload fails because the stored Dropbox token lacks
+  // the files.content.write scope (or isn't connected), an admin gets a one-tap
+  // reconnect right here instead of hunting for it in Link Check.
+  const [needsReconnect, setNeedsReconnect] = useState(false);
+  const [showReconnect, setShowReconnect] = useState(false);
+  const [appKey, setAppKey] = useState('');
   const streamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
@@ -88,6 +98,9 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
     return () => stopCam();
   }, [mobile, mode, showSettings, startCam, stopCam]);
   useEffect(() => () => clearTimeout(focusTimer.current), []);
+  // Admins may need to reconnect Dropbox — fetch the public OAuth app key once
+  // so the reconnect card can build its authorize link.
+  useEffect(() => { if (isAdmin) call({ action: 'dropbox_status' }).then(({ data }) => setAppKey(data?.appKey || '')).catch(() => {}); }, [isAdmin]);
 
   const snap = async () => {
     if (!videoRef.current) return;
@@ -105,6 +118,8 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
     // Terminal failure — flip the thumbnail to red (tap-to-retry) AND surface a
     // clear toast so the user never assumes a silent success.
     const err = data?.error === 'no_folder' ? 'No upload folder set — open Settings' : data?.error === 'dropbox_not_connected' ? 'Dropbox not connected — ask an admin' : data?.error === 'needs_write_scope' ? 'Dropbox needs reconnecting for uploads' : (data?.details || data?.error || 'Upload failed — tap the photo to retry');
+    // Scope/connection failures are fixable by reconnecting — surface the button.
+    if (data?.error === 'needs_write_scope' || data?.error === 'dropbox_not_connected') setNeedsReconnect(true);
     setItems(prev => prev.map(it => it.id === id ? { ...it, status: 'err', message: err } : it));
     addToast(err, 'error');
   };
@@ -118,6 +133,15 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
     doUpload(id, name, dateStr, url).catch(() => { setItems(prev => prev.map(x => x.id === id ? { ...x, status: 'err', message: 'Upload failed — tap the photo to retry' } : x)); addToast('Upload failed — check your connection and tap the photo to retry', 'error'); });
   };
   const retry = (it: Item) => { setItems(prev => prev.map(x => x.id === it.id ? { ...x, status: 'up', message: undefined } : x)); doUpload(it.id, it.name, it.dateStr, it.dataUrl).catch(() => {}); };
+  // After a successful reconnect, clear the banner and re-send everything that
+  // failed for a scope/connection reason so the owner doesn't re-shoot them.
+  const onReconnected = () => {
+    setShowReconnect(false); setNeedsReconnect(false);
+    addToast('Dropbox reconnected', 'success');
+    const failed = items.filter(i => i.status === 'err');
+    setItems(prev => prev.map(x => x.status === 'err' ? { ...x, status: 'up' as UpStatus, message: undefined } : x));
+    failed.forEach(it => doUpload(it.id, it.name, it.dateStr, it.dataUrl).catch(() => {}));
+  };
   const openDate = () => { const el = dateInputRef.current as any; if (el?.showPicker) { try { el.showPicker(); return; } catch { /* fall through */ } } el?.click(); };
 
   const sent = items.filter(i => i.status === 'ok').length;
@@ -162,6 +186,14 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
               <span style={{ position: 'absolute', bottom: -2, right: -2, width: 13, height: 13, borderRadius: '50%', background: ring(it.status), color: '#05070c', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{it.status === 'ok' ? '✓' : it.status === 'err' ? '!' : '↑'}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Reconnect banner — shown to admins after a scope/connection upload failure */}
+      {needsReconnect && isAdmin && !showReconnect && !showSettings && (
+        <div style={{ position: 'absolute', top: 'max(66px, calc(env(safe-area-inset-top) + 56px))', left: 12, right: 12, zIndex: 7, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'rgba(239,68,68,.16)', border: '1px solid rgba(239,68,68,.4)', borderRadius: 12, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div style={{ flex: 1, fontSize: 11.5, color: '#fff', lineHeight: 1.4 }}>Dropbox needs reconnecting before uploads work.</div>
+          <button onClick={() => setShowReconnect(true)} style={{ ...S.btnPrimary, padding: '7px 12px', fontSize: 12, flexShrink: 0 }}>Reconnect</button>
         </div>
       )}
 
@@ -218,6 +250,20 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Upload Folder</div>
           </div>
           <div style={{ padding: 16, overflowY: 'auto' }}><FwdSettings addToast={addToast} onChanged={() => {}} /></div>
+        </div>
+      )}
+
+      {/* reconnect sheet — admin re-authorises Dropbox with upload permission */}
+      {showReconnect && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 9, background: T.bg, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: 'max(12px, env(safe-area-inset-top)) 14px 12px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', gap: 10, background: T.s }}>
+            <div onClick={() => setShowReconnect(false)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${T.bd2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.ac2, cursor: 'pointer' }}>‹</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Reconnect Dropbox</div>
+          </div>
+          <div style={{ padding: 16, overflowY: 'auto' }}>
+            <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.6, marginBottom: 12 }}>Your Dropbox connection was set up before uploads were added, so it can't save files yet. Reconnect once below to grant upload permission — on the Dropbox screen, press <b style={{ color: T.tx }}>Allow</b>.</div>
+            <ConnectDropboxCard appKey={appKey} call={call} addToast={addToast} onConnected={onReconnected} />
+          </div>
         </div>
       )}
     </div>,
