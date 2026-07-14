@@ -28,6 +28,10 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
   const [showPaste, setShowPaste] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [bulk, setBulk] = useState<BulkRow[] | null>(null);
+  // Mode the CURRENT bulk results were generated with — the Save-all gate must
+  // check this, not the live toggle, or links minted in Separate mode (one per
+  // image) could be written into the master sheet as if they were folder links.
+  const [bulkMode, setBulkMode] = useState<Mode>('combine');
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -53,7 +57,8 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
         r.data.ok ? r.data : { ok: false, sku: s, error: explainGen(r.data, r.status), folder: r.data.folder, candidates: r.data.candidates };
       setResults({ combine: toRes(c), separate: toRes(sep) });
       const act = mode === 'combine' ? c : sep;
-      if (c.data.ok || sep.data.ok) addToast(`Links ready for ${s} — Combine & Separate`, 'success');
+      if (c.data.ok && sep.data.ok) addToast(`Links ready for ${s} — Combine & Separate`, 'success');
+      else if (c.data.ok || sep.data.ok) addToast(`${c.data.ok ? 'Combine' : 'Separate'} links ready for ${s} — ${c.data.ok ? 'Separate' : 'Combine'} failed`, 'info');
       else addToast(explainGen(act.data, act.status), act.data?.candidates?.length ? 'info' : 'error');
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setBusy(false);
@@ -67,7 +72,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
   const startBulk = async (skusIn: string[]) => {
     let skus = skusIn;
     if (skus.length > BULK_CAP) { addToast(`${skus.length} SKUs — doing the first ${BULK_CAP}`, 'info'); skus = skus.slice(0, BULK_CAP); }
-    setBulkBusy(true); setProgress({ done: 0, total: skus.length });
+    setBulkBusy(true); setBulkMode(mode); setProgress({ done: 0, total: skus.length });
     const rows = await runBulk(skus, mode, (r, done) => { setBulk(r); setProgress({ done, total: skus.length }); });
     const ok = rows.filter(r => r.status === 'ok').length;
     addToast(`${ok} of ${rows.length} SKUs got links${ok < rows.length ? ' — see the list' : ''}`, ok > 0 ? 'success' : 'error');
@@ -86,6 +91,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
       const { data } = await call({ action: 'linkgen_writesheet', items: [{ sku: sku0, url }] }) as { data: WriteResult };
       if (data.ok) addToast(`Saved to ${data.written?.[0]?.tab || 'sheet'} ${data.written?.[0]?.cell?.split('!')[1] || ''}`.trim(), 'success');
       else if (data.error === 'sku_not_found') addToast(`${sku0} is not in the master sheet`, 'error');
+      else if (data.error === 'sku_ambiguous') addToast(`${sku0} exists in BOTH master tabs — update the sheet manually to be safe`, 'error');
       else addToast(friendlyError(data.error || 'Could not save to the sheet'), 'error');
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setSavingSheet(false);
@@ -97,8 +103,12 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
     setBulkSaving(true);
     try {
       const { data } = await call({ action: 'linkgen_writesheet', items }) as { data: WriteResult };
-      if (data.ok) addToast(`Saved ${data.count} to the master sheet${data.notFound?.length ? ` — ${data.notFound.length} not in sheet` : ''}`, 'success');
-      else if (data.error === 'sku_not_found') addToast('None of these SKUs are in the master sheet', 'error');
+      const skipped = [
+        data.notFound?.length ? `${data.notFound.length} not in sheet` : '',
+        data.ambiguous?.length ? `${data.ambiguous.length} in both tabs (skipped: ${data.ambiguous.join(', ')})` : '',
+      ].filter(Boolean).join(' · ');
+      if (data.ok) addToast(`Saved ${data.skuCount ?? data.count} SKU${(data.skuCount ?? data.count) === 1 ? '' : 's'} to the master sheet${skipped ? ` — ${skipped}` : ''}`, 'success');
+      else if (data.error === 'sku_not_found' || data.error === 'sku_ambiguous') addToast(`Nothing saved — ${skipped || 'no matching SKUs in the master sheet'}`, 'error');
       else addToast(friendlyError(data.error || 'Could not save to the sheet'), 'error');
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setBulkSaving(false);
@@ -153,7 +163,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
 
       {bulk && bulk.length > 0 && (
         <>
-          {canSave && !bulkBusy && mode === 'combine' && bulk.some(r => r.status === 'ok') && (
+          {canSave && !bulkBusy && bulkMode === 'combine' && bulk.some(r => r.status === 'ok') && (
             <button onClick={saveAllToSheet} disabled={bulkSaving} style={{ ...S.btnGhost, marginBottom: 8, color: T.bl, border: '1px solid rgba(56,189,248,.25)', background: 'rgba(56,189,248,.06)', pointerEvents: bulkSaving ? 'none' : 'auto', opacity: bulkSaving ? 0.5 : 1 }}>{bulkSaving ? 'Saving…' : 'Save all to master sheet'}</button>
           )}
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}` }}>

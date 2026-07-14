@@ -68,7 +68,11 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
     // hands back sideways, so we no longer force portrait at the camera level.
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } })
       .then(stream => {
-        if (!videoRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
+        // Identity check: only attach if MY <video> is still the live one. A
+        // slow-resolving permission prompt can outlive a stop/start cycle —
+        // checking "any video mounted" would adopt a stale stream and leak the
+        // newer one (camera light stays on until page close).
+        if (videoRef.current !== v) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream; v.srcObject = stream;
         const track = stream.getVideoTracks()[0]; trackRef.current = track || null;
         // Best-effort continuous autofocus so the preview stays sharp (Android
@@ -99,17 +103,26 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
   };
 
   useEffect(() => {
-    if (mobile && mode === 'camera' && !showSettings) { const t = setTimeout(startCam, 150); return () => { clearTimeout(t); stopCam(); }; }
+    // Camera runs only when it's actually visible — the settings AND reconnect
+    // sheets fully cover it (streaming underneath burns battery, and iOS can
+    // kill the backgrounded track leaving a frozen preview on return).
+    if (mobile && mode === 'camera' && !showSettings && !showReconnect) { const t = setTimeout(startCam, 150); return () => { clearTimeout(t); stopCam(); }; }
     return () => stopCam();
-  }, [mobile, mode, showSettings, startCam, stopCam]);
+  }, [mobile, mode, showSettings, showReconnect, startCam, stopCam]);
   useEffect(() => () => clearTimeout(focusTimer.current), []);
-  // Admins may need to reconnect Dropbox — fetch the public OAuth app key once
-  // so the reconnect card can build its authorize link.
-  useEffect(() => { if (isAdmin) call({ action: 'dropbox_status' }).then(({ data }) => setAppKey(data?.appKey || '')).catch(() => {}); }, [isAdmin]);
+  // Admins may need to reconnect Dropbox — fetch the public OAuth app key for
+  // the reconnect card's authorize link. Re-tried when the sheet opens so one
+  // transient failure at mount doesn't leave the card stuck on "Loading…".
+  useEffect(() => {
+    if (isAdmin && !appKey) call({ action: 'dropbox_status' }).then(({ data }) => setAppKey(data?.appKey || '')).catch(() => {});
+  }, [isAdmin, appKey, showReconnect]);
 
   const snap = async () => {
-    if (!videoRef.current) return;
-    try { const c = await captureFrame(videoRef.current); stopCam(); setPending(c); setMode('review'); }
+    const v = videoRef.current;
+    // Don't capture before the stream is live — drawing a not-yet-ready video
+    // produces a solid-black "document" (shutter tapped during camera startup).
+    if (!v || v.readyState < 2 || !v.videoWidth) { addToast('Camera is still starting — try again', 'info'); return; }
+    try { const c = await captureFrame(v); stopCam(); setPending(c); setMode('review'); }
     catch (e) { addToast(friendlyError(e), 'error'); }
   };
 
@@ -122,8 +135,13 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
     setRotating(false);
   };
 
+  // NEVER throws: every failure path (server error OR network throw) flips the
+  // item to 'err' so it stays tap-to-retryable — a swallowed rejection used to
+  // leave items stuck in 'up' (blue, unretryable) forever.
   const doUpload = async (id: string, name: string, ds: string, dataUrl: string) => {
-    const { data } = await call({ action: 'fwd_upload', dataUrl, dateStr: ds });
+    let data: any;
+    try { ({ data } = await call({ action: 'fwd_upload', dataUrl, dateStr: ds })); }
+    catch { data = { ok: false, error: 'Upload failed — check your connection and tap the photo to retry' }; }
     if (data?.ok) {
       setItems(prev => prev.map(it => it.id === id ? { ...it, status: 'ok', name: data.name || name, message: data.path } : it));
       addToast('Uploaded to Dropbox', 'success');
@@ -138,23 +156,38 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
     addToast(err, 'error');
   };
 
+  // Cap the session list so hours of scanning don't hold hundreds of base64
+  // photos in memory — drop the OLDEST uploaded ('ok') items past the cap, but
+  // never drop pending/failed ones (they still need the user's attention).
+  const ITEM_CAP = 40;
+  const trimItems = (list: Item[]): Item[] => {
+    if (list.length <= ITEM_CAP) return list;
+    let okKeep = ITEM_CAP - list.filter(i => i.status !== 'ok').length;
+    return list.filter(i => i.status !== 'ok' || okKeep-- > 0);
+  };
+
   const upload = () => {
-    if (!pending) return;
+    if (!pending || rotating) return;
     const id = `${Date.now()}-${Math.round(Math.random() * 1e4)}`;
     const name = `${dateStr}.jpg`;
-    setItems(prev => [{ id, name, dateStr, dataUrl: pending.dataUrl, status: 'up' as UpStatus }, ...prev]);
+    setItems(prev => trimItems([{ id, name, dateStr, dataUrl: pending.dataUrl, status: 'up' as UpStatus }, ...prev]));
     const url = pending.dataUrl; setPending(null); setMode('camera');
-    doUpload(id, name, dateStr, url).catch(() => { setItems(prev => prev.map(x => x.id === id ? { ...x, status: 'err', message: 'Upload failed — tap the photo to retry' } : x)); addToast('Upload failed — check your connection and tap the photo to retry', 'error'); });
+    doUpload(id, name, dateStr, url);
   };
-  const retry = (it: Item) => { setItems(prev => prev.map(x => x.id === it.id ? { ...x, status: 'up', message: undefined } : x)); doUpload(it.id, it.name, it.dateStr, it.dataUrl).catch(() => {}); };
+  const retry = (it: Item) => { setItems(prev => prev.map(x => x.id === it.id ? { ...x, status: 'up', message: undefined } : x)); doUpload(it.id, it.name, it.dateStr, it.dataUrl); };
+  // Mirror of `items` for event handlers created before the latest render —
+  // onReconnected fires from a child callback whose closure can be stale.
+  const itemsRef = useRef<Item[]>(items);
+  useEffect(() => { itemsRef.current = items; }, [items]);
   // After a successful reconnect, clear the banner and re-send everything that
-  // failed for a scope/connection reason so the owner doesn't re-shoot them.
+  // failed so the owner doesn't re-shoot them (reads the LIVE list, not the
+  // closure — an item that failed/succeeded during the exchange is honoured).
   const onReconnected = () => {
     setShowReconnect(false); setNeedsReconnect(false);
     addToast('Dropbox reconnected', 'success');
-    const failed = items.filter(i => i.status === 'err');
-    setItems(prev => prev.map(x => x.status === 'err' ? { ...x, status: 'up' as UpStatus, message: undefined } : x));
-    failed.forEach(it => doUpload(it.id, it.name, it.dateStr, it.dataUrl).catch(() => {}));
+    const failed = itemsRef.current.filter(i => i.status === 'err');
+    setItems(prev => prev.map(x => failed.some(f => f.id === x.id) ? { ...x, status: 'up' as UpStatus, message: undefined } : x));
+    failed.forEach(it => doUpload(it.id, it.name, it.dateStr, it.dataUrl));
   };
   const openDate = () => { const el = dateInputRef.current as any; if (el?.showPicker) { try { el.showPicker(); return; } catch { /* fall through */ } } el?.click(); };
 
@@ -194,7 +227,9 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
       {/* recent uploads strip */}
       {items.length > 0 && mode === 'camera' && (
         <div style={{ position: 'absolute', top: 'max(70px, calc(env(safe-area-inset-top) + 60px))', left: 0, right: 0, zIndex: 6, display: 'flex', gap: 6, overflowX: 'auto', padding: '0 12px', WebkitOverflowScrolling: 'touch' }}>
-          {items.slice(0, 12).map(it => (
+          {/* Failed/uploading items surface FIRST so a red thumbnail can never
+              be pushed out of the strip by newer successes (retry lives here). */}
+          {[...items.filter(i => i.status !== 'ok'), ...items.filter(i => i.status === 'ok')].slice(0, 12).map(it => (
             <div key={it.id} onClick={() => it.status === 'err' && retry(it)} title={it.message || it.name} style={{ position: 'relative', flexShrink: 0, cursor: it.status === 'err' ? 'pointer' : 'default' }}>
               <img src={it.dataUrl} alt="" style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'cover', border: `2px solid ${ring(it.status)}` }} />
               <span style={{ position: 'absolute', bottom: -2, right: -2, width: 13, height: 13, borderRadius: '50%', background: ring(it.status), color: '#05070c', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{it.status === 'ok' ? '✓' : it.status === 'err' ? '!' : '↑'}</span>
@@ -248,10 +283,12 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
               </div>
               <div onClick={() => setDateStr(localToday())} style={{ fontSize: 11, color: T.ac2, border: '1px solid rgba(99,102,241,.3)', background: T.ac3, borderRadius: 8, padding: '6px 10px', fontWeight: 600, cursor: 'pointer' }}>Today</div>
             </div>
+            {/* All three lock while a rotation is in flight — uploading mid-turn
+                would send the OLD (un-rotated) image. */}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setPending(null); setMode('camera'); }} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Retake</button>
+              <button onClick={() => { if (!rotating) { setPending(null); setMode('camera'); } }} disabled={rotating} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center', pointerEvents: rotating ? 'none' : 'auto', opacity: rotating ? 0.5 : 1 }}>Retake</button>
               <button onClick={rotate} disabled={rotating} aria-label="Rotate photo" title="Rotate" style={{ ...S.btnGhost, justifyContent: 'center', minWidth: 46, padding: '8px 12px', pointerEvents: rotating ? 'none' : 'auto', opacity: rotating ? 0.5 : 1, fontSize: 17 }}>↻</button>
-              <button onClick={upload} style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center' }}>Upload to Dropbox</button>
+              <button onClick={upload} disabled={rotating} style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center', pointerEvents: rotating ? 'none' : 'auto', opacity: rotating ? 0.5 : 1 }}>{rotating ? 'Rotating…' : 'Upload to Dropbox'}</button>
             </div>
           </div>
         </>

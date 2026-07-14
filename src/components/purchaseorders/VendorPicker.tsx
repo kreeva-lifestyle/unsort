@@ -12,9 +12,9 @@ import type { POVendor } from '../../types/database';
 type Picked = { id: string | null; name: string; phone: string };
 type VendorRow = Pick<POVendor, 'id' | 'name' | 'phone'>;
 
-export default function VendorPicker({ value, phone, onPick, addToast, disabled }: {
+export default function VendorPicker({ value, onPick, addToast, disabled }: {
   value: string;
-  phone: string;
+  phone: string; // still accepted from the parent; intentionally NOT reused on manual edits (see onChange note)
   onPick: (v: Picked) => void;
   addToast: (m: string, t?: string) => void;
   disabled?: boolean;
@@ -78,7 +78,10 @@ export default function VendorPicker({ value, phone, onPick, addToast, disabled 
       <input
         value={q}
         disabled={disabled}
-        onChange={e => { const v = e.target.value; setQ(v); onPick({ id: null, name: v, phone }); search(v); setOpen(true); }}
+        onChange={e => { const v = e.target.value; setQ(v); onPick({ id: null, name: v, phone: '' }); search(v); setOpen(true); }}
+        // ^ phone cleared on manual edit: it belonged to the previously PICKED
+        //   vendor — carrying it onto a retyped free-text vendor printed the
+        //   wrong phone on the PO.
         onFocus={() => { if (q) { search(q); setOpen(true); } }}
         placeholder="Search or type vendor name…"
         style={{ ...S.fInput, width: '100%' }}

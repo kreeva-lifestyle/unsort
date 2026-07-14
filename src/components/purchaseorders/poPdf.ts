@@ -24,7 +24,7 @@ export function buildPoPdf(po: PurchaseOrder, items: PurchaseOrderItem[]): strin
     Number(po.discount_amount) > 0 ? money(po.discount_type === 'percentage' ? `Discount (${Number(po.discount_value)}%)` : 'Discount', po.discount_amount, '−') : '',
     Number(po.tax_amount) > 0 ? money(`Tax (${Number(po.tax_percent)}%)`, po.tax_amount) : '',
     Number(po.other_charges) > 0 ? money('Other charges', po.other_charges) : '',
-    Number(po.round_off) !== 0 ? money('Round off', po.round_off, Number(po.round_off) < 0 ? '−' : '') : '',
+    Number(po.round_off) !== 0 ? money('Round off', Math.abs(Number(po.round_off)), Number(po.round_off) < 0 ? '−' : '') : '',
   ].filter(Boolean).join('');
 
   const vendorLines = [

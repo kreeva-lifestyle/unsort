@@ -49,19 +49,22 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
   const [showQrShare, setShowQrShare] = useState(false);
   const [qrPhone, setQrPhone] = useState('');
   const [settleArm, setSettleArm] = useState(false);
+  const [settleMode, setSettleMode] = useState('Cash');
   const [settling, setSettling] = useState(false);
 
-  // Record that this return's credit was refunded to the customer in cash —
-  // the RPC raises amount_paid to total + writes the payment row atomically,
-  // so the return stops offsetting the customer's outstanding.
+  // Record that this return's credit was refunded to the customer — the RPC
+  // raises amount_paid to total + writes the payment row atomically, so the
+  // return stops offsetting the customer's outstanding. The refund MODE is the
+  // user's choice (a UPI refund misfiled as Cash would skew the per-mode
+  // cash-book totals).
   const settleRefund = async () => {
     if (settling) return;
     setSettling(true);
-    const { data, error } = await supabase.rpc('settle_return_refund', { p_challan_id: c.id, p_mode: 'Cash' });
+    const { data, error } = await supabase.rpc('settle_return_refund', { p_challan_id: c.id, p_mode: settleMode });
     setSettling(false);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     const refunded = Number((data as { refunded?: number } | null)?.refunded ?? 0);
-    addToast(`₹${refunded.toLocaleString('en-IN')} cash refund recorded — this return no longer reduces the customer's outstanding`, 'success');
+    addToast(`₹${refunded.toLocaleString('en-IN')} ${settleMode} refund recorded — this return no longer reduces the customer's outstanding`, 'success');
     setSettleArm(false);
     onSettled?.();
     onClose();
@@ -313,13 +316,16 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
           {creditLeft > 0 && (
             <div style={{ background: 'rgba(251,191,36,.04)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
               <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5, marginBottom: 8 }}>
-                This return currently reduces the customer's outstanding by ₹{creditLeft.toLocaleString('en-IN')}. If you handed that amount back in cash instead, record it here so the credit stops counting.
+                This return currently reduces the customer's outstanding by ₹{creditLeft.toLocaleString('en-IN')}. If you handed that amount back instead, record it here so the credit stops counting.
               </div>
               {!settleArm ? (
-                <button onClick={() => setSettleArm(true)} style={{ ...S.btnGhost, color: T.yl, border: '1px solid rgba(251,191,36,.3)', background: 'rgba(251,191,36,.08)' }}>Refunded in Cash — settle credit</button>
+                <button onClick={() => setSettleArm(true)} style={{ ...S.btnGhost, color: T.yl, border: '1px solid rgba(251,191,36,.3)', background: 'rgba(251,191,36,.08)' }}>Refunded to customer — settle credit</button>
               ) : (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: T.tx }}>Record ₹{creditLeft.toLocaleString('en-IN')} cash refund?</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: T.tx }}>Record ₹{creditLeft.toLocaleString('en-IN')} refund via</span>
+                  <select value={settleMode} onChange={e => setSettleMode(e.target.value)} style={{ ...S.fInput, width: 130 }}>
+                    {['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Other'].map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
                   <button onClick={settleRefund} disabled={settling} style={{ ...S.btnPrimary, pointerEvents: settling ? 'none' : 'auto', opacity: settling ? 0.5 : 1 }}>{settling ? 'Recording…' : 'Yes, refunded'}</button>
                   <button onClick={() => setSettleArm(false)} style={S.btnGhost}>Cancel</button>
                 </div>

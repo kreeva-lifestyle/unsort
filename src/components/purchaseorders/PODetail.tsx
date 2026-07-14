@@ -73,7 +73,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
   const canApprove = po.status === 'draft' && canManage;
   // "Mark Sent" only makes sense before goods start arriving; once a PO is
   // partially received it was obviously already sent, so hide it then.
-  const canSend = po.status === 'approved';
+  const canSend = po.status === 'approved' && canManage; // same gate as Approve/Cancel — status transitions are manager+ actions
   const canCancel = !['completed', 'cancelled'].includes(po.status) && canManage;
   const canEdit = po.status === 'draft';
 

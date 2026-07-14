@@ -24,7 +24,7 @@ interface Props {
   onSelectAll: () => void;
   onClearSelection: () => void;
   // Last batch banner
-  lastBatch: { id: string; count: number; mode: string } | null;
+  lastBatch: { id: string; count: number; mode: string; settled: number } | null;
   undoingBatch: boolean;
   onUndoBatch: () => void;
   onDismissBatch: () => void;
@@ -65,7 +65,10 @@ export default function ChallanBulkActions(p: Props) {
 
       {p.lastBatch && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', marginBottom: 8, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 6 }}>
-          <span style={{ fontSize: 10, color: T.gr, fontWeight: 600, flex: 1 }}>{p.lastBatch.id}: {p.lastBatch.count} challans paid via {p.lastBatch.mode}</span>
+          <span style={{ fontSize: 10, color: T.gr, fontWeight: 600, flex: 1 }}>
+            {p.lastBatch.id}: {p.lastBatch.count} challans paid{p.lastBatch.settled > 0 ? ` + ${p.lastBatch.settled} return credit${p.lastBatch.settled === 1 ? '' : 's'} settled` : ''} via {p.lastBatch.mode}
+            {p.lastBatch.settled > 0 && <span style={{ color: T.yl, fontWeight: 500 }}> — Undo restores the sales only; settled return credits stay consumed</span>}
+          </span>
           <button disabled={p.undoingBatch} onClick={p.onUndoBatch} style={{ ...S.btnDanger, ...S.btnSm, pointerEvents: p.undoingBatch ? 'none' : 'auto', opacity: p.undoingBatch ? 0.5 : 1 }}>{p.undoingBatch ? 'Undoing…' : 'Undo Batch'}</button>
           <span onClick={p.onDismissBatch} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }} aria-label="Dismiss">&times;</span>
         </div>

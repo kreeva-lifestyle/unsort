@@ -62,20 +62,25 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
+  // Monotonic fetch id — a slower stale response (e.g. the SKU-search path has
+  // an extra awaited RPC) must never overwrite the result of a newer fetch.
+  const fetchSeq = useRef(0);
   const fetchPos = useCallback(async (silent = false) => {
+    const seq = ++fetchSeq.current;
     if (!silent) setLoading(true);
     let q = supabase.from('purchase_orders').select(`${COLS}, purchase_order_items(quantity, received_qty)`, { count: 'estimated' });
     if (debouncedSearch) {
       const s = debouncedSearch.replace(/[%_,().]/g, '').trim();
-      const num = parseInt(s);
-      if (!isNaN(num)) {
-        q = q.or(`po_number.eq.${num},vendor_name.ilike.%${s}%`);
-      } else if (s) {
-        // Match vendor name OR any PO whose line-item SKU matches (search_po_ids).
+      if (s) {
+        // Vendor name always matches; a pure number also matches the PO #; and
+        // ANY term (numeric SKUs like "15003" included) also matches line-item
+        // SKUs via search_po_ids.
+        const ors = [`vendor_name.ilike.%${s}%`];
+        if (/^\d+$/.test(s)) ors.push(`po_number.eq.${parseInt(s)}`);
         const { data: idRows } = await supabase.rpc('search_po_ids', { q: s });
         const ids = (idRows as string[] | null) || [];
-        if (ids.length > 0) q = q.or(`vendor_name.ilike.%${s}%,id.in.(${ids.join(',')})`);
-        else q = q.ilike('vendor_name', `%${s}%`);
+        if (ids.length > 0) ors.push(`id.in.(${ids.join(',')})`);
+        q = q.or(ors.join(','));
       }
     }
     if (statusFilter) q = q.eq('status', statusFilter);
@@ -85,6 +90,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     if (dateTo) q = q.lte('po_date', dateTo);
     q = q.order('po_number', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
     const { data, count, error } = await q;
+    if (seq !== fetchSeq.current) return; // a newer fetch superseded this one
     if (error) { addToast(friendlyError(error), 'error'); if (!silent) setLoading(false); return; }
     setPos((data as PORow[] | null) || []);
     setTotalCount(count || 0);
@@ -108,22 +114,26 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
 
   // Load full items + receipts + audit for a PO, then open the detail panel.
   const openDetail = useCallback(async (poRow: PurchaseOrder) => {
-    const [{ data: items }, { data: receipts }, { data: audit }] = await Promise.all([
+    const [itemsRes, receiptsRes, auditRes] = await Promise.all([
       supabase.from('purchase_order_items').select('id, po_id, item_name, sku, quantity, unit, rate, amount, received_qty, sort_order, created_at').eq('po_id', poRow.id).order('sort_order'),
       supabase.from('purchase_order_receipts').select('id, po_id, po_item_id, received_qty, receipt_date, remarks, received_by, created_at').eq('po_id', poRow.id).order('created_at', { ascending: false }),
       supabase.from('audit_log').select('id, action, module, record_id, details, user_id, user_email, created_at, changes').eq('module', 'purchase_order').eq('record_id', poRow.id).order('created_at', { ascending: false }).limit(30),
     ]);
-    setDetail({ po: poRow, items: (items as PurchaseOrderItem[] | null) || [], receipts: (receipts as PurchaseOrderReceipt[] | null) || [], audit: (audit as AuditLog[] | null) || [] });
-  }, []);
+    // Never open a detail (or later print) on silently-missing data — a
+    // transient failure here would render a PO with zero line items.
+    if (itemsRes.error || receiptsRes.error) { addToast(friendlyError(itemsRes.error || receiptsRes.error), 'error'); return; }
+    setDetail({ po: poRow, items: (itemsRes.data as PurchaseOrderItem[] | null) || [], receipts: (receiptsRes.data as PurchaseOrderReceipt[] | null) || [], audit: (auditRes.data as AuditLog[] | null) || [] });
+  }, [addToast]);
 
   const openPrint = useCallback(async (poRow: PurchaseOrder, preItems?: PurchaseOrderItem[]) => {
     let items = preItems;
     if (!items) {
-      const { data } = await supabase.from('purchase_order_items').select('id, po_id, item_name, sku, quantity, unit, rate, amount, received_qty, sort_order, created_at').eq('po_id', poRow.id).order('sort_order');
+      const { data, error } = await supabase.from('purchase_order_items').select('id, po_id, item_name, sku, quantity, unit, rate, amount, received_qty, sort_order, created_at').eq('po_id', poRow.id).order('sort_order');
+      if (error) { addToast(friendlyError(error), 'error'); return; }
       items = (data as PurchaseOrderItem[] | null) || [];
     }
     setPrintData({ po: poRow, items, html: buildPoPdf(poRow, items) });
-  }, []);
+  }, [addToast]);
 
   const closeForm = () => { setShowForm(false); setEditing(null); setDuplicating(null); };
   const onSaved = async (r: { id: string; po_number: number }, isNew: boolean) => {
