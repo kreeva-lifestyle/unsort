@@ -51,6 +51,24 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
     setBusy('');
   };
 
+  // Undo a mistyped receipt — reverses the received tally + recomputes status.
+  const removeReceipt = async (r: PurchaseOrderReceipt) => {
+    if (busy) return;
+    const item = items.find(it => it.id === r.po_item_id);
+    const ok = await ask({ title: 'Remove this receipt?', message: `This removes the entry of +${Number(r.received_qty)}${item ? ` for ${item.item_name}` : ''}. The received total will be reduced — you can receive the correct amount again.`, confirmLabel: 'Remove', cancelLabel: 'Keep', danger: true });
+    if (!ok) return;
+    setBusy('r' + r.id);
+    try {
+      const { error } = await supabase.rpc('delete_po_receipt', { p_receipt_id: r.id });
+      if (error) throw new Error(error.message);
+      await poAuditLog('RECEIPT_REMOVED', po.id, `PO #${po.po_number} — removed receipt of +${Number(r.received_qty)}${item ? ` (${item.item_name})` : ''}`);
+      addToast('Receipt removed', 'success');
+      onChanged();
+    } catch (e) { addToast(friendlyError(e), 'error'); }
+    setBusy('');
+  };
+  const canRemoveReceipt = canManage && !['draft', 'cancelled'].includes(po.status);
+
   const canReceive = ['approved', 'sent', 'partially_received'].includes(po.status);
   const canApprove = po.status === 'draft' && canManage;
   // "Mark Sent" only makes sense before goods start arriving; once a PO is
@@ -96,7 +114,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
                       <tr key={it.id} style={{ borderBottom: `1px solid ${T.bd}` }}>
                         <td style={S.tdStyle}><span style={{ fontSize: 13, color: T.tx }}>{it.item_name}</span>{it.unit && <span style={{ fontSize: 10, color: T.tx3, marginLeft: 4 }}>/{it.unit}</span>}{it.sku && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 1 }}>{it.sku}</div>}</td>
                         <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono }}>{Number(it.quantity)}</td>
-                        <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono, color: Number(it.received_qty) > 0 ? T.gr : T.tx3 }}>{Number(it.received_qty || 0)}</td>
+                        <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono, color: Number(it.received_qty) > 0 ? T.gr : T.tx3 }}>{Number(it.received_qty || 0)}{Number(it.received_qty) > Number(it.quantity) && <span style={{ color: T.yl, fontSize: 10, marginLeft: 4 }}>+{Number(it.received_qty) - Number(it.quantity)}</span>}</td>
                         <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono, color: rem > 0 ? T.yl : T.tx3 }}>{rem}</td>
                         <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono, color: T.tx3 }}>{it.rate == null ? '—' : `₹${inr(it.rate)}`}</td>
                         <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono }}>{it.amount == null ? '—' : `₹${inr(it.amount)}`}</td>
@@ -124,9 +142,12 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
               {receipts.map(r => {
                 const item = items.find(it => it.id === r.po_item_id);
                 return (
-                  <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
-                    <div><span style={{ color: T.tx }}>{item?.item_name || 'Item'}</span> <span style={{ color: T.gr, fontFamily: T.mono }}>+{Number(r.received_qty)}</span>{r.remarks && <span style={{ color: T.tx3, marginLeft: 6 }}>· {r.remarks}</span>}</div>
-                    <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{fmtDate(r.receipt_date)}</span>
+                  <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '7px 10px', background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
+                    <div style={{ minWidth: 0 }}><span style={{ color: T.tx }}>{item?.item_name || 'Item'}</span> <span style={{ color: T.gr, fontFamily: T.mono }}>+{Number(r.received_qty)}</span>{r.remarks && <span style={{ color: T.tx3, marginLeft: 6 }}>· {r.remarks}</span>}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{fmtDate(r.receipt_date)}</span>
+                      {canRemoveReceipt && <button onClick={() => removeReceipt(r)} disabled={!!busy} title="Remove this receipt" style={{ border: 'none', background: 'none', color: T.re, cursor: busy ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: 600, padding: '2px 4px', opacity: busy ? 0.5 : 0.85 }}>Undo</button>}
+                    </div>
                   </div>
                 );
               })}

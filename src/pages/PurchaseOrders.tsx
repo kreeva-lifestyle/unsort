@@ -15,6 +15,7 @@ import POForm, { type EditingPO } from '../components/purchaseorders/POForm';
 import PODetail from '../components/purchaseorders/PODetail';
 import POReceive from '../components/purchaseorders/POReceive';
 import { buildPoPdf } from '../components/purchaseorders/poPdf';
+import { sharePoImage } from '../components/purchaseorders/poImage';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../types/database';
 
 const COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, created_by, modified_by, created_at, updated_at';
@@ -57,7 +58,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const [duplicating, setDuplicating] = useState<EditingPO | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [receiving, setReceiving] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[] } | null>(null);
-  const [printHtml, setPrintHtml] = useState<string | null>(null);
+  const [printData, setPrintData] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[]; html: string } | null>(null);
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
@@ -103,7 +104,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     return () => { supabase.removeChannel(ch); };
   }, [fetchPos]);
 
-  useEffect(() => { document.body.classList.toggle('modal-open', !!printHtml); return () => { document.body.classList.remove('modal-open'); }; }, [printHtml]);
+  useEffect(() => { document.body.classList.toggle('modal-open', !!printData); return () => { document.body.classList.remove('modal-open'); }; }, [printData]);
 
   // Load full items + receipts + audit for a PO, then open the detail panel.
   const openDetail = useCallback(async (poRow: PurchaseOrder) => {
@@ -121,7 +122,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
       const { data } = await supabase.from('purchase_order_items').select('id, po_id, item_name, sku, quantity, unit, rate, amount, received_qty, sort_order, created_at').eq('po_id', poRow.id).order('sort_order');
       items = (data as PurchaseOrderItem[] | null) || [];
     }
-    setPrintHtml(buildPoPdf(poRow, items));
+    setPrintData({ po: poRow, items, html: buildPoPdf(poRow, items) });
   }, []);
 
   const closeForm = () => { setShowForm(false); setEditing(null); setDuplicating(null); };
@@ -137,7 +138,14 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     }
   };
 
-  const refreshDetail = async () => { if (detail) await openDetail(detail.po); fetchPos(true); };
+  // Re-fetch the fresh PO row (not the stale detail.po) so status transitions —
+  // Approve / Mark Sent / Cancel / Receive — reflect immediately in the buttons.
+  const refreshDetail = async () => {
+    if (!detail) return;
+    const { data } = await supabase.from('purchase_orders').select(COLS).eq('id', detail.po.id).maybeSingle();
+    await openDetail((data as PurchaseOrder) ?? detail.po);
+    fetchPos(true);
+  };
 
   return (
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
@@ -178,20 +186,21 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
       {receiving && <POReceive po={receiving.po} items={receiving.items} onClose={() => setReceiving(null)}
         onReceived={() => { setReceiving(null); refreshDetail(); }} addToast={addToast} />}
 
-      {printHtml && createPortal(
+      {printData && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
           <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Purchase Order</span>
-            <button onClick={() => setPrintHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: T.tx2, cursor: 'pointer', fontSize: 16 }} aria-label="Close">&times;</button>
+            <button onClick={() => setPrintData(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: T.tx2, cursor: 'pointer', fontSize: 16 }} aria-label="Close">&times;</button>
           </div>
-          <iframe srcDoc={printHtml} style={{ flex: 1, border: 'none', width: '100%', background: '#fff' }} title="Purchase Order preview" />
-          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <button onClick={() => setPrintHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: T.tx2, fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
-            <button onClick={() => printOrQueue('document', printHtml!, 'A4', 'Purchase Order', undefined, addToast)} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', ...S.btnPrimary, fontSize: 13, flex: 1, maxWidth: 160 }}>Print / Share</button>
+          <iframe srcDoc={printData.html} style={{ flex: 1, border: 'none', width: '100%', background: '#fff' }} title="Purchase Order preview" />
+          <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button onClick={() => setPrintData(null)} style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: T.tx2, fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 130 }}>Close</button>
+            <button onClick={() => printOrQueue('document', printData.html, 'A4', 'Purchase Order', undefined, addToast)} style={{ padding: '10px 18px', borderRadius: 8, border: `1px solid ${T.ac3}`, background: T.ac3, color: T.ac2, fontSize: 13, fontWeight: 600, cursor: 'pointer', flex: 1, maxWidth: 130 }}>Print</button>
+            <button onClick={() => sharePoImage(printData.po, printData.items, addToast)} style={{ padding: '10px 18px', borderRadius: 8, border: 'none', ...S.btnPrimary, fontSize: 13, flex: 1, maxWidth: 130 }}>Share</button>
           </div>
         </div>, document.body)}
 
-      {active !== false && !detail && !showForm && !receiving && !printHtml && canCreate && createPortal(
+      {active !== false && !detail && !showForm && !receiving && !printData && canCreate && createPortal(
         <button className="fab" aria-label="New purchase order" onClick={() => { setEditing(null); setDuplicating(null); setShowForm(true); }}>+</button>,
         document.body,
       )}
