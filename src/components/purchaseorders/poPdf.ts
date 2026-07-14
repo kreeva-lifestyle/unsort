@@ -29,7 +29,6 @@ export function buildPoPdf(po: PurchaseOrder, items: PurchaseOrderItem[]): strin
 
   const vendorLines = [
     po.vendor_phone ? `<div>Phone: ${escHtml(po.vendor_phone)}</div>` : '',
-    po.notes ? '' : '',
   ].filter(Boolean).join('');
 
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
