@@ -98,6 +98,24 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
     a.href = result.url; a.download = fileName(); a.click();
   };
 
+  // Send to WhatsApp. There is no way to attach an image to a specific number
+  // from the web, so on a phone we share the image file (WhatsApp shows up in
+  // the share sheet); on desktop we save the image and open WhatsApp Web so the
+  // user can drop it into a chat.
+  const whatsapp = async () => {
+    if (!result) return;
+    const file = new File([result.blob], fileName(), { type: 'image/jpeg' });
+    const text = `${catalogName.trim() || 'Rate card'} — rate card`;
+    if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+      try { await navigator.share({ files: [file], title: catalogName.trim(), text }); }
+      catch (e: any) { if (e?.name !== 'AbortError') addToast(friendlyError(e), 'error'); }
+      return;
+    }
+    download();
+    addToast('Image saved — attach it in the WhatsApp chat', 'success');
+    window.open('https://web.whatsapp.com', '_blank', 'noopener');
+  };
+
   const pickBox = (label: string, value: string, onClick: () => void) => (
     <div onClick={onClick} style={{ padding: '14px 14px', borderRadius: 8, border: `1px dashed ${value ? 'rgba(34,197,94,.35)' : T.bd2}`, background: value ? 'rgba(34,197,94,.05)' : T.glass1, cursor: 'pointer', minHeight: 44 }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: value ? T.gr : T.tx2 }}>{label}</div>
@@ -146,8 +164,9 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 12 }}>
           <img src={result.url} alt="Rate card preview" style={{ width: '100%', borderRadius: 8, display: 'block', marginBottom: 10 }} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={share} style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center' }}>Share</button>
-            <button onClick={download} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Download JPG</button>
+            <button onClick={whatsapp} style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center', background: T.gr, border: 'none', color: '#fff' }}>WhatsApp</button>
+            <button onClick={share} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Share</button>
+            <button onClick={download} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Save</button>
           </div>
         </div>
       )}
