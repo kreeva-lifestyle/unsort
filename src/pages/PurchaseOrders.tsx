@@ -125,10 +125,16 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   }, []);
 
   const closeForm = () => { setShowForm(false); setEditing(null); setDuplicating(null); };
-  const onSaved = (r: { id: string; po_number: number }, isNew: boolean) => {
+  const onSaved = async (r: { id: string; po_number: number }, isNew: boolean) => {
     closeForm();
     addToast(isNew ? `PO #${r.po_number} created` : `PO #${r.po_number} updated`, 'success');
     fetchPos();
+    // Edits originate from the detail view — reopen it so the user keeps their
+    // place instead of being dropped back to the list.
+    if (!isNew) {
+      const { data } = await supabase.from('purchase_orders').select(COLS).eq('id', r.id).maybeSingle();
+      if (data) openDetail(data as PurchaseOrder);
+    }
   };
 
   const refreshDetail = async () => { if (detail) await openDetail(detail.po); fetchPos(true); };
