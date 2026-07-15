@@ -9,7 +9,7 @@ import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import Empty from '../ui/Empty';
 import { call, GenRow, GenUsage } from './api';
-import { parseSkuText } from '../minis/dropboxlinks/bulk';
+import { parseSkuLines } from './skuInput';
 import TemplateManager from './TemplateManager';
 import ResultsTable from './ResultsTable';
 import type { ListingTemplate } from '../../types/database';
@@ -50,12 +50,12 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
 
   const isAdmin = status?.role === 'admin';
   const selected = templates.find(t => t.id === selectedId);
-  const skuCount = parseSkuText(skuText).length;
+  const skuCount = parseSkuLines(skuText).length;
 
   const generate = async () => {
     if (generating) return;
     if (!selected) { addToast('Pick a template first', 'error'); return; }
-    let skus = parseSkuText(skuText);
+    let skus = parseSkuLines(skuText);
     if (skus.length === 0) { addToast('Paste at least one SKU', 'error'); return; }
     if (skus.length > RUN_CAP) { addToast(`Capped to the first ${RUN_CAP} SKUs (of ${skus.length}) — run again for the rest`, 'error'); skus = skus.slice(0, RUN_CAP); }
     setGenerating(true);
@@ -67,7 +67,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
       for (let i = 0; i < skus.length; i += CHUNK) {
         const chunk = skus.slice(i, i + CHUNK);
         let data: any, st = 0;
-        try { ({ status: st, data } = await call({ action: 'generate', skus: chunk, templateId: selected.id })); }
+        try { ({ status: st, data } = await call({ action: 'generate', items: chunk, templateId: selected.id })); }
         catch (e) { addToast(friendlyError(e), 'error'); break; }
         if (!data?.ok) {
           addToast(data?.error === 'no_api_key'
@@ -124,14 +124,17 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
           </div>
           <button onClick={() => setManageOpen(true)} style={S.btnGhost}>Manage Templates</button>
         </div>
-        <div style={S.fLabel}>SKUs (paste — newline, comma or space separated)</div>
+        <div style={S.fLabel}>SKUs — one per line, Dropbox image link optional after the SKU</div>
         <textarea
           value={skuText}
           onChange={e => setSkuText(e.target.value)}
-          placeholder={'AD-1001\nDT-2044\nAD-1010-M'}
+          placeholder={'AD-1001\nDT-2044 https://www.dropbox.com/scl/fo/…'}
           rows={4}
           style={{ ...S.fInput, width: '100%', height: 'auto', minHeight: 84, resize: 'vertical', fontFamily: T.mono, lineHeight: 1.6 }}
         />
+        <div style={{ fontSize: 10, color: T.tx3, marginTop: 4, lineHeight: 1.5 }}>
+          With a link, photos come from exactly that folder (image columns are filled in photo order — 1st photo → Front Image). Without one, the SKU's folder is searched automatically in the Link Generator folders.
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
           <button
             onClick={generate}

@@ -30,7 +30,7 @@ export default function ResultsTable({ headers, kinds, rows, usage, template, ad
       await exportFilledXlsx(headers, ok, template);
       const skipped = rows.length - ok.length;
       const into = template.file_name ? ` into ${template.file_name}` : '';
-      addToast(`Exported ${ok.length}${into}${skipped ? ` — ${skipped} SKU(s) skipped (not in master sheet)` : ''}`, 'success');
+      addToast(`Exported ${ok.length}${into}${skipped ? ` — ${skipped} SKU(s) skipped (see status)` : ''}`, 'success');
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setExporting(false);
   };
@@ -54,9 +54,10 @@ export default function ResultsTable({ headers, kinds, rows, usage, template, ad
                 <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
                 <td style={S.tdStyle}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.status === 'ok' ? '#22C55E' : '#F59E0B', flexShrink: 0 }} />
-                    <span style={{ fontSize: 11 }}>{r.status === 'ok' ? (r.noImage ? 'Ready (no photo found)' : 'Ready') : 'Not in master sheet'}</span>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.status === 'ok' ? '#22C55E' : r.status === 'bad_link' ? '#EF4444' : '#F59E0B', flexShrink: 0 }} />
+                    <span style={{ fontSize: 11 }}>{r.status === 'ok' ? (r.noImage ? 'Ready (no photo found)' : 'Ready') : r.status === 'bad_link' ? 'Dropbox link failed' : 'Not in master sheet'}</span>
                   </span>
+                  {r.note && <div style={{ fontSize: 9, color: T.tx3, marginTop: 3 }}>{r.note}</div>}
                 </td>
                 {previewIdx >= 0 && <td style={{ ...S.tdStyle, fontSize: 12, maxWidth: 380 }}>{r.values[previewIdx] || '—'}</td>}
               </tr>
