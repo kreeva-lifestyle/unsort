@@ -992,3 +992,16 @@ export const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
   draft: 'Draft', approved: 'Approved', sent: 'Sent',
   partially_received: 'Partially Received', completed: 'Completed', cancelled: 'Cancelled',
 };
+
+// ---- Listing AI ----
+export type ListingTemplateField = { header: string; mandatory: boolean; hint: string };
+
+export type ListingTemplate = {
+  id: string;
+  name: string;
+  marketplace: string;
+  fields: ListingTemplateField[];
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
