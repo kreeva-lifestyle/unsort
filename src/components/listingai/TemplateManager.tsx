@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
-import { parseTemplateFile } from './templateParse';
+import { parseTemplateFile, isImageColumn } from './templateParse';
 import FieldRow from './FieldRow';
 import type { ListingTemplate, ListingTemplateField } from '../../types/database';
 
@@ -161,6 +161,16 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
             </div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 8, lineHeight: 1.5 }}>
               Tick required fields. Columns with a dropdown show an "options" chip (tap to preview). Set a <b>fixed value</b> for anything that's the same on every product (brand, origin, addresses…) — fixed fields are filled instantly and never cost AI tokens. Price-like columns are blanked automatically.
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <button onClick={() => {
+                const skippable = (f: ListingTemplateField) => !f.mandatory && !f.fixed && !f.skip && !isImageColumn(f.header);
+                const n = editing.fields.filter(skippable).length;
+                setEditing({ ...editing, fields: editing.fields.map(f => skippable(f) ? { ...f, skip: true } : f) });
+                addToast(n ? `${n} non-mandatory column(s) skipped — mandatory, fixed and photo columns kept` : 'Nothing to skip — everything left is mandatory, fixed or a photo column', 'success');
+              }} style={{ ...S.btnGhost, ...S.btnSm }}>Skip all non-mandatory</button>
+              <button onClick={() => setEditing(ed => ed ? { ...ed, fields: ed.fields.map(f => f.skip ? { ...f, skip: false } : f) } : ed)} style={{ ...S.btnGhost, ...S.btnSm }}>Fill all</button>
+              <span style={{ fontSize: 10, color: T.tx3 }}>{editing.fields.filter(f => f.mandatory).length} mandatory · {editing.fields.filter(f => f.skip).length} skipped</span>
             </div>
             <div style={{ maxHeight: '38vh', overflowY: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
               {editing.fields.map((f, i) => (
