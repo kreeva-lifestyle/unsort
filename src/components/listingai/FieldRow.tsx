@@ -20,11 +20,15 @@ export default function FieldRow({ f, onChange, addToast }: {
     );
   }
   // Skipped: the owner never wants this column filled - exported empty.
+  // A skipped MANDATORY column is a marketplace rejection waiting to happen,
+  // so its badge goes red.
   if (f.skip) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${T.bd}`, opacity: 0.45 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${T.bd}`, opacity: f.mandatory ? 0.75 : 0.45 }}>
         <span style={{ fontSize: 12, color: T.tx3, flex: 1, textDecoration: 'line-through' }}>{f.header}</span>
-        <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(255,255,255,.06)', color: T.tx3 }}>skipped — left empty</span>
+        <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: f.mandatory ? 'rgba(239,68,68,.12)' : 'rgba(255,255,255,.06)', color: f.mandatory ? T.re : T.tx3 }}>
+          {f.mandatory ? 'MANDATORY skipped — exported empty' : 'skipped — left empty'}
+        </span>
         <button onClick={() => onChange({ skip: false })} style={{ ...S.btnGhost, ...S.btnSm }}>Fill</button>
       </div>
     );
@@ -54,7 +58,10 @@ export default function FieldRow({ f, onChange, addToast }: {
           <input value={f.hint} onChange={e => onChange({ hint: e.target.value })} placeholder="hint" style={{ ...S.fInput, width: '45%', height: 30, fontSize: 12 }} />
         </span>
       )}
-      <button onClick={() => onChange({ skip: true })} title="Skip — never fill this column" style={{ ...S.btnGhost, ...S.btnSm, padding: '4px 7px', color: T.tx3, flexShrink: 0 }}>&#215;</button>
+      <button onClick={() => {
+        if (f.mandatory) addToast(`"${f.header}" is marked mandatory — the marketplace requires it, but it will be exported EMPTY while skipped`, 'error');
+        onChange({ skip: true });
+      }} title="Skip — never fill this column" style={{ ...S.btnGhost, ...S.btnSm, padding: '4px 7px', color: T.tx3, flexShrink: 0 }}>&#215;</button>
     </div>
   );
 }
