@@ -8,6 +8,9 @@ import type { ListingTemplateField } from '../../types/database';
 // Columns the module always leaves blank (enforced server-side too).
 export const SENSITIVE_RE = /price|mrp|\bgst\b|\brate\b|cost|amount|margin|commission|\bhsn\b/i;
 
+// Header normalization shared with the edge fn (taught-mapping keys).
+export const normHeader = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, '');
+
 export interface ParsedTemplate {
   sheetName: string;
   headerRow: number; // zero-based row index of the header row

@@ -11,6 +11,8 @@ import Empty from '../ui/Empty';
 import { call, GenRow, GenUsage } from './api';
 import { parseSkuLines } from './skuInput';
 import TemplateManager from './TemplateManager';
+import MappingsManager from './MappingsManager';
+import SavedLinks from './SavedLinks';
 import ResultsTable from './ResultsTable';
 import type { ListingTemplate } from '../../types/database';
 
@@ -24,6 +26,8 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
   const [selectedId, setSelectedId] = useState('');
   const [skuText, setSkuText] = useState('');
   const [manageOpen, setManageOpen] = useState(false);
+  const [mappingsOpen, setMappingsOpen] = useState(false);
+  const [linksOpen, setLinksOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [headers, setHeaders] = useState<string[]>([]);
@@ -123,6 +127,8 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
             </select>
           </div>
           <button onClick={() => setManageOpen(true)} style={S.btnGhost}>Manage Templates</button>
+          <button onClick={() => setMappingsOpen(true)} style={S.btnGhost}>Taught Mappings</button>
+          <button onClick={() => setLinksOpen(true)} style={S.btnGhost}>Saved Links</button>
         </div>
         <div style={S.fLabel}>SKUs — one per line, Dropbox image link optional after the SKU</div>
         <textarea
@@ -133,7 +139,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
           style={{ ...S.fInput, width: '100%', height: 'auto', minHeight: 84, resize: 'vertical', fontFamily: T.mono, lineHeight: 1.6 }}
         />
         <div style={{ fontSize: 10, color: T.tx3, marginTop: 4, lineHeight: 1.5 }}>
-          With a link, photos come from exactly that folder (image columns are filled in photo order — 1st photo → Front Image). Without one, the SKU's folder is searched automatically in the Link Generator folders.
+          Give a SKU's link ONCE — it's remembered, so next time just the SKU is enough. Photos come from: your typed link → the saved link → the master sheet's IMAGE link → automatic folder search. Image columns fill in photo order (1st photo → Front Image).
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
           <button
@@ -150,6 +156,9 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
         <ResultsTable headers={headers} kinds={kinds} rows={rows} usage={usage} template={selected} addToast={addToast} />
       )}
       <TemplateManager open={manageOpen} onClose={() => { setManageOpen(false); loadTemplates(); }} templates={templates} refresh={loadTemplates} addToast={addToast} />
+      <MappingsManager open={mappingsOpen} onClose={() => setMappingsOpen(false)}
+        fields={selected?.fields || [...new Map(templates.flatMap(t => t.fields).map(f => [f.header, f])).values()]} addToast={addToast} />
+      <SavedLinks open={linksOpen} onClose={() => setLinksOpen(false)} addToast={addToast} />
     </div>
   );
 }

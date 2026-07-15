@@ -56,6 +56,11 @@ export default function ResultsTable({ headers, kinds, rows, usage, template, ad
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.status === 'ok' ? '#22C55E' : r.status === 'bad_link' ? '#EF4444' : '#F59E0B', flexShrink: 0 }} />
                     <span style={{ fontSize: 11 }}>{r.status === 'ok' ? (r.noImage ? 'Ready (no photo found)' : 'Ready') : r.status === 'bad_link' ? 'Dropbox link failed' : 'Not in master sheet'}</span>
+                    {r.status === 'ok' && r.linkSource && (
+                      <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 8, fontWeight: 600, background: 'rgba(99,102,241,.1)', color: T.ac2, whiteSpace: 'nowrap' }}>
+                        {{ typed: 'link saved ✓', saved: 'saved link', master: 'master link', search: 'auto-found' }[r.linkSource]}
+                      </span>
+                    )}
                   </span>
                   {r.note && <div style={{ fontSize: 9, color: T.tx3, marginTop: 3 }}>{r.note}</div>}
                 </td>
