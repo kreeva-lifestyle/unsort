@@ -8,7 +8,8 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
-import { parseTemplateFile, SENSITIVE_RE } from './templateParse';
+import { parseTemplateFile } from './templateParse';
+import FieldRow from './FieldRow';
 import type { ListingTemplate, ListingTemplateField } from '../../types/database';
 
 type Editing = {
@@ -125,7 +126,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
                     {t.marketplace && <span style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: T.ac3, color: T.ac2 }}>{t.marketplace}</span>}
                   </div>
                   <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>
-                    {t.fields.length} fields · {t.fields.filter(f => f.allowed?.length).length} with dropdown values{t.file_name ? ` · exports into ${t.file_name}` : ''} — tap to edit
+                    {t.fields.length} fields · {t.fields.filter(f => f.allowed?.length).length} with dropdowns · {t.fields.filter(f => f.fixed).length} fixed{t.file_name ? ` · exports into ${t.file_name}` : ''} — tap to edit
                   </div>
                 </div>
                 {confirmDel === t.id ? (
@@ -159,27 +160,11 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
               )}
             </div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 8, lineHeight: 1.5 }}>
-              Tick required fields. Columns with a fixed dropdown show an "options" chip (tap to preview) — generation only picks from those values. Price-like columns are blanked automatically.
+              Tick required fields. Columns with a dropdown show an "options" chip (tap to preview). Set a <b>fixed value</b> for anything that's the same on every product (brand, origin, addresses…) — fixed fields are filled instantly and never cost AI tokens. Price-like columns are blanked automatically.
             </div>
             <div style={{ maxHeight: '38vh', overflowY: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
-              {editing.fields.map((f, i) => SENSITIVE_RE.test(f.header) ? (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${T.bd}`, opacity: 0.5 }}>
-                  <span style={{ fontSize: 12, color: T.tx3, flex: 1 }}>{f.header}</span>
-                  <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(239,68,68,.1)', color: T.re }}>always blank</span>
-                </div>
-              ) : (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: `1px solid ${T.bd}` }}>
-                  <input type="checkbox" checked={f.mandatory} onChange={e => setField(i, { mandatory: e.target.checked })} title="Mandatory" style={{ width: 15, height: 15, accentColor: T.ac, cursor: 'pointer', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, color: T.tx2, flex: 1, minWidth: 90, wordBreak: 'break-word' }}>{f.header}</span>
-                  {(f.allowed?.length || 0) > 0 && (
-                    <span onClick={() => addToast(`${f.header}: ${f.allowed!.slice(0, 15).join(', ')}${f.allowed!.length > 15 ? ` … +${f.allowed!.length - 15} more` : ''}`, 'success')}
-                      title={f.allowed!.slice(0, 30).join(', ')}
-                      style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(34,197,94,.1)', color: T.gr, cursor: 'pointer', flexShrink: 0 }}>
-                      {f.allowed!.length} options
-                    </span>
-                  )}
-                  <input value={f.hint} onChange={e => setField(i, { hint: e.target.value })} placeholder="hint" style={{ ...S.fInput, width: '32%', height: 30, fontSize: 12 }} />
-                </div>
+              {editing.fields.map((f, i) => (
+                <FieldRow key={i} f={f} onChange={patch => setField(i, patch)} addToast={addToast} />
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>

@@ -37,7 +37,9 @@ function rangeValues(wb: XLSX.WorkBook, ref: string): string[] {
   const out: string[] = [];
   try {
     const r = XLSX.utils.decode_range(m[3].includes(':') ? m[3] : `${m[3]}:${m[3]}`);
-    for (let R = r.s.r; R <= Math.min(r.e.r, r.s.r + 10000) && out.length <= ALLOWED_CAP; R++) {
+    // Collect past the cap (dupes exist in real dataset sheets) so the
+    // caller can reliably tell "big list" from "exactly at the cap".
+    for (let R = r.s.r; R <= Math.min(r.e.r, r.s.r + 20000) && out.length <= ALLOWED_CAP * 2; R++) {
       for (let C = r.s.c; C <= r.e.c; C++) {
         const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
         const v = cell == null ? '' : String(cell.v ?? '').trim();
@@ -101,8 +103,11 @@ export async function extractDropdowns(buf: ArrayBuffer, wb: XLSX.WorkBook, shee
         if (ch.localName === 'sqref' && !sqref) sqref = ch.textContent || ''; // x14: <xm:sqref>
       }
       if (!sqref || !formula) continue;
-      const vals = [...new Set(resolveFormula(wb, formula, sheetName))].slice(0, ALLOWED_CAP);
-      if (!vals.length) continue;
+      const vals = [...new Set(resolveFormula(wb, formula, sheetName))];
+      // Oversized lists (e.g. Myntra's 48k-row brand list) must NOT be
+      // truncated — a wrong first-500 enum would force wrong values. Treat
+      // them as free text instead; the AI still sees the master data.
+      if (!vals.length || vals.length > ALLOWED_CAP) continue;
       for (const c of sqrefCols(sqref)) if (!out.has(c)) out.set(c, vals);
     }
   } catch { /* best-effort: a sheet without readable validations still works */ }

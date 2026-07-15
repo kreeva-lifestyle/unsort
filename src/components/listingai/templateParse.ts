@@ -49,8 +49,14 @@ export async function parseTemplateFile(buf: ArrayBuffer, pickSheet?: string): P
     if (!header || seen.has(header.toLowerCase())) return;
     seen.add(header.toLowerCase());
     const allowed = dropdowns.get(colIdx);
-    // A "*" in the header is the common mandatory marker on seller sheets.
-    fields.push({ header, mandatory: header.includes('*'), hint: '', ...(allowed?.length ? { allowed } : {}) });
+    // A single-value dropdown (e.g. Myntra's articleType = "Lehenga Choli")
+    // is a constant: pre-pin it as the fixed value — filled in code, zero AI
+    // cost. A "*" in the header is the common mandatory marker.
+    fields.push({
+      header, mandatory: header.includes('*'), hint: '',
+      ...(allowed?.length ? { allowed } : {}),
+      ...(allowed?.length === 1 ? { fixed: allowed[0] } : {}),
+    });
   });
   return { sheetName, headerRow: headerIdx, fields, sheetNames: wb.SheetNames };
 }
