@@ -12,7 +12,7 @@ import { call, GenRow, GenUsage } from './api';
 import { parseSkuLines } from './skuInput';
 import TemplateManager from './TemplateManager';
 import MappingsManager from './MappingsManager';
-import SavedLinks from './SavedLinks';
+import ImageFolders from './ImageFolders';
 import ResultsTable from './ResultsTable';
 import type { ListingTemplate } from '../../types/database';
 
@@ -128,18 +128,18 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
           </div>
           <button onClick={() => setManageOpen(true)} style={S.btnGhost}>Manage Templates</button>
           <button onClick={() => setMappingsOpen(true)} style={S.btnGhost}>Taught Mappings</button>
-          <button onClick={() => setLinksOpen(true)} style={S.btnGhost}>Saved Links</button>
+          <button onClick={() => setLinksOpen(true)} style={S.btnGhost}>Image Folders</button>
         </div>
-        <div style={S.fLabel}>SKUs — one per line, Dropbox image link optional after the SKU</div>
+        <div style={S.fLabel}>SKUs — one per line</div>
         <textarea
           value={skuText}
           onChange={e => setSkuText(e.target.value)}
-          placeholder={'AD-1001\nDT-2044 https://www.dropbox.com/scl/fo/…'}
+          placeholder={'AD-1001\nDT-2044\nAD-1010'}
           rows={4}
           style={{ ...S.fInput, width: '100%', height: 'auto', minHeight: 84, resize: 'vertical', fontFamily: T.mono, lineHeight: 1.6 }}
         />
         <div style={{ fontSize: 10, color: T.tx3, marginTop: 4, lineHeight: 1.5 }}>
-          Give a SKU's link ONCE — it's remembered, so next time just the SKU is enough. Photos come from: your typed link → the saved link → the master sheet's IMAGE link → automatic folder search. Image columns fill in photo order (1st photo → Front Image).
+          Photos are found automatically: each SKU's subfolder inside your saved Image Folders → the master sheet's IMAGE link → Link Generator folders. Need a one-off override? Paste a folder link after the SKU on its line. Image columns fill in photo order (1st photo → Front Image).
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
           <button
@@ -158,7 +158,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
       <TemplateManager open={manageOpen} onClose={() => { setManageOpen(false); loadTemplates(); }} templates={templates} refresh={loadTemplates} addToast={addToast} />
       <MappingsManager open={mappingsOpen} onClose={() => setMappingsOpen(false)}
         fields={selected?.fields || [...new Map(templates.flatMap(t => t.fields).map(f => [f.header, f])).values()]} addToast={addToast} />
-      <SavedLinks open={linksOpen} onClose={() => setLinksOpen(false)} addToast={addToast} />
+      <ImageFolders open={linksOpen} onClose={() => setLinksOpen(false)} addToast={addToast} />
     </div>
   );
 }
