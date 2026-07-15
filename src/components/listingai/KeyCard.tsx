@@ -2,8 +2,8 @@
 // via the edge function). The key is validated against Anthropic before it is
 // saved and never reaches the browser bundle or client-readable tables.
 import { useState } from 'react';
-import { T, S } from '../../../lib/theme';
-import { friendlyError } from '../../../lib/friendlyError';
+import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
 import { call } from './api';
 
 export default function KeyCard({ hasKey, onSaved, addToast }: {

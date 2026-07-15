@@ -384,6 +384,7 @@ const ICON_PATHS: Record<string, string> = {
   print:    'M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z',
   clock:    'M12 22a10 10 0 100-20 10 10 0 000 20zM12 6v6l4 2',
   receipt:  'M5 2l1.5 1.5L8 2l1.5 1.5L11 2l1.5 1.5L14 2l1.5 1.5L17 2l1.5 1.5L20 2v20l-1.5-1.5L17 22l-1.5-1.5L14 22l-1.5-1.5L11 22l-1.5-1.5L8 22l-1.5-1.5L5 22V2zM8 8h8M8 12h8M8 16h5',
+  cpu:      'M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2M6 4h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2zM9 9h6v6H9z',
 };
 
 export const Icon = ({ name, size = 16 }: { name: string; size?: number }) => {

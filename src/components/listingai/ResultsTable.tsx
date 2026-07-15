@@ -1,11 +1,11 @@
 // Results grid + export for Listing AI. One row per SKU with status and a
 // title-ish preview; the full sheet goes out via Export in template order.
 import { useState } from 'react';
-import { T, S } from '../../../lib/theme';
-import { friendlyError } from '../../../lib/friendlyError';
+import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
 import { GenRow, GenUsage } from './api';
 import { exportFilledXlsx } from './exportFilled';
-import type { ListingTemplate } from '../../../types/database';
+import type { ListingTemplate } from '../../types/database';
 
 const fmtK = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 

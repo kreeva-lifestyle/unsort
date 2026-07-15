@@ -3,7 +3,7 @@
 // (data validations), so generation can be locked to marketplace values.
 import * as XLSX from 'xlsx';
 import { extractDropdowns } from './validationParse';
-import type { ListingTemplateField } from '../../../types/database';
+import type { ListingTemplateField } from '../../types/database';
 
 // Columns the module always leaves blank (enforced server-side too).
 export const SENSITIVE_RE = /price|mrp|\bgst\b|\brate\b|cost|amount|margin|commission|\bhsn\b/i;

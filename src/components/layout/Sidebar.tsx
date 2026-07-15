@@ -11,6 +11,7 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
     { id: 'packtime', icon: 'scan', label: 'PackStation' },
     { id: 'challan', icon: 'file', label: 'Cash Challan' },
     { id: 'purchaseorders', icon: 'receipt', label: 'Purchase Orders' },
+    { id: 'listingai', icon: 'cpu', label: 'Listing AI' },
     { id: 'attendance', icon: 'clock', label: 'Attendance' },
     { id: 'programs', icon: 'layers', label: 'Programs' },
     { id: 'minis', icon: 'sparkles', label: 'Minis' },

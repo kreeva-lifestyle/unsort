@@ -4,16 +4,15 @@
 // export the filled sheet in the template's exact column order. Price-like
 // columns are always left blank (enforced server-side).
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../lib/supabase';
-import { T, S } from '../../../lib/theme';
-import { friendlyError } from '../../../lib/friendlyError';
-import Empty from '../../ui/Empty';
+import { supabase } from '../../lib/supabase';
+import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
+import Empty from '../ui/Empty';
 import { call, GenRow, GenUsage } from './api';
-import { parseSkuText } from '../dropboxlinks/bulk';
+import { parseSkuText } from '../minis/dropboxlinks/bulk';
 import TemplateManager from './TemplateManager';
-import KeyCard from './KeyCard';
 import ResultsTable from './ResultsTable';
-import type { ListingTemplate } from '../../../types/database';
+import type { ListingTemplate } from '../../types/database';
 
 const CHUNK = 3;    // SKUs per edge call (server caps at 5) — keeps each call fast
 const RUN_CAP = 60; // SKUs per run, so one tap can't burn an unbounded API bill
@@ -72,7 +71,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
         catch (e) { addToast(friendlyError(e), 'error'); break; }
         if (!data?.ok) {
           addToast(data?.error === 'no_api_key'
-            ? (isAdmin ? 'Add your Anthropic API key above first' : 'No API key configured — ask an admin to add it in Listing AI')
+            ? (isAdmin ? 'Add the Anthropic API key in Settings → Listing AI first' : 'No API key configured — ask an admin to add it in Settings → Listing AI')
             : String(data?.details || data?.error || `Failed (${st})`), 'error');
           break;
         }
@@ -107,10 +106,11 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
           Master sheet + Dropbox photo → filled marketplace sheet, fresh wording every run. Price columns always stay blank.
         </div>
       </div>
-      {isAdmin && <KeyCard hasKey={!!status?.hasKey} onSaved={loadStatus} addToast={addToast} />}
-      {!isAdmin && status && !status.hasKey && (
+      {status && !status.hasKey && (
         <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '10px 12px', fontSize: 11, color: T.yl, marginBottom: 14 }}>
-          No Anthropic API key configured yet — ask an admin to add it here.
+          {isAdmin
+            ? 'No Anthropic API key configured yet — add it in Settings → Listing AI.'
+            : 'No Anthropic API key configured yet — ask an admin to add it in Settings → Listing AI.'}
         </div>
       )}
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16 }}>
