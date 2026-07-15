@@ -994,13 +994,21 @@ export const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
 };
 
 // ---- Listing AI ----
-export type ListingTemplateField = { header: string; mandatory: boolean; hint: string };
+// `allowed` holds the marketplace's dropdown dataset for that column (parsed
+// from the uploaded sheet's data validations) — generation may only pick
+// from it. Empty/absent = free text.
+export type ListingTemplateField = { header: string; mandatory: boolean; hint: string; allowed?: string[] };
 
 export type ListingTemplate = {
   id: string;
   name: string;
   marketplace: string;
   fields: ListingTemplateField[];
+  // Original uploaded workbook (stored in the listing-templates bucket as
+  // <id>.xlsx) so exports preserve the marketplace's exact file & layout.
+  file_name?: string;
+  sheet_name?: string;
+  header_row?: number;
   created_by?: string | null;
   created_at?: string;
   updated_at?: string;
