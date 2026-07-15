@@ -5,11 +5,11 @@
 // under the same name replaces fields + file — how format changes land.
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { supabase } from '../../../lib/supabase';
-import { T, S } from '../../../lib/theme';
-import { friendlyError } from '../../../lib/friendlyError';
+import { supabase } from '../../lib/supabase';
+import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
 import { parseTemplateFile, SENSITIVE_RE } from './templateParse';
-import type { ListingTemplate, ListingTemplateField } from '../../../types/database';
+import type { ListingTemplate, ListingTemplateField } from '../../types/database';
 
 type Editing = {
   id: string | null; name: string; marketplace: string; fields: ListingTemplateField[];

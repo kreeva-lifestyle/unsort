@@ -1,15 +1,15 @@
-export const TAB_IDS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'purchaseorders', 'attendance', 'programs', 'minis', 'printstation', 'settings'] as const;
+export const TAB_IDS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'purchaseorders', 'listingai', 'attendance', 'programs', 'minis', 'printstation', 'settings'] as const;
 export type TabId = typeof TAB_IDS[number];
 
 const TAB_TO_MODULE: Record<string, string> = {
   dashboard: 'dashboard', inventory: 'inventory', brandtag: 'brandtag',
-  packtime: 'packtime', challan: 'challan', purchaseorders: 'purchaseorders', attendance: 'attendance', programs: 'programs', minis: 'minis', printstation: 'printstation',
+  packtime: 'packtime', challan: 'challan', purchaseorders: 'purchaseorders', listingai: 'listingai', attendance: 'attendance', programs: 'programs', minis: 'minis', printstation: 'printstation',
 };
 
 export const MODULE_LABELS: Record<string, string> = {
   dashboard: 'Dashboard', inventory: 'Inventory', extras: 'Spare Parts',
   packtime: 'PackStation', brandtag: 'Brand Tags', challan: 'Cash Challan',
-  cashbook: 'Cash Book', purchaseorders: 'Purchase Orders', attendance: 'Attendance', programs: 'Programs', minis: 'Minis', printstation: 'Print Station',
+  cashbook: 'Cash Book', purchaseorders: 'Purchase Orders', listingai: 'Listing AI', attendance: 'Attendance', programs: 'Programs', minis: 'Minis', printstation: 'Print Station',
 };
 
 export const ALL_MODULE_KEYS = Object.keys(MODULE_LABELS);
@@ -31,6 +31,6 @@ export const canAccessTab = (role: string | null | undefined, tab: string, modul
   // Operators are excluded from finance-adjacent modules by default (an admin
   // can still grant access per-user via module_access) — purchase orders carry
   // vendor rates and order values, same sensitivity as the challan book.
-  if (role === 'operator') return !['brandtag', 'challan', 'attendance', 'programs', 'minis', 'purchaseorders'].includes(tab);
+  if (role === 'operator') return !['brandtag', 'challan', 'attendance', 'programs', 'minis', 'purchaseorders', 'listingai'].includes(tab);
   return ['dashboard', 'inventory', 'settings'].includes(tab);
 };

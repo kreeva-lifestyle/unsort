@@ -4,9 +4,9 @@
 // header row in the correct columns. Falls back to a plain sheet for old
 // templates saved before the file was kept.
 import * as XLSX from 'xlsx';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import type { GenRow } from './api';
-import type { ListingTemplate } from '../../../types/database';
+import type { ListingTemplate } from '../../types/database';
 
 type TplRef = Pick<ListingTemplate, 'id' | 'name' | 'file_name' | 'sheet_name' | 'header_row'>;
 

@@ -1,6 +1,6 @@
 // Edge-function caller for Listing AI (mirrors dropboxlinks/api.ts). The
 // edge fn authorises per caller role, so the user's session token is sent.
-import { supabase, SUPABASE_ANON_KEY } from '../../../lib/supabase';
+import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 
 export const FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/listing-ai';
 
