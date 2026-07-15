@@ -11,6 +11,11 @@ export const SENSITIVE_RE = /price|mrp|\bgst\b|\brate\b|cost|amount|margin|commi
 // Header normalization shared with the edge fn (taught-mapping keys).
 export const normHeader = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+// Image-slot columns (same rule as the edge fn): filled with Dropbox links
+// in code at zero AI cost, so bulk actions should never skip them.
+export const isImageColumn = (h: string) =>
+  /(front|side|back|additional)\s*image|image\s*\d|look\s*shot|detail\s*angle/i.test(h) && !/certificate|\bbis\b|document/i.test(h);
+
 export interface ParsedTemplate {
   sheetName: string;
   headerRow: number; // zero-based row index of the header row
