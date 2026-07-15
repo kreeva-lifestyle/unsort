@@ -58,7 +58,7 @@ export default function ResultsTable({ headers, kinds, rows, usage, template, ad
                     <span style={{ fontSize: 11 }}>{r.status === 'ok' ? (r.noImage ? 'Ready (no photo found)' : 'Ready') : r.status === 'bad_link' ? 'Dropbox link failed' : 'Not in master sheet'}</span>
                     {r.status === 'ok' && r.linkSource && (
                       <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 8, fontWeight: 600, background: 'rgba(99,102,241,.1)', color: T.ac2, whiteSpace: 'nowrap' }}>
-                        {{ typed: 'link saved ✓', saved: 'saved link', master: 'master link', search: 'auto-found' }[r.linkSource]}
+                        {{ typed: 'direct link', folders: 'image folder', master: 'master link', search: 'auto-found' }[r.linkSource]}
                       </span>
                     )}
                   </span>

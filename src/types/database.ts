@@ -998,8 +998,9 @@ export const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
 // from the uploaded sheet's data validations) — generation may only pick
 // from it. Empty/absent = free text. `fixed` is a value entered once on the
 // template (or auto-detected from a single-value dropdown): it is filled in
-// code on every run and never sent to the AI — zero token cost.
-export type ListingTemplateField = { header: string; mandatory: boolean; hint: string; allowed?: string[]; fixed?: string };
+// code on every run and never sent to the AI — zero token cost. `skip` marks
+// a column the owner never wants filled: always exported empty, zero cost.
+export type ListingTemplateField = { header: string; mandatory: boolean; hint: string; allowed?: string[]; fixed?: string; skip?: boolean };
 
 // A taught value mapping: "when the master sheet says SOURCE for this
 // column, always use TARGET on the marketplace sheet." The AI is stateless —
@@ -1013,11 +1014,10 @@ export type ListingMapping = {
   updated_at?: string;
 };
 
-// A saved per-SKU Dropbox image link: entered once (or auto-saved from a
-// successful run), reused on every later run by typing just the SKU.
-export type ListingSkuLink = {
+// A saved Dropbox PARENT folder link: the folder that contains every SKU's
+// subfolder. Saved once — each run finds the SKU's subfolder inside it.
+export type ListingFolder = {
   id: string;
-  sku: string;
   link: string;
   updated_at?: string;
 };
