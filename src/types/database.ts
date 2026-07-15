@@ -996,8 +996,10 @@ export const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
 // ---- Listing AI ----
 // `allowed` holds the marketplace's dropdown dataset for that column (parsed
 // from the uploaded sheet's data validations) — generation may only pick
-// from it. Empty/absent = free text.
-export type ListingTemplateField = { header: string; mandatory: boolean; hint: string; allowed?: string[] };
+// from it. Empty/absent = free text. `fixed` is a value entered once on the
+// template (or auto-detected from a single-value dropdown): it is filled in
+// code on every run and never sent to the AI — zero token cost.
+export type ListingTemplateField = { header: string; mandatory: boolean; hint: string; allowed?: string[]; fixed?: string };
 
 export type ListingTemplate = {
   id: string;
