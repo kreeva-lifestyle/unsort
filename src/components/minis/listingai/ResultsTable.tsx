@@ -1,35 +1,45 @@
 // Results grid + export for Listing AI. One row per SKU with status and a
 // title-ish preview; the full sheet goes out via Export in template order.
+import { useState } from 'react';
 import { T, S } from '../../../lib/theme';
+import { friendlyError } from '../../../lib/friendlyError';
 import { GenRow, GenUsage } from './api';
 import { exportFilledXlsx } from './exportFilled';
+import type { ListingTemplate } from '../../../types/database';
 
 const fmtK = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 
-export default function ResultsTable({ headers, kinds, rows, usage, templateName, addToast }: {
+export default function ResultsTable({ headers, kinds, rows, usage, template, addToast }: {
   headers: string[];
   kinds: string[];
   rows: GenRow[];
   usage: GenUsage | null;
-  templateName: string;
+  template: Pick<ListingTemplate, 'id' | 'name' | 'file_name' | 'sheet_name' | 'header_row'>;
   addToast: (m: string, t?: string) => void;
 }) {
+  const [exporting, setExporting] = useState(false);
   let previewIdx = headers.findIndex((h, ix) => kinds[ix] === 'ai' && /title|product\s*name/i.test(h));
   if (previewIdx < 0) previewIdx = kinds.findIndex(k => k === 'ai');
   const ok = rows.filter(r => r.status === 'ok');
 
-  const exportSheet = () => {
+  const exportSheet = async () => {
+    if (exporting) return;
     if (ok.length === 0) { addToast('Nothing to export — no SKU generated successfully', 'error'); return; }
-    exportFilledXlsx(headers, ok, templateName);
-    if (ok.length < rows.length) addToast(`Exported ${ok.length} — ${rows.length - ok.length} SKU(s) skipped (not in master sheet)`, 'success');
-    else addToast(`Exported ${ok.length} listing(s)`, 'success');
+    setExporting(true);
+    try {
+      await exportFilledXlsx(headers, ok, template);
+      const skipped = rows.length - ok.length;
+      const into = template.file_name ? ` into ${template.file_name}` : '';
+      addToast(`Exported ${ok.length}${into}${skipped ? ` — ${skipped} SKU(s) skipped (not in master sheet)` : ''}`, 'success');
+    } catch (e) { addToast(friendlyError(e), 'error'); }
+    setExporting(false);
   };
 
   return (
     <div style={{ marginTop: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Results</div>
-        <button onClick={exportSheet} style={{ ...S.btnGhost, ...S.btnSm, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export {ok.length} to Excel</button>
+        <button onClick={exportSheet} disabled={exporting} style={{ ...S.btnGhost, ...S.btnSm, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', pointerEvents: exporting ? 'none' : 'auto', opacity: exporting ? 0.5 : 1 }}>{exporting ? 'Exporting…' : `Export ${ok.length} to Excel`}</button>
       </div>
       <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.01)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}>

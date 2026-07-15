@@ -1,32 +1,56 @@
-// Parse an uploaded marketplace listing sheet into template fields.
-// Only the header row matters — the marketplace's column layout IS the
-// template; values are generated later per SKU.
+// Parse an uploaded marketplace listing sheet into template fields — the
+// header row of the data-entry sheet PLUS each column's dropdown dataset
+// (data validations), so generation can be locked to marketplace values.
 import * as XLSX from 'xlsx';
+import { extractDropdowns } from './validationParse';
 import type { ListingTemplateField } from '../../../types/database';
 
-// Columns the module always leaves blank. Mirrors the server-side rule in the
-// listing-ai edge function — shown in the UI so the owner knows why.
+// Columns the module always leaves blank (enforced server-side too).
 export const SENSITIVE_RE = /price|mrp|\bgst\b|\brate\b|cost|amount|margin|commission|\bhsn\b/i;
 
-export function parseTemplateFile(buf: ArrayBuffer): ListingTemplateField[] {
-  const wb = XLSX.read(buf, { type: 'array' });
-  const grid = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' });
-  // Marketplace sheets often start with instruction/notes rows — take the row
-  // with the most non-empty cells among the first 10 as the header row.
-  let headerRow: unknown[] = [];
-  let best = 0;
-  for (const r of grid.slice(0, 10)) {
+export interface ParsedTemplate {
+  sheetName: string;
+  headerRow: number; // zero-based row index of the header row
+  fields: ListingTemplateField[];
+  sheetNames: string[]; // all sheets, for the manual override picker
+}
+
+// Marketplace sheets often start with instruction/notes rows — the header
+// row is the row with the most non-empty cells among the first 10.
+function bestHeaderRow(grid: unknown[][]): { idx: number; count: number } {
+  let idx = 0, count = 0;
+  grid.slice(0, 10).forEach((r, i) => {
     const filled = (r || []).filter(c => String(c ?? '').trim()).length;
-    if (filled > best) { best = filled; headerRow = r; }
+    if (filled > count) { count = filled; idx = i; }
+  });
+  return { idx, count };
+}
+
+export async function parseTemplateFile(buf: ArrayBuffer, pickSheet?: string): Promise<ParsedTemplate> {
+  const wb = XLSX.read(buf, { type: 'array' });
+  // Data-entry sheet = the visible sheet whose header row carries the most
+  // labels (dataset/instruction sheets are usually hidden or sparse).
+  const visibility = wb.Workbook?.Sheets || [];
+  const visible = wb.SheetNames.filter((_, i) => !(visibility[i] as { Hidden?: number } | undefined)?.Hidden);
+  const candidates = pickSheet && wb.SheetNames.includes(pickSheet) ? [pickSheet] : (visible.length ? visible : wb.SheetNames);
+  let sheetName = candidates[0], headerIdx = 0, best = -1;
+  let bestGrid: unknown[][] = [];
+  for (const name of candidates) {
+    const grid = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, raw: false, defval: '' });
+    const { idx, count } = bestHeaderRow(grid);
+    if (count > best) { best = count; sheetName = name; headerIdx = idx; bestGrid = grid; }
   }
+  const headerRow = (bestGrid[headerIdx] || []) as unknown[];
+  const dropdowns = await extractDropdowns(buf, wb, sheetName);
   const seen = new Set<string>();
   const fields: ListingTemplateField[] = [];
-  for (const c of headerRow) {
+  headerRow.forEach((c, colIdx) => {
     const header = String(c ?? '').trim();
-    if (!header || seen.has(header.toLowerCase())) continue;
+    if (!header || seen.has(header.toLowerCase())) return;
     seen.add(header.toLowerCase());
+    const allowed = dropdowns.get(colIdx);
     // A "*" in the header is the common mandatory marker on seller sheets.
-    fields.push({ header, mandatory: header.includes('*'), hint: '' });
-  }
-  return fields;
+    fields.push({ header, mandatory: header.includes('*'), hint: '', ...(allowed?.length ? { allowed } : {}) });
+  });
+  return { sheetName, headerRow: headerIdx, fields, sheetNames: wb.SheetNames };
 }

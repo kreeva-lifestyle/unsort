@@ -42,7 +42,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
 
   const loadTemplates = useCallback(async () => {
     const { data, error } = await supabase.from('listing_templates')
-      .select('id, name, marketplace, fields, updated_at').order('name');
+      .select('id, name, marketplace, fields, file_name, sheet_name, header_row, updated_at').order('name');
     if (error) { addToast(friendlyError(error), 'error'); return; }
     setTemplates((data as ListingTemplate[] | null) || []);
   }, [addToast]);
@@ -143,8 +143,8 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
           {generating && <span style={{ fontSize: 11, color: T.tx3 }}>Fetching data, photos and writing listings — stay on this screen…</span>}
         </div>
       </div>
-      {rows.length > 0 && (
-        <ResultsTable headers={headers} kinds={kinds} rows={rows} usage={usage} templateName={selected?.name || 'Listings'} addToast={addToast} />
+      {rows.length > 0 && selected && (
+        <ResultsTable headers={headers} kinds={kinds} rows={rows} usage={usage} template={selected} addToast={addToast} />
       )}
       <TemplateManager open={manageOpen} onClose={() => { setManageOpen(false); loadTemplates(); }} templates={templates} refresh={loadTemplates} addToast={addToast} />
     </div>
