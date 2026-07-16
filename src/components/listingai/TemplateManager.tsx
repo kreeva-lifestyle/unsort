@@ -10,14 +10,17 @@ import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { fetchMasterColumns } from './api';
 import { parseTemplateFile, SENSITIVE_RE } from './templateParse';
-import { mergeTemplateFields, describeMerge } from './mergeFields';
+import { mergeTemplateFields, describeMerge, pruneRules } from './mergeFields';
 import FieldRow from './FieldRow';
 import EditorToolbar from './EditorToolbar';
+import EditorMeta from './EditorMeta';
+import RulesEditor from './RulesEditor';
 import TemplateListRow from './TemplateListRow';
-import type { ListingTemplate, ListingTemplateField } from '../../types/database';
+import type { ListingTemplate, ListingTemplateField, ListingTemplateRule } from '../../types/database';
 
 type Editing = {
   id: string | null; name: string; marketplace: string; fields: ListingTemplateField[];
+  rules: ListingTemplateRule[];
   sheetName: string; headerRow: number; sheetNames: string[];
   fileBuf: ArrayBuffer | null; fileName: string; // null when editing flags of a saved template
 };
@@ -31,13 +34,14 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
   const [saving, setSaving] = useState(false);
   const [confirmDel, setConfirmDel] = useState('');
   const [masterCols, setMasterCols] = useState<string[]>([]);
+  const [showRules, setShowRules] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     document.body.classList.toggle('modal-open', open);
     return () => document.body.classList.remove('modal-open');
   }, [open]);
-  useEffect(() => { if (!open) { setEditing(null); setMergeInfo(''); setSaving(false); setConfirmDel(''); } }, [open]);
+  useEffect(() => { if (!open) { setEditing(null); setMergeInfo(''); setSaving(false); setConfirmDel(''); setShowRules(false); } }, [open]);
   // Master headers for the ⤓ pairing select — best-effort, once per open.
   useEffect(() => {
     if (!open || !editing || masterCols.length) return;
@@ -56,10 +60,12 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
       const target = editing?.id ? templates.find(t => t.id === editing.id)
         : templates.find(t => t.name.trim().toLowerCase() === base.toLowerCase());
       let fields = p.fields, info = '';
+      // Rules survive a re-upload; targets whose column vanished are dropped.
+      const pr = pruneRules(editing?.rules ?? target?.rules ?? [], p.fields);
       if (target) {
         const m = mergeTemplateFields(editing?.id ? editing.fields : target.fields, p.fields);
         fields = m.fields;
-        info = describeMerge(m.summary);
+        info = describeMerge(m.summary) + (pr.dropped ? `; ${pr.dropped} rule target(s) dropped (column gone)` : '');
         addToast(`Sheet changes merged into "${target.name}"`, 'success');
       } else {
         const withData = p.fields.filter(f => f.allowed?.length).length;
@@ -70,7 +76,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
         id: target?.id ?? null,
         name: editing?.name || target?.name || base,
         marketplace: editing?.marketplace || target?.marketplace || '',
-        fields, sheetName: p.sheetName, headerRow: p.headerRow, sheetNames: p.sheetNames,
+        fields, rules: pr.rules, sheetName: p.sheetName, headerRow: p.headerRow, sheetNames: p.sheetNames,
         fileBuf: buf, fileName,
       });
     } catch { addToast('Could not read that file — check the format', 'error'); }
@@ -93,7 +99,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
     try {
       const existing = templates.find(t => t.id === editing.id)
         || templates.find(t => t.name.trim().toLowerCase() === name.toLowerCase());
-      const payload: Record<string, unknown> = { name, marketplace: editing.marketplace.trim(), fields: editing.fields, updated_at: new Date().toISOString() };
+      const payload: Record<string, unknown> = { name, marketplace: editing.marketplace.trim(), fields: editing.fields, rules: editing.rules, updated_at: new Date().toISOString() };
       if (editing.fileBuf) { payload.file_name = editing.fileName; payload.sheet_name = editing.sheetName; payload.header_row = editing.headerRow; }
       let id = existing?.id || '';
       if (existing) {
@@ -148,48 +154,39 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
             )}
             {templates.map(t => (
               <TemplateListRow key={t.id} t={t} confirming={confirmDel === t.id}
-                onOpen={() => { setMergeInfo(''); setEditing({ id: t.id, name: t.name, marketplace: t.marketplace, fields: t.fields, sheetName: t.sheet_name || '', headerRow: t.header_row || 0, sheetNames: [], fileBuf: null, fileName: t.file_name || '' }); }}
+                onOpen={() => { setMergeInfo(''); setEditing({ id: t.id, name: t.name, marketplace: t.marketplace, fields: t.fields, rules: t.rules || [], sheetName: t.sheet_name || '', headerRow: t.header_row || 0, sheetNames: [], fileBuf: null, fileName: t.file_name || '' }); }}
                 onAskDelete={() => setConfirmDel(t.id)} onCancelDelete={() => setConfirmDel('')} onDelete={() => del(t)} />
             ))}
           </>}
           {editing && <>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-              <div style={{ flex: 2, minWidth: 160 }}>
-                <div style={S.fLabel}>Template name</div>
-                <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') save(); }} placeholder="e.g. Myntra Kurta Set" style={{ ...S.fInput, width: '100%' }} />
-              </div>
-              <div style={{ flex: 1, minWidth: 120 }}>
-                <div style={S.fLabel}>Marketplace</div>
-                <input value={editing.marketplace} onChange={e => setEditing({ ...editing, marketplace: e.target.value })} placeholder="Myntra / Ajio / …" style={{ ...S.fInput, width: '100%' }} />
-              </div>
-              {editing.fileBuf && editing.sheetNames.length > 1 && (
-                <div style={{ flex: 1, minWidth: 140 }}>
-                  <div style={S.fLabel}>Data-entry sheet</div>
-                  <select value={editing.sheetName} onChange={e => parseInto(editing.fileBuf!, editing.fileName, e.target.value)} style={{ ...S.fInput, width: '100%' }}>
-                    {editing.sheetNames.map(n => <option key={n} value={n}>{n}</option>)}
-                  </select>
-                </div>
-              )}
-            </div>
-            <div style={{ fontSize: 11, color: T.tx3, marginBottom: 8, lineHeight: 1.5 }}>
-              Tick required fields. Columns with a dropdown show an "options" chip (tap to preview). Set a <b>fixed value</b> for anything that's the same on every product — fixed fields fill instantly and never cost AI tokens. Price-like columns are blanked automatically.
-            </div>
+            <EditorMeta name={editing.name} marketplace={editing.marketplace} sheetName={editing.sheetName} sheetNames={editing.sheetNames} hasFile={!!editing.fileBuf}
+              onPatch={p => setEditing(ed => ed ? { ...ed, ...p } : ed)}
+              onPickSheet={s => parseInto(editing.fileBuf!, editing.fileName, s)} onEnter={save} />
             {mergeInfo && (
               <div style={{ background: 'rgba(56,189,248,.06)', border: '1px solid rgba(56,189,248,.2)', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: T.bl, marginBottom: 8, lineHeight: 1.5 }}>
                 Sheet update merged: {mergeInfo}
               </div>
             )}
-            <EditorToolbar fields={editing.fields} isSaved={!!editing.id}
-              onFields={fields => setEditing(ed => ed ? { ...ed, fields } : ed)}
-              onReupload={() => fileRef.current?.click()} addToast={addToast} />
-            <div style={{ maxHeight: '38vh', overflowY: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
-              {editing.fields.map((f, i) => (
-                <FieldRow key={i} f={f} onChange={patch => setField(i, patch)} addToast={addToast} masterCols={masterCols} others={editing.fields.filter(o => o.header !== f.header && !o.sameAs && !o.skip && !SENSITIVE_RE.test(o.header)).map(o => o.header)} />
-              ))}
-            </div>
+            {showRules ? (
+              <RulesEditor fields={editing.fields} masterCols={masterCols} rules={editing.rules}
+                onChange={rules => setEditing(ed => ed ? { ...ed, rules } : ed)} onBack={() => setShowRules(false)} />
+            ) : <>
+              <div style={{ fontSize: 11, color: T.tx3, marginBottom: 8, lineHeight: 1.5 }}>
+                Tick required fields. Columns with a dropdown show an "options" chip (tap to preview). Set a <b>fixed value</b> for anything that's the same on every product — fixed fields fill instantly and never cost AI tokens. Price-like columns are blanked automatically.
+              </div>
+              <EditorToolbar fields={editing.fields} isSaved={!!editing.id}
+                onFields={fields => setEditing(ed => ed ? { ...ed, fields } : ed)}
+                onReupload={() => fileRef.current?.click()} addToast={addToast}
+                rulesCount={editing.rules.length} onRules={() => setShowRules(true)} />
+              <div style={{ maxHeight: '38vh', overflowY: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
+                {editing.fields.map((f, i) => (
+                  <FieldRow key={i} f={f} onChange={patch => setField(i, patch)} addToast={addToast} masterCols={masterCols} others={editing.fields.filter(o => o.header !== f.header && !o.sameAs && !o.skip && !SENSITIVE_RE.test(o.header)).map(o => o.header)} />
+                ))}
+              </div>
+            </>}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, flex: 1, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save template'}</button>
-              <button onClick={() => { setEditing(null); setMergeInfo(''); }} style={S.btnGhost}>Back</button>
+              <button onClick={() => { setEditing(null); setMergeInfo(''); setShowRules(false); }} style={S.btnGhost}>Back</button>
             </div>
           </>}
         </div>

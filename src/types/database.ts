@@ -1044,11 +1044,25 @@ export type ListingFolder = {
   updated_at?: string;
 };
 
+// A conditional fill rule on a template: WHEN a product's master-sheet
+// value or a generated column's value matches (or always) → SET target
+// columns, either to one fixed value or to a per-size chart applied to
+// each expanded size row. Evaluated in the edge function, zero AI cost.
+export type ListingTemplateRuleSet = { header: string; value?: string; perSize?: Record<string, string> };
+export type ListingTemplateRule = {
+  source: 'always' | 'master' | 'column';
+  key: string;   // master column (master) or template header (column); '' for always
+  op: 'is' | 'contains';
+  value: string; // condition value; '' for always
+  set: ListingTemplateRuleSet[];
+};
+
 export type ListingTemplate = {
   id: string;
   name: string;
   marketplace: string;
   fields: ListingTemplateField[];
+  rules?: ListingTemplateRule[];
   // Original uploaded workbook (stored in the listing-templates bucket as
   // <id>.xlsx) so exports preserve the marketplace's exact file & layout.
   file_name?: string;
