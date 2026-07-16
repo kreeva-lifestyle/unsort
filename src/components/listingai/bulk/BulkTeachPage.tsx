@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
+import Empty from '../../ui/Empty';
 import ColumnCard from './ColumnCard';
 import { ScanColumn, StagedLesson, lessonKey, scanMappings, suggestMappings } from './bulkApi';
 import type { ListingTemplate } from '../../../types/database';
@@ -22,6 +23,7 @@ export default function BulkTeachPage({ onBack, templates, initialTemplateId, ad
   const [templateId, setTemplateId] = useState(initialTemplateId || templates[0]?.id || '');
   const [columns, setColumns] = useState<ScanColumn[] | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [scanErr, setScanErr] = useState('');
   const [staged, setStaged] = useState<Record<string, StagedLesson>>({});
   const [suggestions, setSuggestions] = useState<Record<string, string>>({});
   const [suggestingCol, setSuggestingCol] = useState(''); // header, or '*' for all
@@ -35,11 +37,12 @@ export default function BulkTeachPage({ onBack, templates, initialTemplateId, ad
     if (!id) { setColumns(null); return; }
     setScanning(true);
     setColumns(null);
+    setScanErr('');
     try {
       const { columns: cols, warnings } = await scanMappings(id);
       setColumns(cols);
       for (const w of warnings || []) addToast(w, 'error');
-    } catch (e) { addToast(friendlyError(e), 'error'); }
+    } catch (e) { setScanErr(friendlyError(e)); addToast(friendlyError(e), 'error'); }
     setScanning(false);
   }, [addToast]);
 
@@ -135,6 +138,9 @@ export default function BulkTeachPage({ onBack, templates, initialTemplateId, ad
         </div>
       )}
       {scanning && <div style={{ padding: '40px 0', textAlign: 'center', color: T.tx3, fontSize: 12 }}>Scanning the master sheet — both brand tabs, every row…</div>}
+      {!scanning && !columns && scanErr && (
+        <Empty icon="warning" title="Scan failed" message={scanErr} cta="Retry" onCta={() => scan(templateId)} />
+      )}
       {!scanning && columns && columns.length === 0 && (
         <div style={{ padding: '40px 20px', textAlign: 'center', color: T.tx3, fontSize: 12 }}>
           This template has no dropdown columns that pair with a master column — there is nothing to teach here.
@@ -157,6 +163,19 @@ export default function BulkTeachPage({ onBack, templates, initialTemplateId, ad
           ))}
         </>
       )}
+      {!scanning && columns && (() => {
+        // Dropdown columns the scan can't cover (no master-column pairing).
+        // Pairing them in Manage Templates brings them onto this board.
+        const scanned = new Set(columns.map(c => c.header));
+        const unscanned = (tpl?.fields || []).filter(f => f.allowed?.length && !f.skip && !f.fixed && !f.sameAs && !scanned.has(f.header)).map(f => f.header);
+        return unscanned.length ? (
+          <div style={{ marginTop: 14, padding: '10px 12px', background: 'rgba(245,158,11,.05)', border: '1px solid rgba(245,158,11,.18)', borderRadius: 8, fontSize: 11, color: T.tx3, lineHeight: 1.6 }}>
+            <b style={{ color: T.yl }}>Not scanned</b> — these dropdown columns aren't paired to a master column yet, so their values can't be checked here:{' '}
+            <span style={{ color: T.tx2 }}>{unscanned.slice(0, 12).join(' · ')}{unscanned.length > 12 ? ` … +${unscanned.length - 12} more` : ''}</span>.
+            {' '}Pair them in <b>Manage Templates</b> (the ⤓ "from master" control on each column) and they'll appear on this board.
+          </div>
+        ) : null;
+      })()}
     </div>
   );
 }

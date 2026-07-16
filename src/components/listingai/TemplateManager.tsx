@@ -8,9 +8,11 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
-import { parseTemplateFile, isImageColumn, SENSITIVE_RE } from './templateParse';
+import { fetchMasterColumns } from './api';
+import { parseTemplateFile, SENSITIVE_RE } from './templateParse';
 import { mergeTemplateFields, describeMerge } from './mergeFields';
 import FieldRow from './FieldRow';
+import EditorToolbar from './EditorToolbar';
 import TemplateListRow from './TemplateListRow';
 import type { ListingTemplate, ListingTemplateField } from '../../types/database';
 
@@ -28,6 +30,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
   const [mergeInfo, setMergeInfo] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmDel, setConfirmDel] = useState('');
+  const [masterCols, setMasterCols] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -35,6 +38,11 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
     return () => document.body.classList.remove('modal-open');
   }, [open]);
   useEffect(() => { if (!open) { setEditing(null); setMergeInfo(''); setSaving(false); setConfirmDel(''); } }, [open]);
+  // Master headers for the ⤓ pairing select — best-effort, once per open.
+  useEffect(() => {
+    if (!open || !editing || masterCols.length) return;
+    fetchMasterColumns().then(setMasterCols).catch(() => setMasterCols([]));
+  }, [open, editing, masterCols.length]);
 
   if (!open) return null;
 
@@ -171,20 +179,12 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
                 Sheet update merged: {mergeInfo}
               </div>
             )}
-            <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <button onClick={() => {
-                const skippable = (f: ListingTemplateField) => !f.mandatory && !f.fixed && !f.skip && !f.sameAs && !isImageColumn(f.header);
-                const n = editing.fields.filter(skippable).length;
-                setEditing({ ...editing, fields: editing.fields.map(f => skippable(f) ? { ...f, skip: true } : f) });
-                addToast(n ? `${n} non-mandatory column(s) skipped — mandatory, fixed, wired and photo columns kept` : 'Nothing to skip — everything left is mandatory, fixed, wired or a photo column', 'success');
-              }} style={{ ...S.btnGhost, ...S.btnSm }}>Skip all non-mandatory</button>
-              <button onClick={() => setEditing(ed => ed ? { ...ed, fields: ed.fields.map(f => f.skip ? { ...f, skip: false } : f) } : ed)} style={{ ...S.btnGhost, ...S.btnSm }}>Fill all</button>
-              {editing.id && <button onClick={() => fileRef.current?.click()} title="Upload the marketplace's new sheet version — your settings are kept, changes are merged" style={{ ...S.btnGhost, ...S.btnSm }}>Update from new sheet</button>}
-              <span style={{ fontSize: 10, color: T.tx3 }}>{editing.fields.filter(f => f.mandatory).length} mandatory · {editing.fields.filter(f => f.skip).length} skipped</span>
-            </div>
+            <EditorToolbar fields={editing.fields} isSaved={!!editing.id}
+              onFields={fields => setEditing(ed => ed ? { ...ed, fields } : ed)}
+              onReupload={() => fileRef.current?.click()} addToast={addToast} />
             <div style={{ maxHeight: '38vh', overflowY: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
               {editing.fields.map((f, i) => (
-                <FieldRow key={i} f={f} onChange={patch => setField(i, patch)} addToast={addToast} others={editing.fields.filter(o => o.header !== f.header && !o.sameAs && !o.skip && !SENSITIVE_RE.test(o.header)).map(o => o.header)} />
+                <FieldRow key={i} f={f} onChange={patch => setField(i, patch)} addToast={addToast} masterCols={masterCols} others={editing.fields.filter(o => o.header !== f.header && !o.sameAs && !o.skip && !SENSITIVE_RE.test(o.header)).map(o => o.header)} />
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>

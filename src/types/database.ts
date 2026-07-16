@@ -1003,7 +1003,25 @@ export const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
 // sameAs: this column is WIRED to another template column and copies its
 // final value on every run (in code, zero AI cost) — for sheets that repeat
 // the same data under different column names.
-export type ListingTemplateField = { header: string; mandatory: boolean; hint: string; allowed?: string[]; fixed?: string; skip?: boolean; sameAs?: string };
+export type ListingTemplateField = { header: string; mandatory: boolean; hint: string; allowed?: string[]; fixed?: string; skip?: boolean; sameAs?: string; masterAs?: string };
+
+// --- listing_runs (13 cols) ---
+// A saved generation run (the "sheet"), reopenable/exportable for 5 days —
+// a pg_cron job purges anything older, and loads filter on created_at too.
+export type ListingRun = {
+  id: string;
+  template_id: string | null;
+  template_name: string;
+  model?: string | null;
+  est_usd?: number | null;
+  sku_count?: number | null;
+  ok_count?: number | null;
+  headers?: string[];
+  kinds?: string[];
+  rows?: unknown[];
+  usage?: unknown;
+  created_at: string;
+};
 
 // A taught value mapping: "when the master sheet says SOURCE for this
 // column, always use TARGET on the marketplace sheet." The AI is stateless —

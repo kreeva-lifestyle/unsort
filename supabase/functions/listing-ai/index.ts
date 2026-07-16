@@ -1,5 +1,17 @@
-// listing-ai Edge Function - AI Listing Module backend (v13).
+// listing-ai Edge Function - AI Listing Module backend (v14).
 //
+// v14: owner-controlled master pairing + scan visibility.
+// - A template field may carry `masterAs: "<master header>"` - the owner's
+//   explicit pairing to a master-sheet column, set in the template editor.
+//   It wins over the built-in DIRECT_MAP/same-name pairing and flows through
+//   generation, taught mappings, size expansion and the Bulk Teach scan.
+// - New `master_columns` action returns the live master header list (feeds
+//   the pairing select - new sheet columns appear with zero code changes).
+// - scan_mappings also returns settled values (autoValues + taughtValues,
+//   capped 150 each) so the Bulk Teach board can SHOW what matched/was
+//   taught instead of hiding everything once settled.
+// - DIRECT_MAP learns the unambiguous colour headers (Prominent Colour,
+//   Brand Colour) -> master COLOR.
 // v13: size expansion. The master sheet stores every size of a style in ONE
 // cell ("XS, S, M, L, XL, XXL") while marketplaces like Myntra accept only
 // individual sizes and expect one row per size (styleGroupId ties them).
@@ -72,6 +84,7 @@
 //   set_key          (admin)         -> store / clear the Anthropic API key (vault)
 //   set_model        (admin)         -> pick the generation model (whitelist)
 //   generate         (admin/manager) -> fill a marketplace template for up to 5 SKUs
+//   master_columns   (admin/manager) -> live master-sheet header list (pairing UI)
 //   scan_mappings    (admin/manager) -> distinct master values per dropdown column,
 //                                       bucketed auto/taught/ignored/stale/unmatched
 //   suggest_mappings (admin/manager) -> one AI call proposing allowed values for
@@ -412,7 +425,7 @@ const normHeader = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, '');
 // Template header -> master column, only for unambiguous 1:1 matches.
 const DIRECT_MAP: [RegExp, string][] = [
   [/^(sku|skuid|skucode|sellersku|sellerskuid|vendorsku|vendorskucode|stylecode|styleid|designno|designnumber|productid|productcode|itemsku)$/, 'SKU'],
-  [/^(colou?r|primarycolou?r|colou?rfamily)$/, 'COLOR'],
+  [/^(colou?r|primarycolou?r|colou?rfamily|prominentcolou?r|brandcolou?rremarks|brandcolou?r)$/, 'COLOR'],
   [/^(size|sizename|standardsize)$/, 'SIZE'],
   [/^(neck|neckline|necktype)$/, 'NECK'],
   [/^(sleeve|sleevelength|sleevetype|sleevestyling)$/, 'SLEEVE LENGTH'],
@@ -438,7 +451,7 @@ const NOT_IMAGE_COL_RE = /certificate|\bbis\b|document/i;
 // duplicate-content problem the module exists to avoid.
 const CONTENT_RE = /title|description|display\s*name|style\s*note|style\s*tip|tag|keyword|detail/i;
 
-interface TplField { header: string; mandatory: boolean; hint: string; allowed: string[]; fixed: string; skip: boolean; sameAs: string }
+interface TplField { header: string; mandatory: boolean; hint: string; allowed: string[]; fixed: string; skip: boolean; sameAs: string; masterAs: string }
 // For kind 'wired', masterCol holds the SOURCE template header, not a master
 // sheet column.
 type Classified = TplField & { kind: 'blank' | 'image' | 'fixed' | 'wired' | 'brand' | 'direct' | 'ai'; masterCol: string };
@@ -477,6 +490,13 @@ function classifyFields(fields: TplField[], masterHeaders: Map<string, string>):
     // Fixed value (owner-pinned or auto from a single-value dropdown): filled
     // in code every run, never sent to the model - zero token cost.
     if (f.fixed) return { ...f, kind: 'fixed' as const, masterCol: '' };
+    // Owner's explicit master pairing (template editor) wins over the
+    // built-in DIRECT_MAP/same-name defaults. Silently ignored when the
+    // master sheet no longer has that column - the defaults take over.
+    if (f.masterAs) {
+      const mh = masterHeaders.get(normHeader(f.masterAs));
+      if (mh) return { ...f, kind: 'direct' as const, masterCol: mh };
+    }
     const n = normHeader(f.header);
     if (/^(brand|brandname)$/.test(n)) return { ...f, kind: 'brand' as const, masterCol: '' };
     const d = DIRECT_MAP.find(([re]) => re.test(n));
@@ -530,6 +550,7 @@ async function loadTemplateFields(templateId: string): Promise<{ tpl: any; field
         fixed: String(f?.fixed || '').trim(),
         skip: f?.skip === true,
         sameAs: String(f?.sameAs || '').trim(),
+        masterAs: String(f?.masterAs || '').trim(),
       };
     })
     .filter((f: TplField) => f.header);
@@ -689,10 +710,22 @@ Deno.serve(async (req) => {
       return json({ ok: true }, req);
     }
 
+    // Live master-sheet header list - feeds the "fill from master column"
+    // pairing select in the template editor. Dynamic: a new column in the
+    // sheet appears here with zero code changes.
+    if (action === 'master_columns') {
+      const role = await callerRole(req);
+      if (!role || !['admin', 'manager'].includes(role)) return fail(403, 'Only admin or manager can use Listing AI', req);
+      const warnings: string[] = [];
+      const { tabs, masterHeaders } = await readMasterTabs(warnings);
+      if (tabs.length === 0) return fail(502, 'Could not read the master sheet', req, warnings.join('; '));
+      return json({ ok: true, columns: [...masterHeaders.values()].sort() }, req);
+    }
+
     // Free, deterministic: every distinct master value per template dropdown
     // column, bucketed exactly as a run would resolve it. Powers the Bulk
-    // Teach page - values already settled (auto / taught / ignored) are only
-    // counted, never listed, so the owner sees just what needs them.
+    // Teach page - unmatched values are listed for teaching; settled values
+    // (auto / taught) are also returned, capped, so the board can SHOW them.
     if (action === 'scan_mappings') {
       const role = await callerRole(req);
       if (!role || !['admin', 'manager'].includes(role)) return fail(403, 'Only admin or manager can use Listing AI', req);
@@ -742,15 +775,18 @@ Deno.serve(async (req) => {
           }
         }
         const key = normHeader(f.header);
-        let auto = 0, taughtN = 0, ignoredN = 0;
+        let ignoredN = 0;
+        const autoValues: string[] = [];
+        const taughtValues: { source: string; target: string }[] = [];
         const stale: { source: string; target: string }[] = [];
         const unmatched: { value: string; count: number }[] = [];
         for (const { value, count } of distinct.values()) {
-          if (canon(f, value)) { auto++; continue; }
+          const c = canon(f, value);
+          if (c) { autoValues.push(c); continue; }
           const m = byKey[`${key} ${value.toLowerCase()}`];
           if (m) {
             if (m.ignored) { ignoredN++; continue; }
-            if (canon(f, m.target)) { taughtN++; continue; }
+            if (canon(f, m.target)) { taughtValues.push({ source: value, target: m.target }); continue; }
             // Taught, but the marketplace removed the target from the list -
             // the run falls back to AI for it. Surface it for re-teaching.
             stale.push({ source: value, target: m.target });
@@ -759,9 +795,15 @@ Deno.serve(async (req) => {
           unmatched.push({ value, count });
         }
         unmatched.sort((a, b) => b.count - a.count);
+        autoValues.sort();
+        taughtValues.sort((a, b) => a.source.localeCompare(b.source));
         return {
           header: f.header, fieldKey: key, masterCol: f.kind === 'brand' ? 'BRAND (sheet tab)' : f.masterCol,
-          distinct: distinct.size, auto, taught: taughtN, ignored: ignoredN, stale,
+          distinct: distinct.size, auto: autoValues.length, taught: taughtValues.length, ignored: ignoredN, stale,
+          // Settled values are SHOWN (read-only) on the board, capped so a
+          // giant column can't bloat the response.
+          autoValues: autoValues.slice(0, 150),
+          taughtValues: taughtValues.slice(0, 150),
           unmatched: unmatched.slice(0, UNMATCHED_CAP),
           truncated: unmatched.length > UNMATCHED_CAP ? unmatched.length - UNMATCHED_CAP : 0,
         };

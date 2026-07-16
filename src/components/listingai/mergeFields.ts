@@ -50,6 +50,9 @@ export function mergeTemplateFields(
       ...(of.skip ? { skip: true } : {}),
       ...(fixed ? { fixed } : {}),
       ...(sameAs ? { sameAs } : {}),
+      // Master pairing references OUR sheet, not the marketplace's - it
+      // always survives a marketplace re-upload.
+      ...(of.masterAs ? { masterAs: of.masterAs } : {}),
     };
   });
 
