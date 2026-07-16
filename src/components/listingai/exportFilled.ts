@@ -1,10 +1,13 @@
 // Export generated listings. When the template's original workbook is stored
-// (v2), the rows are written INTO that file — same file name, same sheets
-// (instructions + hidden datasets included), values placed under the real
-// header row in the correct columns. Falls back to a plain sheet for old
-// templates saved before the file was kept.
+// (v2), values are injected DIRECTLY into that file's worksheet XML and the
+// file is re-zipped byte-for-byte — so styles, column widths, drawings, cell
+// comments and every dropdown data-validation survive. (SheetJS CE would strip
+// all of that on write, which is why we only READ with it, never writeFile.)
+// Falls back to a plain sheet for old templates saved before the file was kept.
 import * as XLSX from 'xlsx';
+import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { supabase } from '../../lib/supabase';
+import { injectCells, resolveSheetPart, type CellWrite } from './xlsxInject';
 import type { GenRow } from './api';
 import type { ListingTemplate } from '../../types/database';
 
@@ -16,7 +19,9 @@ export async function exportFilledXlsx(headers: string[], rows: GenRow[], tpl: T
     try {
       const { data, error } = await supabase.storage.from('listing-templates').download(`${tpl.id}.xlsx`);
       if (!error && data) {
-        const wb = XLSX.read(await data.arrayBuffer(), { type: 'array' });
+        const buf = await data.arrayBuffer();
+        // Read-only: use SheetJS just to locate the header row + column order.
+        const wb = XLSX.read(buf, { type: 'array' });
         const ws = wb.Sheets[tpl.sheet_name];
         if (ws) {
           const headerRowIdx = tpl.header_row ?? 0;
@@ -25,21 +30,28 @@ export async function exportFilledXlsx(headers: string[], rows: GenRow[], tpl: T
           const grid = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false, defval: '' });
           const sheetHdr = ((grid[headerRowIdx] || []) as unknown[]).map(h => String(h ?? '').trim().toLowerCase());
           const colFor = headers.map(h => sheetHdr.indexOf(h.trim().toLowerCase()));
-          const aoa = values.map(vals => {
-            const row: (string | null)[] = [];
-            vals.forEach((v, i) => { const c = colFor[i]; if (c >= 0) row[c] = v; });
-            return row; // sparse — sheet_add_aoa skips empty slots
+          // Data fills the pre-built empty rows starting directly under the
+          // header (1-based sheet row = headerRowIdx + 2).
+          const firstDataRow = headerRowIdx + 2;
+          const writes: CellWrite[] = [];
+          values.forEach((vals, i) => {
+            vals.forEach((v, j) => {
+              const c = colFor[j];
+              if (c >= 0 && v != null && String(v) !== '') writes.push({ r: firstDataRow + i, c, v: String(v) });
+            });
           });
-          // Write at the first EMPTY row after the header: marketplace files
-          // (e.g. Myntra) ship help text and examples right under the header
-          // row — never overwrite existing content, theirs or ours.
-          let startRow = grid.length;
-          for (let r = headerRowIdx + 1; r < grid.length; r++) {
-            if (((grid[r] || []) as unknown[]).every(c => String(c ?? '').trim() === '')) { startRow = r; break; }
+          // Surgical inject into the worksheet XML, everything else untouched.
+          const files = unzipSync(new Uint8Array(buf));
+          const part = resolveSheetPart(strFromU8(files['xl/workbook.xml']), strFromU8(files['xl/_rels/workbook.xml.rels']), tpl.sheet_name);
+          if (part && files[part]) {
+            files[part] = strToU8(injectCells(strFromU8(files[part]), writes));
+            const out = zipSync(files, { level: 6 });
+            const url = URL.createObjectURL(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+            const a = document.createElement('a');
+            a.href = url; a.download = tpl.file_name; a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            return;
           }
-          XLSX.utils.sheet_add_aoa(ws, aoa, { origin: { r: startRow, c: 0 } });
-          XLSX.writeFile(wb, tpl.file_name);
-          return;
         }
       }
     } catch { /* fall through to the plain export below */ }
