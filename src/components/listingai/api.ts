@@ -10,6 +10,11 @@ export interface GenResponse {
   ok: boolean; error?: string; details?: string;
   headers?: string[]; kinds?: string[]; rows?: GenRow[];
   usage?: GenUsage; aiFieldCount?: number; warnings?: string[];
+  model?: string;         // active generation model (owner-picked in Settings)
+  estUsd?: number;        // what this chunk's AI call cost, in USD
+  cacheSavedUsd?: number; // what the prompt cache saved vs full price
+  messageId?: string;     // thread into the next chunk's prevMessageId (cache checkup)
+  cacheNote?: string;     // plain-language cache-miss warning, when structural
 }
 
 export const call = async (body: object): Promise<{ status: number; data: any }> => {

@@ -1,5 +1,17 @@
-// listing-ai Edge Function - AI Listing Module backend (v11).
+// listing-ai Edge Function - AI Listing Module backend (v12).
 //
+// v12: owner-selectable model + cost visibility + cache checkup.
+// The model is no longer hardcoded: `listing_ai_model` in app_secrets picks
+// haiku/sonnet/opus (new `set_model` action, admin only; default Haiku 4.5 -
+// the cheapest tier, 5x cheaper than Opus). Every generate/suggest response
+// now carries `estUsd` + `cacheSavedUsd` so the client can show real money
+// instead of token counts. suggest_mappings is PINNED to Haiku regardless of
+// the picker - its outputs are canon-validated so the cheap model is safe.
+// Cache diagnostics (beta cache-diagnosis-2026-04-07): the client threads the
+// previous chunk's message id through `prevMessageId`; a *_changed
+// cache_miss_reason (except messages_changed, which is expected because each
+// chunk carries different SKUs while the cached SYSTEM prefix still hits)
+// comes back as a plain-language `cacheNote` warning.
 // v11: bulk teaching. New `scan_mappings` action (free, deterministic):
 // reads every distinct master-sheet value per template dropdown column and
 // buckets it exactly as a run would resolve it (auto / taught / ignored /
@@ -49,6 +61,7 @@
 // Actions (POST JSON { action, ... }, caller role checked via profiles.role):
 //   status           (signed-in)     -> { ok, hasKey, role, model }
 //   set_key          (admin)         -> store / clear the Anthropic API key (vault)
+//   set_model        (admin)         -> pick the generation model (whitelist)
 //   generate         (admin/manager) -> fill a marketplace template for up to 5 SKUs
 //   scan_mappings    (admin/manager) -> distinct master values per dropdown column,
 //                                       bucketed auto/taught/ignored/stale/unmatched
@@ -61,8 +74,31 @@
 
 // deno-lint-ignore-file no-explicit-any
 
-const MODEL = 'claude-opus-4-8';
+// Whitelisted models + per-MTok USD pricing (cache write 1.25x in, read 0.1x).
+// Sonnet 5 has an intro price ($2/$10) through 2026-08-31 - we bill-estimate
+// at the sticker price so the shown cost is never an underestimate.
+const MODELS: Record<string, { in: number; out: number }> = {
+  'claude-haiku-4-5': { in: 1, out: 5 },
+  'claude-sonnet-5': { in: 3, out: 15 },
+  'claude-opus-4-8': { in: 5, out: 25 },
+};
+const DEFAULT_MODEL = 'claude-haiku-4-5'; // cheapest tier - owner's pick
+const SUGGEST_MODEL = 'claude-haiku-4-5'; // suggestions are canon-validated, cheap is safe
 const SKU_CAP = 5;
+
+interface Usage { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
+
+const estUsdOf = (model: string, u: Usage): number => {
+  const p = MODELS[model] || MODELS[DEFAULT_MODEL];
+  const usd = (u.input_tokens * p.in + u.cache_creation_input_tokens * p.in * 1.25 + u.cache_read_input_tokens * p.in * 0.1 + u.output_tokens * p.out) / 1e6;
+  return Math.round(usd * 10000) / 10000;
+};
+
+// What the prompt cache saved vs paying full price for those tokens (~90%).
+const cacheSavedUsdOf = (model: string, u: Usage): number => {
+  const p = MODELS[model] || MODELS[DEFAULT_MODEL];
+  return Math.round((u.cache_read_input_tokens * p.in * 0.9 / 1e6) * 10000) / 10000;
+};
 
 const ALLOWED_ORIGINS = [
   'https://dailyoffice.aryadesigns.co.in',
@@ -164,6 +200,13 @@ async function getSecret(key: string): Promise<string | null> {
   if (!r.ok) return null;
   const rows = await r.json().catch(() => []);
   return rows?.[0]?.value ?? null;
+}
+
+// Active generation model: owner-picked via set_model, defaults to the
+// cheapest tier. Unknown/stale stored values fall back to the default.
+async function getModel(): Promise<string> {
+  const m = (await getSecret('listing_ai_model')) || '';
+  return MODELS[m] ? m : DEFAULT_MODEL;
 }
 
 async function setSecret(key: string, value: string): Promise<void> {
@@ -599,7 +642,18 @@ Deno.serve(async (req) => {
       const role = await callerRole(req);
       if (!role) return fail(401, 'Sign in to DailyOffice first', req);
       const key = await getSecret('anthropic_api_key');
-      return json({ ok: true, hasKey: !!key, role, model: MODEL }, req);
+      return json({ ok: true, hasKey: !!key, role, model: await getModel() }, req);
+    }
+
+    // Owner-facing model picker (Settings -> Listing AI). Whitelist only -
+    // an arbitrary model string can never reach the Anthropic call.
+    if (action === 'set_model') {
+      const role = await callerRole(req);
+      if (role !== 'admin') return fail(403, 'Only an admin can change the model', req);
+      const model = String(body?.model || '').trim();
+      if (!MODELS[model]) return fail(400, 'Unknown model - pick one of the listed options', req);
+      await setSecret('listing_ai_model', model);
+      return json({ ok: true, model }, req);
     }
 
     if (action === 'set_key') {
@@ -609,7 +663,7 @@ Deno.serve(async (req) => {
       if (!key) { await setSecret('anthropic_api_key', ''); return json({ ok: true, cleared: true }, req); }
       if (!/^sk-ant-/.test(key)) return fail(400, 'That does not look like an Anthropic API key (it starts with sk-ant-)', req);
       // Free validation call - rejects a bad key before we store it.
-      const t = await fetch(`https://api.anthropic.com/v1/models/${MODEL}`, { headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' } });
+      const t = await fetch(`https://api.anthropic.com/v1/models/${await getModel()}`, { headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' } });
       if (t.status === 401 || t.status === 403) return fail(400, 'Anthropic rejected this key - check it and try again', req);
       await setSecret('anthropic_api_key', key);
       return json({ ok: true }, req);
@@ -760,7 +814,9 @@ Deno.serve(async (req) => {
         method: 'POST',
         headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({
-          model: MODEL,
+          // Always the cheapest tier: suggestions are canon-validated below,
+          // so a wrong guess can never become an invalid export.
+          model: SUGGEST_MODEL,
           max_tokens: Math.min(8000, 300 + total * 30),
           system: sys,
           messages: [{ role: 'user', content: `${userText}\n\nOutput one suggestion object per master value (header, source, target). Empty target = no confident fit.` }],
@@ -794,9 +850,7 @@ Deno.serve(async (req) => {
         cache_read_input_tokens: u.cache_read_input_tokens || 0,
         cache_creation_input_tokens: u.cache_creation_input_tokens || 0,
       };
-      // Opus pricing: $5/MTok in, $25/MTok out (cache read 10%, write 125%).
-      const estUsd = (usage.input_tokens * 5 + usage.cache_creation_input_tokens * 6.25 + usage.cache_read_input_tokens * 0.5 + usage.output_tokens * 25) / 1e6;
-      return json({ ok: true, suggestions, unsure, usage, estUsd: Math.round(estUsd * 1000) / 1000 }, req);
+      return json({ ok: true, suggestions, unsure, usage, estUsd: estUsdOf(SUGGEST_MODEL, usage) }, req);
     }
 
     if (action === 'generate') {
@@ -979,7 +1033,13 @@ Deno.serve(async (req) => {
       const liveMapped = mappedFields.filter(f => !deterministic.has(f.header));
       const schemaFields = [...aiFields, ...liveMapped];
       const aiValues: Record<string, Record<string, string>> = {};
-      let usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+      let usage: Usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+      const model = await getModel();
+      // Cache checkup: the client threads the previous chunk's message id so
+      // the API can pinpoint WHY a cache miss happened (docs: cache-diagnostics).
+      const prevMessageId = typeof body?.prevMessageId === 'string' && body.prevMessageId ? body.prevMessageId : null;
+      let messageId = '';
+      let cacheNote = '';
 
       if (live.length > 0 && schemaFields.length > 0) {
         const nonce = crypto.randomUUID().slice(0, 8);
@@ -999,14 +1059,15 @@ Deno.serve(async (req) => {
         const sysText = buildSystemPrefix(String(tpl.name || ''), String(tpl.marketplace || ''), schemaFields, taughtLines, enumSet);
         const doCall = (strict: boolean) => fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
-          headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+          headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'cache-diagnosis-2026-04-07', 'content-type': 'application/json' },
           body: JSON.stringify({
-            model: MODEL,
+            model,
             // Scale with schema WIDTH, not just SKU count - a 70-column
             // template needs far more than a flat per-SKU budget.
             max_tokens: Math.min(24000, 500 + live.length * Math.max(1600, 45 * schemaFields.length)),
             system: [{ type: 'text', text: sysText, cache_control: { type: 'ephemeral' } }],
             messages: [{ role: 'user', content: strict ? content : [...content, { type: 'text', text: 'Reply with ONLY the JSON object {"products":[{"sku":...,"fields":{...}}]} - no prose, no code fences.' }] }],
+            diagnostics: { previous_message_id: prevMessageId },
             ...(strict ? { output_config: { format: { type: 'json_schema', schema: buildSchema(schemaFields, enumSet) } } } : {}),
           }),
         });
@@ -1055,6 +1116,17 @@ Deno.serve(async (req) => {
           cache_read_input_tokens: u.cache_read_input_tokens || 0,
           cache_creation_input_tokens: u.cache_creation_input_tokens || 0,
         };
+        messageId = String(data?.id || '');
+        // Cache checkup verdict. messages_changed is EXPECTED here (each
+        // chunk carries different SKUs while the cached SYSTEM prefix still
+        // hits) - only structural breaks are worth telling the owner about.
+        const reason = String(data?.diagnostics?.cache_miss_reason?.type || '');
+        const CACHE_NOTES: Record<string, string> = {
+          model_changed: 'the AI model changed mid-run',
+          system_changed: 'the instructions changed between batches (e.g. a mapping was taught mid-run)',
+          tools_changed: 'the output format changed between batches',
+        };
+        if (CACHE_NOTES[reason]) cacheNote = `Cache checkup: ${CACHE_NOTES[reason]} - this batch cost more than usual. It self-heals on the next run.`;
       }
 
       const rows = items.map(it => {
@@ -1091,6 +1163,11 @@ Deno.serve(async (req) => {
         kinds: classified.map(f => f.kind),
         rows,
         usage,
+        model,
+        estUsd: estUsdOf(model, usage),
+        cacheSavedUsd: cacheSavedUsdOf(model, usage),
+        messageId: messageId || undefined,
+        cacheNote: cacheNote || undefined,
         aiFieldCount: aiFields.length,
         warnings: warnings.length ? warnings : undefined,
       }, req);

@@ -35,6 +35,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
   const [kinds, setKinds] = useState<string[]>([]);
   const [rows, setRows] = useState<GenRow[]>([]);
   const [usage, setUsage] = useState<GenUsage | null>(null);
+  const [cost, setCost] = useState({ usd: 0, saved: 0 });
 
   const loadStatus = useCallback(async () => {
     try {
@@ -64,15 +65,20 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
     if (skus.length === 0) { addToast('Paste at least one SKU', 'error'); return; }
     if (skus.length > RUN_CAP) { addToast(`Capped to the first ${RUN_CAP} SKUs (of ${skus.length}) — run again for the rest`, 'error'); skus = skus.slice(0, RUN_CAP); }
     setGenerating(true);
-    setRows([]); setHeaders([]); setKinds([]); setUsage(null);
+    setRows([]); setHeaders([]); setKinds([]); setUsage(null); setCost({ usd: 0, saved: 0 });
     setProgress({ done: 0, total: skus.length });
     const acc: GenRow[] = [];
     const tot: GenUsage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+    // Cache checkup: threading each chunk's message id into the next call
+    // lets the API explain any cache miss (see cacheNote below).
+    let prevMessageId: string | null = null;
+    let cacheWarned = false;
+    let usd = 0, saved = 0;
     try {
       for (let i = 0; i < skus.length; i += CHUNK) {
         const chunk = skus.slice(i, i + CHUNK);
         let data: any, st = 0;
-        try { ({ status: st, data } = await call({ action: 'generate', items: chunk, templateId: selected.id })); }
+        try { ({ status: st, data } = await call({ action: 'generate', items: chunk, templateId: selected.id, prevMessageId })); }
         catch (e) { addToast(friendlyError(e), 'error'); break; }
         if (!data?.ok) {
           addToast(data?.error === 'no_api_key'
@@ -87,7 +93,10 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
         tot.output_tokens += u.output_tokens || 0;
         tot.cache_read_input_tokens += u.cache_read_input_tokens || 0;
         tot.cache_creation_input_tokens += u.cache_creation_input_tokens || 0;
-        setRows([...acc]); setUsage({ ...tot });
+        usd += data.estUsd || 0; saved += data.cacheSavedUsd || 0;
+        prevMessageId = data.messageId || null;
+        if (data.cacheNote && !cacheWarned) { addToast(String(data.cacheNote), 'error'); cacheWarned = true; }
+        setRows([...acc]); setUsage({ ...tot }); setCost({ usd, saved });
         setProgress({ done: Math.min(i + CHUNK, skus.length), total: skus.length });
         for (const w of (data.warnings || []) as string[]) addToast(w, 'error');
       }
@@ -176,7 +185,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
         </div>
       </div>
       {rows.length > 0 && selected && (
-        <ResultsTable headers={headers} kinds={kinds} rows={rows} usage={usage} template={selected} addToast={addToast} />
+        <ResultsTable headers={headers} kinds={kinds} rows={rows} usage={usage} cost={cost} template={selected} addToast={addToast} />
       )}
       <TemplateManager open={manageOpen} onClose={() => { setManageOpen(false); loadTemplates(); }} templates={templates} refresh={loadTemplates} addToast={addToast} />
       <ImageFolders open={linksOpen} onClose={() => setLinksOpen(false)} addToast={addToast} />
