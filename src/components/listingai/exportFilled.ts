@@ -30,7 +30,14 @@ export async function exportFilledXlsx(headers: string[], rows: GenRow[], tpl: T
             vals.forEach((v, i) => { const c = colFor[i]; if (c >= 0) row[c] = v; });
             return row; // sparse — sheet_add_aoa skips empty slots
           });
-          XLSX.utils.sheet_add_aoa(ws, aoa, { origin: { r: headerRowIdx + 1, c: 0 } });
+          // Write at the first EMPTY row after the header: marketplace files
+          // (e.g. Myntra) ship help text and examples right under the header
+          // row — never overwrite existing content, theirs or ours.
+          let startRow = grid.length;
+          for (let r = headerRowIdx + 1; r < grid.length; r++) {
+            if (((grid[r] || []) as unknown[]).every(c => String(c ?? '').trim() === '')) { startRow = r; break; }
+          }
+          XLSX.utils.sheet_add_aoa(ws, aoa, { origin: { r: startRow, c: 0 } });
           XLSX.writeFile(wb, tpl.file_name);
           return;
         }

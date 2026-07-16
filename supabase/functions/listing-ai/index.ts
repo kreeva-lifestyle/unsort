@@ -1,5 +1,14 @@
-// listing-ai Edge Function - AI Listing Module backend (v12).
+// listing-ai Edge Function - AI Listing Module backend (v13).
 //
+// v13: size expansion. The master sheet stores every size of a style in ONE
+// cell ("XS, S, M, L, XL, XXL") while marketplaces like Myntra accept only
+// individual sizes and expect one row per size (styleGroupId ties them).
+// A comma SIZE value now resolves per-token (canon + taught, zero AI) and
+// the SKU's row EXPANDS into one otherwise-identical row per resolved size;
+// unknown sizes are skipped with a note, never exported invalid. Single
+// values (e.g. "SEMI-STITCHED UPTO 42BUST") keep the old path - taught
+// lessons like "-> Onesize" still apply. scan_mappings counts the individual
+// sizes instead of the joined line, so Bulk Teach stops listing it.
 // v12: owner-selectable model + cost visibility + cache checkup.
 // The model is no longer hardcoded: `listing_ai_model` in app_secrets picks
 // haiku/sonnet/opus (new `set_model` action, admin only; default Haiku 4.5 -
@@ -446,6 +455,17 @@ const canon = (f: { allowed: string[] }, v: string): string | undefined => {
   return cv ? f.allowed.find(a => normHeader(a) === cv) : undefined;
 };
 
+// A master SIZE cell may list every size of the style in one line
+// ("XS, S, M, L, XL, XXL"). Tokens drive one-row-per-size expansion and
+// per-size counting in the Bulk Teach scan. [] = not a multi-size value.
+const sizeTokens = (raw: string): string[] =>
+  raw.includes(',') ? [...new Set(raw.split(',').map(t => t.trim()).filter(Boolean))] : [];
+
+// The template column a size expansion targets: paired to the master SIZE
+// column AND locked to a dropdown (free-text size columns keep the joined
+// line - e.g. Shopify - and never expand).
+const isSizeField = (f: Classified) => f.kind === 'direct' && f.masterCol === 'SIZE' && f.allowed.length > 0;
+
 function classifyFields(fields: TplField[], masterHeaders: Map<string, string>): Classified[] {
   return fields.map(f => {
     // Owner-skipped columns are never filled - exported empty, zero cost.
@@ -709,9 +729,15 @@ Deno.serve(async (req) => {
             for (let i = 1; i < t.rows.length; i++) {
               const v = String(t.rows[i][ci] ?? '').trim();
               if (!v) continue;
-              const c = distinct.get(v.toLowerCase()) || { value: v, count: 0 };
-              c.count++;
-              distinct.set(v.toLowerCase(), c);
+              // SIZE columns: a comma line means "all these sizes" - count
+              // the individual sizes (rows expand per size at generation),
+              // so the joined string never shows up as needing a lesson.
+              const toks = f.masterCol === 'SIZE' ? sizeTokens(v) : [];
+              for (const p of (toks.length ? toks : [v])) {
+                const c = distinct.get(p.toLowerCase()) || { value: p, count: 0 };
+                c.count++;
+                distinct.set(p.toLowerCase(), c);
+              }
             }
           }
         }
@@ -1027,7 +1053,15 @@ Deno.serve(async (req) => {
       const deterministic = new Set<string>();
       for (const f of mappedFields) {
         if (live.length === 0) break;
-        const all = live.every(it => resolveVal(f, f.kind === 'brand' ? brandOf(it) : masterVal(it, f.masterCol)) !== undefined);
+        const all = live.every(it => {
+          const raw = f.kind === 'brand' ? brandOf(it) : masterVal(it, f.masterCol);
+          // Multi-size values resolve when EVERY individual size does - the
+          // row later expands into one row per size, so the joined line
+          // itself never needs the AI.
+          const toks = isSizeField(f) ? sizeTokens(raw) : [];
+          if (toks.length) return toks.every(t => resolveVal(f, t) !== undefined);
+          return resolveVal(f, raw) !== undefined;
+        });
         if (all) deterministic.add(f.header);
       }
       const liveMapped = mappedFields.filter(f => !deterministic.has(f.header));
@@ -1129,8 +1163,8 @@ Deno.serve(async (req) => {
         if (CACHE_NOTES[reason]) cacheNote = `Cache checkup: ${CACHE_NOTES[reason]} - this batch cost more than usual. It self-heals on the next run.`;
       }
 
-      const rows = items.map(it => {
-        if (it.status !== 'ok') return { sku: it.sku, status: it.status, note: it.note, values: classified.map(() => '') };
+      const rows = items.flatMap(it => {
+        if (it.status !== 'ok') return [{ sku: it.sku, status: it.status, note: it.note, values: classified.map(() => '') }];
         const av = aiValues[it.sku] || {};
         let imgSlot = 0;
         const values = classified.map(f => {
@@ -1154,7 +1188,31 @@ Deno.serve(async (req) => {
         });
         // Wired columns fill last, from the values just computed above.
         applyWired(classified, values, m => { it.note = it.note ? `${it.note}; ${m}` : m; });
-        return { sku: it.sku, status: 'ok' as const, noImage: it.img ? undefined : true, note: it.note, linkSource: it.linkSource || undefined, values };
+        const base = { sku: it.sku, status: 'ok' as const, noImage: it.img ? undefined : true, linkSource: it.linkSource || undefined };
+        // One row per size: a comma master SIZE + a dropdown size column
+        // expands into otherwise-identical rows, one per resolved size
+        // (Myntra LOT format - styleGroupId ties them together). Columns
+        // that copied the joined line verbatim (wired/same-name) get the
+        // per-row size too. Unknown sizes are skipped, never exported.
+        const sizeIdx = classified.findIndex(isSizeField);
+        const rawSize = sizeIdx >= 0 ? masterVal(it, 'SIZE') : '';
+        const toks = sizeIdx >= 0 ? sizeTokens(rawSize) : [];
+        if (toks.length === 0) return [{ ...base, note: it.note, values }];
+        const out: { sku: string; status: 'ok'; noImage?: boolean; linkSource?: string; note?: string; values: string[] }[] = [];
+        const skippedSizes: string[] = [];
+        for (const t of toks) {
+          const c = resolveVal(classified[sizeIdx], t);
+          if (c === undefined) { skippedSizes.push(t); continue; }
+          const v = values.map((x, ix) => ix === sizeIdx ? c
+            : (x && x.trim().toLowerCase() === rawSize.trim().toLowerCase() ? c : x));
+          out.push({ ...base, note: [`size: ${c}`, it.note].filter(Boolean).join('; '), values: v });
+        }
+        if (skippedSizes.length) {
+          const msg = `size(s) not in the marketplace list, row(s) skipped: ${skippedSizes.join(', ')} - teach them in Bulk Teach`;
+          if (out.length) out[0].note = `${out[0].note}; ${msg}`;
+          else out.push({ ...base, note: [it.note, msg].filter(Boolean).join('; '), values });
+        }
+        return out;
       });
 
       return json({
