@@ -7,8 +7,9 @@ import { friendlyError } from '../../lib/friendlyError';
 import { normHeader } from './templateParse';
 import type { ListingMapping, ListingTemplateField } from '../../types/database';
 
-export default function TaughtMappingsPage({ onBack, fields, addToast }: {
+export default function TaughtMappingsPage({ onBack, onBulk, fields, addToast }: {
   onBack: () => void;
+  onBulk: () => void;
   fields: ListingTemplateField[];
   addToast: (m: string, t?: string) => void;
 }) {
@@ -22,7 +23,7 @@ export default function TaughtMappingsPage({ onBack, fields, addToast }: {
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from('listing_mappings')
-      .select('id, field_key, field_label, source, target, updated_at').order('field_label').order('source');
+      .select('id, field_key, field_label, source, target, ignored, updated_at').order('field_label').order('source');
     if (error) { addToast(friendlyError(error), 'error'); return; }
     setRows((data as ListingMapping[] | null) || []);
   }, [addToast]);
@@ -35,6 +36,7 @@ export default function TaughtMappingsPage({ onBack, fields, addToast }: {
   // Stale = the selected template HAS this column with a dropdown, but the
   // taught target is no longer one of its values (marketplace changed the sheet).
   const isStale = (r: ListingMapping) => {
+    if (r.ignored) return false;
     const f = fields.find(x => normHeader(x.header) === r.field_key);
     return !!(f?.allowed?.length && !f.allowed.some(a => normHeader(a) === normHeader(r.target)));
   };
@@ -45,15 +47,12 @@ export default function TaughtMappingsPage({ onBack, fields, addToast }: {
     if (!source.trim() || !target.trim()) { addToast('Fill both the master value and the marketplace value', 'error'); return; }
     setSaving(true);
     try {
-      const key = normHeader(header);
-      const payload = { field_key: key, field_label: header, source: source.trim(), target: target.trim(), updated_at: new Date().toISOString() };
-      // Same column + same source (case-insensitive) replaces the old lesson.
-      const existing = rows.find(r => r.field_key === key && r.source.trim().toLowerCase() === source.trim().toLowerCase());
-      const { error } = existing
-        ? await supabase.from('listing_mappings').update(payload).eq('id', existing.id)
-        : await supabase.from('listing_mappings').insert({ ...payload, created_by: (await supabase.auth.getUser()).data.user?.id });
+      // Same RPC as Bulk Teach: one atomic upsert on (column, master value) —
+      // re-teaching replaces the old lesson, and un-ignores a dismissed value.
+      const lesson = { field_key: normHeader(header), field_label: header, source: source.trim(), target: target.trim(), ignored: false };
+      const { error } = await supabase.rpc('teach_bulk', { p_lessons: [lesson] });
       if (error) { addToast(friendlyError(error), 'error'); setSaving(false); return; }
-      addToast(existing ? 'Mapping updated' : 'Mapping taught — it will be used on every run now', 'success');
+      addToast('Mapping taught — it will be used on every run now', 'success');
       setSource(''); setTarget('');
       load();
     } catch (e) { addToast(friendlyError(e), 'error'); }
@@ -78,9 +77,10 @@ export default function TaughtMappingsPage({ onBack, fields, addToast }: {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header with back button */}
       <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.bd}`, background: T.s2 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
           <button onClick={onBack} style={{ ...S.btnGhost, ...S.btnSm }}>← Back</button>
           <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Taught Mappings</div>
+          <button onClick={onBulk} title="Scan the whole master sheet and teach many values at once" style={{ ...S.btnGhost, ...S.btnSm, marginLeft: 'auto', color: T.ac2, border: '1px solid rgba(99,102,241,.35)' }}>⚡ Bulk Teach</button>
         </div>
         <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5 }}>
           Teach permanent corrections: when the master sheet says X for a column, always use Y on the marketplace. Applied instantly on every run — no AI cost, no repeated mistakes.
@@ -143,9 +143,13 @@ export default function TaughtMappingsPage({ onBack, fields, addToast }: {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, wordBreak: 'break-word' }}>
-                      <span style={{ color: T.tx2 }}>{r.source}</span>
-                      <span style={{ color: T.tx3, fontSize: 11 }}>→</span>
-                      <span style={{ color: T.ac2, fontWeight: 600 }}>{r.target}</span>
+                      <span style={{ color: T.tx2, textDecoration: r.ignored ? 'line-through' : 'none', opacity: r.ignored ? 0.6 : 1 }}>{r.source}</span>
+                      {r.ignored ? (
+                        <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 8, fontWeight: 600, background: 'rgba(255,255,255,.06)', color: T.tx3 }}>ignored — never suggested (delete to bring it back)</span>
+                      ) : (<>
+                        <span style={{ color: T.tx3, fontSize: 11 }}>→</span>
+                        <span style={{ color: T.ac2, fontWeight: 600 }}>{r.target}</span>
+                      </>)}
                     </div>
                     {isStale(r) && (
                       <div title="The marketplace changed this column's dropdown — this value no longer exists in it. Teach the new value (same column + same master value replaces this lesson)." style={{ marginTop: 4, padding: '2px 6px', borderRadius: 4, fontSize: 8, fontWeight: 600, background: 'rgba(239,68,68,.12)', color: T.re, whiteSpace: 'nowrap', display: 'inline-block' }}>

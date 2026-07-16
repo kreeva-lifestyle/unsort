@@ -1013,7 +1013,8 @@ export type ListingMapping = {
   field_key: string;   // normalized header (lowercase alphanumerics)
   field_label: string; // header as displayed
   source: string;
-  target: string;
+  target: string;      // '' when ignored
+  ignored?: boolean;   // owner dismissed this master value — never suggest it
   updated_at?: string;
 };
 
