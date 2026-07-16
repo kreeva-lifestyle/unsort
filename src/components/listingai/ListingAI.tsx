@@ -11,7 +11,7 @@ import Empty from '../ui/Empty';
 import { call, GenRow, GenUsage } from './api';
 import { parseSkuLines } from './skuInput';
 import TemplateManager from './TemplateManager';
-import MappingsManager from './MappingsManager';
+import TaughtMappingsPage from './TaughtMappingsPage';
 import ImageFolders from './ImageFolders';
 import ResultsTable from './ResultsTable';
 import type { ListingTemplate } from '../../types/database';
@@ -25,8 +25,8 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
   const [templates, setTemplates] = useState<ListingTemplate[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [skuText, setSkuText] = useState('');
+  const [viewMode, setViewMode] = useState<'main' | 'mappings'>('main');
   const [manageOpen, setManageOpen] = useState(false);
-  const [mappingsOpen, setMappingsOpen] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -102,6 +102,16 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
     return <Empty icon="clipboard" title="Listing AI" message="Only admin and manager accounts can generate marketplace listings." />;
   }
 
+  if (viewMode === 'mappings') {
+    return (
+      <TaughtMappingsPage
+        onBack={() => setViewMode('main')}
+        fields={selected?.fields || [...new Map(templates.flatMap(t => t.fields).map(f => [f.header, f])).values()]}
+        addToast={addToast}
+      />
+    );
+  }
+
   return (
     <div style={{ maxWidth: 860 }}>
       <div style={{ marginBottom: 14 }}>
@@ -127,7 +137,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
             </select>
           </div>
           <button onClick={() => setManageOpen(true)} style={S.btnGhost}>Manage Templates</button>
-          <button onClick={() => setMappingsOpen(true)} style={S.btnGhost}>Taught Mappings</button>
+          <button onClick={() => setViewMode('mappings')} style={S.btnGhost}>Taught Mappings</button>
           <button onClick={() => setLinksOpen(true)} style={S.btnGhost}>Image Folders</button>
         </div>
         <div style={S.fLabel}>SKUs — one per line</div>
@@ -156,8 +166,6 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
         <ResultsTable headers={headers} kinds={kinds} rows={rows} usage={usage} template={selected} addToast={addToast} />
       )}
       <TemplateManager open={manageOpen} onClose={() => { setManageOpen(false); loadTemplates(); }} templates={templates} refresh={loadTemplates} addToast={addToast} />
-      <MappingsManager open={mappingsOpen} onClose={() => setMappingsOpen(false)}
-        fields={selected?.fields || [...new Map(templates.flatMap(t => t.fields).map(f => [f.header, f])).values()]} addToast={addToast} />
       <ImageFolders open={linksOpen} onClose={() => setLinksOpen(false)} addToast={addToast} />
     </div>
   );
