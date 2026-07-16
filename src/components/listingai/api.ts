@@ -17,6 +17,14 @@ export interface GenResponse {
   cacheNote?: string;     // plain-language cache-miss warning, when structural
 }
 
+// Live master-sheet header list (edge reads the Google Sheet) — feeds the
+// "fill from master column" pairing select in the template editor.
+export const fetchMasterColumns = async (): Promise<string[]> => {
+  const { status, data } = await call({ action: 'master_columns' });
+  if (!data?.ok) throw new Error(String(data?.details || data?.error || `Could not read the master sheet (${status})`));
+  return (data.columns || []) as string[];
+};
+
 export const call = async (body: object): Promise<{ status: number; data: any }> => {
   const { data: { session } } = await supabase.auth.getSession();
   const jwt = session?.access_token || SUPABASE_ANON_KEY;

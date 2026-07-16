@@ -2,23 +2,23 @@
 // Shopify) from the offline master sheet + one Dropbox photo per SKU, via the
 // listing-ai edge function. Pick a saved template → paste SKUs → Generate →
 // export the filled sheet in the template's exact column order. Price-like
-// columns are always left blank (enforced server-side).
+// columns are always left blank (enforced server-side). Runs are saved for
+// 5 days (Recent runs) so a reload never loses a generated sheet.
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import Empty from '../ui/Empty';
-import { call, GenRow, GenUsage } from './api';
+import { call } from './api';
 import { parseSkuLines } from './skuInput';
+import { useGenerateRun } from './useGenerateRun';
 import TemplateManager from './TemplateManager';
 import TaughtMappingsPage from './TaughtMappingsPage';
 import BulkTeachPage from './bulk/BulkTeachPage';
 import ImageFolders from './ImageFolders';
 import ResultsTable from './ResultsTable';
+import RunHistory from './RunHistory';
 import type { ListingTemplate } from '../../types/database';
-
-const CHUNK = 3;    // SKUs per edge call (server caps at 5) — keeps each call fast
-const RUN_CAP = 60; // SKUs per run, so one tap can't burn an unbounded API bill
 
 export default function ListingAI({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const [status, setStatus] = useState<{ hasKey: boolean; role: string } | null>(null);
@@ -29,13 +29,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
   const [viewMode, setViewMode] = useState<'main' | 'mappings' | 'bulk'>('main');
   const [manageOpen, setManageOpen] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [progress, setProgress] = useState({ done: 0, total: 0 });
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [kinds, setKinds] = useState<string[]>([]);
-  const [rows, setRows] = useState<GenRow[]>([]);
-  const [usage, setUsage] = useState<GenUsage | null>(null);
-  const [cost, setCost] = useState({ usd: 0, saved: 0 });
+  const gen = useGenerateRun(addToast);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -58,53 +52,11 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
   const selected = templates.find(t => t.id === selectedId);
   const skuCount = parseSkuLines(skuText).length;
 
-  const generate = async () => {
-    if (generating) return;
+  const generate = () => {
     if (!selected) { addToast('Pick a template first', 'error'); return; }
-    let skus = parseSkuLines(skuText);
+    const skus = parseSkuLines(skuText);
     if (skus.length === 0) { addToast('Paste at least one SKU', 'error'); return; }
-    if (skus.length > RUN_CAP) { addToast(`Capped to the first ${RUN_CAP} SKUs (of ${skus.length}) — run again for the rest`, 'error'); skus = skus.slice(0, RUN_CAP); }
-    setGenerating(true);
-    setRows([]); setHeaders([]); setKinds([]); setUsage(null); setCost({ usd: 0, saved: 0 });
-    setProgress({ done: 0, total: skus.length });
-    const acc: GenRow[] = [];
-    const tot: GenUsage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
-    // Cache checkup: threading each chunk's message id into the next call
-    // lets the API explain any cache miss (see cacheNote below).
-    let prevMessageId: string | null = null;
-    let cacheWarned = false;
-    let usd = 0, saved = 0;
-    try {
-      for (let i = 0; i < skus.length; i += CHUNK) {
-        const chunk = skus.slice(i, i + CHUNK);
-        let data: any, st = 0;
-        try { ({ status: st, data } = await call({ action: 'generate', items: chunk, templateId: selected.id, prevMessageId })); }
-        catch (e) { addToast(friendlyError(e), 'error'); break; }
-        if (!data?.ok) {
-          addToast(data?.error === 'no_api_key'
-            ? (isAdmin ? 'Add the Anthropic API key in Settings → Listing AI first' : 'No API key configured — ask an admin to add it in Settings → Listing AI')
-            : String(data?.details || data?.error || `Failed (${st})`), 'error');
-          break;
-        }
-        setHeaders(data.headers || []); setKinds(data.kinds || []);
-        acc.push(...((data.rows || []) as GenRow[]));
-        const u = data.usage || {};
-        tot.input_tokens += u.input_tokens || 0;
-        tot.output_tokens += u.output_tokens || 0;
-        tot.cache_read_input_tokens += u.cache_read_input_tokens || 0;
-        tot.cache_creation_input_tokens += u.cache_creation_input_tokens || 0;
-        usd += data.estUsd || 0; saved += data.cacheSavedUsd || 0;
-        prevMessageId = data.messageId || null;
-        if (data.cacheNote && !cacheWarned) { addToast(String(data.cacheNote), 'error'); cacheWarned = true; }
-        setRows([...acc]); setUsage({ ...tot }); setCost({ usd, saved });
-        setProgress({ done: Math.min(i + CHUNK, skus.length), total: skus.length });
-        for (const w of (data.warnings || []) as string[]) addToast(w, 'error');
-      }
-      if (acc.length > 0) {
-        const okCount = acc.filter(r => r.status === 'ok').length;
-        addToast(`${okCount} of ${acc.length} SKU(s) generated`, okCount > 0 ? 'success' : 'error');
-      }
-    } finally { setGenerating(false); }
+    gen.generate(selected, skus, isAdmin);
   };
 
   if (statusErr) return <Empty icon="warning" title="Listing AI unavailable" message={statusErr} cta="Retry" onCta={loadStatus} />;
@@ -176,17 +128,18 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
           <button
             onClick={generate}
-            disabled={generating}
-            style={{ ...S.btnPrimary, pointerEvents: generating ? 'none' : 'auto', opacity: generating ? 0.5 : 1 }}
+            disabled={gen.generating}
+            style={{ ...S.btnPrimary, pointerEvents: gen.generating ? 'none' : 'auto', opacity: gen.generating ? 0.5 : 1 }}
           >
-            {generating ? `Generating ${progress.done}/${progress.total}…` : `Generate${skuCount ? ` ${Math.min(skuCount, RUN_CAP)} SKU${skuCount > 1 ? 's' : ''}` : ''}`}
+            {gen.generating ? `Generating ${gen.progress.done}/${gen.progress.total}…` : `Generate${skuCount ? ` ${Math.min(skuCount, 60)} SKU${skuCount > 1 ? 's' : ''}` : ''}`}
           </button>
-          {generating && <span style={{ fontSize: 11, color: T.tx3 }}>Fetching data, photos and writing listings — stay on this screen…</span>}
+          {gen.generating && <span style={{ fontSize: 11, color: T.tx3 }}>Fetching data, photos and writing listings — stay on this screen…</span>}
         </div>
       </div>
-      {rows.length > 0 && selected && (
-        <ResultsTable headers={headers} kinds={kinds} rows={rows} usage={usage} cost={cost} template={selected} addToast={addToast} />
+      {gen.rows.length > 0 && gen.runTpl && (
+        <ResultsTable headers={gen.headers} kinds={gen.kinds} rows={gen.rows} usage={gen.usage} cost={gen.cost} template={gen.runTpl} addToast={addToast} />
       )}
+      <RunHistory templates={templates} refreshKey={gen.savedCount} onOpen={gen.loadRun} addToast={addToast} />
       <TemplateManager open={manageOpen} onClose={() => { setManageOpen(false); loadTemplates(); }} templates={templates} refresh={loadTemplates} addToast={addToast} />
       <ImageFolders open={linksOpen} onClose={() => setLinksOpen(false)} addToast={addToast} />
     </div>

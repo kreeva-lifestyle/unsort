@@ -63,14 +63,28 @@ export default function ColumnCard({ col, allowed, staged, suggestions, defaultO
               staged={staged[keyOf(u.value)]} suggestion={suggestions[keyOf(u.value)]}
               onStage={t => onStage(u.value, t)} onIgnore={() => onIgnore(u.value)} onUnstage={() => onUnstage(u.value)} />
           ))}
-          {needsYou === 0 && (
-            <div style={{ padding: '14px', fontSize: 11, color: T.tx3, textAlign: 'center' }}>
-              All {col.distinct} value(s) settled — {col.auto} match automatically{col.taught ? `, ${col.taught} taught` : ''}{col.ignored ? `, ${col.ignored} ignored` : ''}.
-            </div>
-          )}
           {col.truncated > 0 && (
             <div style={{ padding: '8px 14px', fontSize: 10, color: T.yl }}>
               {col.truncated} rarer value(s) not shown — teach these first, then Rescan.
+            </div>
+          )}
+          {((col.taughtValues?.length || 0) > 0 || (col.autoValues?.length || 0) > 0) && (
+            <div style={{ borderTop: needsYou > 0 ? `1px solid ${T.bd}` : 'none', maxHeight: 240, overflowY: 'auto' }}>
+              {(col.taughtValues || []).map(tv => (
+                <div key={`t-${tv.source}`} title="Taught lesson — edit or delete it in Taught Mappings" style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '6px 14px', fontSize: 11.5, opacity: 0.75 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.ac2, flexShrink: 0, alignSelf: 'center' }} />
+                  <span style={{ fontFamily: T.mono, color: T.tx2, wordBreak: 'break-word' }}>{tv.source}</span>
+                  <span style={{ color: T.tx3 }}>→</span>
+                  <span style={{ color: T.ac2, fontWeight: 600 }}>{tv.target}</span>
+                </div>
+              ))}
+              {(col.autoValues || []).map(v => (
+                <div key={`a-${v}`} title="Matches the marketplace list as-is — nothing to teach" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', fontSize: 11.5, opacity: 0.6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.gr, flexShrink: 0 }} />
+                  <span style={{ fontFamily: T.mono, color: T.tx2, wordBreak: 'break-word' }}>{v}</span>
+                  <span style={{ fontSize: 9, color: T.gr }}>matches</span>
+                </div>
+              ))}
             </div>
           )}
         </div>

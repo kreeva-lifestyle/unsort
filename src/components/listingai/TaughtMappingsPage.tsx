@@ -1,11 +1,15 @@
-// Full-page Taught Mappings editor — permanent memory for marketplace value corrections.
-// Unlike templates (per-marketplace sheets), mappings are global and persistent across re-uploads.
+// Full-page Taught Mappings editor — permanent memory for marketplace value
+// corrections. Server-side pagination + filters (column / taught vs ignored /
+// text search) so the page stays fast as lessons accumulate.
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { normHeader } from './templateParse';
+import MappingRow from './MappingRow';
 import type { ListingMapping, ListingTemplateField } from '../../types/database';
+
+const PER_PAGE = [10, 25, 50, 100];
 
 export default function TaughtMappingsPage({ onBack, onBulk, fields, addToast }: {
   onBack: () => void;
@@ -14,25 +18,48 @@ export default function TaughtMappingsPage({ onBack, onBulk, fields, addToast }:
   addToast: (m: string, t?: string) => void;
 }) {
   const [rows, setRows] = useState<ListingMapping[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [perPage, setPerPage] = useState(25);
+  const [colFilter, setColFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'taught' | 'ignored'>('all');
+  const [search, setSearch] = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [labels, setLabels] = useState<{ key: string; label: string }[]>([]);
   const [header, setHeader] = useState('');
   const [source, setSource] = useState('');
   const [target, setTarget] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmDel, setConfirmDel] = useState('');
-  const [search, setSearch] = useState('');
+
+  useEffect(() => { const t = setTimeout(() => { setDebounced(search); setPage(0); }, 300); return () => clearTimeout(t); }, [search]);
+
+  const loadLabels = useCallback(async () => {
+    const { data } = await supabase.from('listing_mappings').select('field_key, field_label').limit(2000);
+    const seen = new Map<string, string>();
+    for (const r of (data as { field_key: string; field_label: string }[] | null) || []) if (!seen.has(r.field_key)) seen.set(r.field_key, r.field_label);
+    setLabels([...seen.entries()].map(([key, label]) => ({ key, label })).sort((a, b) => a.label.localeCompare(b.label)));
+  }, []);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase.from('listing_mappings')
-      .select('id, field_key, field_label, source, target, ignored, updated_at').order('field_label').order('source');
+    let q = supabase.from('listing_mappings')
+      .select('id, field_key, field_label, source, target, ignored, updated_at', { count: 'exact' });
+    if (colFilter) q = q.eq('field_key', colFilter);
+    if (typeFilter === 'taught') q = q.eq('ignored', false);
+    if (typeFilter === 'ignored') q = q.eq('ignored', true);
+    const s = debounced.replace(/[%,()]/g, '').trim();
+    if (s) q = q.or(`source.ilike.%${s}%,target.ilike.%${s}%,field_label.ilike.%${s}%`);
+    const { data, count, error } = await q.order('field_label').order('source').range(page * perPage, page * perPage + perPage - 1);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     setRows((data as ListingMapping[] | null) || []);
-  }, [addToast]);
+    setTotal(count || 0);
+  }, [addToast, colFilter, typeFilter, debounced, page, perPage]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadLabels(); }, [loadLabels]);
 
   const pickable = fields.filter(f => f.header && !/price|mrp|gst/i.test(f.header));
   const picked = pickable.find(f => f.header === header);
-
   // Stale = the selected template HAS this column with a dropdown, but the
   // taught target is no longer one of its values (marketplace changed the sheet).
   const isStale = (r: ListingMapping) => {
@@ -54,7 +81,7 @@ export default function TaughtMappingsPage({ onBack, onBulk, fields, addToast }:
       if (error) { addToast(friendlyError(error), 'error'); setSaving(false); return; }
       addToast('Mapping taught — it will be used on every run now', 'success');
       setSource(''); setTarget('');
-      load();
+      load(); loadLabels();
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setSaving(false);
   };
@@ -64,18 +91,14 @@ export default function TaughtMappingsPage({ onBack, onBulk, fields, addToast }:
     if (error) { addToast(friendlyError(error), 'error'); return; }
     addToast('Mapping removed', 'success');
     setConfirmDel('');
-    load();
+    setPage(0);
+    load(); loadLabels();
   };
 
-  const filtered = rows.filter(r =>
-    !search || r.field_label.toLowerCase().includes(search.toLowerCase()) ||
-    r.source.toLowerCase().includes(search.toLowerCase()) ||
-    r.target.toLowerCase().includes(search.toLowerCase())
-  );
+  const pages = Math.max(1, Math.ceil(total / perPage));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header with back button */}
       <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.bd}`, background: T.s2 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
           <button onClick={onBack} style={{ ...S.btnGhost, ...S.btnSm }}>← Back</button>
@@ -86,10 +109,8 @@ export default function TaughtMappingsPage({ onBack, onBulk, fields, addToast }:
           Teach permanent corrections: when the master sheet says X for a column, always use Y on the marketplace. Applied instantly on every run — no AI cost, no repeated mistakes.
         </div>
       </div>
-
-      {/* Teaching form */}
-      <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.bd}` }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.bd}` }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <select value={header} onChange={e => { setHeader(e.target.value); setTarget(''); }} style={{ ...S.fInput, flex: '1 1 150px', minWidth: 140 }}>
             <option value="">Column…</option>
             {pickable.map(f => <option key={f.header} value={f.header}>{f.header}</option>)}
@@ -106,72 +127,40 @@ export default function TaughtMappingsPage({ onBack, onBulk, fields, addToast }:
           <button onClick={add} disabled={saving} style={{ ...S.btnPrimary, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1, flexShrink: 0 }}>{saving ? 'Saving…' : 'Teach'}</button>
         </div>
       </div>
-
-      {/* Search and list */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '14px 16px' }}>
-        {rows.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search mappings…"
-              style={{ ...S.fInput, width: '100%', marginBottom: 8 }}
-            />
-            <div style={{ fontSize: 10, color: T.tx3 }}>
-              Showing {filtered.length} of {rows.length} mapping{rows.length !== 1 ? 's' : ''}
-            </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '12px 16px' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search mappings…" style={{ ...S.fInput, flex: '2 1 180px', minWidth: 160 }} />
+          <select value={colFilter} onChange={e => { setColFilter(e.target.value); setPage(0); }} style={{ ...S.fInput, flex: '1 1 130px', minWidth: 120 }}>
+            <option value="">All columns</option>
+            {labels.map(l => <option key={l.key} value={l.key}>{l.label}</option>)}
+          </select>
+          <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value as typeof typeFilter); setPage(0); }} style={{ ...S.fInput, flex: '1 1 110px', minWidth: 100 }}>
+            <option value="all">All types</option>
+            <option value="taught">Taught</option>
+            <option value="ignored">Ignored</option>
+          </select>
+        </div>
+        {total === 0 ? (
+          <div style={{ padding: '36px 20px', textAlign: 'center', color: T.tx3, fontSize: 12 }}>
+            {debounced || colFilter || typeFilter !== 'all' ? 'No mappings match these filters.' : 'Nothing taught yet. When a run maps a value you don’t like, teach the correct one above — it sticks forever.'}
           </div>
-        )}
-
-        {rows.length === 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: T.tx3, textAlign: 'center', padding: '40px 20px' }}>
-            <div>
-              <div style={{ fontSize: 12, marginBottom: 8 }}>Nothing taught yet</div>
-              <div style={{ fontSize: 11 }}>When a run maps a value you don't like, teach the correct one above — it sticks forever.</div>
-            </div>
-          </div>
-        )}
-
-        {rows.length > 0 && (
+        ) : (
           <div style={{ flex: 1, overflow: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
-            <div style={{ display: 'grid', gap: 0 }}>
-              {filtered.map(r => (
-                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: `1px solid ${T.bd}`, fontSize: 13 }}>
-                  <div style={{ width: 110, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <div style={{ fontSize: 10, color: T.tx3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }} title={r.field_label}>{r.field_label}</div>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, wordBreak: 'break-word' }}>
-                      <span style={{ color: T.tx2, textDecoration: r.ignored ? 'line-through' : 'none', opacity: r.ignored ? 0.6 : 1 }}>{r.source}</span>
-                      {r.ignored ? (
-                        <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 8, fontWeight: 600, background: 'rgba(255,255,255,.06)', color: T.tx3 }}>ignored — never suggested (delete to bring it back)</span>
-                      ) : (<>
-                        <span style={{ color: T.tx3, fontSize: 11 }}>→</span>
-                        <span style={{ color: T.ac2, fontWeight: 600 }}>{r.target}</span>
-                      </>)}
-                    </div>
-                    {isStale(r) && (
-                      <div title="The marketplace changed this column's dropdown — this value no longer exists in it. Teach the new value (same column + same master value replaces this lesson)." style={{ marginTop: 4, padding: '2px 6px', borderRadius: 4, fontSize: 8, fontWeight: 600, background: 'rgba(239,68,68,.12)', color: T.re, whiteSpace: 'nowrap', display: 'inline-block' }}>
-                        not in this sheet's list anymore
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    {confirmDel === r.id ? (
-                      <>
-                        <button onClick={() => del(r.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Confirm</button>
-                        <button onClick={() => setConfirmDel('')} style={{ ...S.btnGhost, ...S.btnSm }}>Cancel</button>
-                      </>
-                    ) : (
-                      <button onClick={() => setConfirmDel(r.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            {rows.map(r => (
+              <MappingRow key={r.id} r={r} stale={isStale(r)} confirming={confirmDel === r.id}
+                onAskDelete={() => setConfirmDel(r.id)} onCancelDelete={() => setConfirmDel('')} onDelete={() => del(r.id)} />
+            ))}
           </div>
         )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1 }}>Prev</button>
+          <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {pages}</span>
+          <button onClick={() => setPage(p => Math.min(pages - 1, p + 1))} disabled={page >= pages - 1} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= pages - 1 ? 0.3 : 1 }}>Next</button>
+          <span style={{ marginLeft: 'auto', fontSize: 10, color: T.tx3 }}>{total} mapping{total !== 1 ? 's' : ''}</span>
+          <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setPage(0); }} style={{ ...S.fInput, width: 'auto', height: 28, fontSize: 11, padding: '4px 8px', borderRadius: 6 }}>
+            {PER_PAGE.map(n => <option key={n} value={n}>{n} / page</option>)}
+          </select>
+        </div>
       </div>
     </div>
   );

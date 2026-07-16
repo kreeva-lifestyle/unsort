@@ -6,9 +6,10 @@ import { T, S } from '../../lib/theme';
 import { SENSITIVE_RE } from './templateParse';
 import type { ListingTemplateField } from '../../types/database';
 
-export default function FieldRow({ f, others, onChange, addToast }: {
+export default function FieldRow({ f, others, masterCols, onChange, addToast }: {
   f: ListingTemplateField;
   others: string[]; // headers this column may be wired to (excl. self/wired/skipped/sensitive)
+  masterCols: string[]; // live master-sheet headers for the ⤓ pairing select
   onChange: (patch: Partial<ListingTemplateField>) => void;
   addToast: (m: string, t?: string) => void;
 }) {
@@ -31,6 +32,19 @@ export default function FieldRow({ f, others, onChange, addToast }: {
           {f.mandatory ? 'MANDATORY skipped — exported empty' : 'skipped — left empty'}
         </span>
         <button onClick={() => onChange({ skip: false })} style={{ ...S.btnGhost, ...S.btnSm }}>Fill</button>
+      </div>
+    );
+  }
+  // Paired: fills from a specific MASTER-SHEET column (owner's explicit
+  // pairing beats the automatic name matching). Values go through the usual
+  // dropdown/taught-mapping reconciliation and show up in Bulk Teach.
+  if (f.masterAs) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${T.bd}` }}>
+        <input type="checkbox" checked={f.mandatory} onChange={e => onChange({ mandatory: e.target.checked })} title="Mandatory" style={{ width: 15, height: 15, accentColor: T.ac, cursor: 'pointer', flexShrink: 0 }} />
+        <span style={{ fontSize: 12, color: T.tx2, flex: 1, minWidth: 90, wordBreak: 'break-word' }}>{f.header}</span>
+        <span title="Fills from this master-sheet column on every run — dropdown values are matched/taught as usual" style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(34,197,94,.1)', color: T.gr }}>&#10515; from "{f.masterAs}"</span>
+        <button onClick={() => onChange({ masterAs: '' })} style={{ ...S.btnGhost, ...S.btnSm }}>Unpair</button>
       </div>
     );
   }
@@ -78,6 +92,16 @@ export default function FieldRow({ f, others, onChange, addToast }: {
         }} title="Wire — copy another column's value on every run" style={{ ...S.fInput, width: 36, height: 30, fontSize: 12, color: T.tx3, padding: '4px 4px', flexShrink: 0 }}>
           <option value="">&#8646;</option>
           {others.map(h => <option key={h} value={h}>= {h}</option>)}
+        </select>
+      )}
+      {masterCols.length > 0 && (
+        <select value="" onChange={e => {
+          if (!e.target.value) return;
+          onChange({ masterAs: e.target.value, fixed: '' });
+          addToast(`"${f.header}" now fills from the master column "${e.target.value}" — its values appear in Bulk Teach`, 'success');
+        }} title="Pair — fill this column from a master-sheet column" style={{ ...S.fInput, width: 36, height: 30, fontSize: 12, color: T.tx3, padding: '4px 4px', flexShrink: 0 }}>
+          <option value="">&#10515;</option>
+          {masterCols.map(h => <option key={h} value={h}>&#10515; {h}</option>)}
         </select>
       )}
       <button onClick={() => {
