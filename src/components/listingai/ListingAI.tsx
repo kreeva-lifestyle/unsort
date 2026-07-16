@@ -12,6 +12,7 @@ import { call, GenRow, GenUsage } from './api';
 import { parseSkuLines } from './skuInput';
 import TemplateManager from './TemplateManager';
 import TaughtMappingsPage from './TaughtMappingsPage';
+import BulkTeachPage from './bulk/BulkTeachPage';
 import ImageFolders from './ImageFolders';
 import ResultsTable from './ResultsTable';
 import type { ListingTemplate } from '../../types/database';
@@ -25,7 +26,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
   const [templates, setTemplates] = useState<ListingTemplate[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [skuText, setSkuText] = useState('');
-  const [viewMode, setViewMode] = useState<'main' | 'mappings'>('main');
+  const [viewMode, setViewMode] = useState<'main' | 'mappings' | 'bulk'>('main');
   const [manageOpen, setManageOpen] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -102,10 +103,22 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
     return <Empty icon="clipboard" title="Listing AI" message="Only admin and manager accounts can generate marketplace listings." />;
   }
 
+  if (viewMode === 'bulk') {
+    return (
+      <BulkTeachPage
+        onBack={() => setViewMode('mappings')}
+        templates={templates}
+        initialTemplateId={selectedId}
+        addToast={addToast}
+      />
+    );
+  }
+
   if (viewMode === 'mappings') {
     return (
       <TaughtMappingsPage
         onBack={() => setViewMode('main')}
+        onBulk={() => setViewMode('bulk')}
         fields={selected?.fields || [...new Map(templates.flatMap(t => t.fields).map(f => [f.header, f])).values()]}
         addToast={addToast}
       />
