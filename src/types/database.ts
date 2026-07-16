@@ -1000,7 +1000,10 @@ export const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
 // template (or auto-detected from a single-value dropdown): it is filled in
 // code on every run and never sent to the AI — zero token cost. `skip` marks
 // a column the owner never wants filled: always exported empty, zero cost.
-export type ListingTemplateField = { header: string; mandatory: boolean; hint: string; allowed?: string[]; fixed?: string; skip?: boolean };
+// sameAs: this column is WIRED to another template column and copies its
+// final value on every run (in code, zero AI cost) — for sheets that repeat
+// the same data under different column names.
+export type ListingTemplateField = { header: string; mandatory: boolean; hint: string; allowed?: string[]; fixed?: string; skip?: boolean; sameAs?: string };
 
 // A taught value mapping: "when the master sheet says SOURCE for this
 // column, always use TARGET on the marketplace sheet." The AI is stateless —

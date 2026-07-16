@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
-import { parseTemplateFile, isImageColumn } from './templateParse';
+import { parseTemplateFile, isImageColumn, SENSITIVE_RE } from './templateParse';
 import { mergeTemplateFields, describeMerge } from './mergeFields';
 import FieldRow from './FieldRow';
 import TemplateListRow from './TemplateListRow';
@@ -173,10 +173,10 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
             )}
             <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <button onClick={() => {
-                const skippable = (f: ListingTemplateField) => !f.mandatory && !f.fixed && !f.skip && !isImageColumn(f.header);
+                const skippable = (f: ListingTemplateField) => !f.mandatory && !f.fixed && !f.skip && !f.sameAs && !isImageColumn(f.header);
                 const n = editing.fields.filter(skippable).length;
                 setEditing({ ...editing, fields: editing.fields.map(f => skippable(f) ? { ...f, skip: true } : f) });
-                addToast(n ? `${n} non-mandatory column(s) skipped — mandatory, fixed and photo columns kept` : 'Nothing to skip — everything left is mandatory, fixed or a photo column', 'success');
+                addToast(n ? `${n} non-mandatory column(s) skipped — mandatory, fixed, wired and photo columns kept` : 'Nothing to skip — everything left is mandatory, fixed, wired or a photo column', 'success');
               }} style={{ ...S.btnGhost, ...S.btnSm }}>Skip all non-mandatory</button>
               <button onClick={() => setEditing(ed => ed ? { ...ed, fields: ed.fields.map(f => f.skip ? { ...f, skip: false } : f) } : ed)} style={{ ...S.btnGhost, ...S.btnSm }}>Fill all</button>
               {editing.id && <button onClick={() => fileRef.current?.click()} title="Upload the marketplace's new sheet version — your settings are kept, changes are merged" style={{ ...S.btnGhost, ...S.btnSm }}>Update from new sheet</button>}
@@ -184,7 +184,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
             </div>
             <div style={{ maxHeight: '38vh', overflowY: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
               {editing.fields.map((f, i) => (
-                <FieldRow key={i} f={f} onChange={patch => setField(i, patch)} addToast={addToast} />
+                <FieldRow key={i} f={f} onChange={patch => setField(i, patch)} addToast={addToast} others={editing.fields.filter(o => o.header !== f.header && !o.sameAs && !o.skip && !SENSITIVE_RE.test(o.header)).map(o => o.header)} />
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>

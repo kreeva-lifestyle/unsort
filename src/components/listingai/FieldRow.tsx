@@ -6,8 +6,9 @@ import { T, S } from '../../lib/theme';
 import { SENSITIVE_RE } from './templateParse';
 import type { ListingTemplateField } from '../../types/database';
 
-export default function FieldRow({ f, onChange, addToast }: {
+export default function FieldRow({ f, others, onChange, addToast }: {
   f: ListingTemplateField;
+  others: string[]; // headers this column may be wired to (excl. self/wired/skipped/sensitive)
   onChange: (patch: Partial<ListingTemplateField>) => void;
   addToast: (m: string, t?: string) => void;
 }) {
@@ -30,6 +31,17 @@ export default function FieldRow({ f, onChange, addToast }: {
           {f.mandatory ? 'MANDATORY skipped — exported empty' : 'skipped — left empty'}
         </span>
         <button onClick={() => onChange({ skip: false })} style={{ ...S.btnGhost, ...S.btnSm }}>Fill</button>
+      </div>
+    );
+  }
+  // Wired: copies another column's final value on every run — zero AI cost.
+  if (f.sameAs) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${T.bd}` }}>
+        <input type="checkbox" checked={f.mandatory} onChange={e => onChange({ mandatory: e.target.checked })} title="Mandatory" style={{ width: 15, height: 15, accentColor: T.ac, cursor: 'pointer', flexShrink: 0 }} />
+        <span style={{ fontSize: 12, color: T.tx2, flex: 1, minWidth: 90, wordBreak: 'break-word' }}>{f.header}</span>
+        <span title="Copies that column's value on every run — no AI cost" style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(56,189,248,.1)', color: T.bl }}>= copies "{f.sameAs}"</span>
+        <button onClick={() => onChange({ sameAs: '' })} style={{ ...S.btnGhost, ...S.btnSm }}>Unlink</button>
       </div>
     );
   }
@@ -57,6 +69,16 @@ export default function FieldRow({ f, onChange, addToast }: {
           <input value={f.fixed || ''} onChange={e => onChange({ fixed: e.target.value })} placeholder="fixed value" title="Fixed value — used on every run, no AI cost" style={{ ...S.fInput, width: '55%', height: 30, fontSize: 12, color: f.fixed ? T.ac2 : undefined }} />
           <input value={f.hint} onChange={e => onChange({ hint: e.target.value })} placeholder="hint" style={{ ...S.fInput, width: '45%', height: 30, fontSize: 12 }} />
         </span>
+      )}
+      {others.length > 0 && (
+        <select value="" onChange={e => {
+          if (!e.target.value) return;
+          onChange({ sameAs: e.target.value, fixed: '' });
+          addToast(`"${f.header}" will copy "${e.target.value}" on every run — no AI cost`, 'success');
+        }} title="Wire — copy another column's value on every run" style={{ ...S.fInput, width: 36, height: 30, fontSize: 12, color: T.tx3, padding: '4px 4px', flexShrink: 0 }}>
+          <option value="">&#8646;</option>
+          {others.map(h => <option key={h} value={h}>= {h}</option>)}
+        </select>
       )}
       <button onClick={() => {
         if (f.mandatory) addToast(`"${f.header}" is marked mandatory — the marketplace requires it, but it will be exported EMPTY while skipped`, 'error');
