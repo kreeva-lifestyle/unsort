@@ -73,7 +73,7 @@ export default function ResultsTable({ headers, kinds, rows, usage, template, ad
       {usage && (
         <div style={{ fontSize: 10, color: T.tx3, marginTop: 8, fontFamily: T.mono }}>
           {(() => {
-            const free = kinds.filter(k => k === 'fixed' || k === 'image' || k === 'direct' || k === 'brand').length;
+            const free = kinds.filter(k => k === 'fixed' || k === 'image' || k === 'direct' || k === 'brand' || k === 'wired').length;
             const ai = kinds.filter(k => k === 'ai').length;
             const blank = kinds.filter(k => k === 'blank').length;
             return `${free} column(s) filled free (fixed / master / photos) · ${ai} written by AI${blank ? ` · ${blank} left empty` : ''}`;

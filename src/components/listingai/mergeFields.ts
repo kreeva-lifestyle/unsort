@@ -10,6 +10,7 @@ export interface MergeSummary {
   removed: string[];      // columns the marketplace dropped
   listsChanged: string[]; // columns whose dropdown values changed
   fixedDropped: string[]; // fixed values no longer valid in the new list
+  wireDropped: string[];  // wired links whose source column disappeared
   kept: number;           // columns whose settings carried over
 }
 
@@ -19,7 +20,7 @@ export function mergeTemplateFields(
 ): { fields: ListingTemplateField[]; summary: MergeSummary } {
   const oldBy = new Map(oldFields.map(f => [normHeader(f.header), f]));
   const newKeys = new Set(newFields.map(f => normHeader(f.header)));
-  const summary: MergeSummary = { added: [], removed: [], listsChanged: [], fixedDropped: [], kept: 0 };
+  const summary: MergeSummary = { added: [], removed: [], listsChanged: [], fixedDropped: [], wireDropped: [], kept: 0 };
 
   const fields = newFields.map(nf => {
     const of = oldBy.get(normHeader(nf.header));
@@ -34,12 +35,21 @@ export function mergeTemplateFields(
       fixed = '';
     }
     if (!fixed) fixed = nf.fixed || '';
+    // A wired link survives only while its SOURCE column still exists in the
+    // new sheet (re-pointed to the source's new casing); otherwise dropped.
+    let sameAs = of.sameAs || '';
+    if (sameAs) {
+      const src = newFields.find(x => normHeader(x.header) === normHeader(sameAs));
+      if (src) sameAs = src.header;
+      else { summary.wireDropped.push(`${nf.header} (copied "${sameAs}")`); sameAs = ''; }
+    }
     return {
       ...nf, // new header casing + NEW allowed list from the marketplace
       mandatory: of.mandatory,
       hint: of.hint || nf.hint,
       ...(of.skip ? { skip: true } : {}),
       ...(fixed ? { fixed } : {}),
+      ...(sameAs ? { sameAs } : {}),
     };
   });
 
@@ -54,6 +64,7 @@ export const describeMerge = (s: MergeSummary): string => {
     s.removed.length ? `−${s.removed.length} removed: ${s.removed.slice(0, 4).join(', ')}${s.removed.length > 4 ? '…' : ''}` : '',
     s.listsChanged.length ? `${s.listsChanged.length} dropdown list(s) changed` : '',
     s.fixedDropped.length ? `fixed value no longer valid on: ${s.fixedDropped.join(', ')}` : '',
+    s.wireDropped.length ? `wired link removed (source column gone): ${s.wireDropped.join(', ')}` : '',
   ].filter(Boolean);
   return `${bits.length ? bits.join(' · ') : 'No layout changes'} · your settings kept on ${s.kept} column(s)`;
 };

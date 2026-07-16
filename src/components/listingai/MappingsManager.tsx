@@ -41,6 +41,14 @@ export default function MappingsManager({ open, onClose, fields, addToast }: {
 
   const pickable = fields.filter(f => f.header && !/price|mrp|gst/i.test(f.header));
   const picked = pickable.find(f => f.header === header);
+  // Stale = the selected template HAS this column with a dropdown, but the
+  // taught target is no longer one of its values (marketplace changed the
+  // sheet). The run falls back to AI for it — never exports a bad value —
+  // but re-teaching restores the free deterministic fill.
+  const isStale = (r: ListingMapping) => {
+    const f = fields.find(x => normHeader(x.header) === r.field_key);
+    return !!(f?.allowed?.length && !f.allowed.some(a => normHeader(a) === normHeader(r.target)));
+  };
 
   const add = async () => {
     if (saving) return;
@@ -110,6 +118,11 @@ export default function MappingsManager({ open, onClose, fields, addToast }: {
                   <span style={{ fontSize: 10, color: T.tx3, width: 120, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.field_label}>{r.field_label}</span>
                   <span style={{ fontSize: 12, color: T.tx2, flex: 1, minWidth: 0, wordBreak: 'break-word' }}>
                     {r.source} <span style={{ color: T.tx3 }}>→</span> <span style={{ color: T.ac2, fontWeight: 600 }}>{r.target}</span>
+                    {isStale(r) && (
+                      <span title="The marketplace changed this column's dropdown — this value no longer exists in it. Teach the new value (same column + same master value replaces this lesson)." style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, fontSize: 8, fontWeight: 600, background: 'rgba(239,68,68,.12)', color: T.re, whiteSpace: 'nowrap' }}>
+                        not in this sheet's list anymore
+                      </span>
+                    )}
                   </span>
                   {confirmDel === r.id ? (
                     <>
