@@ -3,7 +3,26 @@
 // (mandatory ticks, fixed values, skips, hints) must survive on columns that
 // still exist, while the marketplace's NEW dropdown lists always win.
 import { normHeader } from './templateParse';
-import type { ListingTemplateField } from '../../types/database';
+import type { ListingTemplateField, ListingTemplateRule } from '../../types/database';
+
+// Rules reference template headers; after a marketplace re-upload, drop
+// set-entries (and column-watching conditions) whose header disappeared.
+// Master-sourced conditions are kept — they reference OUR sheet, not theirs.
+export function pruneRules(rules: ListingTemplateRule[], fields: ListingTemplateField[]): { rules: ListingTemplateRule[]; dropped: number } {
+  const have = new Set(fields.map(f => normHeader(f.header)));
+  let dropped = 0;
+  const out = rules
+    .map(r => {
+      const set = r.set.filter(s => { const ok = have.has(normHeader(s.header)); if (!ok) dropped++; return ok; });
+      return { ...r, set };
+    })
+    .filter(r => {
+      if (r.set.length === 0) return false;
+      if (r.source === 'column' && !have.has(normHeader(r.key))) { dropped += 1; return false; }
+      return true;
+    });
+  return { rules: out, dropped };
+}
 
 export interface MergeSummary {
   added: string[];        // columns new in this sheet version

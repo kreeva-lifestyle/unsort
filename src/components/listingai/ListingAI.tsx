@@ -41,7 +41,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
 
   const loadTemplates = useCallback(async () => {
     const { data, error } = await supabase.from('listing_templates')
-      .select('id, name, marketplace, fields, file_name, sheet_name, header_row, updated_at').order('name');
+      .select('id, name, marketplace, fields, rules, file_name, sheet_name, header_row, updated_at').order('name');
     if (error) { addToast(friendlyError(error), 'error'); return; }
     setTemplates((data as ListingTemplate[] | null) || []);
   }, [addToast]);

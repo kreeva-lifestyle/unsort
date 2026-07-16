@@ -1,5 +1,15 @@
-// listing-ai Edge Function - AI Listing Module backend (v14).
+// listing-ai Edge Function - AI Listing Module backend (v15).
 //
+// v15: owner-defined conditional rules + per-size charts.
+// listing_templates.rules holds template-level rules: WHEN a master-sheet
+// column or a template column's computed value matches (is/contains) - or
+// always - SET target columns to fixed values, or to per-size values (size
+// charts) applied during row expansion. Semi-stitched vs stitched products
+// can now fill measurement/closure columns differently without touching the
+// AI: rules run in code AFTER base values (so they overwrite the AI's pick -
+// owner rules always win) and BEFORE wired copies (wires propagate ruled
+// values). Every rule target is canon-validated against its own dropdown, so
+// a rule can never smuggle a non-marketplace value into a locked column.
 // v14: owner-controlled master pairing + scan visibility.
 // - A template field may carry `masterAs: "<master header>"` - the owner's
 //   explicit pairing to a master-sheet column, set in the template editor.
@@ -531,11 +541,76 @@ function applyWired(classified: Classified[], values: string[], note: (m: string
 
 // ---- shared loaders (generate + scan_mappings + suggest_mappings) ---------
 
+// Owner-defined template rules (listing_templates.rules): "WHEN a product's
+// master/template column value matches -> SET columns". Deterministic, zero
+// AI cost. A set entry carries a single value, a per-size chart, or both.
+interface RuleSet { header: string; value: string; perSize: Record<string, string> }
+interface TplRule { source: 'always' | 'master' | 'column'; key: string; op: 'is' | 'contains'; value: string; set: RuleSet[] }
+
+// Evaluate rules for ONE product. Applies single-value sets to `values`
+// in place (canon-validated) and returns the per-size charts keyed by
+// column index for the expansion step. Runs BEFORE applyWired so wired
+// copies propagate ruled values; overwrites the AI's pick (owner wins).
+function applyRules(
+  rules: TplRule[], classified: Classified[], values: string[],
+  masterValOf: (col: string) => string, note: (m: string) => void,
+): Map<number, Record<string, string>> {
+  const charts = new Map<number, Record<string, string>>();
+  for (const r of rules) {
+    let hit = r.source === 'always';
+    if (!hit) {
+      let cv = '';
+      if (r.source === 'master') cv = masterValOf(r.key.toUpperCase());
+      else {
+        const ix = classified.findIndex(f => normHeader(f.header) === normHeader(r.key));
+        cv = ix < 0 ? '' : values[ix];
+      }
+      const a = cv.trim().toLowerCase();
+      const b = r.value.trim().toLowerCase();
+      hit = b !== '' && (r.op === 'contains' ? a.includes(b) : a === b);
+    }
+    if (!hit) continue;
+    for (const s of r.set) {
+      const ix = classified.findIndex(f => normHeader(f.header) === normHeader(s.header));
+      if (ix < 0) { note(`rule: column "${s.header}" is not in this template - skipped`); continue; }
+      const f = classified[ix];
+      if (Object.keys(s.perSize).length) charts.set(ix, { ...(charts.get(ix) || {}), ...s.perSize });
+      if (!s.value) continue;
+      if (f.allowed.length) {
+        const c = canon(f, s.value);
+        if (c === undefined) { note(`rule for "${f.header}": "${s.value}" is not in the marketplace list - skipped`); continue; }
+        values[ix] = c;
+      } else values[ix] = s.value;
+    }
+  }
+  return charts;
+}
+
+// Apply per-size chart values to one output row. Size keys are matched
+// tolerantly ("xl" hits "XL"); chart values still pass the column's own
+// dropdown. No chart entry for this size -> the column keeps its value.
+function applyCharts(
+  charts: Map<number, Record<string, string>>, classified: Classified[],
+  v: string[], size: string, note: (m: string) => void,
+) {
+  if (!size || charts.size === 0) return;
+  for (const [ix, chart] of charts) {
+    const key = Object.keys(chart).find(k => k.trim().toLowerCase() === size.trim().toLowerCase() || normHeader(k) === normHeader(size));
+    if (!key) continue;
+    const f = classified[ix];
+    if (f.allowed.length) {
+      const c = canon(f, chart[key]);
+      if (c === undefined) { note(`size chart for "${f.header}": "${chart[key]}" is not in the marketplace list - skipped`); continue; }
+      v[ix] = c;
+    } else v[ix] = chart[key];
+  }
+}
+
 // Template row -> sanitized TplField[]. Oversized lists are never truncated
 // into a wrong enum - a list beyond the cap is treated as free text (defense
 // in depth; the client already drops them at parse time).
-async function loadTemplateFields(templateId: string): Promise<{ tpl: any; fields: TplField[] } | { error: string }> {
-  const tr = await fetch(`${SB_URL}/rest/v1/listing_templates?id=eq.${encodeURIComponent(templateId)}&select=name,marketplace,fields`, { headers: svcHeaders });
+async function loadTemplateFields(templateId: string): Promise<{ tpl: any; fields: TplField[]; rules: TplRule[] } | { error: string }> {
+  const tr = await fetch(`${SB_URL}/rest/v1/listing_templates?id=eq.${encodeURIComponent(templateId)}&select=name,marketplace,fields,rules`, { headers: svcHeaders });
   const trows = await tr.json().catch(() => []);
   const tpl = trows?.[0];
   if (!tpl) return { error: 'Template not found - save it again in Manage Templates' };
@@ -555,7 +630,26 @@ async function loadTemplateFields(templateId: string): Promise<{ tpl: any; field
     })
     .filter((f: TplField) => f.header);
   if (fields.length === 0) return { error: 'This template has no fields - re-upload the sheet in Manage Templates' };
-  return { tpl, fields };
+  // Rules are owner input persisted as jsonb - sanitize every field and drop
+  // entries that can't act (no targets, or a condition missing key/value).
+  const rules: TplRule[] = (Array.isArray(tpl.rules) ? tpl.rules : [])
+    .map((r: any) => ({
+      source: (['always', 'master', 'column'].includes(r?.source) ? r.source : 'always') as TplRule['source'],
+      key: String(r?.key || '').trim(),
+      op: (r?.op === 'contains' ? 'contains' : 'is') as TplRule['op'],
+      value: String(r?.value || '').trim(),
+      set: (Array.isArray(r?.set) ? r.set : []).map((s: any) => ({
+        header: String(s?.header || '').trim(),
+        value: String(s?.value || '').trim(),
+        perSize: (s?.perSize && typeof s.perSize === 'object' && !Array.isArray(s.perSize))
+          ? Object.fromEntries(Object.entries(s.perSize)
+              .map(([k, v]) => [String(k).trim(), String(v ?? '').trim()])
+              .filter(([k, v]) => k && v))
+          : {},
+      })).filter((s: RuleSet) => s.header && (s.value || Object.keys(s.perSize).length > 0)),
+    }))
+    .filter((r: TplRule) => r.set.length > 0 && (r.source === 'always' || (r.key && r.value)));
+  return { tpl, fields, rules };
 }
 
 // Both master tabs in full: rows feed the SKU index (generate) and the
@@ -940,7 +1034,7 @@ Deno.serve(async (req) => {
 
       const loaded = await loadTemplateFields(templateId);
       if ('error' in loaded) return fail(404, loaded.error, req);
-      const { tpl, fields } = loaded;
+      const { tpl, fields, rules: tplRules } = loaded;
 
       // Master sheet first: its headers feed classification (a template
       // column with the same name as a master column copies OUR value).
@@ -1205,7 +1299,8 @@ Deno.serve(async (req) => {
         if (CACHE_NOTES[reason]) cacheNote = `Cache checkup: ${CACHE_NOTES[reason]} - this batch cost more than usual. It self-heals on the next run.`;
       }
 
-      const rows = items.flatMap(it => {
+      type OutRow = { sku: string; status: Item['status']; noImage?: boolean; linkSource?: string; note?: string; values: string[] };
+      const rows = items.flatMap((it): OutRow[] => {
         if (it.status !== 'ok') return [{ sku: it.sku, status: it.status, note: it.note, values: classified.map(() => '') }];
         const av = aiValues[it.sku] || {};
         let imgSlot = 0;
@@ -1228,8 +1323,13 @@ Deno.serve(async (req) => {
           }
           return String(av[f.header] ?? '');
         });
-        // Wired columns fill last, from the values just computed above.
-        applyWired(classified, values, m => { it.note = it.note ? `${it.note}; ${m}` : m; });
+        // Notes dedupe: chart failures inside the size loop would otherwise
+        // repeat once per size row.
+        const noteFn = (m: string) => { if (it.note?.includes(m)) return; it.note = it.note ? `${it.note}; ${m}` : m; };
+        // Owner rules overwrite the AI's picks, then wires copy the final
+        // (ruled) values. Per-size charts come back for the expansion step.
+        const charts = applyRules(tplRules, classified, values, col => masterVal(it, col), noteFn);
+        applyWired(classified, values, noteFn);
         const base = { sku: it.sku, status: 'ok' as const, noImage: it.img ? undefined : true, linkSource: it.linkSource || undefined };
         // One row per size: a comma master SIZE + a dropdown size column
         // expands into otherwise-identical rows, one per resolved size
@@ -1239,7 +1339,12 @@ Deno.serve(async (req) => {
         const sizeIdx = classified.findIndex(isSizeField);
         const rawSize = sizeIdx >= 0 ? masterVal(it, 'SIZE') : '';
         const toks = sizeIdx >= 0 ? sizeTokens(rawSize) : [];
-        if (toks.length === 0) return [{ ...base, note: it.note, values }];
+        if (toks.length === 0) {
+          // Single-row products (e.g. Onesize) still get their chart value,
+          // keyed by the size column's final value.
+          if (sizeIdx >= 0) applyCharts(charts, classified, values, values[sizeIdx], noteFn);
+          return [{ ...base, note: it.note, values }];
+        }
         const out: { sku: string; status: 'ok'; noImage?: boolean; linkSource?: string; note?: string; values: string[] }[] = [];
         const skippedSizes: string[] = [];
         for (const t of toks) {
@@ -1247,6 +1352,7 @@ Deno.serve(async (req) => {
           if (c === undefined) { skippedSizes.push(t); continue; }
           const v = values.map((x, ix) => ix === sizeIdx ? c
             : (x && x.trim().toLowerCase() === rawSize.trim().toLowerCase() ? c : x));
+          applyCharts(charts, classified, v, c, noteFn);
           out.push({ ...base, note: [`size: ${c}`, it.note].filter(Boolean).join('; '), values: v });
         }
         if (skippedSizes.length) {
