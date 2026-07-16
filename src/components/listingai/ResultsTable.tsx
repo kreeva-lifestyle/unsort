@@ -9,11 +9,12 @@ import type { ListingTemplate } from '../../types/database';
 
 const fmtK = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 
-export default function ResultsTable({ headers, kinds, rows, usage, template, addToast }: {
+export default function ResultsTable({ headers, kinds, rows, usage, cost, template, addToast }: {
   headers: string[];
   kinds: string[];
   rows: GenRow[];
   usage: GenUsage | null;
+  cost: { usd: number; saved: number };
   template: Pick<ListingTemplate, 'id' | 'name' | 'file_name' | 'sheet_name' | 'header_row'>;
   addToast: (m: string, t?: string) => void;
 }) {
@@ -71,16 +72,20 @@ export default function ResultsTable({ headers, kinds, rows, usage, template, ad
         </table>
       </div>
       {usage && (
-        <div style={{ fontSize: 10, color: T.tx3, marginTop: 8, fontFamily: T.mono }}>
+        <div style={{ fontSize: 11, color: T.tx2, marginTop: 8 }}>
           {(() => {
             const free = kinds.filter(k => k === 'fixed' || k === 'image' || k === 'direct' || k === 'brand' || k === 'wired').length;
-            const ai = kinds.filter(k => k === 'ai').length;
             const blank = kinds.filter(k => k === 'blank').length;
-            return `${free} column(s) filled free (fixed / master / photos) · ${ai} written by AI${blank ? ` · ${blank} left empty` : ''}`;
+            return <>
+              AI cost this run: <b style={{ color: T.gr, fontFamily: T.mono }}>${cost.usd.toFixed(3)}</b>
+              {cost.saved > 0 && <> · cache saved <span style={{ fontFamily: T.mono }}>${cost.saved.toFixed(3)}</span></>}
+              {' '}· {free} column(s) filled free{blank ? ` · ${blank} left empty` : ''}
+            </>;
           })()}
-          <br />
-          Tokens: {fmtK(usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens)} in
-          ({fmtK(usage.cache_read_input_tokens)} from cache) + {fmtK(usage.output_tokens)} out · price fields left blank
+          <div style={{ fontSize: 10, color: T.tx3, marginTop: 3, fontFamily: T.mono }}>
+            Tokens: {fmtK(usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens)} in
+            ({fmtK(usage.cache_read_input_tokens)} from cache) + {fmtK(usage.output_tokens)} out · price fields left blank
+          </div>
         </div>
       )}
     </div>
