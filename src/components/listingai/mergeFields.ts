@@ -9,12 +9,19 @@ import type { ListingTemplateField, ListingTemplateRule } from '../../types/data
 // set-entries (and column-watching conditions) whose header disappeared.
 // Master-sourced conditions are kept — they reference OUR sheet, not theirs.
 export function pruneRules(rules: ListingTemplateRule[], fields: ListingTemplateField[]): { rules: ListingTemplateRule[]; dropped: number } {
-  const have = new Set(fields.map(f => normHeader(f.header)));
+  // Map normalized header -> the new sheet's exact casing, so surviving rule
+  // targets/conditions are re-pointed (the editor's <select> matches headers
+  // by exact string; an old-cased header would show as unselected).
+  const canon = new Map(fields.map(f => [normHeader(f.header), f.header]));
+  const have = new Set(canon.keys());
   let dropped = 0;
   const out = rules
     .map(r => {
-      const set = r.set.filter(s => { const ok = have.has(normHeader(s.header)); if (!ok) dropped++; return ok; });
-      return { ...r, set };
+      const set = r.set
+        .map(s => ({ ...s, header: canon.get(normHeader(s.header)) ?? s.header }))
+        .filter(s => { const ok = have.has(normHeader(s.header)); if (!ok) dropped++; return ok; });
+      const key = r.source === 'column' ? (canon.get(normHeader(r.key)) ?? r.key) : r.key;
+      return { ...r, key, set };
     })
     .filter(r => {
       if (r.set.length === 0) return false;
@@ -46,12 +53,15 @@ export function mergeTemplateFields(
     if (!of) { summary.added.push(nf.header); return nf; }
     summary.kept++;
     if (JSON.stringify(of.allowed || []) !== JSON.stringify(nf.allowed || [])) summary.listsChanged.push(nf.header);
-    // Owner's fixed value survives only while the new list still allows it;
-    // otherwise fall back to the new auto-pin (single-value dropdown) or none.
+    // Owner's fixed value survives only while the new list still allows it,
+    // and is RE-POINTED to the new list's exact casing ("Art silk" -> the new
+    // "Art Silk") so it still matches the dropdown on export and shows selected
+    // in the editor; otherwise fall back to the new auto-pin or none.
     let fixed = of.fixed || '';
-    if (fixed && nf.allowed?.length && !nf.allowed.some(a => a.toLowerCase() === fixed.toLowerCase())) {
-      summary.fixedDropped.push(`${nf.header} (was "${fixed}")`);
-      fixed = '';
+    if (fixed && nf.allowed?.length) {
+      const hit = nf.allowed.find(a => a.toLowerCase() === fixed.toLowerCase());
+      if (hit) fixed = hit;
+      else { summary.fixedDropped.push(`${nf.header} (was "${fixed}")`); fixed = ''; }
     }
     if (!fixed) fixed = nf.fixed || '';
     // A wired link survives only while its SOURCE column still exists in the
