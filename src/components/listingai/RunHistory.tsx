@@ -22,6 +22,7 @@ export default function RunHistory({ templates, refreshKey, onOpen, addToast }: 
   const [runs, setRuns] = useState<ListingRun[]>([]);
   const [opening, setOpening] = useState('');
   const [confirmDel, setConfirmDel] = useState('');
+  const [deleting, setDeleting] = useState('');
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from('listing_runs')
@@ -53,9 +54,13 @@ export default function RunHistory({ templates, refreshKey, onOpen, addToast }: 
   };
 
   const del = async (id: string) => {
+    if (deleting) return;
+    setDeleting(id);
     const { error } = await supabase.from('listing_runs').delete().eq('id', id);
-    if (error) { addToast(friendlyError(error), 'error'); return; }
+    if (error) { addToast(friendlyError(error), 'error'); setDeleting(''); return; }
+    addToast('Run deleted', 'success');
     setConfirmDel('');
+    setDeleting('');
     load();
   };
 
@@ -80,8 +85,11 @@ export default function RunHistory({ templates, refreshKey, onOpen, addToast }: 
               </button>
               {confirmDel === r.id ? (
                 <>
-                  <button onClick={() => del(r.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Confirm</button>
-                  <button onClick={() => setConfirmDel('')} style={{ ...S.btnGhost, ...S.btnSm }}>Cancel</button>
+                  <button onClick={() => del(r.id)} disabled={!!deleting}
+                    style={{ ...S.btnDanger, ...S.btnSm, pointerEvents: deleting ? 'none' : 'auto', opacity: deleting === r.id ? 0.5 : 1 }}>
+                    {deleting === r.id ? 'Deleting…' : 'Confirm'}
+                  </button>
+                  <button onClick={() => setConfirmDel('')} disabled={!!deleting} style={{ ...S.btnGhost, ...S.btnSm }}>Cancel</button>
                 </>
               ) : (
                 <button onClick={() => setConfirmDel(r.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</button>
