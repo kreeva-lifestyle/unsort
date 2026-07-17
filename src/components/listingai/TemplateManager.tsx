@@ -172,7 +172,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
                 onChange={rules => setEditing(ed => ed ? { ...ed, rules } : ed)} onBack={() => setShowRules(false)} />
             ) : <>
               <div style={{ fontSize: 11, color: T.tx3, marginBottom: 8, lineHeight: 1.5 }}>
-                Tick required fields. Columns with a dropdown show an "options" chip (tap to preview). Set a <b>fixed value</b> for anything that's the same on every product — fixed fields fill instantly and never cost AI tokens. Fixed values can use {'{sku}'} / {'{size}'} (e.g. {'{sku}-{size}'} → XYZ-XS on each size row). Price-like columns are blanked automatically.
+                Tick required fields. Columns with a dropdown show an "options" chip (tap to preview). Set a <b>fixed value</b> for anything that's the same on every product — fixed fields fill instantly and never cost AI tokens. Fixed values can use {'{sku}'} / {'{size}'} (e.g. {'{sku}-{size}'} → XYZ-XS on each size row) and {'{today}'} for the current date (e.g. an addedDate column → today's date, never ask the AI for a date). Price-like columns are blanked automatically.
               </div>
               <EditorToolbar fields={editing.fields} isSaved={!!editing.id}
                 onFields={fields => setEditing(ed => ed ? { ...ed, fields } : ed)}

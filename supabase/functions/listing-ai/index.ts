@@ -1,4 +1,14 @@
-// listing-ai Edge Function - AI Listing Module backend (v16).
+// listing-ai Edge Function - AI Listing Module backend (v17).
+//
+// v17: correctness fixes. (1) The prompt now infers stitch type from the
+// sizes - discrete ready-to-wear sizes (XS..XXL or numeric) mean a fully
+// stitched garment, so the model stops defaulting lehengas to "semi-
+// stitched" and inventing closures / drawstrings the master data never
+// stated. (2) New {today} / {date} token: a fixed value of {today} stamps
+// the current IST date (YYYY-MM-DD) instead of asking the clock-less AI,
+// which hallucinates a training-era date. (3) applyWired now defers canon
+// on placeholder values (parity with applyRules / applyCharts) so a wired
+// copy of a "{sku}-{size}" pattern is never dropped as out-of-list.
 //
 // v16: {sku} / {size} / {brand} placeholders. Any typed value - a fixed
 // value, a rule SET value, a size-chart value - may carry placeholders,
@@ -540,7 +550,10 @@ function applyWired(classified: Classified[], values: string[], note: (m: string
     if (src < 0) { note(`${f.header}: linked column "${f.masterCol}" not found - left empty`); return; }
     const v = values[src];
     if (!v) return;
-    if (f.allowed.length) {
+    // Placeholder values ({sku}-{size}...) defer validation to the per-row
+    // substitution pass - mirror applyRules / applyCharts so a wired copy of
+    // a token pattern is never dropped as "not in its list".
+    if (f.allowed.length && !TOKEN_RE.test(v)) {
       const c = canon(f, v);
       if (!c) { note(`${f.header}: copied "${v}" is not in its own list - left empty`); return; }
       values[ix] = c;
@@ -623,12 +636,17 @@ function applyCharts(
 // pattern "{sku}-{size}" becomes XYZ-XS on the XS row while "{sku}" keeps
 // the parent code. An empty part (e.g. no size on the row) tidies the
 // leftover joiners so "XYZ-" exports as "XYZ".
-const TOKEN_RE = /\{(sku|size|brand)\}/i;
+// {today} / {date} (aliases) resolve to the current date - handy for an
+// addedDate / launchDate column: set the fixed value to {today} and every
+// run stamps the real date, instead of asking the AI (which has no clock
+// and would hallucinate one).
+const TOKEN_RE = /\{(sku|size|brand|today|date)\}/i;
 
 function substituteTokens(v: string, parts: Record<string, string>): string {
   let emptyHit = false;
-  const out = v.replace(/\{(sku|size|brand)\}/gi, (_, k) => {
-    const val = parts[k.toLowerCase()] || '';
+  const out = v.replace(/\{(sku|size|brand|today|date)\}/gi, (_, k) => {
+    const key = k.toLowerCase() === 'date' ? 'today' : k.toLowerCase();
+    const val = parts[key] || '';
     if (!val) emptyHit = true;
     return val;
   });
@@ -748,6 +766,8 @@ function buildSystemPrefix(tplName: string, marketplace: string, schemaFields: C
     '- Fields marked [FIXED LIST] accept ONLY one of their allowed values (the output format enforces this) - pick the single best-fitting value, never invent a variation.',
     '- Each product may include a "Map to allowed values" section: those fields carry a source value from the master sheet - choose the allowed value CLOSEST in meaning to it (e.g. source "Sea Green" with allowed colors -> "Green").',
     '- Apply garment logic ACROSS fields: for semi-stitched or unstitched items, stitched-garment details (closures, final neckline, sleeve styling) do not exist yet - pick "NA" where the allowed list offers it, or leave optional fields empty. Stitch-type fields must agree with the master data (INCLUDES, description) and the photo.',
+    '- Infer stitch type from the sizes: discrete ready-to-wear garment sizes (XS/S/M/L/XL/XXL and similar, or numeric bust/waist/chest sizes) mean the item is FULLY STITCHED - never describe it as semi-stitched or unstitched. Only an explicit master value of "Semi-Stitched" / "Unstitched", or a size like "Free Size" / "Unstitched (N m)", indicates the garment is not fully stitched.',
+    '- Never invent construction details: do not state or imply any stitch type, closure (zip, drawstring, hook, tie) or fit-adjustment mechanic (e.g. "adjusts to your waist") in free-text copy unless the master data explicitly provides it. Describe only what the master data states or the photo clearly shows; when a construction detail is unknown, omit it - never default a lehenga, choli or kurta to "semi-stitched" and never invent a "drawstring".',
     '- Fabric fields: when the master fabric is a trade or fancy name that is not in the allowed list (e.g. "Jimmy Chu"), choose the closest REAL fabric from the list by composition and the photo\'s look and sheen (e.g. shiny synthetic -> Art Silk or Poly Silk). Never pick the first option as a default and never leave a mandatory fabric empty.',
     '- If a field hint lists allowed values, output EXACTLY one of the listed values, matching its spelling and case.',
     '- Fields marked MANDATORY must never be empty - make the best choice the data and photo support.',
@@ -1350,6 +1370,9 @@ Deno.serve(async (req) => {
       }
 
       type OutRow = { sku: string; status: Item['status']; noImage?: boolean; linkSource?: string; note?: string; values: string[] };
+      // {today}/{date} placeholder value: the current date in IST (this is an
+      // India-time business) as YYYY-MM-DD, matching the sheet's date format.
+      const todayIST = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
       const rows = items.flatMap((it): OutRow[] => {
         if (it.status !== 'ok') return [{ sku: it.sku, status: it.status, note: it.note, values: classified.map(() => '') }];
         const av = aiValues[it.sku] || {};
@@ -1392,7 +1415,7 @@ Deno.serve(async (req) => {
         if (toks.length === 0) {
           // Single-row products (e.g. Onesize): chart keyed by the size
           // column's final value; placeholders resolve with that size too.
-          finalizeRow(charts, classified, values, { sku: it.sku, size: sizeIdx >= 0 ? values[sizeIdx] : '', brand: brandOf(it) }, noteFn);
+          finalizeRow(charts, classified, values, { sku: it.sku, size: sizeIdx >= 0 ? values[sizeIdx] : '', brand: brandOf(it), today: todayIST }, noteFn);
           return [{ ...base, note: it.note, values }];
         }
         const out: { sku: string; status: 'ok'; noImage?: boolean; linkSource?: string; note?: string; values: string[] }[] = [];
@@ -1402,7 +1425,7 @@ Deno.serve(async (req) => {
           if (c === undefined) { skippedSizes.push(t); continue; }
           const v = values.map((x, ix) => ix === sizeIdx ? c
             : (x && x.trim().toLowerCase() === rawSize.trim().toLowerCase() ? c : x));
-          finalizeRow(charts, classified, v, { sku: it.sku, size: c, brand: brandOf(it) }, noteFn);
+          finalizeRow(charts, classified, v, { sku: it.sku, size: c, brand: brandOf(it), today: todayIST }, noteFn);
           out.push({ ...base, note: [`size: ${c}`, it.note].filter(Boolean).join('; '), values: v });
         }
         if (skippedSizes.length) {
