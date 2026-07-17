@@ -11,6 +11,7 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   const l = msg.toLowerCase();
 
   // Postgres constraint violations
+  if ((code === '23505' || l.includes('duplicate key')) && l.includes('listing_templates_name')) return 'A template with this name already exists — open it to edit, or use a different name.';
   if ((code === '23505' || l.includes('duplicate key')) && l.includes('short_code')) return 'This short code is already taken. Try a different one.';
   if ((code === '23505' || l.includes('duplicate key')) && l.includes('link_check_approvals')) return 'This link is already marked correct.';
   if (code === '23505' || l.includes('duplicate key')) return 'A record with these details already exists.';
