@@ -74,7 +74,10 @@ export function mergeTemplateFields(
     }
     return {
       ...nf, // new header casing + NEW allowed list from the marketplace
-      mandatory: of.mandatory,
+      // Keep the owner's tick, but a column the marketplace NEWLY marks
+      // required stays required - otherwise "Skip all non-mandatory" would
+      // skip a column the marketplace now demands and the sheet gets rejected.
+      mandatory: of.mandatory || nf.mandatory,
       hint: of.hint || nf.hint,
       ...(of.skip ? { skip: true } : {}),
       ...(fixed ? { fixed } : {}),
