@@ -53,6 +53,7 @@ export function useGenerateRun(addToast: (m: string, t?: string) => void) {
     let prevMessageId: string | null = null;
     let cacheWarned = false;
     let usd = 0, saved = 0;
+    let processed = 0; // SKUs whose chunk completed — the rest were never attempted
     try {
       for (let i = 0; i < skus.length; i += CHUNK) {
         const chunk = skus.slice(i, i + CHUNK);
@@ -76,13 +77,18 @@ export function useGenerateRun(addToast: (m: string, t?: string) => void) {
         usd += data.estUsd || 0; saved += data.cacheSavedUsd || 0;
         prevMessageId = data.messageId || null;
         if (data.cacheNote && !cacheWarned) { addToast(String(data.cacheNote), 'error'); cacheWarned = true; }
+        processed = Math.min(i + CHUNK, skus.length);
         setRows([...acc]); setUsage({ ...tot }); setCost({ usd, saved });
-        setProgress({ done: Math.min(i + CHUNK, skus.length), total: skus.length });
+        setProgress({ done: processed, total: skus.length });
         for (const w of (data.warnings || []) as string[]) addToast(w, 'error');
       }
       if (acc.length > 0) {
         const okCount = acc.filter(r => r.status === 'ok').length;
-        addToast(`${okCount} of ${acc.length} row(s) generated`, okCount > 0 ? 'success' : 'error');
+        // notAttempted > 0 means a chunk failed and the loop stopped early -
+        // never present a partial run as a clean success.
+        const notAttempted = skus.length - processed;
+        const tail = notAttempted > 0 ? ` — run stopped early, ${notAttempted} SKU(s) not attempted; re-run for the rest` : '';
+        addToast(`${okCount} of ${acc.length} row(s) generated${tail}`, (notAttempted > 0 || okCount === 0) ? 'error' : 'success');
         // Persist the run (survives reload; purged after 5 days). Best-effort
         // — a save failure never hides the on-screen results.
         const { error } = await supabase.from('listing_runs').insert({
