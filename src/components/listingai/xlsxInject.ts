@@ -64,11 +64,16 @@ function insertRow(xml: string, R: number, rowXml: string): string {
 }
 
 function writeRow(xml: string, R: number, cells: CellWrite[]): string {
-  const re = new RegExp('<row r="' + R + '"([^>]*)>([\\s\\S]*?)</row>|<row r="' + R + '"([^>]*)/>');
+  // Self-closing form FIRST: a pre-formatted empty row (<row r="7" ht="15"/>)
+  // must not be eaten by the content branch, whose [^>]*> would swallow the
+  // trailing "/" and run the lazy inner across to the NEXT row's </row>,
+  // nesting rows and corrupting the sheet. Group 1 = self-close attrs;
+  // groups 2/3 = normal-row attrs / inner.
+  const re = new RegExp('<row r="' + R + '"([^>]*)/>|<row r="' + R + '"([^>]*)>([\\s\\S]*?)</row>');
   const m = re.exec(xml);
-  let inner = m ? (m[2] ?? '') : '';
+  let inner = m ? (m[3] ?? '') : '';
   for (const c of cells) inner = setCell(inner, colLetter(c.c) + R, c.c, c.v);
-  const rowXml = '<row r="' + R + '"' + (m ? (m[1] ?? m[3] ?? '') : '') + '>' + inner + '</row>';
+  const rowXml = '<row r="' + R + '"' + (m ? (m[2] ?? m[1] ?? '') : '') + '>' + inner + '</row>';
   return m ? xml.slice(0, m.index) + rowXml + xml.slice(m.index + m[0].length) : insertRow(xml, R, rowXml);
 }
 
