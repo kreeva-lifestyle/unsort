@@ -94,7 +94,7 @@ export default function FieldRow({ f, others, masterCols, onChange, addToast }: 
           if (!e.target.value) return;
           onChange({ sameAs: e.target.value, fixed: '' });
           addToast(`"${f.header}" will copy "${e.target.value}" on every run — no AI cost`, 'success');
-        }} title="Wire — copy another column's value on every run" style={{ ...S.fInput, width: 36, height: 30, fontSize: 12, color: T.tx3, padding: '4px 4px', flexShrink: 0 }}>
+        }} title="Wire — copy another column's value on every run" aria-label={`Wire "${f.header}" to copy another column`} style={{ ...S.fInput, width: 36, height: 30, fontSize: 12, color: T.tx3, padding: '4px 4px', flexShrink: 0 }}>
           <option value="">&#8646;</option>
           {others.map(h => <option key={h} value={h}>= {h}</option>)}
         </select>
@@ -104,7 +104,7 @@ export default function FieldRow({ f, others, masterCols, onChange, addToast }: 
           if (!e.target.value) return;
           onChange({ masterAs: e.target.value, fixed: '' });
           addToast(`"${f.header}" now fills from the master column "${e.target.value}" — its values appear in Bulk Teach`, 'success');
-        }} title="Pair — fill this column from a master-sheet column" style={{ ...S.fInput, width: 36, height: 30, fontSize: 12, color: T.tx3, padding: '4px 4px', flexShrink: 0 }}>
+        }} title="Pair — fill this column from a master-sheet column" aria-label={`Pair "${f.header}" with a master-sheet column`} style={{ ...S.fInput, width: 36, height: 30, fontSize: 12, color: T.tx3, padding: '4px 4px', flexShrink: 0 }}>
           <option value="">&#10515;</option>
           {masterCols.map(h => <option key={h} value={h}>&#10515; {h}</option>)}
         </select>
@@ -112,7 +112,7 @@ export default function FieldRow({ f, others, masterCols, onChange, addToast }: 
       <button onClick={() => {
         if (f.mandatory) addToast(`"${f.header}" is marked mandatory — the marketplace requires it, but it will be exported EMPTY while skipped`, 'error');
         onChange({ skip: true });
-      }} title="Skip — never fill this column" style={{ ...S.btnGhost, ...S.btnSm, padding: '4px 7px', color: T.tx3, flexShrink: 0 }}>&#215;</button>
+      }} title="Skip — never fill this column" aria-label={`Skip "${f.header}" — never fill this column`} style={{ ...S.btnGhost, ...S.btnSm, padding: '4px 7px', color: T.tx3, flexShrink: 0 }}>&#215;</button>
     </div>
   );
 }

@@ -43,7 +43,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
   useEffect(() => { document.body.classList.toggle('modal-open', open); return () => document.body.classList.remove('modal-open'); }, [open]);
   useEffect(() => { if (!open) { setEditing(null); setMergeInfo(''); setSaving(false); setConfirmDel(''); setShowRules(false); setFieldQ(''); setConfirmClose(false); } }, [open]);
   // Master headers for the ⤓ pairing select — best-effort, once per open.
-  useEffect(() => { if (open && editing && !masterCols.length) fetchMasterColumns().then(setMasterCols).catch(() => setMasterCols([])); }, [open, editing, masterCols.length]);
+  useEffect(() => { if (open && editing && !masterCols.length) fetchMasterColumns().then(setMasterCols).catch(e => { setMasterCols([]); addToast(`Couldn't load master columns — "fill from master" pairing is unavailable: ${friendlyError(e)}`, 'error'); }); }, [open, editing, masterCols.length]);
 
   if (!open) return null;
 
