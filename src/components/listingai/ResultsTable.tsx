@@ -28,10 +28,20 @@ export default function ResultsTable({ headers, kinds, rows, usage, cost, templa
     if (ok.length === 0) { addToast('Nothing to export — no SKU generated successfully', 'error'); return; }
     setExporting(true);
     try {
-      await exportFilledXlsx(headers, ok, template);
-      const skipped = rows.length - ok.length;
-      const into = template.file_name ? ` into ${template.file_name}` : '';
-      addToast(`Exported ${ok.length}${into}${skipped ? ` — ${skipped} SKU(s) skipped (see status)` : ''}`, 'success');
+      const res = await exportFilledXlsx(headers, ok, template);
+      const skipTail = rows.length - ok.length ? ` — ${rows.length - ok.length} SKU(s) skipped (see status)` : '';
+      if (res.formatted) {
+        const unmatched = res.total - res.matched;
+        // Unmatched columns are a real, silent data loss on the marketplace
+        // sheet — surface it as an error so it isn't uploaded unnoticed.
+        addToast(unmatched
+          ? `Exported ${ok.length} into ${template.file_name}, but ${unmatched} column(s) didn't match the template and were left out — re-upload the template if it changed.${skipTail}`
+          : `Exported ${ok.length} into ${template.file_name}${skipTail}`, unmatched ? 'error' : 'success');
+      } else if (res.hadTemplate) {
+        addToast(`The template's columns no longer match this run — exported a plain data sheet instead. Re-upload the template to restore the formatted export.${skipTail}`, 'error');
+      } else {
+        addToast(`Exported ${ok.length} as a data sheet${skipTail}`, 'success');
+      }
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setExporting(false);
   };
