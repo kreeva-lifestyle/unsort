@@ -37,15 +37,13 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
   const [masterCols, setMasterCols] = useState<string[]>([]);
   const [showRules, setShowRules] = useState(false);
   const [fieldQ, setFieldQ] = useState('');
+  const [confirmClose, setConfirmClose] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { document.body.classList.toggle('modal-open', open); return () => document.body.classList.remove('modal-open'); }, [open]);
-  useEffect(() => { if (!open) { setEditing(null); setMergeInfo(''); setSaving(false); setConfirmDel(''); setShowRules(false); setFieldQ(''); } }, [open]);
+  useEffect(() => { if (!open) { setEditing(null); setMergeInfo(''); setSaving(false); setConfirmDel(''); setShowRules(false); setFieldQ(''); setConfirmClose(false); } }, [open]);
   // Master headers for the ⤓ pairing select — best-effort, once per open.
-  useEffect(() => {
-    if (!open || !editing || masterCols.length) return;
-    fetchMasterColumns().then(setMasterCols).catch(() => setMasterCols([]));
-  }, [open, editing, masterCols.length]);
+  useEffect(() => { if (open && editing && !masterCols.length) fetchMasterColumns().then(setMasterCols).catch(() => setMasterCols([])); }, [open, editing, masterCols.length]);
 
   if (!open) return null;
 
@@ -131,13 +129,18 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
   // Search filter keeps ORIGINAL indices so setField patches the right row.
   const q = fieldQ.trim().toLowerCase();
   const visible = (editing?.fields ?? []).map((f, i) => ({ f, i })).filter(({ f }) => !q || f.header.toLowerCase().includes(q));
+  // Leaving the editor discards the working copy — guard it when dirty so a stray backdrop tap can't wipe a big configuration.
+  const orig = editing?.id ? templates.find(t => t.id === editing.id) : undefined;
+  const dirty = !!editing && (!orig || JSON.stringify([editing.name, editing.marketplace, editing.fields, editing.rules]) !== JSON.stringify([orig.name, orig.marketplace, orig.fields, orig.rules || []]));
+  const leaveEditor = () => { setEditing(null); setMergeInfo(''); setShowRules(false); setFieldQ(''); setConfirmClose(false); };
+  const requestLeave = () => { if (dirty) setConfirmClose(true); else leaveEditor(); };
 
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay} onClick={editing ? requestLeave : onClose}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 560 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>{editing ? (editing.id ? 'Edit Template' : 'New Template') : 'Manage Templates'}</div>
-          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+          <span onClick={editing ? requestLeave : onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
         </div>
         <div style={{ padding: 16, overflowY: 'auto' }}>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={onFile} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
@@ -159,9 +162,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
               onPatch={p => setEditing(ed => ed ? { ...ed, ...p } : ed)}
               onPickSheet={s => parseInto(editing.fileBuf!, editing.fileName, s)} onEnter={save} />
             {mergeInfo && (
-              <div style={{ background: 'rgba(56,189,248,.06)', border: '1px solid rgba(56,189,248,.2)', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: T.bl, marginBottom: 8, lineHeight: 1.5 }}>
-                Sheet update merged: {mergeInfo}
-              </div>
+              <div style={{ background: 'rgba(56,189,248,.06)', border: '1px solid rgba(56,189,248,.2)', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: T.bl, marginBottom: 8, lineHeight: 1.5 }}>Sheet update merged: {mergeInfo}</div>
             )}
             {showRules ? (
               <RulesEditor fields={editing.fields} masterCols={masterCols} rules={editing.rules}
@@ -179,9 +180,15 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
                 {q && visible.length === 0 && <div style={{ padding: '30px 10px', textAlign: 'center', color: T.tx3, fontSize: 12 }}>No columns match "{fieldQ.trim()}"</div>}
               </div>
             </>}
+            {confirmClose && (
+              <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 12, color: T.tx2, marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ flex: 1, minWidth: 150 }}>Discard unsaved changes to this template?</span>
+                <button onClick={leaveEditor} style={{ ...S.btnDanger, ...S.btnSm }}>Discard</button><button onClick={() => setConfirmClose(false)} style={{ ...S.btnGhost, ...S.btnSm, marginLeft: 8 }}>Keep editing</button>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, flex: 1, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save template'}</button>
-              <button onClick={() => { setEditing(null); setMergeInfo(''); setShowRules(false); setFieldQ(''); }} style={S.btnGhost}>Back</button>
+              <button onClick={requestLeave} style={S.btnGhost}>Back</button>
             </div>
           </>}
         </div>
