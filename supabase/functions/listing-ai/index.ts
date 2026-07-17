@@ -1,4 +1,10 @@
-// listing-ai Edge Function - AI Listing Module backend (v22).
+// listing-ai Edge Function - AI Listing Module backend (v23).
+//
+// v23: the master sheet is cached in the isolate for 60s. A 60-SKU run
+// chunks into ~20 edge calls that each re-downloaded both master tabs (40
+// full reads); consecutive chunks on a warm isolate now share one read.
+// Only a complete, error-free read is cached; a master edit shows within a
+// minute.
 //
 // v22: three size/pairing correctness fixes. (1) masterVal now matches the
 // master column by NORMALIZED header, so a header spelled differently on the
@@ -757,8 +763,20 @@ async function loadTemplateFields(templateId: string): Promise<{ tpl: any; field
 // distinct-value scan (scan_mappings); headers feed classification.
 interface MasterTab { tab: string; headers: string[]; rows: string[][] }
 
+// Short-lived module-scope cache of the whole master sheet. A 60-SKU run
+// chunks into ~20 sequential edge calls that each used to re-download BOTH
+// tabs (40 full reads) - latency + Google Sheets quota. Warm isolates share
+// this cache so consecutive chunks read once. TTL keeps it fresh (a master
+// edit shows within a minute); only a COMPLETE, error-free read is cached so
+// a transient failure isn't served for the window.
+const MASTER_TTL_MS = 60_000;
+let masterCache: { id: string; at: number; tabs: MasterTab[]; masterHeaders: Map<string, string> } | null = null;
+
 async function readMasterTabs(warnings: string[]): Promise<{ tabs: MasterTab[]; masterHeaders: Map<string, string> }> {
   const masterId = getMasterSheetId();
+  if (masterCache && masterCache.id === masterId && Date.now() - masterCache.at < MASTER_TTL_MS) {
+    return { tabs: masterCache.tabs, masterHeaders: masterCache.masterHeaders };
+  }
   const tabs: MasterTab[] = [];
   const masterHeaders = new Map<string, string>();
   for (const tab of MASTER_TABS) {
@@ -770,6 +788,7 @@ async function readMasterTabs(warnings: string[]): Promise<{ tabs: MasterTab[]; 
       tabs.push({ tab, headers, rows });
     } catch (e) { warnings.push(`Cannot read master tab "${tab}" - ${(e as Error).message}`); }
   }
+  if (tabs.length === MASTER_TABS.length && warnings.length === 0) masterCache = { id: masterId, at: Date.now(), tabs, masterHeaders };
   return { tabs, masterHeaders };
 }
 
