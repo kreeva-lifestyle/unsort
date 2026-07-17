@@ -1,4 +1,10 @@
-// listing-ai Edge Function - AI Listing Module backend (v18).
+// listing-ai Edge Function - AI Listing Module backend (v19).
+//
+// v19: all-sizes-skipped rows are finalized before export. When every size
+// of a multi-size SKU fails to resolve, the fallback row now runs through
+// finalizeRow (placeholders + charts) with a blank size cell, so it can no
+// longer export literal {today}/{sku} tokens or the joined "XS, S, M" line
+// as a finished row.
 //
 // v18: price/HSN columns unlocked - owner-controlled, never AI-written.
 // SENSITIVE headers are no longer force-blanked: fixed values, master
@@ -1442,7 +1448,14 @@ Deno.serve(async (req) => {
         if (skippedSizes.length) {
           const msg = `size(s) not in the marketplace list, row(s) skipped: ${skippedSizes.join(', ')} - teach them in Bulk Teach`;
           if (out.length) out[0].note = `${out[0].note}; ${msg}`;
-          else out.push({ ...base, note: [it.note, msg].filter(Boolean).join('; '), values });
+          else {
+            // Every size was unknown: still resolve placeholders/charts and
+            // blank the size cell, so we never export literal {today}/{sku}
+            // tokens or the joined "XS, S, M" line as a finished row.
+            if (sizeIdx >= 0) values[sizeIdx] = '';
+            finalizeRow(charts, classified, values, { sku: it.sku, size: '', brand: brandOf(it), today: todayIST }, noteFn);
+            out.push({ ...base, note: [it.note, msg].filter(Boolean).join('; '), values });
+          }
         }
         return out;
       });
