@@ -28,32 +28,40 @@ function sqrefCols(sqref: string): number[] {
   return [...cols];
 }
 
+// A resolved list plus whether we had to stop before the range ended. A
+// truncated range must NEVER be stored as a complete enum: dedup happens
+// AFTER collection, so a heavily-duplicated range whose true unique count
+// exceeds the cap could dedupe small from the first N rows and look complete.
+interface Resolved { vals: string[]; truncated: boolean }
+
 // Read a "Sheet!A2:A300"-style range from the parsed workbook as strings.
-function rangeValues(wb: XLSX.WorkBook, ref: string): string[] {
+// Collects EVERY value up to the 20000-row scan bound (dedup is the caller's
+// job) and reports whether the range extends past that bound.
+function rangeValues(wb: XLSX.WorkBook, ref: string): Resolved {
   const m = ref.replace(/\$/g, '').match(/^(?:'([^']+)'|([^'!]+))!([A-Z]+\d*(?::[A-Z]+\d*)?)$/i);
-  if (!m) return [];
+  if (!m) return { vals: [], truncated: false };
   const ws = wb.Sheets[m[1] || m[2]];
-  if (!ws) return [];
+  if (!ws) return { vals: [], truncated: false };
   const out: string[] = [];
   try {
     const r = XLSX.utils.decode_range(m[3].includes(':') ? m[3] : `${m[3]}:${m[3]}`);
-    // Collect past the cap (dupes exist in real dataset sheets) so the
-    // caller can reliably tell "big list" from "exactly at the cap".
-    for (let R = r.s.r; R <= Math.min(r.e.r, r.s.r + 20000) && out.length <= ALLOWED_CAP * 2; R++) {
+    const rowEnd = Math.min(r.e.r, r.s.r + 20000);
+    const truncated = r.e.r > r.s.r + 20000; // more rows than we scanned
+    for (let R = r.s.r; R <= rowEnd; R++) {
       for (let C = r.s.c; C <= r.e.c; C++) {
         const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
         const v = cell == null ? '' : String(cell.v ?? '').trim();
         if (v) out.push(v);
       }
     }
-  } catch { return []; }
-  return out;
+    return { vals: out, truncated };
+  } catch { return { vals: [], truncated: false }; }
 }
 
-function resolveFormula(wb: XLSX.WorkBook, formula: string, ownSheet: string): string[] {
+function resolveFormula(wb: XLSX.WorkBook, formula: string, ownSheet: string): Resolved {
   let f = formula.trim().replace(/^=/, '').trim();
-  if (!f) return [];
-  if (f.startsWith('"')) return f.replace(/^"|"$/g, '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!f) return { vals: [], truncated: false };
+  if (f.startsWith('"')) return { vals: f.replace(/^"|"$/g, '').split(',').map(s => s.trim()).filter(Boolean), truncated: false };
   const dn = (wb.Workbook?.Names || []).find(n => (n.Name || '').toLowerCase() === f.toLowerCase());
   if (dn?.Ref) f = dn.Ref;
   if (!f.includes('!')) f = `'${ownSheet}'!${f}`; // same-sheet range like $A$2:$A$9
@@ -103,11 +111,12 @@ export async function extractDropdowns(buf: ArrayBuffer, wb: XLSX.WorkBook, shee
         if (ch.localName === 'sqref' && !sqref) sqref = ch.textContent || ''; // x14: <xm:sqref>
       }
       if (!sqref || !formula) continue;
-      const vals = [...new Set(resolveFormula(wb, formula, sheetName))];
-      // Oversized lists (e.g. Myntra's 48k-row brand list) must NOT be
-      // truncated — a wrong first-500 enum would force wrong values. Treat
+      const resolved = resolveFormula(wb, formula, sheetName);
+      const vals = [...new Set(resolved.vals)];
+      // Oversized OR truncated lists (e.g. Myntra's 48k-row brand list) must
+      // NOT be stored — a wrong/partial enum would force wrong values. Treat
       // them as free text instead; the AI still sees the master data.
-      if (!vals.length || vals.length > ALLOWED_CAP) continue;
+      if (!vals.length || vals.length > ALLOWED_CAP || resolved.truncated) continue;
       for (const c of sqrefCols(sqref)) if (!out.has(c)) out.set(c, vals);
     }
   } catch { /* best-effort: a sheet without readable validations still works */ }
