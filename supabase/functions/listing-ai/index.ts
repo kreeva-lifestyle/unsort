@@ -1,4 +1,12 @@
-// listing-ai Edge Function - AI Listing Module backend (v20).
+// listing-ai Edge Function - AI Listing Module backend (v22).
+//
+// v22: three size/pairing correctness fixes. (1) masterVal now matches the
+// master column by NORMALIZED header, so a header spelled differently on the
+// two tabs ("Top Fabric" vs "Top-Fabric") no longer reads '' for a whole
+// brand. (2) EVERY template column paired to the master SIZE expands per size
+// (was only the first), each resolved to its own dropdown. (3) Wired copies
+// are applied per output ROW inside finalizeRow, so a column wired to a
+// per-size-chart column gets that row's charted value instead of a stale one.
 //
 // v20: a rule SET no longer fills an owner-SKIPPED column - the owner's
 // "skip" (exported empty) wins over a rule that happens to target it.
@@ -676,15 +684,17 @@ function substituteTokens(v: string, parts: Record<string, string>): string {
   return emptyHit ? out.replace(/[-_/ ]{2,}/g, '-').replace(/^[-_/ ]+|[-_/ ]+$/g, '') : out;
 }
 
-// Finalize ONE output row: per-size chart values, then placeholder
-// substitution across EVERY column (covers fixed values, rule values,
-// chart values AND wired copies of pattern columns). Substituted values
-// in dropdown columns still pass canon - miss -> empty + note.
+// Finalize ONE output row: per-size chart values, then wired copies (so a
+// column wired to a chart-driven column gets THIS row's charted value, not a
+// stale pre-expansion one), then placeholder substitution across EVERY column
+// (fixed values, rule values, chart values AND wired copies of pattern
+// columns). Substituted values in dropdown columns still pass canon.
 function finalizeRow(
   charts: Map<number, Record<string, string>>, classified: Classified[],
   v: string[], parts: Record<string, string>, note: (m: string) => void,
 ) {
   applyCharts(charts, classified, v, parts.size || '', note);
+  applyWired(classified, v, note);
   for (let ix = 0; ix < v.length; ix++) {
     if (!v[ix] || !TOKEN_RE.test(v[ix])) continue;
     const s = substituteTokens(v[ix], parts);
@@ -944,7 +954,8 @@ Deno.serve(async (req) => {
           }
         } else {
           for (const t of tabs) {
-            const ci = t.headers.findIndex(h => h.toUpperCase() === f.masterCol);
+            // Normalized match - a tab may spell the header differently.
+            const ci = t.headers.findIndex(h => normHeader(h) === normHeader(f.masterCol));
             if (ci < 0) continue;
             for (let i = 1; i < t.rows.length; i++) {
               const v = String(t.rows[i][ci] ?? '').trim();
@@ -1272,7 +1283,11 @@ Deno.serve(async (req) => {
 
       const live = items.filter(i => i.status === 'ok');
       const masterVal = (it: Item, col: string) => {
-        const i = (it.headers || []).findIndex(h => h.toUpperCase() === col);
+        // Match by normalized header: the two master tabs may spell a header
+        // differently ("Top Fabric" vs "Top-Fabric"), and masterCol carries
+        // the FIRST tab's spelling - an exact compare silently read '' for
+        // every product on the other tab.
+        const i = (it.headers || []).findIndex(h => normHeader(h) === normHeader(col));
         return i < 0 ? '' : String((it.row || [])[i] ?? '').trim();
       };
       const brandOf = (it: Item) => brandOfTab(it.tab || '');
@@ -1424,17 +1439,20 @@ Deno.serve(async (req) => {
         // Notes dedupe: chart failures inside the size loop would otherwise
         // repeat once per size row.
         const noteFn = (m: string) => { if (it.note?.includes(m)) return; it.note = it.note ? `${it.note}; ${m}` : m; };
-        // Owner rules overwrite the AI's picks, then wires copy the final
-        // (ruled) values. Per-size charts come back for the expansion step.
+        // Owner rules overwrite the AI's picks; per-size charts come back for
+        // the expansion step. Wired copies are applied per output row inside
+        // finalizeRow (so they pick up ruled + per-row charted values).
         const charts = applyRules(tplRules, classified, values, col => masterVal(it, col), noteFn);
-        applyWired(classified, values, noteFn);
         const base = { sku: it.sku, status: 'ok' as const, noImage: it.img ? undefined : true, linkSource: it.linkSource || undefined };
         // One row per size: a comma master SIZE + a dropdown size column
         // expands into otherwise-identical rows, one per resolved size
-        // (Myntra LOT format - styleGroupId ties them together). Columns
-        // that copied the joined line verbatim (wired/same-name) get the
-        // per-row size too. Unknown sizes are skipped, never exported.
-        const sizeIdx = classified.findIndex(isSizeField);
+        // (Myntra LOT format - styleGroupId ties them together). EVERY column
+        // paired to the master SIZE (there can be more than one, e.g. "Size" +
+        // "Standard Size") gets this row's size, resolved to its own list;
+        // columns that copied the joined line verbatim get it too. Unknown
+        // sizes are skipped, never exported.
+        const sizeIdxs = classified.map((f, i) => isSizeField(f) ? i : -1).filter(i => i >= 0);
+        const sizeIdx = sizeIdxs[0] ?? -1;
         const rawSize = sizeIdx >= 0 ? masterVal(it, 'SIZE') : '';
         const toks = sizeIdx >= 0 ? sizeTokens(rawSize) : [];
         if (toks.length === 0) {
@@ -1448,7 +1466,8 @@ Deno.serve(async (req) => {
         for (const t of toks) {
           const c = resolveVal(classified[sizeIdx], t);
           if (c === undefined) { skippedSizes.push(t); continue; }
-          const v = values.map((x, ix) => ix === sizeIdx ? c
+          const v = values.map((x, ix) => sizeIdxs.includes(ix)
+            ? (resolveVal(classified[ix], t) ?? c) // each SIZE-paired column, per its own list
             : (x && x.trim().toLowerCase() === rawSize.trim().toLowerCase() ? c : x));
           finalizeRow(charts, classified, v, { sku: it.sku, size: c, brand: brandOf(it), today: todayIST }, noteFn);
           out.push({ ...base, note: [`size: ${c}`, it.note].filter(Boolean).join('; '), values: v });
@@ -1458,9 +1477,9 @@ Deno.serve(async (req) => {
           if (out.length) out[0].note = `${out[0].note}; ${msg}`;
           else {
             // Every size was unknown: still resolve placeholders/charts and
-            // blank the size cell, so we never export literal {today}/{sku}
+            // blank every size cell, so we never export literal {today}/{sku}
             // tokens or the joined "XS, S, M" line as a finished row.
-            if (sizeIdx >= 0) values[sizeIdx] = '';
+            for (const j of sizeIdxs) values[j] = '';
             finalizeRow(charts, classified, values, { sku: it.sku, size: '', brand: brandOf(it), today: todayIST }, noteFn);
             out.push({ ...base, note: [it.note, msg].filter(Boolean).join('; '), values });
           }
