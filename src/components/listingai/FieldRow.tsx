@@ -56,7 +56,9 @@ export default function FieldRow({ f, others, masterCols, onChange, addToast }: 
   // an unset one exports empty (enforced server-side too).
   const noAI = SENSITIVE_RE.test(f.header);
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: `1px solid ${T.bd}` }}>
+    // flexWrap: tight rows wrap controls to a second line instead of
+    // clipping them off the modal's right edge.
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: `1px solid ${T.bd}`, flexWrap: 'wrap' }}>
       <input type="checkbox" checked={f.mandatory} onChange={e => onChange({ mandatory: e.target.checked })} title="Mandatory" style={{ width: 15, height: 15, accentColor: T.ac, cursor: 'pointer', flexShrink: 0 }} />
       <span style={{ fontSize: 12, color: T.tx2, flex: 1, minWidth: 90, wordBreak: 'break-word' }}>{f.header}</span>
       {nAllowed > 0 && (
@@ -66,14 +68,16 @@ export default function FieldRow({ f, others, masterCols, onChange, addToast }: 
           {nAllowed} options
         </span>
       )}
-      {nAllowed > 0 ? (
+      {nAllowed > 0 ? (<>
         <select value={f.fixed || ''} onChange={e => onChange({ fixed: e.target.value })}
           title="Fixed value — used on every run, no AI cost"
-          style={{ ...S.fInput, width: '38%', height: 30, fontSize: 12, color: f.fixed ? T.ac2 : T.tx3 }}>
+          style={{ ...S.fInput, flex: '1 1 150px', minWidth: 150, height: 30, fontSize: 12, color: f.fixed ? T.ac2 : T.tx3 }}>
           <option value="">{noAI ? 'left empty (no AI)' : 'AI picks per product'}</option>
           {f.allowed!.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
-      ) : (
+        {/* Guides the AI's pick among the options (e.g. "kurta + pyjama = 2"). */}
+        {!noAI && !f.fixed && <input value={f.hint} onChange={e => onChange({ hint: e.target.value })} placeholder="hint" title="Hint for the AI's pick — ignored once a fixed value is set" style={{ ...S.fInput, flex: '1 1 90px', minWidth: 90, height: 30, fontSize: 12 }} />}
+      </>) : (
         <span style={{ display: 'flex', gap: 4, width: '44%', flexShrink: 0 }}>
           <input value={f.fixed || ''} onChange={e => onChange({ fixed: e.target.value })} placeholder="fixed value" title="Fixed value — used on every run, no AI cost" style={{ ...S.fInput, width: '55%', height: 30, fontSize: 12, color: f.fixed ? T.ac2 : undefined }} />
           {/* Hints only steer the AI, which never touches price-like columns —
