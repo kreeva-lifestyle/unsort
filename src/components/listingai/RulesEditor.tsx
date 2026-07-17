@@ -16,7 +16,11 @@ export default function RulesEditor({ fields, masterCols, rules, onChange, onBac
   onChange: (rules: ListingTemplateRule[]) => void;
   onBack: () => void;
 }) {
-  const targetable = fields.filter(f => !f.skip);
+  // Wired columns are excluded as rule condition-sources AND SET targets: a
+  // rule can't read a wired column (it copies its source only after rules run,
+  // so a condition on it always sees empty), and a SET on a wired column is
+  // overwritten by the wire. Offering them would just misfire silently.
+  const targetable = fields.filter(f => !f.skip && !f.sameAs);
   const patchRule = (i: number, patch: Partial<ListingTemplateRule>) =>
     onChange(rules.map((r, ix) => ix === i ? { ...r, ...patch } : r));
 
