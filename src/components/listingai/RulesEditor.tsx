@@ -24,7 +24,7 @@ export default function RulesEditor({ fields, masterCols, rules, onChange, onBac
   return (
     <div>
       <div style={{ fontSize: 11, color: T.tx3, marginBottom: 8, lineHeight: 1.5 }}>
-        Rules fill columns <b>your way</b> when a product matches — e.g. WHEN the master SIZE contains "semi-stitched" → SET Closure to NA. They cost nothing and always win over the AI. "Per size" values apply to each size row (S → 28, M → 30…).
+        Rules fill columns <b>your way</b> when a product matches — e.g. WHEN the master SIZE contains "semi-stitched" → SET Closure to NA. They cost nothing and always win over the AI. "Per size" values apply to each size row (S → 28, M → 30…). Values can use <b>{'{sku}'}</b> and <b>{'{size}'}</b>: set a child-code column to <b>{'{sku}-{size}'}</b> (→ XYZ-XS, XYZ-S… per size row) and the parent-code column to <b>{'{sku}'}</b>.
       </div>
       <div style={{ maxHeight: '38vh', overflowY: 'auto' }}>
         {rules.length === 0 && (

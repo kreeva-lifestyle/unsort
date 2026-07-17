@@ -1,5 +1,14 @@
-// listing-ai Edge Function - AI Listing Module backend (v15).
+// listing-ai Edge Function - AI Listing Module backend (v16).
 //
+// v16: {sku} / {size} / {brand} placeholders. Any typed value - a fixed
+// value, a rule SET value, a size-chart value - may carry placeholders,
+// resolved PER OUTPUT ROW after size expansion. "{sku}-{size}" in a child
+// code column becomes XYZ-XS on the XS row, XYZ-S on the S row... while
+// "{sku}" keeps the parent code (Myntra styleId / styleGroupId pattern) -
+// works on any sheet, composable with rules (e.g. semi-stitched products
+// can SET the child column to plain "{sku}"). When a part is empty (no
+// size on the row) the leftover joiners are tidied ("XYZ-" -> "XYZ").
+// Substituted values in dropdown columns still pass canon.
 // v15: owner-defined conditional rules + per-size charts.
 // listing_templates.rules holds template-level rules: WHEN a master-sheet
 // column or a template column's computed value matches (is/contains) - or
@@ -576,7 +585,9 @@ function applyRules(
       const f = classified[ix];
       if (Object.keys(s.perSize).length) charts.set(ix, { ...(charts.get(ix) || {}), ...s.perSize });
       if (!s.value) continue;
-      if (f.allowed.length) {
+      // Placeholder values ({sku}-{size}...) defer validation to the
+      // per-row substitution pass - the final string is what must pass.
+      if (f.allowed.length && !TOKEN_RE.test(s.value)) {
         const c = canon(f, s.value);
         if (c === undefined) { note(`rule for "${f.header}": "${s.value}" is not in the marketplace list - skipped`); continue; }
         values[ix] = c;
@@ -588,7 +599,8 @@ function applyRules(
 
 // Apply per-size chart values to one output row. Size keys are matched
 // tolerantly ("xl" hits "XL"); chart values still pass the column's own
-// dropdown. No chart entry for this size -> the column keeps its value.
+// dropdown (placeholder values defer validation to the substitution pass).
+// No chart entry for this size -> the column keeps its value.
 function applyCharts(
   charts: Map<number, Record<string, string>>, classified: Classified[],
   v: string[], size: string, note: (m: string) => void,
@@ -598,11 +610,49 @@ function applyCharts(
     const key = Object.keys(chart).find(k => k.trim().toLowerCase() === size.trim().toLowerCase() || normHeader(k) === normHeader(size));
     if (!key) continue;
     const f = classified[ix];
-    if (f.allowed.length) {
+    if (f.allowed.length && !TOKEN_RE.test(chart[key])) {
       const c = canon(f, chart[key]);
       if (c === undefined) { note(`size chart for "${f.header}": "${chart[key]}" is not in the marketplace list - skipped`); continue; }
       v[ix] = c;
     } else v[ix] = chart[key];
+  }
+}
+
+// {sku} / {size} / {brand} placeholders - usable in fixed values, rule SET
+// values and size-chart values - resolve per OUTPUT ROW: a child code
+// pattern "{sku}-{size}" becomes XYZ-XS on the XS row while "{sku}" keeps
+// the parent code. An empty part (e.g. no size on the row) tidies the
+// leftover joiners so "XYZ-" exports as "XYZ".
+const TOKEN_RE = /\{(sku|size|brand)\}/i;
+
+function substituteTokens(v: string, parts: Record<string, string>): string {
+  let emptyHit = false;
+  const out = v.replace(/\{(sku|size|brand)\}/gi, (_, k) => {
+    const val = parts[k.toLowerCase()] || '';
+    if (!val) emptyHit = true;
+    return val;
+  });
+  return emptyHit ? out.replace(/[-_/ ]{2,}/g, '-').replace(/^[-_/ ]+|[-_/ ]+$/g, '') : out;
+}
+
+// Finalize ONE output row: per-size chart values, then placeholder
+// substitution across EVERY column (covers fixed values, rule values,
+// chart values AND wired copies of pattern columns). Substituted values
+// in dropdown columns still pass canon - miss -> empty + note.
+function finalizeRow(
+  charts: Map<number, Record<string, string>>, classified: Classified[],
+  v: string[], parts: Record<string, string>, note: (m: string) => void,
+) {
+  applyCharts(charts, classified, v, parts.size || '', note);
+  for (let ix = 0; ix < v.length; ix++) {
+    if (!v[ix] || !TOKEN_RE.test(v[ix])) continue;
+    const s = substituteTokens(v[ix], parts);
+    const f = classified[ix];
+    if (f.allowed.length) {
+      const c = canon(f, s);
+      if (c === undefined) { note(`${f.header}: "${s}" is not in the marketplace list - left empty`); v[ix] = ''; continue; }
+      v[ix] = c;
+    } else v[ix] = s;
   }
 }
 
@@ -1340,9 +1390,9 @@ Deno.serve(async (req) => {
         const rawSize = sizeIdx >= 0 ? masterVal(it, 'SIZE') : '';
         const toks = sizeIdx >= 0 ? sizeTokens(rawSize) : [];
         if (toks.length === 0) {
-          // Single-row products (e.g. Onesize) still get their chart value,
-          // keyed by the size column's final value.
-          if (sizeIdx >= 0) applyCharts(charts, classified, values, values[sizeIdx], noteFn);
+          // Single-row products (e.g. Onesize): chart keyed by the size
+          // column's final value; placeholders resolve with that size too.
+          finalizeRow(charts, classified, values, { sku: it.sku, size: sizeIdx >= 0 ? values[sizeIdx] : '', brand: brandOf(it) }, noteFn);
           return [{ ...base, note: it.note, values }];
         }
         const out: { sku: string; status: 'ok'; noImage?: boolean; linkSource?: string; note?: string; values: string[] }[] = [];
@@ -1352,7 +1402,7 @@ Deno.serve(async (req) => {
           if (c === undefined) { skippedSizes.push(t); continue; }
           const v = values.map((x, ix) => ix === sizeIdx ? c
             : (x && x.trim().toLowerCase() === rawSize.trim().toLowerCase() ? c : x));
-          applyCharts(charts, classified, v, c, noteFn);
+          finalizeRow(charts, classified, v, { sku: it.sku, size: c, brand: brandOf(it) }, noteFn);
           out.push({ ...base, note: [`size: ${c}`, it.note].filter(Boolean).join('; '), values: v });
         }
         if (skippedSizes.length) {
