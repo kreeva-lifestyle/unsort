@@ -11,6 +11,7 @@ import { friendlyError } from '../../lib/friendlyError';
 import { fetchMasterColumns } from './api';
 import { parseTemplateFile } from './templateParse';
 import { mergeTemplateFields, describeMerge, pruneRules } from './mergeFields';
+import { persistTemplate } from './persistTemplate';
 import FieldRow from './FieldRow';
 import EditorToolbar from './EditorToolbar';
 import EditorMeta from './EditorMeta';
@@ -102,23 +103,14 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
       if (templates.some(t => t.id !== editing.id && t.name.trim().toLowerCase() === name.toLowerCase())) {
         addToast(`A template named "${name}" already exists — open it to edit, or use a different name.`, 'error'); setSaving(false); return;
       }
-      const payload: Record<string, unknown> = { name, marketplace: editing.marketplace.trim(), fields: editing.fields, rules: editing.rules, updated_at: new Date().toISOString() };
-      if (editing.fileBuf) { payload.file_name = editing.fileName; payload.sheet_name = editing.sheetName; payload.header_row = editing.headerRow; }
-      let id = existing?.id || '';
-      if (existing) {
-        const { error } = await supabase.from('listing_templates').update(payload).eq('id', existing.id);
-        if (error) { addToast(friendlyError(error), 'error'); setSaving(false); return; }
-      } else {
-        const { data, error } = await supabase.from('listing_templates')
-          .insert({ ...payload, created_by: (await supabase.auth.getUser()).data.user?.id }).select('id').single();
-        if (error || !data) { addToast(friendlyError(error || 'Save failed'), 'error'); setSaving(false); return; }
-        id = data.id;
-      }
-      if (editing.fileBuf && id) {
-        const { error: upErr } = await supabase.storage.from('listing-templates')
-          .upload(`${id}.xlsx`, new Blob([editing.fileBuf]), { upsert: true, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        if (upErr) addToast(`Template saved, but the original file could not be stored — exports will use a plain sheet. ${friendlyError(upErr)}`, 'error');
-      }
+      // persistTemplate uploads the workbook BEFORE committing its metadata, so
+      // a failed upload can't leave the row describing a file that isn't there.
+      const ok = await persistTemplate({
+        id: existing?.id ?? null, name, marketplace: editing.marketplace.trim(),
+        fields: editing.fields, rules: editing.rules,
+        fileBuf: editing.fileBuf, fileName: editing.fileName, sheetName: editing.sheetName, headerRow: editing.headerRow,
+      }, addToast);
+      if (!ok) { setSaving(false); return; }
       addToast(existing ? 'Template updated' : 'Template saved', 'success');
       refresh();
       setEditing(null);
