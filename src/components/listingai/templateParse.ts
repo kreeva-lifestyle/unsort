@@ -5,7 +5,8 @@ import * as XLSX from 'xlsx';
 import { extractDropdowns } from './validationParse';
 import type { ListingTemplateField } from '../../types/database';
 
-// Columns the module always leaves blank (enforced server-side too).
+// Price-like columns: never AI-written (enforced server-side too). The owner
+// fills them via fixed values, pairing, wires or rules; unset exports empty.
 export const SENSITIVE_RE = /price|mrp|\bgst\b|\brate\b|cost|amount|margin|commission|\bhsn\b/i;
 
 // Header normalization shared with the edge fn (taught-mapping keys).

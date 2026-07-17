@@ -2,7 +2,8 @@
 // Shopify) from the offline master sheet + one Dropbox photo per SKU, via the
 // listing-ai edge function. Pick a saved template → paste SKUs → Generate →
 // export the filled sheet in the template's exact column order. Price-like
-// columns are always left blank (enforced server-side). Runs are saved for
+// columns are never AI-written - the owner fills them via fixed values,
+// pairing, wires or rules (enforced server-side). Runs are saved for
 // 5 days (Recent runs) so a reload never loses a generated sheet.
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -91,7 +92,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Listing AI</div>
         <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>
-          Master sheet + Dropbox photo → filled marketplace sheet, fresh wording every run. Price columns always stay blank.
+          Master sheet + Dropbox photo → filled marketplace sheet, fresh wording every run. Price columns are never AI-written — you fill or skip them.
         </div>
       </div>
       {status && !status.hasKey && (

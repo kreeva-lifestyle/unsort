@@ -84,7 +84,7 @@ export default function ResultsTable({ headers, kinds, rows, usage, cost, templa
           })()}
           <div style={{ fontSize: 10, color: T.tx3, marginTop: 3, fontFamily: T.mono }}>
             Tokens: {fmtK(usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens)} in
-            ({fmtK(usage.cache_read_input_tokens)} from cache) + {fmtK(usage.output_tokens)} out · price fields left blank
+            ({fmtK(usage.cache_read_input_tokens)} from cache) + {fmtK(usage.output_tokens)} out
           </div>
         </div>
       )}

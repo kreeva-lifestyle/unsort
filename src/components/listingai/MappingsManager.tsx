@@ -39,7 +39,7 @@ export default function MappingsManager({ open, onClose, fields, addToast }: {
 
   if (!open) return null;
 
-  const pickable = fields.filter(f => f.header && !/price|mrp|gst/i.test(f.header));
+  const pickable = fields.filter(f => f.header);
   const picked = pickable.find(f => f.header === header);
   // Stale = the selected template HAS this column with a dropdown, but the
   // taught target is no longer one of its values (marketplace changed the

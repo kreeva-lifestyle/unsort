@@ -9,7 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { fetchMasterColumns } from './api';
-import { parseTemplateFile, SENSITIVE_RE } from './templateParse';
+import { parseTemplateFile } from './templateParse';
 import { mergeTemplateFields, describeMerge, pruneRules } from './mergeFields';
 import FieldRow from './FieldRow';
 import EditorToolbar from './EditorToolbar';
@@ -172,7 +172,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
                 onChange={rules => setEditing(ed => ed ? { ...ed, rules } : ed)} onBack={() => setShowRules(false)} />
             ) : <>
               <div style={{ fontSize: 11, color: T.tx3, marginBottom: 8, lineHeight: 1.5 }}>
-                Tick required fields. Columns with a dropdown show an "options" chip (tap to preview). Set a <b>fixed value</b> for anything that's the same on every product — fixed fields fill instantly and never cost AI tokens. Fixed values can use {'{sku}'} / {'{size}'} (e.g. {'{sku}-{size}'} → XYZ-XS on each size row) and {'{today}'} for the current date (e.g. an addedDate column → today's date, never ask the AI for a date). Price-like columns are blanked automatically.
+                Tick required fields. Columns with a dropdown show an "options" chip (tap to preview). Set a <b>fixed value</b> for anything that's the same on every product — fixed fields fill instantly and never cost AI tokens. Fixed values can use {'{sku}'} / {'{size}'} (e.g. {'{sku}-{size}'} → XYZ-XS on each size row) and {'{today}'} for the current date (e.g. an addedDate column → today's date, never ask the AI for a date). Price-like columns are never AI-written — set a fixed value, pair, wire or skip them; left unset they export empty.
               </div>
               <EditorToolbar fields={editing.fields} isSaved={!!editing.id}
                 onFields={fields => setEditing(ed => ed ? { ...ed, fields } : ed)}
@@ -180,7 +180,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
                 rulesCount={editing.rules.length} onRules={() => setShowRules(true)} />
               <div style={{ maxHeight: '38vh', overflowY: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
                 {editing.fields.map((f, i) => (
-                  <FieldRow key={i} f={f} onChange={patch => setField(i, patch)} addToast={addToast} masterCols={masterCols} others={editing.fields.filter(o => o.header !== f.header && !o.sameAs && !o.skip && !SENSITIVE_RE.test(o.header)).map(o => o.header)} />
+                  <FieldRow key={i} f={f} onChange={patch => setField(i, patch)} addToast={addToast} masterCols={masterCols} others={editing.fields.filter(o => o.header !== f.header && !o.sameAs && !o.skip).map(o => o.header)} />
                 ))}
               </div>
             </>}

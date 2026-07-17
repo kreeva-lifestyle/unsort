@@ -13,14 +13,6 @@ export default function FieldRow({ f, others, masterCols, onChange, addToast }: 
   onChange: (patch: Partial<ListingTemplateField>) => void;
   addToast: (m: string, t?: string) => void;
 }) {
-  if (SENSITIVE_RE.test(f.header)) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${T.bd}`, opacity: 0.5 }}>
-        <span style={{ fontSize: 12, color: T.tx3, flex: 1 }}>{f.header}</span>
-        <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(239,68,68,.1)', color: T.re }}>always blank</span>
-      </div>
-    );
-  }
   // Skipped: the owner never wants this column filled - exported empty.
   // A skipped MANDATORY column is a marketplace rejection waiting to happen,
   // so its badge goes red.
@@ -60,10 +52,16 @@ export default function FieldRow({ f, others, masterCols, onChange, addToast }: 
     );
   }
   const nAllowed = f.allowed?.length || 0;
+  // Price-like columns are owner-filled only - the AI never writes them, so
+  // an unset one exports empty (enforced server-side too).
+  const noAI = SENSITIVE_RE.test(f.header);
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: `1px solid ${T.bd}` }}>
       <input type="checkbox" checked={f.mandatory} onChange={e => onChange({ mandatory: e.target.checked })} title="Mandatory" style={{ width: 15, height: 15, accentColor: T.ac, cursor: 'pointer', flexShrink: 0 }} />
       <span style={{ fontSize: 12, color: T.tx2, flex: 1, minWidth: 90, wordBreak: 'break-word' }}>{f.header}</span>
+      {noAI && (
+        <span title="The AI never writes price-like columns — set a fixed value, wire, pair or skip; left unset it exports empty" style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(255,255,255,.06)', color: T.tx3, flexShrink: 0 }}>never AI-filled</span>
+      )}
       {nAllowed > 0 && (
         <span onClick={() => addToast(`${f.header}: ${f.allowed!.slice(0, 15).join(', ')}${nAllowed > 15 ? ` … +${nAllowed - 15} more` : ''}`, 'success')}
           title={f.allowed!.slice(0, 30).join(', ')}
@@ -75,7 +73,7 @@ export default function FieldRow({ f, others, masterCols, onChange, addToast }: 
         <select value={f.fixed || ''} onChange={e => onChange({ fixed: e.target.value })}
           title="Fixed value — used on every run, no AI cost"
           style={{ ...S.fInput, width: '38%', height: 30, fontSize: 12, color: f.fixed ? T.ac2 : T.tx3 }}>
-          <option value="">AI picks per product</option>
+          <option value="">{noAI ? 'left empty (no AI)' : 'AI picks per product'}</option>
           {f.allowed!.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
       ) : (
