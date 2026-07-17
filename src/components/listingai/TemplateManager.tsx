@@ -35,13 +35,14 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
   const [confirmDel, setConfirmDel] = useState('');
   const [masterCols, setMasterCols] = useState<string[]>([]);
   const [showRules, setShowRules] = useState(false);
+  const [fieldQ, setFieldQ] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     document.body.classList.toggle('modal-open', open);
     return () => document.body.classList.remove('modal-open');
   }, [open]);
-  useEffect(() => { if (!open) { setEditing(null); setMergeInfo(''); setSaving(false); setConfirmDel(''); setShowRules(false); } }, [open]);
+  useEffect(() => { if (!open) { setEditing(null); setMergeInfo(''); setSaving(false); setConfirmDel(''); setShowRules(false); setFieldQ(''); } }, [open]);
   // Master headers for the ⤓ pairing select — best-effort, once per open.
   useEffect(() => {
     if (!open || !editing || masterCols.length) return;
@@ -135,6 +136,9 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
 
   const setField = (i: number, patch: Partial<ListingTemplateField>) =>
     setEditing(ed => ed ? { ...ed, fields: ed.fields.map((f, ix) => ix === i ? { ...f, ...patch } : f) } : ed);
+  // Search filter keeps ORIGINAL indices so setField patches the right row.
+  const q = fieldQ.trim().toLowerCase();
+  const visible = (editing?.fields ?? []).map((f, i) => ({ f, i })).filter(({ f }) => !q || f.header.toLowerCase().includes(q));
 
   return createPortal(
     <div style={S.modalOverlay} onClick={onClose}>
@@ -154,7 +158,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
             )}
             {templates.map(t => (
               <TemplateListRow key={t.id} t={t} confirming={confirmDel === t.id}
-                onOpen={() => { setMergeInfo(''); setEditing({ id: t.id, name: t.name, marketplace: t.marketplace, fields: t.fields, rules: t.rules || [], sheetName: t.sheet_name || '', headerRow: t.header_row || 0, sheetNames: [], fileBuf: null, fileName: t.file_name || '' }); }}
+                onOpen={() => { setMergeInfo(''); setFieldQ(''); setEditing({ id: t.id, name: t.name, marketplace: t.marketplace, fields: t.fields, rules: t.rules || [], sheetName: t.sheet_name || '', headerRow: t.header_row || 0, sheetNames: [], fileBuf: null, fileName: t.file_name || '' }); }}
                 onAskDelete={() => setConfirmDel(t.id)} onCancelDelete={() => setConfirmDel('')} onDelete={() => del(t)} />
             ))}
           </>}
@@ -177,16 +181,15 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
               <EditorToolbar fields={editing.fields} isSaved={!!editing.id}
                 onFields={fields => setEditing(ed => ed ? { ...ed, fields } : ed)}
                 onReupload={() => fileRef.current?.click()} addToast={addToast}
-                rulesCount={editing.rules.length} onRules={() => setShowRules(true)} />
+                rulesCount={editing.rules.length} onRules={() => setShowRules(true)} query={fieldQ} onQuery={setFieldQ} />
               <div style={{ maxHeight: '38vh', overflowY: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
-                {editing.fields.map((f, i) => (
-                  <FieldRow key={i} f={f} onChange={patch => setField(i, patch)} addToast={addToast} masterCols={masterCols} others={editing.fields.filter(o => o.header !== f.header && !o.sameAs && !o.skip).map(o => o.header)} />
-                ))}
+                {visible.map(({ f, i }) => <FieldRow key={i} f={f} onChange={patch => setField(i, patch)} addToast={addToast} masterCols={masterCols} others={editing.fields.filter(o => o.header !== f.header && !o.sameAs && !o.skip).map(o => o.header)} />)}
+                {q && visible.length === 0 && <div style={{ padding: '30px 10px', textAlign: 'center', color: T.tx3, fontSize: 12 }}>No columns match "{fieldQ.trim()}"</div>}
               </div>
             </>}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, flex: 1, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save template'}</button>
-              <button onClick={() => { setEditing(null); setMergeInfo(''); setShowRules(false); }} style={S.btnGhost}>Back</button>
+              <button onClick={() => { setEditing(null); setMergeInfo(''); setShowRules(false); setFieldQ(''); }} style={S.btnGhost}>Back</button>
             </div>
           </>}
         </div>
