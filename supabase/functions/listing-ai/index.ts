@@ -1,4 +1,8 @@
-// listing-ai Edge Function - AI Listing Module backend (v19).
+// listing-ai Edge Function - AI Listing Module backend (v20).
+//
+// v20: a rule SET no longer fills an owner-SKIPPED column - the owner's
+// "skip" (exported empty) wins over a rule that happens to target it.
+// Price-like blank columns are not skipped, so rules still fill those.
 //
 // v19: all-sizes-skipped rows are finalized before export. When every size
 // of a multi-size SKU fails to resolve, the fallback row now runs through
@@ -611,6 +615,10 @@ function applyRules(
       const ix = classified.findIndex(f => normHeader(f.header) === normHeader(s.header));
       if (ix < 0) { note(`rule: column "${s.header}" is not in this template - skipped`); continue; }
       const f = classified[ix];
+      // An owner-skipped column stays empty even when a rule targets it - the
+      // owner's "skip" wins. (Price-like blank columns are NOT skipped, so
+      // rules can still fill them, per the v18 intent.)
+      if (f.skip) { note(`rule: column "${f.header}" is skipped - left empty`); continue; }
       if (Object.keys(s.perSize).length) charts.set(ix, { ...(charts.get(ix) || {}), ...s.perSize });
       if (!s.value) continue;
       // Placeholder values ({sku}-{size}...) defer validation to the
