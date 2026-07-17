@@ -1,4 +1,14 @@
-// listing-ai Edge Function - AI Listing Module backend (v23).
+// listing-ai Edge Function - AI Listing Module backend (v24).
+//
+// v24: taught-mappings 20k cap no longer drops lessons silently. When the
+// listing_mappings table exceeds the 20,000-row fetch cap, the oldest
+// lessons stop applying - fetchAllMappings now flags that via warnings
+// (surfaced in generate + scan_mappings) so the owner knows to trim ignored
+// mappings. Mappings stay UNcached (unlike the master sheet) - they're
+// edited in-app and a teach->regenerate loop must see the change at once.
+// Also: asciiArg is now a char-code map (was a high-range regex with raw
+// control bytes) so the source is pure ASCII - identical at runtime, but
+// removes an invisible byte that corrupted earlier deploys.
 //
 // v23: the master sheet is cached in the isolate for 60s. A 60-SKU run
 // chunks into ~20 edge calls that each re-downloaded both master tabs (40
@@ -203,8 +213,12 @@ const json = (body: unknown, req: Request, status = 200) =>
 const fail = (status: number, error: string, req: Request, details?: string) =>
   json({ ok: false, error, details }, req, status);
 
+// Escape every non-ASCII char (code > 126) for Dropbox-API-Arg headers.
+// Written as a char-code map, NOT a high-range regex, so the source stays
+// pure ASCII with no unicode-escape literals - those round-trip badly when
+// the file is redeployed as an inline JSON string (they decode to raw bytes).
 const asciiArg = (o: unknown) =>
-  JSON.stringify(o).replace(/[-￿]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+  Array.from(JSON.stringify(o), (c) => c.charCodeAt(0) > 126 ? '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0') : c).join('');
 
 function pemToDer(pem: string): Uint8Array {
   const normalized = pem.includes('\\n') ? pem.replace(/\\n/g, '\n') : pem;
@@ -316,20 +330,30 @@ async function callerRole(req: Request): Promise<string | null> {
 // Taught mappings: PAGINATED past PostgREST's 1000-row page - with bulk
 // teaching the table can easily exceed one page, and lessons past it used
 // to silently stop applying. Newest first so downstream caps keep the most
-// recently taught lessons.
+// recently taught lessons. NOT cached across calls (unlike the master
+// sheet): mappings are edited client-side and a teach->regenerate loop
+// expects the new lesson to apply immediately, so we always read fresh.
 interface MappingRow { field_key: string; field_label: string; source: string; target: string; ignored: boolean; updated_at: string }
 
-async function fetchAllMappings(): Promise<MappingRow[]> {
+const MAPPINGS_CAP = 20_000;
+
+// warnings (optional): when the table exceeds MAPPINGS_CAP we stop paging to
+// bound the request, but the DROPPED lessons would otherwise vanish with no
+// signal - push a warning so the owner knows to trim ignored mappings.
+async function fetchAllMappings(warnings?: string[]): Promise<MappingRow[]> {
   const out: MappingRow[] = [];
   const PAGE = 1000;
-  for (let offset = 0; offset < 20_000; offset += PAGE) {
+  let capped = false;
+  for (let offset = 0; offset < MAPPINGS_CAP; offset += PAGE) {
     const r = await fetch(`${SB_URL}/rest/v1/listing_mappings?select=field_key,field_label,source,target,ignored,updated_at&order=updated_at.desc&limit=${PAGE}&offset=${offset}`, { headers: svcHeaders });
     if (!r.ok) break;
     const rows = await r.json().catch(() => []);
     if (!Array.isArray(rows) || rows.length === 0) break;
     out.push(...rows);
     if (rows.length < PAGE) break;
+    if (offset + PAGE >= MAPPINGS_CAP) capped = true; // a full final page => more remain
   }
+  if (capped) warnings?.push(`Only the ${MAPPINGS_CAP.toLocaleString()} most-recently-taught mappings were applied; older lessons were skipped. Delete unused/ignored mappings to stay under the limit.`);
   return out;
 }
 
@@ -957,7 +981,7 @@ Deno.serve(async (req) => {
       // Only columns a run fills FROM a master column against a fixed list
       // can be taught: direct (paired master column) and brand (tab name).
       const scanCols = classified.filter(f => (f.kind === 'direct' || f.kind === 'brand') && f.allowed.length > 0);
-      const mappings = await fetchAllMappings();
+      const mappings = await fetchAllMappings(warnings);
       const byKey: Record<string, MappingRow> = {};
       for (const m of mappings) byKey[`${m.field_key} ${m.source.trim().toLowerCase()}`] = m;
 
@@ -1185,7 +1209,7 @@ Deno.serve(async (req) => {
       // Taught mappings: the owner's permanent corrections, applied in code.
       // Paginated fetch (v11) - past 1000 lessons, everything still applies.
       // Ignored rows are the owner's "leave this to the AI" - excluded here.
-      const allMappings = await fetchAllMappings();
+      const allMappings = await fetchAllMappings(warnings);
       const activeMappings = allMappings.filter(m => !m.ignored && m.target);
       const taught: Record<string, string> = {};
       for (const m of activeMappings) taught[`${m.field_key} ${String(m.source).trim().toLowerCase()}`] = String(m.target);
