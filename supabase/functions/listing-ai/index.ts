@@ -1,4 +1,10 @@
-// listing-ai Edge Function - AI Listing Module backend (v17).
+// listing-ai Edge Function - AI Listing Module backend (v18).
+//
+// v18: price/HSN columns unlocked - owner-controlled, never AI-written.
+// SENSITIVE headers are no longer force-blanked: fixed values, master
+// pairing, wires and rules fill them like any other column. The AI path
+// stays closed - an unset price column exports empty, and price fields
+// never enter the AI schema or prompt, so the model can't invent an MRP.
 //
 // v17: correctness fixes. (1) The prompt now infers stitch type from the
 // sizes - discrete ready-to-wear sizes (XS..XXL or numeric) mean a fully
@@ -443,8 +449,9 @@ const rawUrl = (url: string) =>
   /[?&]dl=0/.test(url) ? url.replace(/([?&])dl=0/, '$1raw=1') : url + (url.includes('?') ? '&' : '?') + 'raw=1';
 
 // ---- field classification ------------------------------------------------
-// Sensitive columns are blanked in CODE, not by prompt - the model never even
-// sees a price field, so it can never fill one.
+// Price-like columns are never AI-written: the owner fills them via fixed
+// values, master pairing, wires or rules - with no deterministic source they
+// export empty. The model never sees a price field, so it can't invent one.
 const SENSITIVE_RE = /price|mrp|\bgst\b|\brate\b|cost|amount|margin|commission|\bhsn\b/i;
 // Master columns that never help the model (links, stock dates, prices).
 const EXCLUDE_SRC = /price|gst|image|out of stock/i;
@@ -511,7 +518,7 @@ const isSizeField = (f: Classified) => f.kind === 'direct' && f.masterCol === 'S
 function classifyFields(fields: TplField[], masterHeaders: Map<string, string>): Classified[] {
   return fields.map(f => {
     // Owner-skipped columns are never filled - exported empty, zero cost.
-    if (f.skip || SENSITIVE_RE.test(f.header)) return { ...f, kind: 'blank' as const, masterCol: '' };
+    if (f.skip) return { ...f, kind: 'blank' as const, masterCol: '' };
     if (IMAGE_COL_RE.test(f.header) && !NOT_IMAGE_COL_RE.test(f.header)) return { ...f, kind: 'image' as const, masterCol: '' };
     // Wired: the owner linked this column to another - it copies that
     // column's final value in code (applyWired), zero AI cost.
@@ -535,7 +542,9 @@ function classifyFields(fields: TplField[], masterHeaders: Map<string, string>):
     // fields are excluded so listings stay fresh.
     const mh = masterHeaders.get(n);
     if (mh && !CONTENT_RE.test(f.header)) return { ...f, kind: 'direct' as const, masterCol: mh };
-    return { ...f, kind: 'ai' as const, masterCol: '' };
+    // Price-like columns with no deterministic source export empty instead
+    // of falling through to the AI.
+    return { ...f, kind: SENSITIVE_RE.test(f.header) ? 'blank' as const : 'ai' as const, masterCol: '' };
   });
 }
 
@@ -1270,7 +1279,9 @@ Deno.serve(async (req) => {
         });
         if (all) deterministic.add(f.header);
       }
-      const liveMapped = mappedFields.filter(f => !deterministic.has(f.header));
+      // Price-like columns never join the AI schema - an unresolved value
+      // exports empty rather than letting the model pick one.
+      const liveMapped = mappedFields.filter(f => !deterministic.has(f.header) && !SENSITIVE_RE.test(f.header));
       const schemaFields = [...aiFields, ...liveMapped];
       const aiValues: Record<string, Record<string, string>> = {};
       let usage: Usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };

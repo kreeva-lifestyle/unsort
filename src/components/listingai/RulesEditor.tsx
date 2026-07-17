@@ -4,7 +4,6 @@
 // measurement/closure columns differently. Values are always validated
 // against each column's dropdown server-side.
 import { T, S } from '../../lib/theme';
-import { SENSITIVE_RE } from './templateParse';
 import RuleSetRow from './RuleSetRow';
 import type { ListingTemplateField, ListingTemplateRule } from '../../types/database';
 
@@ -17,7 +16,7 @@ export default function RulesEditor({ fields, masterCols, rules, onChange, onBac
   onChange: (rules: ListingTemplateRule[]) => void;
   onBack: () => void;
 }) {
-  const targetable = fields.filter(f => !f.skip && !SENSITIVE_RE.test(f.header));
+  const targetable = fields.filter(f => !f.skip);
   const patchRule = (i: number, patch: Partial<ListingTemplateRule>) =>
     onChange(rules.map((r, ix) => ix === i ? { ...r, ...patch } : r));
 
