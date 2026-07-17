@@ -38,10 +38,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
   const [fieldQ, setFieldQ] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    document.body.classList.toggle('modal-open', open);
-    return () => document.body.classList.remove('modal-open');
-  }, [open]);
+  useEffect(() => { document.body.classList.toggle('modal-open', open); return () => document.body.classList.remove('modal-open'); }, [open]);
   useEffect(() => { if (!open) { setEditing(null); setMergeInfo(''); setSaving(false); setConfirmDel(''); setShowRules(false); setFieldQ(''); } }, [open]);
   // Master headers for the ⤓ pairing select — best-effort, once per open.
   useEffect(() => {
@@ -98,8 +95,13 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
     if (!name) { addToast('Give the template a name', 'error'); return; }
     setSaving(true);
     try {
-      const existing = templates.find(t => t.id === editing.id)
-        || templates.find(t => t.name.trim().toLowerCase() === name.toLowerCase());
+      // A different template sharing this name must NEVER be silently
+      // overwritten — that destroyed its row + stored workbook. Block it;
+      // the DB unique index on lower(name) backstops a stale-prop race.
+      const existing = editing.id ? templates.find(t => t.id === editing.id) : undefined;
+      if (templates.some(t => t.id !== editing.id && t.name.trim().toLowerCase() === name.toLowerCase())) {
+        addToast(`A template named "${name}" already exists — open it to edit, or use a different name.`, 'error'); setSaving(false); return;
+      }
       const payload: Record<string, unknown> = { name, marketplace: editing.marketplace.trim(), fields: editing.fields, rules: editing.rules, updated_at: new Date().toISOString() };
       if (editing.fileBuf) { payload.file_name = editing.fileName; payload.sheet_name = editing.sheetName; payload.header_row = editing.headerRow; }
       let id = existing?.id || '';
@@ -129,9 +131,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
     const { error } = await supabase.from('listing_templates').delete().eq('id', t.id);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     await supabase.storage.from('listing-templates').remove([`${t.id}.xlsx`]);
-    addToast('Template deleted', 'success');
-    setConfirmDel('');
-    refresh();
+    addToast('Template deleted', 'success'); setConfirmDel(''); refresh();
   };
 
   const setField = (i: number, patch: Partial<ListingTemplateField>) =>
