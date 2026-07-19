@@ -632,11 +632,23 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (effPaid < 0) { setFormError('Amount paid cannot be negative'); return; }
     if (effPaid > grandTotal) { setFormError(`Amount paid (₹${effPaid}) cannot exceed total (₹${grandTotal})`); return; }
     if (!paymentMode && effPaid > 0) { setFormError('Select a payment mode when amount is paid'); return; }
+    // 'Return Credit' rows are written ONLY by applying a return (RPC). A new
+    // payment typed into the form must carry a real receipt mode, or analytics
+    // would count a UPI/cash receipt as credit.
+    if (!isReturn && editing && amountPaid > Number(editing.amount_paid || 0) && paymentMode === 'Return Credit') {
+      setFormError('Pick the payment mode for this NEW payment (UPI/Cash/...) — "Return Credit" is set automatically only when a return is applied.');
+      return;
+    }
     if (!paymentDate && effPaid > 0) { setFormError('Payment date is required when amount is paid'); return; }
     // Returns are credits (no cash), so 'paid' status with amount_paid 0 is valid.
     if (!isReturn && challanStatus === 'paid' && amountPaid < grandTotal) {
       const already = editing ? Number(editing.amount_paid || 0) : 0;
-      setFormError(`Status "Paid" needs Amount Paid = total ₹${grandTotal}. Amount Paid is the RUNNING TOTAL${already > 0 ? ` — ₹${already} is already recorded, so enter ₹${grandTotal} to settle (₹${grandTotal - already} more now)` : ', not just today\'s payment'}.`);
+      const more = Math.round((grandTotal - already) * 100) / 100;
+      const fmt = (n: number) => n.toLocaleString('en-IN');
+      setFormError(`Status "Paid" needs Amount Paid = total ₹${fmt(grandTotal)}. Amount Paid is the RUNNING TOTAL${
+        already > 0 && more > 0 ? ` — ₹${fmt(already)} is already recorded, so enter ₹${fmt(grandTotal)} to settle (₹${fmt(more)} more now)` :
+        already > 0 ? ` — ₹${fmt(already)} is already recorded, which is MORE than the current total; entering ₹${fmt(grandTotal)} will record a reversal of the difference` :
+        ', not just today\'s payment'}.`);
       return;
     }
     if (!isReturn && challanStatus === 'partial' && (amountPaid <= 0 || amountPaid > grandTotal - 0.01)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
