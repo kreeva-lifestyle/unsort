@@ -6,6 +6,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { useAuth } from '../../hooks/useAuth';
 import { T, S } from '../../lib/theme';
 import { SkeletonRows } from '../ui/Skeleton';
+import ApplyCreditModal from './ApplyCreditModal';
 import type { CashChallan, CashChallanItem } from '../../types/database';
 
 type Challan = CashChallan & { cash_challan_items?: Partial<CashChallanItem>[] };
@@ -51,6 +52,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
   const [settleArm, setSettleArm] = useState(false);
   const [settleMode, setSettleMode] = useState('Cash');
   const [settling, setSettling] = useState(false);
+  const [showCredit, setShowCredit] = useState(false);
 
   // Record that this return's credit was refunded to the customer — the RPC
   // raises amount_paid to total + writes the payment row atomically, so the
@@ -319,7 +321,10 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
                 This return currently reduces the customer's outstanding by ₹{creditLeft.toLocaleString('en-IN')}. If you handed that amount back instead, record it here so the credit stops counting.
               </div>
               {!settleArm ? (
-                <button onClick={() => setSettleArm(true)} style={{ ...S.btnGhost, color: T.yl, border: '1px solid rgba(251,191,36,.3)', background: 'rgba(251,191,36,.08)' }}>Refunded to customer — settle credit</button>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button onClick={() => setSettleArm(true)} style={{ ...S.btnGhost, color: T.yl, border: '1px solid rgba(251,191,36,.3)', background: 'rgba(251,191,36,.08)' }}>Refunded to customer — settle credit</button>
+                  <button onClick={() => setShowCredit(true)} style={{ ...S.btnGhost, color: T.ac2 }}>Apply to a challan…</button>
+                </div>
               ) : (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: T.tx }}>Record ₹{creditLeft.toLocaleString('en-IN')} refund via</span>
@@ -355,7 +360,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
                     ) : (
                       <>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 600, color: T.tx }}>{e.action === 'CREATE' ? 'Created' : e.action === 'UPDATE' ? 'Updated' : e.action === 'VOID' ? 'Voided' : e.action === 'BULK_PAY' ? 'Bulk Paid' : e.action === 'BULK_UNPAY' ? 'Bulk Unpaid' : e.action === 'INV_TOGGLE' ? 'Inv. Toggled' : e.action === 'SETTLE_REFUND' ? 'Settled Refund' : e.action === 'BATCH_UNDO' ? 'Batch Undo' : e.action || 'Changed'}</span>
+                          <span style={{ fontWeight: 600, color: T.tx }}>{e.action === 'CREATE' ? 'Created' : e.action === 'UPDATE' ? 'Updated' : e.action === 'VOID' ? 'Voided' : e.action === 'BULK_PAY' ? 'Bulk Paid' : e.action === 'BULK_UNPAY' ? 'Bulk Unpaid' : e.action === 'INV_TOGGLE' ? 'Inv. Toggled' : e.action === 'SETTLE_REFUND' ? 'Settled Refund' : e.action === 'CREDIT_APPLIED' ? 'Credit Applied' : e.action === 'BATCH_UNDO' ? 'Batch Undo' : e.action || 'Changed'}</span>
                           {e.user_name && <span style={{ fontSize: 9, color: T.tx3 }}>by {e.user_name}</span>}
                         </div>
                         {e.changes && Object.keys(e.changes).length > 0 && (
@@ -410,6 +415,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
             <button onClick={onPrint} style={btnBase}>Print</button>
             {qrUrl && <button onClick={() => { setQrPhone(c.customer_phone || ''); setShowQrShare(true); }} style={btnBase}>Share QR</button>}
             {canRemind && <button onClick={onRemind} style={{ ...S.btnSuccess, padding: '8px 16px' }}>Remind</button>}
+            {canRemind && <button onClick={() => setShowCredit(true)} style={btnBase} title="Pay this challan down with a return's credit — no cash moves">Use return credit</button>}
             {canReturn && <button onClick={onReturn} style={{ ...S.btnDanger, padding: '8px 16px' }}>Return</button>}
             {!isVoided && (isRet || c.status !== 'paid') && <button onClick={onVoid} style={{ ...S.btnDanger, padding: '8px 16px' }}>Void</button>}
           </div>
@@ -442,5 +448,10 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
     document.body
   ) : null;
 
-  return <>{createPortal(content, document.body)}{qrModal}</>;
+  const creditModal = showCredit ? (
+    <ApplyCreditModal challan={c} addToast={addToast} onClose={() => setShowCredit(false)}
+      onDone={() => { setShowCredit(false); onSettled?.(); onClose(); }} />
+  ) : null;
+
+  return <>{createPortal(content, document.body)}{qrModal}{creditModal}</>;
 }
