@@ -634,7 +634,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (!paymentMode && effPaid > 0) { setFormError('Select a payment mode when amount is paid'); return; }
     if (!paymentDate && effPaid > 0) { setFormError('Payment date is required when amount is paid'); return; }
     // Returns are credits (no cash), so 'paid' status with amount_paid 0 is valid.
-    if (!isReturn && challanStatus === 'paid' && amountPaid < grandTotal) { setFormError(`Status is "Paid" but amount paid (₹${amountPaid}) is less than total (₹${grandTotal})`); return; }
+    if (!isReturn && challanStatus === 'paid' && amountPaid < grandTotal) {
+      const already = editing ? Number(editing.amount_paid || 0) : 0;
+      setFormError(`Status "Paid" needs Amount Paid = total ₹${grandTotal}. Amount Paid is the RUNNING TOTAL${already > 0 ? ` — ₹${already} is already recorded, so enter ₹${grandTotal} to settle (₹${grandTotal - already} more now)` : ', not just today\'s payment'}.`);
+      return;
+    }
     if (!isReturn && challanStatus === 'partial' && (amountPaid <= 0 || amountPaid > grandTotal - 0.01)) { setFormError('Partial status requires amount between ₹1 and total'); return; }
     if (challanStatus === 'unpaid' && amountPaid > 0) { setFormError('Status is "Unpaid" but amount is paid. Change status to "Paid" or "Partial"'); return; }
     setSaving(true);
