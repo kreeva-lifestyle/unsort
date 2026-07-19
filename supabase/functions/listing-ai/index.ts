@@ -1,4 +1,10 @@
-// listing-ai Edge Function - AI Listing Module backend (v24).
+// listing-ai Edge Function - AI Listing Module backend (v25).
+//
+// v25: fix v24's asciiArg regression. Array.from iterates code POINTS, so
+// astral chars (emoji) in Dropbox paths lost their low surrogate and the
+// thumbnail path was corrupted (photo silently missing for emoji-named
+// folders). Now an indexed per-code-unit loop, byte-identical to the
+// original regex behaviour.
 //
 // v24: taught-mappings 20k cap no longer drops lessons silently. When the
 // listing_mappings table exceeds the 20,000-row fetch cap, the oldest
@@ -213,12 +219,21 @@ const json = (body: unknown, req: Request, status = 200) =>
 const fail = (status: number, error: string, req: Request, details?: string) =>
   json({ ok: false, error, details }, req, status);
 
-// Escape every non-ASCII char (code > 126) for Dropbox-API-Arg headers.
-// Written as a char-code map, NOT a high-range regex, so the source stays
-// pure ASCII with no unicode-escape literals - those round-trip badly when
-// the file is redeployed as an inline JSON string (they decode to raw bytes).
-const asciiArg = (o: unknown) =>
-  Array.from(JSON.stringify(o), (c) => c.charCodeAt(0) > 126 ? '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0') : c).join('');
+// Escape every non-ASCII CODE UNIT (charCode > 126) for Dropbox-API-Arg
+// headers. Indexed loop, NOT Array.from: Array.from iterates code POINTS,
+// so an astral char (emoji) arrived as one two-unit string and only its
+// high surrogate was emitted - corrupting emoji-bearing Dropbox paths (the
+// v24 bug). Source stays pure ASCII (no unicode-escape literals - they
+// round-trip badly when redeployed as an inline JSON string).
+const asciiArg = (o: unknown) => {
+  const s = JSON.stringify(o);
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const cc = s.charCodeAt(i);
+    out += cc > 126 ? '\\u' + cc.toString(16).padStart(4, '0') : s[i];
+  }
+  return out;
+};
 
 function pemToDer(pem: string): Uint8Array {
   const normalized = pem.includes('\\n') ? pem.replace(/\\n/g, '\n') : pem;
