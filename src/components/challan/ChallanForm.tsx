@@ -307,7 +307,31 @@ export default function ChallanForm(p: ChallanFormProps) {
                 Credit note — reduces the customer's outstanding balance. No cash is refunded.
               </div>
             </div>
-          ) : (
+          ) : (<>
+            {/* Editing a challan that already has payments: "Amount Paid" is
+                the RUNNING TOTAL, not today's payment - the trap that made a
+                follow-up payment look wrong. Show paid-so-far / left-to-pay,
+                preview exactly what saving records, and offer one-tap settle. */}
+            {p.editing && Number(p.editing.amount_paid || 0) > 0 && (() => {
+              const prev = Number(p.editing.amount_paid || 0);
+              const left = Math.max(0, p.grandTotal - prev);
+              const diff = (p.amountPaid || 0) - prev;
+              const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+              return (
+                <div style={{ background: 'rgba(56,189,248,.05)', border: '1px solid rgba(56,189,248,.15)', borderRadius: T.rSm, padding: '8px 10px', marginBottom: 8, fontSize: 11, color: T.tx2, lineHeight: 1.5 }}>
+                  Paid so far <b style={{ fontFamily: T.mono }}>₹{prev.toLocaleString('en-IN')}</b>{p.editing.payment_mode ? ` (${p.editing.payment_mode})` : ''} · Left to pay <b style={{ fontFamily: T.mono, color: left > 0 ? T.re : T.gr }}>₹{left.toLocaleString('en-IN')}</b>
+                  <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>"Amount Paid" below is the running total — not just today's payment.</div>
+                  {diff > 0 && <div style={{ fontSize: 10, color: T.gr, marginTop: 2 }}>Saving records a new payment of ₹{diff.toLocaleString('en-IN')}{p.paymentMode && p.paymentMode !== 'Return Credit' ? ` via ${p.paymentMode}` : ' — pick the payment mode below'}.</div>}
+                  {diff < 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 2 }}>⚠ This LOWERS the recorded payment by ₹{Math.abs(diff).toLocaleString('en-IN')} — a reversal entry will be written.</div>}
+                  {left > 0 && (
+                    <button onClick={() => { p.setAmountPaid(p.grandTotal); p.setChallanStatus('paid'); p.setPaymentDate(today); if (p.paymentMode === 'Return Credit') p.setPaymentMode(''); }}
+                      style={{ ...S.btnGhost, ...S.btnSm, marginTop: 6, color: T.gr, border: '1px solid rgba(34,197,94,.3)', background: 'rgba(34,197,94,.06)' }}>
+                      Received ₹{left.toLocaleString('en-IN')} now — settle in full
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
             <div className="challan-form-grid-4" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
               <div>
                 <label style={lbl}>Status</label>
@@ -320,7 +344,9 @@ export default function ChallanForm(p: ChallanFormProps) {
               <div>
                 <label style={lbl}>Payment Mode</label>
                 <select value={p.paymentMode} onChange={e => p.setPaymentMode(e.target.value)} style={{ ...inp, fontSize: 11 }}>
-                  <option value="">Select...</option>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
+                  <option value="">Select...</option>
+                  {p.paymentMode && !PAYMENT_MODES.includes(p.paymentMode) && <option value={p.paymentMode} disabled>{p.paymentMode}</option>}
+                  {PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
               <div>
@@ -332,7 +358,7 @@ export default function ChallanForm(p: ChallanFormProps) {
                 <DateInput value={p.paymentDate} onChange={e => p.setPaymentDate(e.target.value)} style={{ width: '100%' }} />
               </div>
             </div>
-          )}
+          </>)}
         </div>
 
         {/* Totals card — honest math. Totals go red when negative so the
