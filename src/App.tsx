@@ -151,7 +151,10 @@ const MainApp = () => {
   });
   useEffect(() => { try { localStorage.setItem('sidebarOpen', sidebarOpen ? '1' : '0'); } catch { /* private mode */ } }, [sidebarOpen]);
 
-  return (<div style={{ minHeight: '100%', background: T.bg, width: '100%', overflowX: 'hidden', position: 'relative' }}>
+  // height (NOT minHeight): a child's percentage height cannot resolve against
+  // an auto-height parent per spec — WebKit enforces this, so with minHeight
+  // the .main-area 100% collapsed and scrolling died in Safari.
+  return (<div style={{ height: '100%', background: T.bg, width: '100%', overflowX: 'hidden', position: 'relative' }}>
     <div className="app-glows" aria-hidden="true" />
     <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setNotifItemId(null); setMobileMenu(false); }} profile={profile} collapsed={!sidebarOpen} />
     {/* Mobile overlay */}
