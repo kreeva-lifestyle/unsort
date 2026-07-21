@@ -74,6 +74,7 @@ import SidebarComponent from './components/layout/Sidebar';
 import HeaderComponent from './components/layout/Header';
 import ToastContainerComponent from './components/layout/ToastContainer';
 import OfflineBar from './components/ui/OfflineBar';
+import ViewportDebug from './components/ui/ViewportDebug';
 import { T, S, Icon } from './lib/theme';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { NotificationProvider, useNotifications } from './hooks/useNotifications';
@@ -150,7 +151,7 @@ const MainApp = () => {
   });
   useEffect(() => { try { localStorage.setItem('sidebarOpen', sidebarOpen ? '1' : '0'); } catch { /* private mode */ } }, [sidebarOpen]);
 
-  return (<div style={{ minHeight: '100dvh', background: T.bg, width: '100%', overflowX: 'hidden', position: 'relative' }}>
+  return (<div style={{ minHeight: '100%', background: T.bg, width: '100%', overflowX: 'hidden', position: 'relative' }}>
     <div className="app-glows" aria-hidden="true" />
     <SidebarComponent activeTab={tab} setActiveTab={(t) => { setTab(t); setNotifItemId(null); setMobileMenu(false); }} profile={profile} collapsed={!sidebarOpen} />
     {/* Mobile overlay */}
@@ -161,7 +162,9 @@ const MainApp = () => {
     </div>
     <div className="main-area" style={{ marginLeft: sidebarOpen ? 220 : 0, display: 'flex', flexDirection: 'column', maxWidth: '100vw', transition: 'margin-left .25s cubic-bezier(.4,0,.2,1)' }}>
       {/* Mobile bottom nav */}
-      <div className="mobile-hamburger" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 102, background: T.s, borderTop: `1px solid ${T.bd}`, padding: '8px 0', paddingBottom: 'max(8px, env(safe-area-inset-bottom))', justifyContent: 'space-around' }}>
+      {/* Bottom padding (home-indicator inset) lives in index.css (.mobile-hamburger)
+          — the single owner; a second inline value here used to fight it. */}
+      <div className="mobile-hamburger" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 102, background: T.s, borderTop: `1px solid ${T.bd}`, padding: '8px 0', justifyContent: 'space-around' }}>
         {[{ id: 'dashboard', icon: 'grid', label: 'Home' }, { id: 'inventory', icon: 'box', label: 'Inventory' }, { id: 'packtime', icon: 'scan', label: 'PackStation' }, { id: 'challan', icon: 'file', label: 'Challan' }].filter(t => checkTab(t.id)).map(t => (
           <div key={t.id} onClick={() => { setTab(t.id); setMobileMenu(false); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: tab === t.id ? T.ac : T.tx3, fontSize: 9, fontWeight: 500, transition: 'color .2s ease', position: 'relative' }}>
             <Icon name={t.icon} size={20} /><span>{t.label}</span>
@@ -195,6 +198,7 @@ const MainApp = () => {
     <ToastContainerComponent toasts={toasts} />
     <OfflineBar />
     <InstallPrompt />
+    <ViewportDebug />
   </div>);
 };
 
@@ -208,7 +212,7 @@ const InstallPrompt = () => {
   }, []);
   if (!deferredPrompt || dismissed) return null;
   return (
-    <div style={{ position: 'fixed', bottom: 'calc(70px + env(safe-area-inset-bottom, 0px))', right: 16, zIndex: 200, background: 'rgba(14,18,30,.96)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: `1px solid ${T.ac3}`, borderRadius: 10, padding: '8px 10px 8px 12px', boxShadow: '0 8px 24px rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', gap: 8, animation: 'slideUp .3s cubic-bezier(.2,.9,.3,1)' }}>
+    <div style={{ position: 'fixed', bottom: 'calc(var(--nav-h, 60px) + 10px)', right: 16, zIndex: 200, background: 'rgba(14,18,30,.96)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: `1px solid ${T.ac3}`, borderRadius: 10, padding: '8px 10px 8px 12px', boxShadow: '0 8px 24px rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', gap: 8, animation: 'slideUp .3s cubic-bezier(.2,.9,.3,1)' }}>
       <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Install app</span>
       <button onClick={() => { deferredPrompt.prompt(); setDeferredPrompt(null); }} style={{ ...S.btnPrimary, padding: '5px 12px', fontSize: 10, flexShrink: 0 }}>Install</button>
       <span onClick={() => { setDismissed(true); sessionStorage.setItem('pwa-dismiss', '1'); }} style={{ color: T.tx3, cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 4 }} aria-label="Close">&times;</span>
