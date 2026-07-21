@@ -6,6 +6,8 @@
 // from a single screenshot instead of guesswork.
 import { useState, useEffect } from 'react';
 
+declare const __APP_BUILD__: string; // injected by vite define (build stamp)
+
 const enabled = () => {
   try { return window.location.search.includes('vpdebug') || !!localStorage.getItem('vpdebug'); }
   catch { return false; }
@@ -35,6 +37,7 @@ export default function ViewportDebug() {
         'nav.h': nr ? nr.height.toFixed(1) : '-',
         'gap(inner-navBot)': nr ? (window.innerHeight - nr.bottom).toFixed(1) : '-',
         standalone: String(window.matchMedia('(display-mode: standalone)').matches),
+        build: typeof __APP_BUILD__ === 'string' ? __APP_BUILD__ : 'dev',
       });
     };
     read();

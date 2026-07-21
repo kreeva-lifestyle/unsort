@@ -20,4 +20,7 @@ export default defineConfig({
   plugins: [react(), swVersionStamp()],
   base: '/',
   build: { cssTarget: 'safari15' },
+  // Build stamp shown in the ?vpdebug overlay — lets a device screenshot prove
+  // which build it is actually running (stale-cache diagnosis).
+  define: { __APP_BUILD__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC') },
 })
