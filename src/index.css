@@ -1,14 +1,13 @@
 @import './design-tokens.css';
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { overflow: hidden; height: 100%; height: 100dvh; }
+html { overflow: hidden; height: 100%; }
 
 body {
   font-family: 'Inter', -apple-system, sans-serif;
   background-color: oklch(0.08 0.02 265);
   color: oklch(0.93 0.01 250);
   height: 100%;
-  height: 100dvh;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: contain;
   width: 100%;
@@ -20,8 +19,13 @@ body {
   line-height: 1.55;
 }
 
-#root { height: 100%; height: 100dvh; width: 100%; overflow: hidden; }
-.main-area { height: 100dvh !important; }
+/* #root is a FIXED frame filling the visual viewport. position:fixed + inset:0
+   puts the app shell in the SAME coordinate system as fixed children (bottom
+   nav, FAB) by construction — on iOS standalone PWAs the dvh unit and the
+   fixed-position viewport can disagree, which floated the bottom nav above
+   the screen edge with a dead strip below it. A fixed frame cannot drift. */
+#root { position: fixed; inset: 0; overflow: hidden; }
+.main-area { height: 100% !important; }
 
 ::selection { background: oklch(0.55 0.22 265 / 0.25); color: oklch(0.93 0.01 250); }
 
@@ -226,6 +230,11 @@ body.modal-open .fab { display: none !important; }
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 @media (max-width: 768px) {
+  /* Single source of truth for bottom-nav geometry. --nav-h = 8px top pad +
+     44px item + bottom pad (home-indicator inset, min 8px) + 1px border.
+     EVERY bottom clearance below derives from it — the old hardcoded
+     52/70/80/84 constants had drifted apart and caused gaps/overlaps. */
+  :root { --sab: env(safe-area-inset-bottom, 0px); --nav-h: calc(53px + max(8px, var(--sab))); }
   .login-page { padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0) !important; }
   .login-split { grid-template-columns: 1fr !important; gap: 0 !important; padding: 20px !important; }
   .login-hero { display: none !important; }
@@ -238,7 +247,7 @@ body.modal-open .fab { display: none !important; }
   .mobile-drawer { display: block !important; }
   .desktop-only { display: none !important; }
   .mobile-only { display: flex !important; }
-  .fab { display: flex !important; position: fixed !important; bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important; right: 16px !important; width: 52px !important; height: 52px !important; border-radius: 50% !important; background: linear-gradient(135deg, oklch(0.55 0.22 265), oklch(0.65 0.18 270)) !important; color: #fff !important; align-items: center !important; justify-content: center !important; font-size: 24px !important; font-weight: 300 !important; box-shadow: 0 6px 24px rgba(99,102,241,.45) !important; z-index: 103 !important; cursor: pointer !important; border: none !important; animation: fi .2s ease !important; }
+  .fab { display: flex !important; position: fixed !important; bottom: calc(var(--nav-h) + 12px) !important; right: 16px !important; width: 52px !important; height: 52px !important; border-radius: 50% !important; background: linear-gradient(135deg, oklch(0.55 0.22 265), oklch(0.65 0.18 270)) !important; color: #fff !important; align-items: center !important; justify-content: center !important; font-size: 24px !important; font-weight: 300 !important; box-shadow: 0 6px 24px rgba(99,102,241,.45) !important; z-index: 103 !important; cursor: pointer !important; border: none !important; animation: fi .2s ease !important; }
   .challan-row-actions { display: none !important; }
   .bt-actions-col { display: none !important; }
   .settings-tabs { flex-direction: column !important; width: 100% !important; }
@@ -250,7 +259,7 @@ body.modal-open .fab { display: none !important; }
   .inv-more-fields { display: block !important; }
   .inv-more-content { display: none !important; }
   .challan-filter-btns { flex: none !important; }
-  .toast-container { top: auto !important; bottom: calc(52px + env(safe-area-inset-bottom, 0) + 4px) !important; left: 12px !important; right: 12px !important; display: flex !important; flex-direction: column-reverse !important; }
+  .toast-container { top: auto !important; bottom: calc(var(--nav-h) + 8px) !important; left: 12px !important; right: 12px !important; display: flex !important; flex-direction: column-reverse !important; }
   .toast-item { animation: toastIn .4s cubic-bezier(.2,1,.3,1) !important; }
   .toast-item.leaving { animation: toastOut .3s ease-in forwards !important; }
   .pager, .scan-pagination, .vs-pagination { padding-bottom: 6px !important; }
@@ -263,9 +272,9 @@ body.modal-open .fab { display: none !important; }
   .scan-history-mobile { display: block !important; }
   .scan-courier-pills { scrollbar-width: none !important; }
   .scan-courier-pills::-webkit-scrollbar { display: none !important; }
-  .mobile-drawer { top: env(safe-area-inset-top, 0) !important; bottom: calc(52px + env(safe-area-inset-bottom, 0)) !important; height: auto !important; }
+  .mobile-drawer { top: env(safe-area-inset-top, 0) !important; bottom: var(--nav-h) !important; height: auto !important; }
   .mobile-drawer .sidebar { display: flex !important; width: 100% !important; height: 100% !important; padding-bottom: 0 !important; }
-  .page-pad { padding: 14px max(12px, env(safe-area-inset-right, 0)) calc(80px + env(safe-area-inset-bottom, 0)) max(12px, env(safe-area-inset-left, 0)) !important; }
+  .page-pad { padding: 14px max(12px, env(safe-area-inset-right, 0)) calc(var(--nav-h) + 14px) max(12px, env(safe-area-inset-left, 0)) !important; }
   .filter-bar { gap: 6px !important; padding: 8px 10px !important; }
   .filter-bar select, .filter-bar input { font-size: 12px !important; padding: 6px 8px !important; min-width: 0 !important; }
   .header-bar { padding: env(safe-area-inset-top, 0) 16px 0 !important; height: calc(56px + env(safe-area-inset-top, 0)) !important; }
@@ -284,7 +293,7 @@ body.modal-open .fab { display: none !important; }
   .modal-inner form { padding: 14px !important; }
   .two-col { grid-template-columns: 1fr !important; }
   .mobile-hamburger > div { min-height: 44px !important; display: flex !important; align-items: center !important; justify-content: center !important; flex-direction: column !important; gap: 3px !important; }
-  .mobile-hamburger { padding-left: env(safe-area-inset-left, 0) !important; padding-right: env(safe-area-inset-right, 0) !important; padding-bottom: env(safe-area-inset-bottom, 0) !important; }
+  .mobile-hamburger { padding-left: env(safe-area-inset-left, 0) !important; padding-right: env(safe-area-inset-right, 0) !important; padding-bottom: max(8px, var(--sab)) !important; }
   .filter-bar { padding-left: max(10px, env(safe-area-inset-left, 0)) !important; padding-right: max(10px, env(safe-area-inset-right, 0)) !important; }
 }
 
