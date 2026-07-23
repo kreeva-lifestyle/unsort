@@ -11,6 +11,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import SwipeRow from '../components/ui/SwipeRow';
 import { SkeletonRows } from '../components/ui/Skeleton';
+import Empty from '../components/ui/Empty';
 import type {
   Product,
   ProductComponent,
@@ -336,17 +337,17 @@ export default function InventoryExtras() {
             style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
         </div>
         <select value={catFilter} onChange={e => { setCatFilter(e.target.value); setPage(0); }}
-          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', outline: 'none', cursor: 'pointer', flexShrink: 0 }}>
+          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', height: 36, outline: 'none', cursor: 'pointer', flexShrink: 0 }}>
           <option value="all">All Categories</option>
           {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
         </select>
         <select value={compFilter} onChange={e => { setCompFilter(e.target.value); setPage(0); }}
-          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', outline: 'none', cursor: 'pointer', flexShrink: 0 }}>
+          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', height: 36, outline: 'none', cursor: 'pointer', flexShrink: 0 }}>
           <option value="all">All Components</option>
           {[...new Set(extras.map(ex => ex.component_name))].sort().map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={matchFilter} onChange={e => { setMatchFilter(e.target.value); setPage(0); }}
-          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', outline: 'none', cursor: 'pointer', flexShrink: 0 }}>
+          style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', height: 36, outline: 'none', cursor: 'pointer', flexShrink: 0 }}>
           <option value="all">All Matches</option>
           <option value="has">Has Matches</option>
           <option value="none">No Matches</option>
@@ -364,14 +365,14 @@ export default function InventoryExtras() {
             <th style={th}>Size</th><th style={th}>Qty</th><th style={th}>Matches</th><th style={th}>Actions</th>
           </tr></thead>
           <tbody>
-            {paged.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', padding: 30, color: T.tx3 }}>No spare parts found</td></tr>}
+            {paged.length === 0 && <tr><td colSpan={7} style={{ padding: 12 }}><Empty icon="search" title="No spare parts found" message="Adjust the filters, or add spare parts to see them here." /></td></tr>}
             {paged.map(ex => (
               <tr key={ex.id} style={{ transition: 'background 150ms' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                 <td style={{ ...td, fontFamily: T.mono, fontSize: 11, color: T.tx }}>{ex.sku}</td>
                 <td style={td}>{ex.product_name}{(() => { const p = products.find(pr => pr.id === ex.product_id); return p?.sku ? <span style={{ marginLeft: 4, fontSize: 9, color: T.tx3, fontFamily: T.mono }}>({p.sku})</span> : null; })()}</td>
                 <td style={td}>{ex.component_name}</td>
                 <td style={td}>{ex.size}</td>
-                <td style={{ ...td, fontWeight: 600, color: ex.quantity > 0 ? T.gr : T.re }}>{ex.quantity}{ex.quantity < 1 && <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 3, fontSize: 8, fontWeight: 700, textTransform: 'uppercase', background: 'rgba(239,68,68,.10)', color: T.re }}>Out of stock</span>}</td>
+                <td style={{ ...td, fontWeight: 600, color: ex.quantity > 0 ? T.gr : T.re }}>{ex.quantity}{ex.quantity < 1 && <span style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', background: 'oklch(0.63 0.22 25 / .10)', color: T.re }}>Out of stock</span>}</td>
                 <td style={td}>
                   {(matchCounts[ex.id] || 0) > 0 ? (
                     <button onClick={() => loadMatches(ex)} style={{ color: T.yl, cursor: 'pointer', fontSize: 11, fontWeight: 600, background: 'none', border: 'none', padding: 0, fontFamily: T.sans }} title="View matching items" aria-label={`${matchCounts[ex.id]} match${matchCounts[ex.id] > 1 ? 'es' : ''}`}>
@@ -392,7 +393,7 @@ export default function InventoryExtras() {
 
       {/* Mobile card view */}
       <div className="inv-extra-mobile">
-        {paged.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No spare parts found</div>}
+        {paged.length === 0 && <Empty icon="search" title="No spare parts found" message="Adjust the filters, or add spare parts to see them here." />}
         {paged.map((ex, idx) => (
           <SwipeRow key={ex.id} hint={idx === 0 && !!canEdit} hintKey="spare-parts" actions={canEdit ? [
             { label: 'Edit', color: '#6366F1', onClick: () => openEdit(ex) },
@@ -408,7 +409,7 @@ export default function InventoryExtras() {
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: ex.quantity > 0 ? T.gr : T.re }}>{ex.quantity}</div>
-                  {ex.quantity < 1 && <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', color: T.re, marginTop: 2 }}>Out of stock</div>}
+                  {ex.quantity < 1 && <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: T.re, marginTop: 2 }}>Out of stock</div>}
                   {(matchCounts[ex.id] || 0) > 0 && <div style={{ fontSize: 10, color: T.yl, fontWeight: 600, marginTop: 2 }}>{matchCounts[ex.id]} match{matchCounts[ex.id] > 1 ? 'es' : ''}</div>}
                 </div>
               </div>
@@ -417,7 +418,7 @@ export default function InventoryExtras() {
         ))}
       </div>
 
-      {extras.length === EXTRAS_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {EXTRAS_LIMIT} items. Use search to find more.</div>}
+      {extras.length === EXTRAS_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {EXTRAS_LIMIT} items. Use search to find more.</div>}
 
       {/* Pagination */}
       {totalPages > 1 && <div className="pager" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
@@ -442,7 +443,7 @@ export default function InventoryExtras() {
           </div>
           <form onSubmit={e => { e.preventDefault(); addExtra(); }} style={{ padding: 16 }}>
             <div style={{ marginBottom: 10 }}>
-              <label style={label}>Category * <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0, fontSize: 8, color: T.tx3 }}>Select product category</span></label>
+              <label style={label}>Category * <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0, fontSize: 9, color: T.tx3 }}>Select product category</span></label>
               <select value={fProductId} onChange={e => { setFProductId(e.target.value); setFComponentId(''); }} style={input}>
                 <option value="">Select category...</option>
                 {products.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
@@ -519,7 +520,7 @@ export default function InventoryExtras() {
             <div><label style={label}>Reason (optional)</label>
               <input value={adjustReason} onChange={e => setAdjustReason(e.target.value)} placeholder="e.g. Found more stock" style={input} /></div>
             {error && <div style={{ color: T.re, fontSize: 11 }}>{error}</div>}
-            <button onClick={adjustQuantity} style={{ ...btn, textAlign: 'center', justifyContent: 'center', display: 'flex', border: 'none', background: adjustMode === 'remove' ? 'rgba(239,68,68,0.7)' : undefined, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>
+            <button onClick={adjustQuantity} style={{ ...btn, textAlign: 'center', justifyContent: 'center', display: 'flex', border: 'none', background: adjustMode === 'remove' ? 'oklch(0.63 0.22 25 / 0.7)' : undefined, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>
               {saving ? 'Saving…' : adjustMode === 'add' ? 'Add' : 'Remove'}
             </button>
           </div>
@@ -533,11 +534,11 @@ export default function InventoryExtras() {
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Matching Unsorted Items</span>
             <button onClick={() => setMatchExtra(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16, background: 'none', border: 'none' }} title="Close" aria-label="Close">&times;</button>
           </div>
-          <div style={{ padding: 10, fontSize: 11, color: T.tx2, borderBottom: `1px solid ${T.bd}`, background: 'rgba(245,158,11,.03)' }}>
+          <div style={{ padding: 10, fontSize: 11, color: T.tx2, borderBottom: `1px solid ${T.bd}`, background: 'oklch(0.78 0.18 75 / .03)' }}>
             Extra: {matchExtra.component_name} | SKU: {matchExtra.sku} | Size: {matchExtra.size} | Qty available: <b style={{ color: T.gr }}>{matchExtra.quantity}</b>
           </div>
           <div style={{ padding: 12, maxHeight: 400, overflowY: 'auto' }}>
-            {matches.length === 0 && <div style={{ color: T.tx3, fontSize: 11, textAlign: 'center', padding: 20 }}>No matching items</div>}
+            {matches.length === 0 && <Empty icon="search" title="No matching items" message="No inventory item is missing this component in this size right now." />}
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               {matches.length > 0 && <thead><tr>
                 <th style={th}>Batch #</th><th style={th}>SKU</th><th style={th}>Size</th><th style={th}>Location</th><th style={th}>Action</th>
@@ -589,7 +590,7 @@ export default function InventoryExtras() {
             <button onClick={() => setEditingExtra(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16, background: 'none', border: 'none' }} title="Close" aria-label="Close">&times;</button>
           </div>
           <div style={{ padding: 16 }}>
-            {error && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: T.re, marginBottom: 10 }}>{error}</div>}
+            {error && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: T.re, marginBottom: 10 }}>{error}</div>}
             <div style={{ marginBottom: 8, fontSize: 10, color: T.tx3 }}>{editingExtra.product_name} · {editingExtra.component_name}</div>
             <div className="inv-extra-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <div><label style={label}>SKU *</label><input value={editForm.sku} onChange={e => setEditForm({ ...editForm, sku: e.target.value })} style={{ ...input, fontFamily: T.mono }} /></div>

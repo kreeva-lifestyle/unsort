@@ -107,7 +107,7 @@ export default function SalaryPaymentFlow({ employees, salaries, payments, month
             <div style={{ fontSize: 34, fontWeight: 800, fontFamily: T.sora, color: noSalary ? T.yl : (sal && sal.finalSalary < 0 ? T.re : T.tx), lineHeight: 1.1, marginTop: 2 }}>{sal ? inr(sal.finalSalary) : '—'}</div>
             {sal && sal.extraMinutes > 0 && <div style={{ fontSize: 10, color: T.gr, fontFamily: T.mono, marginTop: 3, fontWeight: 700 }}>+{minutesToHM(sal.extraMinutes)}h extra time (paid in salary)</div>}
             {sal && sal.penaltyTotal > 0 && (
-              <div style={{ marginTop: 6, width: '100%', maxWidth: 300, background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.18)', borderRadius: 8, padding: '7px 10px', textAlign: 'left' }}>
+              <div style={{ marginTop: 6, width: '100%', maxWidth: 300, background: 'oklch(0.63 0.22 25 / .06)', border: '1px solid oklch(0.63 0.22 25 / .18)', borderRadius: 8, padding: '7px 10px', textAlign: 'left' }}>
                 <div style={{ fontSize: 10, color: T.re, fontFamily: T.mono, fontWeight: 700 }}>gross {inr(sal.gross)} − {inr(sal.penaltyTotal)} penalty</div>
                 {(penaltiesByEmp?.get(emp!.id) || []).map(p => (
                   <div key={p.id} style={{ fontSize: 10, color: T.tx2, marginTop: 3, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
@@ -117,7 +117,7 @@ export default function SalaryPaymentFlow({ employees, salaries, payments, month
                 ))}
               </div>
             )}
-            {noSalary && <div style={{ fontSize: 11, color: T.yl, marginTop: 8, background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 6, padding: '6px 10px' }}>No monthly salary set for this employee — set it in Employees before paying.</div>}
+            {noSalary && <div style={{ fontSize: 11, color: T.yl, marginTop: 8, background: 'oklch(0.78 0.18 75 / .1)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 6, padding: '6px 10px' }}>No monthly salary set for this employee — set it in Employees before paying.</div>}
           </div>
         )}
       </div>

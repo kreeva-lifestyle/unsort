@@ -9,7 +9,7 @@ interface Props {
 export default function FabricBreakdown({ items, t }: Props) {
   if (items.length === 0) return null;
   return (
-    <div style={{ marginTop: 6, padding: '8px 14px', background: 'rgba(56,189,248,.04)', border: `1px solid rgba(56,189,248,.10)`, borderRadius: 8 }}>
+    <div style={{ marginTop: 6, padding: '8px 14px', background: 'oklch(0.77 0.14 230 / .04)', border: `1px solid oklch(0.77 0.14 230 / .10)`, borderRadius: 8 }}>
       <div style={{ fontSize: 9, fontWeight: 600, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>{t('fabricBreakdown')}</div>
       {items.map(([name, total]) => (
         <div key={name} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 11 }}>

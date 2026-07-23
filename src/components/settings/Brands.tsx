@@ -47,7 +47,7 @@ export default function Brands({ addToast }: { addToast: (msg: string, type?: st
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <Toggle on={b.is_active} onToggle={() => toggleBrand(b.id, b.is_active)} size="sm" />
-            <span onClick={() => deleteBrand(b.id)} style={{ ...S.btnDanger, cursor: 'pointer' }}>Delete</span>
+            <span className="touch44" onClick={() => deleteBrand(b.id)} style={{ ...S.btnDanger, cursor: 'pointer' }}>Delete</span>
           </div>
         </div>
       ))}

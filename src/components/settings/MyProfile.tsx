@@ -108,13 +108,13 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
       </div>
 
       {/* My Phone — required for WhatsApp notifications */}
-      <div style={{ background: 'rgba(34,197,94,.05)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 8, padding: 14, marginBottom: 12 }}>
+      <div style={{ background: 'oklch(0.72 0.19 145 / .05)', border: '1px solid oklch(0.72 0.19 145 / .15)', borderRadius: 8, padding: 14, marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: T.gr, fontFamily: T.sora }}>My Phone Number</div>
           {!phoneEditing && (myPhone.length === 10 ? (
-            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,.12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase' as const }}>✓ Saved</span>
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'oklch(0.72 0.19 145 / .12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase' as const }}>✓ Saved</span>
           ) : (
-            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' as const }}>Required</span>
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' as const }}>Required</span>
           ))}
         </div>
         <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10 }}>Required to receive WhatsApp notifications for cash handovers and payment alerts.</div>
@@ -138,13 +138,13 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
       </div>
 
       {/* My Cash PIN — for confirming cash handovers */}
-      <div style={{ background: 'rgba(245,158,11,.05)', border: '1px solid rgba(245,158,11,.15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+      <div style={{ background: 'oklch(0.78 0.18 75 / .05)', border: '1px solid oklch(0.78 0.18 75 / .15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: T.yl, fontFamily: T.sora }}>My Cash PIN</div>
           {!editingPin && (pinExists ? (
-            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,.12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>✓ Saved</span>
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'oklch(0.72 0.19 145 / .12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>✓ Saved</span>
           ) : (
-            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Not Set</span>
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Not Set</span>
           ))}
         </div>
         <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10 }}>Required to sign cash handovers received from accountant. 4-6 digits.</div>
@@ -173,7 +173,7 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
                 <input type="password" value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••" inputMode="numeric" style={{ ...S.fInput, fontFamily: T.mono, letterSpacing: 4, textAlign: 'center' as const, fontSize: 14 }} />
               </div>
             </div>
-            {pinError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '5px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{pinError}</div>}
+            {pinError && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '5px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{pinError}</div>}
             <div style={{ display: 'flex', gap: 6 }}>
               <button onClick={saveMyPin} disabled={pinSaving} style={{ ...S.btnPrimary, opacity: pinSaving ? 0.6 : 1 }}>{pinSaving ? 'Saving...' : 'Save PIN'}</button>
               <button onClick={() => { setEditingPin(false); setNewPin(''); setConfirmPin(''); setPinError(''); }} style={S.btnGhost}>Cancel</button>
@@ -182,11 +182,11 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
         )}
       </div>
       {/* Face ID — device-local biometric unlock */}
-      <div style={{ background: 'rgba(56,189,248,.05)', border: '1px solid rgba(56,189,248,.15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+      <div style={{ background: 'oklch(0.77 0.14 230 / .05)', border: '1px solid oklch(0.77 0.14 230 / .15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: T.bl, fontFamily: T.sora }}>Face ID Login</div>
           {faceEnrolled ? (
-            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(34,197,94,.12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>✓ Enabled</span>
+            <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'oklch(0.72 0.19 145 / .12)', color: T.gr, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>✓ Enabled</span>
           ) : (
             <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,.06)', color: T.tx3, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Off</span>
           )}
@@ -195,7 +195,7 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
 
         {faceEnrolled ? (
           <div>
-            <div style={{ background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.gr, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ background: 'oklch(0.72 0.19 145 / .08)', border: '1px solid oklch(0.72 0.19 145 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.gr, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
               <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: T.gr, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', flexShrink: 0 }}>
                 <path d="M3 8V6a3 3 0 013-3h2M16 3h2a3 3 0 013 3v2M21 16v2a3 3 0 01-3 3h-2M8 21H6a3 3 0 01-3-3v-2" />
                 <path d="M9 9.5v1M15 9.5v1M9 15.2a4.2 4.2 0 006 0" />
@@ -212,7 +212,7 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
       </div>
 
       {/* Change Password */}
-      <div style={{ background: 'rgba(99,102,241,.05)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+      <div style={{ background: 'oklch(0.55 0.22 265 / .05)', border: '1px solid oklch(0.55 0.22 265 / .15)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: T.ac2, fontFamily: T.sora, marginBottom: 4 }}>Change Password</div>
         <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10 }}>Update your login password.</div>
         {!changingPwd ? (
@@ -223,7 +223,7 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
               <div><label style={{ ...S.fLabel, marginBottom: 3 }}>New Password</label><input type="password" value={pwd} onChange={e => { setPwd(e.target.value); setPwdError(''); }} placeholder="Min 8 characters" autoFocus style={S.fInput} /></div>
               <div><label style={{ ...S.fLabel, marginBottom: 3 }}>Confirm</label><input type="password" value={pwdConfirm} onChange={e => { setPwdConfirm(e.target.value); setPwdError(''); }} placeholder="Re-enter" style={S.fInput} /></div>
             </div>
-            {pwdError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '5px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{pwdError}</div>}
+            {pwdError && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '5px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{pwdError}</div>}
             <div style={{ display: 'flex', gap: 6 }}>
               <button onClick={async () => {
                 setPwdError('');

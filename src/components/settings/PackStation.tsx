@@ -85,7 +85,7 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
               </div>
               <div style={{ display: 'flex', gap: 4 }}>
                 <Toggle on={c.is_active} onToggle={() => toggleCourier(c.id, c.is_active)} size="sm" />
-                <span onClick={() => deleteCourier(c.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
+                <span className="touch44" onClick={() => deleteCourier(c.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
               </div>
             </div>
           ))}
@@ -105,7 +105,7 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
                 <span style={{ fontSize: 14, fontFamily: T.mono, fontWeight: 600, color: T.tx }}>{c.number}</span>
                 {!c.is_active && <span style={{ fontSize: 8, color: T.tx3, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.03)' }}>disabled</span>}
               </div>
-              <span onClick={() => deleteCamera(c.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
+              <span className="touch44" onClick={() => deleteCamera(c.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
             </div>
           ))}
           {cameras.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No cameras configured</div>}

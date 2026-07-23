@@ -25,10 +25,10 @@ export default function MatchingCompanyRepeater({ rows, onChange, t, brandOption
         <div key={i} className="prg-matching-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 6, marginBottom: 6 }}>
           <input value={r.company_name} onChange={e => update(i, 'company_name', e.target.value)}
             placeholder={t('brandName')}
-            style={{ ...S.fInput, fontSize: 11 }} />
+            style={{ ...S.fInput, fontSize: 12 }} />
           <input list="dl-brand" value={r.matching_label} onChange={e => update(i, 'matching_label', e.target.value)}
             placeholder={t('brandLabel')}
-            style={{ ...S.fInput, fontSize: 11 }} />
+            style={{ ...S.fInput, fontSize: 12 }} />
           <button type="button" onClick={() => remove(i)}
             style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', alignSelf: 'center' }} aria-label="Remove">×</button>
         </div>

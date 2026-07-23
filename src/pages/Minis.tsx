@@ -345,9 +345,9 @@ export default function Minis() {
         {back}
         <div style={{ display: 'flex', gap: 6 }}>
           <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
-          {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export XLS</div>}
-          {rows.length > 0 && <div onClick={!comparing ? compareNonUploaded : undefined} style={{ ...S.btnGhost, color: T.yl, border: '1px solid rgba(251,191,36,.2)', background: 'rgba(251,191,36,.06)', opacity: comparing ? 0.5 : 1, pointerEvents: comparing ? 'none' : 'auto' }}>{comparing ? 'Comparing…' : 'Compare Non-Uploaded'}</div>}
-          {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); setCompareRows([]); setCompareHeaders([]); setCompareFilter('all'); setCompareSearch(''); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)' }}>Close</div>}
+          {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export XLS</div>}
+          {rows.length > 0 && <div onClick={!comparing ? compareNonUploaded : undefined} style={{ ...S.btnGhost, color: T.yl, border: '1px solid oklch(0.78 0.18 75 / .2)', background: 'oklch(0.78 0.18 75 / .06)', opacity: comparing ? 0.5 : 1, pointerEvents: comparing ? 'none' : 'auto' }}>{comparing ? 'Comparing…' : 'Compare Non-Uploaded'}</div>}
+          {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); setCompareRows([]); setCompareHeaders([]); setCompareFilter('all'); setCompareSearch(''); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid oklch(0.63 0.22 25 / .2)', background: 'oklch(0.63 0.22 25 / .06)' }}>Close</div>}
         </div>
       </div>
       <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
@@ -355,7 +355,7 @@ export default function Minis() {
       {fileName && <div style={{ fontSize: 10, color: T.tx3, marginBottom: 8 }}>File: {fileName} -- {rows.length} rows</div>}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: rows.length > 0 ? 12 : 0 }}>
         {Object.entries(SIZE_MAP).map(([num, name]) => (
-          <span key={num} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(99,102,241,.08)', color: T.ac2, fontFamily: T.mono }}>{num}={name}</span>
+          <span key={num} style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'oklch(0.55 0.22 265 / .08)', color: T.ac2, fontFamily: T.mono }}>{num}={name}</span>
         ))}
       </div>
       {rows.length > 0 && <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}`, marginTop: 8 }}>
@@ -404,7 +404,7 @@ export default function Minis() {
             <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, strokeLinecap: 'round' as const, opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
             <input value={compareSearch} onChange={e => setCompareSearch(e.target.value)} placeholder="Search SKU…" style={{ ...S.fSearch, width: '100%' }} />
           </div>
-          {compareFilter !== 'all' && compareFilter !== 'ignored' && <div onClick={() => exportCompareFilter(compareFilter)} style={{ ...S.btnSm, cursor: 'pointer', color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Export {compareFiltered.length}</div>}
+          {compareFilter !== 'all' && compareFilter !== 'ignored' && <div onClick={() => exportCompareFilter(compareFilter)} style={{ ...S.btnSm, cursor: 'pointer', color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Export {compareFiltered.length}</div>}
           {compareFilter !== 'all' && <div onClick={() => setCompareFilter('all')} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx3, border: `1px solid ${T.bd}`, borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Clear</div>}
         </div>
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}` }}>
@@ -422,7 +422,7 @@ export default function Minis() {
                     <td style={S.tdStyle}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: catColor, background: `${catColor}18` }}>{catLabel}</span></td>
                     <td style={{ ...S.tdStyle, textAlign: 'right' as const }}>
                       {compareFilter === 'ignored'
-                        ? <span onClick={() => unignoreSku(r._key, r.sku)} style={{ cursor: 'pointer', color: T.re, fontSize: 10, fontWeight: 600, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.06)', borderRadius: 5, padding: '3px 9px' }}>Delete</span>
+                        ? <span onClick={() => unignoreSku(r._key, r.sku)} style={{ cursor: 'pointer', color: T.re, fontSize: 10, fontWeight: 600, border: '1px solid oklch(0.63 0.22 25 / .2)', background: 'oklch(0.63 0.22 25 / .06)', borderRadius: 5, padding: '3px 9px' }}>Delete</span>
                         : <span onClick={() => ignoreSku(r)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 10, fontWeight: 600, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '3px 9px' }}>Ignore</span>}
                     </td>
                   </tr>
@@ -452,7 +452,7 @@ export default function Minis() {
           { id: 'dropbox_links' as MiniView, title: 'Dropbox Link Generator', desc: 'SKU → view-only Dropbox links — whole folder or every image, single or bulk from Excel' },
           { id: 'forward_dropbox' as MiniView, title: 'Forward → Dropbox', desc: 'Snap a document, name it by date, send it to Dropbox — phone only' },
         ].map(t => (
-          <div key={t.id} onClick={() => setView(t.id)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; e.currentTarget.style.background = 'rgba(99,102,241,.04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
+          <div key={t.id} onClick={() => setView(t.id)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'oklch(0.55 0.22 265 / .3)'; e.currentTarget.style.background = 'oklch(0.55 0.22 265 / .04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>{t.title}</div>
             <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5 }}>{t.desc}</div>
           </div>

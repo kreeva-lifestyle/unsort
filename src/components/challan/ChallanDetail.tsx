@@ -218,7 +218,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: mobile ? 16 : 18, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>#{c.challan_number}</span>
               <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 4, background: sc.bg, color: sc.color, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{isRet ? 'Return' : c.status}</span>
-              {c.handover_id && <span title="This cash was included in a signed handover" style={{ fontSize: 9, padding: '3px 8px', borderRadius: 4, background: 'rgba(56,189,248,.12)', color: T.bl, fontWeight: 700, letterSpacing: 0.3 }}>{hoNum ? `Handed over · HO-${String(hoNum).padStart(4, '0')}` : 'Handed over'}</span>}
+              {c.handover_id && <span title="This cash was included in a signed handover" style={{ fontSize: 9, padding: '3px 8px', borderRadius: 4, background: 'oklch(0.77 0.14 230 / .12)', color: T.bl, fontWeight: 700, letterSpacing: 0.3 }}>{hoNum ? `Handed over · HO-${String(hoNum).padStart(4, '0')}` : 'Handed over'}</span>}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{c.customer_name}</span>
@@ -300,13 +300,13 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
                 <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: Number(c.amount_paid) > 0 ? T.gr : T.tx3 }}>₹{Number(c.amount_paid || 0).toLocaleString('en-IN')}</div>
               </div>
               {due > 0 && !isRet && (
-                <div style={{ flex: 1, background: 'rgba(239,68,68,.04)', border: '1px solid rgba(239,68,68,.12)', borderRadius: 8, padding: '10px 14px' }}>
+                <div style={{ flex: 1, background: 'oklch(0.63 0.22 25 / .04)', border: '1px solid oklch(0.63 0.22 25 / .12)', borderRadius: 8, padding: '10px 14px' }}>
                   <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}>Outstanding</div>
                   <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: T.re }}>₹{due.toLocaleString('en-IN')}</div>
                 </div>
               )}
               {isRet && (
-                <div style={{ flex: 1, background: creditLeft > 0 ? 'rgba(251,191,36,.05)' : 'rgba(34,197,94,.05)', border: `1px solid ${creditLeft > 0 ? 'rgba(251,191,36,.18)' : 'rgba(34,197,94,.12)'}`, borderRadius: 8, padding: '10px 14px' }}>
+                <div style={{ flex: 1, background: creditLeft > 0 ? 'oklch(0.78 0.18 75 / .05)' : 'oklch(0.72 0.19 145 / .05)', border: `1px solid ${creditLeft > 0 ? 'oklch(0.78 0.18 75 / .18)' : 'oklch(0.72 0.19 145 / .12)'}`, borderRadius: 8, padding: '10px 14px' }}>
                   <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}>Credit</div>
                   <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: creditLeft > 0 ? T.yl : T.gr }}>{creditLeft > 0 ? `₹${creditLeft.toLocaleString('en-IN')} unused` : 'Settled ✓'}</div>
                 </div>
@@ -316,13 +316,13 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
 
           {/* ── Return credit settlement (in-app confirm, financial action) ── */}
           {creditLeft > 0 && (
-            <div style={{ background: 'rgba(251,191,36,.04)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
+            <div style={{ background: 'oklch(0.78 0.18 75 / .04)', border: '1px solid oklch(0.78 0.18 75 / .15)', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
               <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5, marginBottom: 8 }}>
                 This return currently reduces the customer's outstanding by ₹{creditLeft.toLocaleString('en-IN')}. If you handed that amount back instead, record it here so the credit stops counting.
               </div>
               {!settleArm ? (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button onClick={() => setSettleArm(true)} style={{ ...S.btnGhost, color: T.yl, border: '1px solid rgba(251,191,36,.3)', background: 'rgba(251,191,36,.08)' }}>Refunded to customer — settle credit</button>
+                  <button onClick={() => setSettleArm(true)} style={{ ...S.btnGhost, color: T.yl, border: '1px solid oklch(0.78 0.18 75 / .3)', background: 'oklch(0.78 0.18 75 / .08)' }}>Refunded to customer — settle credit</button>
                   <button onClick={() => setShowCredit(true)} style={{ ...S.btnGhost, color: T.ac2 }}>Apply to a challan…</button>
                 </div>
               ) : (
@@ -352,7 +352,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           <span style={{ fontFamily: T.mono, fontWeight: 600, color: e.is_reversal ? T.re : T.gr }}>{e.is_reversal ? '−' : '+'}₹{Number(e.amount).toLocaleString('en-IN')}</span>
                           <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3 }}>{e.payment_mode}</span>
-                          {e.batch_id && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(99,102,241,.1)', color: T.ac2, fontFamily: T.mono, fontWeight: 600 }}>{e.batch_id}</span>}
+                          {e.batch_id && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'oklch(0.55 0.22 265 / .1)', color: T.ac2, fontFamily: T.mono, fontWeight: 600 }}>{e.batch_id}</span>}
                           {e.user_name && <span style={{ fontSize: 9, color: T.tx3 }}>by {e.user_name}</span>}
                         </div>
                         {e.notes && e.notes !== 'Backfilled from existing payment data' && <div style={{ fontSize: 9, color: T.tx3, marginTop: 2 }}>{e.notes}</div>}

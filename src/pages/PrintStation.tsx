@@ -249,7 +249,7 @@ export default function PrintStation() {
       </div>
 
       {!connected && (
-        <div style={{ background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 8, padding: '14px 16px', marginBottom: 16, fontSize: 12, color: T.re, lineHeight: 1.5 }}>
+        <div style={{ background: 'oklch(0.63 0.22 25 / .06)', border: '1px solid oklch(0.63 0.22 25 / .15)', borderRadius: 8, padding: '14px 16px', marginBottom: 16, fontSize: 12, color: T.re, lineHeight: 1.5 }}>
           <strong>QZ Tray is not running.</strong> Install QZ Tray on this computer and start it. Print jobs will queue and be processed once connected.{' '}
           <a href="https://qz.io/download/" target="_blank" rel="noopener noreferrer" style={{ color: T.ac2, fontWeight: 600 }}>Download QZ Tray ↗</a>
         </div>

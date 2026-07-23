@@ -162,7 +162,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
               onPatch={p => setEditing(ed => ed ? { ...ed, ...p } : ed)}
               onPickSheet={s => parseInto(editing.fileBuf!, editing.fileName, s)} onEnter={save} />
             {mergeInfo && (
-              <div style={{ background: 'rgba(56,189,248,.06)', border: '1px solid rgba(56,189,248,.2)', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: T.bl, marginBottom: 8, lineHeight: 1.5 }}>Sheet update merged: {mergeInfo}</div>
+              <div style={{ background: 'oklch(0.77 0.14 230 / .06)', border: '1px solid oklch(0.77 0.14 230 / .2)', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: T.bl, marginBottom: 8, lineHeight: 1.5 }}>Sheet update merged: {mergeInfo}</div>
             )}
             {showRules ? (
               <RulesEditor fields={editing.fields} masterCols={masterCols} rules={editing.rules}
@@ -181,7 +181,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
               </div>
             </>}
             {confirmClose && (
-              <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 12, color: T.tx2, marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 12, color: T.tx2, marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ flex: 1, minWidth: 150 }}>Discard unsaved changes to this template?</span>
                 <button onClick={leaveEditor} style={{ ...S.btnDanger, ...S.btnSm }}>Discard</button><button onClick={() => setConfirmClose(false)} style={{ ...S.btnGhost, ...S.btnSm, marginLeft: 8 }}>Keep editing</button>
               </div>

@@ -143,7 +143,7 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
               </div>
             ))}
           </div>
-          {rows.length === STOCK_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {STOCK_LIMIT} items. Use search to find more.</div>}
+          {rows.length === STOCK_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {STOCK_LIMIT} items. Use search to find more.</div>}
           {filtered.length > pageSize && <div className="vs-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, padding: '4px 0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }} aria-label="Previous page">Prev</span>

@@ -72,7 +72,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontFamily: T.sora, fontSize: 26, fontWeight: 700, color: T.tx, letterSpacing: -0.5 }}>{program.program_uid}</span>
             {program.voice_note_path && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 14, color: T.yl, fontSize: 10, fontWeight: 600 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .2)', borderRadius: 14, color: T.yl, fontSize: 10, fontWeight: 600 }}>
                 <svg viewBox="0 0 24 24" style={{ width: 11, height: 11, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2" /></svg>
                 Voice
               </span>
@@ -175,7 +175,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       {/* Totals */}
       {(workParts.length > 0 || fabricParts.length > 0) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
-          <div className="prg-grand-fabric" onClick={() => setShowFabricBreakdown(v => !v)} style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, padding: '12px 16px', background: 'rgba(56,189,248,.06)', border: '1px solid rgba(56,189,248,.2)', borderRadius: 10, cursor: 'pointer' }}>
+          <div className="prg-grand-fabric" onClick={() => setShowFabricBreakdown(v => !v)} style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, padding: '12px 16px', background: 'oklch(0.77 0.14 230 / .06)', border: '1px solid oklch(0.77 0.14 230 / .2)', borderRadius: 10, cursor: 'pointer' }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>{t('grandFabricTotal')}</span>
             <span style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.bl, letterSpacing: -0.3 }}>{(workFM + fabricFM).toFixed(2)} m</span>
             <span style={{ fontSize: 10, color: T.tx3, transform: showFabricBreakdown ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform .15s' }}>▶</span>

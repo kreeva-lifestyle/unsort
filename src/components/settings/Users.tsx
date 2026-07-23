@@ -106,10 +106,10 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
           {ALL_MODULE_KEYS.map(k => {
             const on = access[k] !== false;
             return (
-              <button key={k} onClick={() => toggleModule(u.id, k)}
+              <button key={k} className="touch44" onClick={() => toggleModule(u.id, k)}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, fontSize: 10.5, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', userSelect: 'none', minHeight: 30,
-                  background: on ? 'rgba(34,197,94,.10)' : 'rgba(255,255,255,.02)',
-                  border: `1px solid ${on ? 'rgba(34,197,94,.28)' : T.bd}`,
+                  background: on ? 'oklch(0.72 0.19 145 / .10)' : 'rgba(255,255,255,.02)',
+                  border: `1px solid ${on ? 'oklch(0.72 0.19 145 / .28)' : T.bd}`,
                   color: on ? T.gr : T.tx3 }}>
                 <span style={{ fontSize: 9, opacity: on ? 1 : 0.55 }}>{on ? '✓' : '✕'}</span>{MODULE_LABELS[k]}
               </button>
@@ -180,7 +180,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
           const ring = ROLE_COLORS[u.role] || T.ac2;
           return (
             <div key={u.id} className="user-card" style={{ background: T.glass2, border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 16, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', transition: 'border-color .15s' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,.28)')} onMouseLeave={e => (e.currentTarget.style.borderColor = T.bd2)}>
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'oklch(0.55 0.22 265 / .28)')} onMouseLeave={e => (e.currentTarget.style.borderColor = T.bd2)}>
               <div className="user-card-head" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <div style={{ width: 44, height: 44, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff', flexShrink: 0, boxShadow: `0 0 0 2px ${T.bg}, 0 0 0 3.5px ${ring}66` }}>{(u.full_name || u.email || '?')[0].toUpperCase()}</div>
                 <div style={{ flex: 1, minWidth: 150 }}>
@@ -236,7 +236,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
               <div><label style={S.fLabel}>Password</label><input value={inviteForm.password} onChange={(e) => setInviteForm({ ...inviteForm, password: e.target.value })} placeholder="Auto-generate if empty" style={S.fInput} /></div>
               <div><label style={S.fLabel}>Role</label><select value={inviteForm.role} onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })} style={S.fInput}><option value="viewer">Viewer</option><option value="operator">Operator</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>
             </div>
-            <div style={{ background: 'rgba(99,102,241,.05)', border: `1px solid rgba(99,102,241,.15)`, borderRadius: T.r, padding: '8px 12px', fontSize: 10, color: T.ac2, marginBottom: 12 }}>The user will be created with the credentials above. Share the email and password with them so they can sign in.</div>
+            <div style={{ background: 'oklch(0.55 0.22 265 / .05)', border: `1px solid oklch(0.55 0.22 265 / .15)`, borderRadius: T.r, padding: '8px 12px', fontSize: 10, color: T.ac2, marginBottom: 12 }}>The user will be created with the credentials above. Share the email and password with them so they can sign in.</div>
             <div style={{ padding: '12px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 7 }}>
               <span onClick={closeInvite} style={S.btnGhost}>Cancel</span>
               <button type="submit" disabled={inviting} style={S.btnPrimary}>{inviting ? 'Creating...' : 'Create & Invite'}</button>

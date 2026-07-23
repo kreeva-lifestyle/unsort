@@ -45,8 +45,8 @@ if ('serviceWorker' in navigator) {
       const overlay = document.createElement('div');
       overlay.setAttribute('style', 'position:fixed;inset:0;z-index:99999;background:rgba(6,8,16,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,-apple-system,sans-serif');
       overlay.innerHTML = `
-        <div style="background:rgba(15,20,32,.95);border:1px solid rgba(99,102,241,.2);border-radius:14px;padding:32px 28px;text-align:center;max-width:340px;width:100%">
-          <div style="width:48px;height:48px;margin:0 auto 16px;border-radius:12px;background:rgba(99,102,241,.12);display:flex;align-items:center;justify-content:center">
+        <div style="background:rgba(15,20,32,.95);border:1px solid oklch(0.55 0.22 265 / .2);border-radius:14px;padding:32px 28px;text-align:center;max-width:340px;width:100%">
+          <div style="width:48px;height:48px;margin:0 auto 16px;border-radius:12px;background:oklch(0.55 0.22 265 / .12);display:flex;align-items:center;justify-content:center">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#818CF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
           </div>
           <div style="font-family:Sora,Inter,sans-serif;font-size:16px;font-weight:700;color:#E2E8F0;margin-bottom:8px">Update Available</div>

@@ -255,6 +255,10 @@ body.modal-open .fab { display: none !important; }
   .settings-tabs > div { min-height: 44px !important; }
   .ho-actions button, .po-actions button { min-height: 44px !important; }
   .att-3col { grid-template-columns: 1fr !important; }
+  .touch44 { min-height: 44px !important; display: inline-flex !important; align-items: center !important; }
+  .step44 { width: 44px !important; height: 44px !important; }
+  .step44-val { height: 44px !important; }
+  .challan-items-head { display: none !important; }
   .user-card { padding: 14px !important; }
   .user-card-controls { width: 100% !important; justify-content: space-between !important; margin-top: 2px !important; }
   .user-card-controls select { flex: 1 !important; min-width: 0 !important; }

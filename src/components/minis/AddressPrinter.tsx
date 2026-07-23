@@ -130,9 +130,9 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
                 <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{l.phone}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                <button onClick={() => setCopy(l.id, getCopies(l.id) - 1)} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
-                <span style={{ width: 30, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: getCopies(l.id) > 1 ? T.ac2 : T.tx3, background: getCopies(l.id) > 1 ? T.ac3 : 'transparent' }}>{getCopies(l.id)}</span>
-                <button onClick={() => setCopy(l.id, getCopies(l.id) + 1)} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                <button className="step44" aria-label="Decrease copies" onClick={() => setCopy(l.id, getCopies(l.id) - 1)} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
+                <span className="step44-val" style={{ width: 30, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: getCopies(l.id) > 1 ? T.ac2 : T.tx3, background: getCopies(l.id) > 1 ? T.ac3 : 'transparent' }}>{getCopies(l.id)}</span>
+                <button className="step44" aria-label="Increase copies" onClick={() => setCopy(l.id, getCopies(l.id) + 1)} style={{ width: 28, height: 28, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
               </div>
               <div className="desktop-only" style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                 <span onClick={() => { const expanded = Array(getCopies(l.id)).fill(l); setPrintHtml(buildLabelHtml(expanded)); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '6px 12px', fontSize: 11 }}>Print</span>
@@ -159,7 +159,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
         </div>
       </div>}
 
-      {labels.length === LABEL_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {LABEL_LIMIT} addresses. Use search to find more.</div>}
+      {labels.length === LABEL_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {LABEL_LIMIT} addresses. Use search to find more.</div>}
 
       {/* Add/Edit Modal */}
       {showAdd && createPortal(<div style={S.modalOverlay} onClick={closeModal}>
@@ -184,7 +184,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
               <div style={{ fontSize: 11, color: '#333' }}>{form.city || 'City'}, {form.state || 'State'} - {form.pincode || '000000'}</div>
               <div style={{ fontSize: 11, fontWeight: 600, marginTop: 3 }}>{form.phone || 'Phone'}</div>
             </div>
-            {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{formError}</div>}
+            {formError && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{formError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${T.bd}` }}>
               <span onClick={closeModal} style={S.btnGhost}>Cancel</span>
               <button type="submit" style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving...' : editingId ? 'Update' : 'Save'}</button>

@@ -64,7 +64,7 @@ export default function ChallanBulkActions(p: Props) {
       )}
 
       {p.lastBatch && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', marginBottom: 8, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', marginBottom: 8, background: 'oklch(0.72 0.19 145 / .06)', border: '1px solid oklch(0.72 0.19 145 / .15)', borderRadius: 6 }}>
           <span style={{ fontSize: 10, color: T.gr, fontWeight: 600, flex: 1 }}>
             {p.lastBatch.id}: {p.lastBatch.count} challans paid{p.lastBatch.settled > 0 ? ` + ${p.lastBatch.settled} return credit${p.lastBatch.settled === 1 ? '' : 's'} settled` : ''} via {p.lastBatch.mode}
             {p.lastBatch.settled > 0 && <span style={{ color: T.yl, fontWeight: 500 }}> — Undo restores the sales only; settled return credits stay consumed</span>}

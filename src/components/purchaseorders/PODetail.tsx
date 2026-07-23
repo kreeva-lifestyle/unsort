@@ -173,8 +173,8 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
           <button onClick={onPrint} style={{ ...S.btnGhost, ...S.btnSm }}>Print / Share</button>
           <button onClick={onDuplicate} style={{ ...S.btnGhost, ...S.btnSm }}>Duplicate</button>
           {canEdit && <button onClick={onEdit} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</button>}
-          {canCancel && <button onClick={() => setStatus('cancelled', 'cancelled')} disabled={!!busy} style={{ ...S.btnDanger, ...S.btnSm, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>Cancel PO</button>}
-          {canSend && <button onClick={() => setStatus('sent', 'marked sent')} disabled={!!busy} style={{ ...S.btnGhost, ...S.btnSm, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>Mark Sent</button>}
+          {canCancel && <button onClick={() => setStatus('cancelled', 'cancelled')} disabled={!!busy} style={{ ...S.btnDanger, ...S.btnSm, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy === 'cancelled' ? 'Cancelling…' : 'Cancel PO'}</button>}
+          {canSend && <button onClick={() => setStatus('sent', 'marked sent')} disabled={!!busy} style={{ ...S.btnGhost, ...S.btnSm, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy === 'sent' ? 'Marking…' : 'Mark Sent'}</button>}
           {canApprove && <button onClick={() => setStatus('approved', 'approved')} disabled={!!busy} style={{ ...S.btnPrimary, ...S.btnSm, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy === 'approved' ? 'Approving…' : 'Approve'}</button>}
           {canReceive && <button onClick={onReceive} style={{ ...S.btnPrimary, ...S.btnSm }}>Receive</button>}
         </div>

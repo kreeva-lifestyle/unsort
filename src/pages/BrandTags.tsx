@@ -17,8 +17,8 @@ import { T, S } from '../lib/theme';
 const btnGhost: React.CSSProperties = S.btnGhost;
 const btnSm: React.CSSProperties = { ...S.btnGhost, ...S.btnSm };
 const inp: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 6,
-  color: T.tx, fontFamily: T.sans, fontSize: 12, padding: '7px 10px',
+  background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd}`, borderRadius: 8,
+  color: T.tx, fontFamily: T.sans, fontSize: 13, padding: '8px 12px', height: 36,
   outline: 'none', boxSizing: 'border-box', transition: T.transition,
 };
 const thS: React.CSSProperties = {
@@ -406,7 +406,7 @@ export default function BrandTagPrinter() {
         } else if (errMsg.toLowerCase().includes('zip') || errMsg.toLowerCase().includes('format')) {
           addToast('File format unsupported. Use .xlsx, .xls, or .csv (not encrypted).', 'error');
         } else {
-          addToast('Failed to parse Excel: ' + (errMsg || 'unknown error'), 'error');
+          addToast('Failed to parse Excel — ' + friendlyError(e), 'error');
         }
       }
     };
@@ -506,7 +506,7 @@ export default function BrandTagPrinter() {
         const parsed = parseOrderSheet(json, masterRows);
         setOrderRows(parsed); setOrderPage(0);
         setOrderLoading(false); setOrderLoadMsg('');
-      } catch (e: any) { addToast('Failed to parse order sheet — ' + (e?.message || 'check column format'), 'error'); setOrderLoading(false); setOrderLoadMsg(''); }
+      } catch (e: any) { addToast('Failed to parse order sheet — ' + friendlyError(e), 'error'); setOrderLoading(false); setOrderLoadMsg(''); }
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
@@ -548,7 +548,7 @@ export default function BrandTagPrinter() {
           {importing && <span style={{ fontSize: 10, color: T.yl, marginTop: 4, fontWeight: 600, display: 'block' }}>Importing {importProgress}...</span>}
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          {orderLoading && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: T.yl }}><span style={{ width: 10, height: 10, border: '1.5px solid rgba(251,191,36,.2)', borderTopColor: T.yl, borderRadius: '50%', animation: 'btnSpin .6s linear infinite', flexShrink: 0 }} />{orderLoadMsg}</span>}
+          {orderLoading && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: T.yl }}><span style={{ width: 10, height: 10, border: '1.5px solid oklch(0.78 0.18 75 / .2)', borderTopColor: T.yl, borderRadius: '50%', animation: 'btnSpin .6s linear infinite', flexShrink: 0 }} />{orderLoadMsg}</span>}
           <input ref={orderFileRef} type="file" accept=".xlsx,.xls" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} onChange={handleOrderImport} />
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} onChange={handleImport} />
           <div style={{ position: 'relative' }} className="desktop-only">
@@ -566,7 +566,7 @@ export default function BrandTagPrinter() {
                     { label: 'Export to Excel', action: handleExport },
                     { label: 'Test print', action: printTestLabel },
                   ].map((opt, i) => (
-                    <div key={i} onClick={() => { setMoreMenuOpen(false); opt.action(); }} style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, color: T.tx2, borderRadius: 5, transition: 'all .12s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,.08)'; e.currentTarget.style.color = T.tx; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx2; }}>{opt.label}</div>
+                    <div key={i} onClick={() => { setMoreMenuOpen(false); opt.action(); }} style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, color: T.tx2, borderRadius: 5, transition: 'all .12s' }} onMouseEnter={e => { e.currentTarget.style.background = 'oklch(0.55 0.22 265 / .08)'; e.currentTarget.style.color = T.tx; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx2; }}>{opt.label}</div>
                   ))}
                 </div>
               </>
@@ -587,9 +587,9 @@ export default function BrandTagPrinter() {
           <input type="text" placeholder="Search SKU, product, EAN..." value={search} onChange={e => handleSearch(e.target.value)} style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' as any, flexWrap: 'nowrap' }}>
-          <button onClick={() => setBrandFilter('')} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${!brandFilter ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: !brandFilter ? 'rgba(99,102,241,.08)' : 'transparent', color: !brandFilter ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition, whiteSpace: 'nowrap', flexShrink: 0 }}>All</button>
+          <button onClick={() => setBrandFilter('')} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${!brandFilter ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: !brandFilter ? 'oklch(0.55 0.22 265 / .08)' : 'transparent', color: !brandFilter ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition, whiteSpace: 'nowrap', flexShrink: 0 }}>All</button>
           {brandOptions.map(b => (
-            <button key={b} onClick={() => setBrandFilter(brandFilter === b ? '' : b)} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${brandFilter === b ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: brandFilter === b ? 'rgba(99,102,241,.08)' : 'transparent', color: brandFilter === b ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition, whiteSpace: 'nowrap', flexShrink: 0 }}>{b}</button>
+            <button key={b} onClick={() => setBrandFilter(brandFilter === b ? '' : b)} style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${brandFilter === b ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: brandFilter === b ? 'oklch(0.55 0.22 265 / .08)' : 'transparent', color: brandFilter === b ? T.ac2 : T.tx2, fontFamily: T.sans, transition: T.transition, whiteSpace: 'nowrap', flexShrink: 0 }}>{b}</button>
           ))}
           <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)} style={{ background: 'transparent', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx, fontFamily: T.sans, fontSize: 11, padding: '6px 10px', outline: 'none', cursor: 'pointer', flexShrink: 0 }}><option value="">All sizes</option>{SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
         </div>
@@ -604,10 +604,10 @@ export default function BrandTagPrinter() {
             ))}
           </tr></thead>
           <tbody>
-            {rows.length === 0 && !loading && <tr><td colSpan={8} style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 10 }}>No rows. Import Excel or add SKUs.</td></tr>}
+            {rows.length === 0 && !loading && <tr><td colSpan={8} style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
             {rows.map(row => (
               <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.015)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                <td style={tdS}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: 'rgba(99,102,241,.10)', color: T.ac2 }}>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</span></td>
+                <td style={tdS}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: 'oklch(0.55 0.22 265 / .10)', color: T.ac2 }}>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</span></td>
                 <td style={tdS}><div style={{ fontFamily: T.mono, fontSize: 11, color: T.tx3 }}>{row.sku}</div><div style={{ fontWeight: 500, color: T.tx, marginTop: 1 }}>{row.product.replace(/^PRODUCT DESC:\s*/i, '')}</div></td>
                 <td style={tdS}>{row.size}</td>
                 <td style={tdS}>{row.color}</td>
@@ -615,9 +615,9 @@ export default function BrandTagPrinter() {
                 <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11, color: T.tx3 }}>{row.jioCode}</td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-                    <button onClick={() => { const old = row.copies || 0; const v = Math.max(0, old - 1); setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Decrease copies">−</button>
-                    <span style={{ width: 32, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: row.copies > 0 ? T.ac2 : T.tx3, background: row.copies > 0 ? 'rgba(99,102,241,.06)' : 'transparent' }}>{row.copies || 0}</span>
-                    <button onClick={() => { const old = row.copies || 0; const v = old + 1; setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Increase copies">+</button>
+                    <button onClick={() => { const old = row.copies || 0; const v = Math.max(0, old - 1); setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Decrease copies" className="step44">−</button>
+                    <span className="step44-val" style={{ width: 32, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: row.copies > 0 ? T.ac2 : T.tx3, background: row.copies > 0 ? 'oklch(0.55 0.22 265 / .06)' : 'transparent' }}>{row.copies || 0}</span>
+                    <button onClick={() => { const old = row.copies || 0; const v = old + 1; setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Increase copies" className="step44">+</button>
                   </div>
                 </td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }} className="bt-actions-col">

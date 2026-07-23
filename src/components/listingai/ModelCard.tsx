@@ -40,14 +40,14 @@ export default function ModelCard({ model, onSaved, addToast }: {
           <div key={o.id} onClick={() => pick(o.id)}
             style={{
               display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 8, cursor: active ? 'default' : 'pointer', marginBottom: 6,
-              border: `1px solid ${active ? 'rgba(99,102,241,.35)' : T.bd}`, background: active ? 'rgba(99,102,241,.06)' : 'transparent',
+              border: `1px solid ${active ? 'oklch(0.55 0.22 265 / .35)' : T.bd}`, background: active ? 'oklch(0.55 0.22 265 / .06)' : 'transparent',
               opacity: saving && saving !== o.id ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto',
             }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: active ? T.ac2 : 'rgba(255,255,255,.12)', flexShrink: 0, marginTop: 5 }} />
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: active ? T.ac2 : T.tx }}>{o.name}</span>
-                <span style={{ padding: '1px 7px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(34,197,94,.1)', color: T.gr, fontFamily: T.mono }}>{o.price}</span>
+                <span style={{ padding: '1px 7px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'oklch(0.72 0.19 145 / .1)', color: T.gr, fontFamily: T.mono }}>{o.price}</span>
                 {saving === o.id && <span style={{ fontSize: 10, color: T.tx3 }}>Saving…</span>}
               </span>
               <span style={{ display: 'block', fontSize: 11, color: T.tx3, marginTop: 2, lineHeight: 1.5 }}>{o.desc}</span>

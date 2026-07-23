@@ -88,11 +88,11 @@ export default function ChallanLedger({
               <div style={{ fontSize: 7, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 2 }}>Total Billed</div>
               <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>₹{total.toLocaleString('en-IN')}</div>
             </div>
-            <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.12)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
+            <div style={{ background: 'oklch(0.72 0.19 145 / .06)', border: '1px solid oklch(0.72 0.19 145 / .12)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
               <div style={{ fontSize: 7, color: T.gr, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 2 }}>Paid</div>
               <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: T.gr }}>₹{paid.toLocaleString('en-IN')}</div>
             </div>
-            <div style={{ background: outstanding > 0 ? 'rgba(239,68,68,.06)' : 'rgba(34,197,94,.06)', border: `1px solid ${outstanding > 0 ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)'}`, borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
+            <div style={{ background: outstanding > 0 ? 'oklch(0.63 0.22 25 / .06)' : 'oklch(0.72 0.19 145 / .06)', border: `1px solid ${outstanding > 0 ? 'oklch(0.63 0.22 25 / .12)' : 'oklch(0.72 0.19 145 / .12)'}`, borderRadius: 8, padding: '8px 10px', textAlign: 'center' as const }}>
               <div style={{ fontSize: 7, color: outstanding > 0 ? T.re : T.gr, letterSpacing: 1, textTransform: 'uppercase' as const, fontWeight: 600, marginBottom: 2 }}>Outstanding</div>
               <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.sora, color: outstanding > 0 ? T.re : T.gr }}>₹{outstanding.toLocaleString('en-IN')}</div>
             </div>
@@ -109,7 +109,7 @@ export default function ChallanLedger({
                     <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>#{c.challan_number}</span>
                     <span style={{ fontSize: 9, color: T.tx3 }}>{new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
                     <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: sc.bg, color: sc.color, fontWeight: 600, textTransform: 'uppercase' as const }}>{c.status}</span>
-                    {isRet && <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' as const }}>↩ Return</span>}
+                    {isRet && <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' as const }}>↩ Return</span>}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -163,7 +163,7 @@ export default function ChallanLedger({
             const csv = 'Customer,Billed,Paid,Outstanding,Challans\n' + due.map(c => `${esc(c.name)},${c.total},${c.paid},${c.outstanding},${c.count}`).join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Outstanding_Customers_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
-          }} style={{ width: '100%', marginTop: 10, padding: '7px', borderRadius: 6, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.04)', color: T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Export Outstanding ({dueCount})</button>
+          }} style={{ width: '100%', marginTop: 10, padding: '7px', borderRadius: 6, border: '1px solid oklch(0.63 0.22 25 / .2)', background: 'oklch(0.63 0.22 25 / .04)', color: T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Export Outstanding ({dueCount})</button>
         )}
       </div>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
@@ -181,10 +181,10 @@ export default function ChallanLedger({
             </div>
             {c.outstanding > 0 && (c.aging.current > 0 || c.aging.d30 > 0 || c.aging.d60 > 0 || c.aging.d90plus > 0) && (
               <div className="challan-aging-pills" style={{ display: 'flex', gap: 4, marginTop: 5, fontSize: 8, fontWeight: 600, fontFamily: T.mono }}>
-                {c.aging.current > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(34,197,94,.1)', color: T.gr }}>0-30d: ₹{c.aging.current.toLocaleString('en-IN')}</span>}
-                {c.aging.d30 > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(245,158,11,.1)', color: T.yl }}>31-60d: ₹{c.aging.d30.toLocaleString('en-IN')}</span>}
+                {c.aging.current > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'oklch(0.72 0.19 145 / .1)', color: T.gr }}>0-30d: ₹{c.aging.current.toLocaleString('en-IN')}</span>}
+                {c.aging.d30 > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'oklch(0.78 0.18 75 / .1)', color: T.yl }}>31-60d: ₹{c.aging.d30.toLocaleString('en-IN')}</span>}
                 {c.aging.d60 > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(251,146,60,.12)', color: '#FB923C' }}>61-90d: ₹{c.aging.d60.toLocaleString('en-IN')}</span>}
-                {c.aging.d90plus > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.1)', color: T.re }}>90+d: ₹{c.aging.d90plus.toLocaleString('en-IN')}</span>}
+                {c.aging.d90plus > 0 && <span style={{ padding: '1px 5px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .1)', color: T.re }}>90+d: ₹{c.aging.d90plus.toLocaleString('en-IN')}</span>}
               </div>
             )}
           </div>
@@ -192,7 +192,7 @@ export default function ChallanLedger({
         {customers.length === 0 && <div style={{ padding: 24, textAlign: 'center' as const, color: T.tx3, fontSize: 12 }}>No customers found. Search by name below.</div>}
       </div>
       {truncated && (
-        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', fontSize: 10, color: T.yl, lineHeight: 1.4 }}>
+        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6, background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .2)', fontSize: 10, color: T.yl, lineHeight: 1.4 }}>
           Totals are aggregated from the most recent challans only — older unpaid balances may be missing. Tap Load More to include older history, or search a customer by name for their complete figures.
         </div>
       )}

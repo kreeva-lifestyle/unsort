@@ -45,7 +45,7 @@ export default function RootSettings({ addToast, onChanged }: { addToast: (m: st
         <div key={i} style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.bd}`, background: r.enabled ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.005)', opacity: r.enabled ? 1 : 0.55 }}>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             <button onClick={() => patch(i, { enabled: !r.enabled })} title={r.enabled ? 'On — click to switch off' : 'Off — click to switch on'}
-              style={{ ...S.btnSm, minWidth: 44, border: `1px solid ${r.enabled ? 'rgba(34,197,94,.4)' : T.bd2}`, background: r.enabled ? 'rgba(34,197,94,.12)' : 'transparent', color: r.enabled ? T.gr : T.tx3, cursor: 'pointer' }}>
+              style={{ ...S.btnSm, minWidth: 44, border: `1px solid ${r.enabled ? 'oklch(0.72 0.19 145 / .4)' : T.bd2}`, background: r.enabled ? 'oklch(0.72 0.19 145 / .12)' : 'transparent', color: r.enabled ? T.gr : T.tx3, cursor: 'pointer' }}>
               {r.enabled ? 'ON' : 'OFF'}
             </button>
             <input value={r.label} onChange={e => patch(i, { label: e.target.value })} placeholder="Name (e.g. ARYA)" style={{ ...S.fInput, width: 110 }} />

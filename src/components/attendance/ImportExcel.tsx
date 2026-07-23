@@ -192,12 +192,12 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
           )}
           {result && (
             <div>
-              <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.2)', borderRadius: 8, padding: 12, marginBottom: 10 }}>
+              <div style={{ background: 'oklch(0.72 0.19 145 / .06)', border: '1px solid oklch(0.72 0.19 145 / .2)', borderRadius: 8, padding: 12, marginBottom: 10 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: T.gr }}>{result.inserted} entries imported</div>
                 {result.employeesCreated > 0 && <div style={{ fontSize: 11, color: T.tx2, marginTop: 4 }}>{result.employeesCreated} new employee(s) created — set their salary + fix time in the Employees tab.</div>}
               </div>
               {result.skipped.length > 0 && (
-                <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: 10, marginBottom: 10, maxHeight: 160, overflowY: 'auto' }}>
+                <div style={{ background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .2)', borderRadius: 8, padding: 10, marginBottom: 10, maxHeight: 160, overflowY: 'auto' }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: T.yl, marginBottom: 4 }}>{result.skipped.length} row(s) skipped</div>
                   {result.skipped.slice(0, 30).map((s, i) => <div key={i} style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>Row {s.row}: {s.reason}</div>)}
                   {result.skipped.length > 30 && <div style={{ fontSize: 10, color: T.tx3 }}>…and {result.skipped.length - 30} more</div>}

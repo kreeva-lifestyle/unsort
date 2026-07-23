@@ -1332,7 +1332,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Create/Edit Modal — extracted to components/challan/ChallanForm.tsx ──
   if (showModal) return (<>
     {draftRestored && !editing && (
-      <div style={{ margin: '0 16px 8px', padding: '8px 12px', borderRadius: 6, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ margin: '0 16px 8px', padding: '8px 12px', borderRadius: 6, background: 'oklch(0.72 0.19 145 / .06)', border: '1px solid oklch(0.72 0.19 145 / .15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 10, color: T.gr, fontWeight: 600 }}>Draft restored (saved {Math.round((Date.now() - draftRestoredAt) / 60000)} min ago)</span>
         <button onClick={() => { clearDraft(); closeModal(); }} style={{ ...S.btnGhost, ...S.btnSm }}>Discard</button>
       </div>
@@ -1400,7 +1400,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         <div className="challan-nav-btns" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('analytics'); await fetchAnalytics(); setViewOpening(null); setShowAnalytics(true); window.history.pushState({ view: 'analytics' }, ''); }} style={{ ...S.btnGhost, opacity: viewOpening === 'analytics' ? 0.6 : 1 }}>{viewOpening === 'analytics' ? 'Opening…' : 'Analytics'}</button>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('ledger'); await fetchLedger(); setViewOpening(null); setShowLedger(true); window.history.pushState({ view: 'ledger' }, ''); }} style={{ ...S.btnGhost, opacity: viewOpening === 'ledger' ? 0.6 : 1 }}>{viewOpening === 'ledger' ? 'Opening…' : 'Ledger'}</button>
-          {profile?.module_access?.cashbook !== false && <button onClick={() => { setShowCashBook(true); window.history.pushState({ view: 'cashbook' }, ''); }} style={{ ...S.btnGhost, color: T.gr, borderColor: 'rgba(34,197,94,.25)', background: 'rgba(34,197,94,.06)' }}>Cash Book</button>}
+          {profile?.module_access?.cashbook !== false && <button onClick={() => { setShowCashBook(true); window.history.pushState({ view: 'cashbook' }, ''); }} style={{ ...S.btnGhost, color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .25)', background: 'oklch(0.72 0.19 145 / .06)' }}>Cash Book</button>}
           <button onClick={() => { setShowModal(true); window.history.pushState({ view: 'challan-new' }, ''); }} style={S.btnPrimary} className="desktop-only">+ New Challan</button>
         </div>
       </div>
@@ -1567,7 +1567,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Void Challan?</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: confirmAction.inventoryDeducted ? 8 : 14 }}>{`Challan #${confirmAction.challanNumber} will be marked voided. This cannot be undone.`}</div>
             {confirmAction.inventoryDeducted && (
-              <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl, marginBottom: 14, textAlign: 'left' as const }}>
+              <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl, marginBottom: 14, textAlign: 'left' as const }}>
                 Inventory was {confirmAction.isReturn ? 'added back' : 'deducted'} for this challan. After voiding, you'll need to reverse the inventory {confirmAction.isReturn ? 'addition' : 'deduction'} manually.
               </div>
             )}

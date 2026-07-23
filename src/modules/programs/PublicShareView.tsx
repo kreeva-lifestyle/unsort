@@ -139,7 +139,7 @@ export default function PublicShareView({ shareToken }: Props) {
                   {fabricParts.map((p: any, i: number) => (
                     <tr key={i}><td style={tdS}>{p.part_name || '—'}</td><td style={{ ...tdS, fontFamily: T.mono, textAlign: 'right', color: T.bl, fontWeight: 600 }}>{Number(p.fabric_meter || 0).toFixed(2)}</td></tr>
                   ))}
-                  <tr style={{ background: 'rgba(56,189,248,.04)' }}>
+                  <tr style={{ background: 'oklch(0.77 0.14 230 / .04)' }}>
                     <td style={{ padding: '8px', fontSize: 11, fontWeight: 700, textAlign: 'right' }}>{t('grandTotal')}</td>
                     <td style={{ padding: '8px', fontFamily: T.mono, fontSize: 12, fontWeight: 700, color: T.bl, textAlign: 'right' }}>{fabricFM.toFixed(2)}</td>
                   </tr>
@@ -150,7 +150,7 @@ export default function PublicShareView({ shareToken }: Props) {
         )}
         {(workParts.length > 0 || fabricParts.length > 0) && (
           <>
-            <div onClick={() => setShowFB(v => !v)} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginBottom: 8, padding: '12px 16px', background: 'rgba(56,189,248,.06)', border: `1px solid rgba(56,189,248,.15)`, borderRadius: 10, cursor: 'pointer' }}>
+            <div onClick={() => setShowFB(v => !v)} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginBottom: 8, padding: '12px 16px', background: 'oklch(0.77 0.14 230 / .06)', border: `1px solid oklch(0.77 0.14 230 / .15)`, borderRadius: 10, cursor: 'pointer' }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>{t('grandFabricTotal')}</span>
               <span style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.bl }}>{(workFM + fabricFM).toFixed(2)} m</span>
               <span style={{ fontSize: 10, color: T.tx3, transform: showFB ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform .15s' }}>▶</span>

@@ -21,12 +21,12 @@ export default function LinkResult({ result, saveUrl, canSave, saving, busy, onP
   const links = result.links || [];
   const goodLinks = links.filter(l => l.url);
   return (
-    <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${result.ok ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}`, borderRadius: 10, padding: 14, marginBottom: 12, maxWidth: 720 }}>
+    <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${result.ok ? 'oklch(0.72 0.19 145 / .25)' : 'oklch(0.63 0.22 25 / .25)'}`, borderRadius: 10, padding: 14, marginBottom: 12, maxWidth: 720 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 700, fontFamily: T.mono, color: T.tx, flex: 1 }}>{result.sku}</div>
         {result.ok && saveUrl && canSave && (
           <button onClick={() => onSave(saveUrl)} disabled={saving} title="Write this folder link into the master sheet's IMAGE column"
-            style={{ ...S.btnGhost, padding: '5px 11px', fontSize: 10, color: T.bl, border: '1px solid rgba(56,189,248,.25)', background: 'rgba(56,189,248,.06)', pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
+            style={{ ...S.btnGhost, padding: '5px 11px', fontSize: 10, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)', background: 'oklch(0.77 0.14 230 / .06)', pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
             {saving ? 'Saving…' : 'Save to sheet'}
           </button>
         )}

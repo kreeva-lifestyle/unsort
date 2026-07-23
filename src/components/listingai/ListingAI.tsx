@@ -96,7 +96,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
         </div>
       </div>
       {status && !status.hasKey && (
-        <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '10px 12px', fontSize: 11, color: T.yl, marginBottom: 14 }}>
+        <div style={{ background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .2)', borderRadius: 8, padding: '10px 12px', fontSize: 11, color: T.yl, marginBottom: 14 }}>
           {isAdmin
             ? 'No Anthropic API key configured yet — add it in Settings → Listing AI.'
             : 'No Anthropic API key configured yet — ask an admin to add it in Settings → Listing AI.'}

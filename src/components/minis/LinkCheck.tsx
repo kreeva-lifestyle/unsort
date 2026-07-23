@@ -147,14 +147,14 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
           {scanning ? `Checking… ${progress.done}/${progress.total || '…'} (${pct}%)` : 'Find Broken Links'}
         </button>
         {pending > 0 && !scanning && canFix && (
-          <button onClick={() => runFix(true)} disabled={fixing} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.25)', background: 'rgba(34,197,94,.06)', opacity: fixing ? 0.6 : 1, pointerEvents: fixing ? 'none' : 'auto' }}>
+          <button onClick={() => runFix(true)} disabled={fixing} style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .25)', background: 'oklch(0.72 0.19 145 / .06)', opacity: fixing ? 0.6 : 1, pointerEvents: fixing ? 'none' : 'auto' }}>
             {fixing ? `Working… ${progress.done}/${progress.total}` : `Find Correct Links (${pending})`}
           </button>
         )}
         {replaceable > 0 && !scanning && !fixing && canFix && (
           <button onClick={() => runFix(false)} style={S.btnSuccessSolid}>Replace {replaceable} link{replaceable === 1 ? '' : 's'}</button>
         )}
-        {problems && problems.length > 0 && <button onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)' }}>Export {problems.length}</button>}
+        {problems && problems.length > 0 && <button onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)' }}>Export {problems.length}</button>}
         {connected === true && !scanning && problems === null && <span style={{ fontSize: 10, color: T.tx3 }}>Dropbox connected ✓ — checks dead, empty and WRONG links on every active product</span>}
         {connected === true && !scanning && canConnect && <button onClick={() => setConnected(false)} style={{ background: 'none', border: 'none', color: T.tx3, fontSize: 10, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>Reconnect</button>}
       </div>
@@ -175,14 +175,14 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
             <thead><tr>{['SKU', 'Tab', 'Sheet Row', 'Status', 'Link'].map(c => <th key={c} style={{ ...S.thStyle, whiteSpace: 'nowrap' as const }}>{c}</th>)}</tr></thead>
             <tbody>
               {problems.map((p, i) => (
-                <tr key={i} style={p.fixed ? { background: 'rgba(34,197,94,.05)' } : undefined}>
+                <tr key={i} style={p.fixed ? { background: 'oklch(0.72 0.19 145 / .05)' } : undefined}>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600, whiteSpace: 'nowrap' as const }}>{p.sku}</td>
                   <td style={S.tdStyle}>{p.tab}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono }}>{p.row}</td>
                   <td style={{ ...S.tdStyle, color: statusColor(p), fontWeight: 600 }}>
                     {p.fixed ? '✅ ' : p.willUse ? '🟢 ' : ''}{p.problem}
                     {canFix && p.url && !p.fixed && /^WRONG LINK/.test(p.problem) && !p.approved && (
-                      <button onClick={() => markCorrect(p, false)} title="This link IS correct for this SKU — stop flagging it" style={{ ...S.btnGhost, display: 'block', marginTop: 5, padding: '3px 9px', fontSize: 10, color: T.gr, border: '1px solid rgba(34,197,94,.3)', background: 'rgba(34,197,94,.06)' }}>Correct ✓ — don't show again</button>
+                      <button onClick={() => markCorrect(p, false)} title="This link IS correct for this SKU — stop flagging it" style={{ ...S.btnGhost, display: 'block', marginTop: 5, padding: '3px 9px', fontSize: 10, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .3)', background: 'oklch(0.72 0.19 145 / .06)' }}>Correct ✓ — don't show again</button>
                     )}
                     {p.approved && (
                       <button onClick={() => markCorrect(p, true)} style={{ background: 'none', border: 'none', color: T.tx3, fontSize: 10, cursor: 'pointer', textDecoration: 'underline', padding: 0, display: 'block', marginTop: 4 }}>Undo</button>

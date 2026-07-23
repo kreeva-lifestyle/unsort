@@ -240,7 +240,7 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
 
       {/* Reconnect banner — shown to admins after a scope/connection upload failure */}
       {needsReconnect && isAdmin && !showReconnect && !showSettings && (
-        <div style={{ position: 'absolute', top: 'max(66px, calc(env(safe-area-inset-top) + 56px))', left: 12, right: 12, zIndex: 7, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'rgba(239,68,68,.16)', border: '1px solid rgba(239,68,68,.4)', borderRadius: 12, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+        <div style={{ position: 'absolute', top: 'max(66px, calc(env(safe-area-inset-top) + 56px))', left: 12, right: 12, zIndex: 7, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'oklch(0.63 0.22 25 / .16)', border: '1px solid oklch(0.63 0.22 25 / .4)', borderRadius: 12, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
           <div style={{ flex: 1, fontSize: 11.5, color: '#fff', lineHeight: 1.4 }}>Dropbox needs reconnecting before uploads work.</div>
           <button onClick={() => setShowReconnect(true)} style={{ ...S.btnPrimary, padding: '7px 12px', fontSize: 12, flexShrink: 0 }}>Reconnect</button>
         </div>
@@ -273,7 +273,7 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 6, padding: '14px 14px calc(16px + env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 10, background: 'linear-gradient(0deg, rgba(5,7,12,.97), rgba(5,7,12,.75) 70%, transparent)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
               <span style={{ fontFamily: T.mono, fontSize: 15, fontWeight: 700, color: '#fff' }}>{dateStr}.jpg</span>
-              {pending && <span style={{ fontSize: 10, color: T.gr, background: 'rgba(34,197,94,.12)', border: '1px solid rgba(34,197,94,.25)', borderRadius: 5, padding: '2px 6px', fontWeight: 600 }}>~{pending.kb} KB</span>}
+              {pending && <span style={{ fontSize: 10, color: T.gr, background: 'oklch(0.72 0.19 145 / .12)', border: '1px solid oklch(0.72 0.19 145 / .25)', borderRadius: 5, padding: '2px 6px', fontWeight: 600 }}>~{pending.kb} KB</span>}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,.05)', border: `1px solid ${T.bd2}`, borderRadius: 9, overflow: 'hidden' }}>
@@ -281,7 +281,7 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
                 <div onClick={openDate} style={{ padding: '5px 10px', fontSize: 12, fontWeight: 700, color: T.tx, cursor: 'pointer' }}>{fmtDate(dateStr)}</div>
                 <div onClick={nextDay} style={{ width: 30, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.ac2, fontSize: 15, cursor: atToday ? 'default' : 'pointer', opacity: atToday ? 0.4 : 1 }}>›</div>
               </div>
-              <div onClick={() => setDateStr(localToday())} style={{ fontSize: 11, color: T.ac2, border: '1px solid rgba(99,102,241,.3)', background: T.ac3, borderRadius: 8, padding: '6px 10px', fontWeight: 600, cursor: 'pointer' }}>Today</div>
+              <div onClick={() => setDateStr(localToday())} style={{ fontSize: 11, color: T.ac2, border: '1px solid oklch(0.55 0.22 265 / .3)', background: T.ac3, borderRadius: 8, padding: '6px 10px', fontWeight: 600, cursor: 'pointer' }}>Today</div>
             </div>
             {/* All three lock while a rotation is in flight — uploading mid-turn
                 would send the OLD (un-rotated) image. */}

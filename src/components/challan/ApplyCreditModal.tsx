@@ -11,6 +11,7 @@ import { friendlyError } from '../../lib/friendlyError';
 import { useAuth } from '../../hooks/useAuth';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
+import { SkeletonRows } from '../ui/Skeleton';
 import type { CashChallan } from '../../types/database';
 
 type Row = Pick<CashChallan, 'id' | 'challan_number' | 'customer_name' | 'total' | 'amount_paid' | 'status' | 'created_at' | 'is_return'>;
@@ -95,7 +96,7 @@ export default function ApplyCreditModal({ challan: c, onClose, onDone, addToast
               ? <>Return <b>#{c.challan_number}</b> has <b style={{ color: T.yl }}>{inr(srcOpen)}</b> unused credit. Pick which of {c.customer_name}'s outstanding challans it pays down — no cash moves.</>
               : <>Challan <b>#{c.challan_number}</b> has <b style={{ color: T.re }}>{inr(srcOpen)}</b> pending. Pick one of {c.customer_name}'s returns to pay it down with credit — no cash moves.</>}
           </div>
-          {loading && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading…</div>}
+          {loading && <SkeletonRows rows={3} />}
           {!loading && rows.length === 0 && (
             <div style={{ padding: '24px 12px', textAlign: 'center', color: T.tx3, fontSize: 11 }}>
               {fromReturn ? 'No outstanding challans for this customer.' : 'No returns with unused credit for this customer.'}
@@ -105,7 +106,7 @@ export default function ApplyCreditModal({ challan: c, onClose, onDone, addToast
             <div style={{ border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden', marginBottom: 12, maxHeight: 220, overflowY: 'auto' }}>
               {rows.map(r => (
                 <div key={r.id} onClick={() => pick(r)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', cursor: 'pointer', borderBottom: `1px solid ${T.bd}`, background: picked?.id === r.id ? 'rgba(99,102,241,.08)' : 'transparent', borderLeft: picked?.id === r.id ? `2px solid ${T.ac}` : '2px solid transparent' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', cursor: 'pointer', borderBottom: `1px solid ${T.bd}`, background: picked?.id === r.id ? 'oklch(0.55 0.22 265 / .08)' : 'transparent', borderLeft: picked?.id === r.id ? `2px solid ${T.ac}` : '2px solid transparent' }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.mono }}>#{r.challan_number}</span>
                   <span style={{ fontSize: 10, color: T.tx3, flex: 1 }}>{r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}</span>
                   <span style={{ fontSize: 11, fontFamily: T.mono, color: fromReturn ? T.re : T.yl, fontWeight: 600 }}>
@@ -128,7 +129,7 @@ export default function ApplyCreditModal({ challan: c, onClose, onDone, addToast
               )}
             </div>
           )}
-          {err && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 12 }}>{err}</div>}
+          {err && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 12 }}>{err}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button onClick={onClose} disabled={saving} style={S.btnGhost}>Cancel</button>
             <button onClick={submit} disabled={!picked || saving}
