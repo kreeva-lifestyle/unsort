@@ -1169,7 +1169,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Complete Session */}
       {sessionCount > 0 && (
-        <div style={{ position: 'sticky', bottom: 70, zIndex: 10, paddingTop: 8 }}>
+        <div style={{ position: 'sticky', bottom: 'calc(var(--nav-h, 62px) + 8px)', zIndex: 10, paddingTop: 8 }}>
           <button onClick={() => setShowComplete(true)} style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: `1px solid rgba(34,197,94,.18)`, fontSize: 12, fontWeight: 600, fontFamily: T.sans, background: 'rgba(34,197,94,.12)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', color: T.gr, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
             <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M20 6L9 17l-5-5" /></svg>
             Complete Session

@@ -1141,7 +1141,7 @@ export default function CashBook() {
         </div>,
         document.body
       )}
-      {pendingExpDel && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, overflow: 'hidden', minWidth: 260 }}>
+      {pendingExpDel && <div style={{ position: 'fixed', bottom: 'calc(var(--nav-h, 8px) + 12px)', left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, overflow: 'hidden', minWidth: 260 }}>
         <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 12, color: T.tx, flex: 1 }}>Expense deleted</span><button onClick={undoExpDel} style={{ padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.yl, color: '#fff' }}>Undo</button><button onClick={dismissExpDel} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14, border: 'none', background: 'none' }} aria-label="Dismiss">✕</button></div>
         <div className="undo-bar" key={pendingExpDel.id} />
       </div>}
