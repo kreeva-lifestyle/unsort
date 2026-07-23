@@ -1,4 +1,13 @@
-// listing-ai Edge Function - AI Listing Module backend (v25).
+// listing-ai Edge Function - AI Listing Module backend (v26).
+//
+// v26: pre-AI category validation. New free `validate` action checks each
+// pasted SKU's master-row text against the template's garment category
+// (saved category or auto-detected from the template name) so a wrong-
+// template paste (Kurta Set SKUs into a Lehenga template) is caught
+// BEFORE any Anthropic spend. `generate` gets the same guard server-side:
+// mismatched SKUs come back status 'category_mismatch' without touching
+// Dropbox or the AI, unless the client passes force:true (the owner's
+// explicit 'Run anyway').
 //
 // v25: fix v24's asciiArg regression. Array.from iterates code POINTS, so
 // astral chars (emoji) in Dropbox paths lost their low surrogate and the
@@ -182,6 +191,8 @@ const MODELS: Record<string, { in: number; out: number }> = {
 const DEFAULT_MODEL = 'claude-haiku-4-5'; // cheapest tier - owner's pick
 const SUGGEST_MODEL = 'claude-haiku-4-5'; // suggestions are canon-validated, cheap is safe
 const SKU_CAP = 5;
+// validate covers a whole run in ONE call (no AI, master read is cached).
+const VALIDATE_CAP = 60;
 
 interface Usage { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
 
@@ -276,6 +287,42 @@ function getMasterSheetId(): string {
 }
 
 const MASTER_TABS = ['ARYA', 'DRESSTIVE'];
+
+// Garment-category taxonomy - the ONLY place keywords live (the client holds
+// ids+labels for display only). PRIORITY ORDER: first match wins, so set-type
+// phrases come before their component words ("kurta set" before "kurta"; a
+// kurta-set row that mentions its dupatta must NOT detect as dupatta).
+// Word-boundary regexes: "dress" must not match the DRESSTIVE brand name.
+const CATEGORIES: { id: string; label: string; res: RegExp[] }[] = [
+  { id: 'kurta-set',     label: 'Kurta Set',     res: [/\bkurta\s*sets?\b/, /\bkurta\s+with\b/, /\bsuit\s*sets?\b/] },
+  { id: 'lehenga-choli', label: 'Lehenga Choli', res: [/\blah?enga\b/, /\bghagra\b/, /\bcholi\b/] },
+  { id: 'sharara',       label: 'Sharara Set',   res: [/\bsharara\b/, /\bgharara\b/] },
+  { id: 'palazzo',       label: 'Palazzo Set',   res: [/\bpalazz?o\b/] },
+  { id: 'anarkali',      label: 'Anarkali',      res: [/\banarkali\b/] },
+  { id: 'coord',         label: 'Co-ord Set',    res: [/\bco-?\s?ords?\b/] },
+  { id: 'saree',         label: 'Saree',         res: [/\bsarees?\b/, /\bsaris?\b/] },
+  { id: 'gown',          label: 'Gown',          res: [/\bgowns?\b/] },
+  { id: 'kurta',         label: 'Kurta / Kurti', res: [/\bkurtas?\b/, /\bkurtis?\b/] },
+  { id: 'dress',         label: 'Dress',         res: [/\bdress(es)?\b/] },
+  { id: 'dupatta',       label: 'Dupatta',       res: [/\bdupatt?a\b/, /\bchunni\b/, /\bodhni\b/] },
+];
+// Detected X is ACCEPTABLE for a template of category Y (no warning) -
+// marketplaces commonly file sharara/palazzo/anarkali sets under kurta sets.
+const CAT_COMPAT: Record<string, string[]> = {
+  'kurta-set': ['sharara', 'palazzo', 'anarkali', 'kurta'],
+  'anarkali': ['kurta-set', 'gown'],
+  'kurta': ['kurta-set'],
+  'sharara': ['kurta-set'],
+  'palazzo': ['kurta-set'],
+};
+const detectCategory = (text: string): string | null => {
+  const t = String(text || '').toLowerCase();
+  for (const c of CATEGORIES) if (c.res.some(re => re.test(t))) return c.id;
+  return null;
+};
+const catLabel = (id: string | null) => CATEGORIES.find(c => c.id === id)?.label ?? null;
+const catCompatible = (tplCat: string, detected: string) =>
+  tplCat === detected || (CAT_COMPAT[tplCat] || []).includes(detected);
 
 const normSku = (v: unknown) => String(v ?? '').trim().toUpperCase();
 
@@ -756,7 +803,7 @@ function finalizeRow(
 // into a wrong enum - a list beyond the cap is treated as free text (defense
 // in depth; the client already drops them at parse time).
 async function loadTemplateFields(templateId: string): Promise<{ tpl: any; fields: TplField[]; rules: TplRule[] } | { error: string }> {
-  const tr = await fetch(`${SB_URL}/rest/v1/listing_templates?id=eq.${encodeURIComponent(templateId)}&select=name,marketplace,fields,rules`, { headers: svcHeaders });
+  const tr = await fetch(`${SB_URL}/rest/v1/listing_templates?id=eq.${encodeURIComponent(templateId)}&select=name,marketplace,fields,rules,category`, { headers: svcHeaders });
   const trows = await tr.json().catch(() => []);
   const tpl = trows?.[0];
   if (!tpl) return { error: 'Template not found - save it again in Manage Templates' };
@@ -832,6 +879,28 @@ async function readMasterTabs(warnings: string[]): Promise<{ tabs: MasterTab[]; 
 }
 
 const brandOfTab = (tab: string) => tab === 'ARYA' ? 'ARYA' : 'DRESSTIVE';
+
+type SkuIndexRow = { tab: string; headers: string[]; row: string[] };
+function buildSkuIndex(tabs: MasterTab[]): Record<string, SkuIndexRow> {
+  const index: Record<string, SkuIndexRow> = {};
+  for (const t of tabs) {
+    const skuIdx = skuColIndex(t.headers);
+    for (let i = 1; i < t.rows.length; i++) {
+      const s2 = normSku(t.rows[i][skuIdx]);
+      if (s2 && !index[s2]) index[s2] = { tab: t.tab, headers: t.headers, row: t.rows[i] };
+    }
+  }
+  return index;
+}
+// Master-row text for the AI source AND category detection - same header
+// filter, so PRICE/GST/IMAGE noise can't fake a garment keyword.
+function rowTextOf(m: SkuIndexRow): string {
+  return m.headers
+    .map((h, i) => ({ h, v: String(m.row[i] ?? '').trim() }))
+    .filter(x => x.h && x.v && !EXCLUDE_SRC.test(x.h))
+    .map(x => `${x.h}: ${x.v}`)
+    .join('\n');
+}
 
 // ---- Anthropic -------------------------------------------------------------
 
@@ -975,6 +1044,40 @@ Deno.serve(async (req) => {
       const { tabs, masterHeaders } = await readMasterTabs(warnings);
       if (tabs.length === 0) return fail(502, 'Could not read the master sheet', req, warnings.join('; '));
       return json({ ok: true, columns: [...masterHeaders.values()].sort() }, req);
+    }
+
+    // Free pre-generation check: is each SKU in the master sheet, and does
+    // its master-row text look like this template's garment category? One
+    // call for the whole run, zero AI tokens - catches a wrong-template
+    // paste BEFORE any Anthropic spend. Warns only on positive evidence:
+    // a row whose text names no garment never flags.
+    if (action === 'validate') {
+      const role = await callerRole(req);
+      if (!role || !['admin', 'manager'].includes(role)) return fail(403, 'Only admin or manager can use Listing AI', req);
+      const rawItems: { sku: string }[] = (Array.isArray(body?.items) ? body.items : [])
+        .map((it: any) => ({ sku: normSku(it?.sku) }))
+        .filter((it: any) => it.sku);
+      const seen = new Set<string>();
+      const lines = rawItems.filter(it => { if (seen.has(it.sku)) return false; seen.add(it.sku); return true; }).slice(0, VALIDATE_CAP);
+      const templateId = String(body?.templateId || '').trim();
+      if (lines.length === 0) return fail(400, 'No SKUs provided', req);
+      if (!templateId) return fail(400, 'No template selected', req);
+      const loaded = await loadTemplateFields(templateId);
+      if ('error' in loaded) return fail(404, loaded.error, req);
+      const tplCat: string | null = loaded.tpl.category || detectCategory(String(loaded.tpl.name || ''));
+      const categorySource = loaded.tpl.category ? 'saved' : (tplCat ? 'name' : null);
+      const warnings: string[] = [];
+      const { tabs } = await readMasterTabs(warnings);
+      if (tabs.length === 0) return fail(502, 'Could not read the master sheet', req, warnings.join('; '));
+      const index = buildSkuIndex(tabs);
+      const results = lines.map(ln => {
+        const m = index[ln.sku];
+        if (!m) return { sku: ln.sku, found: false, detected: null, detectedLabel: null, mismatch: false };
+        const detected = detectCategory(rowTextOf(m));
+        const mismatch = !!(tplCat && detected && !catCompatible(tplCat, detected));
+        return { sku: ln.sku, found: true, detected, detectedLabel: catLabel(detected), mismatch };
+      });
+      return json({ ok: true, templateCategory: tplCat, templateCategoryLabel: catLabel(tplCat), categorySource, results, warnings }, req);
     }
 
     // Free, deterministic: every distinct master value per template dropdown
@@ -1197,19 +1300,16 @@ Deno.serve(async (req) => {
       const loaded = await loadTemplateFields(templateId);
       if ('error' in loaded) return fail(404, loaded.error, req);
       const { tpl, fields, rules: tplRules } = loaded;
+      // Category guard inputs: force=true is the owner's explicit 'Run
+      // anyway' from the preflight panel - it disables the mismatch skip.
+      const force = body?.force === true;
+      const tplCat: string | null = tpl.category || detectCategory(String(tpl.name || ''));
 
       // Master sheet first: its headers feed classification (a template
       // column with the same name as a master column copies OUR value).
       const warnings: string[] = [];
       const { tabs, masterHeaders } = await readMasterTabs(warnings);
-      const index: Record<string, { tab: string; headers: string[]; row: string[] }> = {};
-      for (const t of tabs) {
-        const skuIdx = skuColIndex(t.headers);
-        for (let i = 1; i < t.rows.length; i++) {
-          const s = normSku(t.rows[i][skuIdx]);
-          if (s && !index[s]) index[s] = { tab: t.tab, headers: t.headers, row: t.rows[i] };
-        }
-      }
+      const index = buildSkuIndex(tabs);
       if (Object.keys(index).length === 0) return fail(502, 'Could not read the master sheet', req, warnings.join('; '));
 
       const classified = classifyFields(fields, masterHeaders);
@@ -1278,11 +1378,19 @@ Deno.serve(async (req) => {
         rootPaths = await resolveImageRoots(dbxToken);
       } catch { /* no images */ }
 
-      interface Item { sku: string; status: 'ok' | 'not_in_master' | 'bad_link'; tab?: string; headers?: string[]; row?: string[]; srcText?: string; img?: string | null; imgPaths?: string[]; imgLinks?: string[]; note?: string; linkSource?: string }
+      interface Item { sku: string; status: 'ok' | 'not_in_master' | 'bad_link' | 'category_mismatch'; tab?: string; headers?: string[]; row?: string[]; srcText?: string; img?: string | null; imgPaths?: string[]; imgLinks?: string[]; note?: string; linkSource?: string }
       const items: Item[] = [];
       for (const ln of lines) {
         const m = index[ln.sku];
         if (!m) { items.push({ sku: ln.sku, status: 'not_in_master' }); continue; }
+        // Wrong-template guard: skip BEFORE any Dropbox/thumbnail/AI work.
+        if (!force && tplCat) {
+          const det = detectCategory(rowTextOf(m));
+          if (det && !catCompatible(tplCat, det)) {
+            items.push({ sku: ln.sku, status: 'category_mismatch', note: `Looks like ${catLabel(det)} in the master sheet, but this template is ${catLabel(tplCat)}` });
+            continue;
+          }
+        }
         // Photo source priority: typed one-off link (loud failure) -> the
         // owner's Image Folders -> the master sheet's own IMAGE column link
         // -> Link Generator roots.
@@ -1309,11 +1417,7 @@ Deno.serve(async (req) => {
             try { imgPaths = await findSkuImagePaths(dbxToken, rootPaths, ln.sku); if (imgPaths.length) linkSource = 'search'; } catch { imgPaths = []; }
           }
         }
-        const srcText = m.headers
-          .map((h, i) => ({ h, v: String(m.row[i] ?? '').trim() }))
-          .filter(x => x.h && x.v && !EXCLUDE_SRC.test(x.h))
-          .map(x => `${x.h}: ${x.v}`)
-          .join('\n');
+        const srcText = rowTextOf(m);
         let img: string | null = null;
         if (dbxToken && imgPaths.length) { try { img = await thumbB64(dbxToken, imgPaths[0]); } catch { img = null; } }
         items.push({ sku: ln.sku, status: 'ok', tab: m.tab, headers: m.headers, row: m.row, srcText, img, imgPaths, linkSource });

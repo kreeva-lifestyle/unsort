@@ -1,11 +1,15 @@
-// RateCard Studio — catalog name + hero photo + Excel → glassmorphic
-// rate-card JPG (WhatsApp-ready). Fully client-side: nothing is uploaded
-// or saved; the image is drawn on a canvas by renderRateCard.ts.
+// RateCard Studio — catalog name + hero photo + rate rows → glassmorphic
+// rate-card JPG (WhatsApp-ready). Rows come from an Excel import OR the
+// in-app manual editor (same finalize pass either way). Fully client-side:
+// nothing is uploaded or saved (the manual draft lives in localStorage);
+// the image is drawn on a canvas by renderRateCard.ts.
 import { useState, useEffect, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { parseRateSheet, ParsedRateSheet } from './parseRateSheet';
 import { renderRateCard } from './renderRateCard';
+import ManualRateEditor from './ManualRateEditor';
+import RateCardActions from './RateCardActions';
 
 const SCRIPT_FONT_URL = 'https://fonts.gstatic.com/s/greatvibes/v21/RWmMoKWR9v4ksMfaWd_JN9XFiaQoDmlr.woff2';
 const DEFAULT_DISCLAIMER = 'ALL RATES ARE FLAT NO DISCOUNT AND EXCLUSIVE OF GST AND SHIPPING';
@@ -22,6 +26,7 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
   const [disclaimer, setDisclaimer] = useState(DEFAULT_DISCLAIMER);
   const [heroUrl, setHeroUrl] = useState('');
   const [heroName, setHeroName] = useState('');
+  const [mode, setMode] = useState<'import' | 'manual'>('import');
   const [parsed, setParsed] = useState<ParsedRateSheet | null>(null);
   const [excelName, setExcelName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -59,7 +64,15 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
     reader.readAsArrayBuffer(f);
   };
 
-  const ready = catalogName.trim() && heroUrl && parsed && parsed.rows.length > 0;
+  const setMode2 = (m: 'import' | 'manual') => {
+    if (m === mode) return;
+    // Rows don't carry across modes; the manual draft survives in localStorage
+    // and re-feeds parsed when its editor remounts.
+    setMode(m); setParsed(null); setExcelName(''); setResult(null);
+  };
+
+  const blocked = (parsed?.blockers.length ?? 0) > 0;
+  const ready = catalogName.trim() && heroUrl && parsed && parsed.rows.length > 0 && !blocked;
 
   const generate = async () => {
     if (busy || !ready || !parsed) return;
@@ -81,46 +94,15 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
     setBusy(false);
   };
 
-  const fileName = () => `RateCard-${catalogName.trim().replace(/[^\w-]+/g, '_') || 'catalog'}.jpg`;
-
-  const share = async () => {
-    if (!result) return;
-    const file = new File([result.blob], fileName(), { type: 'image/jpeg' });
-    try {
-      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: catalogName.trim() });
-      else download();
-    } catch (e: any) { if (e?.name !== 'AbortError') addToast(friendlyError(e), 'error'); }
-  };
-
-  const download = () => {
-    if (!result) return;
-    const a = document.createElement('a');
-    a.href = result.url; a.download = fileName(); a.click();
-  };
-
-  // Send to WhatsApp. There is no way to attach an image to a specific number
-  // from the web, so on a phone we share the image file (WhatsApp shows up in
-  // the share sheet); on desktop we save the image and open WhatsApp Web so the
-  // user can drop it into a chat.
-  const whatsapp = async () => {
-    if (!result) return;
-    const file = new File([result.blob], fileName(), { type: 'image/jpeg' });
-    const text = `${catalogName.trim() || 'Rate card'} — rate card`;
-    if (navigator.canShare?.({ files: [file] }) && navigator.share) {
-      try { await navigator.share({ files: [file], title: catalogName.trim(), text }); }
-      catch (e: any) { if (e?.name !== 'AbortError') addToast(friendlyError(e), 'error'); }
-      return;
-    }
-    download();
-    addToast('Image saved — attach it in the WhatsApp chat', 'success');
-    window.open('https://web.whatsapp.com', '_blank', 'noopener');
-  };
-
   const pickBox = (label: string, value: string, onClick: () => void) => (
     <div onClick={onClick} style={{ padding: '14px 14px', borderRadius: 8, border: `1px dashed ${value ? 'oklch(0.72 0.19 145 / .35)' : T.bd2}`, background: value ? 'oklch(0.72 0.19 145 / .05)' : T.glass1, cursor: 'pointer', minHeight: 44 }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: value ? T.gr : T.tx2 }}>{label}</div>
       <div style={{ fontSize: 10, color: T.tx3, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || 'Tap to choose'}</div>
     </div>
+  );
+
+  const modeBtn = (m: 'import' | 'manual', label: string) => (
+    <button onClick={() => setMode2(m)} style={mode === m ? { ...S.btnPrimary, ...S.btnSm, minHeight: 32 } : { ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>{label}</button>
   );
 
   return (
@@ -130,26 +112,37 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
           <label style={S.fLabel}>Catalog Name</label>
           <input value={catalogName} onChange={e => { setCatalogName(e.target.value); setResult(null); }} placeholder="e.g. Tehzeeb" style={{ ...S.fInput, width: '100%' }} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+          {modeBtn('import', 'Import Excel')}
+          {modeBtn('manual', 'Build manually')}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: mode === 'import' ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 10 }}>
           {pickBox('Catalog Photo', heroName, () => heroRef.current?.click())}
-          {pickBox('Rate Excel', excelName ? `${excelName} · ${parsed?.rows.length ?? 0} designs` : '', () => xlsRef.current?.click())}
+          {mode === 'import' && pickBox('Rate Excel', excelName ? `${excelName} · ${parsed?.rows.length ?? 0} designs` : '', () => xlsRef.current?.click())}
         </div>
         <input ref={heroRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickHero(f); e.target.value = ''; }} />
         <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickExcel(f); e.target.value = ''; }} />
+        {mode === 'manual' && <ManualRateEditor onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} />}
         {heroUrl && <img src={heroUrl} alt="Catalog" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: `1px solid ${T.bd}`, marginBottom: 10 }} />}
         {parsed && parsed.stats && (
           <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10, fontFamily: T.mono }}>
             {parsed.stats.designs} designs{parsed.stats.total > 0 ? ` · avg RS.${parsed.stats.avg.toLocaleString('en-IN')} · total RS.${parsed.stats.total.toLocaleString('en-IN')}` : ''}
           </div>
         )}
+        {/* blockers — the all-or-nothing price rule; Generate stays disabled */}
+        {parsed && blocked && (
+          <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10, lineHeight: 1.6 }}>
+            {parsed.blockers.map((b, i) => <div key={i}>• {b}</div>)}
+          </div>
+        )}
         {/* smart checks — GST slab autocorrect, duplicate SKUs, price/rounding notes */}
-        {parsed && (parsed.warnings.length > 0 ? (
+        {parsed && !blocked && (parsed.warnings.length > 0 ? (
           <div style={{ background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: T.yl, marginBottom: 4, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Smart checks — {parsed.warnings.length} note{parsed.warnings.length === 1 ? '' : 's'}</div>
             {parsed.warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: T.tx2, lineHeight: 1.6 }}>• {w}</div>)}
           </div>
         ) : (
-          <div style={{ fontSize: 11, color: T.gr, marginBottom: 10 }}>✓ Smart checks passed — GST slabs, SKUs and totals all look right</div>
+          <div style={{ fontSize: 11, color: T.gr, marginBottom: 10 }}>✓ Smart checks passed — {parsed.priceCol ? 'GST slabs, SKUs and totals all look right' : 'SKUs look right (price-less card)'}</div>
         ))}
         <div style={{ marginBottom: 12 }}>
           <label style={S.fLabel}>Bottom Note</label>
@@ -160,17 +153,8 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
         </button>
       </div>
 
-      {result && (
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 12 }}>
-          <img src={result.url} alt="Rate card preview" style={{ width: '100%', borderRadius: 8, display: 'block', marginBottom: 10 }} />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={whatsapp} style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center', background: T.gr, border: 'none', color: '#fff' }}>WhatsApp</button>
-            <button onClick={share} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Share</button>
-            <button onClick={download} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Save</button>
-          </div>
-        </div>
-      )}
-      {!result && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Fill the catalog name, pick the photo and import the rate Excel — then Generate to get a WhatsApp-ready image.</div>}
+      {result && <RateCardActions result={result} catalogName={catalogName} addToast={addToast} />}
+      {!result && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Fill the catalog name, pick the photo and {mode === 'import' ? 'import the rate Excel' : 'type the rows'} — then Generate to get a WhatsApp-ready image.</div>}
     </div>
   );
 }
