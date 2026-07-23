@@ -26,6 +26,12 @@ export const buildMasterSheet = (rows: MasterRow[], chosen: string[]): Finalized
     const row: Record<string, string> = { SKU: r.sku };
     for (const c of chosen) {
       let v = r.values[c] || '';
+      // The two master tabs may spell the price header differently ("PRICE"
+      // vs "RATE"). The card keeps ONE price column, so a row whose price
+      // lives under the other spelling falls back to any price-like key —
+      // otherwise a fully-priced cross-tab card hits the missing-price
+      // blocker for no real reason.
+      if (c === priceCol && !v) v = Object.entries(r.values).find(([k]) => isPriceHeader(k))?.[1] || '';
       if (c === priceCol && /^\d+(?:\.\d+)?$/.test(v)) v = `${v}/- +${Number(v) > GST_BOUNDARY ? 18 : 5}%(GST)`;
       row[c] = v;
     }
@@ -79,8 +85,10 @@ export default function MasterRateCard({ onSheet, addToast }: {
   };
 
   const fetchRows = async () => {
-    const skus = parseSkuLines(skuText).map(l => l.sku);
+    let skus = parseSkuLines(skuText).map(l => l.sku);
     if (skus.length === 0) { addToast('Type at least one SKU', 'error'); return; }
+    // Server caps at 200 — cap here too so no SKU is ever dropped silently.
+    if (skus.length > 200) { addToast(`Capped to the first 200 SKUs (of ${skus.length}) — split the rest into a second card`, 'error'); skus = skus.slice(0, 200); }
     setBusy(true);
     try {
       const { status, data } = await call({ action: 'ratecard_rows', skus });
