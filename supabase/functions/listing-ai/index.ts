@@ -1,4 +1,11 @@
-// listing-ai Edge Function - AI Listing Module backend (v27).
+// listing-ai Edge Function - AI Listing Module backend (v28).
+//
+// v28: ratecard_rows returns EVERY column of the tabs the found SKUs
+// live on (sheet order) plus colCounts (how many of the found SKUs have
+// data per column). v27 only returned non-empty columns, so a column
+// whose cell happened to be blank for the typed SKUs silently vanished
+// from the picker - now it shows with a 0/N count instead, and the
+// client can warn per-SKU when a chosen column has gaps.
 //
 // v27: `ratecard_rows` action for RateCard Studio's From-Master mode.
 // Given SKUs it returns each one's master row (values keyed by the
@@ -1106,22 +1113,33 @@ Deno.serve(async (req) => {
       const { tabs } = await readMasterTabs(warnings);
       if (tabs.length === 0) return fail(502, 'Could not read the master sheet', req, warnings.join('; '));
       const index = buildSkuIndex(tabs);
-      const columns: string[] = []; // uppercased, first-seen order, only non-empty for these SKUs
+      // EVERY column of the tabs the found SKUs live on, in sheet order -
+      // an empty cell must not hide a column from the picker. colCounts says
+      // how many of the found SKUs actually carry data per column.
+      const columns: string[] = [];
+      const colCounts: Record<string, number> = {};
+      const usedTabs = new Set<string>();
       const rows = skus.map((sku: string) => {
         const m = index[sku];
         if (!m) return { sku, found: false, category: null, categoryLabel: null, values: {} };
+        if (!usedTabs.has(m.tab)) {
+          usedTabs.add(m.tab);
+          for (const h of m.headers) {
+            const label = String(h || '').trim().toUpperCase();
+            if (label && !columns.includes(label)) { columns.push(label); colCounts[label] = colCounts[label] ?? 0; }
+          }
+        }
         const values: Record<string, string> = {};
         m.headers.forEach((h, i) => {
           const label = String(h || '').trim().toUpperCase();
           const v = String(m.row[i] ?? '').trim();
           if (!label || !v) return;
-          if (values[label] === undefined) values[label] = v; // first spelling wins on dup headers
-          if (!columns.includes(label)) columns.push(label);
+          if (values[label] === undefined) { values[label] = v; colCounts[label] = (colCounts[label] ?? 0) + 1; } // first spelling wins on dup headers
         });
         const category = detectCategory(rowTextOf(m));
         return { sku, found: true, category, categoryLabel: catLabel(category), values };
       });
-      return json({ ok: true, columns, rows, warnings }, req);
+      return json({ ok: true, columns, colCounts, rows, warnings }, req);
     }
 
     // Free, deterministic: every distinct master value per template dropdown

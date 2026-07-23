@@ -53,7 +53,7 @@ export default function MasterRateCard({ onSheet, addToast }: {
 }) {
   const [skuText, setSkuText] = useState('');
   const [busy, setBusy] = useState(false);
-  const [fetched, setFetched] = useState<{ columns: string[]; rows: MasterRow[] } | null>(null);
+  const [fetched, setFetched] = useState<{ columns: string[]; colCounts: Record<string, number>; rows: MasterRow[] } | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
 
   const found = fetched?.rows.filter(r => r.found) ?? [];
@@ -64,8 +64,19 @@ export default function MasterRateCard({ onSheet, addToast }: {
   // gets its SKU column from the typed list.
   const pickable = (fetched?.columns ?? []).filter(c => !SKU_ALIASES.includes(norm(c)));
 
-  const emit = (rows: MasterRow[], cols: string[], isMixed: boolean) =>
-    onSheet(!isMixed && rows.length ? buildMasterSheet(rows, cols) : null);
+  const emit = (rows: MasterRow[], cols: string[], isMixed: boolean) => {
+    if (isMixed || !rows.length) { onSheet(null); return; }
+    const sheet = buildMasterSheet(rows, cols);
+    // A chosen column with master gaps still renders (as "—") — but say so
+    // per SKU, so the owner fixes the master instead of wondering where the
+    // data went. Price gaps already hit the all-or-nothing blocker.
+    for (const c of cols) {
+      if (c === sheet.priceCol) continue;
+      const gaps = rows.filter(r => !(r.values[c] || '').trim()).map(r => r.sku);
+      if (gaps.length) sheet.warnings.push(`${c} is empty in the master sheet for ${gaps.join(', ')} — shown as "—" on the card`);
+    }
+    onSheet(sheet);
+  };
 
   const fetchRows = async () => {
     const skus = parseSkuLines(skuText).map(l => l.sku);
@@ -76,13 +87,14 @@ export default function MasterRateCard({ onSheet, addToast }: {
       if (!data?.ok) throw new Error(String(data?.details || data?.error || `Fetch failed (${status})`));
       const rows = (data.rows || []) as MasterRow[];
       const columns = (data.columns || []) as string[];
+      const colCounts = (data.colCounts || {}) as Record<string, number>;
       const okRows = rows.filter(r => r.found);
       // Restore the owner's last column picks, filtered to what exists now.
       let picks: string[] = [];
       try { const saved = JSON.parse(localStorage.getItem(COLS_KEY) || '[]') as string[]; picks = columns.filter(c => saved.includes(c)); } catch { picks = []; }
       if (!picks.length) { const p = columns.find(c => isPriceHeader(c)); picks = p ? [p] : []; }
       picks = picks.filter(c => !SKU_ALIASES.includes(norm(c)));
-      setFetched({ columns, rows });
+      setFetched({ columns, colCounts, rows });
       setChosen(picks);
       emit(okRows, picks, categoryGroups(okRows).length > 1);
       for (const w of (data.warnings || []) as string[]) addToast(w, 'error');
@@ -98,12 +110,19 @@ export default function MasterRateCard({ onSheet, addToast }: {
     emit(found, next, mixed);
   };
 
+  // Chips show a data count when some fetched SKUs lack a value ("0/3" =
+  // the column exists on the tab but is empty for every typed SKU) — a
+  // column must never just vanish from the picker.
+  const countOf = (c: string) => {
+    const n = fetched?.colCounts?.[c];
+    return n === undefined || n >= found.length ? '' : ` · ${n}/${found.length}`;
+  };
   const chip = (c: string, on: boolean, locked: boolean) => (
     <button key={c} onClick={() => !locked && toggleCol(c)} aria-pressed={on}
       style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: locked ? 'default' : 'pointer', minHeight: 32,
         background: on ? 'oklch(0.55 0.22 265 / .10)' : 'rgba(255,255,255,.02)',
         border: `1px solid ${on ? 'oklch(0.55 0.22 265 / .35)' : T.bd}`, color: on ? T.ac2 : T.tx3 }}>
-      {on ? '✓ ' : ''}{c}{locked ? ' (always)' : ''}
+      {on ? '✓ ' : ''}{c}{locked ? ' (always)' : countOf(c)}
     </button>
   );
 
