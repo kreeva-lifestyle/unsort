@@ -129,7 +129,10 @@ export default function TaughtMappingsPage({ onBack, onBulk, fields, addToast }:
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '12px 16px' }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search mappings…" style={{ ...S.fInput, flex: '2 1 180px', minWidth: 160 }} />
+          <div style={{ position: 'relative', flex: '2 1 180px', minWidth: 160 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.tx3} strokeWidth="1.8" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', opacity: 0.5, pointerEvents: 'none' }}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" /></svg>
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search mappings…" style={{ ...S.fSearch, width: '100%' }} />
+          </div>
           <select value={colFilter} onChange={e => { setColFilter(e.target.value); setPage(0); }} style={{ ...S.fInput, flex: '1 1 130px', minWidth: 120 }}>
             <option value="">All columns</option>
             {labels.map(l => <option key={l.key} value={l.key}>{l.label}</option>)}

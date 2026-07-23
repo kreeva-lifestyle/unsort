@@ -1536,7 +1536,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
       {/* WhatsApp Share Bar */}
       {whatsAppShare && (
-        <div style={{ position: 'fixed', bottom: 'calc(80px + env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)', zIndex: 300, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '10px 14px', boxShadow: '0 8px 30px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 12, animation: 'su .2s ease', minWidth: 280 }}>
+        <div style={{ position: 'fixed', bottom: 'calc(var(--nav-h, 70px) + 10px)', left: '50%', transform: 'translateX(-50%)', zIndex: 300, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '10px 14px', boxShadow: '0 8px 30px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 12, animation: 'su .2s ease', minWidth: 280 }}>
           <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: 'none', stroke: T.ac2, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', flexShrink: 0 }}><rect x="5" y="2" width="14" height="20" rx="3" /><path d="M5 6h14M5 18h14" /><circle cx="12" cy="20" r=".5" fill={T.ac2} /></svg>
           <span style={{ flex: 1, fontSize: 12, color: T.tx }}>Share on WhatsApp?</span>
           <button onClick={() => { window.location.href = whatsAppShare.url; setWhatsAppShare(null); }} style={{ ...S.btnPrimary, background: '#25D366', boxShadow: 'none', gap: 4, fontSize: 11 }}>Send</button>

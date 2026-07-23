@@ -916,7 +916,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             <td style={S.tdStyle}>
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                 <button onClick={() => openComps(item)} style={{ ...S.btnPrimary, ...S.btnSm }}>View</button>
-                {!isCompletedView && item.status !== 'dry_clean' && completablePairs[item.id]?.length > 0 && <button onClick={() => setShowCompleteModal({ itemId: item.id })} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600, fontFamily: T.sans, background: 'rgba(16,185,129,.12)', color: T.gr, display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' as const }}>Complete ({completablePairs[item.id].length})</button>}
+                {!isCompletedView && item.status !== 'dry_clean' && completablePairs[item.id]?.length > 0 && <button onClick={() => setShowCompleteModal({ itemId: item.id })} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600, fontFamily: T.sans, background: 'rgba(34,197,94,.12)', color: T.gr, display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' as const }}>Complete ({completablePairs[item.id].length})</button>}
                 {isCompletedView && canEdit && <button onClick={async () => { if (await ask({ title: item.paired_with ? 'Revert paired items?' : 'Revert this item?', message: item.paired_with ? 'This will revert BOTH paired items back to Inventory.' : 'This item will return to Inventory.', confirmLabel: 'Revert', danger: true })) handleCancelCompletion(item.id); }} style={{ ...S.btnSm, padding: '4px 10px', borderRadius: 5, border: '1px solid rgba(251,191,36,.15)', cursor: 'pointer', fontSize: 10, fontWeight: 600, fontFamily: T.sans, background: 'rgba(251,191,36,.05)', color: T.yl, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' as const }}>Revert{item.paired_with ? ' Both' : ''}</button>}
                 {canEdit && <button onClick={() => openEdit(item)} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</button>}
                 {canEdit && <button onClick={() => handleDelete(item.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Del</button>}
@@ -1166,8 +1166,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         const selectedPair = showCompleteModal.pairId ? items.find(i => i.id === showCompleteModal.pairId) : null;
 
         return (<div style={S.modalOverlay}><div className="modal-inner" style={{ ...S.modalBox, width: 540, maxWidth: '100%' }}>
-          <div style={{ ...S.modalHead, background: 'rgba(16,185,129,.06)', borderBottom: '1px solid rgba(16,185,129,.2)' }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#10b981' }}>Complete Product</span>
+          <div style={{ ...S.modalHead, background: 'rgba(34,197,94,.06)', borderBottom: '1px solid rgba(34,197,94,.2)' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: T.gr }}>Complete Product</span>
           </div>
           <div style={{ padding: 18 }}>
             {/* Current item */}
@@ -1188,10 +1188,10 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
               {pairItems.map((b: any) => {
                 const missingB = itemMissing[b.id] || [];
                 const isSelected = showCompleteModal.pairId === b.id;
-                return <div key={b.id} onClick={() => setShowCompleteModal({ ...showCompleteModal, pairId: b.id })} style={{ background: isSelected ? 'rgba(16,185,129,.08)' : T.s2, border: `1px solid ${isSelected ? 'rgba(16,185,129,.4)' : T.bd}`, borderRadius: T.r, padding: 12, marginBottom: 6, cursor: 'pointer', transition: 'all .15s' }}>
+                return <div key={b.id} onClick={() => setShowCompleteModal({ ...showCompleteModal, pairId: b.id })} style={{ background: isSelected ? 'rgba(34,197,94,.08)' : T.s2, border: `1px solid ${isSelected ? 'rgba(34,197,94,.4)' : T.bd}`, borderRadius: T.r, padding: 12, marginBottom: 6, cursor: 'pointer', transition: 'all .15s' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isSelected ? '#10b981' : T.bd2}`, background: isSelected ? '#10b981' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 700, flexShrink: 0 }}>{isSelected && '✓'}</div>
+                      <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isSelected ? T.gr : T.bd2}`, background: isSelected ? T.gr : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 700, flexShrink: 0 }}>{isSelected && '✓'}</div>
                       <span style={{ fontSize: 11, fontFamily: T.mono, color: T.gr }}>{b.batch_number}</span>
                       {b.serial_number && <span style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2 }}>{b.serial_number}</span>}
                       {b.size && <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: T.s3, color: T.tx2 }}>{b.size}</span>}
@@ -1204,7 +1204,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
                       : <span style={{ fontSize: 10, color: T.gr }}>All components present</span>
                     }
                   </div>
-                  {isSelected && <div style={{ marginLeft: 26, marginTop: 6, fontSize: 11, color: '#10b981' }}>Combined = <strong>Complete {itemA.products?.name}</strong></div>}
+                  {isSelected && <div style={{ marginLeft: 26, marginTop: 6, fontSize: 11, color: T.gr }}>Combined = <strong>Complete {itemA.products?.name}</strong></div>}
                 </div>;
               })}
             </div>

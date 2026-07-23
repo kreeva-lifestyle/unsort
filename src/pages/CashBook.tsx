@@ -860,13 +860,13 @@ export default function CashBook() {
                   </div>
                 )}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4, fontFamily: T.mono }}>
-                  <span style={{ color: T.tx2 }}>Opening Balance</span><span style={{ color: T.tx2 }}>₹{handBreakdown.opening.toFixed(2)}</span>
-                  <span style={{ color: T.gr }}>+ Cash Sales</span><span style={{ color: T.gr }}>+₹{handBreakdown.cashSales.toFixed(2)}</span>
-                  {handBreakdown.cashReturns > 0 && <><span style={{ color: T.re }}>− Cash Returns</span><span style={{ color: T.re }}>−₹{handBreakdown.cashReturns.toFixed(2)}</span></>}
-                  <span style={{ color: T.re }}>− Cash Expenses</span><span style={{ color: T.re }}>−₹{handBreakdown.expenses.toFixed(2)}</span>
-                  {handBreakdown.previousHandovers > 0 && <><span style={{ color: T.yl }}>− Previous Handovers</span><span style={{ color: T.yl }}>−₹{handBreakdown.previousHandovers.toFixed(2)}</span></>}
+                  <span style={{ color: T.tx2 }}>Opening Balance</span><span style={{ color: T.tx2 }}>₹{handBreakdown.opening.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                  <span style={{ color: T.gr }}>+ Cash Sales</span><span style={{ color: T.gr }}>+₹{handBreakdown.cashSales.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                  {handBreakdown.cashReturns > 0 && <><span style={{ color: T.re }}>− Cash Returns</span><span style={{ color: T.re }}>−₹{handBreakdown.cashReturns.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></>}
+                  <span style={{ color: T.re }}>− Cash Expenses</span><span style={{ color: T.re }}>−₹{handBreakdown.expenses.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                  {handBreakdown.previousHandovers > 0 && <><span style={{ color: T.yl }}>− Previous Handovers</span><span style={{ color: T.yl }}>−₹{handBreakdown.previousHandovers.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></>}
                   <span style={{ fontWeight: 700, color: T.tx, borderTop: `1px solid ${T.bd}`, paddingTop: 4 }}>= Available Cash</span>
-                  <span style={{ fontWeight: 700, color: handBreakdown.available >= 0 ? T.gr : T.re, borderTop: `1px solid ${T.bd}`, paddingTop: 4 }}>₹{handBreakdown.available.toFixed(2)}</span>
+                  <span style={{ fontWeight: 700, color: handBreakdown.available >= 0 ? T.gr : T.re, borderTop: `1px solid ${T.bd}`, paddingTop: 4 }}>₹{handBreakdown.available.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
                 </div>
               </div>
             )}
@@ -928,7 +928,7 @@ export default function CashBook() {
             {handBreakdown && Math.abs(Number(handAmount) - handBreakdown.available) > 0.01 && (
               <div style={{ marginBottom: 10 }}>
                 <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.yl, marginBottom: 6 }}>
-                  ⚠ Amount differs from available (₹{handBreakdown.available.toFixed(2)}). Reason required:
+                  ⚠ Amount differs from available (₹{handBreakdown.available.toLocaleString('en-IN', { maximumFractionDigits: 2 })}). Reason required:
                 </div>
                 <input type="text" value={handReason} onChange={e => setHandReason(e.target.value)} placeholder="e.g., Keeping ₹200 as petty cash" style={{ ...S.fInput, width: '100%' }} />
               </div>
