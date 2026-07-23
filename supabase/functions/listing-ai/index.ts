@@ -1,4 +1,7 @@
-// listing-ai Edge Function - AI Listing Module backend (v28).
+// listing-ai Edge Function - AI Listing Module backend (v29).
+//
+// v29: ratecard_rows warns when the 200-SKU cap truncates the request -
+// dropped SKUs used to vanish silently (neither found nor not-in-master).
 //
 // v28: ratecard_rows returns EVERY column of the tabs the found SKUs
 // live on (sheet order) plus colCounts (how many of the found SKUs have
@@ -1104,12 +1107,14 @@ Deno.serve(async (req) => {
       const role = await callerRole(req);
       if (!role || !['admin', 'manager'].includes(role)) return fail(403, 'Only admin or manager can read the master sheet', req);
       const seenRc = new Set<string>();
-      const skus = (Array.isArray(body?.skus) ? body.skus : [])
+      const allSkus = (Array.isArray(body?.skus) ? body.skus : [])
         .map((v: unknown) => normSku(v))
-        .filter((v: string) => { if (!v || seenRc.has(v)) return false; seenRc.add(v); return true; })
-        .slice(0, RATECARD_CAP);
+        .filter((v: string) => { if (!v || seenRc.has(v)) return false; seenRc.add(v); return true; });
+      const skus = allSkus.slice(0, RATECARD_CAP);
       if (skus.length === 0) return fail(400, 'No SKUs provided', req);
       const warnings: string[] = [];
+      // A silently-dropped SKU is data loss - say exactly how many were cut.
+      if (allSkus.length > RATECARD_CAP) warnings.push(`Only the first ${RATECARD_CAP} SKUs were looked up - ${allSkus.length - RATECARD_CAP} more were skipped. Split them into a second card.`);
       const { tabs } = await readMasterTabs(warnings);
       if (tabs.length === 0) return fail(502, 'Could not read the master sheet', req, warnings.join('; '));
       const index = buildSkuIndex(tabs);

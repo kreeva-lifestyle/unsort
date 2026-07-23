@@ -3,9 +3,11 @@
 // in-app manual editor (same finalize pass either way). Fully client-side:
 // nothing is uploaded or saved (the manual draft lives in localStorage);
 // the image is drawn on a canvas by renderRateCard.ts.
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
+import { numericKeyDown } from '../../../lib/numericInput';
+import { applyMarkup } from './finalizeRateRows';
 import { parseRateSheet, ParsedRateSheet } from './parseRateSheet';
 import { renderRateCard } from './renderRateCard';
 import ManualRateEditor from './ManualRateEditor';
@@ -31,6 +33,8 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
   const [parsed, setParsed] = useState<ParsedRateSheet | null>(null);
   const [excelName, setExcelName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [markupKind, setMarkupKind] = useState<'pct' | 'flat'>('pct');
+  const [markupVal, setMarkupVal] = useState('');
   const [result, setResult] = useState<{ url: string; blob: Blob } | null>(null);
   const [scriptReady, setScriptReady] = useState(false);
   const heroRef = useRef<HTMLInputElement>(null);
@@ -68,15 +72,26 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
   const setMode2 = (m: 'import' | 'manual' | 'master') => {
     if (m === mode) return;
     // Rows don't carry across modes; the manual draft survives in localStorage
-    // and re-feeds parsed when its editor remounts.
-    setMode(m); setParsed(null); setExcelName(''); setResult(null);
+    // and re-feeds parsed when its editor remounts. The markup is cleared too —
+    // a markup typed for one seller's sheet must not silently apply to the
+    // next sheet built in another mode.
+    setMode(m); setParsed(null); setExcelName(''); setResult(null); setMarkupVal('');
   };
 
-  const blocked = (parsed?.blockers.length ?? 0) > 0;
-  const ready = catalogName.trim() && heroUrl && parsed && parsed.rows.length > 0 && !blocked;
+  // Optional seller markup — everything downstream (stats, GST slab, card)
+  // works on the marked-up copy; the base sheet stays untouched so clearing
+  // the markup instantly restores the original prices.
+  const effective = useMemo(() => {
+    const v = Number(markupVal);
+    return parsed && parsed.priceCol && Number.isFinite(v) && v > 0
+      ? applyMarkup(parsed, { kind: markupKind, value: v }) : parsed;
+  }, [parsed, markupKind, markupVal]);
+
+  const blocked = (effective?.blockers.length ?? 0) > 0;
+  const ready = catalogName.trim() && heroUrl && effective && effective.rows.length > 0 && !blocked;
 
   const generate = async () => {
-    if (busy || !ready || !parsed) return;
+    if (busy || !ready || !effective) return;
     setBusy(true);
     try {
       const heroImg = await loadImg(heroUrl);
@@ -84,9 +99,9 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
       if (!logoImg) addToast('Logo image failed to load — card generated without it', 'info');
       const canvas = document.createElement('canvas');
       await renderRateCard(canvas, {
-        heroImg, logoImg, catalogName: catalogName.trim(), rows: parsed.rows, columns: parsed.columns,
-        skuCol: parsed.skuCol, priceCol: parsed.priceCol,
-        disclaimer, stats: parsed.stats, scriptFont: scriptReady ? 'Great Vibes' : 'Sora',
+        heroImg, logoImg, catalogName: catalogName.trim(), rows: effective.rows, columns: effective.columns,
+        skuCol: effective.skuCol, priceCol: effective.priceCol,
+        disclaimer, stats: effective.stats, scriptFont: scriptReady ? 'Great Vibes' : 'Sora',
       });
       const blob = await new Promise<Blob>((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('Could not create the image')), 'image/jpeg', 0.92));
       setResult(prev => { if (prev) URL.revokeObjectURL(prev.url); return { url: URL.createObjectURL(blob), blob }; });
@@ -127,26 +142,41 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
         {mode === 'manual' && <ManualRateEditor onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} />}
         {mode === 'master' && <MasterRateCard onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} />}
         {heroUrl && <img src={heroUrl} alt="Catalog" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: `1px solid ${T.bd}`, marginBottom: 10 }} />}
-        {parsed && parsed.stats && (
+        {effective && effective.stats && (
           <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10, fontFamily: T.mono }}>
-            {parsed.stats.designs} designs{parsed.stats.total > 0 ? ` · avg RS.${parsed.stats.avg.toLocaleString('en-IN')} · total RS.${parsed.stats.total.toLocaleString('en-IN')}` : ''}
+            {effective.stats.designs} designs{effective.stats.total > 0 ? ` · avg RS.${effective.stats.avg.toLocaleString('en-IN')} · total RS.${effective.stats.total.toLocaleString('en-IN')}` : ''}
           </div>
         )}
         {/* blockers — the all-or-nothing price rule; Generate stays disabled */}
-        {parsed && blocked && (
+        {effective && blocked && (
           <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10, lineHeight: 1.6 }}>
-            {parsed.blockers.map((b, i) => <div key={i}>• {b}</div>)}
+            {effective.blockers.map((b, i) => <div key={i}>• {b}</div>)}
           </div>
         )}
         {/* smart checks — GST slab autocorrect, duplicate SKUs, price/rounding notes */}
-        {parsed && !blocked && (parsed.warnings.length > 0 ? (
+        {effective && !blocked && (effective.warnings.length > 0 ? (
           <div style={{ background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: T.yl, marginBottom: 4, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Smart checks — {parsed.warnings.length} note{parsed.warnings.length === 1 ? '' : 's'}</div>
-            {parsed.warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: T.tx2, lineHeight: 1.6 }}>• {w}</div>)}
+            <div style={{ fontSize: 10, fontWeight: 700, color: T.yl, marginBottom: 4, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Smart checks — {effective.warnings.length} note{effective.warnings.length === 1 ? '' : 's'}</div>
+            {effective.warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: T.tx2, lineHeight: 1.6 }}>• {w}</div>)}
           </div>
         ) : (
-          <div style={{ fontSize: 11, color: T.gr, marginBottom: 10 }}>✓ Smart checks passed — {parsed.priceCol ? 'GST slabs, SKUs and totals all look right' : 'SKUs look right (price-less card)'}</div>
+          <div style={{ fontSize: 11, color: T.gr, marginBottom: 10 }}>✓ Smart checks passed — {effective.priceCol ? 'GST slabs, SKUs and totals all look right' : 'SKUs look right (price-less card)'}</div>
         ))}
+        {parsed?.priceCol && (
+          <div style={{ marginBottom: 10 }}>
+            <label style={S.fLabel}>Seller Markup <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(optional)</span></label>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <button onClick={() => { setMarkupKind('pct'); setResult(null); }} style={markupKind === 'pct' ? { ...S.btnPrimary, ...S.btnSm, minHeight: 36 } : { ...S.btnGhost, ...S.btnSm, minHeight: 36 }}>%</button>
+              <button onClick={() => { setMarkupKind('flat'); setResult(null); }} style={markupKind === 'flat' ? { ...S.btnPrimary, ...S.btnSm, minHeight: 36 } : { ...S.btnGhost, ...S.btnSm, minHeight: 36 }}>&#8377;</button>
+              <input type="number" min={0} value={markupVal} onKeyDown={e => numericKeyDown(e)}
+                onChange={e => { setMarkupVal(e.target.value); setResult(null); }}
+                placeholder={markupKind === 'pct' ? 'e.g. 10 = +10% on every price' : 'e.g. 200 = +\u20B9200 on every price'}
+                style={{ ...S.fInput, flex: 1 }} />
+              {markupVal && <button onClick={() => { setMarkupVal(''); setResult(null); }} title="Clear markup" aria-label="Clear markup" style={{ ...S.btnGhost, ...S.btnSm, minHeight: 36 }}>&#215;</button>}
+            </div>
+            <div style={{ fontSize: 10, color: T.tx3, marginTop: 4, lineHeight: 1.5 }}>Leave empty for your own rates. With a markup, GST slabs and totals are re-worked on the marked-up prices.</div>
+          </div>
+        )}
         <div style={{ marginBottom: 12 }}>
           <label style={S.fLabel}>Bottom Note</label>
           <input value={disclaimer} onChange={e => { setDisclaimer(e.target.value); setResult(null); }} style={{ ...S.fInput, width: '100%' }} />

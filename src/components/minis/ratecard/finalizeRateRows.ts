@@ -28,6 +28,28 @@ export const priceNumber = (cell: string): number | null => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
+// Optional seller markup: bump every price by a percent or a flat ₹ amount
+// before the GST/stats passes. Never mutates the base sheet — rows are
+// cloned, the first number in each price cell is replaced with the marked-up
+// value (rounded to whole rupees), and finalize re-runs so the GST slab is
+// re-decided on the NEW price (a markup can push a ₹2,400 piece over the
+// ₹2,500 boundary into the 18% slab).
+export interface Markup { kind: 'pct' | 'flat'; value: number }
+
+export function applyMarkup(sheet: FinalizedSheet, markup: Markup): FinalizedSheet {
+  if (!sheet.priceCol || !(markup.value > 0) || sheet.blockers.length > 0) return sheet;
+  const pc = sheet.priceCol;
+  const rows = sheet.rows.map(r => {
+    const base = priceNumber(r[pc] || '');
+    if (base === null) return { ...r };
+    const up = markup.kind === 'pct' ? base * (1 + markup.value / 100) : base + markup.value;
+    return { ...r, [pc]: (r[pc] || '').replace(/\d[\d,]*(?:\.\d+)?/, String(Math.round(up))) };
+  });
+  const out = finalizeRateRows(rows, sheet.columns, sheet.skuCol, pc);
+  out.warnings.unshift(`Markup applied: ${markup.kind === 'pct' ? `+${markup.value}%` : `+₹${markup.value.toLocaleString('en-IN')}`} on every price`);
+  return out;
+}
+
 export function finalizeRateRows(rows: RateRow[], columns: string[], skuCol: string, priceCol: string | null): FinalizedSheet {
   const warnings: string[] = [];
   const blockers: string[] = [];
