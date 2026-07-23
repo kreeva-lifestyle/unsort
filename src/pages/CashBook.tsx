@@ -1118,7 +1118,7 @@ export default function CashBook() {
             </div>
             {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{formError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setShowAdd(false); setFormError(''); setExpSaving(false); }} style={{ ...S.btnGhost, flex: 1, padding: '9px 0', fontSize: 11 }}>Cancel</button>
+              <button onClick={() => { setShowAdd(false); setFormError(''); setExpSaving(false); setAmount(''); setDescription(''); setCategory(CATEGORIES[0]); setEntryDate(today); }} style={{ ...S.btnGhost, flex: 1, padding: '9px 0', fontSize: 11 }}>Cancel</button>
               <button onClick={addExpense} disabled={expSaving || !!addLockH} style={{ ...S.btnPrimary, flex: 1, padding: '9px 0', fontSize: 11, opacity: (expSaving || addLockH) ? 0.5 : 1, pointerEvents: (expSaving || addLockH) ? 'none' : 'auto' }}>{expSaving ? 'Saving…' : addLockH ? 'Date Locked' : 'Add'}</button>
             </div>
           </div>

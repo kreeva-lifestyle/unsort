@@ -232,7 +232,7 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
                 setPwdSaving(true);
                 const { error } = await supabase.auth.updateUser({ password: pwd });
                 setPwdSaving(false);
-                if (error) { setPwdError(error.message || 'Failed to update password'); return; }
+                if (error) { setPwdError(friendlyError(error)); return; }
                 addToast('Password updated', 'success');
                 setChangingPwd(false); setPwd(''); setPwdConfirm('');
               }} disabled={pwdSaving} style={{ ...S.btnPrimary, opacity: pwdSaving ? 0.6 : 1 }}>{pwdSaving ? 'Saving…' : 'Update Password'}</button>
