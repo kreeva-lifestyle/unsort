@@ -68,7 +68,10 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
   };
 
   return (
-    <div className="login-page" style={{ position: 'fixed', inset: 0, background: T.bg, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    // overflowY auto (NOT hidden): with the iOS keyboard open the fixed frame
+    // doesn't shrink, so the centered card's lower half — password + Sign In —
+    // sat under the keyboard with no way to scroll to it.
+    <div className="login-page" style={{ position: 'fixed', inset: 0, background: T.bg, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
       {/* Ambient orbs */}
       <div style={{ position: 'absolute', width: 600, height: 600, top: -200, right: -100, background: `radial-gradient(circle, ${T.ac44} 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .3s ease forwards' }} />
       <div style={{ position: 'absolute', width: 500, height: 500, bottom: -200, left: -100, background: `radial-gradient(circle, ${T.bl30} 0%, transparent 60%)`, borderRadius: '50%', filter: 'blur(80px)', opacity: 0, animation: 'loginGlowInOut 5s .5s ease forwards' }} />
