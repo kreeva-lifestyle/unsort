@@ -17,6 +17,17 @@ export const norm = (s: unknown) => String(s ?? '').toLowerCase().replace(/[^a-z
 export const SKU_ALIASES = ['sku', 'skuno', 'skucode', 'design', 'designno', 'dno', 'code', 'itemcode', 'style', 'styleno', 'catalogno'];
 export const PRICE_ALIASES = ['price', 'rate', 'rateprice', 'mrp', 'amount', 'sellingprice'];
 
+// Price-column detection: exact alias first, then a word match so decorated
+// headers ("PRICE (RS.)", "OFFLINE PRICE") still count. Word-bounded so
+// SEPARATE never reads as RATE; GST/% columns are excluded ("GST RATE" is a
+// percentage, not a price).
+export const isPriceHeader = (label: string): boolean => {
+  if (PRICE_ALIASES.includes(norm(label))) return true;
+  const l = String(label ?? '').toLowerCase();
+  if (/gst|%/.test(l)) return false;
+  return /(^|[^a-z])(price|mrp|rate|amount)([^a-z]|$)/.test(l);
+};
+
 const cellText = (v: unknown): string => {
   if (v == null) return '';
   if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
@@ -50,7 +61,7 @@ export function parseRateSheet(data: ArrayBuffer): ParsedRateSheet {
     colIdx.push([label, idx]);
     const n = norm(raw);
     if (!skuCol && SKU_ALIASES.includes(n)) skuCol = label;
-    if (!priceCol && PRICE_ALIASES.includes(n)) priceCol = label;
+    if (!priceCol && isPriceHeader(raw)) priceCol = label;
   });
   if (!skuCol) throw new Error('Could not find the SKU column');
 

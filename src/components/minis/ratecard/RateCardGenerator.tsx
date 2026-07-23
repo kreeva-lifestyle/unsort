@@ -154,6 +154,17 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
         <button onClick={generate} disabled={busy || !ready} style={{ ...S.btnPrimary, width: '100%', justifyContent: 'center', pointerEvents: busy ? 'none' : 'auto', opacity: busy || !ready ? 0.5 : 1 }}>
           {busy ? 'Generating…' : 'Generate Rate Card'}
         </button>
+        {/* A greyed button with no explanation is a dead end — say what's missing. */}
+        {!ready && !busy && (
+          <div style={{ fontSize: 10, color: T.tx3, marginTop: 6, textAlign: 'center', lineHeight: 1.5 }}>
+            To enable: {[
+              !catalogName.trim() && 'add a catalog name',
+              !heroUrl && 'pick a catalog photo',
+              !(parsed && parsed.rows.length > 0) && (mode === 'import' ? 'import the rate Excel' : mode === 'manual' ? 'add at least one row with an SKU' : 'fetch SKUs from the master sheet'),
+              blocked && 'fix the red issues above',
+            ].filter(Boolean).join(' · ')}
+          </div>
+        )}
       </div>
 
       {result && <RateCardActions result={result} catalogName={catalogName} addToast={addToast} />}

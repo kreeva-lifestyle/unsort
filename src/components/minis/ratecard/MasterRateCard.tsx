@@ -10,7 +10,7 @@ import { friendlyError } from '../../../lib/friendlyError';
 import { call } from '../../listingai/api';
 import { parseSkuLines } from '../../listingai/skuInput';
 import { finalizeRateRows, FinalizedSheet } from './finalizeRateRows';
-import { norm, PRICE_ALIASES, SKU_ALIASES } from './parseRateSheet';
+import { norm, isPriceHeader, SKU_ALIASES } from './parseRateSheet';
 
 interface MasterRow { sku: string; found: boolean; category: string | null; categoryLabel: string | null; values: Record<string, string> }
 const COLS_KEY = 'ratecard_master_cols_v1';
@@ -21,7 +21,7 @@ const GST_BOUNDARY = 2500; // display formatting only — finalize re-checks the
 // cells already carrying GST text keep it (finalize autocorrects a wrong %).
 export const buildMasterSheet = (rows: MasterRow[], chosen: string[]): FinalizedSheet => {
   const columns = ['SKU', ...chosen];
-  const priceCol = chosen.find(c => PRICE_ALIASES.includes(norm(c))) || null;
+  const priceCol = chosen.find(c => isPriceHeader(c)) || null;
   const objRows = rows.map(r => {
     const row: Record<string, string> = { SKU: r.sku };
     for (const c of chosen) {
@@ -80,7 +80,7 @@ export default function MasterRateCard({ onSheet, addToast }: {
       // Restore the owner's last column picks, filtered to what exists now.
       let picks: string[] = [];
       try { const saved = JSON.parse(localStorage.getItem(COLS_KEY) || '[]') as string[]; picks = columns.filter(c => saved.includes(c)); } catch { picks = []; }
-      if (!picks.length) { const p = columns.find(c => PRICE_ALIASES.includes(norm(c))); picks = p ? [p] : []; }
+      if (!picks.length) { const p = columns.find(c => isPriceHeader(c)); picks = p ? [p] : []; }
       picks = picks.filter(c => !SKU_ALIASES.includes(norm(c)));
       setFetched({ columns, rows });
       setChosen(picks);

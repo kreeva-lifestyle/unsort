@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { finalizeRateRows, FinalizedSheet } from './finalizeRateRows';
-import { norm, PRICE_ALIASES } from './parseRateSheet';
+import { isPriceHeader } from './parseRateSheet';
 
 const DRAFT_KEY = 'ratecard_manual_draft_v1';
 const ROW_CAP = 200; // canvas + localStorage sanity
@@ -42,7 +42,7 @@ export default function ManualRateEditor({ onSheet, addToast }: {
     const filled = rows.filter(r => (r[0] || '').trim());
     if (!filled.length) { onSheet(null); return; }
     const objRows = filled.map(r => Object.fromEntries(columns.map((c, i) => [c, (r[i] || '').trim()])));
-    const priceCol = columns.find(c => PRICE_ALIASES.includes(norm(c))) || null;
+    const priceCol = columns.find(c => isPriceHeader(c)) || null;
     onSheet(finalizeRateRows(objRows, columns, 'SKU', priceCol));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft]);
