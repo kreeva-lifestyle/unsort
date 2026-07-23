@@ -254,6 +254,7 @@ body.modal-open .fab { display: none !important; }
   .settings-tabs > div { justify-content: flex-start !important; }
   .settings-tabs > div { min-height: 44px !important; }
   .ho-actions button, .po-actions button { min-height: 44px !important; }
+  .att-3col { grid-template-columns: 1fr !important; }
   .user-card { padding: 14px !important; }
   .user-card-controls { width: 100% !important; justify-content: space-between !important; margin-top: 2px !important; }
   .user-card-controls select { flex: 1 !important; min-width: 0 !important; }
