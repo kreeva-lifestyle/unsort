@@ -762,7 +762,7 @@ export default function CashBook() {
                   </span>
                 </span>
               ) : (
-                <button onClick={() => setConfirmDelete(e.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4 }} aria-label="Delete">
+                <button onClick={() => setConfirmDelete(e.id)} style={{ padding: 12, minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'none', cursor: 'pointer', opacity: 0.5 }} aria-label="Delete">
                   <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
                 </button>
               )}
@@ -819,7 +819,7 @@ export default function CashBook() {
               {h.status === 'confirmed' && h.confirmed_at && <div style={{ fontSize: 9, color: T.gr, fontFamily: T.mono, marginBottom: 4 }}>Signed at {new Date(h.confirmed_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
               {h.status === 'disputed' && h.rejected_at && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono, marginBottom: 4 }}>Rejected at {new Date(h.rejected_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
               {h.status === 'cancelled' && h.cancelled_at && <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, marginBottom: 4 }}>Cancelled by sender at {new Date(h.cancelled_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
-              <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+              <div className="ho-actions" style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
                 {h.status === 'pending' && h.to_user_id === currentUserId && <button onClick={() => setConfirmingHandover(h)} style={{ ...S.btnSuccess, ...S.btnSm }}>Sign &amp; Confirm</button>}
                 {h.status === 'pending' && h.to_user_id === currentUserId && <button onClick={() => { setRejectingHandover(h); setRejectReason(''); setRejectError(''); }} style={{ ...S.btnDanger, ...S.btnSm }}>Reject</button>}
                 {h.status === 'pending' && h.from_user_id === currentUserId && <button onClick={() => setCancellingHandover(h)} style={{ ...S.btnDanger, ...S.btnSm }}>Cancel</button>}

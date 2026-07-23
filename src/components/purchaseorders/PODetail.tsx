@@ -169,7 +169,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
         </div>
 
         {/* Actions */}
-        <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div className="po-actions" style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button onClick={onPrint} style={{ ...S.btnGhost, ...S.btnSm }}>Print / Share</button>
           <button onClick={onDuplicate} style={{ ...S.btnGhost, ...S.btnSm }}>Duplicate</button>
           {canEdit && <button onClick={onEdit} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</button>}
