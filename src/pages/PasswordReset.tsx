@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { friendlyError } from '../lib/friendlyError';
 import { T, S } from '../lib/theme';
 
 export default function PasswordReset() {
@@ -16,7 +17,7 @@ export default function PasswordReset() {
     if (password !== confirm) { setError('Passwords do not match'); return; }
     setSaving(true);
     const { error: upErr } = await supabase.auth.updateUser({ password });
-    if (upErr) { setError(upErr.message || 'Failed to update password'); setSaving(false); return; }
+    if (upErr) { setError(friendlyError(upErr)); setSaving(false); return; }
     setDone(true);
   };
 
