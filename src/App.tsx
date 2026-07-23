@@ -83,6 +83,13 @@ import { BreadcrumbProvider } from './hooks/useBreadcrumb';
 import { TAB_IDS, canAccessTab, getFirstAllowedTab } from './lib/tabs';
 import { initGlobalPrintMode } from './lib/printQueue';
 import { logError } from './lib/errorLogger';
+// Public routes (share links, password reset) render OUTSIDE .main-area, so
+// they don't get <main>'s scroll. #root is a fixed overflow:hidden frame -
+// without their own scroll container, tall public pages clip below the fold.
+const PubScroll = ({ children }: { children: React.ReactNode }) => (
+  <div style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>{children}</div>
+);
+
 const getTabFromHash = () => {
   const h = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   return (TAB_IDS as readonly string[]).includes(h) ? h : 'dashboard';
@@ -245,11 +252,11 @@ const AppContent = () => {
 
   // Password recovery callback — Supabase redirects with #access_token=...&type=recovery
   const hash = window.location.hash;
-  if (hash.includes('type=recovery')) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyPasswordReset /></Suspense>;
+  if (hash.includes('type=recovery')) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><PubScroll><LazyPasswordReset /></PubScroll></Suspense>;
 
   // Public share route — no auth required, rendered before login gate
   const shareMatch = hash.match(/^#\/share\/program\/([a-f0-9]+)$/);
-  if (shareMatch) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyPublicShareView shareToken={shareMatch[1]} /></Suspense>;
+  if (shareMatch) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><PubScroll><LazyPublicShareView shareToken={shareMatch[1]} /></PubScroll></Suspense>;
 
   const shortMatch = hash.match(/^#\/s\/([a-zA-Z0-9_-]{3,32})$/);
   if (shortMatch) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyTracklyRedirect shortCode={shortMatch[1]} /></Suspense>;

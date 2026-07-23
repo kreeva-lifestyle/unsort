@@ -789,8 +789,8 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           </button>
 
           {showFiltersPopover && (<>
-            <div className="inv-filter-backdrop" onClick={() => setShowFiltersPopover(false)} style={{ position: 'fixed', inset: 0, zIndex: 100 }} />
-            <div className="inv-filter-popover" style={{ position: 'absolute', top: 40, right: 0, width: 460, zIndex: 101, background: 'rgba(14,18,30,0.98)', border: `1px solid ${T.bd2}`, borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,.55)', overflow: 'hidden', animation: 'fi .15s ease' }}>
+            <div className="inv-filter-backdrop" onClick={() => setShowFiltersPopover(false)} style={{ position: 'fixed', inset: 0, zIndex: 110 }} />
+            <div className="inv-filter-popover" style={{ position: 'absolute', top: 40, right: 0, width: 460, zIndex: 111, background: 'rgba(14,18,30,0.98)', border: `1px solid ${T.bd2}`, borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,.55)', overflow: 'hidden', animation: 'fi .15s ease' }}>
               <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Filter items</div>
                 {activeFilterCount > 0 && <button onClick={clearFilters} style={{ background: 'transparent', border: 'none', color: T.tx3, fontSize: 11, cursor: 'pointer', fontFamily: T.sans }}>Clear all</button>}
@@ -1217,7 +1217,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
         </div></div>);
       })()}
 
-      {pendingDelete && <div style={{ position: 'fixed', bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, animation: 'su .2s ease', overflow: 'hidden', minWidth: 280 }}>
+      {pendingDelete && <div style={{ position: 'fixed', bottom: 'calc(var(--nav-h, 8px) + 12px)', left: '50%', transform: 'translateX(-50%)', background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: 0, boxShadow: '0 8px 30px rgba(0,0,0,.5)', zIndex: 300, animation: 'su .2s ease', overflow: 'hidden', minWidth: 280 }}>
         <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 12, color: T.tx, flex: 1 }}>Item deleted</span>
           <button onClick={undoDelete} style={{ ...S.btnPrimary, padding: '4px 12px', fontSize: 11, background: T.yl, color: '#fff', boxShadow: 'none' }}>Undo</button>
