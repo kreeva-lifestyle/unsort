@@ -2,6 +2,7 @@
 // Personal settings (Phone + Cash PIN) moved to MyProfile.tsx so non-admins
 // can still set their own PIN for cash handover confirmation.
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import Toggle from '../ui/Toggle';
 import { T, S } from '../../lib/theme';
@@ -204,7 +205,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
         })}
       </div>
 
-      {showInvite && (<div style={S.modalOverlay} onClick={() => { setShowInvite(false); setInviteResult(null); }}><div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
+      {showInvite && createPortal(<div style={S.modalOverlay} onClick={() => { setShowInvite(false); setInviteResult(null); }}><div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Invite New User</span><span onClick={() => { setShowInvite(false); setInviteResult(null); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span></div>
         {inviteResult ? (
           <div style={{ padding: 16 }}>
@@ -242,8 +243,8 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
             </div>
           </form>
         )}
-      </div></div>)}
-      {resetResult && (<div style={S.modalOverlay} onClick={() => setResetResult(null)}><div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
+      </div></div>, document.body)}
+      {resetResult && createPortal(<div style={S.modalOverlay} onClick={() => setResetResult(null)}><div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Password Reset</div>
         <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>New password for <strong style={{ color: T.tx }}>{resetResult.name}</strong>. Share this with the user:</div>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: 12, marginBottom: 12 }}>
@@ -252,7 +253,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
         </div>
         <div style={{ fontSize: 10, color: T.tx3, marginBottom: 14, textAlign: 'center' as const }}>The user should change their password after signing in.</div>
         <button onClick={() => setResetResult(null)} style={{ ...S.btnPrimary, width: '100%', justifyContent: 'center' }}>Done</button>
-      </div></div>)}
+      </div></div>, document.body)}
       <ConfirmModal {...modalProps} />
     </div>
   );

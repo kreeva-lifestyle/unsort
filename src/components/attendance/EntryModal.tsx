@@ -100,7 +100,7 @@ export default function AttendanceEntryModal({ employees, month, editing, preset
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div className="att-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
               <label style={lbl}>In</label>
               <DateInput type="time" value={inT} onChange={e => setInT(e.target.value)} style={{ width: '100%', fontFamily: T.mono }} />
@@ -127,7 +127,7 @@ export default function AttendanceEntryModal({ employees, month, editing, preset
             <label style={lbl}>Manager's remarks</label>
             <input value={mgr} onChange={e => setMgr(e.target.value)} style={{ ...S.fInput, width: '100%' }} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
+          <div className="att-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
             <div>
               <label style={lbl}>Shift ID</label>
               <input value={shift} onChange={e => setShift(e.target.value)} style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />

@@ -1,5 +1,6 @@
 // Categories (products + components) CRUD — settings sub-page
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
@@ -142,7 +143,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
       </div>))}</div>
       {categories.length === 0 && <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 36, textAlign: 'center' }}><p style={{ color: T.tx3, fontSize: 12, marginBottom: 6 }}>No categories yet</p><p style={{ color: T.tx3, fontSize: 10 }}>Add a category like "Lehenga Choli" with components like Lehenga, Blouse, Dupatta</p>{canEdit && <div onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={{ ...S.btnPrimary, marginTop: 12, display: 'inline-flex' }}>+ Add First Category</div>}</div>}
 
-      {showModal && (<div style={S.modalOverlay} onClick={closeModal}><div className="modal-inner" style={{ ...S.modalBox, width: 480 }} onClick={e => e.stopPropagation()}><div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Category</span><span onClick={closeModal} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }} aria-label="Close">✕</span></div><form onSubmit={handleSubmit} style={{ padding: 16 }}>
+      {showModal && createPortal(<div style={S.modalOverlay} onClick={closeModal}><div className="modal-inner" style={{ ...S.modalBox, width: 480 }} onClick={e => e.stopPropagation()}><div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Category</span><span onClick={closeModal} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }} aria-label="Close">✕</span></div><form onSubmit={handleSubmit} style={{ padding: 16 }}>
         <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Category name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Lehenga Choli" style={S.fInput} /></div>
         <div style={{ marginBottom: 12 }}><label style={S.fLabel}>Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description (optional)" style={S.fInput} /></div>
         <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><label style={{ ...S.fLabel, margin: 0 }}>Components</label><span onClick={addCompRow} style={{ ...S.btnPrimary, ...S.btnSm }}>+ Add More</span></div>
@@ -157,9 +158,9 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
           {newComps.map((c, i) => compInputRow(c, i, newComps.length, selected ? comps.length : 0))}
         </div>
         <div style={{ padding: '12px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 7 }}><span onClick={closeModal} style={S.btnGhost}>Cancel</span><button type="submit" disabled={saving} style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving…' : selected ? 'Update' : 'Add Category'}</button></div>
-      </form></div></div>)}
+      </form></div></div>, document.body)}
 
-      {showCompModal && selected && (<div style={S.modalOverlay} onClick={() => setShowCompModal(false)}><div className="modal-inner" style={{ ...S.modalBox, width: 500 }} onClick={e => e.stopPropagation()}><div style={S.modalHead}><div><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Components of "{selected.name}"</span><p style={{ margin: '3px 0 0', fontSize: 10, color: T.tx3 }}>Manage the individual parts of this category</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }} aria-label="Close">✕</span></div><div style={{ padding: 16 }}>
+      {showCompModal && selected && createPortal(<div style={S.modalOverlay} onClick={() => setShowCompModal(false)}><div className="modal-inner" style={{ ...S.modalBox, width: 500 }} onClick={e => e.stopPropagation()}><div style={S.modalHead}><div><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Components of "{selected.name}"</span><p style={{ margin: '3px 0 0', fontSize: 10, color: T.tx3 }}>Manage the individual parts of this category</p></div><span onClick={() => setShowCompModal(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }} aria-label="Close">✕</span></div><div style={{ padding: 16 }}>
         {canEdit && <form onSubmit={addCompToExisting} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, padding: 12, borderRadius: T.r, marginBottom: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}><p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, margin: 0 }}>Add Components</p><span onClick={addCompRow} style={{ fontSize: 10, color: T.ac, cursor: 'pointer' }}>+ Add More</span></div>
           {newComps.map((c, i) => compInputRow(c, i, newComps.length))}
@@ -168,7 +169,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
         {comps.length > 0 && <p style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600, marginBottom: 8 }}>{comps.length} Component{comps.length !== 1 ? 's' : ''}</p>}
         {comps.map((c, i) => (<div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', border: `1px solid ${T.bd}`, borderRadius: 6, marginBottom: 5, background: 'rgba(255,255,255,0.02)' }}><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 20, height: 20, borderRadius: '50%', background: T.s3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 600, color: T.tx3, fontFamily: T.mono }}>{i + 1}</span><span style={{ fontSize: 12, color: T.tx, fontWeight: 500 }}>{c.name}</span></div>{canEdit && <span onClick={() => deleteComp(c.id)} style={S.btnDanger}>Delete</span>}</div>))}
         {comps.length === 0 && <div style={{ textAlign: 'center', padding: 16, color: T.tx3 }}><p style={{ fontSize: 11 }}>No components yet</p></div>}
-      </div></div></div>)}
+      </div></div></div>, document.body)}
       <ConfirmModal {...modalProps} />
     </div>
   );

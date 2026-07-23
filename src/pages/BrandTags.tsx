@@ -654,8 +654,8 @@ export default function BrandTagPrinter() {
         const opp = orderPerPage;
         const otp = Math.ceil(orderRows.length / opp);
         const opaged = orderRows.slice(orderPage * opp, (orderPage + 1) * opp);
-        return <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.80)', zIndex: 200, backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
-          <div style={{ background: 'rgba(14,18,30,0.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, width: '95vw', maxWidth: 1100, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', backdropFilter: 'blur(32px)' }}>
+        return <div onClick={() => setOrderRows(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.80)', zIndex: 200, backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
+          <div className="modal-inner" onClick={e => e.stopPropagation()} style={{ background: 'rgba(14,18,30,0.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, width: '95vw', maxWidth: 1100, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', backdropFilter: 'blur(32px)' }}>
             <div style={{ padding: '10px 14px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
               <div>
                 <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Order Sheet Preview</span>
