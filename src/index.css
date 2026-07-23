@@ -252,6 +252,8 @@ body.modal-open .fab { display: none !important; }
   .bt-actions-col { display: none !important; }
   .settings-tabs { flex-direction: column !important; width: 100% !important; }
   .settings-tabs > div { justify-content: flex-start !important; }
+  .settings-tabs > div { min-height: 44px !important; }
+  .ho-actions button, .po-actions button { min-height: 44px !important; }
   .user-card { padding: 14px !important; }
   .user-card-controls { width: 100% !important; justify-content: space-between !important; margin-top: 2px !important; }
   .user-card-controls select { flex: 1 !important; min-width: 0 !important; }

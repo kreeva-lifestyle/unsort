@@ -707,17 +707,17 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 12 }}>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.ac87}, ${T.ac22})` }} />
-          <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Total Scans</div>
+          <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Total Scans</div>
           <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.ac2 }}>{historyTotal}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.grCC}, ${T.gr22})` }} />
-          <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Today</div>
+          <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Today</div>
           <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.gr }}>{historyData.filter(r => r.scanned_at && new Date(r.scanned_at).toDateString() === new Date().toDateString()).length}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.ylCC}, ${T.yl22})` }} />
-          <div style={{ fontSize: 8, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Couriers</div>
+          <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Couriers</div>
           <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.yl }}>{new Set(historyData.map(r => r.courier)).size}</div>
         </div>
       </div>
@@ -1005,15 +1005,15 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 20, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>{sessionCount}</div>
-              <div style={{ fontSize: 7, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 600 }}>Scanned</div>
+              <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 600 }}>Scanned</div>
             </div>
-            <div onClick={() => setSearchOpen(p => !p)} style={{ width: 28, height: 28, borderRadius: 8, border: `1px solid ${searchOpen ? T.ac + '33' : T.bd}`, background: searchOpen ? 'rgba(99,102,241,.10)' : 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: searchOpen ? T.ac2 : T.tx3 }}>
+            <div onClick={() => setSearchOpen(p => !p)} style={{ width: 44, height: 44, borderRadius: 8, border: `1px solid ${searchOpen ? T.ac + '33' : T.bd}`, background: searchOpen ? 'rgba(99,102,241,.10)' : 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: searchOpen ? T.ac2 : T.tx3 }}>
               <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
             </div>
             <div onClick={() => {
               if (sessionCount > 0) { setConfirmChangeSetup(true); }
               else { endSession(); }
-            }} style={{ width: 28, height: 28, borderRadius: 8, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.tx3 }}>
+            }} style={{ width: 44, height: 44, borderRadius: 8, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.tx3 }}>
               <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M18 6L6 18M6 6l12 12" /></svg>
             </div>
           </div>
@@ -1038,15 +1038,15 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {/* Counter + Today Total */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         <div style={{ flex: 1, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Session</div>
+          <div style={{ fontSize: 9, color: T.gr, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Session</div>
           <div style={{ fontSize: 28, fontWeight: 800, fontFamily: T.sora, color: T.gr, lineHeight: 1 }}>{sessionCount}</div>
         </div>
         <div style={{ flex: 1, background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.12)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }} title="Total scans in this Google Sheet over the last 7 days">
-          <div style={{ fontSize: 8, color: T.ac2, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>7-Day Total</div>
+          <div style={{ fontSize: 9, color: T.ac2, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>7-Day Total</div>
           <div style={{ fontSize: 28, fontWeight: 800, fontFamily: T.sora, color: T.ac2, lineHeight: 1 }}>{sheetTotal}</div>
         </div>
         <div onClick={() => { setTodaySummaryOpen(true); fetchTodaySummary(); }} style={{ flex: 1, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.12)', borderRadius: 10, padding: '10px 12px', textAlign: 'center', cursor: 'pointer' }} title="Tap to see today's breakdown by courier">
-          <div style={{ fontSize: 8, color: T.yl, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Today Total</div>
+          <div style={{ fontSize: 9, color: T.yl, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Today Total</div>
           <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.yl, lineHeight: 1 }}>Tap to view</div>
         </div>
       </div>
@@ -1119,7 +1119,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* AWB Input */}
       <div style={{ marginBottom: 12 }}>
-        {pendingWrites > 0 && <div style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.18)', color: T.yl, fontWeight: 600, display: 'inline-block', marginBottom: 6 }}>Syncing {pendingWrites}</div>}
+        {pendingWrites > 0 && <div style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.18)', color: T.yl, fontWeight: 600, display: 'inline-block', marginBottom: 6 }}>Syncing {pendingWrites}</div>}
         <div style={{ position: 'relative' }}>
           <input ref={inputRef} type="text" inputMode="text" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
             value={awbInput} onChange={e => setAwbInput(e.target.value)} onKeyDown={handleKeyDown}

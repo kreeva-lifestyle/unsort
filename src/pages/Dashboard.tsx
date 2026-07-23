@@ -187,7 +187,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>{greeting}, {profile?.full_name?.split(' ')[0] || 'there'}</h2>
           <p style={{ margin: '4px 0 0', fontSize: 14, color: T.tx2, fontWeight: 500 }}>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</p>
         </div>
-        <button onClick={manualRefresh} disabled={refreshing} title="Refresh dashboard" aria-label="Refresh dashboard" style={{ background: 'none', border: `1px solid ${T.bd2}`, borderRadius: 8, padding: 8, cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: T.transition, opacity: refreshing ? 0.5 : 1 }}>
+        <button onClick={manualRefresh} disabled={refreshing} title="Refresh dashboard" aria-label="Refresh dashboard" style={{ background: 'none', border: `1px solid ${T.bd2}`, borderRadius: 8, padding: 8, minWidth: 44, minHeight: 44, cursor: 'pointer', color: T.tx3, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: T.transition, opacity: refreshing ? 0.5 : 1 }}>
           <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 2, animation: refreshing ? 'spin 1s linear infinite' : 'none' }}><path d="M23 4v6h-6M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" /></svg>
         </button>
       </div>
@@ -292,7 +292,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         {/* Scan Trend 7d */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-            <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', margin: 0 }}>Scans — 7 Days</p>
+            <p style={{ fontSize: 10, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', margin: 0 }}>Scans — 7 Days</p>
             <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.mono, color: T.ac2 }}>{scanTrend.reduce((s, d) => s + d.count, 0)}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 72, paddingTop: 8 }}>
@@ -302,11 +302,11 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
               const isMax = s.count === maxScan && s.count > 0;
               return (
                 <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <span style={{ fontSize: 8, color: isMax ? T.ac2 : T.tx3, fontFamily: T.mono, fontWeight: isMax ? 700 : 500 }}>{s.count}</span>
+                  <span style={{ fontSize: 9, color: isMax ? T.ac2 : T.tx3, fontFamily: T.mono, fontWeight: isMax ? 700 : 500 }}>{s.count}</span>
                   <div className="bar-hover-v" title={`${new Date(s.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}: ${s.count} scan${s.count === 1 ? '' : 's'}`} style={{ width: '100%', maxWidth: 28, borderRadius: '4px 4px 2px 2px', height: barH,
                     background: isToday ? `linear-gradient(180deg, ${T.ac}, ${T.ac2})` : isMax ? `linear-gradient(180deg, ${T.ac87}, ${T.ac55})` : `linear-gradient(180deg, ${T.ac55}, ${T.ac22})`,
                     boxShadow: isToday ? `0 2px 8px ${T.ac44}` : 'none' }} />
-                  <span style={{ fontSize: 7, color: isToday ? T.tx : T.tx3, fontFamily: T.mono, fontWeight: isToday ? 600 : 400 }}>{new Date(s.date).getDate()}</span>
+                  <span style={{ fontSize: 9, color: isToday ? T.tx : T.tx3, fontFamily: T.mono, fontWeight: isToday ? 600 : 400 }}>{new Date(s.date).getDate()}</span>
                 </div>
               );
             })}
@@ -325,7 +325,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
             return (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-                  <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', margin: 0 }}>Revenue — 30 Days</p>
+                  <p style={{ fontSize: 10, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', margin: 0 }}>Revenue — 30 Days</p>
                   <span style={{ fontSize: 12, fontWeight: 700, fontFamily: T.mono, color: T.gr }}>₹{total > 1000 ? `${(total / 1000).toFixed(1)}k` : total.toLocaleString('en-IN')}</span>
                 </div>
                 <div style={{ position: 'relative', height: 72, paddingTop: 8 }}>
@@ -348,9 +348,9 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
                     <polyline points={avgs.map((a, i) => `${i + 0.5},${52 - Math.max(2, (Math.max(0, a) / range) * 48)}`).join(' ')} fill="none" stroke={T.ac2} strokeWidth="0.6" strokeOpacity="0.7" />
                   </svg>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                    <span style={{ fontSize: 7, color: T.tx3, fontFamily: T.mono }}>{revTrend[0] ? new Date(revTrend[0].date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}</span>
-                    <span style={{ fontSize: 7, color: T.ac2, fontFamily: T.mono }}>— 7d avg</span>
-                    <span style={{ fontSize: 7, color: T.tx3, fontFamily: T.mono }}>{revTrend.length > 0 ? new Date(revTrend[revTrend.length - 1].date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}</span>
+                    <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>{revTrend[0] ? new Date(revTrend[0].date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}</span>
+                    <span style={{ fontSize: 9, color: T.ac2, fontFamily: T.mono }}>— 7d avg</span>
+                    <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>{revTrend.length > 0 ? new Date(revTrend[revTrend.length - 1].date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}</span>
                   </div>
                 </div>
               </>
@@ -362,7 +362,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
         {/* Inventory Breakdown */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
-          <p style={{ fontSize: 8, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Inventory Breakdown</p>
+          <p style={{ fontSize: 10, color: T.tx3, letterSpacing: 0.8, fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Inventory Breakdown</p>
           {(() => { const nonCompletedTotal = Object.entries(invBreakdown).filter(([s]) => s !== 'completed').reduce((a, [, c]) => a + c, 0) || 1; return Object.entries(invBreakdown).filter(([status]) => status !== 'completed').map(([status, count]) => {
             const total = nonCompletedTotal;
             return (
@@ -412,13 +412,13 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         <div style={{ maxHeight: 200, overflowY: 'auto' }}>
           {tasks.map(t => (
             <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderBottom: `1px solid ${T.bd}`, opacity: t.is_done ? 0.45 : 1 }}>
-              <div onClick={() => toggleTask(t.id, t.is_done)} style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${t.is_done ? T.gr : T.bd2}`, background: t.is_done ? T.gr : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 700, flexShrink: 0 }}>{t.is_done && '✓'}</div>
+              <div onClick={() => toggleTask(t.id, t.is_done)} style={{ width: 20, height: 20, padding: 2, borderRadius: 3, border: `1.5px solid ${t.is_done ? T.gr : T.bd2}`, background: t.is_done ? T.gr : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 700, flexShrink: 0 }}>{t.is_done && '✓'}</div>
               {editingTaskId === t.id ? (
                 <input autoFocus value={editingTaskTitle} onChange={e => setEditingTaskTitle(e.target.value)} onBlur={() => updateTask(t.id)} onKeyDown={e => { if (e.key === 'Enter') updateTask(t.id); if (e.key === 'Escape') setEditingTaskId(null); }} style={{ ...S.fInput, flex: 1 }} />
               ) : (
                 <span onClick={() => { setEditingTaskId(t.id); setEditingTaskTitle(t.title); }} style={{ flex: 1, fontSize: 11, color: T.tx, textDecoration: t.is_done ? 'line-through' : 'none', cursor: 'text' }}>{t.title}</span>
               )}
-              <span onClick={() => deleteTask(t.id)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 11, opacity: 0.4 }}>×</span>
+              <span onClick={() => deleteTask(t.id)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14, padding: '6px 8px', opacity: 0.4 }}>×</span>
             </div>
           ))}
           {tasks.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: T.tx3, fontSize: 10 }}>No notes yet</div>}
