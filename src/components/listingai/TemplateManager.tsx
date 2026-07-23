@@ -20,7 +20,7 @@ import TemplateListRow from './TemplateListRow';
 import type { ListingTemplate, ListingTemplateField, ListingTemplateRule } from '../../types/database';
 
 type Editing = {
-  id: string | null; name: string; marketplace: string; fields: ListingTemplateField[];
+  id: string | null; name: string; marketplace: string; category: string; fields: ListingTemplateField[];
   rules: ListingTemplateRule[];
   sheetName: string; headerRow: number; sheetNames: string[];
   fileBuf: ArrayBuffer | null; fileName: string; // null when editing flags of a saved template
@@ -73,6 +73,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
         id: target?.id ?? null,
         name: editing?.name || target?.name || base,
         marketplace: editing?.marketplace || target?.marketplace || '',
+        category: editing?.category || target?.category || '',
         fields, rules: pr.rules, sheetName: p.sheetName, headerRow: p.headerRow, sheetNames: p.sheetNames,
         fileBuf: buf, fileName,
       });
@@ -104,7 +105,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
       // persistTemplate uploads the workbook BEFORE committing its metadata, so
       // a failed upload can't leave the row describing a file that isn't there.
       const ok = await persistTemplate({
-        id: existing?.id ?? null, name, marketplace: editing.marketplace.trim(),
+        id: existing?.id ?? null, name, marketplace: editing.marketplace.trim(), category: editing.category,
         fields: editing.fields, rules: editing.rules,
         fileBuf: editing.fileBuf, fileName: editing.fileName, sheetName: editing.sheetName, headerRow: editing.headerRow,
       }, addToast);
@@ -131,7 +132,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
   const visible = (editing?.fields ?? []).map((f, i) => ({ f, i })).filter(({ f }) => !q || f.header.toLowerCase().includes(q));
   // Leaving the editor discards the working copy — guard it when dirty so a stray backdrop tap can't wipe a big configuration.
   const orig = editing?.id ? templates.find(t => t.id === editing.id) : undefined;
-  const dirty = !!editing && (!orig || JSON.stringify([editing.name, editing.marketplace, editing.fields, editing.rules]) !== JSON.stringify([orig.name, orig.marketplace, orig.fields, orig.rules || []]));
+  const dirty = !!editing && (!orig || JSON.stringify([editing.name, editing.marketplace, editing.category, editing.fields, editing.rules]) !== JSON.stringify([orig.name, orig.marketplace, orig.category || '', orig.fields, orig.rules || []]));
   const leaveEditor = () => { setEditing(null); setMergeInfo(''); setShowRules(false); setFieldQ(''); setConfirmClose(false); };
   const requestLeave = () => { if (dirty) setConfirmClose(true); else leaveEditor(); };
 
@@ -153,12 +154,12 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
             )}
             {templates.map(t => (
               <TemplateListRow key={t.id} t={t} confirming={confirmDel === t.id}
-                onOpen={() => { setMergeInfo(''); setFieldQ(''); setEditing({ id: t.id, name: t.name, marketplace: t.marketplace, fields: t.fields, rules: t.rules || [], sheetName: t.sheet_name || '', headerRow: t.header_row || 0, sheetNames: [], fileBuf: null, fileName: t.file_name || '' }); }}
+                onOpen={() => { setMergeInfo(''); setFieldQ(''); setEditing({ id: t.id, name: t.name, marketplace: t.marketplace, category: t.category || '', fields: t.fields, rules: t.rules || [], sheetName: t.sheet_name || '', headerRow: t.header_row || 0, sheetNames: [], fileBuf: null, fileName: t.file_name || '' }); }}
                 onAskDelete={() => setConfirmDel(t.id)} onCancelDelete={() => setConfirmDel('')} onDelete={() => del(t)} />
             ))}
           </>}
           {editing && <>
-            <EditorMeta name={editing.name} marketplace={editing.marketplace} sheetName={editing.sheetName} sheetNames={editing.sheetNames} hasFile={!!editing.fileBuf}
+            <EditorMeta name={editing.name} marketplace={editing.marketplace} category={editing.category} sheetName={editing.sheetName} sheetNames={editing.sheetNames} hasFile={!!editing.fileBuf}
               onPatch={p => setEditing(ed => ed ? { ...ed, ...p } : ed)}
               onPickSheet={s => parseInto(editing.fileBuf!, editing.fileName, s)} onEnter={save} />
             {mergeInfo && (

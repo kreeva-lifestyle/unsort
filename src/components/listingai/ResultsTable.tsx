@@ -66,7 +66,7 @@ export default function ResultsTable({ headers, kinds, rows, usage, cost, templa
                 <td style={S.tdStyle}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.status === 'ok' ? T.gr : r.status === 'bad_link' ? T.re : T.yl, flexShrink: 0 }} />
-                    <span style={{ fontSize: 11 }}>{r.status === 'ok' ? (r.noImage ? 'Ready (no photo found)' : 'Ready') : r.status === 'bad_link' ? 'Dropbox link failed' : 'Not in master sheet'}</span>
+                    <span style={{ fontSize: 11 }}>{r.status === 'ok' ? (r.noImage ? 'Ready (no photo found)' : 'Ready') : r.status === 'bad_link' ? 'Dropbox link failed' : r.status === 'category_mismatch' ? 'Category mismatch — skipped' : 'Not in master sheet'}</span>
                     {r.status === 'ok' && r.linkSource && (
                       <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 8, fontWeight: 600, background: 'oklch(0.55 0.22 265 / .1)', color: T.ac2, whiteSpace: 'nowrap' }}>
                         {{ typed: 'direct link', folders: 'image folder', master: 'master link', search: 'auto-found' }[r.linkSource]}

@@ -1061,6 +1061,10 @@ export type ListingTemplate = {
   id: string;
   name: string;
   marketplace: string;
+  // Garment-category id for pre-AI SKU validation ('kurta-set', 'lehenga-
+  // choli', ... — see listingai/categories.ts). NULL = the edge fn detects
+  // it from the template name at request time.
+  category?: string | null;
   fields: ListingTemplateField[];
   rules?: ListingTemplateRule[];
   // Original uploaded workbook (stored in the listing-templates bucket as

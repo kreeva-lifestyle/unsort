@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { call, GenRow, GenUsage } from './api';
 import { SkuLine } from './skuInput';
+import { runValidate, splitIssues, PreflightIssues } from './preflight';
 import type { ListingTemplate, ListingRun } from '../../types/database';
 
 const CHUNK = 3;    // SKUs per edge call (server caps at 5) — keeps each call fast
@@ -37,10 +38,47 @@ export function useGenerateRun(addToast: (m: string, t?: string) => void) {
     setRunTpl(tpl);
   };
 
+  // Pre-AI preflight state: issues found by the free validate call, plus what
+  // we need to continue after the owner's choice.
+  const [preflight, setPreflight] = useState<{ tpl: ListingTemplate; skus: SkuLine[]; isAdmin: boolean; issues: PreflightIssues } | null>(null);
+
+  // Free pre-check BEFORE any AI spend: one edge call flags SKUs missing from
+  // the master sheet or looking like a different garment category than the
+  // template. Issues pause here (the panel decides); a clean list runs with no
+  // extra tap. Fail-open on pre-check errors — the edge generate path has the
+  // same category guard server-side, so a broken preflight still can't burn
+  // tokens on mismatched SKUs.
   const generate = async (selected: ListingTemplate, allSkus: SkuLine[], isAdmin: boolean) => {
     if (generating) return;
     let skus = allSkus;
     if (skus.length > RUN_CAP) { addToast(`Capped to the first ${RUN_CAP} SKUs (of ${skus.length}) — run again for the rest`, 'error'); skus = skus.slice(0, RUN_CAP); }
+    setPreflight(null);
+    let issues: PreflightIssues | null = null;
+    try {
+      setGenerating(true); // covers the validate round-trip so Generate can't double-fire
+      issues = splitIssues(await runValidate(skus, selected.id), skus);
+    } catch { addToast("Couldn't pre-check the SKUs — continuing without the check", 'error'); }
+    finally { setGenerating(false); }
+    if (issues && (issues.notInMaster.length > 0 || issues.mismatched.length > 0)) {
+      setPreflight({ tpl: selected, skus, isAdmin, issues });
+      return;
+    }
+    await run(selected, skus, isAdmin, false);
+  };
+
+  // The owner's choice on the preflight panel. 'clean' drops the flagged SKUs;
+  // 'force' runs everything with the server-side guard disabled (force:true).
+  const confirmPreflight = async (mode: 'clean' | 'force' | 'cancel') => {
+    const p = preflight;
+    setPreflight(null);
+    if (!p || mode === 'cancel') return;
+    if (mode === 'force') { await run(p.tpl, p.skus, p.isAdmin, true); return; }
+    if (p.issues.clean.length === 0) { addToast('No valid SKUs left to run', 'error'); return; }
+    await run(p.tpl, p.issues.clean, p.isAdmin, false);
+  };
+
+  const run = async (selected: ListingTemplate, skus: SkuLine[], isAdmin: boolean, force: boolean) => {
+    if (generating) return;
     setGenerating(true);
     setRows([]); setHeaders([]); setKinds([]); setUsage(null); setCost({ usd: 0, saved: 0 });
     setRunTpl(selected);
@@ -58,7 +96,7 @@ export function useGenerateRun(addToast: (m: string, t?: string) => void) {
       for (let i = 0; i < skus.length; i += CHUNK) {
         const chunk = skus.slice(i, i + CHUNK);
         let data: any, st = 0;
-        try { ({ status: st, data } = await call({ action: 'generate', items: chunk, templateId: selected.id, prevMessageId })); }
+        try { ({ status: st, data } = await call({ action: 'generate', items: chunk, templateId: selected.id, prevMessageId, force })); }
         catch (e) { addToast(friendlyError(e), 'error'); break; }
         if (!data?.ok) {
           addToast(data?.error === 'no_api_key'
@@ -103,5 +141,5 @@ export function useGenerateRun(addToast: (m: string, t?: string) => void) {
     } finally { setGenerating(false); }
   };
 
-  return { generating, progress, headers, kinds, rows, usage, cost, runTpl, savedCount, generate, loadRun };
+  return { generating, progress, headers, kinds, rows, usage, cost, runTpl, savedCount, generate, loadRun, preflight, confirmPreflight };
 }

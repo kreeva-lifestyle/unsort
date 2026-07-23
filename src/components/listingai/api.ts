@@ -5,7 +5,7 @@ import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 export const FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/listing-ai';
 
 export interface GenUsage { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
-export interface GenRow { sku: string; status: 'ok' | 'not_in_master' | 'bad_link'; noImage?: boolean; note?: string; linkSource?: 'typed' | 'folders' | 'master' | 'search'; values: string[] }
+export interface GenRow { sku: string; status: 'ok' | 'not_in_master' | 'bad_link' | 'category_mismatch'; noImage?: boolean; note?: string; linkSource?: 'typed' | 'folders' | 'master' | 'search'; values: string[] }
 export interface GenResponse {
   ok: boolean; error?: string; details?: string;
   headers?: string[]; kinds?: string[]; rows?: GenRow[];

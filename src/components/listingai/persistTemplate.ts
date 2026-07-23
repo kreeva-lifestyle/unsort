@@ -18,12 +18,13 @@ const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.s
 export interface PersistInput {
   id: string | null; // existing template id, or null for a new one
   name: string; marketplace: string;
+  category: string; // garment-category id; '' persists as null = auto-detect from name
   fields: ListingTemplateField[]; rules: ListingTemplateRule[];
   fileBuf: ArrayBuffer | null; fileName: string; sheetName: string; headerRow: number;
 }
 
 export async function persistTemplate(t: PersistInput, addToast: (m: string, k?: string) => void): Promise<boolean> {
-  const base: Record<string, unknown> = { name: t.name, marketplace: t.marketplace, fields: t.fields, rules: t.rules, updated_at: new Date().toISOString() };
+  const base: Record<string, unknown> = { name: t.name, marketplace: t.marketplace, category: t.category || null, fields: t.fields, rules: t.rules, updated_at: new Date().toISOString() };
   const meta = { file_name: t.fileName, sheet_name: t.sheetName, header_row: t.headerRow };
   const put = (id: string) => supabase.storage.from('listing-templates')
     .upload(`${id}.xlsx`, new Blob([t.fileBuf!]), { upsert: true, contentType: XLSX_MIME });

@@ -18,6 +18,7 @@ import TaughtMappingsPage from './TaughtMappingsPage';
 import BulkTeachPage from './bulk/BulkTeachPage';
 import ImageFolders from './ImageFolders';
 import ResultsTable from './ResultsTable';
+import PreflightPanel from './PreflightPanel';
 import RunHistory from './RunHistory';
 import type { ListingTemplate } from '../../types/database';
 
@@ -42,7 +43,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
 
   const loadTemplates = useCallback(async () => {
     const { data, error } = await supabase.from('listing_templates')
-      .select('id, name, marketplace, fields, rules, file_name, sheet_name, header_row, updated_at').order('name');
+      .select('id, name, marketplace, category, fields, rules, file_name, sheet_name, header_row, updated_at').order('name');
     if (error) { addToast(friendlyError(error), 'error'); return; }
     setTemplates((data as ListingTemplate[] | null) || []);
   }, [addToast]);
@@ -137,6 +138,9 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
           {gen.generating && <span style={{ fontSize: 11, color: T.tx3 }}>Fetching data, photos and writing listings — stay on this screen…</span>}
         </div>
       </div>
+      {gen.preflight && (
+        <PreflightPanel issues={gen.preflight.issues} generating={gen.generating} onConfirm={gen.confirmPreflight} />
+      )}
       {gen.rows.length > 0 && gen.runTpl && (
         <ResultsTable headers={gen.headers} kinds={gen.kinds} rows={gen.rows} usage={gen.usage} cost={gen.cost} template={gen.runTpl} addToast={addToast} />
       )}
