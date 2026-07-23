@@ -185,9 +185,9 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div onClick={() => !importing && masterRef.current?.click()} style={{ ...S.btnPrimary, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>{importing ? 'Loading...' : 'Import Master SKUs'}</div>
         <div onClick={() => !importing && vendorRef.current?.click()} style={{ ...S.btnGhost, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>+ Add Vendor Files</div>
-        <div onClick={() => !importing && blockedRef.current?.click()} style={{ ...S.btnGhost, color: T.yl, border: '1px solid rgba(245,158,11,.2)', background: 'rgba(245,158,11,.06)', opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>{blockedFile ? 'Replace Blocked' : 'Blocked Inventory'}</div>
+        <div onClick={() => !importing && blockedRef.current?.click()} style={{ ...S.btnGhost, color: T.yl, border: '1px solid oklch(0.78 0.18 75 / .2)', background: 'oklch(0.78 0.18 75 / .06)', opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>{blockedFile ? 'Replace Blocked' : 'Blocked Inventory'}</div>
         {masterSkus.length > 0 && vendorFiles.length > 0 && <div onClick={compute} style={{ ...S.btnSuccess, cursor: 'pointer' }}>Compute</div>}
-        {computed && results.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)' }}>Export XLS</div>}
+        {computed && results.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)' }}>Export XLS</div>}
         {computed && results.length > 0 && <div onClick={pushToSheet} style={{ ...S.btnPrimary, background: T.gr, color: '#fff', fontWeight: 700, opacity: pushing ? 0.5 : 1, pointerEvents: pushing ? 'none' : 'auto' }}>{pushing ? 'Pushing...' : 'Push to Sheet'}</div>}
         {(masterSkus.length > 0 || vendorFiles.length > 0 || blockedFile) && <div onClick={() => { setMasterSkus([]); setMasterFile(''); setVendorFiles([]); setBlockedFile(''); setBlockedMap({}); setResults([]); setComputed(false); }} style={{ ...S.btnDanger, cursor: 'pointer' }}>Reset</div>}
       </div>
@@ -199,7 +199,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
         {masterFile && <span style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: T.ac3, color: T.ac2 }}>Master: {masterSkus.length} SKUs</span>}
         {vendorFiles.map((v, i) => <span key={i} style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 500, background: 'rgba(255,255,255,.04)', color: T.tx2, border: `1px solid ${T.bd}` }}>{v.name} ({v.rows.length})</span>)}
-        {blockedFile && <span style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: 'rgba(245,158,11,.08)', color: T.yl, border: '1px solid rgba(245,158,11,.2)' }}>Blocked: {Object.keys(blockedMap).length} SKUs</span>}
+        {blockedFile && <span style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: 'oklch(0.78 0.18 75 / .08)', color: T.yl, border: '1px solid oklch(0.78 0.18 75 / .2)' }}>Blocked: {Object.keys(blockedMap).length} SKUs</span>}
       </div>
 
       {/* Results */}
@@ -230,7 +230,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         {/* Filter export */}
         {filter !== 'all' && <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
           <span style={{ fontSize: 11, color: T.tx2 }}>Showing: <b style={{ color: flagColor(filter) }}>{flagLabel(filter) || 'In Stock'}</b> ({filtered.length})</span>
-          <div onClick={() => { if (filtered.length === 0) { addToast('Nothing to export in this filter', 'error'); return; } const data = filtered.map(r => ({ SKU: r.sku, Quantity: r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? 'Not Found' : r.total })); const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Filtered'); XLSX.writeFile(wb, `Odette_${filter}_${new Date().toISOString().slice(0, 10)}.xls`); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Export {filtered.length}</div>
+          <div onClick={() => { if (filtered.length === 0) { addToast('Nothing to export in this filter', 'error'); return; } const data = filtered.map(r => ({ SKU: r.sku, Quantity: r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? 'Not Found' : r.total })); const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Filtered'); XLSX.writeFile(wb, `Odette_${filter}_${new Date().toISOString().slice(0, 10)}.xls`); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Export {filtered.length}</div>
           <div onClick={() => setFilter('all')} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx3, border: `1px solid ${T.bd}`, borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Clear</div>
         </div>}
 

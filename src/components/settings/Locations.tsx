@@ -69,7 +69,7 @@ export default function Locations({ addToast, canEdit }: { addToast: (msg: strin
                 </div>
                 {canEdit && <div style={{ display: 'flex', gap: 4 }}>
                   <span onClick={() => { setEditId(loc.id); setEditName(loc.name); }} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>
-                  <span onClick={() => deleteLocation(loc.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
+                  <span className="touch44" onClick={() => deleteLocation(loc.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
                 </div>}
               </>
             )}

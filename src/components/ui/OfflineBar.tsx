@@ -23,7 +23,7 @@ export default function OfflineBar() {
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 10000,
       background: offline ? T.re : T.gr,
       color: '#fff', textAlign: 'center',
-      fontSize: 11, fontWeight: 600, padding: '6px 0',
+      fontSize: 11, fontWeight: 600, padding: '6px 0', paddingTop: 'calc(6px + env(safe-area-inset-top))',
       transition: 'all .3s ease',
       transform: show ? 'translateY(0)' : 'translateY(-100%)',
     }}>

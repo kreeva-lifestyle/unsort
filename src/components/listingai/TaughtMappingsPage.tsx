@@ -103,7 +103,7 @@ export default function TaughtMappingsPage({ onBack, onBulk, fields, addToast }:
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
           <button onClick={onBack} style={{ ...S.btnGhost, ...S.btnSm }}>← Back</button>
           <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Taught Mappings</div>
-          <button onClick={onBulk} title="Scan the whole master sheet and teach many values at once" style={{ ...S.btnGhost, ...S.btnSm, marginLeft: 'auto', color: T.ac2, border: '1px solid rgba(99,102,241,.35)' }}>⚡ Bulk Teach</button>
+          <button onClick={onBulk} title="Scan the whole master sheet and teach many values at once" style={{ ...S.btnGhost, ...S.btnSm, marginLeft: 'auto', color: T.ac2, border: '1px solid oklch(0.55 0.22 265 / .35)' }}>⚡ Bulk Teach</button>
         </div>
         <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5 }}>
           Teach permanent corrections: when the master sheet says X for a column, always use Y on the marketplace. Applied instantly on every run — no AI cost, no repeated mistakes.

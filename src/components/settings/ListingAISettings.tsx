@@ -31,7 +31,7 @@ export default function ListingAISettings({ addToast }: { addToast: (m: string, 
         It is checked with Anthropic before saving and stored on the server only.
       </div>
       {err && (
-        <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 12 }}>{err}</div>
+        <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 12 }}>{err}</div>
       )}
       {hasKey !== null && <KeyCard hasKey={hasKey} onSaved={loadStatus} addToast={addToast} />}
       {hasKey !== null && <ModelCard model={model} onSaved={loadStatus} addToast={addToast} />}

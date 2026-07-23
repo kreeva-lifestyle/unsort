@@ -730,9 +730,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             style={{ ...S.fSearch, background: 'transparent', border: 'none' }} />
         </div>
         <div className="scan-courier-pills" style={{ display: 'flex', gap: 4, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingRight: 24 }}>
-          <button onClick={() => { setHistoryFilterCourier(''); setHistoryPage(0); }} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${!historyFilterCourier ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: !historyFilterCourier ? 'rgba(99,102,241,.08)' : 'transparent', color: !historyFilterCourier ? T.ac2 : T.tx2, fontFamily: T.sans, whiteSpace: 'nowrap', flexShrink: 0 }}>All</button>
+          <button onClick={() => { setHistoryFilterCourier(''); setHistoryPage(0); }} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${!historyFilterCourier ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: !historyFilterCourier ? 'oklch(0.55 0.22 265 / .08)' : 'transparent', color: !historyFilterCourier ? T.ac2 : T.tx2, fontFamily: T.sans, whiteSpace: 'nowrap', flexShrink: 0 }}>All</button>
           {couriers.map(c => (
-            <button key={c.id} onClick={() => { setHistoryFilterCourier(historyFilterCourier === c.name ? '' : c.name); setHistoryPage(0); }} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${historyFilterCourier === c.name ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: historyFilterCourier === c.name ? 'rgba(99,102,241,.08)' : 'transparent', color: historyFilterCourier === c.name ? T.ac2 : T.tx2, fontFamily: T.sans, whiteSpace: 'nowrap', flexShrink: 0 }}>{c.name}</button>
+            <button key={c.id} onClick={() => { setHistoryFilterCourier(historyFilterCourier === c.name ? '' : c.name); setHistoryPage(0); }} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${historyFilterCourier === c.name ? T.ac : T.bd}`, cursor: 'pointer', fontSize: 11, fontWeight: 500, background: historyFilterCourier === c.name ? 'oklch(0.55 0.22 265 / .08)' : 'transparent', color: historyFilterCourier === c.name ? T.ac2 : T.tx2, fontFamily: T.sans, whiteSpace: 'nowrap', flexShrink: 0 }}>{c.name}</button>
           ))}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
@@ -742,7 +742,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             {brands.map(b => <option key={b} value={b}>{b}</option>)}
           </select>
           <select value={historyPageSize} onChange={e => { setHistoryPageSize(Number(e.target.value)); setHistoryPage(0); }}
-            style={{ ...S.fInput, minWidth: 72, width: 'auto', padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}>
+            style={{ ...S.fInput, minWidth: 72, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, borderRadius: 6, cursor: 'pointer' }}>
           <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
         </select>
         </div>
@@ -857,7 +857,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {dbFails > 0 && <span style={{ fontSize: 9, color: T.re, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)' }}>{dbFails} DB save failed</span>}
+          {dbFails > 0 && <span style={{ fontSize: 9, color: T.re, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'oklch(0.63 0.22 25 / .1)', border: '1px solid oklch(0.63 0.22 25 / .2)' }}>{dbFails} DB save failed</span>}
           <button onClick={() => { const d = new Date(); setHistoryDateTo(d.toISOString().slice(0,10)); d.setDate(d.getDate()-6); setHistoryDateFrom(d.toISOString().slice(0,10)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
         </div>
       </div>
@@ -914,22 +914,22 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
           {/* Verify error — with retry (audit P1) */}
           {verifyResult && !verifyResult.ok && (
-            <div style={{ marginTop: 12, background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.18)', borderRadius: 8, padding: 12, animation: 'fi .2s ease' }}>
+            <div style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .06)', border: '1px solid oklch(0.63 0.22 25 / .18)', borderRadius: 8, padding: 12, animation: 'fi .2s ease' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: T.re, marginBottom: 4 }}>Connection Failed</div>
               <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5 }}>{verifyResult.error}</div>
               {verifyResult.details && <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, marginTop: 4, lineHeight: 1.5 }}>{verifyResult.details}</div>}
-              <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re44}`, background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>↻ Retry</button>
+              <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re44}`, background: 'oklch(0.63 0.22 25 / .08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>↻ Retry</button>
             </div>
           )}
           {verifyResult && verifyResult.ok && verifyResult.columnsOk === false && (
-            <div style={{ marginTop: 12, background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.18)', borderRadius: 8, padding: 12, animation: 'fi .2s ease' }}>
+            <div style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .06)', border: '1px solid oklch(0.63 0.22 25 / .18)', borderRadius: 8, padding: 12, animation: 'fi .2s ease' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: T.re, marginBottom: 4 }}>Column Mismatch</div>
               <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.6, marginBottom: 6 }}>{verifyResult.columnsInfo}</div>
               <div style={{ fontSize: 10, color: T.tx3, lineHeight: 1.6, background: 'rgba(0,0,0,.2)', borderRadius: 6, padding: '8px 10px' }}>
                 Please fix the sheet columns before scanning. Expected order:<br/>
                 <strong style={{ color: T.tx }}>A:</strong> Count &nbsp; <strong style={{ color: T.tx }}>B:</strong> AWB &nbsp; <strong style={{ color: T.tx }}>C:</strong> Timestamp &nbsp; <strong style={{ color: T.tx }}>D:</strong> Camera Number
               </div>
-              <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re44}`, background: 'rgba(239,68,68,.08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>↻ Re-check sheet</button>
+              <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re44}`, background: 'oklch(0.63 0.22 25 / .08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>↻ Re-check sheet</button>
             </div>
           )}
         </div>
@@ -942,14 +942,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, minHeight: '100%', position: 'relative' }} onClick={focusInput}>
 
       {/* Scan counter badge */}
-      {recentScans.length > 0 && <div style={{ position: 'fixed', top: 52, right: 16, zIndex: 200, background: T.gr, color: '#fff', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, boxShadow: '0 2px 10px rgba(34,197,94,.4)' }}>{successScans.length} scanned</div>}
+      {recentScans.length > 0 && <div style={{ position: 'fixed', top: 52, right: 16, zIndex: 200, background: T.gr, color: '#fff', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, boxShadow: '0 2px 10px oklch(0.72 0.19 145 / .4)' }}>{successScans.length} scanned</div>}
 
       {/* Flash */}
-      {flash && <div style={{ position: 'fixed', inset: 0, zIndex: 300, pointerEvents: 'none', background: flash === 'success' ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.10)', animation: 'fi .15s ease' }} />}
+      {flash && <div style={{ position: 'fixed', inset: 0, zIndex: 300, pointerEvents: 'none', background: flash === 'success' ? 'oklch(0.72 0.19 145 / .08)' : 'oklch(0.63 0.22 25 / .10)', animation: 'fi .15s ease' }} />}
 
       {/* Offline indicator */}
       {isOffline && started && (
-        <div style={{ margin: '0 14px 8px', padding: '8px 12px', borderRadius: 6, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', color: T.yl, fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ margin: '0 14px 8px', padding: '8px 12px', borderRadius: 6, background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .2)', color: T.yl, fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.yl, animation: 'subtlePulse 2s ease-in-out infinite' }} />
           You're offline — scans are queued locally. They'll sync when connection returns.
         </div>
@@ -957,18 +957,18 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Dropped scans alert — scans that failed all 3 retries */}
       {droppedCount > 0 && started && (
-        <div style={{ margin: '0 14px 8px', padding: '10px 14px', borderRadius: 6, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', color: T.re, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ margin: '0 14px 8px', padding: '10px 14px', borderRadius: 6, background: 'oklch(0.63 0.22 25 / .1)', border: '1px solid oklch(0.63 0.22 25 / .3)', color: T.re, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.re, animation: 'subtlePulse 1.5s ease-in-out infinite' }} />
           <span style={{ flex: 1 }}>⚠ {droppedCount} scan(s) failed to sync to Google Sheets after retries — they ARE saved in the app, just missing from the sheet. Check connection, then tap Retry.</span>
           <button onClick={() => { const batches = getDroppedBatches().slice(); clearDroppedBatches(); for (const b of batches) enqueueWrite(b.rows, b.sheetName); }} style={{ ...S.btnDanger, ...S.btnSm, fontWeight: 700 }}>Retry sync</button>
-          <button onClick={() => { clearDroppedBatches(); setDroppedCount(0); }} style={{ ...S.btnGhost, ...S.btnSm, color: T.re, borderColor: 'rgba(239,68,68,.3)' }}>Dismiss</button>
+          <button onClick={() => { clearDroppedBatches(); setDroppedCount(0); }} style={{ ...S.btnGhost, ...S.btnSm, color: T.re, borderColor: 'oklch(0.63 0.22 25 / .3)' }}>Dismiss</button>
         </div>
       )}
 
       {/* Duplicate — non-blocking banner (audit P0: let operator keep scanning) */}
       {duplicateAwb && (
         <div style={{ position: 'fixed', top: 56, left: '50%', transform: 'translateX(-50%)', zIndex: 400, pointerEvents: 'none', animation: 'slideDown .15s ease' }}>
-          <div style={{ background: 'rgba(60,15,15,.95)', border: '1px solid rgba(239,68,68,.45)', borderRadius: 10, padding: '8px 14px', boxShadow: '0 8px 24px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 10, color: '#fff' }}>
+          <div style={{ background: 'rgba(60,15,15,.95)', border: '1px solid oklch(0.63 0.22 25 / .45)', borderRadius: 10, padding: '8px 14px', boxShadow: '0 8px 24px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 10, color: '#fff' }}>
             <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round', flexShrink: 0 }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: T.re, textTransform: 'uppercase', letterSpacing: 1 }}>Duplicate — not saved</div>
@@ -980,7 +980,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Write-queue stall warning — sync is lagging (audit P2). Non-blocking so operator keeps going. */}
       {(pendingWrites > 5 || dbFails > 0) && (
-        <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 16 }}>⏳</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: T.yl, textTransform: 'uppercase', letterSpacing: 1 }}>Sync lagging — keep scanning</div>
@@ -1007,7 +1007,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               <div style={{ fontSize: 20, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>{sessionCount}</div>
               <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 600 }}>Scanned</div>
             </div>
-            <div onClick={() => setSearchOpen(p => !p)} style={{ width: 44, height: 44, borderRadius: 8, border: `1px solid ${searchOpen ? T.ac + '33' : T.bd}`, background: searchOpen ? 'rgba(99,102,241,.10)' : 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: searchOpen ? T.ac2 : T.tx3 }}>
+            <div onClick={() => setSearchOpen(p => !p)} style={{ width: 44, height: 44, borderRadius: 8, border: `1px solid ${searchOpen ? T.ac + '33' : T.bd}`, background: searchOpen ? 'oklch(0.55 0.22 265 / .10)' : 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: searchOpen ? T.ac2 : T.tx3 }}>
               <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
             </div>
             <div onClick={() => {
@@ -1037,15 +1037,15 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Counter + Today Total */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-        <div style={{ flex: 1, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+        <div style={{ flex: 1, background: 'oklch(0.72 0.19 145 / .06)', border: '1px solid oklch(0.72 0.19 145 / .15)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
           <div style={{ fontSize: 9, color: T.gr, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Session</div>
           <div style={{ fontSize: 28, fontWeight: 800, fontFamily: T.sora, color: T.gr, lineHeight: 1 }}>{sessionCount}</div>
         </div>
-        <div style={{ flex: 1, background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.12)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }} title="Total scans in this Google Sheet over the last 7 days">
+        <div style={{ flex: 1, background: 'oklch(0.55 0.22 265 / .06)', border: '1px solid oklch(0.55 0.22 265 / .12)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }} title="Total scans in this Google Sheet over the last 7 days">
           <div style={{ fontSize: 9, color: T.ac2, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>7-Day Total</div>
           <div style={{ fontSize: 28, fontWeight: 800, fontFamily: T.sora, color: T.ac2, lineHeight: 1 }}>{sheetTotal}</div>
         </div>
-        <div onClick={() => { setTodaySummaryOpen(true); fetchTodaySummary(); }} style={{ flex: 1, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.12)', borderRadius: 10, padding: '10px 12px', textAlign: 'center', cursor: 'pointer' }} title="Tap to see today's breakdown by courier">
+        <div onClick={() => { setTodaySummaryOpen(true); fetchTodaySummary(); }} style={{ flex: 1, background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .12)', borderRadius: 10, padding: '10px 12px', textAlign: 'center', cursor: 'pointer' }} title="Tap to see today's breakdown by courier">
           <div style={{ fontSize: 9, color: T.yl, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Today Total</div>
           <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora, color: T.yl, lineHeight: 1 }}>Tap to view</div>
         </div>
@@ -1078,12 +1078,12 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* Last Scanned + Undo */}
       {lastScanned && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, background: 'rgba(34,197,94,.05)', border: '1px solid rgba(34,197,94,.12)', borderRadius: 8, padding: '8px 12px', animation: 'fi .15s ease' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, background: 'oklch(0.72 0.19 145 / .05)', border: '1px solid oklch(0.72 0.19 145 / .12)', borderRadius: 8, padding: '8px 12px', animation: 'fi .15s ease' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Last Scanned</div>
             <div style={{ fontSize: 14, fontFamily: T.mono, color: T.tx, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lastScanned}</div>
           </div>
-          <button type="button" onClick={(e) => { e.stopPropagation(); undoLast(); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,.2)', background: 'rgba(239,68,68,.08)', color: '#FCA5A5', fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: T.sans }}>Undo</button>
+          <button type="button" onClick={(e) => { e.stopPropagation(); undoLast(); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid oklch(0.63 0.22 25 / .2)', background: 'oklch(0.63 0.22 25 / .08)', color: '#FCA5A5', fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: T.sans }}>Undo</button>
         </div>
       )}
 
@@ -1119,12 +1119,12 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
       {/* AWB Input */}
       <div style={{ marginBottom: 12 }}>
-        {pendingWrites > 0 && <div style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.18)', color: T.yl, fontWeight: 600, display: 'inline-block', marginBottom: 6 }}>Syncing {pendingWrites}</div>}
+        {pendingWrites > 0 && <div style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'oklch(0.78 0.18 75 / .10)', border: '1px solid oklch(0.78 0.18 75 / .18)', color: T.yl, fontWeight: 600, display: 'inline-block', marginBottom: 6 }}>Syncing {pendingWrites}</div>}
         <div style={{ position: 'relative' }}>
           <input ref={inputRef} type="text" inputMode="text" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
             value={awbInput} onChange={e => setAwbInput(e.target.value)} onKeyDown={handleKeyDown}
             placeholder="Type or scan AWB..."
-            style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `2px solid ${flash === 'success' ? T.gr : flash === 'error' ? T.re : T.ac + '44'}`, borderRadius: 12, color: T.tx, fontFamily: T.mono, fontSize: 16, padding: '14px 50px 14px 16px', outline: 'none', transition: 'border-color .15s', boxSizing: 'border-box', boxShadow: `0 0 12px ${flash === 'success' ? 'rgba(34,197,94,.12)' : flash === 'error' ? 'rgba(239,68,68,.12)' : 'rgba(99,102,241,.04)'}` }} />
+            style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `2px solid ${flash === 'success' ? T.gr : flash === 'error' ? T.re : T.ac + '44'}`, borderRadius: 12, color: T.tx, fontFamily: T.mono, fontSize: 16, padding: '14px 50px 14px 16px', outline: 'none', transition: 'border-color .15s', boxSizing: 'border-box', boxShadow: `0 0 12px ${flash === 'success' ? 'oklch(0.72 0.19 145 / .12)' : flash === 'error' ? 'oklch(0.63 0.22 25 / .12)' : 'oklch(0.55 0.22 265 / .04)'}` }} />
           {/* Camera trigger inside input (audit P3: shave a click on the heavy-use path) */}
           {!cameraOpen && <button type="button" onClick={() => setCameraOpen(true)} title="Scan barcode with camera" style={{ position: 'absolute', right: 48, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: 8, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" /></svg>
@@ -1142,14 +1142,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <span style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' }}>Recent Scans</span>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 9, color: T.tx3 }}>{recentScans.length} this session</span>
-            {successScans.length > 0 && <button className="desktop-only" onClick={e => { e.stopPropagation(); const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n'); const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `PackTime_${courier}_CAM${camera}_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url); }} style={{ padding: '3px 8px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 9, fontWeight: 500, cursor: 'pointer' }}>Export</button>}
+            {successScans.length > 0 && <button className="desktop-only" onClick={e => { e.stopPropagation(); const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n'); const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `PackTime_${courier}_CAM${camera}_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url); }} style={{ padding: '4px 10px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Export</button>}
           </div>
         </div>
         {sessionListOpen && <div style={{ maxHeight: 280, overflowY: 'auto' }}>
           {recentScans.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans yet. Start scanning AWB barcodes.</div>}
           {recentScans.map((s, i) => (
-            <div key={`${s.awb}-${s.time}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .15s ease' : undefined, background: !s.success ? 'rgba(239,68,68,.04)' : 'transparent' }}>
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: s.success ? 'rgba(34,197,94,.12)' : 'rgba(239,68,68,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div key={`${s.awb}-${s.time}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .15s ease' : undefined, background: !s.success ? 'oklch(0.63 0.22 25 / .04)' : 'transparent' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: s.success ? 'oklch(0.72 0.19 145 / .12)' : 'oklch(0.63 0.22 25 / .12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {s.success ? <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.gr, strokeWidth: 2.5 }}><path d="M20 6L9 17l-5-5" /></svg>
                 : <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2.5 }}><path d="M18 6L6 18M6 6l12 12" /></svg>}
               </div>
@@ -1170,7 +1170,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {/* Complete Session */}
       {sessionCount > 0 && (
         <div style={{ position: 'sticky', bottom: 'calc(var(--nav-h, 62px) + 8px)', zIndex: 10, paddingTop: 8 }}>
-          <button onClick={() => setShowComplete(true)} style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: `1px solid rgba(34,197,94,.18)`, fontSize: 12, fontWeight: 600, fontFamily: T.sans, background: 'rgba(34,197,94,.12)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', color: T.gr, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+          <button onClick={() => setShowComplete(true)} style={{ width: '100%', padding: '12px 0', borderRadius: 8, border: `1px solid oklch(0.72 0.19 145 / .18)`, fontSize: 12, fontWeight: 600, fontFamily: T.sans, background: 'oklch(0.72 0.19 145 / .12)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', color: T.gr, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
             <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><path d="M20 6L9 17l-5-5" /></svg>
             Complete Session
           </button>

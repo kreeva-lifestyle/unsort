@@ -118,16 +118,16 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
 
       {loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading analytics...</div> : <>
 
-      {isTruncated && <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 11, color: T.yl, marginBottom: 10 }}>
+      {isTruncated && <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .2)', borderRadius: 6, padding: '6px 10px', fontSize: 11, color: T.yl, marginBottom: 10 }}>
         Charts, breakdowns and the table below are based on the latest {CLICK_LIMIT.toLocaleString('en-IN')} of {totalCount.toLocaleString('en-IN')} clicks in this range — narrow the date range to cover all of it.
       </div>}
 
       {/* KPI cards */}
       <div className="trackly-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
-        <KpiCard label="Total Clicks" value={totalCount} color={T.ac2} bg={T.ac3} bd="rgba(99,102,241,.15)" />
-        <KpiCard label="Unique Visitors" value={uniqueVisitors || '—'} color={T.bl} bg="rgba(56,189,248,.06)" bd="rgba(56,189,248,.15)" />
-        <KpiCard label="Devices" value={Object.keys(deviceCounts).length} color={T.gr} bg="rgba(34,197,94,.06)" bd="rgba(34,197,94,.15)" />
-        <KpiCard label="Countries" value={Object.keys(countryCounts).filter(k => k !== 'Unknown').length || '—'} color={T.yl} bg="rgba(251,191,36,.06)" bd="rgba(251,191,36,.15)" />
+        <KpiCard label="Total Clicks" value={totalCount} color={T.ac2} bg={T.ac3} bd="oklch(0.55 0.22 265 / .15)" />
+        <KpiCard label="Unique Visitors" value={uniqueVisitors || '—'} color={T.bl} bg="oklch(0.77 0.14 230 / .06)" bd="oklch(0.77 0.14 230 / .15)" />
+        <KpiCard label="Devices" value={Object.keys(deviceCounts).length} color={T.gr} bg="oklch(0.72 0.19 145 / .06)" bd="oklch(0.72 0.19 145 / .15)" />
+        <KpiCard label="Countries" value={Object.keys(countryCounts).filter(k => k !== 'Unknown').length || '—'} color={T.yl} bg="oklch(0.78 0.18 75 / .06)" bd="oklch(0.78 0.18 75 / .15)" />
       </div>
 
       {/* Daily chart */}

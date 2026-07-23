@@ -200,9 +200,9 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
         onKeyDown={e => { if (navigateTo && (e.key === 'Enter' || e.key === ' ')) navigateTo('challan'); }}
         title="Net revenue this month (sales − returns)"
         className="stat-hero"
-        style={{ background: `linear-gradient(135deg, rgba(34,197,94,.10), rgba(34,197,94,.04))`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid rgba(34,197,94,.18)`, borderRadius: 12, padding: '18px 22px', marginBottom: 10, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, cursor: navigateTo ? 'pointer' : 'default', transition: T.transition, position: 'relative', overflow: 'hidden' }}
-        onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(34,197,94,.35)')}
-        onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(34,197,94,.18)')}
+        style={{ background: `linear-gradient(135deg, oklch(0.72 0.19 145 / .10), oklch(0.72 0.19 145 / .04))`, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid oklch(0.72 0.19 145 / .18)`, borderRadius: 12, padding: '18px 22px', marginBottom: 10, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, cursor: navigateTo ? 'pointer' : 'default', transition: T.transition, position: 'relative', overflow: 'hidden' }}
+        onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'oklch(0.72 0.19 145 / .35)')}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'oklch(0.72 0.19 145 / .18)')}
       >
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.grCC}, ${T.gr22})` }} />
         <div>
@@ -262,7 +262,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
           </div>
         </div>
         {/* Dry clean stuck */}
-        <div role="button" tabIndex={0} onClick={() => navigateTo?.('inventory')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('inventory'); }} style={{ background: alerts.dryClean.length > 0 ? 'rgba(56,189,248,.08)' : 'rgba(255,255,255,0.04)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${alerts.dryClean.length > 0 ? 'rgba(56,189,248,.18)' : T.bd}`, borderLeft: `3px solid ${alerts.dryClean.length > 0 ? T.bl : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 110 }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(56,189,248,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.dryClean.length > 0 ? 'rgba(56,189,248,.18)' : T.bd)}>
+        <div role="button" tabIndex={0} onClick={() => navigateTo?.('inventory')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('inventory'); }} style={{ background: alerts.dryClean.length > 0 ? 'oklch(0.77 0.14 230 / .08)' : 'rgba(255,255,255,0.04)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${alerts.dryClean.length > 0 ? 'oklch(0.77 0.14 230 / .18)' : T.bd}`, borderLeft: `3px solid ${alerts.dryClean.length > 0 ? T.bl : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 110 }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'oklch(0.77 0.14 230 / .35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.dryClean.length > 0 ? 'oklch(0.77 0.14 230 / .18)' : T.bd)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <Pill tone={alerts.dryClean.length > 0 ? 'bl' : 'neutral'} dot>In Dry Clean</Pill>
             <span style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: alerts.dryClean.length > 0 ? T.bl : T.tx3, lineHeight: 1 }}>{alerts.dryClean.length}</span>
@@ -272,7 +272,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
           </div>
         </div>
         {/* Pending handovers */}
-        <div role="button" tabIndex={0} onClick={() => navigateTo?.('challan')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('challan'); }} style={{ background: alerts.pendingHandovers.length > 0 ? 'rgba(251,191,36,.08)' : 'rgba(255,255,255,0.04)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${alerts.pendingHandovers.length > 0 ? 'rgba(251,191,36,.18)' : T.bd}`, borderLeft: `3px solid ${alerts.pendingHandovers.length > 0 ? T.yl : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 110 }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'rgba(251,191,36,.35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.pendingHandovers.length > 0 ? 'rgba(251,191,36,.18)' : T.bd)}>
+        <div role="button" tabIndex={0} onClick={() => navigateTo?.('challan')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigateTo?.('challan'); }} style={{ background: alerts.pendingHandovers.length > 0 ? 'oklch(0.78 0.18 75 / .08)' : 'rgba(255,255,255,0.04)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${alerts.pendingHandovers.length > 0 ? 'oklch(0.78 0.18 75 / .18)' : T.bd}`, borderLeft: `3px solid ${alerts.pendingHandovers.length > 0 ? T.yl : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: navigateTo ? 'pointer' : 'default', transition: T.transition, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 110 }} onMouseEnter={e => navigateTo && (e.currentTarget.style.borderColor = 'oklch(0.78 0.18 75 / .35)')} onMouseLeave={e => (e.currentTarget.style.borderColor = alerts.pendingHandovers.length > 0 ? 'oklch(0.78 0.18 75 / .18)' : T.bd)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <Pill tone={alerts.pendingHandovers.length > 0 ? 'yl' : 'neutral'} dot>Pending Handovers</Pill>
             <span style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: alerts.pendingHandovers.length > 0 ? T.yl : T.tx3, lineHeight: 1 }}>{alerts.pendingHandovers.length}</span>
@@ -389,7 +389,7 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
               onClick={() => { sessionStorage.setItem('challan_search', c.name); navigateTo?.('challan'); }}
               onKeyDown={e => { if (navigateTo && (e.key === 'Enter' || e.key === ' ')) { sessionStorage.setItem('challan_search', c.name); navigateTo('challan'); } }}
               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 4px', borderBottom: `1px solid ${T.bd}`, cursor: navigateTo ? 'pointer' : 'default', borderRadius: 4, transition: 'background .15s' }}
-              onMouseEnter={e => navigateTo && (e.currentTarget.style.background = 'rgba(99,102,241,.06)')}
+              onMouseEnter={e => navigateTo && (e.currentTarget.style.background = 'oklch(0.55 0.22 265 / .06)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               <span style={{ fontSize: 11, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{c.name}</span>

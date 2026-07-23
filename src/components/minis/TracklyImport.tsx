@@ -91,8 +91,8 @@ export default function TracklyImport({ onBack }: { onBack: () => void }) {
 
           <button onClick={() => !loading && fileRef.current?.click()} style={{
             width: '100%', padding: '20px', borderRadius: 12,
-            border: `2px dashed ${loading ? T.bd : 'rgba(34,197,94,0.3)'}`,
-            background: loading ? T.s : 'rgba(34,197,94,0.04)',
+            border: `2px dashed ${loading ? T.bd : 'oklch(0.72 0.19 145 / 0.3)'}`,
+            background: loading ? T.s : 'oklch(0.72 0.19 145 / 0.04)',
             color: loading ? T.tx3 : '#22C55E', fontSize: 14, fontWeight: 600,
             cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit',
             minHeight: 56, transition: 'all 0.2s',
@@ -119,12 +119,12 @@ export default function TracklyImport({ onBack }: { onBack: () => void }) {
           </div>
 
           {!loading && msg && (
-            <div style={{ marginTop: 16, padding: '12px 14px', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 8, fontSize: 12, color: '#22C55E' }}>
+            <div style={{ marginTop: 16, padding: '12px 14px', background: 'oklch(0.72 0.19 145 / 0.06)', border: '1px solid oklch(0.72 0.19 145 / 0.15)', borderRadius: 8, fontSize: 12, color: '#22C55E' }}>
               {msg}
             </div>
           )}
           {error && (
-            <div style={{ marginTop: 16, padding: '12px 14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, fontSize: 12, color: T.re }}>
+            <div style={{ marginTop: 16, padding: '12px 14px', background: 'oklch(0.63 0.22 25 / 0.08)', border: '1px solid oklch(0.63 0.22 25 / 0.2)', borderRadius: 8, fontSize: 12, color: T.re }}>
               {error}
             </div>
           )}

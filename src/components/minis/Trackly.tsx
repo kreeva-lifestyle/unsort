@@ -129,7 +129,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
             ...(l.short_code === PROTECTED_CODE ? [] : [{ label: 'Del', color: '#EF4444', onClick: () => deleteLink(l.id) }]),
           ]} hint={i === 0} hintKey="trackly">
           <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '12px 14px', transition: 'border-color .15s' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'oklch(0.55 0.22 265 / .3)'; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; }}
             onClick={() => copyLink(l.short_code)}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
@@ -147,7 +147,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
             </div>
             <div className="desktop-only" style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
               <span onClick={e => { e.stopPropagation(); copyLink(l.short_code); }} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', minHeight: 32 }}>Copy</span>
-              <span onClick={e => { e.stopPropagation(); setAnalyticsLink(l); window.history.pushState({ view: 'short-analytics' }, ''); }} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', color: T.gr, borderColor: 'rgba(34,197,94,.2)', minHeight: 32 }}>Analytics</span>
+              <span onClick={e => { e.stopPropagation(); setAnalyticsLink(l); window.history.pushState({ view: 'short-analytics' }, ''); }} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .2)', minHeight: 32 }}>Analytics</span>
               {l.short_code === PROTECTED_CODE
                 ? <span style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'default', color: T.tx3, display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 32 }} title="This link is protected and cannot be deleted"><svg viewBox="0 0 24 24" style={{ width: 11, height: 11, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>Protected</span>
                 : <span onClick={e => { e.stopPropagation(); deleteLink(l.id); }} style={{ ...S.btnDanger, padding: '7px 12px', fontSize: 11, cursor: 'pointer', minHeight: 32 }}>Delete</span>}
@@ -165,7 +165,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
         ))}
       </div>}
 
-      {links.length === LINK_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {LINK_LIMIT} links. Use search to find older ones.</div>}
+      {links.length === LINK_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {LINK_LIMIT} links. Use search to find older ones.</div>}
 
       {filtered.length > 0 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -200,7 +200,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
               </div>
               <div style={{ fontSize: 10, color: T.tx3, marginTop: 4, fontFamily: T.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayShortUrl(form.short_code || '...')}</div>
             </div>
-            {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{formError}</div>}
+            {formError && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{formError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: `1px solid ${T.bd}` }}>
               <span onClick={closeModal} style={S.btnGhost}>Cancel</span>
               <button type="submit" style={{ ...S.btnPrimary, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving...' : 'Create'}</button>

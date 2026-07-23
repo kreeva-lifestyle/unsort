@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Component, Suspense, lazy } from 'react';
+import { friendlyError } from './lib/friendlyError';
 
 // Preload logo immediately for short-link pages — fires before React renders anything,
 // so the 474KB PNG downloads in parallel with JS chunk evaluation.
@@ -20,7 +21,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: un
       <div style={{ position: 'absolute', top: '30%', left: '40%', width: 300, height: 300, background: `radial-gradient(circle, ${T.ac3} 0%, transparent 70%)`, pointerEvents: 'none' }} />
       <div style={{ position: 'relative', zIndex: 1, background: T.s, backdropFilter: 'blur(24px)', border: `1px solid ${T.bd}`, borderRadius: T.rXl, padding: '28px 32px', textAlign: 'center' as const, maxWidth: 380, boxShadow: '0 16px 48px rgba(0,0,0,.4)' }}>
         <p style={{ color: T.tx, fontSize: 14, fontWeight: 600, fontFamily: T.sora, marginBottom: 6 }}>Something went wrong</p>
-        <p style={{ color: T.tx3, fontSize: 11, marginBottom: 16, lineHeight: 1.5 }}>{this.state.error instanceof Error ? this.state.error.message : String(this.state.error)}</p>
+        <p style={{ color: T.tx3, fontSize: 11, marginBottom: 16, lineHeight: 1.5 }}>{friendlyError(this.state.error)}</p>
         <button onClick={() => window.location.reload()} style={{ ...S.btnPrimary, padding: '7px 18px', fontSize: 11 }}>Reload</button>
       </div>
     </div>;

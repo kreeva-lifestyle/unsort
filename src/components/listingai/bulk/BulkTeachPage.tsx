@@ -131,7 +131,7 @@ export default function BulkTeachPage({ onBack, templates, initialTemplateId, ad
             </span>
           ))}
           {totals.need > 0 && needy.reduce((s, c) => s + pendingOf(c).length, 0) > 0 && (
-            <button onClick={() => suggest(needy, '*')} style={{ ...S.btnGhost, ...S.btnSm, color: T.yl, border: '1px solid rgba(245,158,11,.25)', marginLeft: 'auto', pointerEvents: suggestingCol ? 'none' : 'auto', opacity: suggestingCol ? 0.5 : 1 }}>
+            <button onClick={() => suggest(needy, '*')} style={{ ...S.btnGhost, ...S.btnSm, color: T.yl, border: '1px solid oklch(0.78 0.18 75 / .25)', marginLeft: 'auto', pointerEvents: suggestingCol ? 'none' : 'auto', opacity: suggestingCol ? 0.5 : 1 }}>
               {suggestingCol === '*' ? 'Suggesting…' : <>&#10022; Suggest all</>}
             </button>
           )}
@@ -169,7 +169,7 @@ export default function BulkTeachPage({ onBack, templates, initialTemplateId, ad
         const scanned = new Set(columns.map(c => c.header));
         const unscanned = (tpl?.fields || []).filter(f => f.allowed?.length && !f.skip && !f.fixed && !f.sameAs && !scanned.has(f.header)).map(f => f.header);
         return unscanned.length ? (
-          <div style={{ marginTop: 14, padding: '10px 12px', background: 'rgba(245,158,11,.05)', border: '1px solid rgba(245,158,11,.18)', borderRadius: 8, fontSize: 11, color: T.tx3, lineHeight: 1.6 }}>
+          <div style={{ marginTop: 14, padding: '10px 12px', background: 'oklch(0.78 0.18 75 / .05)', border: '1px solid oklch(0.78 0.18 75 / .18)', borderRadius: 8, fontSize: 11, color: T.tx3, lineHeight: 1.6 }}>
             <b style={{ color: T.yl }}>Not scanned</b> — these dropdown columns aren't paired to a master column yet, so their values can't be checked here:{' '}
             <span style={{ color: T.tx2 }}>{unscanned.slice(0, 12).join(' · ')}{unscanned.length > 12 ? ` … +${unscanned.length - 12} more` : ''}</span>.
             {' '}Pair them in <b>Manage Templates</b> (the ⤓ "from master" control on each column) and they'll appear on this board.

@@ -33,6 +33,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
+  const [sharing, setSharing] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -206,7 +207,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 8, justifyContent: 'center' }}>
             <button onClick={() => setPrintData(null)} style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: T.tx2, fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 130 }}>Close</button>
             <button onClick={() => printOrQueue('document', printData.html, 'A4', 'Purchase Order', undefined, addToast)} style={{ padding: '10px 18px', borderRadius: 8, border: `1px solid ${T.ac3}`, background: T.ac3, color: T.ac2, fontSize: 13, fontWeight: 600, cursor: 'pointer', flex: 1, maxWidth: 130 }}>Print</button>
-            <button onClick={() => sharePoImage(printData.po, printData.items, addToast)} style={{ padding: '10px 18px', borderRadius: 8, border: 'none', ...S.btnPrimary, fontSize: 13, flex: 1, maxWidth: 130 }}>Share</button>
+            <button onClick={() => { if (sharing) return; setSharing(true); sharePoImage(printData.po, printData.items, addToast).finally(() => setSharing(false)); }} style={{ padding: '10px 18px', borderRadius: 8, border: 'none', ...S.btnPrimary, fontSize: 13, flex: 1, maxWidth: 130, opacity: sharing ? 0.5 : 1, pointerEvents: sharing ? 'none' as const : 'auto' as const }}>{sharing ? 'Sharing…' : 'Share'}</button>
           </div>
         </div>, document.body)}
 

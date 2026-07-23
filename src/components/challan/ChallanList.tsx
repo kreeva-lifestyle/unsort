@@ -75,7 +75,7 @@ export default function ChallanList(p: Props) {
             <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
             Filters{filterActive ? ` (${[p.statusFilter, p.tagFilter, p.dateFrom, p.dateTo, p.invFilter].filter(Boolean).length})` : ''}
           </button>
-          <button onClick={p.onExport} style={{ ...S.btnGhost, color: T.gr, borderColor: 'rgba(34,197,94,.25)', background: 'rgba(34,197,94,.06)' }}>Export</button>
+          <button onClick={p.onExport} style={{ ...S.btnGhost, color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .25)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export</button>
           <button onClick={p.onToggleBulkMode} style={{ ...S.btnGhost, color: p.bulkMode ? T.ac2 : T.tx3, borderColor: p.bulkMode ? T.ac3 : T.bd2, background: p.bulkMode ? T.ac3 : 'rgba(255,255,255,0.03)' }}>{p.bulkMode ? 'Cancel' : '☑ Select'}</button>
         </div>
       </div>
@@ -172,7 +172,7 @@ export default function ChallanList(p: Props) {
               const paid = Number(c.amount_paid || 0);
               const due = Math.max(0, Number(c.total || 0) - paid);
               return (
-                <tr key={c.id} onClick={() => { if (p.bulkMode) { if (canSelect) p.onToggleSelect(c.id); } else p.onOpenDetail(c); }} style={{ borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: isSelected ? 'rgba(99,102,241,.06)' : 'transparent', transition: 'background .1s' }} onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,.03)'; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(99,102,241,.06)' : 'transparent'; }}>
+                <tr key={c.id} onClick={() => { if (p.bulkMode) { if (canSelect) p.onToggleSelect(c.id); } else p.onOpenDetail(c); }} style={{ borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', background: isSelected ? 'oklch(0.55 0.22 265 / .06)' : 'transparent', transition: 'background .1s' }} onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'oklch(0.55 0.22 265 / .03)'; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isSelected ? 'oklch(0.55 0.22 265 / .06)' : 'transparent'; }}>
                   {p.bulkMode && <td style={{ ...S.tdStyle, padding: '11px 8px' }}><div onClick={e => { e.stopPropagation(); if (canSelect) p.onToggleSelect(c.id); }} style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${canSelect ? (isSelected ? T.ac : T.bd2) : T.bd}`, background: isSelected ? T.ac : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: canSelect ? 'pointer' : 'not-allowed', opacity: canSelect ? 1 : 0.3 }}>{isSelected && <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: '#fff', strokeWidth: 3 }}><polyline points="20 6 9 17 4 12" /></svg>}</div></td>}
                   <td style={S.tdStyle}>
                     <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.ac2 }}>#{c.challan_number}</span>
@@ -182,7 +182,7 @@ export default function ChallanList(p: Props) {
                     <div style={{ fontWeight: 600, fontSize: 13, color: T.tx }}>{c.customer_name}</div>
                     {c.customer_phone && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>+91 {c.customer_phone.replace(/^91/, '').replace(/(\d{5})(\d{5})/, '$1 $2')}</div>}
                     <div style={{ display: 'flex', gap: 4, marginTop: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {isRet && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>Return{srcNum(c) ? ` of #${srcNum(c)}` : ''}</span>}
+                      {isRet && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>Return{srcNum(c) ? ` of #${srcNum(c)}` : ''}</span>}
                       {(c.tags || []).map(t => <span key={t} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: T.ac3, color: T.ac2, fontWeight: 600 }}>{t}</span>)}
                       {c.notes && <span title={c.notes} style={{ display: 'inline-flex', alignItems: 'center', opacity: 0.4 }}><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.tx3, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg></span>}
                     </div>
@@ -195,7 +195,7 @@ export default function ChallanList(p: Props) {
                     <span style={{ fontSize: 12, color: T.tx2 }}>{(() => { const d = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000); return d === 0 ? 'Today' : d === 1 ? '1d ago' : `${d}d ago`; })()}</span>
                   </td>
                   <td style={{ ...S.tdStyle, textAlign: 'center' }}>
-                    {c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, border: `1px solid ${c.inventory_deducted ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}`, background: c.inventory_deducted ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.06)', color: c.inventory_deducted ? T.gr : T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', letterSpacing: 0.3 }} aria-label={c.inventory_deducted ? (c.is_return ? 'Inventory added back' : 'Inventory deducted') : 'Inventory pending'}>
+                    {c.status !== 'voided' && <button onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, border: `1px solid ${c.inventory_deducted ? 'oklch(0.72 0.19 145 / .25)' : 'oklch(0.63 0.22 25 / .25)'}`, background: c.inventory_deducted ? 'oklch(0.72 0.19 145 / .08)' : 'oklch(0.63 0.22 25 / .06)', color: c.inventory_deducted ? T.gr : T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', letterSpacing: 0.3 }} aria-label={c.inventory_deducted ? (c.is_return ? 'Inventory added back' : 'Inventory deducted') : 'Inventory pending'}>
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.inventory_deducted ? T.gr : T.re }} />
                       {c.inventory_deducted ? (c.is_return ? 'Added' : 'Deducted') : 'Pending'}
                     </button>}
@@ -255,7 +255,7 @@ export default function ChallanList(p: Props) {
           ];
           return (
             <SwipeRow key={c.id} actions={swipeActions} hint={i === 0} hintKey="challan">
-              <div onClick={() => { if (p.bulkMode) { if (canSelect) p.onToggleSelect(c.id); } else p.onOpenDetail(c); }} style={{ background: isSelected ? 'rgba(99,102,241,.08)' : 'rgba(255,255,255,0.025)', border: `1px solid ${isSelected ? T.ac + '44' : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', width: '100%', boxSizing: 'border-box' as const }}>
+              <div onClick={() => { if (p.bulkMode) { if (canSelect) p.onToggleSelect(c.id); } else p.onOpenDetail(c); }} style={{ background: isSelected ? 'oklch(0.55 0.22 265 / .08)' : 'rgba(255,255,255,0.025)', border: `1px solid ${isSelected ? T.ac + '44' : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', width: '100%', boxSizing: 'border-box' as const }}>
                 {/* Top: number + name left, total + status right */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -279,8 +279,8 @@ export default function ChallanList(p: Props) {
                   <span>·</span>
                   <span>{(() => { const d = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000); return d === 0 ? 'Today' : d === 1 ? '1d ago' : `${d}d ago`; })()}</span>
                   {c.payment_mode && c.status !== 'voided' && <><span>·</span><span>{c.payment_mode}</span></>}
-                  {c.status !== 'voided' && <><span>·</span><button className="inv-chip" onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, border: `1px solid ${c.inventory_deducted ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}`, background: c.inventory_deducted ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.06)', color: c.inventory_deducted ? T.gr : T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} aria-label={c.inventory_deducted ? (c.is_return ? 'Inventory added back' : 'Inventory deducted') : 'Inventory pending'}><span style={{ width: 5, height: 5, borderRadius: '50%', background: c.inventory_deducted ? T.gr : T.re }} />{c.inventory_deducted ? (c.is_return ? 'Added' : 'Deducted') : 'Pending'}</button></>}
-                  {isRet && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', marginLeft: 2 }}>Return{srcNum(c) ? ` of #${srcNum(c)}` : ''}</span>}
+                  {c.status !== 'voided' && <><span>·</span><button className="inv-chip" onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, border: `1px solid ${c.inventory_deducted ? 'oklch(0.72 0.19 145 / .25)' : 'oklch(0.63 0.22 25 / .25)'}`, background: c.inventory_deducted ? 'oklch(0.72 0.19 145 / .08)' : 'oklch(0.63 0.22 25 / .06)', color: c.inventory_deducted ? T.gr : T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} aria-label={c.inventory_deducted ? (c.is_return ? 'Inventory added back' : 'Inventory deducted') : 'Inventory pending'}><span style={{ width: 5, height: 5, borderRadius: '50%', background: c.inventory_deducted ? T.gr : T.re }} />{c.inventory_deducted ? (c.is_return ? 'Added' : 'Deducted') : 'Pending'}</button></>}
+                  {isRet && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', marginLeft: 2 }}>Return{srcNum(c) ? ` of #${srcNum(c)}` : ''}</span>}
                   {c.notes && <span style={{ display: 'inline-flex', alignItems: 'center', opacity: 0.4, marginLeft: 2 }} title={c.notes}><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.tx3, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg></span>}
                 </div>
                 {/* Balance due */}

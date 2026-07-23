@@ -44,7 +44,7 @@ interface Props {
 }
 
 const StatusPill = ({ status, sc }: { status: string; sc: { bg: string; color: string } }) => (
-  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color, whiteSpace: 'nowrap' }}>
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: sc.bg, color: sc.color, whiteSpace: 'nowrap' }}>
     <span style={{ width: 7, height: 7, borderRadius: '50%', background: sc.color }} />
     {PO_STATUS_LABELS[status as keyof typeof PO_STATUS_LABELS] || status}
   </span>
@@ -118,7 +118,7 @@ export default function POList(p: Props) {
                 const sc = p.statusColors[po.status] || p.statusColors.draft;
                 const pr = progress(po);
                 return (
-                  <tr key={po.id} onClick={() => p.onOpenDetail(po)} style={{ borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }} onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,.03)')} onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}>
+                  <tr key={po.id} onClick={() => p.onOpenDetail(po)} style={{ borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }} onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = 'oklch(0.55 0.22 265 / .03)')} onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}>
                     <td style={S.tdStyle}><span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.ac2 }}>#{po.po_number}</span><div style={{ fontSize: 9, color: T.tx3, marginTop: 1 }}>{po.po_date ? new Date(po.po_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}</div></td>
                     <td style={S.tdStyle}><div style={{ fontWeight: 600, fontSize: 13, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{po.vendor_name}</div>{po.vendor_phone && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{po.vendor_phone}</div>}</td>
                     <td style={S.tdStyle}><span style={{ fontSize: 12, color: T.tx2 }}>{PO_TYPE_LABELS[po.po_type] || po.po_type}</span></td>

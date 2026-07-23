@@ -36,7 +36,7 @@ export default function WorkPartCard({ p, i, canDelete, numIn, txtIn, selIn, onU
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
         <div><div style={lbl}>{t('rate')}</div><input type="number" onKeyDown={numericKeyDown} min="0" step="0.01" value={p.rate || ''} onChange={e => onUpdate(i, 'rate', Math.max(0, Number(e.target.value)))} placeholder="0" style={numIn} /></div>
-        <div><div style={lbl}>{t('total')}</div><div style={{ ...numIn, background: 'rgba(34,197,94,.06)', color: T.gr, fontWeight: 700, fontFamily: "'Sora',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '6px' }}>{p.total ? '₹' + p.total.toFixed(0) : '—'}</div></div>
+        <div><div style={lbl}>{t('total')}</div><div style={{ ...numIn, background: 'oklch(0.72 0.19 145 / .06)', color: T.gr, fontWeight: 700, fontFamily: "'Sora',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '6px' }}>{p.total ? '₹' + p.total.toFixed(0) : '—'}</div></div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <div><div style={lbl}>{t('fabricName')}</div><input list="dl-fn" value={p.fabric_name} onChange={e => onUpdate(i, 'fabric_name', e.target.value)} placeholder={t('fabricPlaceholder')} style={txtIn} /></div>

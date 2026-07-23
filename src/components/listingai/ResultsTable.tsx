@@ -50,7 +50,7 @@ export default function ResultsTable({ headers, kinds, rows, usage, cost, templa
     <div style={{ marginTop: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Results</div>
-        <button onClick={exportSheet} disabled={exporting} style={{ ...S.btnGhost, ...S.btnSm, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)', pointerEvents: exporting ? 'none' : 'auto', opacity: exporting ? 0.5 : 1 }}>{exporting ? 'Exporting…' : `Export ${ok.length} to Excel`}</button>
+        <button onClick={exportSheet} disabled={exporting} style={{ ...S.btnGhost, ...S.btnSm, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)', pointerEvents: exporting ? 'none' : 'auto', opacity: exporting ? 0.5 : 1 }}>{exporting ? 'Exporting…' : `Export ${ok.length} to Excel`}</button>
       </div>
       <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.01)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}>
@@ -65,10 +65,10 @@ export default function ResultsTable({ headers, kinds, rows, usage, cost, templa
                 <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
                 <td style={S.tdStyle}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.status === 'ok' ? '#22C55E' : r.status === 'bad_link' ? '#EF4444' : '#F59E0B', flexShrink: 0 }} />
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.status === 'ok' ? T.gr : r.status === 'bad_link' ? T.re : T.yl, flexShrink: 0 }} />
                     <span style={{ fontSize: 11 }}>{r.status === 'ok' ? (r.noImage ? 'Ready (no photo found)' : 'Ready') : r.status === 'bad_link' ? 'Dropbox link failed' : 'Not in master sheet'}</span>
                     {r.status === 'ok' && r.linkSource && (
-                      <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 8, fontWeight: 600, background: 'rgba(99,102,241,.1)', color: T.ac2, whiteSpace: 'nowrap' }}>
+                      <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 8, fontWeight: 600, background: 'oklch(0.55 0.22 265 / .1)', color: T.ac2, whiteSpace: 'nowrap' }}>
                         {{ typed: 'direct link', folders: 'image folder', master: 'master link', search: 'auto-found' }[r.linkSource]}
                       </span>
                     )}

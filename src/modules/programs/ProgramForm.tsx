@@ -167,7 +167,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                     <td style={td}>{fabricParts.length > 1 && <button onClick={() => setFabricParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 16, minWidth: 44, minHeight: 44 }} aria-label="Remove row">×</button>}</td>
                   </tr>
                 ))}
-                <tr style={{ background: 'rgba(56,189,248,.06)' }}>
+                <tr style={{ background: 'oklch(0.77 0.14 230 / .06)' }}>
                   <td colSpan={2} style={{ padding: '6px 8px', fontSize: 10, color: T.tx3, textAlign: 'center' }}>{fabricParts.length} {fabricParts.length !== 1 ? t('partPlural') : t('partSingular')}</td>
                   <td></td>
                 </tr>
@@ -179,7 +179,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
           <SectionTitle color={T.yl}>{t('matchingProgram')}</SectionTitle>
           <MatchingCompanyRepeater rows={form.matchings} onChange={v => setField('matchings', v)} t={t} brandOptions={brandNames} />
 
-          <div className="prg-grand-fabric" onClick={() => setShowFB(v => !v)} style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginTop: 18, padding: '12px 16px', background: 'rgba(56,189,248,.06)', border: `1px solid rgba(56,189,248,.15)`, borderRadius: 10, cursor: 'pointer' }}>
+          <div className="prg-grand-fabric" onClick={() => setShowFB(v => !v)} style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14, marginTop: 18, padding: '12px 16px', background: 'oklch(0.77 0.14 230 / .06)', border: `1px solid oklch(0.77 0.14 230 / .15)`, borderRadius: 10, cursor: 'pointer' }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>{t('grandFabricTotal')}</span>
             <span style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.bl }}>{(workFM + fabricFM).toFixed(2)} m</span>
             <span style={{ fontSize: 10, color: T.tx3, transform: showFB ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform .15s' }}>▶</span>

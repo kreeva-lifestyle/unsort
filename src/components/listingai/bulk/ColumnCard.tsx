@@ -33,7 +33,7 @@ export default function ColumnCard({ col, allowed, staged, suggestions, defaultO
   const settled = needsYou === 0;
 
   return (
-    <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${settled ? T.bd : 'rgba(239,68,68,.18)'}`, borderRadius: 10, marginBottom: 8, overflow: 'hidden' }}>
+    <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${settled ? T.bd : 'oklch(0.63 0.22 25 / .18)'}`, borderRadius: 10, marginBottom: 8, overflow: 'hidden' }}>
       <div onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', cursor: 'pointer', userSelect: 'none', flexWrap: 'wrap' }}>
         <span style={{ color: T.tx3, fontSize: 10, width: 12, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>&#9654;</span>
         <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, letterSpacing: '.04em' }}>{col.header}</span>
@@ -46,7 +46,7 @@ export default function ColumnCard({ col, allowed, staged, suggestions, defaultO
         {pending.length > 0 && (
           <button onClick={e => { e.stopPropagation(); if (!suggesting) onSuggest(); }}
             title="One AI call proposes a marketplace value for each remaining master value in this column — you still review and Teach each one."
-            style={{ ...S.btnGhost, ...S.btnSm, color: T.yl, border: '1px solid rgba(245,158,11,.25)', background: 'rgba(245,158,11,.06)', pointerEvents: suggesting ? 'none' : 'auto', opacity: suggesting ? 0.5 : 1 }}>
+            style={{ ...S.btnGhost, ...S.btnSm, color: T.yl, border: '1px solid oklch(0.78 0.18 75 / .25)', background: 'oklch(0.78 0.18 75 / .06)', pointerEvents: suggesting ? 'none' : 'auto', opacity: suggesting ? 0.5 : 1 }}>
             {suggesting ? 'Suggesting…' : <>&#10022; Suggest ({pending.length}) &middot; {estimateSuggestUsd(pending.length)}</>}
           </button>
         )}

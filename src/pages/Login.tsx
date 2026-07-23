@@ -113,9 +113,9 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
             </div>
           </div>
 
-          {info && <div style={{ background: 'rgba(56,189,248,.10)', border: '1px solid rgba(56,189,248,.3)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: T.bl, marginBottom: 14 }}>{info}</div>}
-          {error && <div style={{ background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: T.re, marginBottom: 14, animation: 'loginShake .4s ease' }}>{error}</div>}
-          {forgotMsg && <div style={{ background: 'rgba(34,197,94,.10)', border: '1px solid rgba(34,197,94,.3)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: T.gr, marginBottom: 14 }}>{forgotMsg}</div>}
+          {info && <div style={{ background: 'oklch(0.77 0.14 230 / .10)', border: '1px solid oklch(0.77 0.14 230 / .3)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: T.bl, marginBottom: 14 }}>{info}</div>}
+          {error && <div style={{ background: 'oklch(0.63 0.22 25 / .12)', border: '1px solid oklch(0.63 0.22 25 / .3)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: T.re, marginBottom: 14, animation: 'loginShake .4s ease' }}>{error}</div>}
+          {forgotMsg && <div style={{ background: 'oklch(0.72 0.19 145 / .10)', border: '1px solid oklch(0.72 0.19 145 / .3)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: T.gr, marginBottom: 14 }}>{forgotMsg}</div>}
 
           {mode === 'choose' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

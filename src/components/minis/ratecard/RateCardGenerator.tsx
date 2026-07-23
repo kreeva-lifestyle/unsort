@@ -117,7 +117,7 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
   };
 
   const pickBox = (label: string, value: string, onClick: () => void) => (
-    <div onClick={onClick} style={{ padding: '14px 14px', borderRadius: 8, border: `1px dashed ${value ? 'rgba(34,197,94,.35)' : T.bd2}`, background: value ? 'rgba(34,197,94,.05)' : T.glass1, cursor: 'pointer', minHeight: 44 }}>
+    <div onClick={onClick} style={{ padding: '14px 14px', borderRadius: 8, border: `1px dashed ${value ? 'oklch(0.72 0.19 145 / .35)' : T.bd2}`, background: value ? 'oklch(0.72 0.19 145 / .05)' : T.glass1, cursor: 'pointer', minHeight: 44 }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: value ? T.gr : T.tx2 }}>{label}</div>
       <div style={{ fontSize: 10, color: T.tx3, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || 'Tap to choose'}</div>
     </div>
@@ -144,7 +144,7 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
         )}
         {/* smart checks — GST slab autocorrect, duplicate SKUs, price/rounding notes */}
         {parsed && (parsed.warnings.length > 0 ? (
-          <div style={{ background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
+          <div style={{ background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: T.yl, marginBottom: 4, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Smart checks — {parsed.warnings.length} note{parsed.warnings.length === 1 ? '' : 's'}</div>
             {parsed.warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: T.tx2, lineHeight: 1.6 }}>• {w}</div>)}
           </div>

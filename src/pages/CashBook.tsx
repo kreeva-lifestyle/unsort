@@ -782,7 +782,7 @@ export default function CashBook() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>#{s.challan_number}</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{s.customer_name}</span>
-                  {s.is_return && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,.12)', color: T.re, fontWeight: 600, textTransform: 'uppercase' }}>Return</span>}
+                  {s.is_return && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 600, textTransform: 'uppercase' }}>Return</span>}
                 </div>
                 <div style={{ fontSize: 9, color: T.tx3 }}>₹{Number(s.amount_paid).toLocaleString('en-IN')}{s.payment_mode ? ` · ${s.payment_mode}` : ''}{s.payment_date ? ` · ${new Date(s.payment_date + 'T00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}</div>
               </div>
@@ -809,7 +809,7 @@ export default function CashBook() {
                   <span style={{ fontSize: 10, fontFamily: T.mono, color: T.ac2, fontWeight: 600 }}>{formatHandoverNo(h.handover_number)}</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{h.from_user_name} → {h.to_user_name}</span>
                   <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: T.tx3, fontFamily: T.mono }}>{new Date(h.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
-                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : h.status === 'disputed' ? 'rgba(239,68,68,.12)' : h.status === 'cancelled' ? 'rgba(255,255,255,.06)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : h.status === 'disputed' ? T.re : h.status === 'cancelled' ? T.tx3 : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓ Signed' : h.status === 'disputed' ? '✕ Rejected' : h.status === 'cancelled' ? 'Cancelled' : 'Pending'}</span>
+                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: h.status === 'confirmed' ? 'oklch(0.72 0.19 145 / .12)' : h.status === 'disputed' ? 'oklch(0.63 0.22 25 / .12)' : h.status === 'cancelled' ? 'rgba(255,255,255,.06)' : 'oklch(0.78 0.18 75 / .12)', color: h.status === 'confirmed' ? T.gr : h.status === 'disputed' ? T.re : h.status === 'cancelled' ? T.tx3 : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓ Signed' : h.status === 'disputed' ? '✕ Rejected' : h.status === 'cancelled' ? 'Cancelled' : 'Pending'}</span>
                 </div>
                 <span style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(h.amount).toLocaleString('en-IN')}</span>
               </div>
@@ -855,7 +855,7 @@ export default function CashBook() {
               <div style={{ background: T.ac3, border: `1px solid ${T.ac3}`, borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 11 }}>
                 <div style={{ fontSize: 9, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Cash Flow Summary</div>
                 {!handBreakdown.openingIsSet && (
-                  <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 4, padding: '6px 8px', marginBottom: 6, fontSize: 9, color: T.yl }}>
+                  <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .2)', borderRadius: 4, padding: '6px 8px', marginBottom: 6, fontSize: 9, color: T.yl }}>
                     ⚠ No opening balance set for {handPeriodFrom}. Using ₹0. Set it in Cash Book before initiating if that's wrong.
                   </div>
                 )}
@@ -884,7 +884,7 @@ export default function CashBook() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontFamily: T.mono, color: T.tx, fontWeight: 600 }}>₹{Number(h.amount).toLocaleString('en-IN')}</span>
-                      <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: h.status === 'confirmed' ? 'rgba(34,197,94,.12)' : 'rgba(245,158,11,.12)', color: h.status === 'confirmed' ? T.gr : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓' : 'Pending'}</span>
+                      <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 3, background: h.status === 'confirmed' ? 'oklch(0.72 0.19 145 / .12)' : 'oklch(0.78 0.18 75 / .12)', color: h.status === 'confirmed' ? T.gr : T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{h.status === 'confirmed' ? '✓' : 'Pending'}</span>
                     </div>
                   </div>
                 ))}
@@ -908,7 +908,7 @@ export default function CashBook() {
               </div>
               <div>
                 <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Amount (₹)</label>
-                <input type="number" value={handAmount} onKeyDown={e => numericKeyDown(e)} onChange={e => setHandAmount(e.target.value)} placeholder="0.00" style={{ ...S.fInput, width: '100%', fontFamily: T.mono, border: handBreakdown && Math.abs(Number(handAmount) - handBreakdown.available) > 0.01 ? '1px solid rgba(245,158,11,.4)' : `1px solid ${T.bd2}` }} />
+                <input type="number" value={handAmount} onKeyDown={e => numericKeyDown(e)} onChange={e => setHandAmount(e.target.value)} placeholder="0.00" style={{ ...S.fInput, width: '100%', fontFamily: T.mono, border: handBreakdown && Math.abs(Number(handAmount) - handBreakdown.available) > 0.01 ? '1px solid oklch(0.78 0.18 75 / .4)' : `1px solid ${T.bd2}` }} />
               </div>
             </div>
 
@@ -927,7 +927,7 @@ export default function CashBook() {
             {/* Mismatch warning + reason */}
             {handBreakdown && Math.abs(Number(handAmount) - handBreakdown.available) > 0.01 && (
               <div style={{ marginBottom: 10 }}>
-                <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.yl, marginBottom: 6 }}>
+                <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.yl, marginBottom: 6 }}>
                   ⚠ Amount differs from available (₹{handBreakdown.available.toLocaleString('en-IN', { maximumFractionDigits: 2 })}). Reason required:
                 </div>
                 <input type="text" value={handReason} onChange={e => setHandReason(e.target.value)} placeholder="e.g., Keeping ₹200 as petty cash" style={{ ...S.fInput, width: '100%' }} />
@@ -938,7 +938,7 @@ export default function CashBook() {
               <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Notes (optional)</label>
               <textarea value={handNotes} onChange={e => setHandNotes(e.target.value)} rows={2} placeholder="Additional context..." style={{ ...S.fInput, width: '100%', resize: 'vertical' }} />
             </div>
-            {handError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{handError}</div>}
+            {handError && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{handError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setShowHandover(false); setHandError(''); setHandReason(''); setHandAmount(''); setHandToId(''); setHandNotes(''); setHandBreakdown(null); setExcludePaise(false); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
               <button onClick={createHandover} style={{ ...S.btnWarnSolid, flex: 1, padding: '9px 0', borderRadius: 6, fontSize: 11, opacity: handSaving ? 0.5 : 1, pointerEvents: handSaving ? 'none' : 'auto' }}>{handSaving ? 'Initiating…' : 'Initiate'}</button>
@@ -981,9 +981,9 @@ export default function CashBook() {
                 </div>
               </div>
             ) : (
-              <div style={{ fontSize: 13, fontWeight: 700, color: T.gr, fontFamily: T.mono, padding: '10px 12px', background: 'rgba(34,197,94,.06)', borderRadius: 8, marginBottom: 10 }}>Amount: ₹{Number(viewingHandover.amount).toFixed(2)}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.gr, fontFamily: T.mono, padding: '10px 12px', background: 'oklch(0.72 0.19 145 / .06)', borderRadius: 8, marginBottom: 10 }}>Amount: ₹{Number(viewingHandover.amount).toFixed(2)}</div>
             )}
-            {viewingHandover.reason && <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl, marginBottom: 8 }}><strong>Reason:</strong> {viewingHandover.reason}</div>}
+            {viewingHandover.reason && <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl, marginBottom: 8 }}><strong>Reason:</strong> {viewingHandover.reason}</div>}
             {viewingHandover.notes && <div style={{ fontSize: 10, color: T.tx3, marginBottom: 8 }}><strong>Notes:</strong> {viewingHandover.notes}</div>}
             {viewingHandover.confirmed_at && <div style={{ fontSize: 10, color: T.gr, marginBottom: 10 }}>✓ Signed at {new Date(viewingHandover.confirmed_at).toLocaleString('en-IN')}</div>}
             {viewingHandover.status === 'confirmed' && (
@@ -1020,7 +1020,7 @@ export default function CashBook() {
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Sign &amp; Confirm {formatHandoverNo(confirmingHandover.handover_number)}</div>
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>You are confirming receipt of <strong style={{ color: T.gr, fontFamily: T.mono }}>₹{Number(confirmingHandover.amount).toLocaleString('en-IN')}</strong> from <strong style={{ color: T.tx }}>{confirmingHandover.from_user_name}</strong>. This is a permanent legal record.</div>
             <input type="password" value={confirmPin} onChange={e => setConfirmPin(e.target.value)} placeholder="Your 4-6 digit PIN" autoFocus inputMode="numeric" style={{ ...S.fInput, width: '100%', fontFamily: T.mono, fontSize: 18, padding: '10px 12px', textAlign: 'center', letterSpacing: 6, marginBottom: 10 }} />
-            {confirmError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{confirmError}</div>}
+            {confirmError && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{confirmError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setConfirmingHandover(null); setConfirmPin(''); setConfirmError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
               <button onClick={confirmHandover} disabled={busy} style={{ ...S.btnSuccessSolid, flex: 1, padding: '9px 0', borderRadius: 6, fontSize: 11, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Confirming…' : 'Sign & Confirm'}</button>
@@ -1038,7 +1038,7 @@ export default function CashBook() {
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>You are rejecting <strong style={{ color: T.re, fontFamily: T.mono }}>₹{Number(rejectingHandover.amount).toLocaleString('en-IN')}</strong> from <strong style={{ color: T.tx }}>{rejectingHandover.from_user_name}</strong>. This action is final — the sender will need to initiate a new handover.</div>
             <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Reason for rejection</label>
             <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="e.g. Amount doesn't match, missing cash, wrong period..." rows={3} autoFocus style={{ ...S.fInput, width: '100%', resize: 'vertical', marginBottom: 10 }} />
-            {rejectError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{rejectError}</div>}
+            {rejectError && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{rejectError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setRejectingHandover(null); setRejectReason(''); setRejectError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
               <button onClick={submitReject} disabled={busy} style={{ ...S.btnDangerSolid, flex: 1, padding: '9px 0', borderRadius: 6, fontSize: 11, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>{busy ? 'Rejecting…' : 'Confirm Reject'}</button>
@@ -1065,7 +1065,7 @@ export default function CashBook() {
               </div>
             </div>
             {correctAmount.trim() !== '' && !isNaN(Number(correctAmount)) && (() => { const d = Math.round((Number(correctAmount) - Number(correctingExpense.amount)) * 100) / 100; if (d === 0) return null; return <div style={{ fontSize: 10, color: d < 0 ? T.gr : T.yl, fontWeight: 600, marginBottom: 10 }}>{d < 0 ? `₹${Math.abs(d).toLocaleString('en-IN')} will be returned to the cash balance` : `₹${d.toLocaleString('en-IN')} more will be deducted from the cash balance`}</div>; })()}
-            {correctError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{correctError}</div>}
+            {correctError && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{correctError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setCorrectingExpense(null); setCorrectAmount(''); setCorrectError(''); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, ...S.btnGhost, fontSize: 11 }}>Cancel</button>
               <button onClick={submitCorrection} disabled={correctSaving} style={{ ...S.btnPrimary, flex: 1, padding: '9px 0', fontSize: 11, opacity: correctSaving ? 0.5 : 1, pointerEvents: correctSaving ? 'none' : 'auto' }}>{correctSaving ? 'Saving…' : 'Record Adjustment'}</button>
@@ -1098,14 +1098,14 @@ export default function CashBook() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: addLockH ? 6 : 10 }}>
               <div>
                 <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Date</label>
-                <DateInput value={entryDate} max={today} onChange={e => setEntryDate(e.target.value)} style={{ width: '100%', ...(addLockH ? { borderColor: 'rgba(245,158,11,.5)' } : {}) }} />
+                <DateInput value={entryDate} max={today} onChange={e => setEntryDate(e.target.value)} style={{ width: '100%', ...(addLockH ? { borderColor: 'oklch(0.78 0.18 75 / .5)' } : {}) }} />
               </div>
               <div>
                 <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Amount (₹)</label>
                 <input type="number" min="0.01" step="0.01" value={amount} onKeyDown={e => numericKeyDown(e)} onChange={e => setAmount(e.target.value)} autoFocus placeholder="0.00" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
               </div>
             </div>
-            {addLockH && <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.yl, marginBottom: 10 }}>This date is inside {formatHandoverNo(addLockH.handover_number)} ({addLockH.period_from} → {addLockH.period_to}) — the period is handed over and locked. Pick a later date, or record it as a correction on the handover.</div>}
+            {addLockH && <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.yl, marginBottom: 10 }}>This date is inside {formatHandoverNo(addLockH.handover_number)} ({addLockH.period_from} → {addLockH.period_to}) — the period is handed over and locked. Pick a later date, or record it as a correction on the handover.</div>}
             <div style={{ marginBottom: 10 }}>
               <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Category</label>
               <select value={category} onChange={e => setCategory(e.target.value)} style={{ ...S.fInput, width: '100%', cursor: 'pointer' }}>
@@ -1116,7 +1116,7 @@ export default function CashBook() {
               <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Description (optional)</label>
               <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="What was this expense for?" style={{ ...S.fInput, width: '100%', resize: 'vertical' }} />
             </div>
-            {formError && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{formError}</div>}
+            {formError && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{formError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setShowAdd(false); setFormError(''); setExpSaving(false); setAmount(''); setDescription(''); setCategory(CATEGORIES[0]); setEntryDate(today); }} style={{ ...S.btnGhost, flex: 1, padding: '9px 0', fontSize: 11 }}>Cancel</button>
               <button onClick={addExpense} disabled={expSaving || !!addLockH} style={{ ...S.btnPrimary, flex: 1, padding: '9px 0', fontSize: 11, opacity: (expSaving || addLockH) ? 0.5 : 1, pointerEvents: (expSaving || addLockH) ? 'none' : 'auto' }}>{expSaving ? 'Saving…' : addLockH ? 'Date Locked' : 'Add'}</button>

@@ -14,7 +14,7 @@ export default function TemplateListRow({ t, confirming, onOpen, onAskDelete, on
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', border: `1px solid ${T.bd}`, borderRadius: 8, marginBottom: 6, background: 'rgba(255,255,255,0.01)' }}>
       <div onClick={onOpen} style={{ flex: 1, cursor: 'pointer', minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>
+        <div title={t.name} style={{ fontSize: 13, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {t.name}
           {t.marketplace && <span style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: T.ac3, color: T.ac2 }}>{t.marketplace}</span>}
         </div>

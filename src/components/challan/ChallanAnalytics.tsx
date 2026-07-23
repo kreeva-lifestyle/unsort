@@ -42,7 +42,7 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
         <button onClick={onApply} style={S.btnPrimary}>Apply</button>
       </div>
       <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
-        <div style={{ background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 10, padding: '12px', textAlign: 'center' as const }}>
+        <div style={{ background: 'oklch(0.72 0.19 145 / .06)', border: '1px solid oklch(0.72 0.19 145 / .15)', borderRadius: 10, padding: '12px', textAlign: 'center' as const }}>
           <div style={{ fontSize: 9, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Net Revenue</div>
           <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.gr }}>₹{analytics.totalRevenue.toLocaleString('en-IN')}</div>
           {revChange && <div style={{ fontSize: 9, color: revChange.color, marginTop: 4, fontFamily: T.mono, fontWeight: 600 }}>{revChange.label} vs prev · ₹{(analytics.prevRevenue ?? 0).toLocaleString('en-IN')}</div>}
@@ -52,7 +52,7 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
           <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>{analytics.count}</div>
           {salesChange && <div style={{ fontSize: 9, color: salesChange.color, marginTop: 4, fontFamily: T.mono, fontWeight: 600 }}>{salesChange.label} vs prev · {analytics.prevCount ?? 0}</div>}
         </div>
-        <div style={{ background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.12)', borderRadius: 10, padding: '12px', textAlign: 'center' as const }}>
+        <div style={{ background: 'oklch(0.63 0.22 25 / .06)', border: '1px solid oklch(0.63 0.22 25 / .12)', borderRadius: 10, padding: '12px', textAlign: 'center' as const }}>
           <div style={{ fontSize: 9, color: T.re, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Returns</div>
           <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: T.re }}>{analytics.returnsCount || 0}</div>
         </div>

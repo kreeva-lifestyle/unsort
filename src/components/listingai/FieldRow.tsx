@@ -20,7 +20,7 @@ export default function FieldRow({ f, others, masterCols, onChange, addToast }: 
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${T.bd}`, opacity: f.mandatory ? 0.75 : 0.45 }}>
         <span style={{ fontSize: 12, color: T.tx3, flex: 1, textDecoration: 'line-through' }}>{f.header}</span>
-        <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: f.mandatory ? 'rgba(239,68,68,.12)' : 'rgba(255,255,255,.06)', color: f.mandatory ? T.re : T.tx3 }}>
+        <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: f.mandatory ? 'oklch(0.63 0.22 25 / .12)' : 'rgba(255,255,255,.06)', color: f.mandatory ? T.re : T.tx3 }}>
           {f.mandatory ? 'MANDATORY skipped — exported empty' : 'skipped — left empty'}
         </span>
         <button onClick={() => onChange({ skip: false })} style={{ ...S.btnGhost, ...S.btnSm }}>Fill</button>
@@ -35,7 +35,7 @@ export default function FieldRow({ f, others, masterCols, onChange, addToast }: 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${T.bd}` }}>
         <input type="checkbox" checked={f.mandatory} onChange={e => onChange({ mandatory: e.target.checked })} title="Mandatory" style={{ width: 15, height: 15, accentColor: T.ac, cursor: 'pointer', flexShrink: 0 }} />
         <span style={{ fontSize: 12, color: T.tx2, flex: 1, minWidth: 90, wordBreak: 'break-word' }}>{f.header}</span>
-        <span title="Fills from this master-sheet column on every run — dropdown values are matched/taught as usual" style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(34,197,94,.1)', color: T.gr }}>&#10515; from "{f.masterAs}"</span>
+        <span title="Fills from this master-sheet column on every run — dropdown values are matched/taught as usual" style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'oklch(0.72 0.19 145 / .1)', color: T.gr }}>&#10515; from "{f.masterAs}"</span>
         <button onClick={() => onChange({ masterAs: '' })} style={{ ...S.btnGhost, ...S.btnSm }}>Unpair</button>
       </div>
     );
@@ -46,7 +46,7 @@ export default function FieldRow({ f, others, masterCols, onChange, addToast }: 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: `1px solid ${T.bd}` }}>
         <input type="checkbox" checked={f.mandatory} onChange={e => onChange({ mandatory: e.target.checked })} title="Mandatory" style={{ width: 15, height: 15, accentColor: T.ac, cursor: 'pointer', flexShrink: 0 }} />
         <span style={{ fontSize: 12, color: T.tx2, flex: 1, minWidth: 90, wordBreak: 'break-word' }}>{f.header}</span>
-        <span title="Copies that column's value on every run — no AI cost" style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(56,189,248,.1)', color: T.bl }}>= copies "{f.sameAs}"</span>
+        <span title="Copies that column's value on every run — no AI cost" style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'oklch(0.77 0.14 230 / .1)', color: T.bl }}>= copies "{f.sameAs}"</span>
         <button onClick={() => onChange({ sameAs: '' })} style={{ ...S.btnGhost, ...S.btnSm }}>Unlink</button>
       </div>
     );
@@ -64,7 +64,7 @@ export default function FieldRow({ f, others, masterCols, onChange, addToast }: 
       {nAllowed > 0 && (
         <span onClick={() => addToast(`${f.header}: ${f.allowed!.slice(0, 15).join(', ')}${nAllowed > 15 ? ` … +${nAllowed - 15} more` : ''}`, 'success')}
           title={f.allowed!.slice(0, 30).join(', ')}
-          style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(34,197,94,.1)', color: T.gr, cursor: 'pointer', flexShrink: 0 }}>
+          style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'oklch(0.72 0.19 145 / .1)', color: T.gr, cursor: 'pointer', flexShrink: 0 }}>
           {nAllowed} options
         </span>
       )}

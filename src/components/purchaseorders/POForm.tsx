@@ -199,7 +199,7 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: T.tx, borderTop: `1px solid ${T.bd}`, paddingTop: 6, marginTop: 2 }}><span>Grand Total</span><span style={{ fontFamily: T.mono }}>₹{grand.toLocaleString('en-IN')}</span></div>
           </div>
 
-          {error && <div style={{ marginTop: 12, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}
+          {error && <div style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}
         </div>
         <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={S.btnGhost}>Cancel</button>

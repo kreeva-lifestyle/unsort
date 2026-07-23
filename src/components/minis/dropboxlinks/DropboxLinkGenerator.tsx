@@ -116,7 +116,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
 
   const modeBtn = (m: Mode, label: string, hint: string) => (
     <button onClick={() => setMode(m)} title={hint}
-      style={{ ...S.btnGhost, minHeight: 36, border: `1px solid ${mode === m ? 'rgba(99,102,241,.5)' : T.bd2}`, background: mode === m ? 'rgba(99,102,241,.12)' : 'transparent', color: mode === m ? T.ac2 : T.tx3, fontWeight: 600 }}>
+      style={{ ...S.btnGhost, minHeight: 36, border: `1px solid ${mode === m ? 'oklch(0.55 0.22 265 / .5)' : T.bd2}`, background: mode === m ? 'oklch(0.55 0.22 265 / .12)' : 'transparent', color: mode === m ? T.ac2 : T.tx3, fontWeight: 600 }}>
       {label}
     </button>
   );
@@ -133,7 +133,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
         <button onClick={() => setShowSettings(s => !s)} style={{ ...S.btnGhost, marginLeft: 'auto' }}>{showSettings ? 'Close Settings' : 'Settings'}</button>
       </div>
       {rootCount === 0 && (
-        <div style={{ background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 11, color: T.tx2 }}>
+        <div style={{ background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 11, color: T.tx2 }}>
           No search folders configured yet — open Settings and add the Dropbox folder link(s) to search inside.
         </div>
       )}
@@ -141,10 +141,10 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <input value={sku} onChange={e => setSku(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') genOne(); }} placeholder="Enter SKU e.g. 15003" style={{ ...S.fInput, width: 200, fontFamily: T.mono }} />
         <button onClick={() => genOne()} disabled={busy || !sku.trim()} style={{ ...S.btnPrimary, pointerEvents: busy ? 'none' : 'auto', opacity: busy || !sku.trim() ? 0.5 : 1 }}>{busy ? 'Generating…' : 'Generate Link'}</button>
-        <button onClick={() => setShowPaste(p => !p)} style={{ ...S.btnGhost, color: T.ac2, border: '1px solid rgba(99,102,241,.2)' }}>{showPaste ? 'Hide paste' : 'Paste SKUs'}</button>
+        <button onClick={() => setShowPaste(p => !p)} style={{ ...S.btnGhost, color: T.ac2, border: '1px solid oklch(0.55 0.22 265 / .2)' }}>{showPaste ? 'Hide paste' : 'Paste SKUs'}</button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) importFile(f); e.target.value = ''; }} />
-        <button onClick={() => fileRef.current?.click()} disabled={bulkBusy} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)', pointerEvents: bulkBusy ? 'none' : 'auto', opacity: bulkBusy ? 0.5 : 1 }}>{bulkBusy ? `Bulk… ${progress.done}/${progress.total}` : 'Bulk from Excel'}</button>
-        {bulk && bulk.length > 0 && !bulkBusy && <button onClick={() => exportBulkXlsx(bulk)} style={{ ...S.btnGhost, color: T.gr, border: '1px solid rgba(34,197,94,.2)', background: 'rgba(34,197,94,.06)' }}>Export {bulk.length}</button>}
+        <button onClick={() => fileRef.current?.click()} disabled={bulkBusy} style={{ ...S.btnGhost, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)', pointerEvents: bulkBusy ? 'none' : 'auto', opacity: bulkBusy ? 0.5 : 1 }}>{bulkBusy ? `Bulk… ${progress.done}/${progress.total}` : 'Bulk from Excel'}</button>
+        {bulk && bulk.length > 0 && !bulkBusy && <button onClick={() => exportBulkXlsx(bulk)} style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export {bulk.length}</button>}
       </div>
 
       {showPaste && (
@@ -164,7 +164,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
       {bulk && bulk.length > 0 && (
         <>
           {canSave && !bulkBusy && bulkMode === 'combine' && bulk.some(r => r.status === 'ok') && (
-            <button onClick={saveAllToSheet} disabled={bulkSaving} style={{ ...S.btnGhost, marginBottom: 8, color: T.bl, border: '1px solid rgba(56,189,248,.25)', background: 'rgba(56,189,248,.06)', pointerEvents: bulkSaving ? 'none' : 'auto', opacity: bulkSaving ? 0.5 : 1 }}>{bulkSaving ? 'Saving…' : 'Save all to master sheet'}</button>
+            <button onClick={saveAllToSheet} disabled={bulkSaving} style={{ ...S.btnGhost, marginBottom: 8, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)', background: 'oklch(0.77 0.14 230 / .06)', pointerEvents: bulkSaving ? 'none' : 'auto', opacity: bulkSaving ? 0.5 : 1 }}>{bulkSaving ? 'Saving…' : 'Save all to master sheet'}</button>
           )}
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}` }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}>

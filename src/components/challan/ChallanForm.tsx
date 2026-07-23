@@ -141,7 +141,7 @@ export default function ChallanForm(p: ChallanFormProps) {
 
         {/* Return: Select source invoice */}
         {p.isReturn && !p.editing && !p.returnSource && (
-          <div style={{ background: 'rgba(239,68,68,.04)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 10, padding: 14, marginBottom: 12 }}>
+          <div style={{ background: 'oklch(0.63 0.22 25 / .04)', border: '1px solid oklch(0.63 0.22 25 / .15)', borderRadius: 10, padding: 14, marginBottom: 12 }}>
             <label style={{ ...lbl, color: T.re }}>Select Original Invoice *</label>
             <input type="text" value={p.returnSearchQ} onChange={e => { p.setReturnSearchQ(e.target.value); clearTimeout(searchTimeout.current); searchTimeout.current = setTimeout(() => p.searchReturnSource(e.target.value), 300); }}
               placeholder="Search by challan # or customer name..." style={inp} autoFocus />
@@ -160,7 +160,7 @@ export default function ChallanForm(p: ChallanFormProps) {
           </div>
         )}
         {p.isReturn && p.returnSource && !p.editing && (
-          <div style={{ background: 'rgba(239,68,68,.04)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 10, padding: '8px 14px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ background: 'oklch(0.63 0.22 25 / .04)', border: '1px solid oklch(0.63 0.22 25 / .15)', borderRadius: 10, padding: '8px 14px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <span style={{ fontSize: 9, color: T.re, textTransform: 'uppercase' as const, letterSpacing: 1, fontWeight: 600 }}>Return against</span>
               <div style={{ fontSize: 12, color: T.tx, fontWeight: 600 }}>#{p.returnSource.challan_number} — {p.returnSource.customer_name} — ₹{Number(p.returnSource.total).toLocaleString('en-IN')}</div>
@@ -208,11 +208,11 @@ export default function ChallanForm(p: ChallanFormProps) {
               </div>
             </div>
           </div>
-          {outstanding > 0 && <div style={{ fontSize: 11, color: T.re, fontWeight: 600, marginBottom: 10, padding: '6px 10px', background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.12)', borderRadius: 6 }}>Outstanding: ₹{outstanding.toLocaleString('en-IN')}</div>}
+          {outstanding > 0 && <div style={{ fontSize: 11, color: T.re, fontWeight: 600, marginBottom: 10, padding: '6px 10px', background: 'oklch(0.63 0.22 25 / .06)', border: '1px solid oklch(0.63 0.22 25 / .12)', borderRadius: 6 }}>Outstanding: ₹{outstanding.toLocaleString('en-IN')}</div>}
 
           {/* Line Items */}
           <div className="challan-item-grid-wrap" data-items style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 12, overflow: 'hidden' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 56px 80px 100px 28px', gap: 6, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, background: T.glass1 }}>
+            <div className="challan-items-head" style={{ display: 'grid', gridTemplateColumns: '1fr 56px 80px 100px 28px', gap: 6, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, background: T.glass1 }}>
               <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600 }}>SKU</span>
               <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600, textAlign: 'center' as const }}>Qty</span>
               <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600, textAlign: 'right' as const }}>Price</span>
@@ -270,8 +270,8 @@ export default function ChallanForm(p: ChallanFormProps) {
                   </div>
                   <button onClick={() => { if (p.items.length > 1) p.setItems(p.items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }} aria-label="Remove item">×</button>
                 </div>
-                {err && <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.re, borderBottom: `1px solid ${T.bd}`, background: 'rgba(239,68,68,.04)', display: 'flex', alignItems: 'center', gap: 5 }}>⚠ {err}</div>}
-                {!err && d > 0 && q > 0 && pr > 0 && (() => { const pct = it.discount_type === 'percentage' ? d : (d / (q * pr)) * 100; return pct > 10 ? <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.yl, borderBottom: `1px solid ${T.bd}`, background: 'rgba(245,158,11,.04)', display: 'flex', alignItems: 'center', gap: 5 }}>High discount: {Math.round(pct)}% off this item</div> : null; })()}
+                {err && <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.re, borderBottom: `1px solid ${T.bd}`, background: 'oklch(0.63 0.22 25 / .04)', display: 'flex', alignItems: 'center', gap: 5 }}>⚠ {err}</div>}
+                {!err && d > 0 && q > 0 && pr > 0 && (() => { const pct = it.discount_type === 'percentage' ? d : (d / (q * pr)) * 100; return pct > 10 ? <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.yl, borderBottom: `1px solid ${T.bd}`, background: 'oklch(0.78 0.18 75 / .04)', display: 'flex', alignItems: 'center', gap: 5 }}>High discount: {Math.round(pct)}% off this item</div> : null; })()}
               </div>
               );
             })}
@@ -303,7 +303,7 @@ export default function ChallanForm(p: ChallanFormProps) {
                 <label style={lbl}>Status</label>
                 <div style={{ ...inp, fontSize: 11, display: 'flex', alignItems: 'center', color: T.re, fontWeight: 600, cursor: 'default' }}>Credit</div>
               </div>
-              <div style={{ background: 'rgba(239,68,68,.06)', border: `1px solid ${T.reAA || 'rgba(239,68,68,.2)'}`, borderRadius: T.rSm, padding: '8px 10px', fontSize: 11, color: T.tx2, lineHeight: 1.4 }}>
+              <div style={{ background: 'oklch(0.63 0.22 25 / .06)', border: `1px solid ${T.reAA || 'oklch(0.63 0.22 25 / .2)'}`, borderRadius: T.rSm, padding: '8px 10px', fontSize: 11, color: T.tx2, lineHeight: 1.4 }}>
                 Credit note — reduces the customer's outstanding balance. No cash is refunded.
               </div>
             </div>
@@ -318,14 +318,14 @@ export default function ChallanForm(p: ChallanFormProps) {
               const diff = (p.amountPaid || 0) - prev;
               const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
               return (
-                <div style={{ background: 'rgba(56,189,248,.05)', border: '1px solid rgba(56,189,248,.15)', borderRadius: T.rSm, padding: '8px 10px', marginBottom: 8, fontSize: 11, color: T.tx2, lineHeight: 1.5 }}>
+                <div style={{ background: 'oklch(0.77 0.14 230 / .05)', border: '1px solid oklch(0.77 0.14 230 / .15)', borderRadius: T.rSm, padding: '8px 10px', marginBottom: 8, fontSize: 11, color: T.tx2, lineHeight: 1.5 }}>
                   Paid so far <b style={{ fontFamily: T.mono }}>₹{prev.toLocaleString('en-IN')}</b>{p.editing.payment_mode ? ` (${p.editing.payment_mode})` : ''} · Left to pay <b style={{ fontFamily: T.mono, color: left > 0 ? T.re : T.gr }}>₹{left.toLocaleString('en-IN')}</b>
                   <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>"Amount Paid" below is the running total — not just today's payment.</div>
                   {diff > 0 && <div style={{ fontSize: 10, color: T.gr, marginTop: 2 }}>Saving records a new payment of ₹{diff.toLocaleString('en-IN')}{p.paymentMode && p.paymentMode !== 'Return Credit' ? ` via ${p.paymentMode}` : ' — pick the payment mode below'}.</div>}
                   {diff < 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 2 }}>⚠ This LOWERS the recorded payment by ₹{Math.abs(diff).toLocaleString('en-IN')} — a reversal entry will be written.</div>}
                   {left > 0 && (
                     <button onClick={() => { p.setAmountPaid(p.grandTotal); p.setChallanStatus('paid'); p.setPaymentDate(today); if (p.paymentMode === 'Return Credit') p.setPaymentMode(''); }}
-                      style={{ ...S.btnGhost, ...S.btnSm, marginTop: 6, color: T.gr, border: '1px solid rgba(34,197,94,.3)', background: 'rgba(34,197,94,.06)' }}>
+                      style={{ ...S.btnGhost, ...S.btnSm, marginTop: 6, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .3)', background: 'oklch(0.72 0.19 145 / .06)' }}>
                       Received ₹{left.toLocaleString('en-IN')} now — settle in full
                     </button>
                   )}
@@ -363,7 +363,7 @@ export default function ChallanForm(p: ChallanFormProps) {
 
         {/* Totals card — honest math. Totals go red when negative so the
             user sees the problem and fixes it (save is also blocked). */}
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${p.grandTotal < 0 ? 'rgba(239,68,68,.35)' : T.bd}`, borderRadius: 10, padding: '12px 16px', marginBottom: 12 }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${p.grandTotal < 0 ? 'oklch(0.63 0.22 25 / .35)' : T.bd}`, borderRadius: 10, padding: '12px 16px', marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, marginBottom: 4 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{p.subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>
           {p.totalDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Item Discounts{p.totalDiscount > p.subtotal ? ' ⚠' : ''}</span><span style={{ fontFamily: T.mono }}>-₹{p.totalDiscount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>}
           {!p.isReturn && p.shippingCharges > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.bl, marginBottom: 4 }}><span>Shipping/Porter</span><span style={{ fontFamily: T.mono }}>+₹{p.shippingCharges.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>}
@@ -372,7 +372,7 @@ export default function ChallanForm(p: ChallanFormProps) {
           {p.grandTotal < 0 && <div style={{ marginTop: 6, fontSize: 10, color: T.re, display: 'flex', alignItems: 'center', gap: 4 }}>⚠ Total is negative — reduce discount or add items before saving.</div>}
         </div>
 
-        {p.formError && <div style={{ background: 'rgba(239,68,68,.15)', borderLeft: `4px solid ${T.re}`, borderRadius: 6, padding: '10px 14px', fontSize: 11, color: T.tx, marginBottom: 8 }}>{p.formError}</div>}
+        {p.formError && <div style={{ background: 'oklch(0.63 0.22 25 / .15)', borderLeft: `4px solid ${T.re}`, borderRadius: 6, padding: '10px 14px', fontSize: 11, color: T.tx, marginBottom: 8 }}>{p.formError}</div>}
         <button onClick={p.onSave} disabled={p.saving} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: p.saving ? 'not-allowed' : 'pointer', boxShadow: `0 4px 16px ${T.ac3}`, opacity: p.saving ? 0.6 : 1 }}>{p.saving ? 'Saving...' : p.editing ? (p.isReturn ? 'Update Return' : 'Update Challan') : (p.isReturn ? 'Create Return' : 'Create Challan')}</button>
       </div>
 

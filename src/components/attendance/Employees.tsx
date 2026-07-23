@@ -136,7 +136,7 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
                 </div>
                 <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>Shown in the salary payment screen so you can scan &amp; pay.</div>
               </div>
-              {err && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{err}</div>}
+              {err && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{err}</div>}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={close} style={{ ...S.btnGhost, flex: 1 }}>Cancel</button>
                 <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, flex: 1, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save'}</button>

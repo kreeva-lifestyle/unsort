@@ -152,8 +152,8 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
                   <div style={{ fontSize: 13, fontWeight: 700, color: T.tx, display: 'flex', alignItems: 'center', gap: 8 }}>
                     {s.name}
                     {paidByEmp.has(s.employeeId) && <Pill tone="gr" dot>Paid</Pill>}
-                    {saved && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: drift ? 'rgba(245,158,11,.14)' : 'rgba(34,197,94,.12)', color: drift ? T.yl : T.gr, fontWeight: 700, textTransform: 'uppercase' }}>{drift ? 'Saved (changed)' : 'Saved'}</span>}
-                    {s.salary <= 0 && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: 'rgba(239,68,68,.14)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>No salary set</span>}
+                    {saved && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: drift ? 'oklch(0.78 0.18 75 / .14)' : 'oklch(0.72 0.19 145 / .12)', color: drift ? T.yl : T.gr, fontWeight: 700, textTransform: 'uppercase' }}>{drift ? 'Saved (changed)' : 'Saved'}</span>}
+                    {s.salary <= 0 && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .14)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>No salary set</span>}
                   </div>
                   <div style={{ fontSize: 10, color: T.tx3, marginTop: 3, fontFamily: T.mono }}>
                     {s.workDays}W · {s.paidSundays}/{s.sundays}Sun · {s.leaveDays}L · {minutesToHM(s.totalWorkedMinutes)}h · ₹{s.perDaySalary.toLocaleString('en-IN')}/day · ₹{s.perHourSalary.toLocaleString('en-IN')}/hr
@@ -162,7 +162,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
                   {pens.length > 0 && (
                     <div style={{ marginTop: 5, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                       {pens.map(p => (
-                        <span key={p.id} onClick={() => removePenalty(p)} title="Click to remove" style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: T.re, cursor: 'pointer', fontFamily: T.mono }}>−{inr(Number(p.amount))}{p.reason ? ` · ${p.reason}` : ''} ✕</span>
+                        <span key={p.id} onClick={() => removePenalty(p)} title="Click to remove" style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', color: T.re, cursor: 'pointer', fontFamily: T.mono }}>−{inr(Number(p.amount))}{p.reason ? ` · ${p.reason}` : ''} ✕</span>
                       ))}
                     </div>
                   )}
@@ -210,7 +210,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
 
       {/* PDF preview overlay */}
       {pdfHtml && createPortal((
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none', paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Salary PDF</span>
             <div style={{ display: 'flex', gap: 8 }}>

@@ -28,7 +28,7 @@ export default function MappingRow({ r, stale, confirming, onAskDelete, onCancel
           </>)}
         </div>
         {stale && (
-          <div title="The marketplace changed this column's dropdown — this value no longer exists in it. Teach the new value (same column + same master value replaces this lesson)." style={{ marginTop: 4, padding: '2px 6px', borderRadius: 4, fontSize: 8, fontWeight: 600, background: 'rgba(239,68,68,.12)', color: T.re, whiteSpace: 'nowrap', display: 'inline-block' }}>
+          <div title="The marketplace changed this column's dropdown — this value no longer exists in it. Teach the new value (same column + same master value replaces this lesson)." style={{ marginTop: 4, padding: '2px 6px', borderRadius: 4, fontSize: 8, fontWeight: 600, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, whiteSpace: 'nowrap', display: 'inline-block' }}>
             not in this sheet's list anymore
           </div>
         )}

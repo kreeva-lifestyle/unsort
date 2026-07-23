@@ -23,7 +23,7 @@ export default function ValueRow({ value, count, allowed, staged, suggestion, st
   if (staged) {
     const ignored = staged.ignored;
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: `1px solid ${T.bd}`, background: ignored ? 'transparent' : 'rgba(34,197,94,.04)', opacity: ignored ? 0.45 : 1, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: `1px solid ${T.bd}`, background: ignored ? 'transparent' : 'oklch(0.72 0.19 145 / .04)', opacity: ignored ? 0.45 : 1, flexWrap: 'wrap' }}>
         <span style={{ fontFamily: T.mono, fontSize: 12.5, color: T.tx, flex: 1, minWidth: 120, wordBreak: 'break-word', textDecoration: ignored ? 'line-through' : 'none' }}>{staged.source}</span>
         {ignored ? (
           <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(255,255,255,.06)', color: T.tx3 }}>ignored — never suggested again</span>
@@ -42,20 +42,20 @@ export default function ValueRow({ value, count, allowed, staged, suggestion, st
         {count > 0 && <span style={{ fontSize: 10, color: T.tx3, marginLeft: 6 }}>&times;{count}</span>}
       </span>
       {staleTarget !== undefined && (
-        <span title="This value was taught before, but the marketplace removed the old choice from its dropdown — pick the new one." style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(239,68,68,.12)', color: T.re }}>
+        <span title="This value was taught before, but the marketplace removed the old choice from its dropdown — pick the new one." style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'oklch(0.63 0.22 25 / .12)', color: T.re }}>
           was "{staleTarget}" — no longer in the list
         </span>
       )}
       {suggestion && !picked && (
-        <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'rgba(245,158,11,.12)', color: T.yl, whiteSpace: 'nowrap' }}>&#10022; AI suggested</span>
+        <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'oklch(0.78 0.18 75 / .12)', color: T.yl, whiteSpace: 'nowrap' }}>&#10022; AI suggested</span>
       )}
       <select value={sel} onChange={e => setPicked(e.target.value)}
-        style={{ ...S.fInput, width: 180, height: 32, fontSize: 12, color: sel ? (suggestion && !picked ? T.yl : T.ac2) : T.tx3, borderColor: suggestion && !picked && sel ? 'rgba(245,158,11,.4)' : undefined }}>
+        style={{ ...S.fInput, width: 180, height: 32, fontSize: 12, color: sel ? (suggestion && !picked ? T.yl : T.ac2) : T.tx3, borderColor: suggestion && !picked && sel ? 'oklch(0.78 0.18 75 / .4)' : undefined }}>
         <option value="">Use instead&hellip;</option>
         {allowed.map(v => <option key={v} value={v}>{v}</option>)}
       </select>
       <button onClick={() => sel && onStage(sel)} disabled={!sel}
-        style={{ ...S.btnGhost, ...S.btnSm, color: T.ac2, border: '1px solid rgba(99,102,241,.35)', opacity: sel ? 1 : 0.35 }}>Teach</button>
+        style={{ ...S.btnGhost, ...S.btnSm, color: T.ac2, border: '1px solid oklch(0.55 0.22 265 / .35)', opacity: sel ? 1 : 0.35 }}>Teach</button>
       <button onClick={onIgnore} title="Never show this value again — it stays with the AI on runs"
         style={{ ...S.btnGhost, ...S.btnSm, color: T.tx3 }}>Ignore</button>
     </div>

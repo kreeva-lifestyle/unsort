@@ -28,7 +28,7 @@ export default function Empty({
   const illustration = ILLUSTRATIONS[icon];
   return (
     <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px dashed ${T.bd2}`, borderRadius: 12, padding: '40px 24px', textAlign: 'center' as const, animation: 'fi .2s ease' }}>
-      <div style={{ width: 56, height: 56, borderRadius: 14, background: 'rgba(99,102,241,.06)', border: `1px solid rgba(99,102,241,.12)`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', fontSize: illustration ? 0 : 28 }}>
+      <div style={{ width: 56, height: 56, borderRadius: 14, background: 'oklch(0.55 0.22 265 / .06)', border: `1px solid oklch(0.55 0.22 265 / .12)`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', fontSize: illustration ? 0 : 28 }}>
         {illustration || icon}
       </div>
       <div style={{ fontSize: 14, color: T.tx, fontWeight: 700, fontFamily: T.sora, marginBottom: 6 }}>{title}</div>

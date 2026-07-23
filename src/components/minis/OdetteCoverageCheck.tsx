@@ -68,7 +68,7 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
     <div style={{ animation: 'fi .15s ease' }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={reconcile} disabled={loading} style={{ ...S.btnPrimary, opacity: loading ? 0.5 : 1, pointerEvents: loading ? 'none' : 'auto' }}>{loading ? 'Checking…' : 'Reconcile vs Odette'}</button>
-        {result && result.missing.length > 0 && <button onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(56,189,248,.06)' }}>Export {result.missing.length}</button>}
+        {result && result.missing.length > 0 && <button onClick={exportXls} style={{ ...S.btnGhost, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)' }}>Export {result.missing.length}</button>}
         {result && result.tabsRead.map(t => (
           <span key={t.name} style={{ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 500, background: 'rgba(255,255,255,.04)', color: T.tx2, border: `1px solid ${T.bd}` }}>{t.name}: {t.count}</span>
         ))}

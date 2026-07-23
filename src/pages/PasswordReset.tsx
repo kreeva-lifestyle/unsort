@@ -36,7 +36,7 @@ export default function PasswordReset() {
         </div>
         {done ? (
           <div style={{ textAlign: 'center' }}>
-            <div style={{ background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.2)', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
+            <div style={{ background: 'oklch(0.72 0.19 145 / .08)', border: '1px solid oklch(0.72 0.19 145 / .2)', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
               <div style={{ fontSize: 12, color: T.gr, fontWeight: 600 }}>Password updated successfully!</div>
               <div style={{ fontSize: 11, color: T.tx3, marginTop: 4 }}>You can now sign in with your new password.</div>
             </div>
@@ -52,7 +52,7 @@ export default function PasswordReset() {
               <label style={S.fLabel}>Confirm Password</label>
               <input type="password" value={confirm} onChange={e => { setConfirm(e.target.value); setError(''); }} placeholder="Re-enter password" style={S.fInput} />
             </div>
-            {error && <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 12 }}>{error}</div>}
+            {error && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 12 }}>{error}</div>}
             <button type="submit" disabled={saving} style={{ ...S.btnPrimary, width: '100%', justifyContent: 'center', pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
               {saving ? 'Updating…' : 'Update Password'}
             </button>

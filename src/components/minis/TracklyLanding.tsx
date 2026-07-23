@@ -143,10 +143,10 @@ export default function TracklyLanding({ longUrl, onImport }: Props) {
           transition: 'all 0.8s cubic-bezier(.16,1,.3,1)', maxWidth: 440, width: '100%',
         }}>
           <div style={{
-            background: 'rgba(6,8,16,0.82)', border: '1px solid rgba(34,197,94,0.15)',
+            background: 'rgba(6,8,16,0.82)', border: '1px solid oklch(0.72 0.19 145 / 0.15)',
             borderRadius: 16, padding: '36px 28px 32px', textAlign: 'center',
             backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-            boxShadow: '0 0 80px rgba(34,197,94,0.08), 0 0 2px rgba(34,197,94,0.3)',
+            boxShadow: '0 0 80px oklch(0.72 0.19 145 / 0.08), 0 0 2px oklch(0.72 0.19 145 / 0.3)',
           }}>
             <AryaLogo />
 
@@ -159,11 +159,11 @@ export default function TracklyLanding({ longUrl, onImport }: Props) {
 
             <div style={{ display: 'flex', gap: 10, flexDirection: 'column' }}>
               <button onClick={onImport}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(34,197,94,0.55)'; e.currentTarget.style.boxShadow = '0 0 24px rgba(34,197,94,0.25)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(34,197,94,0.3)'; e.currentTarget.style.boxShadow = 'none'; }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'oklch(0.72 0.19 145 / 0.55)'; e.currentTarget.style.boxShadow = '0 0 24px oklch(0.72 0.19 145 / 0.25)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'oklch(0.72 0.19 145 / 0.3)'; e.currentTarget.style.boxShadow = 'none'; }}
                 style={{
-                  width: '100%', padding: '13px 20px', borderRadius: 10, border: '1px solid rgba(34,197,94,0.3)',
-                  background: 'linear-gradient(135deg, rgba(34,197,94,0.18), rgba(34,197,94,0.06))',
+                  width: '100%', padding: '13px 20px', borderRadius: 10, border: '1px solid oklch(0.72 0.19 145 / 0.3)',
+                  background: 'linear-gradient(135deg, oklch(0.72 0.19 145 / 0.18), oklch(0.72 0.19 145 / 0.06))',
                   color: '#22C55E', fontSize: 14, fontWeight: 600, cursor: 'pointer',
                   fontFamily: 'inherit', minHeight: 48, transition: 'all 0.2s',
                   letterSpacing: '0.01em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -197,7 +197,7 @@ export default function TracklyLanding({ longUrl, onImport }: Props) {
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
               </button>
               {downloadError && (
-                <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 12, color: '#F87171' }}>
+                <div style={{ padding: '10px 12px', borderRadius: 8, background: 'oklch(0.63 0.22 25 / 0.08)', border: '1px solid oklch(0.63 0.22 25 / 0.2)', fontSize: 12, color: '#F87171' }}>
                   {downloadError}
                 </div>
               )}

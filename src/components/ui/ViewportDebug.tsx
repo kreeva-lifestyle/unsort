@@ -47,7 +47,7 @@ export default function ViewportDebug() {
 
   if (!on) return null;
   return (
-    <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 60px)', left: 8, zIndex: 99999, background: 'rgba(0,0,0,.82)', border: '1px solid rgba(99,102,241,.5)', borderRadius: 8, padding: '8px 10px', fontFamily: 'monospace', fontSize: 10, lineHeight: 1.6, color: '#7dd3fc', pointerEvents: 'none' }}>
+    <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 60px)', left: 8, zIndex: 99999, background: 'rgba(0,0,0,.82)', border: '1px solid oklch(0.55 0.22 265 / .5)', borderRadius: 8, padding: '8px 10px', fontFamily: 'monospace', fontSize: 10, lineHeight: 1.6, color: '#7dd3fc', pointerEvents: 'none' }}>
       {Object.entries(m).map(([k, v]) => <div key={k}>{k}: <b style={{ color: '#fff' }}>{v}</b></div>)}
     </div>
   );
