@@ -9,6 +9,7 @@ import { friendlyError } from '../../../lib/friendlyError';
 import { parseRateSheet, ParsedRateSheet } from './parseRateSheet';
 import { renderRateCard } from './renderRateCard';
 import ManualRateEditor from './ManualRateEditor';
+import MasterRateCard from './MasterRateCard';
 import RateCardActions from './RateCardActions';
 
 const SCRIPT_FONT_URL = 'https://fonts.gstatic.com/s/greatvibes/v21/RWmMoKWR9v4ksMfaWd_JN9XFiaQoDmlr.woff2';
@@ -26,7 +27,7 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
   const [disclaimer, setDisclaimer] = useState(DEFAULT_DISCLAIMER);
   const [heroUrl, setHeroUrl] = useState('');
   const [heroName, setHeroName] = useState('');
-  const [mode, setMode] = useState<'import' | 'manual'>('import');
+  const [mode, setMode] = useState<'import' | 'manual' | 'master'>('import');
   const [parsed, setParsed] = useState<ParsedRateSheet | null>(null);
   const [excelName, setExcelName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -64,7 +65,7 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
     reader.readAsArrayBuffer(f);
   };
 
-  const setMode2 = (m: 'import' | 'manual') => {
+  const setMode2 = (m: 'import' | 'manual' | 'master') => {
     if (m === mode) return;
     // Rows don't carry across modes; the manual draft survives in localStorage
     // and re-feeds parsed when its editor remounts.
@@ -101,7 +102,7 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
     </div>
   );
 
-  const modeBtn = (m: 'import' | 'manual', label: string) => (
+  const modeBtn = (m: 'import' | 'manual' | 'master', label: string) => (
     <button onClick={() => setMode2(m)} style={mode === m ? { ...S.btnPrimary, ...S.btnSm, minHeight: 32 } : { ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>{label}</button>
   );
 
@@ -115,6 +116,7 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
         <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
           {modeBtn('import', 'Import Excel')}
           {modeBtn('manual', 'Build manually')}
+          {modeBtn('master', 'From Master')}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: mode === 'import' ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 10 }}>
           {pickBox('Catalog Photo', heroName, () => heroRef.current?.click())}
@@ -123,6 +125,7 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
         <input ref={heroRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickHero(f); e.target.value = ''; }} />
         <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickExcel(f); e.target.value = ''; }} />
         {mode === 'manual' && <ManualRateEditor onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} />}
+        {mode === 'master' && <MasterRateCard onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} />}
         {heroUrl && <img src={heroUrl} alt="Catalog" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: `1px solid ${T.bd}`, marginBottom: 10 }} />}
         {parsed && parsed.stats && (
           <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10, fontFamily: T.mono }}>
@@ -154,7 +157,7 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
       </div>
 
       {result && <RateCardActions result={result} catalogName={catalogName} addToast={addToast} />}
-      {!result && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Fill the catalog name, pick the photo and {mode === 'import' ? 'import the rate Excel' : 'type the rows'} — then Generate to get a WhatsApp-ready image.</div>}
+      {!result && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Fill the catalog name, pick the photo and {mode === 'import' ? 'import the rate Excel' : mode === 'manual' ? 'type the rows' : 'fetch the SKUs from the master sheet'} — then Generate to get a WhatsApp-ready image.</div>}
     </div>
   );
 }

@@ -1,4 +1,11 @@
-// listing-ai Edge Function - AI Listing Module backend (v26).
+// listing-ai Edge Function - AI Listing Module backend (v27).
+//
+// v27: `ratecard_rows` action for RateCard Studio's From-Master mode.
+// Given SKUs it returns each one's master row (values keyed by the
+// uppercased header) plus its detected garment category, and the union
+// of non-empty columns - the client builds the rate card from that and
+// enforces the one-category-per-card rule. Free: cached master read,
+// zero AI tokens.
 //
 // v26: pre-AI category validation. New free `validate` action checks each
 // pasted SKU's master-row text against the template's garment category
@@ -193,6 +200,8 @@ const SUGGEST_MODEL = 'claude-haiku-4-5'; // suggestions are canon-validated, ch
 const SKU_CAP = 5;
 // validate covers a whole run in ONE call (no AI, master read is cached).
 const VALIDATE_CAP = 60;
+// ratecard_rows serves the Rate Card builder - bigger cap, still one call.
+const RATECARD_CAP = 200;
 
 interface Usage { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
 
@@ -1078,6 +1087,41 @@ Deno.serve(async (req) => {
         return { sku: ln.sku, found: true, detected, detectedLabel: catLabel(detected), mismatch };
       });
       return json({ ok: true, templateCategory: tplCat, templateCategoryLabel: catLabel(tplCat), categorySource, results, warnings }, req);
+    }
+
+    // RateCard Studio's From-Master mode: each SKU's master row + detected
+    // garment category, plus the union of columns that carry data for these
+    // SKUs (feeds the column picker). Free - cached master read, zero AI.
+    // Category consistency is enforced client-side from the per-row ids.
+    if (action === 'ratecard_rows') {
+      const role = await callerRole(req);
+      if (!role || !['admin', 'manager'].includes(role)) return fail(403, 'Only admin or manager can read the master sheet', req);
+      const seenRc = new Set<string>();
+      const skus = (Array.isArray(body?.skus) ? body.skus : [])
+        .map((v: unknown) => normSku(v))
+        .filter((v: string) => { if (!v || seenRc.has(v)) return false; seenRc.add(v); return true; })
+        .slice(0, RATECARD_CAP);
+      if (skus.length === 0) return fail(400, 'No SKUs provided', req);
+      const warnings: string[] = [];
+      const { tabs } = await readMasterTabs(warnings);
+      if (tabs.length === 0) return fail(502, 'Could not read the master sheet', req, warnings.join('; '));
+      const index = buildSkuIndex(tabs);
+      const columns: string[] = []; // uppercased, first-seen order, only non-empty for these SKUs
+      const rows = skus.map((sku: string) => {
+        const m = index[sku];
+        if (!m) return { sku, found: false, category: null, categoryLabel: null, values: {} };
+        const values: Record<string, string> = {};
+        m.headers.forEach((h, i) => {
+          const label = String(h || '').trim().toUpperCase();
+          const v = String(m.row[i] ?? '').trim();
+          if (!label || !v) return;
+          if (values[label] === undefined) values[label] = v; // first spelling wins on dup headers
+          if (!columns.includes(label)) columns.push(label);
+        });
+        const category = detectCategory(rowTextOf(m));
+        return { sku, found: true, category, categoryLabel: catLabel(category), values };
+      });
+      return json({ ok: true, columns, rows, warnings }, req);
     }
 
     // Free, deterministic: every distinct master value per template dropdown
