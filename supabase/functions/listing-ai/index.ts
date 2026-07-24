@@ -1,4 +1,12 @@
-// listing-ai Edge Function - AI Listing Module backend (v30).
+// listing-ai Edge Function - AI Listing Module backend (v31).
+//
+// v31: the assistant's comparison pack now includes the MASTER sheet's
+// status-like columns (STOCK STATUS etc.) for matched and not-uploaded
+// SKUs, plus a code-computed cross-tab of master-status x seller-status
+// with one exportable SKU table per combination - 'active in master but
+// inactive in seller' is now an exact table, not something the model has
+// to ask for. Prompt hardened to plain text (the chat renders raw text,
+// and v30 answers came back full of markdown # and **).
 //
 // v30: `assistant` action - the Master Assistant chat. The owner uploads a
 // seller sheet (parsed client-side) and asks questions ("which products are
@@ -1227,8 +1235,43 @@ Deno.serve(async (req) => {
             }
           }
           const brandCat = (k: string) => { const m = index[k]; return [brandOfTab(m.tab), catLabel(detectCategory(rowTextOf(m))) || '']; };
-          tables.push({ title: `Matched - in master AND seller sheet (${matched.length})`, columns: ['SKU', ...sHeaders.filter((_, i) => i !== skuIdx).slice(0, 6)], rows: matched.slice(0, 2000).map(k => { const r = sSkuSet.get(k)!; return [k, ...sHeaders.map((_, i) => i).filter(i => i !== skuIdx).slice(0, 6).map(i => r[i] || '')]; }) });
-          tables.push({ title: `Not uploaded by seller - in master only (${masterOnly.length})`, columns: ['SKU', 'BRAND', 'CATEGORY'], rows: masterOnly.slice(0, 2000).map(k => [k, ...brandCat(k)]) });
+          // MASTER-side status columns: "active in master vs active in the
+          // seller sheet" is the owner's core ask - so the master's own
+          // status values ride along and get cross-tabbed IN CODE below.
+          const STATUS_RE = /status|active|live|state|stock/i;
+          const mStatusCols: string[] = [];
+          for (const t of tabs) for (const h of t.headers) { const L = String(h || '').trim().toUpperCase(); if (L && STATUS_RE.test(L) && !mStatusCols.includes(L)) mStatusCols.push(L); }
+          mStatusCols.splice(3);
+          const mValOf = (k: string, label: string) => { const m = index[k]; const i = m.headers.findIndex(h => String(h || '').trim().toUpperCase() === label); return i < 0 ? '' : String(m.row[i] ?? '').trim().slice(0, 40); };
+          const countLine = (skuList: string[], col: string) => {
+            const counts = new Map<string, number>();
+            for (const k of skuList) { const v = mValOf(k, col) || '(empty)'; counts.set(v, (counts.get(v) || 0) + 1); }
+            return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([v, n]) => `${v}=${n}`).join(', ');
+          };
+          for (const col of mStatusCols) {
+            packLines.push(`Master column "${col}" value counts over the ${matched.length} MATCHED SKUs: ${countLine(matched, col)}`);
+            packLines.push(`Master column "${col}" value counts over the ${masterOnly.length} NOT-UPLOADED SKUs: ${countLine(masterOnly, col)}`);
+          }
+          // Cross-tab master-status x seller-status over matched SKUs, one
+          // exportable SKU table per combination - "active in master but
+          // inactive in seller" becomes a ready-made table, never a guess.
+          const sStatusIdx = sHeaders.findIndex((h, i) => i !== skuIdx && STATUS_RE.test(h));
+          if (mStatusCols.length > 0 && sStatusIdx >= 0) {
+            const combos = new Map<string, string[]>();
+            for (const k of matched) {
+              const mv = mValOf(k, mStatusCols[0]) || '(empty)';
+              const sv = (sSkuSet.get(k)![sStatusIdx] || '').slice(0, 40) || '(empty)';
+              const key = `Master ${mStatusCols[0]} = ${mv} · Seller ${sHeaders[sStatusIdx]} = ${sv}`;
+              const arr = combos.get(key) || []; arr.push(k); combos.set(key, arr);
+            }
+            const sorted = [...combos.entries()].sort((a, b) => b[1].length - a[1].length);
+            packLines.push(`CROSS-TAB over the ${matched.length} matched SKUs (exact, computed in code - each combination also has its own SKU table below the answer): ${sorted.map(([key, arr]) => `[${key}]: ${arr.length}`).join(' | ')}`);
+            for (const [key, arr] of sorted.slice(0, 9)) tables.push({ title: `${key} (${arr.length})`, columns: ['SKU'], rows: arr.slice(0, 2000).map(k => [k]) });
+          } else if (mStatusCols.length > 0) {
+            packLines.push('No status-like column was found in the SELLER sheet, so no master-vs-seller status cross-tab exists - the not-uploaded breakdown above still uses the master status.');
+          }
+          tables.push({ title: `Matched - in master AND seller sheet (${matched.length})`, columns: ['SKU', ...sHeaders.filter((_, i) => i !== skuIdx).slice(0, 6), ...mStatusCols.map(c => `MASTER ${c}`)], rows: matched.slice(0, 2000).map(k => { const r = sSkuSet.get(k)!; return [k, ...sHeaders.map((_, i) => i).filter(i => i !== skuIdx).slice(0, 6).map(i => r[i] || ''), ...mStatusCols.map(c => mValOf(k, c))]; }) });
+          tables.push({ title: `Not uploaded by seller - in master only (${masterOnly.length})`, columns: ['SKU', 'BRAND', 'CATEGORY', ...mStatusCols.map(c => `MASTER ${c}`)], rows: masterOnly.slice(0, 2000).map(k => [k, ...brandCat(k), ...mStatusCols.map(c => mValOf(k, c))]) });
           tables.push({ title: `Unknown SKUs - in seller sheet only (${sellerOnly.length})`, columns: ['SKU'], rows: sellerOnly.slice(0, 2000).map(k => [k]) });
           packLines.push(`Sample matched: ${matched.slice(0, 100).join(', ') || '(none)'}`);
           packLines.push(`Sample not-uploaded: ${masterOnly.slice(0, 100).join(', ') || '(none)'}`);
@@ -1249,7 +1292,8 @@ Deno.serve(async (req) => {
         'You answer the owner\'s questions about their offline master sheet and, when attached, a seller/marketplace sheet.',
         'CRITICAL: every number, count and SKU list in the COMPUTED DATA below was calculated in code and is exact. Use ONLY those numbers - never estimate, extrapolate or invent SKUs. If the data does not answer the question, say what is missing and how to get it (e.g. attach the seller sheet, or which column is needed).',
         'The app shows the owner complete result tables below your answer (matched / not uploaded / unknown, exportable as CSV) - reference them by name instead of pasting long lists; quote at most 10 example SKUs inline.',
-        'Presentation: answer the actual question first in 1-2 sentences with the key numbers, then short labelled sections or bullet lines (plain text, no markdown tables, no headings syntax). Be a sharp analyst: point out anything odd (duplicates, unknown SKUs, suspicious status values) even if not asked.',
+        'PRESENTATION - PLAIN TEXT ONLY: the app renders your answer as raw text, so NEVER use markdown of any kind (no #, ##, **, __, ---, no markdown tables). Answer the actual question FIRST in 1-2 sentences with the key numbers, then short bullet lines starting with \"- \". Be a sharp analyst: point out anything odd (duplicates, unknown SKUs, suspicious status values) even if not asked.',
+        'NEVER ask the owner to attach or provide the master sheet - it is already loaded server-side and everything computable from it is in the COMPUTED DATA. If something is genuinely missing, name the exact column that would answer it in one line.',
       ].join('\n');
       const messages = [
         ...history.map(h => ({ role: h.role, content: h.text })),
