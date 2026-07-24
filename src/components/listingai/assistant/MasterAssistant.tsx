@@ -13,6 +13,16 @@ import AssistantTables, { AssistantTable } from './AssistantTables';
 
 interface Msg { role: 'user' | 'assistant'; text: string; tables?: AssistantTable[]; estUsd?: number }
 
+// The chat renders raw text; the model is told plain-text-only but a slipped
+// markdown token must not show as # / ** noise — strip the common ones.
+export const plainText = (t: string): string => t
+  .replace(/^#{1,6}\s*/gm, '')
+  .replace(/\*\*(.+?)\*\*/g, '$1')
+  .replace(/__(.+?)__/g, '$1')
+  .replace(/^\s*---+\s*$/gm, '')
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
+
 export default function MasterAssistant({ onBack, addToast }: {
   onBack: () => void;
   addToast: (m: string, t?: string) => void;
@@ -55,7 +65,7 @@ export default function MasterAssistant({ onBack, addToast }: {
         if (data?.error === 'no_api_key') throw new Error('Add the Anthropic API key in Settings → Listing AI first');
         throw new Error(String(data?.details || data?.error || `Failed (${status})`));
       }
-      setMsgs(m => [...m, { role: 'assistant', text: String(data.answer || ''), tables: (data.tables || []) as AssistantTable[], estUsd: Number(data.estUsd || 0) }]);
+      setMsgs(m => [...m, { role: 'assistant', text: plainText(String(data.answer || '')), tables: (data.tables || []) as AssistantTable[], estUsd: Number(data.estUsd || 0) }]);
       for (const w of (data.warnings || []) as string[]) addToast(w, 'error');
     } catch (e) {
       addToast(friendlyError(e), 'error');
