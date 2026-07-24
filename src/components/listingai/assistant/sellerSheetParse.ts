@@ -27,9 +27,18 @@ export function parseSellerSheet(data: ArrayBuffer, name: string): SellerSheet {
   }
   if (headerIdx < 0) throw new Error('Could not find a header row in that sheet');
 
-  const headers = grid[headerIdx].slice(0, COL_CAP).map(h => cellText(h).slice(0, 60));
+  // Headerless exports are common ("2901,inactive" as row 1): when most of
+  // the would-be header cells are pure numbers, that row is DATA — keep it
+  // and synthesize COL 1..N names (the edge auto-detects the SKU column by
+  // matching values against the master, so names don't matter).
+  let headers = grid[headerIdx].slice(0, COL_CAP).map(h => cellText(h).slice(0, 60));
+  const nonEmpty = headers.filter(Boolean);
+  const numeric = nonEmpty.filter(h => /^\d+(\.\d+)?$/.test(h));
+  const headerless = nonEmpty.length > 0 && numeric.length * 2 >= nonEmpty.length;
+  if (headerless) headers = headers.map((_, i) => `COL ${i + 1}`);
+
   const rows: string[][] = [];
-  for (let i = headerIdx + 1; i < grid.length && rows.length < ROW_CAP; i++) {
+  for (let i = headerIdx + (headerless ? 0 : 1); i < grid.length && rows.length < ROW_CAP; i++) {
     const raw = grid[i];
     if (!raw || raw.every(c => cellText(c) === '')) continue;
     rows.push(headers.map((_, ci) => cellText(raw[ci]).slice(0, CELL_CAP)));
