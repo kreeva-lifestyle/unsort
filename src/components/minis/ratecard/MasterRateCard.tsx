@@ -9,7 +9,7 @@ import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { call } from '../../listingai/api';
 import { parseSkuLines } from '../../listingai/skuInput';
-import { finalizeRateRows, FinalizedSheet } from './finalizeRateRows';
+import { finalizeRateRows, FinalizedSheet, MAX_CARD_ROWS } from './finalizeRateRows';
 import { norm, isPriceHeader, SKU_ALIASES } from './parseRateSheet';
 
 interface MasterRow { sku: string; found: boolean; category: string | null; categoryLabel: string | null; values: Record<string, string> }
@@ -87,8 +87,9 @@ export default function MasterRateCard({ onSheet, addToast }: {
   const fetchRows = async () => {
     let skus = parseSkuLines(skuText).map(l => l.sku);
     if (skus.length === 0) { addToast('Type at least one SKU', 'error'); return; }
-    // Server caps at 200 — cap here too so no SKU is ever dropped silently.
-    if (skus.length > 200) { addToast(`Capped to the first 200 SKUs (of ${skus.length}) — split the rest into a second card`, 'error'); skus = skus.slice(0, 200); }
+    // Owner's rule: max 25 designs per card. Cap BEFORE the fetch, loudly —
+    // no SKU is ever dropped silently (the server caps at 25 too).
+    if (skus.length > MAX_CARD_ROWS) { addToast(`A rate card holds at most ${MAX_CARD_ROWS} SKUs — capped to the first ${MAX_CARD_ROWS} (of ${skus.length}); split the rest into a second card`, 'error'); skus = skus.slice(0, MAX_CARD_ROWS); }
     setBusy(true);
     try {
       const { status, data } = await call({ action: 'ratecard_rows', skus });

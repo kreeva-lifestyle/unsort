@@ -7,11 +7,11 @@
 // refresh never loses typed rows.
 import { useState, useEffect, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
-import { finalizeRateRows, FinalizedSheet } from './finalizeRateRows';
+import { finalizeRateRows, FinalizedSheet, MAX_CARD_ROWS } from './finalizeRateRows';
 import { isPriceHeader } from './parseRateSheet';
 
 const DRAFT_KEY = 'ratecard_manual_draft_v1';
-const ROW_CAP = 200; // canvas + localStorage sanity
+const ROW_CAP = MAX_CARD_ROWS; // owner's rule: max 25 designs per card
 const EMPTY = { columns: ['SKU', 'PRICE'], rows: [['', '']] };
 
 const loadDraft = (): { columns: string[]; rows: string[][] } => {
@@ -50,7 +50,7 @@ export default function ManualRateEditor({ onSheet, addToast }: {
   const setCell = (ri: number, ci: number, v: string) =>
     setDraft(d => ({ ...d, rows: d.rows.map((r, i) => i === ri ? r.map((c, j) => j === ci ? v : c) : r) }));
   const addRow = () => {
-    if (rows.length >= ROW_CAP) { addToast(`Row limit ${ROW_CAP} reached — split into a second card`, 'error'); return; }
+    if (rows.length >= ROW_CAP) { addToast(`A rate card holds at most ${ROW_CAP} designs — split into a second card`, 'error'); return; }
     setDraft(d => ({ ...d, rows: [...d.rows, d.columns.map(() => '')] }));
   };
   const delRow = (ri: number) =>

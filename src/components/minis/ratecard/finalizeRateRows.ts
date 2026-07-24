@@ -20,6 +20,11 @@ export interface FinalizedSheet {
 // Indian GST slabs for clothing (owner's rule): ≤ ₹2500 → 5%, above → 18%
 const GST_BOUNDARY = 2500, GST_HIGH = 18, GST_LOW = 5;
 
+// Owner's rule: a rate card holds at most 25 designs. Enforced here (the one
+// pass every build mode goes through) so import, manual and From-Master all
+// obey the same limit.
+export const MAX_CARD_ROWS = 25;
+
 // "3000/- (FLAT) +12%(GST) +SHIPPING." -> 3000 (first number in the cell).
 export const priceNumber = (cell: string): number | null => {
   const m = cell.replace(/,/g, '').match(/\d+(?:\.\d+)?/);
@@ -53,6 +58,10 @@ export function applyMarkup(sheet: FinalizedSheet, markup: Markup): FinalizedShe
 export function finalizeRateRows(rows: RateRow[], columns: string[], skuCol: string, priceCol: string | null): FinalizedSheet {
   const warnings: string[] = [];
   const blockers: string[] = [];
+
+  if (rows.length > MAX_CARD_ROWS) {
+    blockers.push(`This card has ${rows.length} designs — a rate card holds at most ${MAX_CARD_ROWS}. Split them into more cards.`);
+  }
 
   // All-or-nothing price rule. On a miss the GST/stats passes are skipped —
   // never correct or summarise a sheet that can't ship.

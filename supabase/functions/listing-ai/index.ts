@@ -1,7 +1,9 @@
 // listing-ai Edge Function - AI Listing Module backend (v29).
 //
-// v29: ratecard_rows warns when the 200-SKU cap truncates the request -
+// v29: ratecard_rows warns when the SKU cap truncates the request -
 // dropped SKUs used to vanish silently (neither found nor not-in-master).
+// v29.1: RATECARD_CAP lowered 200 -> 25 (owner's rule: max 25 designs per
+// rate card; the client enforces the same limit in every build mode).
 //
 // v28: ratecard_rows returns EVERY column of the tabs the found SKUs
 // live on (sheet order) plus colCounts (how many of the found SKUs have
@@ -210,8 +212,9 @@ const SUGGEST_MODEL = 'claude-haiku-4-5'; // suggestions are canon-validated, ch
 const SKU_CAP = 5;
 // validate covers a whole run in ONE call (no AI, master read is cached).
 const VALIDATE_CAP = 60;
-// ratecard_rows serves the Rate Card builder - bigger cap, still one call.
-const RATECARD_CAP = 200;
+// ratecard_rows serves the Rate Card builder - owner's rule: a rate card
+// holds at most 25 designs, so there is nothing to look up beyond that.
+const RATECARD_CAP = 25;
 
 interface Usage { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
 
