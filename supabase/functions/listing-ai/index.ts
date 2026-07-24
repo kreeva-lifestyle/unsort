@@ -1,4 +1,15 @@
-// listing-ai Edge Function - AI Listing Module backend (v31).
+// listing-ai Edge Function - AI Listing Module backend (v32).
+//
+// v32: fuzzy SKU intelligence for the Master Assistant. Sellers mangle SKUs
+// when uploading - size-suffixed variants (DRS141-S / DRS141XS fold to
+// DRS141), separator drift (DRS-141), catalog names glued on
+// (TEHZEEB DRS141), and typos (DRA141 for DRS141). A deterministic 5-tier
+// ladder (exact / format / size / embedded / fuzzy) resolves each seller
+// value to a master SKU, tags HOW it matched, folds size variants N:1
+// (status = MIXED when the sizes disagree), and lists fuzzy matches in
+// their own verify table. Ambiguity always degrades to no-match, never a
+// wrong merge. Column detection also uses tiers 1-3, so an all-size-
+// suffixed sheet still finds its SKU column.
 //
 // v31: the assistant's comparison pack now includes the MASTER sheet's
 // status-like columns (STOCK STATUS etc.) for matched and not-uploaded
@@ -941,6 +952,33 @@ function rowTextOf(m: SkuIndexRow): string {
     .join('\n');
 }
 
+// ---- fuzzy SKU matching (Master Assistant, v32) ----------------------------
+// The aggressive normalizer (same family as short-track's): uppercase and
+// delete every separator, so DRS-141 and DRS141 collapse.
+const compactSku = (v: string) => String(v || '').toUpperCase().replace(/[-_\s./]/g, '');
+// Strip ONE trailing size token. Alpha sizes take an optional separator
+// (odette's <base>-<SIZE> shape; 3XL/4XL before XL so "-3XL" never half-
+// strips); NUMERIC sizes require an explicit separator - master SKUs end in
+// digits, so DRS14146 must never lose its tail.
+const stripSkuSize = (raw: string): string => {
+  const alpha = raw.replace(/[-_\s./]?(XXXL|XXL|3XL|4XL|XL|XXS|XS|S|M|L)$/i, '');
+  if (alpha !== raw) return alpha;
+  return raw.replace(/[-_\s./](32|34|36|38|40|42|44|46|48)$/, '');
+};
+// Levenshtein <= 1 - only short letter prefixes reach the typo tier.
+const editDist1 = (a: string, b: string): boolean => {
+  if (a === b) return true;
+  const la = a.length, lb = b.length;
+  if (Math.abs(la - lb) > 1) return false;
+  let i = 0, j = 0, edits = 0;
+  while (i < la && j < lb) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++edits > 1) return false;
+    if (la === lb) { i++; j++; } else if (la > lb) i++; else j++;
+  }
+  return edits + (la - i) + (lb - j) <= 1;
+};
+
 // ---- Anthropic -------------------------------------------------------------
 
 function buildSystemPrefix(tplName: string, marketplace: string, schemaFields: Classified[], taughtLines: string[], enumSet: Set<string>): string {
@@ -1189,6 +1227,55 @@ Deno.serve(async (req) => {
       const index = buildSkuIndex(tabs);
       const masterSkus = Object.keys(index);
 
+      // v32 matcher indexes: compact form -> canonical master SKU, and
+      // digit-tail -> letter-prefix candidates for the typo tier.
+      const compactIndex = new Map<string, string>();
+      let compactCollisions = 0;
+      const tailIndex = new Map<string, { prefix: string; sku: string }[]>();
+      for (const k of masterSkus) {
+        const c = compactSku(k);
+        if (compactIndex.has(c)) compactCollisions++; else compactIndex.set(c, k);
+        const m = c.match(/^([A-Z]+)(\d+)$/);
+        if (m) { const arr = tailIndex.get(m[2]) || []; arr.push({ prefix: m[1], sku: k }); tailIndex.set(m[2], arr); }
+      }
+      const embedKeys = [...compactIndex.keys()].filter(c => c.length >= 5);
+      type MatchType = 'exact' | 'format' | 'size' | 'embedded' | 'fuzzy';
+      let deepBudget = 1500; // embedded/fuzzy scan linearly - cap the stragglers
+      const matchSku = (raw: string): { sku: string; type: MatchType } | null => {
+        const n = normSku(raw);
+        if (!n) return null;
+        if (index[n]) return { sku: n, type: 'exact' };
+        const f = compactIndex.get(compactSku(n));
+        if (f) return { sku: f, type: 'format' };
+        const stripped = stripSkuSize(n);
+        if (stripped !== n && stripped) {
+          if (index[stripped]) return { sku: stripped, type: 'size' };
+          const fs = compactIndex.get(compactSku(stripped));
+          if (fs) return { sku: fs, type: 'size' };
+        }
+        if (deepBudget-- <= 0) return null;
+        // embedded: catalog name glued on - longest master key inside the
+        // value; a tie between DIFFERENT masters is ambiguous -> no match.
+        const hay = compactSku(stripped || n);
+        let bestKeys: string[] = []; let bestLen = 0;
+        for (const key of embedKeys) {
+          if (hay !== key && hay.includes(key)) {
+            if (key.length > bestLen) { bestLen = key.length; bestKeys = [key]; }
+            else if (key.length === bestLen) bestKeys.push(key);
+          }
+        }
+        const bestSkus = [...new Set(bestKeys.map(k2 => compactIndex.get(k2)!))];
+        if (bestSkus.length === 1) return { sku: bestSkus[0], type: 'embedded' };
+        // fuzzy: identical digit tail, letter prefix within 1 edit, UNIQUE
+        // candidate (DRA141 -> DRS141; two candidates = ambiguous, no match).
+        const fm = hay.match(/^([A-Z]+)(\d+)$/);
+        if (fm) {
+          const uniq = [...new Set((tailIndex.get(fm[2]) || []).filter(t => editDist1(t.prefix, fm[1])).map(t => t.sku))];
+          if (uniq.length === 1) return { sku: uniq[0], type: 'fuzzy' };
+        }
+        return null;
+      };
+
       // ---- optional seller sheet (client-parsed; capped there and re-capped here)
       const seller = body?.seller && typeof body.seller === 'object' ? body.seller : null;
       const sName = seller ? String(seller.name || 'seller sheet').slice(0, 120) : '';
@@ -1208,7 +1295,10 @@ Deno.serve(async (req) => {
         const aliasRe = /sku|style\s*code|style\s*id|seller\s*sku|vendor|item\s*code|design/i;
         let skuIdx = sHeaders.findIndex(h => aliasRe.test(h));
         let bestHits = -1;
-        const hitsOf = (ci: number) => sRows.reduce((n, r) => n + (index[normSku(r[ci])] ? 1 : 0), 0);
+        // Tiers 1-3 for scoring (an all-size-suffixed sheet must still find
+        // its SKU column); the loose tiers stay out of column detection.
+        const quickHit = (v: string) => { const n = normSku(v); if (!n) return false; if (index[n] || compactIndex.has(compactSku(n))) return true; const st = stripSkuSize(n); return st !== n && !!st && (!!index[st] || compactIndex.has(compactSku(st))); };
+        const hitsOf = (ci: number) => sRows.reduce((n, r) => n + (quickHit(r[ci]) ? 1 : 0), 0);
         if (skuIdx >= 0) bestHits = hitsOf(skuIdx);
         for (let ci = 0; ci < sHeaders.length; ci++) {
           const h = hitsOf(ci);
@@ -1217,19 +1307,42 @@ Deno.serve(async (req) => {
         if (skuIdx < 0 || bestHits <= 0) {
           packLines.push(`SELLER SHEET "${sName}": ${sRows.length} rows, but NO column matches any master SKU - tell the owner the sheet's SKU column could not be identified and list its columns: ${sHeaders.join(' | ')}`);
         } else {
-          const sSkuSet = new Map<string, string[]>(); // normSku -> first seller row
-          for (const r of sRows) { const k = normSku(r[skuIdx]); if (k && !sSkuSet.has(k)) sSkuSet.set(k, r); }
-          const matched = [...sSkuSet.keys()].filter(k => index[k]);
-          const sellerOnly = [...sSkuSet.keys()].filter(k => !index[k]);
-          const masterOnly = masterSkus.filter(k => !sSkuSet.has(k));
-          packLines.push(`SELLER SHEET "${sName}": ${sRows.length} rows, ${sSkuSet.size} unique SKUs in column "${sHeaders[skuIdx]}". Columns: ${sHeaders.join(' | ')}`);
-          packLines.push(`COMPARISON (exact, computed in code): matched in both = ${matched.length}; in master but NOT in seller sheet (not uploaded) = ${masterOnly.length}; in seller sheet but NOT in master (unknown SKUs) = ${sellerOnly.length}.`);
+          // v32: resolve every seller row through the fuzzy ladder and GROUP
+          // by the master SKU it lands on - size variants fold N:1.
+          const TIER_RANK: Record<MatchType, number> = { exact: 0, format: 1, size: 2, embedded: 3, fuzzy: 4 };
+          interface Grp { sellerSkus: string[]; rows: string[][]; type: MatchType }
+          const groups = new Map<string, Grp>();
+          const unknownRows = new Map<string, string[]>();
+          const seenSeller = new Set<string>();
+          for (const r of sRows) {
+            const rawK = normSku(r[skuIdx]);
+            if (!rawK || seenSeller.has(rawK)) continue;
+            seenSeller.add(rawK);
+            const hit = matchSku(rawK);
+            if (!hit) { unknownRows.set(rawK, r); continue; }
+            const g = groups.get(hit.sku) || { sellerSkus: [], rows: [], type: hit.type };
+            g.sellerSkus.push(rawK); g.rows.push(r);
+            if (TIER_RANK[hit.type] < TIER_RANK[g.type]) g.type = hit.type;
+            groups.set(hit.sku, g);
+          }
+          const matched = [...groups.keys()];
+          const sellerOnly = [...unknownRows.keys()];
+          const masterOnly = masterSkus.filter(k => !groups.has(k));
+          const typeCounts = new Map<string, number>();
+          for (const g of groups.values()) typeCounts.set(g.type, (typeCounts.get(g.type) || 0) + 1);
+          const sizeSplit = [...groups.values()].filter(g => g.rows.length > 1).length;
+          // A master matched by several size rows: shared column value, or
+          // MIXED with the per-variant breakdown when they disagree.
+          const sellerVal = (g: Grp, ci: number) => { const vs = [...new Set(g.rows.map(r => (r[ci] || '').slice(0, 40) || '(empty)'))]; return vs.length === 1 ? vs[0] : `MIXED (${vs.join(' / ')})`.slice(0, 60); };
+          packLines.push(`SELLER SHEET "${sName}": ${sRows.length} rows, ${seenSeller.size} unique SKU values in column "${sHeaders[skuIdx]}". Columns: ${sHeaders.join(' | ')}`);
+          packLines.push(`COMPARISON (computed in code with the 5-tier fuzzy ladder): matched master SKUs = ${matched.length} (how: ${['exact', 'format', 'size', 'embedded', 'fuzzy'].map(t => `${t}=${typeCounts.get(t) || 0}`).join(', ')}); ${sizeSplit} of them matched via multiple size-variant rows; in master but NOT in seller sheet (not uploaded) = ${masterOnly.length}; unmatched seller SKUs (unknown) = ${sellerOnly.length}.${compactCollisions ? ` Note: ${compactCollisions} master SKUs collide when separators are removed.` : ''}`);
+          if ((typeCounts.get('fuzzy') || 0) > 0) packLines.push('FUZZY matches are probable typo corrections (e.g. DRA141 -> DRS141) - present them as "probable, verify" and point to the Fuzzy matches table.');
           // Per-column value breakdown of the seller sheet - powers "live vs
           // not live" for any status-style column without hardcoding names.
           for (let ci = 0; ci < sHeaders.length; ci++) {
             if (ci === skuIdx) continue;
             const counts = new Map<string, number>();
-            for (const r of sSkuSet.values()) { const v = (r[ci] || '').slice(0, 40) || '(empty)'; counts.set(v, (counts.get(v) || 0) + 1); }
+            for (const g of groups.values()) { const v = sellerVal(g, ci); counts.set(v, (counts.get(v) || 0) + 1); }
             if (counts.size > 0 && counts.size <= 12) {
               packLines.push(`Seller column "${sHeaders[ci]}" value counts: ${[...counts.entries()].sort((a, b) => b[1] - a[1]).map(([v, n]) => `${v}=${n}`).join(', ')}`);
             }
@@ -1260,7 +1373,7 @@ Deno.serve(async (req) => {
             const combos = new Map<string, string[]>();
             for (const k of matched) {
               const mv = mValOf(k, mStatusCols[0]) || '(empty)';
-              const sv = (sSkuSet.get(k)![sStatusIdx] || '').slice(0, 40) || '(empty)';
+              const sv = sellerVal(groups.get(k)!, sStatusIdx);
               const key = `Master ${mStatusCols[0]} = ${mv} · Seller ${sHeaders[sStatusIdx]} = ${sv}`;
               const arr = combos.get(key) || []; arr.push(k); combos.set(key, arr);
             }
@@ -1270,7 +1383,9 @@ Deno.serve(async (req) => {
           } else if (mStatusCols.length > 0) {
             packLines.push('No status-like column was found in the SELLER sheet, so no master-vs-seller status cross-tab exists - the not-uploaded breakdown above still uses the master status.');
           }
-          tables.push({ title: `Matched - in master AND seller sheet (${matched.length})`, columns: ['SKU', ...sHeaders.filter((_, i) => i !== skuIdx).slice(0, 6), ...mStatusCols.map(c => `MASTER ${c}`)], rows: matched.slice(0, 2000).map(k => { const r = sSkuSet.get(k)!; return [k, ...sHeaders.map((_, i) => i).filter(i => i !== skuIdx).slice(0, 6).map(i => r[i] || ''), ...mStatusCols.map(c => mValOf(k, c))]; }) });
+          tables.push({ title: `Matched - in master AND seller sheet (${matched.length})`, columns: ['SKU', 'SELLER SKU(S)', 'MATCH', ...sHeaders.filter((_, i) => i !== skuIdx).slice(0, 5), ...mStatusCols.map(c => `MASTER ${c}`)], rows: matched.slice(0, 2000).map(k => { const g = groups.get(k)!; return [k, g.sellerSkus.slice(0, 6).join(', ') + (g.sellerSkus.length > 6 ? ` +${g.sellerSkus.length - 6}` : ''), g.type, ...sHeaders.map((_, i) => i).filter(i => i !== skuIdx).slice(0, 5).map(i => sellerVal(g, i)), ...mStatusCols.map(c => mValOf(k, c))]; }) });
+          const fuzzies = matched.filter(k => groups.get(k)!.type === 'fuzzy');
+          if (fuzzies.length) tables.push({ title: `Fuzzy matches - verify (${fuzzies.length})`, columns: ['SELLER SKU', 'MATCHED MASTER SKU', ...mStatusCols.map(c => `MASTER ${c}`)], rows: fuzzies.slice(0, 2000).map(k => [groups.get(k)!.sellerSkus.join(', '), k, ...mStatusCols.map(c => mValOf(k, c))]) });
           tables.push({ title: `Not uploaded by seller - in master only (${masterOnly.length})`, columns: ['SKU', 'BRAND', 'CATEGORY', ...mStatusCols.map(c => `MASTER ${c}`)], rows: masterOnly.slice(0, 2000).map(k => [k, ...brandCat(k), ...mStatusCols.map(c => mValOf(k, c))]) });
           tables.push({ title: `Unknown SKUs - in seller sheet only (${sellerOnly.length})`, columns: ['SKU'], rows: sellerOnly.slice(0, 2000).map(k => [k]) });
           packLines.push(`Sample matched: ${matched.slice(0, 100).join(', ') || '(none)'}`);
@@ -1293,6 +1408,7 @@ Deno.serve(async (req) => {
         'CRITICAL: every number, count and SKU list in the COMPUTED DATA below was calculated in code and is exact. Use ONLY those numbers - never estimate, extrapolate or invent SKUs. If the data does not answer the question, say what is missing and how to get it (e.g. attach the seller sheet, or which column is needed).',
         'The app shows the owner complete result tables below your answer (matched / not uploaded / unknown, exportable as CSV) - reference them by name instead of pasting long lists; quote at most 10 example SKUs inline.',
         'PRESENTATION - PLAIN TEXT ONLY: the app renders your answer as raw text, so NEVER use markdown of any kind (no #, ##, **, __, ---, no markdown tables). Answer the actual question FIRST in 1-2 sentences with the key numbers, then short bullet lines starting with \"- \". Be a sharp analyst: point out anything odd (duplicates, unknown SKUs, suspicious status values) even if not asked.',
+        'Match types in the data: exact and format are certain; size means size-variant seller rows (DRS141-S, DRS141-XL...) were folded into one master SKU; embedded means the SKU was found inside a longer value (catalog name attached); fuzzy means a probable typo correction - flag fuzzy matches as "probable, verify" and never state them as certain. A MIXED status value means that SKU\'s size variants disagree.',
         'NEVER ask the owner to attach or provide the master sheet - it is already loaded server-side and everything computable from it is in the COMPUTED DATA. If something is genuinely missing, name the exact column that would answer it in one line.',
       ].join('\n');
       const messages = [
