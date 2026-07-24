@@ -1,4 +1,13 @@
-// listing-ai Edge Function - AI Listing Module backend (v29).
+// listing-ai Edge Function - AI Listing Module backend (v30).
+//
+// v30: `assistant` action - the Master Assistant chat. The owner uploads a
+// seller sheet (parsed client-side) and asks questions ("which products are
+// live?", "what has the seller not uploaded?"). EVERY comparison number is
+// computed here in code (SKU set operations against the master, per-column
+// value breakdowns) - the AI only interprets the question and writes the
+// analysis from the computed pack, so counts can never be hallucinated. One
+// AI call per question on the owner's Settings model (getModel()); complete
+// result tables go back to the client for display + CSV export.
 //
 // v29: ratecard_rows warns when the SKU cap truncates the request -
 // dropped SKUs used to vanish silently (neither found nor not-in-master).
@@ -1148,6 +1157,117 @@ Deno.serve(async (req) => {
         return { sku, found: true, category, categoryLabel: catLabel(category), values };
       });
       return json({ ok: true, columns, colCounts, rows, warnings }, req);
+    }
+
+    // Master Assistant: free-form questions over the master sheet, optionally
+    // against an uploaded seller sheet. Deterministic comparison pack built
+    // HERE (exact set math); the AI narrates from the pack only.
+    if (action === 'assistant') {
+      const role = await callerRole(req);
+      if (!role || !['admin', 'manager'].includes(role)) return fail(403, 'Only admin or manager can use the Master Assistant', req);
+      const apiKey = await getSecret('anthropic_api_key');
+      if (!apiKey) return json({ ok: false, error: 'no_api_key' }, req, 409);
+      const question = String(body?.question || '').trim().slice(0, 2000);
+      if (!question) return fail(400, 'Ask a question', req);
+      // Follow-up context: last few turns of plain text, capped hard.
+      const history: { role: 'user' | 'assistant'; text: string }[] = (Array.isArray(body?.history) ? body.history : [])
+        .map((h: any) => ({ role: h?.role === 'assistant' ? 'assistant' as const : 'user' as const, text: String(h?.text || '').slice(0, 1500) }))
+        .filter((h: { text: string }) => h.text)
+        .slice(-6);
+
+      const warnings: string[] = [];
+      const { tabs } = await readMasterTabs(warnings);
+      if (tabs.length === 0) return fail(502, 'Could not read the master sheet', req, warnings.join('; '));
+      const index = buildSkuIndex(tabs);
+      const masterSkus = Object.keys(index);
+
+      // ---- optional seller sheet (client-parsed; capped there and re-capped here)
+      const seller = body?.seller && typeof body.seller === 'object' ? body.seller : null;
+      const sName = seller ? String(seller.name || 'seller sheet').slice(0, 120) : '';
+      const sHeaders: string[] = seller ? (Array.isArray(seller.headers) ? seller.headers : []).slice(0, 30).map((h: unknown) => String(h ?? '').trim().slice(0, 60)) : [];
+      const sRows: string[][] = seller ? (Array.isArray(seller.rows) ? seller.rows : []).slice(0, 4000)
+        .map((r: unknown) => (Array.isArray(r) ? r : []).slice(0, 30).map((c: unknown) => String(c ?? '').trim().slice(0, 120))) : [];
+
+      type Table = { title: string; columns: string[]; rows: string[][] };
+      const tables: Table[] = [];
+      const packLines: string[] = [];
+      const tabCounts = tabs.map(t => `${t.tab}: ${Math.max(0, t.rows.length - 1)} rows`).join(', ');
+      packLines.push(`MASTER SHEET: ${masterSkus.length} unique SKUs (${tabCounts}). Columns: ${tabs.map(t => t.headers.filter(Boolean).join(' | ')).join('  //  ')}`);
+
+      if (seller && sRows.length > 0 && sHeaders.length > 0) {
+        // Seller SKU column: alias names first, else the column whose values
+        // match the most master SKUs (handles any marketplace export).
+        const aliasRe = /sku|style\s*code|style\s*id|seller\s*sku|vendor|item\s*code|design/i;
+        let skuIdx = sHeaders.findIndex(h => aliasRe.test(h));
+        let bestHits = -1;
+        const hitsOf = (ci: number) => sRows.reduce((n, r) => n + (index[normSku(r[ci])] ? 1 : 0), 0);
+        if (skuIdx >= 0) bestHits = hitsOf(skuIdx);
+        for (let ci = 0; ci < sHeaders.length; ci++) {
+          const h = hitsOf(ci);
+          if (h > bestHits) { bestHits = h; skuIdx = ci; }
+        }
+        if (skuIdx < 0 || bestHits <= 0) {
+          packLines.push(`SELLER SHEET "${sName}": ${sRows.length} rows, but NO column matches any master SKU - tell the owner the sheet's SKU column could not be identified and list its columns: ${sHeaders.join(' | ')}`);
+        } else {
+          const sSkuSet = new Map<string, string[]>(); // normSku -> first seller row
+          for (const r of sRows) { const k = normSku(r[skuIdx]); if (k && !sSkuSet.has(k)) sSkuSet.set(k, r); }
+          const matched = [...sSkuSet.keys()].filter(k => index[k]);
+          const sellerOnly = [...sSkuSet.keys()].filter(k => !index[k]);
+          const masterOnly = masterSkus.filter(k => !sSkuSet.has(k));
+          packLines.push(`SELLER SHEET "${sName}": ${sRows.length} rows, ${sSkuSet.size} unique SKUs in column "${sHeaders[skuIdx]}". Columns: ${sHeaders.join(' | ')}`);
+          packLines.push(`COMPARISON (exact, computed in code): matched in both = ${matched.length}; in master but NOT in seller sheet (not uploaded) = ${masterOnly.length}; in seller sheet but NOT in master (unknown SKUs) = ${sellerOnly.length}.`);
+          // Per-column value breakdown of the seller sheet - powers "live vs
+          // not live" for any status-style column without hardcoding names.
+          for (let ci = 0; ci < sHeaders.length; ci++) {
+            if (ci === skuIdx) continue;
+            const counts = new Map<string, number>();
+            for (const r of sSkuSet.values()) { const v = (r[ci] || '').slice(0, 40) || '(empty)'; counts.set(v, (counts.get(v) || 0) + 1); }
+            if (counts.size > 0 && counts.size <= 12) {
+              packLines.push(`Seller column "${sHeaders[ci]}" value counts: ${[...counts.entries()].sort((a, b) => b[1] - a[1]).map(([v, n]) => `${v}=${n}`).join(', ')}`);
+            }
+          }
+          const brandCat = (k: string) => { const m = index[k]; return [brandOfTab(m.tab), catLabel(detectCategory(rowTextOf(m))) || '']; };
+          tables.push({ title: `Matched - in master AND seller sheet (${matched.length})`, columns: ['SKU', ...sHeaders.filter((_, i) => i !== skuIdx).slice(0, 6)], rows: matched.slice(0, 2000).map(k => { const r = sSkuSet.get(k)!; return [k, ...sHeaders.map((_, i) => i).filter(i => i !== skuIdx).slice(0, 6).map(i => r[i] || '')]; }) });
+          tables.push({ title: `Not uploaded by seller - in master only (${masterOnly.length})`, columns: ['SKU', 'BRAND', 'CATEGORY'], rows: masterOnly.slice(0, 2000).map(k => [k, ...brandCat(k)]) });
+          tables.push({ title: `Unknown SKUs - in seller sheet only (${sellerOnly.length})`, columns: ['SKU'], rows: sellerOnly.slice(0, 2000).map(k => [k]) });
+          packLines.push(`Sample matched: ${matched.slice(0, 100).join(', ') || '(none)'}`);
+          packLines.push(`Sample not-uploaded: ${masterOnly.slice(0, 100).join(', ') || '(none)'}`);
+          packLines.push(`Sample unknown: ${sellerOnly.slice(0, 100).join(', ') || '(none)'}`);
+        }
+      } else {
+        // No seller sheet: master-only questions still work (brand counts,
+        // category spread) - computed here, narrated by the model.
+        const catCounts = new Map<string, number>();
+        for (const k of masterSkus) { const c = catLabel(detectCategory(rowTextOf(index[k]))) || 'Undetected'; catCounts.set(c, (catCounts.get(c) || 0) + 1); }
+        packLines.push(`Category spread (detected from row text): ${[...catCounts.entries()].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c}=${n}`).join(', ')}`);
+        packLines.push('No seller sheet was attached to this question.');
+      }
+
+      const model = await getModel();
+      const sys = [
+        'You are the Master Assistant for Arya Designs, an Indian ethnic-wear garment business (brands ARYA and DRESSTIVE).',
+        'You answer the owner\'s questions about their offline master sheet and, when attached, a seller/marketplace sheet.',
+        'CRITICAL: every number, count and SKU list in the COMPUTED DATA below was calculated in code and is exact. Use ONLY those numbers - never estimate, extrapolate or invent SKUs. If the data does not answer the question, say what is missing and how to get it (e.g. attach the seller sheet, or which column is needed).',
+        'The app shows the owner complete result tables below your answer (matched / not uploaded / unknown, exportable as CSV) - reference them by name instead of pasting long lists; quote at most 10 example SKUs inline.',
+        'Presentation: answer the actual question first in 1-2 sentences with the key numbers, then short labelled sections or bullet lines (plain text, no markdown tables, no headings syntax). Be a sharp analyst: point out anything odd (duplicates, unknown SKUs, suspicious status values) even if not asked.',
+      ].join('\n');
+      const messages = [
+        ...history.map(h => ({ role: h.role, content: h.text })),
+        { role: 'user', content: `COMPUTED DATA (exact, from code):\n${packLines.join('\n')}\n\nQUESTION: ${question}` },
+      ];
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model, max_tokens: 1500, system: [{ type: 'text', text: sys, cache_control: { type: 'ephemeral' } }], messages }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.status === 401) return json({ ok: false, error: 'The Anthropic API key was rejected - update it in Settings -> Listing AI' }, req);
+      if (r.status === 429) return json({ ok: false, error: 'Anthropic rate limit hit - wait a minute and try again' }, req);
+      if (r.status >= 400) return json({ ok: false, error: String(data?.error?.message || `Anthropic API error (${r.status})`) }, req);
+      const answer = (data?.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
+      const u = data?.usage || {};
+      const usage = { input_tokens: u.input_tokens || 0, output_tokens: u.output_tokens || 0, cache_read_input_tokens: u.cache_read_input_tokens || 0, cache_creation_input_tokens: u.cache_creation_input_tokens || 0 };
+      return json({ ok: true, answer: answer || 'No answer produced - try rephrasing.', tables, model, usage, estUsd: estUsdOf(model, usage), warnings: warnings.length ? warnings : undefined }, req);
     }
 
     // Free, deterministic: every distinct master value per template dropdown
