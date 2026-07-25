@@ -17,7 +17,6 @@ import TemplateManager from './TemplateManager';
 import TaughtMappingsPage from './TaughtMappingsPage';
 import BulkTeachPage from './bulk/BulkTeachPage';
 import ImageFolders from './ImageFolders';
-import MasterAssistant from './assistant/MasterAssistant';
 import ResultsTable from './ResultsTable';
 import PreflightPanel from './PreflightPanel';
 import RunHistory from './RunHistory';
@@ -65,10 +64,6 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
   if (statusErr) return <Empty icon="warning" title="Listing AI unavailable" message={statusErr} cta="Retry" onCta={loadStatus} />;
   if (status && !['admin', 'manager'].includes(status.role)) {
     return <Empty icon="clipboard" title="Listing AI" message="Only admin and manager accounts can generate marketplace listings." />;
-  }
-
-  if (viewMode === 'assistant') {
-    return <MasterAssistant onBack={() => setViewMode('main')} addToast={addToast} />;
   }
 
   if (viewMode === 'bulk') {
@@ -120,7 +115,6 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
           <button onClick={() => setManageOpen(true)} style={S.btnGhost}>Manage Templates</button>
           <button onClick={() => setViewMode('mappings')} style={S.btnGhost}>Taught Mappings</button>
           <button onClick={() => setLinksOpen(true)} style={S.btnGhost}>Image Folders</button>
-          <button onClick={() => setViewMode('assistant')} style={S.btnGhost}>Master Assistant</button>
         </div>
         <div style={S.fLabel}>SKUs — one per line</div>
         <textarea
