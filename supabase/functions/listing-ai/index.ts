@@ -1,4 +1,11 @@
-// listing-ai Edge Function - AI Listing Module backend (v33).
+// listing-ai Edge Function - AI Listing Module backend (v34).
+//
+// v34: catalogs for RateCard Studio. New `ratecard_catalogs` action lists the
+// master sheet's distinct catalog names (with design counts) so a seller can
+// pick a catalog instead of typing SKUs; `ratecard_rows` accepts `catalog`
+// and resolves that catalog's SKUs server-side. Bucket names that are not
+// real catalogs (Singles / Single / Non-Catalog) are filtered out everywhere.
+// Both paths honour the seller share token and the 25-design card cap.
 //
 // v33: `ratecard_rows` accepts a SHARE TOKEN as an alternative to a signed-in
 // admin/manager, so sellers can build their own rate cards from a public link
@@ -993,6 +1000,18 @@ function stampShareUse(id: string): void {
   }).catch(() => { /* usage stats are not worth an error */ });
 }
 
+// ---- catalogs (RateCard Studio, v34) --------------------------------------
+// The master's catalog column. "CATALOG NO" is a SKU alias, so match only the
+// catalog NAME header.
+const catalogColIndex = (headers: string[]) =>
+  headers.findIndex(h => /^catalog(name)?$/.test(normHeader(String(h || ''))));
+// Buckets that are not real catalogs - never offered to a seller.
+const NON_CATALOG = new Set(['singles', 'single', 'noncatalog', 'nocatalog', 'na', 'none']);
+const isRealCatalog = (v: string) => {
+  const k = normHeader(v);
+  return !!k && !NON_CATALOG.has(k);
+};
+
 // ---- fuzzy SKU matching (Master Assistant, v32) ----------------------------
 // The aggressive normalizer (same family as short-track's): uppercase and
 // delete every separator, so DRS-141 and DRS141 collapse.
@@ -1202,6 +1221,35 @@ Deno.serve(async (req) => {
     // garment category, plus the union of columns that carry data for these
     // SKUs (feeds the column picker). Free - cached master read, zero AI.
     // Category consistency is enforced client-side from the per-row ids.
+    // Distinct catalog names + design counts, for the RateCard catalog picker.
+    // Same two doors as ratecard_rows: owner session or seller share token.
+    if (action === 'ratecard_catalogs') {
+      const shareToken = String(body?.shareToken || '').trim();
+      if (shareToken) {
+        if (rcRateLimited(req)) return fail(429, 'Too many requests - wait a minute and try again', req);
+        const shareId = await shareTokenOk(shareToken);
+        if (!shareId) return fail(403, 'This link is no longer active - ask Arya Designs for the current link', req);
+      } else {
+        const role = await callerRole(req);
+        if (!role || !['admin', 'manager'].includes(role)) return fail(403, 'Only admin or manager can read the master sheet', req);
+      }
+      const warnings: string[] = [];
+      const { tabs } = await readMasterTabs(warnings);
+      if (tabs.length === 0) return fail(502, 'Could not read the master sheet', req, warnings.join('; '));
+      const counts = new Map<string, number>();
+      for (const t of tabs) {
+        const ci = catalogColIndex(t.headers);
+        if (ci < 0) continue;
+        for (let i = 1; i < t.rows.length; i++) {
+          const v = String(t.rows[i][ci] ?? '').trim();
+          if (!isRealCatalog(v)) continue;
+          counts.set(v, (counts.get(v) || 0) + 1);
+        }
+      }
+      const catalogs = [...counts.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+      return json({ ok: true, catalogs, warnings }, req);
+    }
+
     if (action === 'ratecard_rows') {
       // Two ways in: the owner's signed-in admin/manager session, or a valid
       // seller share token (public link). Nothing else.
@@ -1215,17 +1263,38 @@ Deno.serve(async (req) => {
         const role = await callerRole(req);
         if (!role || !['admin', 'manager'].includes(role)) return fail(403, 'Only admin or manager can read the master sheet', req);
       }
-      const seenRc = new Set<string>();
-      const allSkus = (Array.isArray(body?.skus) ? body.skus : [])
-        .map((v: unknown) => normSku(v))
-        .filter((v: string) => { if (!v || seenRc.has(v)) return false; seenRc.add(v); return true; });
-      const skus = allSkus.slice(0, RATECARD_CAP);
-      if (skus.length === 0) return fail(400, 'No SKUs provided', req);
       const warnings: string[] = [];
-      // A silently-dropped SKU is data loss - say exactly how many were cut.
-      if (allSkus.length > RATECARD_CAP) warnings.push(`Only the first ${RATECARD_CAP} SKUs were looked up - ${allSkus.length - RATECARD_CAP} more were skipped. Split them into a second card.`);
       const { tabs } = await readMasterTabs(warnings);
       if (tabs.length === 0) return fail(502, 'Could not read the master sheet', req, warnings.join('; '));
+      // Either an explicit SKU list, or every SKU of one catalog (the picker).
+      const catalog = String(body?.catalog || '').trim();
+      const seenRc = new Set<string>();
+      let allSkus: string[];
+      if (catalog) {
+        if (!isRealCatalog(catalog)) return fail(400, 'That is not a catalog - pick one from the list', req);
+        allSkus = [];
+        for (const t of tabs) {
+          const ci = catalogColIndex(t.headers);
+          if (ci < 0) continue;
+          const skuIdx = skuColIndex(t.headers);
+          for (let i = 1; i < t.rows.length; i++) {
+            if (normHeader(String(t.rows[i][ci] ?? '')) !== normHeader(catalog)) continue;
+            const k = normSku(t.rows[i][skuIdx]);
+            if (k && !seenRc.has(k)) { seenRc.add(k); allSkus.push(k); }
+          }
+        }
+        if (allSkus.length === 0) return fail(404, `No designs found in "${catalog}"`, req);
+      } else {
+        allSkus = (Array.isArray(body?.skus) ? body.skus : [])
+          .map((v: unknown) => normSku(v))
+          .filter((v: string) => { if (!v || seenRc.has(v)) return false; seenRc.add(v); return true; });
+      }
+      const skus = allSkus.slice(0, RATECARD_CAP);
+      if (skus.length === 0) return fail(400, 'No SKUs provided', req);
+      // A silently-dropped SKU is data loss - say exactly how many were cut.
+      if (allSkus.length > RATECARD_CAP) warnings.push(catalog
+        ? `"${catalog}" has ${allSkus.length} designs - a rate card holds ${RATECARD_CAP}, so the first ${RATECARD_CAP} were loaded. Make a second card for the rest.`
+        : `Only the first ${RATECARD_CAP} SKUs were looked up - ${allSkus.length - RATECARD_CAP} more were skipped. Split them into a second card.`);
       const index = buildSkuIndex(tabs);
       // EVERY column of the tabs the found SKUs live on, in sheet order -
       // an empty cell must not hide a column from the picker. colCounts says

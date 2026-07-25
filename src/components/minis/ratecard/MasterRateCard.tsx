@@ -9,61 +9,18 @@ import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { call } from '../../listingai/api';
 import { parseSkuLines } from '../../listingai/skuInput';
-import { finalizeRateRows, FinalizedSheet, MAX_CARD_ROWS } from './finalizeRateRows';
+import { FinalizedSheet, MAX_CARD_ROWS } from './finalizeRateRows';
 import { norm, isPriceHeader, SKU_ALIASES } from './parseRateSheet';
+import { MasterRow, buildMasterSheet, categoryGroups } from './masterSheetBuild';
+import CatalogPicker from './CatalogPicker';
 
-interface MasterRow { sku: string; found: boolean; category: string | null; categoryLabel: string | null; values: Record<string, string> }
 const COLS_KEY = 'ratecard_master_cols_v1';
-const GST_BOUNDARY = 2500; // display formatting only — finalize re-checks the slab
 
-// Build the FinalizedSheet from fetched rows + chosen columns. Bare-number
-// prices are formatted to the card's standard "<n>/- +<slab>%(GST)" form;
-// cells already carrying GST text keep it (finalize autocorrects a wrong %).
-export const buildMasterSheet = (rows: MasterRow[], chosenRaw: string[]): FinalizedSheet => {
-  // A column with no value for ANY fetched SKU would render as a full column
-  // of "—" and waste card width, so it never reaches the card. (Partly-filled
-  // columns DO stay — those gaps are reported as smart-check notes instead.)
-  const chosen = chosenRaw.filter(c => rows.some(r => (r.values[c] || '').trim()));
-  const dropped = chosenRaw.filter(c => !chosen.includes(c));
-  const columns = ['SKU', ...chosen];
-  const priceCol = chosen.find(c => isPriceHeader(c)) || null;
-  const objRows = rows.map(r => {
-    const row: Record<string, string> = { SKU: r.sku };
-    for (const c of chosen) {
-      let v = r.values[c] || '';
-      // The two master tabs may spell the price header differently ("PRICE"
-      // vs "RATE"). The card keeps ONE price column, so a row whose price
-      // lives under the other spelling falls back to any price-like key —
-      // otherwise a fully-priced cross-tab card hits the missing-price
-      // blocker for no real reason.
-      if (c === priceCol && !v) v = Object.entries(r.values).find(([k]) => isPriceHeader(k))?.[1] || '';
-      if (c === priceCol && /^\d+(?:\.\d+)?$/.test(v)) v = `${v}/- +${Number(v) > GST_BOUNDARY ? 18 : 5}%(GST)`;
-      row[c] = v;
-    }
-    return row;
-  });
-  const sheet = finalizeRateRows(objRows, columns, 'SKU', priceCol);
-  if (dropped.length) sheet.warnings.push(`Left off the card (no data in the master for these SKUs): ${dropped.join(', ')}`);
-  return sheet;
-};
-
-// One card = one category: every DETECTED category must equal the majority
-// one (undetected rows never block — warn only on positive evidence).
-export const categoryGroups = (rows: MasterRow[]): { label: string; skus: string[] }[] => {
-  const by = new Map<string, { label: string; skus: string[] }>();
-  for (const r of rows) {
-    if (!r.category) continue;
-    const g = by.get(r.category) || { label: r.categoryLabel || r.category, skus: [] };
-    g.skus.push(r.sku);
-    by.set(r.category, g);
-  }
-  return [...by.values()].sort((a, b) => b.skus.length - a.skus.length);
-};
-
-export default function MasterRateCard({ onSheet, addToast, shareToken }: {
+export default function MasterRateCard({ onSheet, addToast, shareToken, onCatalogName }: {
   onSheet: (s: FinalizedSheet | null) => void;
   addToast: (m: string, t?: string) => void;
   shareToken?: string; // seller link: authorises the master read server-side
+  onCatalogName?: (name: string) => void; // picking a catalog names the card
 }) {
   const [skuText, setSkuText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -99,15 +56,17 @@ export default function MasterRateCard({ onSheet, addToast, shareToken }: {
     onSheet(sheet);
   };
 
-  const fetchRows = async () => {
-    let skus = parseSkuLines(skuText).map(l => l.sku);
-    if (skus.length === 0) { addToast('Type at least one SKU', 'error'); return; }
+  // catalog set => the server resolves that catalog's SKUs; otherwise the
+  // typed list is used.
+  const fetchRows = async (catalog?: string) => {
+    let skus = catalog ? [] : parseSkuLines(skuText).map(l => l.sku);
+    if (!catalog && skus.length === 0) { addToast('Type at least one SKU', 'error'); return; }
     // Owner's rule: max 25 designs per card. Cap BEFORE the fetch, loudly —
     // no SKU is ever dropped silently (the server caps at 25 too).
-    if (skus.length > MAX_CARD_ROWS) { addToast(`A rate card holds at most ${MAX_CARD_ROWS} SKUs — capped to the first ${MAX_CARD_ROWS} (of ${skus.length}); split the rest into a second card`, 'error'); skus = skus.slice(0, MAX_CARD_ROWS); }
+    if (!catalog && skus.length > MAX_CARD_ROWS) { addToast(`A rate card holds at most ${MAX_CARD_ROWS} SKUs — capped to the first ${MAX_CARD_ROWS} (of ${skus.length}); split the rest into a second card`, 'error'); skus = skus.slice(0, MAX_CARD_ROWS); }
     setBusy(true);
     try {
-      const { status, data } = await call({ action: 'ratecard_rows', skus, ...(shareToken ? { shareToken } : {}) });
+      const { status, data } = await call({ action: 'ratecard_rows', ...(catalog ? { catalog } : { skus }), ...(shareToken ? { shareToken } : {}) });
       if (!data?.ok) throw new Error(String(data?.details || data?.error || `Fetch failed (${status})`));
       const rows = (data.rows || []) as MasterRow[];
       const columns = (data.columns || []) as string[];
@@ -122,7 +81,12 @@ export default function MasterRateCard({ onSheet, addToast, shareToken }: {
       setChosen(picks);
       emit(okRows, picks, categoryGroups(okRows).length > 1);
       for (const w of (data.warnings || []) as string[]) addToast(w, 'error');
-      if (okRows.length) addToast(`${okRows.length} SKU${okRows.length === 1 ? '' : 's'} loaded from the master sheet`, 'success');
+      if (catalog) {
+        // Show what was loaded so it stays editable, and name the card.
+        setSkuText(rows.map(r => r.sku).join('\n'));
+        onCatalogName?.(catalog);
+      }
+      if (okRows.length) addToast(`${okRows.length} design${okRows.length === 1 ? '' : 's'} loaded${catalog ? ` from ${catalog}` : ' from the master sheet'}`, 'success');
     } catch (e) { addToast(friendlyError(e), 'error'); setFetched(null); onSheet(null); }
     setBusy(false);
   };
@@ -152,12 +116,13 @@ export default function MasterRateCard({ onSheet, addToast, shareToken }: {
 
   return (
     <div style={{ marginBottom: 10 }}>
+      <CatalogPicker shareToken={shareToken} disabled={busy} addToast={addToast} onPick={c => fetchRows(c)} />
       <label style={S.fLabel}>SKUs — one per line</label>
       <textarea value={skuText} rows={3}
         onChange={e => { setSkuText(e.target.value); if (fetched) { setFetched(null); onSheet(null); } }}
         placeholder={'AD-1001\nAD-1002\nAD-1010'}
         style={{ ...S.fInput, width: '100%', height: 'auto', minHeight: 68, resize: 'vertical', fontFamily: T.mono, lineHeight: 1.6 }} />
-      <button onClick={fetchRows} disabled={busy}
+      <button onClick={() => fetchRows()} disabled={busy}
         style={{ ...S.btnGhost, marginTop: 8, minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>
         {busy ? 'Fetching…' : 'Fetch from Master'}
       </button>
