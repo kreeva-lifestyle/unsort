@@ -11,7 +11,7 @@ import { finalizeRateRows, FinalizedSheet, MAX_CARD_ROWS } from './finalizeRateR
 import { isPriceHeader } from './parseRateSheet';
 
 const DRAFT_KEY = 'ratecard_manual_draft_v1';
-const ROW_CAP = MAX_CARD_ROWS; // owner's rule: max 25 designs per card
+const ROW_CAP = MAX_CARD_ROWS; // owner's rule: max designs per card
 const EMPTY = { columns: ['SKU', 'PRICE'], rows: [['', '']] };
 
 const loadDraft = (): { columns: string[]; rows: string[][] } => {

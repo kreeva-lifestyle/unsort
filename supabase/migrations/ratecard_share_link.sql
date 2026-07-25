@@ -59,3 +59,12 @@ $$;
 
 revoke all on function public.bump_ratecard_share_use(uuid) from anon, authenticated, public;
 grant execute on function public.bump_ratecard_share_use(uuid) to service_role;
+
+-- The seller link's friendly Trackly code (short_links.short_code), so the
+-- owner shares /#/s/ratecard instead of the 32-hex token URL. Stored here so
+-- any admin/manager sees the same code — short_links itself is RLS-scoped to
+-- whoever created it.
+alter table public.ratecard_share add column if not exists short_code text;
+
+comment on column public.ratecard_share.short_code is
+  'Trackly short_links.short_code that redirects to this seller link';

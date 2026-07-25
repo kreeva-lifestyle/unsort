@@ -61,8 +61,8 @@ export default function MasterRateCard({ onSheet, addToast, shareToken, onCatalo
   const fetchRows = async (catalog?: string) => {
     let skus = catalog ? [] : parseSkuLines(skuText).map(l => l.sku);
     if (!catalog && skus.length === 0) { addToast('Type at least one SKU', 'error'); return; }
-    // Owner's rule: max 25 designs per card. Cap BEFORE the fetch, loudly —
-    // no SKU is ever dropped silently (the server caps at 25 too).
+    // Owner's rule: the card's design cap. Cap BEFORE the fetch, loudly —
+    // no SKU is ever dropped silently (the server caps at the same number).
     if (!catalog && skus.length > MAX_CARD_ROWS) { addToast(`A rate card holds at most ${MAX_CARD_ROWS} SKUs — capped to the first ${MAX_CARD_ROWS} (of ${skus.length}); split the rest into a second card`, 'error'); skus = skus.slice(0, MAX_CARD_ROWS); }
     setBusy(true);
     try {

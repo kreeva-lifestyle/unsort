@@ -65,7 +65,17 @@ export default function TracklyRedirect({ shortCode }: { shortCode: string }) {
           let target: URL;
           try { target = new URL(data.longUrl); } catch { setStatus('notfound'); return; }
           if (!ALLOWED_SCHEMES.includes(target.protocol)) { setStatus('notfound'); return; }
-          if (shortCode !== LANDING_CODE) { window.location.replace(target.href); return; }
+          if (shortCode !== LANDING_CODE) {
+            // A short link may point back into this app (e.g. the seller
+            // rate-card page). That target differs only by hash, and a
+            // same-document hash change neither reloads nor fires popstate —
+            // which is all this app listens for — so the new route would
+            // never render. Force the load in that one case.
+            const sameDoc = target.origin === window.location.origin && target.pathname === window.location.pathname;
+            window.location.replace(target.href);
+            if (sameDoc) window.location.reload();
+            return;
+          }
           setCachedUrl(shortCode, target.href);
           setLongUrl(target.href);
           setStatus('landing');
