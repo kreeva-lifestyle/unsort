@@ -19,13 +19,17 @@ export const PRICE_ALIASES = ['price', 'rate', 'rateprice', 'mrp', 'amount', 'se
 
 // Price-column detection: exact alias first, then a word match so decorated
 // headers ("PRICE (RS.)", "OFFLINE PRICE") still count. Word-bounded so
-// SEPARATE never reads as RATE; GST/% columns are excluded ("GST RATE" is a
-// percentage, not a price).
+// SEPARATE never reads as RATE.
+// GST is a QUALIFIER on a price, not a disqualifier: "PRICE EXC GST" and
+// "PRICE INCL GST" are the master sheet's real price columns, so anything
+// naming price/mrp/amount wins outright. Only a column that is ABOUT the tax
+// ("GST RATE", "GST %") is rejected — that one is a percentage.
 export const isPriceHeader = (label: string): boolean => {
   if (PRICE_ALIASES.includes(norm(label))) return true;
   const l = String(label ?? '').toLowerCase();
-  if (/gst|%/.test(l)) return false;
-  return /(^|[^a-z])(price|mrp|rate|amount)([^a-z]|$)/.test(l);
+  if (/(^|[^a-z])(price|mrp|amount)([^a-z]|$)/.test(l)) return true;
+  if (/gst|%|tax/.test(l)) return false;
+  return /(^|[^a-z])rate([^a-z]|$)/.test(l);
 };
 
 const cellText = (v: unknown): string => {
