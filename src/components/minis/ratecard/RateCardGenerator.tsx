@@ -1,17 +1,19 @@
 // RateCard Studio — catalog name + hero photo + rate rows → glassmorphic
-// rate-card JPG (WhatsApp-ready). Rows come from an Excel import OR the
-// in-app manual editor (same finalize pass either way). Fully client-side:
-// nothing is uploaded or saved (the manual draft lives in localStorage);
-// the image is drawn on a canvas by renderRateCard.ts.
+// rate-card JPG (WhatsApp-ready). Rows come from an Excel import, the in-app
+// manual editor, or the master sheet (same finalize pass either way). Nothing
+// is uploaded or saved (the manual draft lives in localStorage); the image is
+// drawn on a canvas by renderRateCard.ts. With `lockedMode` it serves the
+// public seller link (From Master only) — see PublicRateCard.
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
-import { numericKeyDown } from '../../../lib/numericInput';
 import { applyMarkup } from './finalizeRateRows';
 import { parseRateSheet, ParsedRateSheet } from './parseRateSheet';
 import { renderRateCard } from './renderRateCard';
 import ManualRateEditor from './ManualRateEditor';
 import MasterRateCard from './MasterRateCard';
+import SellerLinkBar from './SellerLinkBar';
+import MarkupRow from './MarkupRow';
 import RateCardActions from './RateCardActions';
 
 const SCRIPT_FONT_URL = 'https://fonts.gstatic.com/s/greatvibes/v21/RWmMoKWR9v4ksMfaWd_JN9XFiaQoDmlr.woff2';
@@ -19,17 +21,22 @@ const DEFAULT_DISCLAIMER = 'ALL RATES ARE FLAT NO DISCOUNT AND EXCLUSIVE OF GST 
 
 const loadImg = (src: string) => new Promise<HTMLImageElement>((res, rej) => {
   const img = new Image();
-  img.onload = () => res(img);
-  img.onerror = () => rej(new Error('Could not load image'));
+  img.onload = () => res(img); img.onerror = () => rej(new Error('Could not load image'));
   img.src = src;
 });
 
-export default function RateCardGenerator({ addToast }: { addToast: (m: string, t?: string) => void }) {
+export default function RateCardGenerator({ addToast, lockedMode, shareToken }: {
+  addToast: (m: string, t?: string) => void;
+  // Seller link: lock the tool to From-Master and carry the share token that
+  // authorises the master read. Omitted in the signed-in app.
+  lockedMode?: 'master';
+  shareToken?: string;
+}) {
   const [catalogName, setCatalogName] = useState('');
   const [disclaimer, setDisclaimer] = useState(DEFAULT_DISCLAIMER);
   const [heroUrl, setHeroUrl] = useState('');
   const [heroName, setHeroName] = useState('');
-  const [mode, setMode] = useState<'import' | 'manual' | 'master'>('import');
+  const [mode, setMode] = useState<'import' | 'manual' | 'master'>(lockedMode || 'import');
   const [parsed, setParsed] = useState<ParsedRateSheet | null>(null);
   const [excelName, setExcelName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -114,12 +121,10 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
     <div onClick={onClick} style={{ padding: '14px 14px', borderRadius: 8, border: `1px dashed ${value ? 'oklch(0.72 0.19 145 / .35)' : T.bd2}`, background: value ? 'oklch(0.72 0.19 145 / .05)' : T.glass1, cursor: 'pointer', minHeight: 44 }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: value ? T.gr : T.tx2 }}>{label}</div>
       <div style={{ fontSize: 10, color: T.tx3, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || 'Tap to choose'}</div>
-    </div>
-  );
+    </div>);
 
   const modeBtn = (m: 'import' | 'manual' | 'master', label: string) => (
-    <button onClick={() => setMode2(m)} style={mode === m ? { ...S.btnPrimary, ...S.btnSm, minHeight: 32 } : { ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>{label}</button>
-  );
+    <button onClick={() => setMode2(m)} style={mode === m ? { ...S.btnPrimary, ...S.btnSm, minHeight: 32 } : { ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>{label}</button>);
 
   return (
     <div style={{ animation: 'fi .15s ease', maxWidth: 560 }}>
@@ -128,11 +133,13 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
           <label style={S.fLabel}>Catalog Name</label>
           <input value={catalogName} onChange={e => { setCatalogName(e.target.value); setResult(null); }} placeholder="e.g. Tehzeeb" style={{ ...S.fInput, width: '100%' }} />
         </div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-          {modeBtn('import', 'Import Excel')}
-          {modeBtn('manual', 'Build manually')}
-          {modeBtn('master', 'From Master')}
-        </div>
+        {!lockedMode && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            {modeBtn('import', 'Import Excel')}
+            {modeBtn('manual', 'Build manually')}
+            {modeBtn('master', 'From Master')}
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: mode === 'import' ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 10 }}>
           {pickBox('Catalog Photo', heroName, () => heroRef.current?.click())}
           {mode === 'import' && pickBox('Rate Excel', excelName ? `${excelName} · ${parsed?.rows.length ?? 0} designs` : '', () => xlsRef.current?.click())}
@@ -140,7 +147,8 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
         <input ref={heroRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickHero(f); e.target.value = ''; }} />
         <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickExcel(f); e.target.value = ''; }} />
         {mode === 'manual' && <ManualRateEditor onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} />}
-        {mode === 'master' && <MasterRateCard onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} />}
+        {mode === 'master' && !lockedMode && <SellerLinkBar addToast={addToast} />}
+        {mode === 'master' && <MasterRateCard onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} shareToken={shareToken} />}
         {heroUrl && <img src={heroUrl} alt="Catalog" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: `1px solid ${T.bd}`, marginBottom: 10 }} />}
         {effective && effective.stats && (
           <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10, fontFamily: T.mono }}>
@@ -162,20 +170,10 @@ export default function RateCardGenerator({ addToast }: { addToast: (m: string, 
         ) : (
           <div style={{ fontSize: 11, color: T.gr, marginBottom: 10 }}>✓ Smart checks passed — {effective.priceCol ? 'GST slabs, SKUs and totals all look right' : 'SKUs look right (price-less card)'}</div>
         ))}
-        {parsed?.priceCol && (
-          <div style={{ marginBottom: 10 }}>
-            <label style={S.fLabel}>Seller Markup <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0 }}>(optional)</span></label>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <button onClick={() => { setMarkupKind('pct'); setResult(null); }} style={markupKind === 'pct' ? { ...S.btnPrimary, ...S.btnSm, minHeight: 36 } : { ...S.btnGhost, ...S.btnSm, minHeight: 36 }}>%</button>
-              <button onClick={() => { setMarkupKind('flat'); setResult(null); }} style={markupKind === 'flat' ? { ...S.btnPrimary, ...S.btnSm, minHeight: 36 } : { ...S.btnGhost, ...S.btnSm, minHeight: 36 }}>&#8377;</button>
-              <input type="number" min={0} value={markupVal} onKeyDown={e => numericKeyDown(e)}
-                onChange={e => { setMarkupVal(e.target.value); setResult(null); }}
-                placeholder={markupKind === 'pct' ? 'e.g. 10 = +10% on every price' : 'e.g. 200 = +\u20B9200 on every price'}
-                style={{ ...S.fInput, flex: 1 }} />
-              {markupVal && <button onClick={() => { setMarkupVal(''); setResult(null); }} title="Clear markup" aria-label="Clear markup" style={{ ...S.btnGhost, ...S.btnSm, minHeight: 36 }}>&#215;</button>}
-            </div>
-            <div style={{ fontSize: 10, color: T.tx3, marginTop: 4, lineHeight: 1.5 }}>Leave empty for your own rates. With a markup, GST slabs and totals are re-worked on the marked-up prices.</div>
-          </div>
+        {parsed && parsed.rows.length > 0 && (
+          <MarkupRow noPrice={!parsed.priceCol} kind={markupKind} value={markupVal} mode={mode}
+            onKind={k => { setMarkupKind(k); setResult(null); }}
+            onValue={v => { setMarkupVal(v); setResult(null); }} />
         )}
         <div style={{ marginBottom: 12 }}>
           <label style={S.fLabel}>Bottom Note</label>
