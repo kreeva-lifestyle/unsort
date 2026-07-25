@@ -148,7 +148,7 @@ export default function RateCardGenerator({ addToast, lockedMode, shareToken }: 
         <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickExcel(f); e.target.value = ''; }} />
         {mode === 'manual' && <ManualRateEditor onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} />}
         {mode === 'master' && !lockedMode && <SellerLinkBar addToast={addToast} />}
-        {mode === 'master' && <MasterRateCard onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} shareToken={shareToken} />}
+        {mode === 'master' && <MasterRateCard onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} shareToken={shareToken} onCatalogName={n => { setCatalogName(n); setResult(null); }} />}
         {heroUrl && <img src={heroUrl} alt="Catalog" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: `1px solid ${T.bd}`, marginBottom: 10 }} />}
         {effective && effective.stats && (
           <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10, fontFamily: T.mono }}>
