@@ -14,6 +14,7 @@ import VirtualStock from '../components/minis/VirtualStock';
 import Trackly from '../components/minis/Trackly';
 import ReturnLabels from '../components/minis/ReturnLabels';
 import RateCardGenerator from '../components/minis/ratecard/RateCardGenerator';
+import MasterAssistant from '../components/listingai/assistant/MasterAssistant';
 import DropboxLinkGenerator from '../components/minis/dropboxlinks/DropboxLinkGenerator';
 import ForwardDropbox from '../components/minis/forward/ForwardDropbox';
 
@@ -21,7 +22,7 @@ const SIZE_MAP: Record<number, string> = { 32: 'XXS', 34: 'XS', 36: 'S', 38: 'M'
 
 interface UtsavRow { relid: string; vendorno: string; stock: number; leadtime: number; block: number; designno: string; size: number; catalogname: string; updateddate: string; aryaSku: string }
 
-type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'address' | 'trackly' | 'return_labels' | 'ratecard' | 'dropbox_links' | 'forward_dropbox';
+type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'address' | 'trackly' | 'return_labels' | 'ratecard' | 'dropbox_links' | 'forward_dropbox' | 'master_assistant';
 
 export default function Minis() {
   const { addToast } = useNotifications();
@@ -72,7 +73,7 @@ export default function Minis() {
     if (v !== 'home') window.history.pushState({ miniView: v }, '');
   }, []);
 
-  const viewLabels: Record<MiniView, string | null> = { home: null, cbazaar: 'Cbazaar Import', odette: 'Odette Import', address: 'LabelMaker', utsav: 'Utsav Import', trackly: 'Trackly', return_labels: 'Product QC Labels', ratecard: 'RateCard Studio', dropbox_links: 'Dropbox Link Generator', forward_dropbox: 'Forward → Dropbox' };
+  const viewLabels: Record<MiniView, string | null> = { home: null, cbazaar: 'Cbazaar Import', odette: 'Odette Import', address: 'LabelMaker', utsav: 'Utsav Import', trackly: 'Trackly', return_labels: 'Product QC Labels', ratecard: 'RateCard Studio', dropbox_links: 'Dropbox Link Generator', forward_dropbox: 'Forward → Dropbox', master_assistant: 'Master Assistant' };
   const { set: setBreadcrumb } = useBreadcrumb();
   useEffect(() => {
     setBreadcrumb(viewLabels[view] ? [viewLabels[view]!] : null);
@@ -339,6 +340,13 @@ export default function Minis() {
     </div>
   );
 
+  // MasterAssistant renders its own back button, so no wrapper `back` here.
+  if (view === 'master_assistant') return (
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      <MasterAssistant addToast={addToast} onBack={() => { setViewState('home'); window.history.back(); }} />
+    </div>
+  );
+
   if (view === 'utsav') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
@@ -451,6 +459,7 @@ export default function Minis() {
           { id: 'ratecard' as MiniView, title: 'RateCard Studio', desc: 'Catalog name + photo + rate Excel → shareable glass rate-card image with logo & totals' },
           { id: 'dropbox_links' as MiniView, title: 'Dropbox Link Generator', desc: 'SKU → view-only Dropbox links — whole folder or every image, single or bulk from Excel' },
           { id: 'forward_dropbox' as MiniView, title: 'Forward → Dropbox', desc: 'Snap a document, name it by date, send it to Dropbox — phone only' },
+          { id: 'master_assistant' as MiniView, title: 'Master Assistant', desc: 'Ask about the master sheet — attach a seller sheet to compare live/not-live and what they never uploaded' },
         ].map(t => (
           <div key={t.id} onClick={() => setView(t.id)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'oklch(0.55 0.22 265 / .3)'; e.currentTarget.style.background = 'oklch(0.55 0.22 265 / .04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, marginBottom: 4 }}>{t.title}</div>
