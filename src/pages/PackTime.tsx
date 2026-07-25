@@ -20,6 +20,7 @@ import type {
   PackTimeScanInsert,
   PackTimeShortcut,
 } from '../types/database';
+import { exportName, fileRange, fileDate } from '../lib/exportName';
 
 // In-memory view model for the recent-scans strip. Not a DB row.
 interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; }
@@ -662,7 +663,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     }).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `PackStation_History_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = url; a.download = exportName('PackStation-History', [fileRange(historyDateFrom, historyDateTo)], 'csv'); a.click(); URL.revokeObjectURL(url);
     addToast(`Exported ${allData.length} scan${allData.length !== 1 ? 's' : ''}`, 'success');
   };
 
@@ -1142,7 +1143,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <span style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' }}>Recent Scans</span>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 9, color: T.tx3 }}>{recentScans.length} this session</span>
-            {successScans.length > 0 && <button className="desktop-only" onClick={e => { e.stopPropagation(); const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n'); const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `PackTime_${courier}_CAM${camera}_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url); }} style={{ padding: '4px 10px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Export</button>}
+            {successScans.length > 0 && <button className="desktop-only" onClick={e => { e.stopPropagation(); const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n'); const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = exportName('PackStation-Session', [courier, `CAM${camera}`, fileDate()], 'csv'); a.click(); URL.revokeObjectURL(url); }} style={{ padding: '4px 10px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Export</button>}
           </div>
         </div>
         {sessionListOpen && <div style={{ maxHeight: 280, overflowY: 'auto' }}>
@@ -1197,7 +1198,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               const blob = new Blob([csv], { type: 'text/csv' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
-              a.href = url; a.download = `PackTime_${courier}_CAM${camera}_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.href = url; a.download = exportName('PackStation-Session', [courier, `CAM${camera}`, fileDate()], 'csv');
               a.click(); URL.revokeObjectURL(url);
             }} className="desktop-only" style={{ width: '100%', padding: '7px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 10, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx2, cursor: 'pointer', marginBottom: 10, fontFamily: T.sans }}>Export Session CSV</button>
             <div style={{ display: 'flex', gap: 8 }}>

@@ -17,6 +17,7 @@ import RateCardGenerator from '../components/minis/ratecard/RateCardGenerator';
 import MasterAssistant from '../components/listingai/assistant/MasterAssistant';
 import DropboxLinkGenerator from '../components/minis/dropboxlinks/DropboxLinkGenerator';
 import ForwardDropbox from '../components/minis/forward/ForwardDropbox';
+import { exportName, fileDate } from '../lib/exportName';
 
 const SIZE_MAP: Record<number, string> = { 32: 'XXS', 34: 'XS', 36: 'S', 38: 'M', 40: 'L', 42: 'XL', 44: 'XXL' };
 
@@ -129,7 +130,7 @@ export default function Minis() {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Utsav Export');
-    XLSX.writeFile(wb, `Utsav_Export_${new Date().toISOString().slice(0, 10)}.xls`);
+    XLSX.writeFile(wb, exportName('Utsav-Upload', [fileDate()], 'xls'));
   };
 
   const EDGE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
@@ -251,7 +252,7 @@ export default function Minis() {
       const wb = XLSX.utils.book_new();
       const label = cat === 'stock_out' ? 'StockOut' : cat === 'not_uploaded' ? 'NotUploaded' : 'Export';
       XLSX.utils.book_append_sheet(wb, ws, label);
-      XLSX.writeFile(wb, `Utsav_${label.replace(/\s/g, '')}_${today}.xlsx`);
+      XLSX.writeFile(wb, exportName('Utsav', [label, today], 'xlsx'));
     } else {
       const seen = new Set<string>();
       const squeezed: string[][] = [];
@@ -265,7 +266,7 @@ export default function Minis() {
       const wb = XLSX.utils.book_new();
       const label = cat === 'na' ? 'NA' : cat === 'zero_stock' ? 'InStockBut0' : cat === 'vs_missing' ? 'VirtualStockMissing' : cat === 'duplicate' ? 'Duplicates' : 'Export';
       XLSX.utils.book_append_sheet(wb, ws, label);
-      XLSX.writeFile(wb, `Utsav_${label}_${today}.xlsx`);
+      XLSX.writeFile(wb, exportName('Utsav', [label, today], 'xlsx'));
     }
   };
 

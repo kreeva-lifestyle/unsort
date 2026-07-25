@@ -13,6 +13,7 @@ import type { BrandTag, BrandTagInsert } from '../types/database';
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
 import { T, S } from '../lib/theme';
+import { exportName, fileDate, docTitle } from '../lib/exportName';
 
 const btnGhost: React.CSSProperties = S.btnGhost;
 const btnSm: React.CSSProperties = { ...S.btnGhost, ...S.btnSm };
@@ -149,6 +150,7 @@ const buildLabelsHtml = (labels: BrandTagRow[]): string => {
 </div>`;
   }).join('');
   return `<!DOCTYPE html><html><head>
+<title>${esc(docTitle('Brand-Tags', labels.length === 1 ? labels[0].sku : `${labels.length}-labels`, fileDate()))}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000}
@@ -365,7 +367,7 @@ export default function BrandTagPrinter() {
           const ws = XLSX.utils.json_to_sheet(errorRows as any[]);
           const wb = XLSX.utils.book_new();
           XLSX.utils.book_append_sheet(wb, ws, 'Import Errors');
-          XLSX.writeFile(wb, `brand_tags_import_errors_${new Date().toISOString().slice(0, 10)}.xlsx`);
+          XLSX.writeFile(wb, exportName('Brand-Tags-Import-Errors', [fileDate()], 'xlsx'));
           addToast(`Import rejected — ${errors.length} row(s) missing data. Error report downloaded.`, 'error');
           return;
         }
@@ -433,7 +435,7 @@ export default function BrandTagPrinter() {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Brand Tags');
-    XLSX.writeFile(wb, 'brand_tags_export.xlsx');
+    XLSX.writeFile(wb, exportName('Brand-Tags', [fileDate()], 'xlsx'));
     addToast(`Exported ${rows.length} brand tag${rows.length !== 1 ? 's' : ''}`, 'success');
   }, [rows, addToast]);
 
@@ -678,7 +680,7 @@ export default function BrandTagPrinter() {
                   const ws = XLSX.utils.json_to_sheet(exportData);
                   const wb = XLSX.utils.book_new();
                   XLSX.utils.book_append_sheet(wb, ws, 'Order Preview');
-                  XLSX.writeFile(wb, 'order-preview.xlsx');
+                  XLSX.writeFile(wb, exportName('Brand-Tags-Order', [orderRows?.[0]?.marketplace, fileDate()], 'xlsx'));
                 }}>Export</button>
                 <button onClick={() => setOrderRows(null)} style={S.btnIcon} aria-label="Close">✕</button>
               </div>

@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../../lib/theme';
+import { exportName, fileDate } from '../../lib/exportName';
 
 const CBAZAAR_SIZE_MAP: Record<string, string> = {
   'XS (Extra small)': 'XS', 'S (Small)': 'S', 'M (Medium)': 'M',
@@ -68,7 +69,7 @@ export default function CbazaarImport({ addToast }: { addToast: (msg: string, ty
     const blob = new Blob([header + '\n' + csvRows.join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `Cbazaar_Export_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = exportName('Cbazaar-Upload', [fileDate()], 'csv');
     a.click();
   };
 

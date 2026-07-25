@@ -4,6 +4,7 @@
 import { T, S } from '../../lib/theme';
 import DateInput from '../ui/DateInput';
 import type { CashChallan } from '../../types/database';
+import { exportName, fileDate } from '../../lib/exportName';
 
 type Challan = Omit<CashChallan, 'created_at' | 'updated_at'> & { created_at: string; updated_at: string };
 
@@ -162,7 +163,7 @@ export default function ChallanLedger({
             const esc = (v: string) => { const s = v || ''; const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s; return `"${safe.replace(/"/g, '""')}"`; };
             const csv = 'Customer,Billed,Paid,Outstanding,Challans\n' + due.map(c => `${esc(c.name)},${c.total},${c.paid},${c.outstanding},${c.count}`).join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Outstanding_Customers_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = exportName('Outstanding-Customers', [fileDate()], 'csv'); a.click(); URL.revokeObjectURL(a.href);
           }} style={{ width: '100%', marginTop: 10, padding: '7px', borderRadius: 6, border: '1px solid oklch(0.63 0.22 25 / .2)', background: 'oklch(0.63 0.22 25 / .04)', color: T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Export Outstanding ({dueCount})</button>
         )}
       </div>

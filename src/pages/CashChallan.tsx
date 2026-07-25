@@ -33,6 +33,7 @@ const ccAuditLog = async (action: string, recordId: string, details: string, cha
 };
 
 import { T, S, CHALLAN_STATUS_COLORS as STATUS_COLORS } from '../lib/theme';
+import { exportName, docTitle, fileRange } from '../lib/exportName';
 
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
 // Strip the country code only when it IS a country code (>10 digits) — a
@@ -926,7 +927,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         <td><span style="padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;background:${c.status === 'paid' ? '#d4edda' : c.status === 'partial' ? '#fff3cd' : '#f8d7da'};color:${c.status === 'paid' ? '#155724' : c.status === 'partial' ? '#856404' : '#721c24'}">${escHtml(c.status)}</span></td>
       </tr>`;
     }).join('');
-    const html = `<!DOCTYPE html><html><head><title>Ledger - ${safeName}</title>
+    const html = `<!DOCTYPE html><html><head><title>${escHtml(docTitle('Ledger', customerName))}</title>
       <style>
         body{font-family:'Inter',sans-serif;padding:24px;color:#1a202c;font-size:12px;margin:0}
         h2{margin:0 0 4px;font-size:18px} .sub{color:#718096;font-size:11px;margin-bottom:16px}
@@ -1057,7 +1058,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       </section>
     `;
 
-    const htmlContent = `<!doctype html><html><head><meta charset="utf-8"><title>${escHtml(docType)} #${escHtml(c.challan_number)}</title>
+    const htmlContent = `<!doctype html><html><head><meta charset="utf-8"><title>${escHtml(docTitle(docType, c.challan_number, c.customer_name))}</title>
       <style>
         @page { size: A4; margin: 8mm; }
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #222; }
@@ -1121,7 +1122,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     }
     const csv = header + '\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `CashChallans_${dateFrom || 'all'}_${dateTo || 'all'}_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = exportName('Challans', [fileRange(dateFrom, dateTo)], 'csv'); a.click(); URL.revokeObjectURL(a.href);
     addToast('Exported successfully', 'success');
   };
 

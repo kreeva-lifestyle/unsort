@@ -4,6 +4,7 @@
 import * as XLSX from 'xlsx';
 import { call, explainGen, GenLink } from './api';
 import { friendlyError } from '../../../lib/friendlyError';
+import { exportName, fileDate } from '../../../lib/exportName';
 
 export interface BulkRow { sku: string; status: 'pending' | 'ok' | 'error'; message?: string; links: GenLink[] }
 export const BULK_CAP = 300;
@@ -57,5 +58,5 @@ export function exportBulkXlsx(bulk: BulkRow[]): void {
   const rows = bulk.map(r => [r.sku, r.status === 'ok' ? 'OK' : (r.message || 'Failed'), ...r.links.map(l => l.url)]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...rows]), 'Dropbox Links');
-  XLSX.writeFile(wb, `Dropbox_Links_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(wb, exportName('Dropbox-Links', [fileDate()], 'xlsx'));
 }

@@ -4,6 +4,7 @@
 // shareable document image without any PDF dependency.
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
+import { exportName } from '../../lib/exportName';
 
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = (d: string | null | undefined) => d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -147,7 +148,7 @@ export async function sharePoImage(po: PurchaseOrder, items: PurchaseOrderItem[]
   let blob: Blob;
   try { blob = await renderPoImage(po, items); }
   catch { addToast('Could not build the PO image', 'error'); return; }
-  const file = new File([blob], `PO-${po.po_number}.png`, { type: 'image/png' });
+  const file = new File([blob], exportName('PO', [po.po_number, po.vendor_name], 'png'), { type: 'image/png' });
   const nav = navigator as Navigator & { canShare?: (d: unknown) => boolean };
   if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
     try { await nav.share({ files: [file], title: `Purchase Order #${po.po_number}`, text: `Purchase Order #${po.po_number} — ${po.vendor_name}` }); }

@@ -3,6 +3,7 @@
 // as CSV so a "not uploaded" list can go straight to the seller.
 import { useState } from 'react';
 import { T, S } from '../../../lib/theme';
+import { exportName, fileDate } from '../../../lib/exportName';
 
 export interface AssistantTable { title: string; columns: string[]; rows: string[][] }
 
@@ -16,7 +17,7 @@ export default function AssistantTables({ tables }: { tables: AssistantTable[] }
     const csv = [t.columns.map(csvCell).join(','), ...t.rows.map(r => r.map(csvCell).join(','))].join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     const a = document.createElement('a');
-    a.href = url; a.download = `${t.title.replace(/[^\w-]+/g, '_').slice(0, 60)}.csv`; a.click();
+    a.href = url; a.download = exportName('Master-Assistant', [t.title, fileDate()], 'csv'); a.click();
     URL.revokeObjectURL(url);
   };
 

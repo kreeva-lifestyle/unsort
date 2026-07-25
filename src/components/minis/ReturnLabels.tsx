@@ -5,6 +5,7 @@ import { printOrQueue } from '../../lib/printQueue';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import Empty from '../ui/Empty';
+import { docTitle, fileDate } from '../../lib/exportName';
 
 interface Label { id: string; label_text: string; label_type: string; qc_person: string | null; created_at: string }
 
@@ -59,7 +60,10 @@ const buildPrintHtml = (items: { text: string; type: LabelType; qcPerson: string
         : buildReturnLabel(it.text, date, time)
     )
   );
-  return `<!DOCTYPE html><html><head><style>
+  const kind = items.every(i => i.type === 'qc_assured') ? 'QC-Assured-Labels' : items.every(i => i.type !== 'qc_assured') ? 'Return-Labels' : 'Labels';
+  return `<!DOCTYPE html><html><head>
+<title>${docTitle(kind, items.length === 1 ? items[0].text : `${labels.length}-labels`, fileDate())}</title>
+<style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000}
 .label{width:1.97in;height:2.97in;display:flex;overflow:hidden;page-break-after:always}

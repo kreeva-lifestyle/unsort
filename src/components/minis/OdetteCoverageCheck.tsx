@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { T, S } from '../../lib/theme';
 import { SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
+import { exportName, fileDate } from '../../lib/exportName';
 
 const ODETTE_EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
 
@@ -58,7 +59,7 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
     const ws = XLSX.utils.json_to_sheet(result.missing, { header: result.columns });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Missing from Odette');
-    XLSX.writeFile(wb, `Odette_Missing_${new Date().toISOString().slice(0, 10)}.xls`);
+    XLSX.writeFile(wb, exportName('Odette-Missing-Sizes', [fileDate()], 'xls'));
   };
 
   const q = search.toLowerCase();

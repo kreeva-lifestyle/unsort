@@ -11,6 +11,7 @@ import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { useAuth } from '../../hooks/useAuth';
 import ConnectDropboxCard from './ConnectDropboxCard';
+import { exportName, fileDate } from '../../lib/exportName';
 
 const FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
 
@@ -125,7 +126,7 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
     const rows = problems.map(p => ({ SKU: p.sku, 'Source Tab': p.tab, 'Sheet Row': p.row, Status: p.problem, 'Matched Folder': p.folder || '', Link: p.url || '' }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Broken Links');
-    XLSX.writeFile(wb, `Broken_Image_Links_${new Date().toISOString().slice(0, 10)}.xls`);
+    XLSX.writeFile(wb, exportName('Broken-Image-Links', [fileDate()], 'xls'));
   };
 
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;

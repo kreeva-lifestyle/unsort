@@ -12,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { AttEmployee, AttEntry, AttPenalty, AttSalaryPayment, MonthlySalary, computeMonthlySalary, minutesToHM, monthFirstDay } from '../../lib/attendance';
 import { payslipBody, combinedSummary, wrapPdf, inr } from './payslip';
 import SalaryPaymentFlow from './SalaryPaymentFlow';
+import { docTitle } from '../../lib/exportName';
 
 export default function AttendanceSalary({ employees, entries, penalties, savedSalaries, payments, month, onChanged, addToast }: {
   employees: AttEmployee[]; entries: AttEntry[]; penalties: AttPenalty[];
@@ -99,8 +100,8 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
 
   // ── PDF (builders in payslip.ts) ───────────────────────────────────────────
   const slip = (s: MonthlySalary) => payslipBody(s, employees.find(e => e.id === s.employeeId), pensByEmp.get(s.employeeId) || [], monthLabel);
-  const exportSingle = (s: MonthlySalary) => setPdfHtml(wrapPdf(slip(s), `Salary — ${s.name}`));
-  const exportCombined = () => setPdfHtml(wrapPdf(combinedSummary(shown, monthLabel, totalFinal) + shown.map(slip).join(''), `Salary Summary — ${monthLabel}`));
+  const exportSingle = (s: MonthlySalary) => setPdfHtml(wrapPdf(slip(s), docTitle('Payslip', s.name, monthLabel)));
+  const exportCombined = () => setPdfHtml(wrapPdf(combinedSummary(shown, monthLabel, totalFinal) + shown.map(slip).join(''), docTitle('Salary-Summary', monthLabel)));
 
   return (
     <div>

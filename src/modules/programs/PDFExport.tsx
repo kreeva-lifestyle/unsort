@@ -7,6 +7,7 @@ import { toDirectImageUrl } from './lib/image-url-converters';
 import { getShareUrl } from './lib/share-token';
 import type { Program, ProgramMatching, ProgramPricePart } from './types';
 import type { TranslationKey } from './i18n/en';
+import { docTitle } from '../../lib/exportName';
 
 interface Props {
   programId: string;
@@ -66,7 +67,7 @@ async function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: 
   const showNum = (v: number | null, decimals = 2) => { const x = n(v); return x ? x.toFixed(decimals) : '—'; };
   const showRupee = (v: number | null) => { const x = n(v); return x ? '₹' + x.toFixed(2) : '—'; };
 
-  html = `<!doctype html><html><head><meta charset="utf-8"><title>${L.programReport} ${esc(p.program_uid)}</title>
+  html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(docTitle(L.programReport, p.program_uid))}</title>
     <style>
       @page { size: A4; margin: 12mm; }
       body { font-family: Arial, sans-serif; color: #222; margin: 0; padding: 0; font-size: 11px; }
