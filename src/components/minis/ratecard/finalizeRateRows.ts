@@ -20,10 +20,10 @@ export interface FinalizedSheet {
 // Indian GST slabs for clothing (owner's rule): ≤ ₹2500 → 5%, above → 18%
 const GST_BOUNDARY = 2500, GST_HIGH = 18, GST_LOW = 5;
 
-// Owner's rule: a rate card holds at most 25 designs. Enforced here (the one
+// Owner's rule: a rate card holds at most 50 designs. Enforced here (the one
 // pass every build mode goes through) so import, manual and From-Master all
 // obey the same limit.
-export const MAX_CARD_ROWS = 25;
+export const MAX_CARD_ROWS = 50;
 
 // "3000/- (FLAT) +12%(GST) +SHIPPING." -> 3000 (first number in the cell).
 export const priceNumber = (cell: string): number | null => {

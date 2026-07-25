@@ -1,4 +1,7 @@
-// listing-ai Edge Function - AI Listing Module backend (v34).
+// listing-ai Edge Function - AI Listing Module backend (v35).
+//
+// v35: RATECARD_CAP raised 25 -> 50 (owner's rule change); the client's
+// MAX_CARD_ROWS moves with it.
 //
 // v34: catalogs for RateCard Studio. New `ratecard_catalogs` action lists the
 // master sheet's distinct catalog names (with design counts) so a seller can
@@ -256,8 +259,9 @@ const SKU_CAP = 5;
 // validate covers a whole run in ONE call (no AI, master read is cached).
 const VALIDATE_CAP = 60;
 // ratecard_rows serves the Rate Card builder - owner's rule: a rate card
-// holds at most 25 designs, so there is nothing to look up beyond that.
-const RATECARD_CAP = 25;
+// holds at most 50 designs, so there is nothing to look up beyond that.
+// Keep in sync with MAX_CARD_ROWS in src/components/minis/ratecard/finalizeRateRows.ts.
+const RATECARD_CAP = 50;
 
 interface Usage { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
 
