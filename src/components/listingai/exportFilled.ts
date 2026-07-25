@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import { injectCells, resolveSheetPart, type CellWrite } from './xlsxInject';
 import type { GenRow } from './api';
 import type { ListingTemplate } from '../../types/database';
+import { exportName, fileDate } from '../../lib/exportName';
 
 type TplRef = Pick<ListingTemplate, 'id' | 'name' | 'file_name' | 'sheet_name' | 'header_row'>;
 
@@ -61,7 +62,7 @@ export async function exportFilledXlsx(headers: string[], rows: GenRow[], tpl: T
               const out = zipSync(files, { level: 6 });
               const url = URL.createObjectURL(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
               const a = document.createElement('a');
-              a.href = url; a.download = tpl.file_name!; a.click();
+              a.href = url; a.download = exportName('Listings', [tpl.name, fileDate()], (tpl.file_name!.split('.').pop() || 'xlsx')); a.click();
               setTimeout(() => URL.revokeObjectURL(url), 1000);
               return { formatted: true, matched, total: headers.length, hadTemplate };
             }
@@ -72,7 +73,6 @@ export async function exportFilledXlsx(headers: string[], rows: GenRow[], tpl: T
   }
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...values]), 'Listings');
-  const safe = (tpl.name || 'Listings').replace(/[^\w-]+/g, '_').slice(0, 40) || 'Listings';
-  XLSX.writeFile(wb, `${safe}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(wb, exportName('Listings', [tpl.name, fileDate()], 'xlsx'));
   return { formatted: false, matched: 0, total: headers.length, hadTemplate };
 }

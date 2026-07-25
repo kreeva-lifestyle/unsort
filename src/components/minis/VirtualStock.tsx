@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
+import { exportName, fileDate } from '../../lib/exportName';
 
 const STOCK_LIMIT = 1000;
 
@@ -85,7 +86,7 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `virtual-stock-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = exportName('Virtual-Stock', [fileDate()], 'csv');
     a.click();
     URL.revokeObjectURL(a.href);
     addToast(`Exported ${rows.length} SKUs`, 'success');

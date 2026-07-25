@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { T, S } from '../../lib/theme';
 import { SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
+import { exportName, fileDate } from '../../lib/exportName';
 
 const ODETTE_EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/odette-export';
 const SHEET_NAME = 'ARYA STOCK';
@@ -167,7 +168,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Odette Export');
-    XLSX.writeFile(wb, `Odette_Export_${new Date().toISOString().slice(0, 10)}.xls`);
+    XLSX.writeFile(wb, exportName('Odette-Stock', [fileDate()], 'xls'));
   };
 
   const filtered = results.filter(r => {
@@ -230,7 +231,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         {/* Filter export */}
         {filter !== 'all' && <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
           <span style={{ fontSize: 11, color: T.tx2 }}>Showing: <b style={{ color: flagColor(filter) }}>{flagLabel(filter) || 'In Stock'}</b> ({filtered.length})</span>
-          <div onClick={() => { if (filtered.length === 0) { addToast('Nothing to export in this filter', 'error'); return; } const data = filtered.map(r => ({ SKU: r.sku, Quantity: r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? 'Not Found' : r.total })); const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Filtered'); XLSX.writeFile(wb, `Odette_${filter}_${new Date().toISOString().slice(0, 10)}.xls`); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Export {filtered.length}</div>
+          <div onClick={() => { if (filtered.length === 0) { addToast('Nothing to export in this filter', 'error'); return; } const data = filtered.map(r => ({ SKU: r.sku, Quantity: r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? 'Not Found' : r.total })); const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Filtered'); XLSX.writeFile(wb, exportName('Odette', [flagLabel(filter), fileDate()], 'xls')); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Export {filtered.length}</div>
           <div onClick={() => setFilter('all')} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx3, border: `1px solid ${T.bd}`, borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Clear</div>
         </div>}
 

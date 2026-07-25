@@ -26,6 +26,7 @@ import type {
   CashChallan,
   Profile,
 } from '../types/database';
+import { exportName, docTitle, fileRange } from '../lib/exportName';
 
 const CATEGORIES = ['Office Supplies', 'Rent', 'Salaries', 'Travel', 'Utilities', 'Food', 'Transport', 'Misc', 'Others'];
 
@@ -409,7 +410,7 @@ export default function CashBook() {
   const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
   const printHandoverReceipt = async (h: Handover) => {
     const b = h.breakdown;
-    let html = `<html><head><meta charset="utf-8"><title>Cash Handover Receipt</title><style>
+    let html = `<html><head><meta charset="utf-8"><title>${docTitle('Cash-Handover', formatHandoverNo(h.handover_number), h.date)}</title><style>
       body{font-family:Arial,sans-serif;padding:24px;max-width:600px;margin:auto;color:#222}
       h2{margin:0;text-align:center}
       .header{text-align:center;margin-bottom:20px;border-bottom:2px solid #333;padding-bottom:14px}
@@ -666,7 +667,7 @@ export default function CashBook() {
     }
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `CashBook_${label}_${fromDate}_to_${toDate}.csv`; a.click(); URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = url; a.download = exportName('CashBook', [label, fileRange(fromDate, toDate)], 'csv'); a.click(); URL.revokeObjectURL(url);
     addToast(`Exported ${rowsForTab.length} ${label.toLowerCase()}`, 'success');
   };
 

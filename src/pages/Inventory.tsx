@@ -47,6 +47,7 @@ const canAlterSize = (a: string, b: string): boolean => {
   return Math.abs(ai - bi) === 1;
 };
 import { isDupatta, isLehenga, isBottomType, mfrFromSku } from '../lib/garmentHelpers';
+import { exportName, docTitle, fileDate } from '../lib/exportName';
 
 export default function Inventory({ openItemId, onItemOpened, active }: { openItemId?: string | null; onItemOpened?: () => void; active?: boolean }) {
   const [stage, setStage] = useState<'pending' | 'completed'>('pending');
@@ -474,7 +475,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     if (filtered.length === 0) return;
     const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
     const rows = filtered.map(i => { const m = (itemMissing[i.id] || []).join(', '); const d = (itemDamaged[i.id] || []).join(', '); const issues = [m ? `Missing: ${m}` : '', d ? `Damaged: ${d}` : ''].filter(Boolean).join(' | '); return `<tr><td>${esc(i.serial_number || '—')}</td><td>${esc(i.products?.name || '—')}</td><td>${esc(i.size || '—')}</td><td>${esc(i.location || '—')}</td><td>${esc(i.manufacturer || '—')}</td><td style="text-transform:capitalize">${esc(i.status === 'dry_clean' ? 'Dry Clean' : i.status)}</td><td style="font-size:9px;color:${m ? '#F59E0B' : d ? '#EF4444' : '#4A5568'}">${esc(issues || '—')}</td></tr>`; }).join('');
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inventory Report</title><style>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${docTitle('Inventory', isCompletedView ? 'Completed' : 'Active', fileDate())}</title><style>
       *{margin:0;padding:0;box-sizing:border-box}
       body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#060810;color:#E2E8F0;padding:16px;padding-bottom:80px;-webkit-text-size-adjust:100%}
       .header{margin-bottom:16px}
@@ -507,7 +508,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const printBarcode = async (uniqueId: string) => {
     const canvas = document.createElement('canvas');
     try { JsBarcode(canvas, uniqueId, { format: 'CODE128', width: 2, height: 60, displayValue: true, fontSize: 14, font: 'IBM Plex Mono', margin: 10 }); } catch { return; }
-    const html = `<html><head><title>${uniqueId}</title><style>body{font-family:'IBM Plex Sans',sans-serif;text-align:center;padding:20px}@media print{@page{margin:10mm}}</style></head><body><img src="${canvas.toDataURL()}" /></body></html>`;
+    const html = `<html><head><title>${docTitle('Barcode', uniqueId)}</title><style>body{font-family:'IBM Plex Sans',sans-serif;text-align:center;padding:20px}@media print{@page{margin:10mm}}</style></head><body><img src="${canvas.toDataURL()}" /></body></html>`;
     await printOrQueue('label_small', html, { width: 1.97, height: 2.97 }, `Barcode ${uniqueId}`, undefined, addToast);
   };
   const openComps = async (item: any) => {
@@ -753,7 +754,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
                 if (filtered.length === 0) { addToast('Nothing to export — no items match the current filters', 'error'); setShowExportMenu(false); return; }
                 const csv = 'Batch,SKU,Category,Size,Status,Location,Missing,Damaged\n' + filtered.map(i => `${i.batch_number || ''},${i.serial_number || ''},"${i.products?.name || ''}",${i.size || ''},${i.status},${i.location || ''},"${(itemMissing[i.id] || []).join('; ')}","${(itemDamaged[i.id] || []).join('; ')}"`).join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
-                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Inventory_${stage}_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = exportName('Inventory', [stage, fileDate()], 'csv'); a.click(); URL.revokeObjectURL(a.href);
                 setShowExportMenu(false);
               }} style={{ padding: '12px 14px', fontSize: 12, color: T.tx, cursor: 'pointer', borderTop: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, background: 'transparent', border: 'none', borderTopStyle: 'solid' as const, width: '100%', fontFamily: T.sans }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                 <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.gr, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>

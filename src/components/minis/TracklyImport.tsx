@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { T } from '../../lib/theme';
 import { SUPABASE_ANON_KEY } from '../../lib/supabase';
+import { exportName, fileDate } from '../../lib/exportName';
 
 const EDGE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
 
@@ -13,7 +14,7 @@ function autoDownload(results: { input: string; status: string }[]) {
   const blob = new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `stock-status-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = exportName('Stock-Status', [fileDate()], 'csv');
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

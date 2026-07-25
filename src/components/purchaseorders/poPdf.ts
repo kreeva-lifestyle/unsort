@@ -3,6 +3,7 @@
 // prevent HTML injection from vendor names / item names / notes.
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
+import { docTitle } from '../../lib/exportName';
 
 const escHtml = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -32,7 +33,7 @@ export function buildPoPdf(po: PurchaseOrder, items: PurchaseOrderItem[]): strin
   ].filter(Boolean).join('');
 
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Purchase Order #${escHtml(po.po_number)}</title>
+<title>${escHtml(docTitle('Purchase-Order', po.po_number, po.vendor_name))}</title>
 <style>
   *{box-sizing:border-box}
   body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#1a1a1a;margin:0;padding:24px;font-size:12px;background:#fff}

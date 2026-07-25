@@ -2,13 +2,14 @@
 // Extracted from RateCardGenerator for the file budget.
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
+import { exportName, fileDate } from '../../../lib/exportName';
 
 export default function RateCardActions({ result, catalogName, addToast }: {
   result: { url: string; blob: Blob };
   catalogName: string;
   addToast: (m: string, t?: string) => void;
 }) {
-  const fileName = () => `RateCard-${catalogName.trim().replace(/[^\w-]+/g, '_') || 'catalog'}.jpg`;
+  const fileName = () => exportName('Rate-Card', [catalogName.trim() || 'Catalog', fileDate()], 'jpg');
 
   const download = () => {
     const a = document.createElement('a');

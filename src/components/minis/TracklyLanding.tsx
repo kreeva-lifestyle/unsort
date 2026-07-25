@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { T } from '../../lib/theme';
 import { SUPABASE_ANON_KEY } from '../../lib/supabase';
+import { exportName, fileDate } from '../../lib/exportName';
 
 const EDGE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
 
@@ -124,7 +125,7 @@ export default function TracklyLanding({ longUrl, onImport }: Props) {
         if (s.values?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.values), String(s.tab).slice(0, 31));
       }
       if (wb.SheetNames.length === 0) throw new Error('Sheet is empty');
-      XLSX.writeFile(wb, `arya-stock-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      XLSX.writeFile(wb, exportName('Stock-Sheet', [fileDate()], 'xlsx'));
     } catch {
       setDownloadError('Download failed — please try again, or use Self Import.');
     }
