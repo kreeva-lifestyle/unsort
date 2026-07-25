@@ -19,7 +19,12 @@ const GST_BOUNDARY = 2500; // display formatting only — finalize re-checks the
 // Build the FinalizedSheet from fetched rows + chosen columns. Bare-number
 // prices are formatted to the card's standard "<n>/- +<slab>%(GST)" form;
 // cells already carrying GST text keep it (finalize autocorrects a wrong %).
-export const buildMasterSheet = (rows: MasterRow[], chosen: string[]): FinalizedSheet => {
+export const buildMasterSheet = (rows: MasterRow[], chosenRaw: string[]): FinalizedSheet => {
+  // A column with no value for ANY fetched SKU would render as a full column
+  // of "—" and waste card width, so it never reaches the card. (Partly-filled
+  // columns DO stay — those gaps are reported as smart-check notes instead.)
+  const chosen = chosenRaw.filter(c => rows.some(r => (r.values[c] || '').trim()));
+  const dropped = chosenRaw.filter(c => !chosen.includes(c));
   const columns = ['SKU', ...chosen];
   const priceCol = chosen.find(c => isPriceHeader(c)) || null;
   const objRows = rows.map(r => {
@@ -37,7 +42,9 @@ export const buildMasterSheet = (rows: MasterRow[], chosen: string[]): Finalized
     }
     return row;
   });
-  return finalizeRateRows(objRows, columns, 'SKU', priceCol);
+  const sheet = finalizeRateRows(objRows, columns, 'SKU', priceCol);
+  if (dropped.length) sheet.warnings.push(`Left off the card (no data in the master for these SKUs): ${dropped.join(', ')}`);
+  return sheet;
 };
 
 // One card = one category: every DETECTED category must equal the majority
@@ -53,14 +60,16 @@ export const categoryGroups = (rows: MasterRow[]): { label: string; skus: string
   return [...by.values()].sort((a, b) => b.skus.length - a.skus.length);
 };
 
-export default function MasterRateCard({ onSheet, addToast }: {
+export default function MasterRateCard({ onSheet, addToast, shareToken }: {
   onSheet: (s: FinalizedSheet | null) => void;
   addToast: (m: string, t?: string) => void;
+  shareToken?: string; // seller link: authorises the master read server-side
 }) {
   const [skuText, setSkuText] = useState('');
   const [busy, setBusy] = useState(false);
   const [fetched, setFetched] = useState<{ columns: string[]; colCounts: Record<string, number>; rows: MasterRow[] } | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
+  const [showEmpty, setShowEmpty] = useState(false);
 
   const found = fetched?.rows.filter(r => r.found) ?? [];
   const missing = fetched?.rows.filter(r => !r.found).map(r => r.sku) ?? [];
@@ -68,7 +77,13 @@ export default function MasterRateCard({ onSheet, addToast }: {
   const mixed = groups.length > 1;
   // SKU-alias master columns are redundant on the picker — the card always
   // gets its SKU column from the typed list.
-  const pickable = (fetched?.columns ?? []).filter(c => !SKU_ALIASES.includes(norm(c)));
+  const allPickable = (fetched?.columns ?? []).filter(c => !SKU_ALIASES.includes(norm(c)));
+  // Columns with NO value for any fetched SKU are hidden - they would only add
+  // a column of dashes. They stay reachable behind "+ N empty" so a column can
+  // never silently disappear (the DRS199 lesson).
+  const hasData = (c: string) => (fetched?.colCounts?.[c] ?? 0) > 0;
+  const pickable = allPickable.filter(hasData);
+  const emptyCols = allPickable.filter(c => !hasData(c));
 
   const emit = (rows: MasterRow[], cols: string[], isMixed: boolean) => {
     if (isMixed || !rows.length) { onSheet(null); return; }
@@ -92,7 +107,7 @@ export default function MasterRateCard({ onSheet, addToast }: {
     if (skus.length > MAX_CARD_ROWS) { addToast(`A rate card holds at most ${MAX_CARD_ROWS} SKUs — capped to the first ${MAX_CARD_ROWS} (of ${skus.length}); split the rest into a second card`, 'error'); skus = skus.slice(0, MAX_CARD_ROWS); }
     setBusy(true);
     try {
-      const { status, data } = await call({ action: 'ratecard_rows', skus });
+      const { status, data } = await call({ action: 'ratecard_rows', skus, ...(shareToken ? { shareToken } : {}) });
       if (!data?.ok) throw new Error(String(data?.details || data?.error || `Fetch failed (${status})`));
       const rows = (data.rows || []) as MasterRow[];
       const columns = (data.columns || []) as string[];
@@ -102,7 +117,7 @@ export default function MasterRateCard({ onSheet, addToast }: {
       let picks: string[] = [];
       try { const saved = JSON.parse(localStorage.getItem(COLS_KEY) || '[]') as string[]; picks = columns.filter(c => saved.includes(c)); } catch { picks = []; }
       if (!picks.length) { const p = columns.find(c => isPriceHeader(c)); picks = p ? [p] : []; }
-      picks = picks.filter(c => !SKU_ALIASES.includes(norm(c)));
+      picks = picks.filter(c => !SKU_ALIASES.includes(norm(c)) && (colCounts[c] ?? 0) > 0);
       setFetched({ columns, colCounts, rows });
       setChosen(picks);
       emit(okRows, picks, categoryGroups(okRows).length > 1);
@@ -158,7 +173,18 @@ export default function MasterRateCard({ onSheet, addToast }: {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {chip('SKU', true, true)}
             {pickable.map(c => chip(c, chosen.includes(c), false))}
+            {emptyCols.length > 0 && !showEmpty && (
+              <button onClick={() => setShowEmpty(true)}
+                title={`No data in the master for these SKUs: ${emptyCols.join(', ')}`}
+                style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', minHeight: 32, background: 'transparent', border: `1px dashed ${T.bd2}`, color: T.tx3 }}>
+                + {emptyCols.length} empty
+              </button>
+            )}
+            {showEmpty && emptyCols.map(c => chip(c, chosen.includes(c), false))}
           </div>
+          {showEmpty && emptyCols.length > 0 && (
+            <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>Greyed columns have no data in the master for these SKUs — picking one leaves it off the card.</div>
+          )}
         </div>
       )}
     </div>

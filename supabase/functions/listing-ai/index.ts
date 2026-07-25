@@ -1,4 +1,12 @@
-// listing-ai Edge Function - AI Listing Module backend (v32).
+// listing-ai Edge Function - AI Listing Module backend (v33).
+//
+// v33: `ratecard_rows` accepts a SHARE TOKEN as an alternative to a signed-in
+// admin/manager, so sellers can build their own rate cards from a public link
+// (RateCard Studio "From Master" only). The token is looked up with the
+// service role in ratecard_share (is_active), never trusted from the client,
+// and is rotatable - deactivating a row instantly kills every copy of that
+// URL. Token callers also pass a per-IP rate limit (60/min) because the route
+// is unauthenticated; the signed-in path is unchanged and unlimited.
 //
 // v32: fuzzy SKU intelligence for the Master Assistant. Sellers mangle SKUs
 // when uploading - size-suffixed variants (DRS141-S / DRS141XS fold to
@@ -952,6 +960,39 @@ function rowTextOf(m: SkuIndexRow): string {
     .join('\n');
 }
 
+// ---- public seller link (RateCard Studio, v33) -----------------------------
+// The seller link is unauthenticated, so it gets a per-IP budget. In-memory
+// per isolate (same approach as short-track): not a global guarantee, but it
+// blunts scripted enumeration without touching the signed-in path.
+const RC_RATE_MAX = 60, RC_RATE_WINDOW_MS = 60_000;
+const rcHits = new Map<string, { n: number; resetAt: number }>();
+function rcRateLimited(req: Request): boolean {
+  const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim()
+    || req.headers.get('cf-connecting-ip') || 'unknown';
+  const now = Date.now();
+  const b = rcHits.get(ip);
+  if (!b || now > b.resetAt) { rcHits.set(ip, { n: 1, resetAt: now + RC_RATE_WINDOW_MS }); }
+  else if (++b.n > RC_RATE_MAX) return true;
+  if (rcHits.size > 5000) for (const [k, v] of rcHits) if (now > v.resetAt) rcHits.delete(k);
+  return false;
+}
+// Valid = present in ratecard_share AND is_active. Read with the service role;
+// the table has no anon policy, so the token can only be checked here.
+async function shareTokenOk(token: string): Promise<string | null> {
+  if (!/^[a-f0-9]{32}$/.test(token)) return null;
+  const r = await fetch(`${SB_URL}/rest/v1/ratecard_share?token=eq.${encodeURIComponent(token)}&is_active=is.true&select=id`, { headers: svcHeaders });
+  if (!r.ok) return null;
+  const rows = await r.json().catch(() => []);
+  return rows?.[0]?.id ?? null;
+}
+// Usage stamp - best effort, never blocks or fails the response.
+function stampShareUse(id: string): void {
+  fetch(`${SB_URL}/rest/v1/rpc/bump_ratecard_share_use`, {
+    method: 'POST', headers: { ...svcHeaders, 'content-type': 'application/json' },
+    body: JSON.stringify({ p_id: id }),
+  }).catch(() => { /* usage stats are not worth an error */ });
+}
+
 // ---- fuzzy SKU matching (Master Assistant, v32) ----------------------------
 // The aggressive normalizer (same family as short-track's): uppercase and
 // delete every separator, so DRS-141 and DRS141 collapse.
@@ -1162,8 +1203,18 @@ Deno.serve(async (req) => {
     // SKUs (feeds the column picker). Free - cached master read, zero AI.
     // Category consistency is enforced client-side from the per-row ids.
     if (action === 'ratecard_rows') {
-      const role = await callerRole(req);
-      if (!role || !['admin', 'manager'].includes(role)) return fail(403, 'Only admin or manager can read the master sheet', req);
+      // Two ways in: the owner's signed-in admin/manager session, or a valid
+      // seller share token (public link). Nothing else.
+      const shareToken = String(body?.shareToken || '').trim();
+      if (shareToken) {
+        if (rcRateLimited(req)) return fail(429, 'Too many requests - wait a minute and try again', req);
+        const shareId = await shareTokenOk(shareToken);
+        if (!shareId) return fail(403, 'This link is no longer active - ask Arya Designs for the current link', req);
+        stampShareUse(shareId);
+      } else {
+        const role = await callerRole(req);
+        if (!role || !['admin', 'manager'].includes(role)) return fail(403, 'Only admin or manager can read the master sheet', req);
+      }
       const seenRc = new Set<string>();
       const allSkus = (Array.isArray(body?.skus) ? body.skus : [])
         .map((v: unknown) => normSku(v))

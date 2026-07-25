@@ -69,6 +69,7 @@ const PrintStation = retryImport(() => import('./pages/PrintStation'));
 const LazyPublicShareView = retryImport(() => import('./modules/programs/PublicShareView'));
 const LazyTracklyRedirect = retryImport(() => import('./components/minis/TracklyRedirect'));
 const LazyPasswordReset = retryImport(() => import('./pages/PasswordReset'));
+const LazyPublicRateCard = retryImport(() => import('./components/minis/ratecard/PublicRateCard'));
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import SidebarComponent from './components/layout/Sidebar';
@@ -258,6 +259,10 @@ const AppContent = () => {
   // Public share route — no auth required, rendered before login gate
   const shareMatch = hash.match(/^#\/share\/program\/([a-f0-9]+)$/);
   if (shareMatch) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><PubScroll><LazyPublicShareView shareToken={shareMatch[1]} /></PubScroll></Suspense>;
+
+  // Seller rate-card link — no auth; the token is validated server-side.
+  const rcMatch = hash.match(/^#\/rc\/([a-f0-9]{32})$/);
+  if (rcMatch) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><PubScroll><LazyPublicRateCard token={rcMatch[1]} /></PubScroll></Suspense>;
 
   const shortMatch = hash.match(/^#\/s\/([a-zA-Z0-9_-]{3,32})$/);
   if (shortMatch) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><LazyTracklyRedirect shortCode={shortMatch[1]} /></Suspense>;
