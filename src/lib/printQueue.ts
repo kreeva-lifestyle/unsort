@@ -131,20 +131,44 @@ async function warnIfStationOffline(addToast: AddToast) {
   } catch { /* heartbeat check is best-effort; the 25s watcher still covers it */ }
 }
 
-function browserPrint(html: string): void {
+function printWindow(iw: Window | null | undefined): boolean {
+  if (!iw || typeof iw.print !== 'function') return false;
+  try { iw.focus(); iw.print(); return true; } catch { return false; }
+}
+
+// Print the preview iframe the user is already looking at. Safari — iOS in
+// particular — ignores print() on an off-screen 0x0 frame, which is what made
+// "Print / Share" on the export previews look dead. A frame that is actually
+// on screen prints everywhere.
+function printVisibleFrame(frame?: HTMLIFrameElement | null): boolean {
+  if (!frame || !frame.isConnected) return false;
+  return printWindow(frame.contentWindow);
+}
+
+// Fallback for flows with no preview on screen (barcode, handover receipt).
+// srcdoc + an onload attached BEFORE insertion: the old version wrote the
+// document first and attached the handler afterwards, so a load event that had
+// already fired left print() uncalled and the click did nothing. The timer
+// covers the reverse case — a load event that never arrives.
+function browserPrint(html: string, addToast?: AddToast): void {
   const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;left:-9999px;width:0;height:0;border:none;';
-  document.body.appendChild(iframe);
-  const iw = iframe.contentWindow;
-  if (!iw) return;
-  iw.document.open();
-  iw.document.write(html);
-  iw.document.close();
-  iframe.onload = () => {
-    iw.focus();
-    iw.print();
-    setTimeout(() => document.body.removeChild(iframe), 1000);
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;border:none;pointer-events:none;';
+  let printed = false;
+  const go = () => {
+    if (printed) return;
+    printed = true;
+    // A dead click is the worst outcome: say so rather than leaving the user
+    // tapping a button that does nothing.
+    if (!printWindow(iframe.contentWindow)) {
+      addToast?.('Could not open the print dialog — use your browser’s Share / Print menu', 'error');
+    }
+    setTimeout(() => iframe.remove(), 2000);
   };
+  iframe.onload = go;
+  iframe.srcdoc = html;
+  document.body.appendChild(iframe);
+  setTimeout(go, 1500);
 }
 
 export async function printOrQueue(
@@ -154,6 +178,7 @@ export async function printOrQueue(
   title?: string,
   copies?: number,
   addToast?: AddToast,
+  previewFrame?: HTMLIFrameElement | null,
 ): Promise<{ error: Error | null }> {
   if (getPrintMode() === 'cloud') {
     const { error, jobId } = await submitPrintJob(slot, html, pageSize, title, copies);
@@ -167,6 +192,7 @@ export async function printOrQueue(
     }
     return { error };
   }
-  browserPrint(html);
+  if (printVisibleFrame(previewFrame)) return { error: null };
+  browserPrint(html, addToast);
   return { error: null };
 }

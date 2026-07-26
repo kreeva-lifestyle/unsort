@@ -470,6 +470,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     setShowModal(true);
   };
   const [itemLogs, setItemLogs] = useState<any[]>([]);
+  const exportFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   const exportPdf = () => {
     if (filtered.length === 0) return;
@@ -1301,10 +1302,10 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Export Preview</span>
             <button onClick={() => setExportPdfHtml(null)} style={S.btnIcon} title="Close" aria-label="Close">&times;</button>
           </div>
-          <iframe srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%', background: T.bg }} />
+          <iframe ref={exportFrameRef} title="Inventory export preview" srcDoc={exportPdfHtml} style={{ flex: 1, border: 'none', width: '100%', background: T.bg }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button onClick={() => setExportPdfHtml(null)} style={{ padding: '10px 24px', borderRadius: 8, border: `1px solid ${T.bd2}`, background: T.glass2, color: T.tx2, fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 160 }}>Close</button>
-            <button onClick={() => printOrQueue('document', exportPdfHtml!, 'A4', 'Inventory Export', undefined, addToast)} style={{ ...S.btnPrimary, ...S.btnLg, flex: 1, maxWidth: 160 }}>Print / Share</button>
+            <button onClick={() => printOrQueue('document', exportPdfHtml!, 'A4', 'Inventory Export', undefined, addToast, exportFrameRef.current)} style={{ ...S.btnPrimary, ...S.btnLg, flex: 1, maxWidth: 160 }}>Print / Share</button>
           </div>
         </div>,
         document.body

@@ -43,6 +43,7 @@ export default function InventoryExtras() {
   const [matchFilter, setMatchFilter] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
   const [exportHtml, setExportHtml] = useState<string | null>(null);
+  const exportFrameRef = useRef<HTMLIFrameElement | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -614,10 +615,10 @@ export default function InventoryExtras() {
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Export Preview</span>
             <button onClick={() => setExportHtml(null)} style={S.btnIcon} title="Close" aria-label="Close">&times;</button>
           </div>
-          <iframe srcDoc={exportHtml} style={{ flex: 1, border: 'none', width: '100%', background: T.bg }} />
+          <iframe ref={exportFrameRef} title="Spare parts export preview" srcDoc={exportHtml} style={{ flex: 1, border: 'none', width: '100%', background: T.bg }} />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button onClick={() => setExportHtml(null)} style={{ ...S.btnGhost, flex: 1, maxWidth: 160 }}>Close</button>
-            <button onClick={() => printOrQueue('document', exportHtml!, 'A4', 'Spare Parts Export', undefined, addToast)} style={{ ...S.btnPrimary, padding: '10px 24px', fontSize: 13, flex: 1, maxWidth: 160 }}>Print / Share</button>
+            <button onClick={() => printOrQueue('document', exportHtml!, 'A4', 'Spare Parts Export', undefined, addToast, exportFrameRef.current)} style={{ ...S.btnPrimary, padding: '10px 24px', fontSize: 13, flex: 1, maxWidth: 160 }}>Print / Share</button>
           </div>
         </div>,
         document.body
