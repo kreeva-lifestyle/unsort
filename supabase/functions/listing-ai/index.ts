@@ -1,4 +1,13 @@
-// listing-ai Edge Function - AI Listing Module backend (v35).
+// listing-ai Edge Function - AI Listing Module backend (v36).
+//
+// v36: the master sheet is read from its Postgres MIRROR (master_sheet_rows,
+// filled by the master-sync function on a pg_cron poll) instead of the Sheets
+// API. Every consumer is untouched: readMasterTabs still returns the same
+// { tabs: [{tab, headers, rows: string[][]}], masterHeaders } shape, it just
+// reconstructs it from the mirror. Google is now the FALLBACK, used only when
+// the mirror is stale or unreachable, and the fallback says so out loud - a
+// rate card built on hours-old prices is worse than a slow one. Notably this
+// also means an anonymous seller-link visit no longer reaches Google at all.
 //
 // v35: RATECARD_CAP raised 25 -> 50 (owner's rule change); the client's
 // MAX_CARD_ROWS moves with it.
@@ -927,11 +936,82 @@ interface MasterTab { tab: string; headers: string[]; rows: string[][] }
 const MASTER_TTL_MS = 60_000;
 let masterCache: { id: string; at: number; tabs: MasterTab[]; masterHeaders: Map<string, string> } | null = null;
 
+// ---- the Postgres mirror (v36) --------------------------------------------
+// master-sync copies the sheet into master_sheet_rows every few minutes. If
+// that copy has gone quiet we do NOT serve it: the whole point of this data is
+// that prices and designs are correct, so a stale mirror falls back to the
+// live sheet and says so.
+const MASTER_STALE_MS = 45 * 60_000;
+
+// PostgREST pages at 1000 rows and the mirror is bigger than that; reading it
+// unpaginated would silently truncate the master sheet.
+async function mirrorSelect(path: string, order?: string): Promise<any[]> {
+  if (!order) {
+    const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: svcHeaders });
+    if (!r.ok) throw new Error(`mirror ${r.status}`);
+    return await r.json();
+  }
+  const PAGE = 1000;
+  const out: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const r = await fetch(`${SB_URL}/rest/v1/${path}&order=${order}&offset=${from}&limit=${PAGE}`, { headers: svcHeaders });
+    if (!r.ok) throw new Error(`mirror ${r.status}`);
+    const page = await r.json();
+    out.push(...page);
+    if (page.length < PAGE) return out;
+  }
+}
+
+// Rebuilds the exact shape readMasterTabs has always returned, so every
+// consumer downstream is unaware anything changed. Returns null when the
+// mirror should not be trusted (stale, empty, or missing a tab).
+async function readMasterFromMirror(): Promise<{ tabs: MasterTab[]; masterHeaders: Map<string, string> } | null> {
+  const sync = await mirrorSelect('master_sheet_sync?select=tab,last_success_at');
+  const fresh = MASTER_TABS.every(t => {
+    const at = sync.find((s: any) => s.tab === t)?.last_success_at;
+    return at && Date.now() - new Date(at).getTime() < MASTER_STALE_MS;
+  });
+  if (!fresh) return null;
+
+  const cols = await mirrorSelect('master_sheet_columns?select=tab,ordinal,header', 'tab.asc,ordinal.asc');
+  const rows = await mirrorSelect('master_sheet_rows?select=tab,row_num,cells', 'tab.asc,row_num.asc');
+
+  const tabs: MasterTab[] = [];
+  const masterHeaders = new Map<string, string>();
+  // MASTER_TABS order matters: buildSkuIndex is first-wins across tabs.
+  for (const tab of MASTER_TABS) {
+    const headers = cols.filter((c: any) => c.tab === tab).map((c: any) => String(c.header ?? '').trim());
+    if (headers.length === 0) return null;
+    const body = rows.filter((r: any) => r.tab === tab)
+      .map((r: any) => (Array.isArray(r.cells) ? r.cells : []).map((v: any) => String(v ?? '')));
+    for (const h of headers) { const k = normHeader(h); if (h && k && !masterHeaders.has(k)) masterHeaders.set(k, h.toUpperCase()); }
+    tabs.push({ tab, headers, rows: [headers, ...body] });
+  }
+  return { tabs, masterHeaders };
+}
+
 async function readMasterTabs(warnings: string[]): Promise<{ tabs: MasterTab[]; masterHeaders: Map<string, string> }> {
   const masterId = getMasterSheetId();
   if (masterCache && masterCache.id === masterId && Date.now() - masterCache.at < MASTER_TTL_MS) {
     return { tabs: masterCache.tabs, masterHeaders: masterCache.masterHeaders };
   }
+
+  // 1. The mirror: one indexed query instead of two full Sheets downloads.
+  try {
+    const m = await readMasterFromMirror();
+    if (m) {
+      masterCache = { id: masterId, at: Date.now(), tabs: m.tabs, masterHeaders: m.masterHeaders };
+      return m;
+    }
+    warnings.push('The master copy is out of date - reading the Google sheet directly (slower). Check the master sync.');
+  } catch (e) {
+    warnings.push(`Master copy unavailable (${(e as Error).message}) - reading the Google sheet directly.`);
+  }
+
+  // 2. Fallback: the live sheet, exactly as before. `before` keeps the cache
+  // rule ("only a complete, error-free read is cached") independent of any
+  // mirror warning pushed above.
+  const before = warnings.length;
   const tabs: MasterTab[] = [];
   const masterHeaders = new Map<string, string>();
   for (const tab of MASTER_TABS) {
@@ -943,7 +1023,7 @@ async function readMasterTabs(warnings: string[]): Promise<{ tabs: MasterTab[]; 
       tabs.push({ tab, headers, rows });
     } catch (e) { warnings.push(`Cannot read master tab "${tab}" - ${(e as Error).message}`); }
   }
-  if (tabs.length === MASTER_TABS.length && warnings.length === 0) masterCache = { id: masterId, at: Date.now(), tabs, masterHeaders };
+  if (tabs.length === MASTER_TABS.length && warnings.length === before) masterCache = { id: masterId, at: Date.now(), tabs, masterHeaders };
   return { tabs, masterHeaders };
 }
 

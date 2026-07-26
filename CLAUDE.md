@@ -163,6 +163,13 @@ After every merge to main, you MUST:
 10. Is the search icon 14x14, stroke T.tx3, positioned correctly?
 
 ## Patterns to preserve
+- **The master sheet is mirrored, not fetched.** `master_sheet_rows` /
+  `master_sheet_columns` hold a copy of the Google sheet, refreshed by the
+  `master-sync` edge function on a pg_cron poll. Read it through
+  `readMasterTabs()` in `listing-ai`, which serves the mirror and falls back
+  to the live sheet only when the copy is stale (and says so). Do not add new
+  direct Sheets API reads — extend the mirror instead. The sync is one-way:
+  nothing in the app ever writes to the sheet.
 - Every Supabase error → `addToast(friendlyError(err), 'error')`. Never surface raw `error.message`.
 - Atomic multi-table writes go through SECURITY INVOKER RPCs
   (`delete_inventory_item_cascade`, `complete_inventory_pair`,
