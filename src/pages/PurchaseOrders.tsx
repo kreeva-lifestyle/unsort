@@ -60,6 +60,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [receiving, setReceiving] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[] } | null>(null);
   const [printData, setPrintData] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[]; html: string } | null>(null);
+  const printFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
@@ -203,10 +204,10 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Purchase Order</span>
             <button onClick={() => setPrintData(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: T.tx2, cursor: 'pointer', fontSize: 16 }} aria-label="Close">&times;</button>
           </div>
-          <iframe srcDoc={printData.html} style={{ flex: 1, border: 'none', width: '100%', background: '#fff' }} title="Purchase Order preview" />
+          <iframe ref={printFrameRef} srcDoc={printData.html} style={{ flex: 1, border: 'none', width: '100%', background: '#fff' }} title="Purchase Order preview" />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 8, justifyContent: 'center' }}>
             <button onClick={() => setPrintData(null)} style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: T.tx2, fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 130 }}>Close</button>
-            <button onClick={() => printOrQueue('document', printData.html, 'A4', 'Purchase Order', undefined, addToast)} style={{ padding: '10px 18px', borderRadius: 8, border: `1px solid ${T.ac3}`, background: T.ac3, color: T.ac2, fontSize: 13, fontWeight: 600, cursor: 'pointer', flex: 1, maxWidth: 130 }}>Print</button>
+            <button onClick={() => printOrQueue('document', printData.html, 'A4', 'Purchase Order', undefined, addToast, printFrameRef.current)} style={{ padding: '10px 18px', borderRadius: 8, border: `1px solid ${T.ac3}`, background: T.ac3, color: T.ac2, fontSize: 13, fontWeight: 600, cursor: 'pointer', flex: 1, maxWidth: 130 }}>Print</button>
             <button onClick={() => { if (sharing) return; setSharing(true); sharePoImage(printData.po, printData.items, addToast).finally(() => setSharing(false)); }} style={{ padding: '10px 18px', borderRadius: 8, border: 'none', ...S.btnPrimary, fontSize: 13, flex: 1, maxWidth: 130, opacity: sharing ? 0.5 : 1, pointerEvents: sharing ? 'none' as const : 'auto' as const }}>{sharing ? 'Sharing…' : 'Share'}</button>
           </div>
         </div>, document.body)}
