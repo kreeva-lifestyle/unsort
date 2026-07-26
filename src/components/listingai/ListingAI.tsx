@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import Empty from '../ui/Empty';
+import MasterFreshness from '../ui/MasterFreshness';
 import { call } from './api';
 import { parseSkuLines } from './skuInput';
 import { useGenerateRun } from './useGenerateRun';
@@ -104,6 +105,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
         </div>
       )}
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16 }}>
+        <MasterFreshness />
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 12 }}>
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={S.fLabel}>Marketplace template</div>

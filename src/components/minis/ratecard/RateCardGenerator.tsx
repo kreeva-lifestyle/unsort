@@ -13,6 +13,7 @@ import { renderRateCard } from './renderRateCard';
 import ManualRateEditor from './ManualRateEditor';
 import MasterRateCard from './MasterRateCard';
 import SellerLinkBar from './SellerLinkBar';
+import MasterFreshness from '../../ui/MasterFreshness';
 import MarkupRow from './MarkupRow';
 import RateCardActions from './RateCardActions';
 
@@ -147,6 +148,7 @@ export default function RateCardGenerator({ addToast, lockedMode, shareToken }: 
         <input ref={heroRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickHero(f); e.target.value = ''; }} />
         <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickExcel(f); e.target.value = ''; }} />
         {mode === 'manual' && <ManualRateEditor onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} />}
+        {mode === 'master' && !lockedMode && <MasterFreshness />}
         {mode === 'master' && !lockedMode && <SellerLinkBar addToast={addToast} />}
         {mode === 'master' && <MasterRateCard onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} shareToken={shareToken} onCatalogName={n => { setCatalogName(n); setResult(null); }} />}
         {heroUrl && <img src={heroUrl} alt="Catalog" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: `1px solid ${T.bd}`, marginBottom: 10 }} />}
