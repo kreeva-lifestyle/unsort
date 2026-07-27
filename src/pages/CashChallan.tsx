@@ -435,17 +435,26 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // at its server default (~1000 rows) and the figures would understate
     // with no warning. At the cap we flag `truncated` for the UI.
     const CAP = 10000;
-    const [{ data }, { count: voidedCount }, { data: prevData }, { data: paymentsInPeriod }] = await Promise.all([
+    const [{ data }, { count: voidedCount }, { data: prevData }, { data: paymentsInPeriod, error: payErr }] = await Promise.all([
       supabase.from('cash_challans').select('total, payment_mode, status, is_return').gte('created_at', fromIso).lte('created_at', toIso).neq('status', 'voided').limit(CAP),
       supabase.from('cash_challans').select('id', { count: 'estimated', head: true }).gte('created_at', fromIso).lte('created_at', toIso).eq('status', 'voided'),
       supabase.from('cash_challans').select('total, is_return').gte('created_at', prevFromDt.toISOString()).lte('created_at', prevToDt.toISOString()).neq('status', 'voided').limit(CAP),
       // Mode breakup from the payments ledger, not challan totals — a partial
       // challan only counts what was actually collected, reversals subtract,
       // and refunds on returns count as money out.
-      supabase.from('cash_challan_payments').select('amount, payment_mode, is_reversal, challan:cash_challans(is_return)').gte('payment_date', fromDate).lte('payment_date', toDate).limit(CAP),
+      //
+      // The `!challan_id` hint is required, not decorative: this table has TWO
+      // foreign keys to cash_challans (challan_id and settled_against, the
+      // latter added with return-credit settlement). Without the hint PostgREST
+      // cannot pick one and rejects the whole query with PGRST201, which is how
+      // this panel silently went blank.
+      supabase.from('cash_challan_payments').select('amount, payment_mode, is_reversal, challan:cash_challans!challan_id(is_return)').gte('payment_date', fromDate).lte('payment_date', toDate).limit(CAP),
     ]);
     const rows = (data as AnalyticsRow[] | null) || [];
     const totalRevenue = rows.reduce((s, r) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
+    // Never let the breakup fail quietly: an empty byMode is indistinguishable
+    // from "no payments this period" once it reaches the panel.
+    if (payErr) addToast(friendlyError(payErr), 'error');
     const byMode: Record<string, number> = {};
     type PayRow = { amount: number; payment_mode: string | null; is_reversal: boolean | null; challan: { is_return: boolean | null } | null };
     ((paymentsInPeriod as unknown as PayRow[] | null) || []).forEach((r) => {
