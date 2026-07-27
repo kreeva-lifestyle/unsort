@@ -69,7 +69,7 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
             <span style={{ fontSize: 12, fontFamily: T.mono, color: T.ac2, fontWeight: 600 }}>₹{Number(amount).toLocaleString('en-IN')}</span>
           </div>
         ))}
-        {Object.keys(analytics.byMode).length === 0 && <div style={{ padding: 16, textAlign: 'center' as const, color: T.tx3, fontSize: 11 }}>No data for today</div>}
+        {Object.keys(analytics.byMode).length === 0 && <div style={{ padding: 16, textAlign: 'center' as const, color: T.tx3, fontSize: 11 }}>No payments recorded in this date range</div>}
       </div>
     </div>
   );
