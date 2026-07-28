@@ -8,6 +8,7 @@
 import { useState, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
+import SkuInput from '../../ui/SkuInput';
 import { call, explain, fileToB64, type Hit } from './api';
 import { exportHitsXlsx } from './exportHits';
 import HitList from './HitList';
@@ -113,9 +114,9 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
         ) : (
           <div>
             <div style={S.fLabel}>SKU</div>
-            <input
+            <SkuInput
               value={sku}
-              onChange={e => setSku(e.target.value)}
+              onChange={setSku}
               onKeyDown={e => { if (e.key === 'Enter') search(); }}
               placeholder="e.g. 7101"
               style={{ ...S.fInput, width: '100%', textTransform: 'uppercase' }}

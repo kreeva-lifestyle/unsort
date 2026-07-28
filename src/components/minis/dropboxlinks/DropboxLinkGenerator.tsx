@@ -11,6 +11,7 @@ import { call, explainGen, GenResult, WriteResult } from './api';
 import { runBulk, parseSkuText, parseSkuFile, exportBulkXlsx, BulkRow, BULK_CAP } from './bulk';
 import LinkResult from './LinkResult';
 import RootSettings from './RootSettings';
+import SkuInput from '../../ui/SkuInput';
 
 type Mode = 'combine' | 'separate';
 type Pair = { combine: GenResult | null; separate: GenResult | null };
@@ -139,7 +140,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
       )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-        <input value={sku} onChange={e => setSku(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') genOne(); }} placeholder="Enter SKU e.g. 15003" style={{ ...S.fInput, width: 200, fontFamily: T.mono }} />
+        <SkuInput value={sku} onChange={setSku} onKeyDown={e => { if (e.key === 'Enter') genOne(); }} placeholder="Enter SKU e.g. 15003" style={{ ...S.fInput, width: 200, fontFamily: T.mono }} />
         <button onClick={() => genOne()} disabled={busy || !sku.trim()} style={{ ...S.btnPrimary, pointerEvents: busy ? 'none' : 'auto', opacity: busy || !sku.trim() ? 0.5 : 1 }}>{busy ? 'Generating…' : 'Generate Link'}</button>
         <button onClick={() => setShowPaste(p => !p)} style={{ ...S.btnGhost, color: T.ac2, border: '1px solid oklch(0.55 0.22 265 / .2)' }}>{showPaste ? 'Hide paste' : 'Paste SKUs'}</button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) importFile(f); e.target.value = ''; }} />

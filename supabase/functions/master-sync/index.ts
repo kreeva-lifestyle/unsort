@@ -333,6 +333,11 @@ Deno.serve(async (req) => {
     const modified = await driveModifiedTime();
     const results: TabResult[] = [];
     for (const tab of MASTER_TABS) results.push(await syncTab(tab, mode, modified));
+
+    // NOTE: product_catalog (SKU autosuggest) is NOT refreshed here. It is
+    // rebuilt by its own pg_cron job calling refresh_product_catalog(), which
+    // skips rows that did not change — so a quiet poll writes nothing and this
+    // function needs no redeploy when the catalog's shape changes.
     return json({ ok: !results.some(r => r.error), mode, probe: modified ? 'drive' : 'none', probeError, results });
   } catch (e) {
     return json({ ok: false, error: (e as Error).message }, 500);

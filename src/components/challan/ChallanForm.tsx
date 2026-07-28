@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import DateInput from '../ui/DateInput';
+import SkuInput from '../ui/SkuInput';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { fetchCustomerOutstanding } from '../../lib/customerOutstanding';
@@ -238,7 +239,22 @@ export default function ChallanForm(p: ChallanFormProps) {
               return (
               <div key={i}>
                 <div className="challan-item-row" style={{ display: 'grid', gridTemplateColumns: '1fr 56px 80px 100px 28px', gap: 6, padding: '7px 12px', borderBottom: err ? 'none' : `1px solid ${T.bd}`, alignItems: 'center' }}>
-                  <input data-sku value={it.sku} onChange={e => { const n = [...p.items]; n[i].sku = e.target.value; p.setItems(n); }} placeholder="SKU / Item name" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
+                  <SkuInput
+                    data-sku
+                    value={it.sku}
+                    onChange={v => { const n = [...p.items]; n[i].sku = v; p.setItems(n); }}
+                    // Fill the exc-GST price from the master sheet, but ONLY
+                    // into an empty box: a negotiated price already typed must
+                    // never be silently overwritten by list price.
+                    onPick={prod => {
+                      if (prod.price_exc_gst == null) return;
+                      const n = [...p.items];
+                      if (!Number(n[i].price)) { n[i].price = Number(prod.price_exc_gst); p.setItems(n); }
+                    }}
+                    placeholder="SKU / Item name"
+                    disabled={!!(p.isReturn && p.returnSource)}
+                    style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1, width: '100%' }}
+                  />
                   <input type="number" min="1" step="1" value={it.quantity || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].quantity = Math.max(0, Math.round(Number(e.target.value))); p.setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: qtyBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'center' as const }} />
                   <input type="number" min="0" step="0.01" value={it.price || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].price = Math.max(0, Number(e.target.value)); p.setItems(n); }} placeholder="0" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: priceBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
                   <div className="challan-disc-col" style={{ display: 'flex', gap: 2, alignItems: 'center', opacity: p.isReturn && p.returnSource ? 0.6 : 1 }}>
