@@ -243,9 +243,13 @@ export default function ChallanForm(p: ChallanFormProps) {
                     data-sku
                     value={it.sku}
                     onChange={v => { const n = [...p.items]; n[i].sku = v; p.setItems(n); }}
-                    // Fill the exc-GST price from the master sheet, but ONLY
-                    // into an empty box: a negotiated price already typed must
-                    // never be silently overwritten by list price.
+                    // Fires only once the design is fully resolved — for a
+                    // sized design that means after a size chip is picked, so
+                    // the price never lands on a half-typed parent SKU.
+                    //
+                    // Fills the exc-GST price ONLY into an empty box: a
+                    // negotiated price already typed must never be silently
+                    // overwritten by list price.
                     onPick={prod => {
                       if (prod.price_exc_gst == null) return;
                       const n = [...p.items];

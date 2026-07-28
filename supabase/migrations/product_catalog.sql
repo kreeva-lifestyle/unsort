@@ -159,3 +159,22 @@ select cron.unschedule('product-catalog-refresh')
 where exists (select 1 from cron.job where jobname = 'product-catalog-refresh');
 select cron.schedule('product-catalog-refresh', '*/2 * * * *',
   $$select public.refresh_product_catalog()$$);
+
+-- ---------------------------------------------------------------------------
+-- Size variants + duplicate handling (follow-up migration: product_catalog_sizes)
+--
+-- The sheet's SIZE column carries two different kinds of value:
+--   * a stitch type — SEMI-STITCHED (755 rows) or UNSTITCHED (144) — which is
+--     NOT a size and must never produce a DRS141-SEMI-STITCHED variant;
+--   * a real size list — "XS, S, M, L, XL, XXL", "L, XL", "XS" (377 rows).
+-- So `sizes` is the parsed list and is EMPTY for stitch types.
+--
+-- Duplicate SKUs are SKIPPED, not merged. Six SKUs appear twice in the sheet;
+-- guessing which row is authoritative would put a wrong price on a real
+-- invoice, and a missing suggestion is a far cheaper failure than a
+-- confidently wrong one. They stay typeable by hand.
+alter table product_catalog add column if not exists sizes text[] not null default '{}';
+create index if not exists pc_has_sizes on product_catalog (sku_norm)
+  where cardinality(sizes) > 0;
+-- refresh_product_catalog() is redefined in the product_catalog_sizes
+-- migration to populate `sizes` and to drop duplicate SKUs entirely.
