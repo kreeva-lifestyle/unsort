@@ -11,15 +11,20 @@
 //
 // It ALWAYS accepts free text — a challan can legitimately bill something the
 // master sheet never had, so this suggests but never constrains.
-import { useId, useState, useEffect, useRef } from 'react';
+import { useId, useMemo, useEffect, useRef } from 'react';
 import { T } from '../../lib/theme';
 import {
   useProductCatalog, searchProducts, resolveSku, needsSize, variantSku, type Product,
 } from '../../hooks/useProductCatalog';
 
-// Typing is faster than rendering. Filtering per keystroke makes a fast typist
-// wait on work that is thrown away; one frame's pause does not.
-const DEBOUNCE_MS = 120;
+// Suggestions start here. One character is noise — "D" matches 289 designs and
+// "7" matches 130 — so the dropdown stayed open over the fields below while
+// showing nothing useful.
+//
+// Trade-off accepted knowingly: the 68 SKUs that are only three characters
+// long (994, 221, 330...) now appear only once typed in full. The other 1,202
+// designs still get a head start.
+const MIN_CHARS = 3;
 
 export default function SkuInput({
   value,
@@ -43,14 +48,6 @@ export default function SkuInput({
 } & Record<string, unknown>) {
   const listId = useId();
   const { index } = useProductCatalog();
-  const [query, setQuery] = useState(value);
-
-  // Debounce only the SEARCH, never the input value — the box itself must stay
-  // perfectly responsive; it is the dropdown that can lag a frame.
-  useEffect(() => {
-    const t = setTimeout(() => setQuery(value), DEBOUNCE_MS);
-    return () => clearTimeout(t);
-  }, [value]);
 
   const hit = resolveSku(index, value);
   const product = hit?.product ?? null;
@@ -69,7 +66,21 @@ export default function SkuInput({
     onPick(product, chosenSize, full);
   }, [product, chosenSize, onPick]);
 
-  const opts = query.trim() ? searchProducts(index, query, 25) : [];
+  // Built from `value` itself, NOT a delayed copy of it. The previous version
+  // debounced the search by 120ms while the browser filtered the resulting
+  // options against the live text, so the dropdown was permanently one
+  // keystroke behind — it showed matches for what you typed a moment ago.
+  //
+  // The debounce existed to avoid re-filtering the catalog per keystroke; the
+  // binary-search index answers a prefix query in ~0.15us, so it was guarding
+  // nothing and causing the lag it was meant to prevent. useMemo is per
+  // instance, unlike the module-level memo it replaces, which a challan with
+  // several rows would have thrashed.
+  const q = value.trim();
+  const opts = useMemo(
+    () => (q.length >= MIN_CHARS ? searchProducts(index, q, 25) : []),
+    [index, q],
+  );
 
   return (
     <div style={{ minWidth: 0 }}>
