@@ -9,7 +9,7 @@ import { useState, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import SkuInput from '../../ui/SkuInput';
-import { call, explain, fileToB64, type Hit } from './api';
+import { call, explain, fileToB64, type Hit, type FolderCandidate } from './api';
 import { exportHitsXlsx } from './exportHits';
 import HitList from './HitList';
 
@@ -25,6 +25,9 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
   const [bestGuess, setBestGuess] = useState<string | null>(null);
   const [quota, setQuota] = useState<{ used: number; cap: number } | null>(null);
   const [error, setError] = useState('');
+  // Set when one SKU lives in several Dropbox folders. Not an error — the app
+  // is asking which folder, and these are the answers it will accept.
+  const [candidates, setCandidates] = useState<FolderCandidate[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const subject = mode === 'sku' ? sku.trim().toUpperCase() : (file?.name || 'Upload');
@@ -37,19 +40,26 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
   };
 
   const reset = () => {
-    setFile(null); setPreview(''); setSku(''); setHits(null); setBestGuess(null); setError('');
+    setFile(null); setPreview(''); setSku(''); setHits(null); setBestGuess(null); setError(''); setCandidates([]);
   };
 
-  const search = async () => {
+  const search = async (folder?: string) => {
     if (busy) return;
     if (mode === 'upload' && !file) { setError('Attach a photo first'); return; }
     if (mode === 'sku' && !sku.trim()) { setError('Enter a SKU'); return; }
-    setBusy(true); setError(''); setHits(null);
+    setBusy(true); setError(''); setHits(null); setCandidates([]);
     try {
       const payload = mode === 'sku'
-        ? { action: 'search', source: 'sku', sku: sku.trim().toUpperCase() }
+        ? { action: 'search', source: 'sku', sku: sku.trim().toUpperCase(), folder: folder || undefined }
         : { action: 'search', source: 'upload', image_b64: await fileToB64(file as File) };
       const { status, data } = await call(payload);
+      // A folder choice is a question, not a failure — offer the options
+      // instead of dead-ending on a red box.
+      if (data?.needsFolder && data.candidates?.length) {
+        setCandidates(data.candidates);
+        setError('');
+        return;
+      }
       if (!data?.ok) { const m = explain(data, status); setError(m); addToast(m, 'error'); return; }
       setHits(data.hits || []);
       setBestGuess(data.best_guess ?? null);
@@ -80,7 +90,7 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
           {(['upload', 'sku'] as Mode[]).map(m => (
             <button
               key={m}
-              onClick={() => { setMode(m); setHits(null); setError(''); }}
+              onClick={() => { setMode(m); setHits(null); setError(''); setCandidates([]); }}
               style={{
                 ...(mode === m ? S.btnPrimary : S.btnGhost),
                 flex: 1, minHeight: 44,
@@ -129,7 +139,9 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
           <button
-            onClick={search}
+            // Wrapped, not passed directly: search() now takes an optional
+            // folder, and onClick would hand it the MouseEvent.
+            onClick={() => search()}
             style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}
           >
             {busy ? 'Searching…' : 'Find websites'}
@@ -152,6 +164,32 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
         {error && (
           <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginTop: 10 }}>
             {error}
+          </div>
+        )}
+
+        {/* Amber, not red: nothing has gone wrong — the SKU simply exists in
+            more than one Dropbox folder and the app needs to know which.
+            Mirrors the Dropbox Link Generator's picker (LinkResult.tsx). */}
+        {candidates.length > 0 && (
+          <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 6, padding: '10px', marginTop: 10 }}>
+            <div style={{ fontSize: 11, color: T.yl, lineHeight: 1.5, marginBottom: 8 }}>
+              &ldquo;{sku.trim().toUpperCase()}&rdquo; is in {candidates.length} folders — pick the one you mean:
+            </div>
+            {candidates.map((c, i) => (
+              <button
+                key={i}
+                onClick={() => search(c.path)}
+                disabled={busy}
+                style={{
+                  ...S.btnGhost, display: 'block', width: '100%', textAlign: 'left',
+                  marginTop: i === 0 ? 0 : 6, padding: '10px 12px', minHeight: 44,
+                  fontSize: 11, fontFamily: T.mono,
+                  pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1,
+                }}
+              >
+                📁 {c.display}
+              </button>
+            ))}
           </div>
         )}
       </div>

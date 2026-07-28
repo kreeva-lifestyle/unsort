@@ -15,6 +15,10 @@ export interface Hit {
   score: number | null;
 }
 
+/** A Dropbox folder offered when one SKU exists in several of them. Same shape
+ *  the Dropbox Link Generator already uses (dropboxlinks/api.ts). */
+export interface FolderCandidate { name: string; path: string; display: string }
+
 export interface SearchResult {
   ok: boolean;
   cached?: boolean;
@@ -26,6 +30,10 @@ export interface SearchResult {
   cap?: number;
   error?: string;
   details?: string;
+  /** The SKU sits in more than one Dropbox folder — not an error, a question.
+   *  `candidates` are the folders to choose between. */
+  needsFolder?: boolean;
+  candidates?: FolderCandidate[];
 }
 
 // How confident a hit is, in words rather than jargon.
