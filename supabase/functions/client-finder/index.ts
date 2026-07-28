@@ -41,7 +41,7 @@ function corsHeaders(req: Request) {
   return {
     'Access-Control-Allow-Origin': allowed,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-ping-secret',
   };
 }
 const json = (body: unknown, req: Request, status = 200) =>
@@ -123,13 +123,26 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 // not an image, so it cannot be fetched directly. odette-export's `linkgen`
 // with mode=separate already resolves a SKU to one link per image inside that
 // folder - reuse it rather than reimplementing Dropbox listing here.
-async function skuImageBytes(sku: string, authHeader: string): Promise<{ bytes: Uint8Array; url: string }> {
+// A SKU that lives in more than one Dropbox folder is a QUESTION, not a
+// failure: linkgen answers with the candidate folders and takes a `folder`
+// argument to settle it. Carried as a typed error so the handler can hand the
+// list to the UI - the previous version kept linkgen's "tap the folder you
+// want" wording and threw the candidates away, so the app printed an
+// instruction with nothing to tap.
+class NeedsFolder extends Error {
+  constructor(message: string, readonly candidates: unknown[]) { super(message); }
+}
+
+async function skuImageBytes(sku: string, authHeader: string, folder?: string): Promise<{ bytes: Uint8Array; url: string }> {
   const r = await fetch(`${SB_URL}/functions/v1/odette-export`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: authHeader, apikey: SB_SVC },
-    body: JSON.stringify({ action: 'linkgen', sku, mode: 'separate' }),
+    body: JSON.stringify({ action: 'linkgen', sku, mode: 'separate', folder: folder || undefined }),
   });
   const data = await r.json().catch(() => ({}));
+  if (!data?.ok && Array.isArray(data?.candidates) && data.candidates.length) {
+    throw new NeedsFolder(String(data?.details || data?.error || `"${sku}" was found in more than one folder`), data.candidates);
+  }
   if (!data?.ok) throw new Error(data?.details || data?.error || `Could not find images for ${sku}`);
   const first = (data.links || []).find((l: { url?: string; error?: string }) => l?.url && !l.error);
   if (!first) throw new Error(`No usable image found in the Dropbox folder for ${sku}`);
@@ -276,8 +289,18 @@ Deno.serve(async (req) => {
     if (source === 'sku') {
       sku = String(body?.sku || '').trim().toUpperCase();
       if (!sku) return fail(400, 'Enter a SKU', req);
-      const got = await skuImageBytes(sku, req.headers.get('authorization') || '');
-      bytes = got.bytes;
+      try {
+        const got = await skuImageBytes(sku, req.headers.get('authorization') || '', String(body?.folder || ''));
+        bytes = got.bytes;
+      } catch (e) {
+        // 409, not 500: nothing is broken, the request is just ambiguous. The
+        // candidates go back so the UI can offer a real choice. No Vision call
+        // happens and no search row is written, so this costs no quota.
+        if (e instanceof NeedsFolder) {
+          return json({ ok: false, needsFolder: true, sku, error: e.message, candidates: e.candidates }, req, 409);
+        }
+        throw e;
+      }
     } else {
       const b64in = String(body?.image_b64 || '').replace(/^data:[^;]+;base64,/, '');
       if (!b64in) return fail(400, 'Attach an image first', req);
