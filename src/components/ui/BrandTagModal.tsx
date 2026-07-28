@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import JsBarcode from 'jsbarcode';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
+import SkuInput from './SkuInput';
 
 interface BrandTagRow {
   id: string; brand: string; ean: string; sku: string; qty: string;
@@ -85,7 +86,7 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div><label style={fLabel}>Brand *</label><select value={form.brand} onChange={e => set('brand', e.target.value)} style={fSelect}><option value="">Select brand</option>{brandOptions.map(o => <option key={o} value={o}>{o.replace(/^BRAND NAME:\s*/i, '')}</option>)}</select></div>
-              <div><label style={fLabel}>SKU *</label><input value={form.sku} onChange={e => set('sku', e.target.value)} style={fInput} placeholder="e.g. TNDRS177-M" /></div>
+              <div><label style={fLabel}>SKU *</label><SkuInput value={form.sku} onChange={v => set('sku', v)} style={fInput} placeholder="e.g. TNDRS177-M" /></div>
             </div>
             <div><label style={fLabel}>Product *</label><input value={product} onChange={e => set('product', e.target.value ? 'PRODUCT DESC: ' + e.target.value : '')} list="dl-prod" style={fInput} placeholder="e.g. Co-ord Set" /><datalist id="dl-prod">{productOptions.map(o => <option key={o} value={o.replace(/^PRODUCT DESC:\s*/i, '')} />)}</datalist></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
