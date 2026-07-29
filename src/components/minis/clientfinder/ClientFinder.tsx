@@ -16,10 +16,18 @@ import HitList from './HitList';
 
 type Mode = 'upload' | 'sku';
 
+/** A picked photo plus the blob URL showing it. Kept as one object so the two
+ *  can never drift apart, and so the URL can be revoked when the photo goes. */
+interface Shot { file: File; url: string }
+
+/** Same file picked twice is the same photo. */
+const shotKey = (f: File) => `${f.name}|${f.size}|${f.lastModified}`;
+
 export default function ClientFinder({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const [mode, setMode] = useState<Mode>('upload');
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string>('');
+  // File and its preview URL travel together so removing one can never leave
+  // the two lists misaligned — and so the object URL is always revocable.
+  const [shots, setShots] = useState<Shot[]>([]);
   const [sku, setSku] = useState('');
   const [busy, setBusy] = useState(false);
   const [hits, setHits] = useState<Hit[] | null>(null);
@@ -35,32 +43,72 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const subject = mode === 'sku' ? sku.trim().toUpperCase() : (file?.name || 'Upload');
+  const subject = mode === 'sku'
+    ? sku.trim().toUpperCase()
+    : shots.length > 1 ? `${shots.length}-photos` : (shots[0]?.file.name || 'Upload');
 
-  const pick = (f: File) => {
-    if (!f.type.startsWith('image/')) { addToast('Pick an image file', 'error'); return; }
-    setFile(f);
-    setPreview(URL.createObjectURL(f));
+  // Photos ADD rather than replace, so a batch can be built up from several
+  // folders. Non-images are counted and reported once — one toast per rejected
+  // file would bury the screen when a whole folder gets selected by mistake.
+  const addFiles = (list: FileList | null) => {
+    if (!list?.length) return;
+    const incoming = [...list];
+    const images = incoming.filter(f => f.type.startsWith('image/'));
+    const rejected = incoming.length - images.length;
+    if (rejected) addToast(rejected === 1 ? 'Skipped 1 file — not an image' : `Skipped ${rejected} files — not images`, 'error');
+    if (!images.length) return;
+
+    // createObjectURL / revokeObjectURL stay OUTSIDE the state updater —
+    // StrictMode invokes updaters twice in dev, which would mint a second set
+    // of blob URLs and leak the first. These are event handlers, so reading
+    // `shots` from the closure is current.
+    const seen = new Set(shots.map(s => shotKey(s.file)));
+    const added: Shot[] = [];
+    for (const f of images) {
+      const k = shotKey(f);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      added.push({ file: f, url: URL.createObjectURL(f) });
+    }
+    if (!added.length) return;
+    setShots([...shots, ...added]);
     setHits(null); setError('');
   };
 
-  const reset = () => {
-    setFile(null); setPreview(''); setSku(''); setHits(null); setBestGuess(null); setError(''); setCandidates([]); setPhotos([]);
+  // Revoking matters here: a batch of phone photos held as blob URLs is real
+  // memory, and nothing else ever frees them.
+  const removeShot = (key: string) => {
+    const gone = shots.find(s => shotKey(s.file) === key);
+    if (gone) URL.revokeObjectURL(gone.url);
+    setShots(shots.filter(s => shotKey(s.file) !== key));
   };
+
+  const reset = () => {
+    shots.forEach(s => URL.revokeObjectURL(s.url));
+    setShots([]);
+    setSku(''); setHits(null); setBestGuess(null); setError(''); setCandidates([]); setPhotos([]);
+  };
+
+  // How many Vision calls one tap will make, in whichever mode is active.
+  const count = mode === 'sku' ? photos.length : shots.length;
+  const nothingPicked = count === 0;
 
   // Strongest wins when two photos turn up the same page.
   const KIND_RANK = { full: 0, partial: 1, page: 2, similar: 3 } as const;
 
   const search = async (folder?: string) => {
     if (busy) return;
-    if (mode === 'upload' && !file) { setError('Attach a photo first'); return; }
+    if (mode === 'upload' && shots.length === 0) { setError('Attach a photo first'); return; }
     if (mode === 'sku' && !sku.trim()) { setError('Enter a SKU'); return; }
     if (mode === 'sku' && photos.length === 0) { setError('Pick at least one photo'); return; }
 
     // One request per photo, deliberately. Looping server-side inside a single
     // request would let one tap make N Vision calls while recording ONE search,
     // which is a hole straight through the daily cap.
-    const targets = mode === 'sku' ? photos : [''];
+    //
+    // Dropbox URLs in SKU mode, picked Files in upload mode — the loop is the
+    // same either way, only the payload differs.
+    const targets: (string | File)[] = mode === 'sku' ? photos : shots.map(s => s.file);
     setBusy(true); setError(''); setHits(null); setCandidates([]);
     setProgress(targets.length > 1 ? { done: 0, total: targets.length } : null);
 
@@ -73,8 +121,8 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
     try {
       for (const target of targets) {
         const payload = mode === 'sku'
-          ? { action: 'search', source: 'sku', sku: sku.trim().toUpperCase(), folder: folder || undefined, image_url: target || undefined }
-          : { action: 'search', source: 'upload', image_b64: await fileToB64(file as File) };
+          ? { action: 'search', source: 'sku', sku: sku.trim().toUpperCase(), folder: folder || undefined, image_url: (target as string) || undefined }
+          : { action: 'search', source: 'upload', image_b64: await fileToB64(target as File) };
         const { status, data } = await call(payload);
 
         // A folder choice is a question, not a failure — offer the options
@@ -159,17 +207,51 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
                 ref={fileRef}
                 type="file"
                 accept="image/*"
+                multiple
                 style={{ position: 'absolute', width: 0, height: 0, opacity: 0, overflow: 'hidden' }}
-                onChange={e => { const f = e.target.files?.[0]; if (f) pick(f); e.target.value = ''; }}
+                // Cleared after every pick so choosing the same file again
+                // still fires onChange.
+                onChange={e => { addFiles(e.target.files); e.target.value = ''; }}
               />
-              {file ? `Change photo — ${file.name}` : 'Choose or take a photo'}
+              {shots.length
+                ? `${shots.length} photo${shots.length === 1 ? '' : 's'} — add more`
+                : 'Choose or take photos'}
             </label>
-            {preview && (
-              <img
-                src={preview}
-                alt="Selected product"
-                style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 8, border: `1px solid ${T.bd}`, marginTop: 10, background: T.s }}
-              />
+
+            {shots.length > 0 && (
+              <>
+                {/* Same grid as the SKU photo picker, so both modes look and
+                    behave alike. */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 6, marginTop: 10 }}>
+                  {shots.map(s => {
+                    const key = shotKey(s.file);
+                    return (
+                      <div key={key} style={{ position: 'relative', aspectRatio: '1', borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.bd}`, background: T.s }}>
+                        <img src={s.url} alt={s.file.name} title={s.file.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        <button
+                          type="button"
+                          onClick={() => removeShot(key)}
+                          aria-label={`Remove ${s.file.name}`}
+                          // 30px, not the usual 44: on a 72px tile a 44px
+                          // target would cover most of the photo it is meant
+                          // to identify. Comfortably tappable in practice.
+                          style={{
+                            position: 'absolute', top: 3, right: 3, width: 30, height: 30, borderRadius: '50%',
+                            background: 'rgba(6,8,16,.78)', border: `1px solid ${T.bd2}`, color: T.tx2,
+                            fontSize: 16, lineHeight: 1, cursor: 'pointer', padding: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}
+                        >&#215;</button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 10, color: T.tx3, marginTop: 6 }}>
+                  {shots.length === 1
+                    ? 'Tap × to remove.'
+                    : `Searching ${shots.length} photos — each one is a separate search.`}
+                </div>
+              </>
             )}
           </div>
         ) : (
@@ -201,18 +283,18 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
             // Wrapped, not passed directly: search() now takes an optional
             // folder, and onClick would hand it the MouseEvent.
             onClick={() => search()}
-            disabled={busy || (mode === 'sku' && photos.length === 0)}
-            style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy || (mode === 'sku' && photos.length === 0) ? 0.5 : 1 }}
+            disabled={busy || nothingPicked}
+            style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy || nothingPicked ? 0.5 : 1 }}
           >
             {/* The photo count sits on the control because it IS the cost:
                 three photos is three Vision calls and three of the daily 25. */}
             {busy
               ? (progress ? `Searching ${progress.done + 1} of ${progress.total}…` : 'Searching…')
-              : mode === 'sku' && photos.length > 1
-                ? `Find websites · ${photos.length} photos`
+              : count > 1
+                ? `Find websites · ${count} photos`
                 : 'Find websites'}
           </button>
-          {(hits || file || sku) && (
+          {(hits || shots.length > 0 || sku) && (
             <button onClick={reset} style={{ ...S.btnGhost, minHeight: 44 }}>Clear</button>
           )}
           {hits && hits.length > 0 && (
