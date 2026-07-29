@@ -29,9 +29,10 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
   // Set when one SKU lives in several Dropbox folders. Not an error — the app
   // is asking which folder, and these are the answers it will accept.
   const [candidates, setCandidates] = useState<FolderCandidate[]>([]);
-  // Which of the SKU's Dropbox photos to search. Empty = server falls back to
-  // the first one, which is the old behaviour.
-  const [photo, setPhoto] = useState('');
+  // Which of the SKU's Dropbox photos to search. Each one is a SEPARATE Vision
+  // call, so the count is shown on the button rather than hidden.
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const subject = mode === 'sku' ? sku.trim().toUpperCase() : (file?.name || 'Upload');
@@ -44,40 +45,80 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
   };
 
   const reset = () => {
-    setFile(null); setPreview(''); setSku(''); setHits(null); setBestGuess(null); setError(''); setCandidates([]); setPhoto('');
+    setFile(null); setPreview(''); setSku(''); setHits(null); setBestGuess(null); setError(''); setCandidates([]); setPhotos([]);
   };
+
+  // Strongest wins when two photos turn up the same page.
+  const KIND_RANK = { full: 0, partial: 1, page: 2, similar: 3 } as const;
 
   const search = async (folder?: string) => {
     if (busy) return;
     if (mode === 'upload' && !file) { setError('Attach a photo first'); return; }
     if (mode === 'sku' && !sku.trim()) { setError('Enter a SKU'); return; }
+    if (mode === 'sku' && photos.length === 0) { setError('Pick at least one photo'); return; }
+
+    // One request per photo, deliberately. Looping server-side inside a single
+    // request would let one tap make N Vision calls while recording ONE search,
+    // which is a hole straight through the daily cap.
+    const targets = mode === 'sku' ? photos : [''];
     setBusy(true); setError(''); setHits(null); setCandidates([]);
+    setProgress(targets.length > 1 ? { done: 0, total: targets.length } : null);
+
+    // Deduped across photos by URL — the question is "who has this product",
+    // not "which of my photos found them".
+    const merged = new Map<string, Hit>();
+    let guess: string | null = null;
+    let searched = 0;
+
     try {
-      const payload = mode === 'sku'
-        ? { action: 'search', source: 'sku', sku: sku.trim().toUpperCase(), folder: folder || undefined, image_url: photo || undefined }
-        : { action: 'search', source: 'upload', image_b64: await fileToB64(file as File) };
-      const { status, data } = await call(payload);
-      // A folder choice is a question, not a failure — offer the options
-      // instead of dead-ending on a red box.
-      if (data?.needsFolder && data.candidates?.length) {
-        setCandidates(data.candidates);
-        setError('');
-        return;
+      for (const target of targets) {
+        const payload = mode === 'sku'
+          ? { action: 'search', source: 'sku', sku: sku.trim().toUpperCase(), folder: folder || undefined, image_url: target || undefined }
+          : { action: 'search', source: 'upload', image_b64: await fileToB64(file as File) };
+        const { status, data } = await call(payload);
+
+        // A folder choice is a question, not a failure — offer the options
+        // instead of dead-ending on a red box.
+        if (data?.needsFolder && data.candidates?.length) {
+          setCandidates(data.candidates); setError(''); return;
+        }
+        // Stop on the daily cap, but KEEP what earlier photos already found and
+        // say exactly how far it got. Silent truncation would be worse.
+        if (status === 429) {
+          setError(`Searched ${searched} of ${targets.length} photos — ${data?.error || 'daily limit reached'}.`);
+          break;
+        }
+        if (!data?.ok) { const m = explain(data, status); setError(m); addToast(m, 'error'); return; }
+
+        for (const h of data.hits || []) {
+          const prev = merged.get(h.url);
+          if (!prev || KIND_RANK[h.match_kind] < KIND_RANK[prev.match_kind]) merged.set(h.url, h);
+        }
+        guess = guess ?? (data.best_guess ?? null);
+        if (typeof data.used === 'number' && typeof data.cap === 'number') setQuota({ used: data.used, cap: data.cap });
+        searched++;
+        setProgress(targets.length > 1 ? { done: searched, total: targets.length } : null);
       }
-      if (!data?.ok) { const m = explain(data, status); setError(m); addToast(m, 'error'); return; }
-      setHits(data.hits || []);
-      setBestGuess(data.best_guess ?? null);
-      if (typeof data.used === 'number' && typeof data.cap === 'number') setQuota({ used: data.used, cap: data.cap });
-      const n = (data.hits || []).length;
+
+      // Nothing was actually searched (the cap bit on the first photo). Saying
+      // "no websites found" here would claim a result that was never obtained;
+      // the error already explains what happened.
+      if (searched === 0) return;
+
+      const all = [...merged.values()].sort((a, b) => KIND_RANK[a.match_kind] - KIND_RANK[b.match_kind]);
+      setHits(all);
+      setBestGuess(guess);
+      const real = all.filter(h => h.match_kind !== 'similar').length;
       addToast(
-        n === 0 ? 'No websites found for that image' : `Found ${n} page${n === 1 ? '' : 's'}${data.cached ? ' (from your earlier search)' : ''}`,
-        n === 0 ? 'error' : 'success',
+        real === 0 ? 'No websites found using these photos' : `Found ${real} page${real === 1 ? '' : 's'} across ${searched} photo${searched === 1 ? '' : 's'}`,
+        real === 0 ? 'error' : 'success',
       );
     } catch (e) {
       const m = friendlyError(e);
       setError(m); addToast(m, 'error');
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -94,7 +135,7 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
           {(['upload', 'sku'] as Mode[]).map(m => (
             <button
               key={m}
-              onClick={() => { setMode(m); setHits(null); setError(''); setCandidates([]); setPhoto(''); }}
+              onClick={() => { setMode(m); setHits(null); setError(''); setCandidates([]); setPhotos([]); }}
               style={{
                 ...(mode === m ? S.btnPrimary : S.btnGhost),
                 flex: 1, minHeight: 44,
@@ -135,11 +176,16 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
               placeholder="e.g. 7101"
               style={{ ...S.fInput, width: '100%', textTransform: 'uppercase' }}
             />
-            <PhotoPicker sku={sku} selected={photo} onSelect={setPhoto} addToast={addToast} />
+            <PhotoPicker
+              sku={sku}
+              selected={photos}
+              onToggle={u => setPhotos(p => (p.includes(u) ? p.filter(x => x !== u) : [...p, u]))}
+              onReplaceAll={setPhotos}
+            />
             <div style={{ fontSize: 10, color: T.tx3, marginTop: 6 }}>
-              {photo
-                ? 'Searching the photo you picked.'
-                : 'Load the photos and pick one — otherwise the first photo in the folder is used.'}
+              {photos.length
+                ? `Searching ${photos.length} photo${photos.length === 1 ? '' : 's'} — each one is a separate search.`
+                : 'Type a SKU to load its photos.'}
             </div>
           </div>
         )}
@@ -149,9 +195,16 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
             // Wrapped, not passed directly: search() now takes an optional
             // folder, and onClick would hand it the MouseEvent.
             onClick={() => search()}
-            style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}
+            disabled={busy || (mode === 'sku' && photos.length === 0)}
+            style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy || (mode === 'sku' && photos.length === 0) ? 0.5 : 1 }}
           >
-            {busy ? 'Searching…' : 'Find websites'}
+            {/* The photo count sits on the control because it IS the cost:
+                three photos is three Vision calls and three of the daily 25. */}
+            {busy
+              ? (progress ? `Searching ${progress.done + 1} of ${progress.total}…` : 'Searching…')
+              : mode === 'sku' && photos.length > 1
+                ? `Find websites · ${photos.length} photos`
+                : 'Find websites'}
           </button>
           {(hits || file || sku) && (
             <button onClick={reset} style={{ ...S.btnGhost, minHeight: 44 }}>Clear</button>
