@@ -36,7 +36,10 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
       });
       const data = await resp.json();
       if (!resp.ok || !data.ok) { addToast(friendlyError(data.details || data.error || 'Push failed'), 'error'); setPushing(false); return; }
-      addToast(`Pushed to "${SHEET_NAME}" — ${data.matched || 0} SKUs matched of ${data.totalRows || 0} rows`, 'success');
+      // Naming the column is the point of the change — without it there is no
+      // way to tell the quantities landed in QTY and not whatever sits beside it.
+      const col = data.qtyColumn ? ` column ${data.qtyColumn.letter} (${data.qtyColumn.header})` : '';
+      addToast(`Pushed to "${SHEET_NAME}"${col} — ${data.matched || 0} SKUs matched of ${data.totalRows || 0} rows`, 'success');
     } catch (e: any) { addToast(friendlyError(e), 'error'); }
     setPushing(false);
   };

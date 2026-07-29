@@ -42,7 +42,7 @@ const fail = (status: number, error: string, req: Request, details?: string) =>
 // Dropbox requires the Dropbox-API-Arg header to be ASCII; JSON.stringify emits
 // raw UTF-8, so escape any non-ASCII to \uXXXX to avoid a "Bad HTTP header" 400.
 const asciiArg = (o: unknown) =>
-  JSON.stringify(o).replace(/[-￿]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+  JSON.stringify(o).replace(/[-￿]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
 
 function pemToDer(pem: string): Uint8Array {
   const normalized = pem.includes('\\n') ? pem.replace(/\\n/g, '\n') : pem;
@@ -752,17 +752,44 @@ Deno.serve(async (req) => {
       for (const r of rows) qtyMap[String(r[0] || '').toUpperCase()] = r[1] ?? 0;
       const token = await getGoogleToken();
       const sid = getSheetId();
+
+      // The target column is found BY HEADER, never assumed. This used to write
+      // to column B unconditionally: insert one column on the sheet and every
+      // push would silently overwrite the wrong data, because Sheets accepts
+      // the write without complaint.
+      const headerUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sid}/values/${encodeURIComponent(sheetName + '!1:1')}`;
+      const headerResp = await fetch(headerUrl, { headers: { authorization: `Bearer ${token}` } });
+      const headerData = await headerResp.json();
+      if (!headerResp.ok) throw new Error(`Sheets read ${headerResp.status}: ${headerData.error?.message || 'unknown'}`);
+      const headers: string[] = ((headerData.values || [])[0] || []).map((h: unknown) => String(h ?? '').trim());
+
+      // Exact match, not includes(): "QTY BLOCKED" or "OLD QTY" must not win.
+      const qtyCols = headers.map((h, i) => ({ h, i })).filter(c => c.h.toUpperCase() === 'QTY');
+      if (qtyCols.length === 0) {
+        return fail(400, `No "QTY" column on the ${sheetName} sheet — nothing was written`, req,
+          headers.filter(Boolean).length ? `Columns found: ${headers.filter(Boolean).join(', ')}` : 'The header row is empty');
+      }
+      if (qtyCols.length > 1) {
+        // Guessing between two is exactly the mistake this check exists to stop.
+        return fail(400, `The ${sheetName} sheet has ${qtyCols.length} columns named "QTY" — nothing was written`, req,
+          `Columns ${qtyCols.map(c => colLetter(c.i)).join(' and ')}. Rename or remove one, then push again.`);
+      }
+      const qtyIdx = qtyCols[0].i;
+      const qtyLetter = colLetter(qtyIdx);
+
       const readUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sid}/values/${encodeURIComponent(sheetName + '!A:A')}`;
       const readResp = await fetch(readUrl, { headers: { authorization: `Bearer ${token}` } });
       const readData = await readResp.json();
       if (!readResp.ok) throw new Error(`Sheets read ${readResp.status}: ${readData.error?.message || 'unknown'}`);
       const sheetRows: string[][] = readData.values || [];
-      const colB = sheetRows.slice(1).map((row: string[]) => { const sku = (row[0] || '').trim().toUpperCase(); if (!sku) return ['']; return [qtyMap[sku] !== undefined ? qtyMap[sku] : '']; });
-      const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sid}/values/${encodeURIComponent(sheetName + '!B2')}?valueInputOption=USER_ENTERED`;
-      const writeResp = await fetch(writeUrl, { method: 'PUT', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ values: colB }) });
+      const values = sheetRows.slice(1).map((row: string[]) => { const sku = (row[0] || '').trim().toUpperCase(); if (!sku) return ['']; return [qtyMap[sku] !== undefined ? qtyMap[sku] : '']; });
+
+      // Row 2 onward — the header stays untouched.
+      const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sid}/values/${encodeURIComponent(`${sheetName}!${qtyLetter}2`)}?valueInputOption=USER_ENTERED`;
+      const writeResp = await fetch(writeUrl, { method: 'PUT', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ values }) });
       if (!writeResp.ok) { const wd = await writeResp.json().catch(() => ({})); throw new Error(`Sheets write ${writeResp.status}: ${wd.error?.message || 'unknown'}`); }
-      const matched = colB.filter(r => r[0] !== '').length;
-      return json({ ok: true, count: rows.length, matched, totalRows: sheetRows.length }, req);
+      const matched = values.filter(r => r[0] !== '').length;
+      return json({ ok: true, count: rows.length, matched, totalRows: sheetRows.length, qtyColumn: { header: qtyCols[0].h, letter: qtyLetter } }, req);
     }
     return fail(400, `Unknown action: ${action}`, req);
   } catch (e) {
