@@ -9,6 +9,7 @@ import { useState, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import SkuInput from '../../ui/SkuInput';
+import PhotoPicker from './PhotoPicker';
 import { call, explain, fileToB64, type Hit, type FolderCandidate } from './api';
 import { exportHitsXlsx } from './exportHits';
 import HitList from './HitList';
@@ -28,6 +29,9 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
   // Set when one SKU lives in several Dropbox folders. Not an error — the app
   // is asking which folder, and these are the answers it will accept.
   const [candidates, setCandidates] = useState<FolderCandidate[]>([]);
+  // Which of the SKU's Dropbox photos to search. Empty = server falls back to
+  // the first one, which is the old behaviour.
+  const [photo, setPhoto] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const subject = mode === 'sku' ? sku.trim().toUpperCase() : (file?.name || 'Upload');
@@ -40,7 +44,7 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
   };
 
   const reset = () => {
-    setFile(null); setPreview(''); setSku(''); setHits(null); setBestGuess(null); setError(''); setCandidates([]);
+    setFile(null); setPreview(''); setSku(''); setHits(null); setBestGuess(null); setError(''); setCandidates([]); setPhoto('');
   };
 
   const search = async (folder?: string) => {
@@ -50,7 +54,7 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
     setBusy(true); setError(''); setHits(null); setCandidates([]);
     try {
       const payload = mode === 'sku'
-        ? { action: 'search', source: 'sku', sku: sku.trim().toUpperCase(), folder: folder || undefined }
+        ? { action: 'search', source: 'sku', sku: sku.trim().toUpperCase(), folder: folder || undefined, image_url: photo || undefined }
         : { action: 'search', source: 'upload', image_b64: await fileToB64(file as File) };
       const { status, data } = await call(payload);
       // A folder choice is a question, not a failure — offer the options
@@ -90,7 +94,7 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
           {(['upload', 'sku'] as Mode[]).map(m => (
             <button
               key={m}
-              onClick={() => { setMode(m); setHits(null); setError(''); setCandidates([]); }}
+              onClick={() => { setMode(m); setHits(null); setError(''); setCandidates([]); setPhoto(''); }}
               style={{
                 ...(mode === m ? S.btnPrimary : S.btnGhost),
                 flex: 1, minHeight: 44,
@@ -131,8 +135,11 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
               placeholder="e.g. 7101"
               style={{ ...S.fInput, width: '100%', textTransform: 'uppercase' }}
             />
+            <PhotoPicker sku={sku} selected={photo} onSelect={setPhoto} addToast={addToast} />
             <div style={{ fontSize: 10, color: T.tx3, marginTop: 6 }}>
-              Uses the first photo in that SKU&rsquo;s Dropbox folder, from the master sheet&rsquo;s IMAGE column.
+              {photo
+                ? 'Searching the photo you picked.'
+                : 'Load the photos and pick one — otherwise the first photo in the folder is used.'}
             </div>
           </div>
         )}
