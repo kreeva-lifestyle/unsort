@@ -148,16 +148,22 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
 
         {mode === 'upload' ? (
           <div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) pick(f); e.target.value = ''; }}
-            />
-            <button onClick={() => fileRef.current?.click()} style={{ ...S.btnGhost, width: '100%', minHeight: 44 }}>
+            {/* A <label> wrapping the input, NOT a button calling .click():
+                the tap opens the picker natively, with no JavaScript in the
+                path. And the input is offscreen rather than display:none —
+                iOS silently drops .click() on an unrendered input, which is
+                why this button did nothing on the phone. Same pattern as
+                OdetteImport / BrandTags / Minis. */}
+            <label style={{ ...S.btnGhost, width: '100%', minHeight: 44, position: 'relative', overflow: 'hidden' }}>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                style={{ position: 'absolute', width: 0, height: 0, opacity: 0, overflow: 'hidden' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) pick(f); e.target.value = ''; }}
+              />
               {file ? `Change photo — ${file.name}` : 'Choose or take a photo'}
-            </button>
+            </label>
             {preview && (
               <img
                 src={preview}
