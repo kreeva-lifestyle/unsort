@@ -5,7 +5,7 @@ import { supabase, SUPABASE_ANON_KEY } from '../../../lib/supabase';
 
 export const FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/client-finder';
 
-export type MatchKind = 'full' | 'partial' | 'page';
+export type MatchKind = 'full' | 'partial' | 'page' | 'similar';
 
 export interface Hit {
   domain: string;
@@ -40,8 +40,13 @@ export interface SearchResult {
 export const kindLabel: Record<MatchKind, string> = {
   full: 'Exact image',
   partial: 'Cropped or edited',
-  page: 'Listed by Google',
+  page: 'Listed by Google',      // legacy: no longer produced, old rows keep it
+  similar: 'Looks similar',
 };
+
+/** Similar-looking designs are NOT evidence anyone used your photo, so they are
+ *  separated everywhere rather than ranked alongside real matches. */
+export const isSimilar = (k: MatchKind) => k === 'similar';
 
 export const call = async (body: object): Promise<{ status: number; data: SearchResult }> => {
   const { data: { session } } = await supabase.auth.getSession();

@@ -162,6 +162,7 @@ interface WebDetection {
   fullMatchingImages?: { url?: string }[];
   partialMatchingImages?: { url?: string }[];
   pagesWithMatchingImages?: WebPage[];
+  visuallySimilarImages?: { url?: string }[];
   bestGuessLabels?: { label?: string }[];
 }
 
@@ -181,15 +182,45 @@ async function visionWebDetection(b64: string): Promise<WebDetection> {
   return resp?.webDetection ?? {};
 }
 
-const domainOf = (u: string): string => {
-  try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; }
+// A retailer serves its images from a CDN alias of itself, so myntra.com and
+// assets.myntassets.com are ONE seller listed twice. Folded deliberately and
+// conservatively - a wrong fold would merge two genuinely different sellers,
+// which is worse than a duplicate row.
+const CDN_PARENT: Record<string, string> = {
+  'myntassets.com': 'myntra.com',
+  'ytimg.com': 'youtube.com',
+  'fbsbx.com': 'facebook.com',
+  'in.pinterest.com': 'pinterest.com',
 };
 
-type Hit = { domain: string; url: string; page_title: string | null; match_kind: 'full' | 'partial' | 'page'; score: number | null };
+const domainOf = (u: string): string => {
+  try {
+    let h = new URL(u).hostname.replace(/^www\./, '').toLowerCase();
+    if (CDN_PARENT[h]) return CDN_PARENT[h];
+    // assets./cdn./img./images./media./medias./static. prefixes of a real site
+    const bare = h.replace(/^(assets\d*|cdn\d*|img|images|media|medias|static)\./, '');
+    if (bare !== h) h = bare;
+    for (const [suffix, parent] of Object.entries(CDN_PARENT)) {
+      if (h === suffix || h.endsWith('.' + suffix)) return parent;
+    }
+    return h;
+  } catch { return ''; }
+};
 
-// Pages are the answer to the actual question ("who posted it"). Bare image
-// URLs are added only for domains no page already covers, so a site is never
-// listed twice but a hosting domain is never silently dropped either.
+type Hit = { domain: string; url: string; page_title: string | null; match_kind: 'full' | 'partial' | 'page' | 'similar'; score: number | null };
+
+// Pages are the answer to the actual question ("who posted it").
+//
+// A page carrying NEITHER fullMatchingImages NOR partialMatchingImages is
+// dropped. Those are label associations, not image matches: searching DRS199
+// returned Amazon "Gown: Clothing", Zappos nightwear, four YouTube videos and
+// Collins Dictionary - all because the best-guess label was "gown". Eleven of
+// fourteen hits were that, burying the one result that mattered (a wholesaler
+// listing the design by name). They matched the WORD, not the photo.
+//
+// visuallySimilarImages are kept but marked 'similar' and never mixed in: they
+// show a competitor working in the same style, never that anyone used your
+// image, and the UI must not blur that line.
 function toHits(w: WebDetection): Hit[] {
   const hits: Hit[] = [];
   const seenDomain = new Set<string>();
@@ -197,12 +228,16 @@ function toHits(w: WebDetection): Hit[] {
     if (!p?.url) continue;
     const d = domainOf(p.url);
     if (!d) continue;
-    const kind: Hit['match_kind'] = (p.fullMatchingImages?.length ?? 0) > 0 ? 'full'
-      : (p.partialMatchingImages?.length ?? 0) > 0 ? 'partial' : 'page';
-    hits.push({ domain: d, url: p.url, page_title: p.pageTitle?.slice(0, 300) || null, match_kind: kind, score: p.score ?? null });
+    const full = (p.fullMatchingImages?.length ?? 0) > 0;
+    const partial = (p.partialMatchingImages?.length ?? 0) > 0;
+    if (!full && !partial) continue;              // word match, not image match
+    hits.push({
+      domain: d, url: p.url, page_title: p.pageTitle?.slice(0, 300) || null,
+      match_kind: full ? 'full' : 'partial', score: p.score ?? null,
+    });
     seenDomain.add(d);
   }
-  const addImages = (arr: { url?: string }[] | undefined, kind: 'full' | 'partial') => {
+  const addImages = (arr: { url?: string }[] | undefined, kind: 'full' | 'partial' | 'similar') => {
     for (const im of arr ?? []) {
       if (!im?.url) continue;
       const d = domainOf(im.url);
@@ -213,7 +248,8 @@ function toHits(w: WebDetection): Hit[] {
   };
   addImages(w.fullMatchingImages, 'full');
   addImages(w.partialMatchingImages, 'partial');
-  const rank = { full: 0, partial: 1, page: 2 };
+  addImages(w.visuallySimilarImages, 'similar');
+  const rank = { full: 0, partial: 1, page: 2, similar: 3 };
   return hits.sort((a, b) => rank[a.match_kind] - rank[b.match_kind] || (b.score ?? 0) - (a.score ?? 0));
 }
 
@@ -289,17 +325,31 @@ Deno.serve(async (req) => {
     if (source === 'sku') {
       sku = String(body?.sku || '').trim().toUpperCase();
       if (!sku) return fail(400, 'Enter a SKU', req);
-      try {
-        const got = await skuImageBytes(sku, req.headers.get('authorization') || '', String(body?.folder || ''));
-        bytes = got.bytes;
-      } catch (e) {
-        // 409, not 500: nothing is broken, the request is just ambiguous. The
-        // candidates go back so the UI can offer a real choice. No Vision call
-        // happens and no search row is written, so this costs no quota.
-        if (e instanceof NeedsFolder) {
-          return json({ ok: false, needsFolder: true, sku, error: e.message, candidates: e.candidates }, req, 409);
+      // The client now lists the SKU's photos itself and sends the one the
+      // user picked, so there is nothing to resolve and nothing to guess.
+      // Without it we fall back to the old first-photo path, so a half-deployed
+      // client keeps working.
+      const picked = String(body?.image_url || '').trim();
+      if (picked) {
+        const raw = picked.replace(/([?&])dl=[01]\b/, '$1raw=1');
+        const img = await fetch(raw.includes('raw=1') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}raw=1`);
+        if (!img.ok) return fail(502, `Dropbox returned ${img.status} for that photo`, req);
+        const buf = new Uint8Array(await img.arrayBuffer());
+        if (buf.length < 512) return fail(502, 'That photo came back empty or as a preview page', req);
+        bytes = buf;
+      } else {
+        try {
+          const got = await skuImageBytes(sku, req.headers.get('authorization') || '', String(body?.folder || ''));
+          bytes = got.bytes;
+        } catch (e) {
+          // 409, not 500: nothing is broken, the request is just ambiguous. The
+          // candidates go back so the UI can offer a real choice. No Vision call
+          // happens and no search row is written, so this costs no quota.
+          if (e instanceof NeedsFolder) {
+            return json({ ok: false, needsFolder: true, sku, error: e.message, candidates: e.candidates }, req, 409);
+          }
+          throw e;
         }
-        throw e;
       }
     } else {
       const b64in = String(body?.image_b64 || '').replace(/^data:[^;]+;base64,/, '');
