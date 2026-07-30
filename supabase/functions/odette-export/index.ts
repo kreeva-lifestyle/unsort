@@ -42,7 +42,7 @@ const fail = (status: number, error: string, req: Request, details?: string) =>
 // Dropbox requires the Dropbox-API-Arg header to be ASCII; JSON.stringify emits
 // raw UTF-8, so escape any non-ASCII to \uXXXX to avoid a "Bad HTTP header" 400.
 const asciiArg = (o: unknown) =>
-  JSON.stringify(o).replace(/[-￿]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+  JSON.stringify(o).replace(/[\x7f-\uffff]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
 
 function pemToDer(pem: string): Uint8Array {
   const normalized = pem.includes('\\n') ? pem.replace(/\\n/g, '\n') : pem;
