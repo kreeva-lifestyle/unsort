@@ -4,10 +4,28 @@
 import { useState } from 'react';
 import { T, S } from '../../../lib/theme';
 import Empty from '../../ui/Empty';
-import { kindLabel, type Hit, type MatchKind } from './api';
+import { kindLabel, pixels, sizeLabel, type Hit, type MatchKind } from './api';
 
 const kindColor: Record<MatchKind, string> = { full: T.gr, partial: T.yl, page: T.tx3, similar: T.bl };
 const rank: Record<MatchKind, number> = { full: 0, partial: 1, page: 2, similar: 3 };
+
+// Biggest copy first — a site hosting a 3000px original is a different lead
+// from one showing a thumbnail. Anything unmeasured sorts last: the host
+// refused to say, which is not the same as the image being small.
+const biggestFirst = (a: Hit, b: Hit) =>
+  (pixels(b) - pixels(a)) || ((b.bytes ?? 0) - (a.bytes ?? 0)) || rank[a.match_kind] - rank[b.match_kind];
+
+/** The largest image any one website hosts — what that website is ranked on. */
+const bestOf = (list: Hit[]) => list.reduce((m, h) => (pixels(h) > pixels(m) ? h : m), list[0]);
+
+function SizeText({ hit, dim }: { hit: Hit; dim?: boolean }) {
+  const label = sizeLabel(hit);
+  return (
+    <span style={{ fontSize: 10, color: label ? (dim ? T.tx3 : T.tx2) : T.tx3, fontFamily: T.mono, opacity: label ? 1 : 0.55 }}>
+      {label || 'size unknown'}
+    </span>
+  );
+}
 
 export default function HitList({ hits: allHits }: { hits: Hit[] }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -29,10 +47,14 @@ export default function HitList({ hits: allHits }: { hits: Hit[] }) {
   }
 
   const byDomain = new Map<string, Hit[]>();
-  for (const h of hits) byDomain.set(h.domain, [...(byDomain.get(h.domain) || []), h]);
+  for (const h of hits) byDomain.set(h.domain, [...(byDomain.get(h.domain) || []), h].sort(biggestFirst));
+  // Websites ranked by the largest image each one hosts, not by match strength.
+  // Exact and cropped are deliberately mixed here: a 4000px cropped copy is a
+  // better lead than a 200px exact one. The one line never crossed is
+  // "similar", which is filtered out above and rendered separately.
   const domains = [...byDomain.entries()].sort((a, b) => {
-    const best = (x: Hit[]) => Math.min(...x.map(h => rank[h.match_kind]));
-    return best(a[1]) - best(b[1]) || b[1].length - a[1].length;
+    const A = bestOf(a[1]), B = bestOf(b[1]);
+    return biggestFirst(A, B) || b[1].length - a[1].length;
   });
 
   return (
@@ -47,6 +69,7 @@ export default function HitList({ hits: allHits }: { hits: Hit[] }) {
     <div style={{ borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.01)', overflow: 'hidden' }}>
       {domains.map(([domain, list]) => {
         const strongest = list.reduce((a, b) => (rank[a.match_kind] <= rank[b.match_kind] ? a : b));
+        const largest = bestOf(list);
         const isOpen = !!open[domain];
         return (
           <div key={domain} style={{ borderBottom: `1px solid ${T.bd}` }}>
@@ -57,8 +80,9 @@ export default function HitList({ hits: allHits }: { hits: Hit[] }) {
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: kindColor[strongest.match_kind], flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: T.tx, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{domain}</div>
-                <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>
-                  {kindLabel[strongest.match_kind]}{list.length > 1 ? ` · ${list.length} pages` : ''}
+                <div style={{ fontSize: 10, color: T.tx3, marginTop: 2, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'baseline' }}>
+                  <SizeText hit={largest} />
+                  <span>{kindLabel[strongest.match_kind]}{list.length > 1 ? ` · ${list.length} pages` : ''}</span>
                 </div>
               </div>
               <span style={{ fontSize: 10, color: T.tx3, flexShrink: 0 }}>{isOpen ? '−' : '+'}</span>
@@ -74,8 +98,11 @@ export default function HitList({ hits: allHits }: { hits: Hit[] }) {
                 <div style={{ fontSize: 11, color: T.ac2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {h.page_title || h.url}
                 </div>
-                <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {kindLabel[h.match_kind]} · {h.url}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', marginTop: 2 }}>
+                  <SizeText hit={h} dim />
+                  <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {kindLabel[h.match_kind]} · {h.url}
+                  </span>
                 </div>
               </a>
             ))}

@@ -13,7 +13,29 @@ export interface Hit {
   page_title: string | null;
   match_kind: MatchKind;
   score: number | null;
+  /** The matching image itself — `url` is the page for page hits. */
+  image_url?: string | null;
+  /** null means NOT MEASURED (the host refused), never "small". */
+  width?: number | null;
+  height?: number | null;
+  bytes?: number | null;
 }
+
+/** Pixel count, 0 when unmeasured — only ever used for ordering, never shown. */
+export const pixels = (h: Hit) => (h.width ?? 0) * (h.height ?? 0);
+
+/** "3200 × 4800 · 2.4 MB", or null when nothing could be measured. Never
+ *  invents a number: a host that blocks us is unknown, not small. */
+export function sizeLabel(h: Hit): string | null {
+  const dim = h.width && h.height ? `${h.width} × ${h.height}` : null;
+  const size = h.bytes ? humanBytes(h.bytes) : null;
+  return dim && size ? `${dim} · ${size}` : dim || size;
+}
+
+export const humanBytes = (n: number): string =>
+  n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB`
+    : n >= 1024 ? `${Math.round(n / 1024)} KB`
+      : `${n} B`;
 
 /** A Dropbox folder offered when one SKU exists in several of them. Same shape
  *  the Dropbox Link Generator already uses (dropboxlinks/api.ts). */

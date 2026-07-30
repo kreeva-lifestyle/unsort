@@ -207,7 +207,16 @@ const domainOf = (u: string): string => {
   } catch { return ''; }
 };
 
-type Hit = { domain: string; url: string; page_title: string | null; match_kind: 'full' | 'partial' | 'page' | 'similar'; score: number | null };
+type Hit = {
+  domain: string; url: string; page_title: string | null;
+  match_kind: 'full' | 'partial' | 'page' | 'similar'; score: number | null;
+  // The matching IMAGE. For a page hit `url` is the page (that is what a human
+  // wants to open), so the image is carried separately - it is what gets
+  // measured. null width/height/bytes mean NOT MEASURED, never "small".
+  image_url: string | null; width: number | null; height: number | null; bytes: number | null;
+};
+
+const unmeasured = { image_url: null, width: null, height: null, bytes: null };
 
 // Pages are the answer to the actual question ("who posted it").
 //
@@ -234,6 +243,10 @@ function toHits(w: WebDetection): Hit[] {
     hits.push({
       domain: d, url: p.url, page_title: p.pageTitle?.slice(0, 300) || null,
       match_kind: full ? 'full' : 'partial', score: p.score ?? null,
+      ...unmeasured,
+      // Vision hands back the image URLs on the page and this used to throw
+      // them away after a length check. They are the only thing measurable.
+      image_url: p.fullMatchingImages?.[0]?.url ?? p.partialMatchingImages?.[0]?.url ?? null,
     });
     seenDomain.add(d);
   }
@@ -242,7 +255,8 @@ function toHits(w: WebDetection): Hit[] {
       if (!im?.url) continue;
       const d = domainOf(im.url);
       if (!d || seenDomain.has(d)) continue;
-      hits.push({ domain: d, url: im.url, page_title: null, match_kind: kind, score: null });
+      // Here the hit IS the image, so both fields point at it.
+      hits.push({ domain: d, url: im.url, page_title: null, match_kind: kind, score: null, ...unmeasured, image_url: im.url });
       seenDomain.add(d);
     }
   };
@@ -251,6 +265,152 @@ function toHits(w: WebDetection): Hit[] {
   addImages(w.visuallySimilarImages, 'similar');
   const rank = { full: 0, partial: 1, page: 2, similar: 3 };
   return hits.sort((a, b) => rank[a.match_kind] - rank[b.match_kind] || (b.score ?? 0) - (a.score ?? 0));
+}
+
+// -- Image measurement -------------------------------------------------------
+// Vision returns no dimensions and no file size, so the only way to rank by
+// "biggest copy" is to go and look. A ranged GET pulls a few KB of header
+// rather than a whole 3 MB photo.
+const MEASURE_MAX = 60;        // hits measured per search
+const MEASURE_CONCURRENCY = 8;
+const MEASURE_TIMEOUT_MS = 4_000;
+const MEASURE_BUDGET_MS = 15_000;
+const HEADER_BYTES = 65_535;
+
+const be16 = (b: Uint8Array, o: number) => (b[o] << 8) | b[o + 1];
+const le16 = (b: Uint8Array, o: number) => b[o] | (b[o + 1] << 8);
+const be32 = (b: Uint8Array, o: number) => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
+
+// Dimensions from a file header. Returns null rather than guessing - a wrong
+// number here would reorder the results and mislead.
+function imageSize(b: Uint8Array): { width: number; height: number } | null {
+  if (b.length < 16) return null;
+
+  // PNG: 8-byte signature, then IHDR length+type, then w/h as big-endian u32.
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) {
+    return { width: be32(b, 16), height: be32(b, 20) };
+  }
+  // GIF: logical screen descriptor, little-endian u16.
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) {
+    return { width: le16(b, 6), height: le16(b, 8) };
+  }
+  // WebP: RIFF container, three possible codec chunks.
+  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+      b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) {
+    const tag = String.fromCharCode(b[12], b[13], b[14], b[15]);
+    if (tag === 'VP8 ' && b.length >= 30) {
+      // 3-byte frame tag, 3-byte sync code (9D 01 2A), then 14-bit dims.
+      return { width: le16(b, 26) & 0x3fff, height: le16(b, 28) & 0x3fff };
+    }
+    if (tag === 'VP8L' && b.length >= 25) {
+      const n = b[21] | (b[22] << 8) | (b[23] << 16) | (b[24] << 24);
+      return { width: (n & 0x3fff) + 1, height: ((n >> 14) & 0x3fff) + 1 };
+    }
+    if (tag === 'VP8X' && b.length >= 30) {
+      return {
+        width: (b[24] | (b[25] << 8) | (b[26] << 16)) + 1,
+        height: (b[27] | (b[28] << 8) | (b[29] << 16)) + 1,
+      };
+    }
+    return null;
+  }
+  // JPEG: walk the marker chain BY LENGTH. Scanning for an SOF byte pattern
+  // instead would find the SOF of the EXIF thumbnail inside APP1 and report
+  // the thumbnail's size as the image's.
+  if (b[0] === 0xff && b[1] === 0xd8) {
+    let i = 2;
+    while (i + 3 < b.length) {
+      if (b[i] !== 0xff) { i++; continue; }        // resync over fill bytes
+      const m = b[i + 1];
+      if (m === 0xff) { i++; continue; }
+      if (m === 0x01 || (m >= 0xd0 && m <= 0xd9)) { i += 2; continue; }  // standalone
+      const len = be16(b, i + 2);
+      if (len < 2) return null;
+      // SOF0-SOF15, excluding DHT (C4), JPG (C8) and DAC (CC), which sit in
+      // the same range but are not frame headers.
+      const isSof = m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc;
+      if (isSof) {
+        if (i + 9 > b.length) return null;
+        return { height: be16(b, i + 5), width: be16(b, i + 7) };
+      }
+      if (m === 0xda) return null;                 // start of scan, no SOF seen
+      i += 2 + len;
+    }
+    return null;
+  }
+  return null;
+}
+
+type Measured = { width: number | null; height: number | null; bytes: number | null };
+
+async function measureImage(url: string): Promise<Measured> {
+  const miss: Measured = { width: null, height: null, bytes: null };
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), MEASURE_TIMEOUT_MS);
+  try {
+    const r = await fetch(url, {
+      signal: ctrl.signal, redirect: 'follow',
+      headers: {
+        Range: `bytes=0-${HEADER_BYTES}`,
+        // Some CDNs serve a block page to an unrecognised agent.
+        accept: 'image/*,*/*;q=0.8',
+      },
+    });
+    if (!r.ok) { try { await r.body?.cancel(); } catch { /* noop */ } return miss; }
+
+    // 206 gives the true total after the slash; a server ignoring Range
+    // answers 200 and Content-Length is then the whole file.
+    const cr = r.headers.get('content-range') || '';
+    const total = cr.includes('/') ? Number(cr.split('/')[1]) : Number(r.headers.get('content-length') || '');
+    const bytes = Number.isFinite(total) && total > 0 ? total : null;
+
+    const buf = new Uint8Array(await r.arrayBuffer());
+    const dim = imageSize(buf);
+    // Sanity bound mirrors the DB CHECK, so a parser slip can never poison a
+    // whole insert batch.
+    if (!dim || dim.width <= 0 || dim.height <= 0 || dim.width > 100000 || dim.height > 100000) {
+      return { width: null, height: null, bytes };
+    }
+    return { width: dim.width, height: dim.height, bytes };
+  } catch {
+    return miss;                                   // timeout, DNS, TLS, abort
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// Measures in place, bounded three ways: how many, how parallel, how long.
+// Returns how many were skipped so the caller can SAY so rather than let the
+// user assume everything was measured.
+async function measureAll(hits: Hit[]): Promise<{ measured: number; skipped: number }> {
+  const targets = hits.slice(0, MEASURE_MAX).filter(h => h.image_url);
+  const skipped = hits.length - targets.length;
+  const deadline = Date.now() + MEASURE_BUDGET_MS;
+  let cursor = 0, measured = 0;
+  const worker = async () => {
+    while (cursor < targets.length) {
+      if (Date.now() > deadline) return;           // out of time: leave as null
+      const h = targets[cursor++];
+      const m = await measureImage(h.image_url as string);
+      h.width = m.width; h.height = m.height; h.bytes = m.bytes;
+      if (m.width || m.bytes) measured++;
+    }
+  };
+  await Promise.all(Array.from({ length: MEASURE_CONCURRENCY }, () => worker()));
+  return { measured, skipped };
+}
+
+// Biggest copy first, but never at the cost of the full/partial vs similar
+// distinction: a look-alike from another brand outranking a genuine match
+// would read as someone copying a design when they have not.
+// Unmeasured sorts last - it means "unknown", not "small".
+const px = (h: Hit) => (h.width ?? 0) * (h.height ?? 0);
+function bySize(a: Hit, b: Hit): number {
+  const band = (h: Hit) => (h.match_kind === 'similar' ? 1 : 0);
+  if (band(a) !== band(b)) return band(a) - band(b);
+  const known = (h: Hit) => (h.width && h.height ? 0 : h.bytes ? 1 : 2);
+  if (known(a) !== known(b)) return known(a) - known(b);
+  return px(b) - px(a) || (b.bytes ?? 0) - (a.bytes ?? 0);
 }
 
 // ── Handler ─────────────────────────────────────────────────────────────────
@@ -369,14 +529,21 @@ Deno.serve(async (req) => {
       { headers: svcHeaders });
     const prev = (await prevR.json().catch(() => []))?.[0];
     if (prev?.id) {
-      const hR = await fetch(`${SB_URL}/rest/v1/client_finder_hits?search_id=eq.${prev.id}&select=domain,url,page_title,match_kind,score`, { headers: svcHeaders });
-      const hits = await hR.json().catch(() => []);
+      // The size columns come back too: re-measuring on every cache hit would
+      // be slow and would hammer the hosting sites for numbers already known.
+      const hR = await fetch(`${SB_URL}/rest/v1/client_finder_hits?search_id=eq.${prev.id}&select=domain,url,page_title,match_kind,score,image_url,width,height,bytes`, { headers: svcHeaders });
+      const hits = ((await hR.json().catch(() => [])) as Hit[]).sort(bySize);
       return json({ ok: true, cached: true, search_id: prev.id, best_guess: prev.best_guess, hits, used: used, cap: DAILY_CAP }, req);
     }
 
     const web = await visionWebDetection(bytesToB64(bytes));
     const hits = toHits(web);
     const bestGuess = web.bestGuessLabels?.[0]?.label ?? null;
+
+    // Go and look at how big each hosted copy actually is, then rank by it.
+    // No extra Vision calls, so this does not touch the daily cap.
+    const sizing = await measureAll(hits);
+    hits.sort(bySize);
 
     const insR = await fetch(`${SB_URL}/rest/v1/client_finder_searches`, {
       method: 'POST',
@@ -387,16 +554,31 @@ Deno.serve(async (req) => {
     if (!search?.id) return fail(500, 'Search ran but could not be saved', req, await insR.text().catch(() => ''));
 
     if (hits.length) {
-      await fetch(`${SB_URL}/rest/v1/client_finder_hits`, {
+      const hR = await fetch(`${SB_URL}/rest/v1/client_finder_hits`, {
         method: 'POST', headers: svcHeaders,
         body: JSON.stringify(hits.map(h => ({ ...h, search_id: search.id }))),
       });
+      // Previously unchecked. A rejected batch (one bad column, one failed
+      // CHECK) stores NOTHING, and the next search of the same photo would
+      // then hit the cache and cheerfully report zero results. The search
+      // itself succeeded, so this is a warning on a 200, not a failure.
+      if (!hR.ok) {
+        console.error('client-finder: hits insert failed', hR.status, await hR.text().catch(() => ''));
+        return json({
+          ok: true, cached: false, search_id: search.id, best_guess: bestGuess,
+          entities: (web.webEntities ?? []).filter(e => e.description).slice(0, 8).map(e => e.description),
+          hits, used: used + 1, cap: DAILY_CAP,
+          warning: 'Results are shown but could not be saved — searching this photo again will re-run it.',
+        }, req);
+      }
     }
 
     return json({
       ok: true, cached: false, search_id: search.id, best_guess: bestGuess,
       entities: (web.webEntities ?? []).filter(e => e.description).slice(0, 8).map(e => e.description),
       hits, used: used + 1, cap: DAILY_CAP,
+      // Said out loud: silence here would read as "everything was measured".
+      sized: sizing.measured, unsized: hits.length - sizing.measured, size_skipped: sizing.skipped,
     }, req);
   } catch (e) {
     return fail(500, (e as Error).message || 'Client Finder failed', req);

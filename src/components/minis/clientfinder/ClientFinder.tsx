@@ -140,7 +140,19 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
 
         for (const h of data.hits || []) {
           const prev = merged.get(h.url);
-          if (!prev || KIND_RANK[h.match_kind] < KIND_RANK[prev.match_kind]) merged.set(h.url, h);
+          if (!prev) { merged.set(h.url, h); continue; }
+          // Two photos can turn up the same page. Keep the strongest match
+          // kind AND the larger measurement independently — one photo may
+          // have been measurable where the other was blocked, and losing a
+          // known size to an unknown one would push a real lead down the list.
+          const best: Hit = KIND_RANK[h.match_kind] < KIND_RANK[prev.match_kind] ? { ...h } : { ...prev };
+          const px = (x: Hit) => (x.width ?? 0) * (x.height ?? 0);
+          const bigger = px(h) > px(prev) ? h : prev;
+          best.width = bigger.width ?? prev.width ?? h.width ?? null;
+          best.height = bigger.height ?? prev.height ?? h.height ?? null;
+          best.bytes = Math.max(prev.bytes ?? 0, h.bytes ?? 0) || null;
+          best.image_url = best.image_url || bigger.image_url || null;
+          merged.set(h.url, best);
         }
         guess = guess ?? (data.best_guess ?? null);
         if (typeof data.used === 'number' && typeof data.cap === 'number') setQuota({ used: data.used, cap: data.cap });
@@ -153,7 +165,16 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
       // the error already explains what happened.
       if (searched === 0) return;
 
-      const all = [...merged.values()].sort((a, b) => KIND_RANK[a.match_kind] - KIND_RANK[b.match_kind]);
+      // Biggest copy first, so the Excel export comes out in the same order the
+      // list shows. 'similar' stays pinned below every real match — a large
+      // look-alike is not evidence anyone used your photo.
+      const px = (x: Hit) => (x.width ?? 0) * (x.height ?? 0);
+      const band = (x: Hit) => (x.match_kind === 'similar' ? 1 : 0);
+      const all = [...merged.values()].sort((a, b) =>
+        band(a) - band(b)
+        || px(b) - px(a)
+        || (b.bytes ?? 0) - (a.bytes ?? 0)
+        || KIND_RANK[a.match_kind] - KIND_RANK[b.match_kind]);
       setHits(all);
       setBestGuess(guess);
       const real = all.filter(h => h.match_kind !== 'similar').length;
