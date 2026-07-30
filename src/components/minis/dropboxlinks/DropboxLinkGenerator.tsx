@@ -131,7 +131,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
         {modeBtn('combine', 'Combine', 'One link for the whole SKU folder')}
         {modeBtn('separate', 'Separate', 'A link for every image inside the SKU folder')}
         <span style={{ fontSize: 10, color: T.tx3 }}>{mode === 'combine' ? 'One link per SKU (whole folder)' : 'One link per image in the folder'} · both are ready — tap to switch</span>
-        <button onClick={() => setShowSettings(s => !s)} style={{ ...S.btnGhost, marginLeft: 'auto' }}>{showSettings ? 'Close Settings' : 'Settings'}</button>
+        <button onClick={() => setShowSettings(s => !s)} style={{ ...S.btnGhost, minHeight: 36, marginLeft: 'auto' }}>{showSettings ? 'Close Settings' : 'Settings'}</button>
       </div>
       {rootCount === 0 && (
         <div style={{ background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 11, color: T.tx2 }}>
@@ -139,13 +139,20 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+      {/* flex-start, not the usual center: SkuInput is a two-row block (input +
+          size chips / title line) whose input sits at the TOP. Without this the
+          row defaults to `stretch` and every button grows to the full height of
+          that block the moment a SKU resolves. Centring would instead drop them
+          below the input they sit next to. */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <SkuInput value={sku} onChange={setSku} onKeyDown={e => { if (e.key === 'Enter') genOne(); }} placeholder="Enter SKU e.g. 15003" style={{ ...S.fInput, width: 200, fontFamily: T.mono }} />
-        <button onClick={() => genOne()} disabled={busy || !sku.trim()} style={{ ...S.btnPrimary, pointerEvents: busy ? 'none' : 'auto', opacity: busy || !sku.trim() ? 0.5 : 1 }}>{busy ? 'Generating…' : 'Generate Link'}</button>
-        <button onClick={() => setShowPaste(p => !p)} style={{ ...S.btnGhost, color: T.ac2, border: '1px solid oklch(0.55 0.22 265 / .2)' }}>{showPaste ? 'Hide paste' : 'Paste SKUs'}</button>
+        {/* minHeight 36 matches S.fInput's height — the btn recipes set none and
+            land at ~32px. Same as modeBtn above. */}
+        <button onClick={() => genOne()} disabled={busy || !sku.trim()} style={{ ...S.btnPrimary, minHeight: 36, pointerEvents: busy ? 'none' : 'auto', opacity: busy || !sku.trim() ? 0.5 : 1 }}>{busy ? 'Generating…' : 'Generate Link'}</button>
+        <button onClick={() => setShowPaste(p => !p)} style={{ ...S.btnGhost, minHeight: 36, color: T.ac2, border: '1px solid oklch(0.55 0.22 265 / .2)' }}>{showPaste ? 'Hide paste' : 'Paste SKUs'}</button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) importFile(f); e.target.value = ''; }} />
-        <button onClick={() => fileRef.current?.click()} disabled={bulkBusy} style={{ ...S.btnGhost, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)', pointerEvents: bulkBusy ? 'none' : 'auto', opacity: bulkBusy ? 0.5 : 1 }}>{bulkBusy ? `Bulk… ${progress.done}/${progress.total}` : 'Bulk from Excel'}</button>
-        {bulk && bulk.length > 0 && !bulkBusy && <button onClick={() => exportBulkXlsx(bulk)} style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export {bulk.length}</button>}
+        <button onClick={() => fileRef.current?.click()} disabled={bulkBusy} style={{ ...S.btnGhost, minHeight: 36, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)', pointerEvents: bulkBusy ? 'none' : 'auto', opacity: bulkBusy ? 0.5 : 1 }}>{bulkBusy ? `Bulk… ${progress.done}/${progress.total}` : 'Bulk from Excel'}</button>
+        {bulk && bulk.length > 0 && !bulkBusy && <button onClick={() => exportBulkXlsx(bulk)} style={{ ...S.btnGhost, minHeight: 36, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export {bulk.length}</button>}
       </div>
 
       {showPaste && (
