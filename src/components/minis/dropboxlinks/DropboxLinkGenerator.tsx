@@ -1,28 +1,26 @@
 // Dropbox Link Generator — type a SKU (or paste many / import Excel) and get
 // view-only Dropbox links. COMBINE = one link for the SKU's folder, SEPARATE =
-// a link per image inside it; both are generated together so the toggle is
-// instant. Admin/manager/operator can also write the folder link straight into
-// the offline master sheet's IMAGE column. Folder search happens server-side.
+// a link per image inside it. Both are still fetched per generate so the toggle
+// stays instant, but only the mode ON SCREEN is awaited — see genOne.
+// Admin/manager/operator can also write the folder link straight into the
+// offline master sheet's IMAGE column. Folder search happens server-side.
 import { useState, useEffect, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { useAuth } from '../../../hooks/useAuth';
-import { call, explainGen, GenResult, WriteResult } from './api';
+import { call, WriteResult } from './api';
 import { runBulk, parseSkuText, parseSkuFile, exportBulkXlsx, BulkRow, BULK_CAP } from './bulk';
+import { useGenOne, Mode } from './useGenOne';
 import LinkResult from './LinkResult';
 import RootSettings from './RootSettings';
 import SkuInput from '../../ui/SkuInput';
-
-type Mode = 'combine' | 'separate';
-type Pair = { combine: GenResult | null; separate: GenResult | null };
 
 export default function DropboxLinkGenerator({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const { profile } = useAuth();
   const canSave = ['admin', 'manager', 'operator'].includes((profile?.role as string) || '');
   const [mode, setMode] = useState<Mode>('combine');
   const [sku, setSku] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [results, setResults] = useState<Pair | null>(null);
+  const { busy, results, pending, genOne } = useGenOne(mode, sku, addToast);
   const [savingSheet, setSavingSheet] = useState(false);
   const [rootCount, setRootCount] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -42,28 +40,6 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
     if (data.ok) setRootCount((data.roots || []).filter((r: any) => r.enabled !== false).length);
   }).catch(() => {});
   useEffect(() => { refreshRoots(); }, []);
-
-  // Generate BOTH modes at once so switching Combine/Separate needs no refetch.
-  const genOne = async (folderPath?: string) => {
-    const cur = results?.combine?.sku || results?.separate?.sku || '';
-    const s = (folderPath ? cur || sku : sku).trim().toUpperCase();
-    if (busy || !s) return;
-    setBusy(true); if (!folderPath) setResults(null);
-    try {
-      const [c, sep] = await Promise.all([
-        call({ action: 'linkgen', sku: s, mode: 'combine', folder: folderPath || undefined }),
-        call({ action: 'linkgen', sku: s, mode: 'separate', folder: folderPath || undefined }),
-      ]);
-      const toRes = (r: { status: number; data: any }): GenResult =>
-        r.data.ok ? r.data : { ok: false, sku: s, error: explainGen(r.data, r.status), folder: r.data.folder, candidates: r.data.candidates };
-      setResults({ combine: toRes(c), separate: toRes(sep) });
-      const act = mode === 'combine' ? c : sep;
-      if (c.data.ok && sep.data.ok) addToast(`Links ready for ${s} — Combine & Separate`, 'success');
-      else if (c.data.ok || sep.data.ok) addToast(`${c.data.ok ? 'Combine' : 'Separate'} links ready for ${s} — ${c.data.ok ? 'Separate' : 'Combine'} failed`, 'info');
-      else addToast(explainGen(act.data, act.status), act.data?.candidates?.length ? 'info' : 'error');
-    } catch (e) { addToast(friendlyError(e), 'error'); }
-    setBusy(false);
-  };
 
   const copy = async (text: string, what = 'Link') => {
     try { await navigator.clipboard.writeText(text); addToast(`${what} copied`, 'success'); }
@@ -122,6 +98,9 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
     </button>
   );
   const active = results ? results[mode] : null;
+  // Toggled to the mode still being fetched in the background: show that it's
+  // loading rather than falling through to the "enter a SKU" empty state.
+  const activeLoading = !active && !busy && pending === mode && !!results;
   const saveUrl = results?.combine?.ok ? results.combine.links?.[0]?.url : undefined;
   const pct = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
 
@@ -130,7 +109,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         {modeBtn('combine', 'Combine', 'One link for the whole SKU folder')}
         {modeBtn('separate', 'Separate', 'A link for every image inside the SKU folder')}
-        <span style={{ fontSize: 10, color: T.tx3 }}>{mode === 'combine' ? 'One link per SKU (whole folder)' : 'One link per image in the folder'} · both are ready — tap to switch</span>
+        <span style={{ fontSize: 10, color: T.tx3 }}>{mode === 'combine' ? 'One link per SKU (whole folder)' : 'One link per image in the folder'} · tap to switch</span>
         <button onClick={() => setShowSettings(s => !s)} style={{ ...S.btnGhost, minHeight: 36, marginLeft: 'auto' }}>{showSettings ? 'Close Settings' : 'Settings'}</button>
       </div>
       {rootCount === 0 && (
@@ -168,6 +147,11 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
       )}
 
       {active && <LinkResult result={active} saveUrl={saveUrl} canSave={canSave} saving={savingSheet} busy={busy} onPickCandidate={genOne} onCopy={copy} onSave={url => saveToSheet(url, active.sku)} />}
+      {activeLoading && (
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 14, marginBottom: 12, maxWidth: 720, fontSize: 11, color: T.tx3 }}>
+          Generating {mode === 'combine' ? 'the folder link' : 'a link per image'}…
+        </div>
+      )}
 
       {bulk && bulk.length > 0 && (
         <>
@@ -190,7 +174,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
           </div>
         </>
       )}
-      {!active && !bulk && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Enter a SKU and press Generate — or paste / import an Excel of SKUs for bulk links.</div>}
+      {!active && !activeLoading && !bulk && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Enter a SKU and press Generate — or paste / import an Excel of SKUs for bulk links.</div>}
 
       {showSettings && <RootSettings addToast={addToast} onChanged={refreshRoots} />}
     </div>
