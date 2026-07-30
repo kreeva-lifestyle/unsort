@@ -18,10 +18,26 @@ export interface ValidateResult {
   warnings?: string[];
 }
 
+// The edge caps one validate call at 60 SKUs (VALIDATE_CAP) and splitIssues
+// treats any uncovered SKU as not-in-master — so a 200-SKU run must be
+// checked in batches and merged, or everything past 60 would be wrongly
+// flagged before a single token is spent.
+const VALIDATE_BATCH = 60;
+
 export async function runValidate(items: SkuLine[], templateId: string): Promise<ValidateResult> {
-  const { status, data } = await call({ action: 'validate', items: items.map(i => ({ sku: i.sku })), templateId });
-  if (!data?.ok) throw new Error(String(data?.details || data?.error || `Pre-check failed (${status})`));
-  return data as ValidateResult;
+  let merged: ValidateResult | null = null;
+  for (let i = 0; i < items.length; i += VALIDATE_BATCH) {
+    const batch = items.slice(i, i + VALIDATE_BATCH);
+    const { status, data } = await call({ action: 'validate', items: batch.map(b => ({ sku: b.sku })), templateId });
+    if (!data?.ok) throw new Error(String(data?.details || data?.error || `Pre-check failed (${status})`));
+    const v = data as ValidateResult;
+    if (!merged) merged = v;
+    else {
+      merged.results = merged.results.concat(v.results);
+      if (v.warnings?.length) merged.warnings = [...(merged.warnings || []), ...v.warnings];
+    }
+  }
+  return merged || { templateCategory: null, templateCategoryLabel: null, categorySource: null, results: [] };
 }
 
 export interface PreflightIssues {
