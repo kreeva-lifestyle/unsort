@@ -183,9 +183,14 @@ async function callerRole(req: Request): Promise<string | null> {
 let dbxCache: { token: string; expiresAt: number; rt: string } | null = null;
 
 async function getDropboxToken(): Promise<string> {
-  const [rt, ck, cs] = await Promise.all([getSecret('dropbox_refresh_token'), getSecret('dropbox_app_key'), getSecret('dropbox_app_secret')]);
+  // Only the refresh token gates the cache, so read it alone on the hot path.
+  // app_key/app_secret are needed solely to MINT a new token, so they're fetched
+  // on a miss — previously all three were fetched up front, costing 3 PostgREST
+  // round trips on every call including cache hits.
+  const rt = await getSecret('dropbox_refresh_token');
   if (!rt) throw new Error('dropbox_not_connected');
   if (dbxCache && dbxCache.rt === rt && dbxCache.expiresAt > Date.now() + 60_000) return dbxCache.token;
+  const [ck, cs] = await Promise.all([getSecret('dropbox_app_key'), getSecret('dropbox_app_secret')]);
   if (!ck || !cs) throw new Error('Dropbox app credentials missing from vault');
   const r = await fetch('https://api.dropbox.com/oauth2/token', {
     method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -197,12 +202,27 @@ async function getDropboxToken(): Promise<string> {
   return dbxCache.token;
 }
 
+// One Retry-After-aware retry on 429. linkgen now fans out (roots searched in
+// parallel, 8 share-links in flight), so a brief burst that used to be spread
+// over sequential calls can now land inside Dropbox's rate limit — without this,
+// parallelising would trade latency for "Rate limited" errors. Deliberately ONE
+// retry, capped at 3s: callers already degrade gracefully on a real 429, and a
+// long sleep would risk the edge function's own timeout. A persistent 429 still
+// reaches the caller unchanged.
 async function dbx(token: string, endpoint: string, body: unknown): Promise<{ status: number; data: any }> {
-  const r = await fetch(`https://api.dropboxapi.com/2/${endpoint}`, {
-    method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  return { status: r.status, data: await r.json().catch(() => ({})) };
+  for (let attempt = 0; ; attempt++) {
+    const r = await fetch(`https://api.dropboxapi.com/2/${endpoint}`, {
+      method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (r.status === 429 && attempt === 0) {
+      const wait = Math.min(Number(r.headers.get('retry-after')) || 1, 3);
+      try { await r.body?.cancel(); } catch { /* nothing to drain */ }
+      await new Promise(res => setTimeout(res, wait * 1000));
+      continue;
+    }
+    return { status: r.status, data: await r.json().catch(() => ({})) };
+  }
 }
 
 async function checkLink(url: string, sku: string, dbxToken: string | null): Promise<string | null> {
@@ -266,9 +286,19 @@ async function rootPathForTab(tab: string, token: string): Promise<string> {
 }
 
 const genRootCache: Record<string, { p: string; at: number }> = {};
+
+// The roots list changes approximately never, but was read from the vault over
+// HTTP on every linkgen. Same TTL and same invalidation points as genRootCache
+// (a roots save and a Dropbox reconnect both clear it), so a Settings change
+// still takes effect immediately rather than after the TTL.
+let genRootsCache: { v: { label: string; url: string; enabled: boolean }[]; at: number } | null = null;
 async function loadGenRoots(): Promise<{ label: string; url: string; enabled: boolean }[]> {
+  if (genRootsCache && Date.now() - genRootsCache.at < ROOT_TTL_MS) return genRootsCache.v;
   const raw = await getSecret('dropbox_linkgen_roots');
-  try { const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; } catch { return []; }
+  let v: { label: string; url: string; enabled: boolean }[] = [];
+  try { const arr = raw ? JSON.parse(raw) : []; if (Array.isArray(arr)) v = arr; } catch { v = []; }
+  genRootsCache = { v, at: Date.now() };
+  return v;
 }
 
 // Forward→Dropbox single shared folder: { url, path, display } in one vault row.
@@ -352,6 +382,7 @@ Deno.serve(async (req) => {
       if (!r.ok || !data.refresh_token) return fail(400, 'Dropbox connect failed', req, data.error_description || data.error || 'No refresh token returned — get a fresh code and try again');
       await setSecret('dropbox_refresh_token', data.refresh_token);
       dbxCache = null;
+      genRootsCache = null;
       for (const k of Object.keys(rootPathCache)) delete rootPathCache[k];
       for (const k of Object.keys(genRootCache)) delete genRootCache[k];
       return json({ ok: true, connected: true }, req);
@@ -444,6 +475,7 @@ Deno.serve(async (req) => {
           else { delete genRootCache[r.url]; out.push({ ...r, resolved: false, error: meta.data?.error_summary || `HTTP ${meta.status}` }); }
         }
         await setSecret('dropbox_linkgen_roots', JSON.stringify(roots));
+        genRootsCache = null; // saved roots must apply to the next linkgen, not 10 min later
         return json({ ok: true, roots: out }, req);
       }
       return fail(400, `Unknown op: ${op}`, req);
@@ -477,10 +509,18 @@ Deno.serve(async (req) => {
         if (meta.status >= 400 || meta.data?.['.tag'] !== 'folder') return json({ ok: false, sku, error: 'That folder no longer exists in Dropbox' }, req);
         folder = meta.data;
       } else {
+        // One search per configured root, fired CONCURRENTLY. search_v2 is
+        // Dropbox's slowest metadata endpoint (~0.5-3s each) and awaiting the
+        // roots in series was the bulk of a request — 4 enabled roots meant 4
+        // serial searches before a single link was minted. Results are consumed
+        // in root order below, so the candidate list is identical to what the
+        // sequential version produced; only the waiting is shared.
+        const searches = await Promise.all(rootPaths.map(rootPath =>
+          dbx(token, 'files/search_v2', { query: sku, options: { path: rootPath, max_results: 25, filename_only: true } })
+        ));
+        if (searches.some(sr => sr.status === 429)) return json({ ok: false, sku, error: 'Rate limited — try again in a minute' }, req);
         const found: any[] = [];
-        for (const rootPath of rootPaths) {
-          const sr = await dbx(token, 'files/search_v2', { query: sku, options: { path: rootPath, max_results: 25, filename_only: true } });
-          if (sr.status === 429) return json({ ok: false, sku, error: 'Rate limited — try again in a minute' }, req);
+        for (const sr of searches) {
           if (sr.status >= 400) continue;
           for (const m of (sr.data.matches || [])) { const md = m.metadata?.metadata; if (md && md['.tag'] === 'folder') found.push(md); }
         }
@@ -503,15 +543,33 @@ Deno.serve(async (req) => {
       const files = (ls.data.entries || []).filter((e: any) => e['.tag'] === 'file' && isImage(e.name)).sort((a: any, b: any) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
       if (files.length === 0) return json({ ok: false, sku, folder: folder.path_display, error: `No images directly inside ${folder.path_display}` }, req);
       const CAP = 40;
+      const targets = files.slice(0, CAP);
       let note = files.length > CAP ? `Folder has ${files.length} images — first ${CAP} linked` : undefined;
       let needsReconnect = false;
-      const links: { name: string; url: string; error?: string }[] = [];
-      for (const f of files.slice(0, CAP)) {
-        const mk = await ensureSharedLink(token, f.path_lower);
-        if (mk.needsReconnect) { needsReconnect = true; note = mk.error; break; }
-        if (mk.rateLimited) { note = `${mk.error} — ${links.length} of ${Math.min(files.length, CAP)} links generated`; break; }
-        links.push({ name: f.name, url: mk.url || '', error: mk.url ? undefined : mk.error });
-      }
+      // 8 share-links in flight instead of one at a time. This was the worst case
+      // in the whole feature: 40 images x 1-2 Dropbox calls each meant up to 80
+      // SEQUENTIAL round trips (~20s) for one SKU. Same 8-worker shared-cursor
+      // shape `linkcheck` uses above, so there's one pool pattern in this file.
+      // Slots are pre-sized and written BY INDEX, so the returned link order still
+      // follows the filename sort no matter which worker finishes first.
+      const slots: ({ name: string; url: string; error?: string } | null)[] = new Array(targets.length).fill(null);
+      let cursor = 0, stop = false, rlError = '';
+      const linkWorker = async () => {
+        while (!stop && cursor < targets.length) {
+          const i = cursor++;
+          const f = targets[i];
+          const mk = await ensureSharedLink(token, f.path_lower);
+          // Stop pulling new work on a fatal condition. Calls already in flight
+          // still land in their slots, so the user keeps every link that
+          // succeeded rather than losing the tail of the batch.
+          if (mk.needsReconnect) { needsReconnect = true; note = mk.error; stop = true; return; }
+          if (mk.rateLimited) { rlError = mk.error || 'Rate limited — try again in a minute'; stop = true; return; }
+          slots[i] = { name: f.name, url: mk.url || '', error: mk.url ? undefined : mk.error };
+        }
+      };
+      await Promise.all(Array.from({ length: 8 }, () => linkWorker()));
+      const links = slots.filter(Boolean) as { name: string; url: string; error?: string }[];
+      if (rlError && !needsReconnect) note = `${rlError} — ${links.length} of ${targets.length} links generated`;
       const good = links.filter(l => l.url).length;
       return json({ ok: good > 0, sku, mode, folder: folder.path_display, links, note, needsReconnect: needsReconnect || undefined, error: good === 0 ? (note || 'Could not create links') : undefined }, req);
     }
