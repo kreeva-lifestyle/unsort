@@ -5,7 +5,7 @@
 // can reverse image search, because none has an image index behind it. The UI
 // says so plainly rather than implying magic, because the failure mode that
 // matters here is a user reading "no websites found" as "nobody copied this".
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import SkuInput from '../../ui/SkuInput';
@@ -42,6 +42,13 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
   const [photos, setPhotos] = useState<string[]>([]);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Unmount is the one exit removeShot/reset don't cover: Minis mounts these
+  // tools by route, so switching tools with photos attached leaked every blob
+  // URL for the life of the tab. The ref keeps the cleanup closure current.
+  const shotsRef = useRef<Shot[]>([]);
+  shotsRef.current = shots;
+  useEffect(() => () => { shotsRef.current.forEach(s => URL.revokeObjectURL(s.url)); }, []);
 
   const subject = mode === 'sku'
     ? sku.trim().toUpperCase()
@@ -117,9 +124,15 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
     const merged = new Map<string, Hit>();
     let guess: string | null = null;
     let searched = 0;
+    // One bad photo (HEIC, oversized, Vision hiccup) must not throw away the
+    // pages other photos already paid a Vision call to find. Failures are
+    // remembered and reported; the loop keeps going.
+    const failed: string[] = [];
+    const nameOf = (t: string | File, i: number) => t instanceof File ? t.name : `photo ${i + 1}`;
 
     try {
-      for (const target of targets) {
+      for (let ti = 0; ti < targets.length; ti++) {
+        const target = targets[ti];
         const payload = mode === 'sku'
           ? { action: 'search', source: 'sku', sku: sku.trim().toUpperCase(), folder: folder || undefined, image_url: (target as string) || undefined }
           : { action: 'search', source: 'upload', image_b64: await fileToB64(target as File) };
@@ -136,22 +149,25 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
           setError(`Searched ${searched} of ${targets.length} photos — ${data?.error || 'daily limit reached'}.`);
           break;
         }
-        if (!data?.ok) { const m = explain(data, status); setError(m); addToast(m, 'error'); return; }
+        if (!data?.ok) { failed.push(`${nameOf(target, ti)}: ${explain(data, status)}`); continue; }
+        // The server can succeed but fail to store the result — it says so
+        // once, and hiding that would misrepresent what the cache will do.
+        if (data.warning) addToast(String(data.warning), 'error');
 
         for (const h of data.hits || []) {
           const prev = merged.get(h.url);
           if (!prev) { merged.set(h.url, h); continue; }
           // Two photos can turn up the same page. Keep the strongest match
-          // kind AND the larger measurement independently — one photo may
-          // have been measurable where the other was blocked, and losing a
-          // known size to an unknown one would push a real lead down the list.
+          // kind, and take the MEASUREMENT (dimensions + bytes + measured URL)
+          // as one unit from the better-measured response — mixing one file's
+          // pixels with another file's bytes described an image that does not
+          // exist, and that fabrication went straight into the Excel export.
           const best: Hit = KIND_RANK[h.match_kind] < KIND_RANK[prev.match_kind] ? { ...h } : { ...prev };
           const px = (x: Hit) => (x.width ?? 0) * (x.height ?? 0);
-          const bigger = px(h) > px(prev) ? h : prev;
-          best.width = bigger.width ?? prev.width ?? h.width ?? null;
-          best.height = bigger.height ?? prev.height ?? h.height ?? null;
-          best.bytes = Math.max(prev.bytes ?? 0, h.bytes ?? 0) || null;
-          best.image_url = best.image_url || bigger.image_url || null;
+          const score = (x: Hit) => px(x) || (x.bytes ?? 0);
+          const measured = score(h) > score(prev) ? h : prev;
+          best.width = measured.width; best.height = measured.height;
+          best.bytes = measured.bytes; best.image_url = measured.image_url;
           merged.set(h.url, best);
         }
         guess = guess ?? (data.best_guess ?? null);
@@ -160,9 +176,13 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
         setProgress(targets.length > 1 ? { done: searched, total: targets.length } : null);
       }
 
-      // Nothing was actually searched (the cap bit on the first photo). Saying
-      // "no websites found" here would claim a result that was never obtained;
-      // the error already explains what happened.
+      if (failed.length) {
+        const m = `${failed.length} of ${targets.length} photo${failed.length === 1 ? '' : 's'} failed — ${failed.slice(0, 2).join('; ')}${failed.length > 2 ? '…' : ''}`;
+        setError(m); addToast(m, 'error');
+      }
+      // Nothing was actually searched (the cap bit on the first photo, or every
+      // photo failed). Saying "no websites found" here would claim a result
+      // that was never obtained; the error already explains what happened.
       if (searched === 0) return;
 
       // Biggest copy first, so the Excel export comes out in the same order the

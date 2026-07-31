@@ -52,6 +52,9 @@ export interface SearchResult {
   cap?: number;
   error?: string;
   details?: string;
+  /** Search succeeded but the result could not be stored — the same photo
+   *  will re-run (and re-spend) instead of hitting the 24h cache. */
+  warning?: string;
   /** The SKU sits in more than one Dropbox folder — not an error, a question.
    *  `candidates` are the folders to choose between. */
   needsFolder?: boolean;
