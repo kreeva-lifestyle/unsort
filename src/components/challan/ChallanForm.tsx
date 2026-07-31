@@ -80,6 +80,12 @@ export type ChallanFormProps = {
 export default function ChallanForm(p: ChallanFormProps) {
   const { addToast } = useNotifications();
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
+  // Last price THIS FORM auto-filled, per row. Lets a corrected SKU replace
+  // its own auto-fill: without it, typing DRS102 (auto ₹X), then fixing the
+  // row to DRS105, kept DRS102's price — the empty-box guard saw ₹X as a
+  // negotiated price. A price the operator actually typed clears the entry,
+  // so a human's number is still never overwritten.
+  const autoFilled = useRef<Record<number, number>>({});
   const [nextNum, setNextNum] = useState<number | null>(null);
   const [outstanding, setOutstanding] = useState(0);
   const [recentCustomers, setRecentCustomers] = useState<{ name: string; phone?: string; id?: string }[]>([]);
@@ -247,20 +253,26 @@ export default function ChallanForm(p: ChallanFormProps) {
                     // sized design that means after a size chip is picked, so
                     // the price never lands on a half-typed parent SKU.
                     //
-                    // Fills the exc-GST price ONLY into an empty box: a
-                    // negotiated price already typed must never be silently
-                    // overwritten by list price.
+                    // Fills the exc-GST price only into an empty box OR over
+                    // this form's own earlier auto-fill (a corrected SKU must
+                    // bring its own price). A price the operator typed is
+                    // never overwritten.
                     onPick={prod => {
                       if (prod.price_exc_gst == null) return;
                       const n = [...p.items];
-                      if (!Number(n[i].price)) { n[i].price = Number(prod.price_exc_gst); p.setItems(n); }
+                      const cur = Number(n[i].price);
+                      if (!cur || cur === autoFilled.current[i]) {
+                        n[i].price = Number(prod.price_exc_gst);
+                        autoFilled.current[i] = Number(prod.price_exc_gst);
+                        p.setItems(n);
+                      }
                     }}
                     placeholder="SKU / Item name"
                     disabled={!!(p.isReturn && p.returnSource)}
                     style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1, width: '100%' }}
                   />
                   <input type="number" min="1" step="1" value={it.quantity || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].quantity = Math.max(0, Math.round(Number(e.target.value))); p.setItems(n); }} placeholder="1" style={{ background: 'rgba(255,255,255,0.04)', border: qtyBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'center' as const }} />
-                  <input type="number" min="0" step="0.01" value={it.price || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].price = Math.max(0, Number(e.target.value)); p.setItems(n); }} placeholder="0" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: priceBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
+                  <input type="number" min="0" step="0.01" value={it.price || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].price = Math.max(0, Number(e.target.value)); delete autoFilled.current[i]; p.setItems(n); }} placeholder="0" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: priceBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
                   <div className="challan-disc-col" style={{ display: 'flex', gap: 2, alignItems: 'center', opacity: p.isReturn && p.returnSource ? 0.6 : 1 }}>
                     <select value={it.discount_type || 'flat'} onChange={e => { const n = [...p.items]; n[i].discount_type = e.target.value; n[i].discount_value = 0; p.setItems(n); }} disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx3, fontSize: 11, padding: '4px 6px', outline: 'none', width: 32 }}>
                       <option value="flat">₹</option><option value="percentage">%</option>

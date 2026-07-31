@@ -195,17 +195,27 @@ const CDN_PARENT: Record<string, string> = {
 
 const domainOf = (u: string): string => {
   try {
-    let h = new URL(u).hostname.replace(/^www\./, '').toLowerCase();
+    const h = new URL(u).hostname.replace(/^www\./, '').toLowerCase();
     if (CDN_PARENT[h]) return CDN_PARENT[h];
-    // assets./cdn./img./images./media./medias./static. prefixes of a real site
-    const bare = h.replace(/^(assets\d*|cdn\d*|img|images|media|medias|static)\./, '');
-    if (bare !== h) h = bare;
     for (const [suffix, parent] of Object.entries(CDN_PARENT)) {
       if (h === suffix || h.endsWith('.' + suffix)) return parent;
     }
     return h;
+    // No generic cdn./assets./img. prefix-stripping here — it turned
+    // cdn.shopify.com into "shopify.com", and the per-domain dedupe below then
+    // DELETED every Shopify-hosted store after the first one. Multi-tenant
+    // hosts are not CDN aliases of one seller. Folding stays opt-in via the
+    // hardcoded CDN_PARENT map, exactly as its comment demands.
   } catch { return ''; }
 };
+
+// Hosts where one domain serves MANY unrelated sellers. Deduping these by
+// domain would keep one store and silently drop the rest — for Indian
+// ethnicwear, Shopify resellers are the dominant copy vector, so that was
+// likely the single largest source of missed clients. Dedupe by full URL
+// instead: a duplicate row is cheaper than a deleted client.
+const MULTI_TENANT = ['shopify.com', 'myshopify.com', 'wixstatic.com', 'wixsite.com', 'squarespace-cdn.com', 'squarespace.com', 'bigcartel.com', 'blogspot.com', 'wordpress.com', 'cloudfront.net'];
+const isMultiTenant = (d: string) => MULTI_TENANT.some(s => d === s || d.endsWith('.' + s));
 
 type Hit = {
   domain: string; url: string; page_title: string | null;
@@ -250,14 +260,19 @@ function toHits(w: WebDetection): Hit[] {
     });
     seenDomain.add(d);
   }
+  const seenUrl = new Set<string>();
   const addImages = (arr: { url?: string }[] | undefined, kind: 'full' | 'partial' | 'similar') => {
     for (const im of arr ?? []) {
       if (!im?.url) continue;
       const d = domainOf(im.url);
-      if (!d || seenDomain.has(d)) continue;
+      if (!d) continue;
+      // Multi-tenant hosts dedupe by URL, everything else by domain — ten
+      // Shopify stores hosting the design must yield ten rows, not one.
+      if (isMultiTenant(d) ? seenUrl.has(im.url) : seenDomain.has(d)) continue;
       // Here the hit IS the image, so both fields point at it.
       hits.push({ domain: d, url: im.url, page_title: null, match_kind: kind, score: null, ...unmeasured, image_url: im.url });
       seenDomain.add(d);
+      seenUrl.add(im.url);
     }
   };
   addImages(w.fullMatchingImages, 'full');
@@ -364,7 +379,31 @@ async function measureImage(url: string): Promise<Measured> {
     const total = cr.includes('/') ? Number(cr.split('/')[1]) : Number(r.headers.get('content-length') || '');
     const bytes = Number.isFinite(total) && total > 0 ? total : null;
 
-    const buf = new Uint8Array(await r.arrayBuffer());
+    // Read AT MOST the header window, then hang up. arrayBuffer() here trusted
+    // the Range header to have been honoured — but plenty of hosts answer a
+    // ranged GET with 200 and the whole file, and 8 workers each buffering a
+    // print-res JPEG is how an edge isolate hits its memory ceiling and takes
+    // the entire (already paid-for) search down with it.
+    const CAP = HEADER_BYTES + 1;
+    let buf = new Uint8Array(0);
+    const reader = r.body?.getReader();
+    if (reader) {
+      const parts: Uint8Array[] = [];
+      let got = 0;
+      while (got < CAP) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) { parts.push(value); got += value.length; }
+      }
+      try { await reader.cancel(); } catch { /* already closed */ }
+      buf = new Uint8Array(Math.min(got, CAP));
+      let off = 0;
+      for (const p of parts) {
+        if (off >= buf.length) break;
+        buf.set(p.subarray(0, Math.min(p.length, buf.length - off)), off);
+        off += p.length;
+      }
+    }
     const dim = imageSize(buf);
     // Sanity bound mirrors the DB CHECK, so a parser slip can never poison a
     // whole insert batch.
@@ -442,11 +481,20 @@ Deno.serve(async (req) => {
     // user's daily quota - this is how result quality gets measured honestly.
     const PX = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
     const probeUrl = String(body?.image_url || '').trim();
+    // The image dry-run needs the ping SECRET, not just a session: for a
+    // signed-in user it was an unmetered billed Vision call (no search row, no
+    // daily cap, no audit trail) plus an open server-side fetch of any URL
+    // they typed. Ops holding the secret keep the full dry-run; a session
+    // gets the 1x1 reachability check only.
+    if (probeUrl && !allowed) return fail(403, 'The image dry-run needs the ping secret', req);
+    if (probeUrl && !/^https:\/\//i.test(probeUrl)) return fail(400, 'Only https image URLs can be probed', req);
     try {
       let b64 = PX;
       if (probeUrl) {
-        const im = await fetch(probeUrl);
-        if (!im.ok) return fail(502, `Could not fetch that image: HTTP ${im.status}`, req);
+        const im = await fetch(probeUrl, { redirect: 'follow' });
+        if (!im.ok) { try { await im.body?.cancel(); } catch { /* noop */ } return fail(502, `Could not fetch that image: HTTP ${im.status}`, req); }
+        const len = Number(im.headers.get('content-length') || 0);
+        if (len > 15_000_000) { try { await im.body?.cancel(); } catch { /* noop */ } return fail(413, 'That image is too large to probe', req); }
         b64 = bytesToB64(new Uint8Array(await im.arrayBuffer()));
       }
       const web = await visionWebDetection(b64);
@@ -474,6 +522,12 @@ Deno.serve(async (req) => {
       `${SB_URL}/rest/v1/client_finder_searches?searched_by=eq.${who.id}&created_at=gte.${since}&select=id`,
       { headers: { ...svcHeaders, Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } });
     const used = Number((cntR.headers.get('content-range') || '/0').split('/')[1] || 0);
+    // Fail CLOSED. An errored count query (or a content-range of "*" -> NaN)
+    // used to read as used=0/NaN and wave every request past the cap — the one
+    // control this file exists to enforce, off exactly when the DB is unwell.
+    if (!cntR.ok || !Number.isFinite(used)) {
+      return fail(503, 'Could not verify today\'s search count - try again in a moment', req);
+    }
     if (used >= DAILY_CAP) {
       return fail(429, `Daily limit reached - ${DAILY_CAP} searches per person per day. Try again tomorrow.`, req);
     }
@@ -532,8 +586,16 @@ Deno.serve(async (req) => {
       // The size columns come back too: re-measuring on every cache hit would
       // be slow and would hammer the hosting sites for numbers already known.
       const hR = await fetch(`${SB_URL}/rest/v1/client_finder_hits?search_id=eq.${prev.id}&select=domain,url,page_title,match_kind,score,image_url,width,height,bytes`, { headers: svcHeaders });
-      const hits = ((await hR.json().catch(() => [])) as Hit[]).sort(bySize);
-      return json({ ok: true, cached: true, search_id: prev.id, best_guess: prev.best_guess, hits, used: used, cap: DAILY_CAP }, req);
+      const hRaw = await hR.json().catch(() => []);
+      // A PostgREST ERROR parses as an object, and .sort on it threw a 500 on
+      // every repeat search. A failed cache read now falls through to a fresh
+      // search instead of crashing (the sha-dedupe lookup takes the newest
+      // row, so the duplicate search row is harmless).
+      if (hR.ok && Array.isArray(hRaw)) {
+        const hits = (hRaw as Hit[]).sort(bySize);
+        return json({ ok: true, cached: true, search_id: prev.id, best_guess: prev.best_guess, hits, used: used, cap: DAILY_CAP }, req);
+      }
+      console.error('client-finder: cached hits read failed', hR.status);
     }
 
     const web = await visionWebDetection(bytesToB64(bytes));
@@ -558,12 +620,16 @@ Deno.serve(async (req) => {
         method: 'POST', headers: svcHeaders,
         body: JSON.stringify(hits.map(h => ({ ...h, search_id: search.id }))),
       });
-      // Previously unchecked. A rejected batch (one bad column, one failed
-      // CHECK) stores NOTHING, and the next search of the same photo would
-      // then hit the cache and cheerfully report zero results. The search
-      // itself succeeded, so this is a warning on a 200, not a failure.
+      // A rejected batch (one bad column, one failed CHECK) stores NOTHING —
+      // and the search row written above would then satisfy the 24h sha-dedupe
+      // and serve an empty "cached" result for a photo that had matches. The
+      // row must go too, so the next search genuinely re-runs; only then is
+      // the warning below true. The search itself succeeded, so this stays a
+      // warning on a 200, not a failure.
       if (!hR.ok) {
         console.error('client-finder: hits insert failed', hR.status, await hR.text().catch(() => ''));
+        await fetch(`${SB_URL}/rest/v1/client_finder_searches?id=eq.${search.id}`, { method: 'DELETE', headers: svcHeaders })
+          .catch(e => console.error('client-finder: poisoned search row cleanup failed', e));
         return json({
           ok: true, cached: false, search_id: search.id, best_guess: bestGuess,
           entities: (web.webEntities ?? []).filter(e => e.description).slice(0, 8).map(e => e.description),

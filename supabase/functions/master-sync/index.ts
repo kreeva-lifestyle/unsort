@@ -199,7 +199,13 @@ async function syncTab(tab: string, mode: string, modified: string | null): Prom
   try {
     if (mode === 'auto') {
       if (modified && lease.sheet_modified && new Date(modified).getTime() === new Date(lease.sheet_modified).getTime()) {
-        await db.from('master_sheet_sync').update({ status: 'idle' }).eq('tab', tab);
+        // A probe that CONFIRMED the sheet is unchanged is a successful
+        // freshness check — record it as one. Updating only `status` here left
+        // last_success_at frozen at the last work-doing run, so consumers
+        // gating on it (listing-ai's 45-min staleness window vs the hourly
+        // full sync) declared a byte-perfect mirror "stale" for 15 minutes of
+        // every hour and fell back to slow direct Google reads.
+        await db.from('master_sheet_sync').update({ status: 'idle', last_success_at: new Date().toISOString(), last_error: null }).eq('tab', tab);
         return { tab, skipped: true, reason: 'sheet unchanged' };
       }
       // No probe (Drive unavailable): do not re-download every two minutes.
@@ -210,7 +216,13 @@ async function syncTab(tab: string, mode: string, modified: string | null): Prom
     }
 
     const raw = await readSheetRaw(tab);
-    if (raw.length === 0) throw new Error('tab is empty');
+    // < 2, not === 0: a header-only response would make shapeRows return [],
+    // and the vanished-rows delete below would then wipe the ENTIRE tab from
+    // the mirror — after which product_catalog's next refresh empties every
+    // SKU suggestion in the app. A sheet that really has zero data rows and a
+    // truncated/glitched API response are indistinguishable here, so refuse
+    // both; the error lands in the ledger and the next run retries.
+    if (raw.length < 2) throw new Error('tab came back with no data rows — refusing to clear the mirror');
     const headers = (raw[0] || []).map(h => String(h ?? '').trim());
     const shaped = await shapeRows(tab, raw, headers);
 

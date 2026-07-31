@@ -62,13 +62,26 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
         </div>
       </div>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-        <div style={{ padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, fontSize: 10, fontWeight: 600, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1 }}>Payment Mode Breakup</div>
+        {/* Deliberately COLLECTED money (payments by payment_date), while Net
+            Revenue above is BILLED money (challan totals by created_at). Unpaid
+            challans and payments landing on later days make the two disagree —
+            correctly. Without the caption and total, that reads as a bug. */}
+        <div style={{ padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <span style={{ fontSize: 10, fontWeight: 600, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1 }}>Payment Mode Breakup</span>
+          <span style={{ fontSize: 9, color: T.tx3 }}>money collected in this range — unpaid billed amounts are not here</span>
+        </div>
         {Object.entries(analytics.byMode).map(([mode, amount]) => (
           <div key={mode} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: `1px solid ${T.bd}` }}>
             <span style={{ fontSize: 12, color: T.tx }}>{mode}</span>
             <span style={{ fontSize: 12, fontFamily: T.mono, color: T.ac2, fontWeight: 600 }}>₹{Number(amount).toLocaleString('en-IN')}</span>
           </div>
         ))}
+        {Object.keys(analytics.byMode).length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255,255,255,0.02)' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Total collected</span>
+            <span style={{ fontSize: 12, fontFamily: T.mono, color: T.tx, fontWeight: 700 }}>₹{Object.values(analytics.byMode).reduce((s, a) => s + Number(a), 0).toLocaleString('en-IN')}</span>
+          </div>
+        )}
         {Object.keys(analytics.byMode).length === 0 && <div style={{ padding: 16, textAlign: 'center' as const, color: T.tx3, fontSize: 11 }}>No payments recorded in this date range</div>}
       </div>
     </div>

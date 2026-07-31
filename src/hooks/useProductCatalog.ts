@@ -124,20 +124,31 @@ const load = async (): Promise<Index> => {
       // Seed from disk first so suggestions work on the very first keystroke,
       // then confirm freshness. If the fingerprint call fails (offline), the
       // cached rows still stand rather than leaving the box empty.
+      //
+      // The fingerprint is captured BEFORE fetchAll, not after: the catalog
+      // refresh runs every 2 minutes, and stamping rows with a fingerprint
+      // taken after the fetch could pair a post-refresh fingerprint with
+      // pre-refresh rows — which then validate as "fresh" on every later
+      // load, serving stale prices forever. Taken before, a mid-fetch
+      // refresh just means one extra refetch on the next load. (Same reason
+      // an ETag is issued with the body it describes, not after it.)
       if (cached) {
         cache = buildIndex(cached.rows);
         try {
-          if ((await fingerprint()) !== cached.fp) {
+          const fp = await fingerprint();
+          if (fp !== cached.fp) {
             const rows = await fetchAll();
             cache = buildIndex(rows);
-            writeCache(await fingerprint(), rows);
+            writeCache(fp, rows);
           }
         } catch { /* keep the cached index */ }
         return cache;
       }
+      let fp: string | null = null;
+      try { fp = await fingerprint(); } catch { /* cache write skipped below */ }
       const rows = await fetchAll();
       cache = buildIndex(rows);
-      try { writeCache(await fingerprint(), rows); } catch { /* cache is optional */ }
+      if (fp !== null) writeCache(fp, rows);
       return cache;
     } finally {
       inflight = null;
