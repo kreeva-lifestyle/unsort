@@ -60,6 +60,23 @@ function formatTimestamp(d: Date) {
   return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+// LOCAL calendar date as YYYY-MM-DD. toISOString().slice(0,10) is the UTC
+// date — before 05:30 IST that is *yesterday*, which made "Today" filters
+// and date-input maxes wrong every morning.
+function localISODate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// CSV cell: always quoted, quotes doubled, and formula-leading characters
+// neutralised. Unquoted cells broke on the very first export because the
+// en-IN timestamp format itself contains a comma.
+function csvCell(v: unknown): string {
+  let s = String(v ?? '');
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+
 // ── Background write queue ──────────────────────────────────────────────────────
 type QueueItem = { rows: unknown[][]; sheetName: string; retries: number; };
 const writeQueue: QueueItem[] = [];
@@ -73,10 +90,15 @@ function getDroppedBatches() { return droppedBatches; }
 function clearDroppedBatches() { droppedBatches.length = 0; notifyDropped(); }
 
 // Scans whose DB insert failed twice — parked here so the operator can retry
-// from the banner. Previously they lived only in component memory (lost on
-// refresh) while the banner falsely claimed background retries continued.
+// from the banner. Persisted to localStorage: module scope survives unmount
+// but NOT a refresh or an evicted PWA tab, which is exactly when a shop-floor
+// phone loses them.
 type FailedDbScan = { scanRow: PackTimeScanInsert; sheetRow: unknown[]; sheetName: string };
-const failedDbScans: FailedDbScan[] = [];
+const FAILED_KEY = 'packtime_failed_db_scans';
+const failedDbScans: FailedDbScan[] = (() => {
+  try { const raw = localStorage.getItem(FAILED_KEY); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; } catch { return []; }
+})();
+const persistFailed = () => { try { localStorage.setItem(FAILED_KEY, JSON.stringify(failedDbScans.slice(0, 500))); } catch { /* quota */ } };
 
 async function flushQueue() {
   if (flushing || writeQueue.length === 0) return;
@@ -92,11 +114,19 @@ async function flushQueue() {
     }
     try {
       const headers = await getAuthHeaders();
-      const resp = await fetch(EDGE_FN, {
-        method: 'POST', headers,
-        body: JSON.stringify({ action: 'batch', rows: batch, sheetName }),
-      });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      // Timeout like callEdge has: a half-open socket (wifi AP dying without a
+      // RST) left this await hanging forever, `flushing` stuck true, and the
+      // queue grew silently with no retry and no dropped-scan warning.
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 20000);
+      try {
+        const resp = await fetch(EDGE_FN, {
+          method: 'POST', headers,
+          body: JSON.stringify({ action: 'batch', rows: batch, sheetName }),
+          signal: ctl.signal,
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      } finally { clearTimeout(t); }
     } catch {
       const retries = batchRetries + 1;
       if (retries <= 3) {
@@ -205,7 +235,6 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const [sessionCount, setSessionCount] = useState(0);
   const [recentScans, setRecentScans] = useState<ScanEntry[]>([]);
   const successScans = useMemo(() => recentScans.filter(s => s.success), [recentScans]);
-  const failedScans = useMemo(() => recentScans.filter(s => !s.success), [recentScans]);
   const [flash, setFlash] = useState<'success' | 'error' | null>(null);
   const [confirmChangeSetup, setConfirmChangeSetup] = useState(false);
   const [sessionListOpen, setSessionListOpen] = useState(true);
@@ -246,7 +275,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const sessionIdRef = useRef('');
   const sessionStartRef = useRef(Date.now());
   const userIdRef = useRef<string | null>(null);
-  const [dbFails, setDbFails] = useState(0);
+  const [dbFails, setDbFails] = useState(failedDbScans.length);
+  // Duplicates hit this session — the summary's Duplicates tile read from
+  // recentScans, which duplicates are deliberately never added to, so it was
+  // hard-coded zero in effect.
+  const [dupCount, setDupCount] = useState(0);
+  // Lets effects declared earlier (online/offline) reach the retry callback
+  // defined later without reordering half the component.
+  const retryFailedRef = useRef<() => void>(() => {});
 
   // Camera scanner
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -281,7 +317,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   // ── Offline detection ─────────────────────────────────────────────────────
   useEffect(() => {
     const goOff = () => setIsOffline(true);
-    const goOn = () => { setIsOffline(false); addToast('Back online — syncing...', 'success'); };
+    // Actually sync on reconnect — this toast used to fire with no retry
+    // behind it, while flushQueue had already given up after ~6s of downtime.
+    const goOn = () => { setIsOffline(false); addToast('Back online — syncing...', 'success'); flushQueue(); retryFailedRef.current(); };
     window.addEventListener('offline', goOff);
     window.addEventListener('online', goOn);
     return () => { window.removeEventListener('offline', goOff); window.removeEventListener('online', goOn); };
@@ -313,6 +351,10 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         setRecentScans(p => { const hasP = p.some(s => s.pending); return hasP ? p.map(s => s.pending ? { ...s, pending: false } : s) : p; });
         setPendingWrites(0);
       } else { setPendingWrites(writeQueue.length); }
+      // Reconcile the failed-scans banner with the module array — the ad-hoc
+      // inc/dec bookkeeping drifted (a session restart reset the counter to 0
+      // while parked scans remained, stranding them with no visible Retry).
+      setDbFails(failedDbScans.length);
     }, 1000);
     return () => clearInterval(interval);
   }, [started]);
@@ -322,10 +364,22 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const streamRef = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<number>(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  // Identity token per startCam call: rapid close/open leaves two getUserMedia
+  // promises in flight, and whichever resolved second used to overwrite
+  // streamRef — orphaning the other stream's tracks with the camera lit and
+  // nothing left holding a reference to stop them.
+  const camTokenRef = useRef<object>({});
+  const camErrTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const camResumeTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const stopCam = useCallback(() => {
+    camTokenRef.current = {}; // invalidate any in-flight getUserMedia
     cancelAnimationFrame(scanTimerRef.current);
     scanTimerRef.current = 0;
+    clearTimeout(camErrTimerRef.current);
+    // The 1.5s post-scan resume timer re-armed the OLD scan loop (old
+    // detector, detached video) against whatever stream existed later.
+    clearTimeout(camResumeTimerRef.current);
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
@@ -338,13 +392,20 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   const endSession = useCallback(() => {
     const count = sessionCount;
-    stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setVerifyResult(null); setLastScanned(''); setShowComplete(false);
-    if (count > 0) addToast(`Session ended · ${count} AWB${count !== 1 ? 's' : ''} scanned · synced`, 'success');
+    stopCam(); setCameraOpen(false); setStarted(false); setSessionCount(0); setRecentScans([]); setVerifyResult(null); setLastScanned(''); setShowComplete(false); setDupCount(0);
+    // "· synced" was unconditional — it fired even with rows still queued for
+    // the sheet or parked DB failures. Say what is actually true.
+    const unsynced = writeQueue.length > 0 || flushing || failedDbScans.length > 0;
+    if (count > 0) addToast(`Session ended · ${count} AWB${count !== 1 ? 's' : ''} scanned${unsynced ? ' · some rows still syncing in the background' : ' · synced'}`, unsynced ? 'info' : 'success');
   }, [sessionCount, stopCam, addToast]);
 
   const startCam = useCallback(() => {
     if (!cameraRef.current) return;
     setCameraError(''); scanLockRef.current = false;
+    clearTimeout(camErrTimerRef.current);
+    clearTimeout(camResumeTimerRef.current);
+    const myToken = {};
+    camTokenRef.current = myToken;
     const container = cameraRef.current;
     container.innerHTML = '';
 
@@ -367,7 +428,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
     })
     .then(stream => {
-      if (!videoRef.current) return; // component unmounted
+      // Identity check, not just non-null: a newer startCam/stopCam may have
+      // superseded this call while getUserMedia was in flight.
+      if (camTokenRef.current !== myToken || !videoRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
       streamRef.current = stream;
       video.srcObject = stream;
       video.onloadedmetadata = () => {
@@ -383,8 +446,11 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                   scanLockRef.current = true;
                   if (navigator.vibrate) navigator.vibrate(100);
                   setTimeout(() => submitRef.current(code), 50);
-                  // Resume scanning after 1.5s (camera stays open)
-                  setTimeout(() => {
+                  // Resume scanning after 1.5s (camera stays open). Held in a
+                  // ref so stopCam/startCam can cancel it — an uncancelled
+                  // resume re-armed this old loop against a newer stream.
+                  camResumeTimerRef.current = setTimeout(() => {
+                    if (camTokenRef.current !== myToken) return;
                     scanLockRef.current = false;
                     if (streamRef.current) scanTimerRef.current = requestAnimationFrame(loop);
                   }, 1500);
@@ -395,13 +461,20 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             if (streamRef.current && !scanLockRef.current) scanTimerRef.current = requestAnimationFrame(loop);
           };
           scanTimerRef.current = requestAnimationFrame(loop);
-        }).catch(() => { setCameraError('Cannot start video. Check camera permissions.'); setTimeout(() => setCameraOpen(false), 2000); });
+        }).catch(() => { setCameraError('Cannot start video. Check camera permissions.'); camErrTimerRef.current = setTimeout(() => setCameraOpen(false), 2000); });
       };
     })
-    .catch(() => { setCameraError('Camera blocked. Go to browser Settings → Site Settings → Camera → Allow.'); setTimeout(() => setCameraOpen(false), 2000); });
+    .catch(() => { setCameraError('Camera blocked. Go to browser Settings → Site Settings → Camera → Allow.'); camErrTimerRef.current = setTimeout(() => setCameraOpen(false), 2000); });
   }, [stopCam]);
 
   useEffect(() => { if (cameraOpen) setTimeout(() => startCam(), 150); return () => stopCam(); }, [cameraOpen, startCam, stopCam]);
+
+  // PackTime is kept mounted behind display:none when the user switches tabs
+  // (App.tsx), so effect cleanups never fire on "navigation". Without this,
+  // leaving the page kept the camera streaming AND the scan loop decoding —
+  // phantom scans of whatever the lens pointed at while the operator was on a
+  // different screen, with the camera light on the whole time.
+  useEffect(() => { if (!active && cameraOpen) { stopCam(); setCameraOpen(false); } }, [active, cameraOpen, stopCam]);
 
   // ── Init sheet on start (loads existing AWBs for local duplicate detection) ─
   const handleStart = async () => {
@@ -425,11 +498,20 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       awbSetRef.current = new Set([...sheetAwbs, ...dbAwbs]);
       rowCountRef.current = data.totalRows || 0;
       setSheetTotal(data.totalRows || 0);
-      const existingSession = sessionStorage.getItem('packtime_session');
-      sessionIdRef.current = existingSession || crypto.randomUUID();
-      sessionStorage.setItem('packtime_session', sessionIdRef.current);
-      writeQueue.length = 0; flushing = false;
-      setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned(''); setDbFails(0);
+      // Fresh id per session. The old code read one UUID from sessionStorage
+      // and reused it forever across every courier and session on the device,
+      // which made the CSV's Session ID column meaningless and widened
+      // undoLast's session-scope guard to "anything this device ever scanned".
+      sessionIdRef.current = crypto.randomUUID();
+      // The queue is NOT cleared here: items carry their own sheetName, and
+      // flushQueue batches per sheet — clearing silently threw away the
+      // previous session's unsent sheet rows (they were in the DB but never
+      // reached Google). Leftovers drain alongside the new session's writes.
+      // `flushing` is likewise left alone: forcing it false while a flush was
+      // mid-await let a second concurrent loop start over the same array.
+      flushQueue();
+      setStarted(true); setSessionCount(0); setRecentScans([]); setLastScanned(''); setDupCount(0);
+      sessionStartRef.current = Date.now();
       const finalBrand = selectedBrand || c.brand || 'FUSIONIC';
       if (userIdRef.current) {
         supabase.from('packtime_shortcuts').upsert(
@@ -456,7 +538,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
     // Instant local duplicate check
     if (awbSetRef.current.has(key)) {
-      setDuplicateAwb(trimmed); beepErr(); setFlash('error');
+      setDuplicateAwb(trimmed); beepErr(); setFlash('error'); setDupCount(p => p + 1);
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
       // Don't add to recentScans — duplicate banner already provides feedback.
       // Adding causes undoLast to remove both the original and the duplicate entry.
@@ -489,9 +571,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           setSheetTotal(p => Math.max(0, p - 1));
           rowCountRef.current = Math.max(0, rowCountRef.current - 1);
           setRecentScans(p => p.filter(s => s.awb !== trimmed));
-          setDuplicateAwb(trimmed); beepErr(); setFlash('error');
+          setDuplicateAwb(trimmed); beepErr(); setFlash('error'); setDupCount(p => p + 1);
           if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-          if (lastScanned === trimmed) setLastScanned('');
+          // Functional update — the closed-over `lastScanned` was stale (it's
+          // not in this callback's deps), so the banner kept showing the
+          // REJECTED AWB with a live Undo. That Undo then fired a sheet
+          // delete for an AWB whose row belongs to another operator's
+          // session, wiping their legitimate scan out of the Google Sheet.
+          setLastScanned(prev => (prev === trimmed ? '' : prev));
           return;
         }
         // DB insert failed — retry once after 2s; if that fails too, park the
@@ -506,6 +593,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               setPendingWrites(p => p + 1);
             } else {
               failedDbScans.push({ scanRow, sheetRow: row, sheetName: courierSheet });
+              persistFailed();
             }
           });
         }, 2000);
@@ -523,6 +611,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   // also get their sheet row enqueued — they never made it that far before.
   const retryFailedDbScans = useCallback(() => {
     const pending = failedDbScans.splice(0);
+    persistFailed();
     if (pending.length === 0) return;
     for (const f of pending) {
       supabase.from('packtime_scans').insert(f.scanRow).then(({ error }) => {
@@ -532,6 +621,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           setPendingWrites(p => p + 1);
         } else {
           failedDbScans.push(f); // still failing — keep for the next retry
+          persistFailed();
         }
       });
     }
@@ -539,6 +629,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // Keep submitRef in sync for camera callback
   useEffect(() => { submitRef.current = submitAwb; }, [submitAwb]);
+  useEffect(() => { retryFailedRef.current = retryFailedDbScans; }, [retryFailedDbScans]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); const v = awbInput.trim(); if (v) submitAwb(v); } };
 
@@ -584,9 +675,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const fetchHistory = useCallback(async () => {
     if (!historyDateFrom || !historyDateTo) return;
     setHistoryLoading(true);
-    let query = supabase.from('packtime_scans').select('*', { count: 'estimated' })
-      .gte('scanned_at', historyDateFrom + 'T00:00:00.000Z')
-      .lte('scanned_at', historyDateTo + 'T23:59:59.999Z');
+    let query = supabase.from('packtime_scans').select('*', { count: 'exact' })
+      .gte('scanned_at', new Date(historyDateFrom + 'T00:00:00').toISOString())
+      .lte('scanned_at', new Date(historyDateTo + 'T23:59:59.999').toISOString());
     if (historySearch) query = query.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
     if (historyFilterCourier) query = query.eq('courier', historyFilterCourier);
     if (historyFilterBrand) query = query.eq('brand', historyFilterBrand);
@@ -645,8 +736,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     const ps = 5000;
     while (true) {
       let q = supabase.from('packtime_scans').select('id, session_id, awb, courier, camera, brand, scanned_at')
-        .gte('scanned_at', historyDateFrom + 'T00:00:00.000Z')
-        .lte('scanned_at', historyDateTo + 'T23:59:59.999Z');
+        .gte('scanned_at', new Date(historyDateFrom + 'T00:00:00').toISOString())
+        .lte('scanned_at', new Date(historyDateTo + 'T23:59:59.999').toISOString());
       if (historySearch) q = q.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);
       if (historyFilterCourier) q = q.eq('courier', historyFilterCourier);
       if (historyFilterBrand) q = q.eq('brand', historyFilterBrand);
@@ -659,7 +750,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     if (allData.length === 0) { addToast('Nothing to export in this date range', 'error'); return; }
     const csv = 'AWB,Courier,Camera,Brand,Scanned At,Session ID\n' + allData.map((r) => {
       const when = r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
-      return `${r.awb},${r.courier},${r.camera},${r.brand || ''},${when},${r.session_id}`;
+      return [r.awb, r.courier, r.camera, r.brand || '', when, r.session_id].map(csvCell).join(',');
     }).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -692,14 +783,14 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         </div>
         <div>
           <div style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>To</div>
-          <DateInput value={historyDateTo} min={historyDateFrom || undefined} max={new Date().toISOString().slice(0, 10)} onChange={e => { setHistoryDateTo(e.target.value); setHistoryPage(0); }} />
+          <DateInput value={historyDateTo} min={historyDateFrom || undefined} max={localISODate(new Date())} onChange={e => { setHistoryDateTo(e.target.value); setHistoryPage(0); }} />
         </div>
         {[
           { label: 'Today', from: 0 },
           { label: '7 days', from: 6 },
           { label: '30 days', from: 29 },
         ].map(p => (
-          <button key={p.label} onClick={() => { const d = new Date(); const to = d.toISOString().slice(0,10); d.setDate(d.getDate() - p.from); const from = d.toISOString().slice(0,10); setHistoryDateFrom(from); setHistoryDateTo(to); setHistoryPage(0); }} style={{ ...S.btnGhost, ...S.btnSm }}>{p.label}</button>
+          <button key={p.label} onClick={() => { const d = new Date(); const to = localISODate(d); d.setDate(d.getDate() - p.from); const from = localISODate(d); setHistoryDateFrom(from); setHistoryDateTo(to); setHistoryPage(0); }} style={{ ...S.btnGhost, ...S.btnSm }}>{p.label}</button>
         ))}
         {(historyDateFrom || historyDateTo) && <button onClick={() => { setHistoryDateFrom(''); setHistoryDateTo(''); setHistoryData([]); setHistoryTotal(0); setHistoryPage(0); }} style={{ ...S.btnGhost, ...S.btnSm, color: T.tx3 }}>Clear</button>}
       </div>
@@ -843,7 +934,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   if (isDesktop && !showHistory && !started) return (
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 14 }}>
-        <button onClick={() => { const d = new Date(); setHistoryDateTo(d.toISOString().slice(0,10)); d.setDate(d.getDate()-6); setHistoryDateFrom(d.toISOString().slice(0,10)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={S.btnGhost}>History</button>
+        <button onClick={() => { const d = new Date(); setHistoryDateTo(localISODate(d)); d.setDate(d.getDate()-6); setHistoryDateFrom(localISODate(d)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={S.btnGhost}>History</button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12 }}>
         <svg viewBox="0 0 24 24" style={{ width: 48, height: 48, fill: 'none', stroke: T.tx3, strokeWidth: 1.2, marginBottom: 16, opacity: 0.5 }}><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M12 18h.01" /></svg>
@@ -859,7 +950,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {dbFails > 0 && <span style={{ fontSize: 9, color: T.re, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'oklch(0.63 0.22 25 / .1)', border: '1px solid oklch(0.63 0.22 25 / .2)' }}>{dbFails} DB save failed</span>}
-          <button onClick={() => { const d = new Date(); setHistoryDateTo(d.toISOString().slice(0,10)); d.setDate(d.getDate()-6); setHistoryDateFrom(d.toISOString().slice(0,10)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
+          <button onClick={() => { const d = new Date(); setHistoryDateTo(localISODate(d)); d.setDate(d.getDate()-6); setHistoryDateFrom(localISODate(d)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
         </div>
       </div>
 
@@ -1143,7 +1234,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <span style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' }}>Recent Scans</span>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 9, color: T.tx3 }}>{recentScans.length} this session</span>
-            {successScans.length > 0 && <button className="desktop-only" onClick={e => { e.stopPropagation(); const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n'); const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = exportName('PackStation-Session', [courier, `CAM${camera}`, fileDate()], 'csv'); a.click(); URL.revokeObjectURL(url); }} style={{ padding: '4px 10px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Export</button>}
+            {successScans.length > 0 && <button className="desktop-only" onClick={e => { e.stopPropagation(); const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => [s.awb, courier, camera, courierBrand, s.time].map(csvCell).join(',')).join('\n'); const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = exportName('PackStation-Session', [courier, `CAM${camera}`, fileDate()], 'csv'); a.click(); URL.revokeObjectURL(url); }} style={{ padding: '4px 10px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Export</button>}
           </div>
         </div>
         {sessionListOpen && <div style={{ maxHeight: 280, overflowY: 'auto' }}>
@@ -1189,12 +1280,12 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                 <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 2 }}>Courier</div><div style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{courier}</div></div>
                 <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 2 }}>Camera</div><div style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{camera}</div></div>
                 <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 2 }}>Scanned</div><div style={{ fontSize: 20, fontWeight: 800, color: T.gr, fontFamily: T.sora }}>{sessionCount}</div></div>
-                <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 2 }}>Duplicates</div><div style={{ fontSize: 20, fontWeight: 800, color: failedScans.length > 0 ? T.re : T.tx3, fontFamily: T.sora }}>{failedScans.length}</div></div>
+                <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 2 }}>Duplicates</div><div style={{ fontSize: 20, fontWeight: 800, color: dupCount > 0 ? T.re : T.tx3, fontFamily: T.sora }}>{dupCount}</div></div>
               </div>
             </div>
             <button onClick={() => {
               if (successScans.length === 0) { addToast('No successful scans to export', 'error'); return; }
-              const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => `${s.awb},${courier},${camera},${courierBrand},${s.time}`).join('\n');
+              const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => [s.awb, courier, camera, courierBrand, s.time].map(csvCell).join(',')).join('\n');
               const blob = new Blob([csv], { type: 'text/csv' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
