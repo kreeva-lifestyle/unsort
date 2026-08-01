@@ -154,26 +154,33 @@ if (typeof window !== 'undefined') {
       const pending = writeQueue.splice(0);
       for (const item of pending) {
         // sendBeacon can't send Authorization headers → edge function 401s.
-        // fetch+keepalive works during unload and sends auth; payloads are tiny.
+        // fetch+keepalive works during unload and sends auth; payloads are
+        // tiny. Uses the cached session token (getSession is async and unload
+        // handlers can't await) — the edge verifies the caller now, so the
+        // anon key alone would be rejected.
         const body = JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName });
-        fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body, keepalive: true }).catch(e => console.warn('Sheet sync failed:', e));
+        fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${lastAccessToken || SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body, keepalive: true }).catch(e => console.warn('Sheet sync failed:', e));
       }
       e.returnValue = '';
     }
   });
 }
 
-// The packtime Edge Function is authenticated by the Supabase gateway via
-// apikey + Authorization; it does not consume the user's JWT (it uses a Google
-// service account internally). The project now issues user sessions as ES256,
-// but the function's runtime only verifies HS256, so forwarding the user token
-// produced "HTTP 401 — Unsupported JWT algorithm ES256". Sending the anon key
-// (HS256) in both headers satisfies verify_jwt without changing function code.
-const getAuthHeaders = async () => ({
-  'Content-Type': 'application/json',
-  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-  'apikey': SUPABASE_ANON_KEY,
-});
+// The packtime Edge Function verifies the CALLER, not just the header: it
+// resolves the Bearer token to a signed-in active profile (gateway verify_jwt
+// is off, so ES256 session tokens are fine — same pattern as odette-export
+// and client-finder). Sending the anon key here would 401: the anon key
+// proves nothing about who is scanning, and it ships in the JS bundle.
+let lastAccessToken = '';
+const getAuthHeaders = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) lastAccessToken = session.access_token;
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`,
+    'apikey': SUPABASE_ANON_KEY,
+  };
+};
 
 // POST to the packtime Edge Function with a timeout and a single retry on
 // transient network failures. Returns a parsed body plus diagnostic fields so

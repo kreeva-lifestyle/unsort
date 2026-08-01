@@ -14,6 +14,10 @@
 
 // deno-lint-ignore-file no-explicit-any
 
+const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
+const SB_SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const svcHeaders = { apikey: SB_SVC, authorization: `Bearer ${SB_SVC}` };
+
 const ALLOWED_ORIGINS = [
   'https://dailyoffice.aryadesigns.co.in',
   'http://localhost:5173',
@@ -140,6 +144,45 @@ async function sheetsClearRow(sheetName: string, rowNumber: number): Promise<voi
   }
 }
 
+// ── Caller verification ──────────────────────────────────────────────────────
+// The old check was `if (!auth) 401` — ANY non-empty header passed, and the
+// client sent the public anon key (which ships in the JS bundle), so any
+// anonymous caller could append to or clear rows from the production Google
+// Sheet. Same real verification client-finder and odette-export use: the
+// Bearer token must belong to a signed-in, active profile.
+async function caller(req: Request): Promise<{ id: string } | null> {
+  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return null;
+  const u = await fetch(`${SB_URL}/auth/v1/user`, { headers: { authorization: `Bearer ${token}`, apikey: SB_SVC } });
+  if (!u.ok) return null;
+  const user = await u.json().catch(() => null);
+  if (!user?.id) return null;
+  const p = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=is_active`, { headers: svcHeaders });
+  const rows = await p.json().catch(() => []);
+  const prof = rows?.[0];
+  if (!prof || prof.is_active === false) return null;
+  return { id: user.id };
+}
+
+// ── Sheet-name validation ────────────────────────────────────────────────────
+// Validates against the couriers actually configured in packtime_couriers —
+// self-maintaining and FAIL-CLOSED. The previous ALLOWED_SHEETS env check was
+// a no-op unless the secret happened to be set, letting any tab name reach
+// the A1 range. The env allowlist still applies as an EXTRA restriction when
+// present. 5-min in-isolate cache; a failed lookup rejects rather than
+// letting the name through.
+let sheetCache: { names: Set<string>; at: number } | null = null;
+async function isConfiguredSheet(sheetName: string): Promise<boolean | null> {
+  if (!sheetCache || Date.now() - sheetCache.at > 5 * 60_000) {
+    const r = await fetch(`${SB_URL}/rest/v1/packtime_couriers?select=sheet_name`, { headers: svcHeaders });
+    if (!r.ok) return null; // unknown — caller must fail closed
+    const rows = await r.json().catch(() => null);
+    if (!Array.isArray(rows)) return null;
+    sheetCache = { names: new Set(rows.map((x: any) => String(x.sheet_name || '').trim()).filter(Boolean)), at: Date.now() };
+  }
+  return sheetCache.names.has(sheetName);
+}
+
 function verifyColumns(header: string[] | undefined): { ok: boolean; info?: string } {
   if (!header || header.length === 0) return { ok: true };
   const expected = ['Count', 'AWB', 'Timestamp', 'Camera'];
@@ -152,20 +195,17 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(req) });
   if (req.method !== 'POST') return fail(405, 'Method not allowed', req);
 
-  // Auth check — reject requests without a valid Bearer token.
-  // The token is the Supabase anon key or user JWT; its presence proves
-  // the caller went through the app (not a random cURL).
-  const auth = req.headers.get('authorization') || req.headers.get('apikey') || '';
-  if (!auth) return fail(401, 'Unauthorized — missing auth header', req);
+  if (!(await caller(req))) return fail(401, 'Sign in to DailyOffice first', req);
 
   let body: any;
   try { body = await req.json(); } catch { return fail(400, 'Invalid JSON body', req); }
   const action = body?.action;
-  const sheetName = body?.sheetName;
+  const sheetName = String(body?.sheetName || '').trim();
   if (!action || !sheetName) return fail(400, 'Missing action or sheetName', req);
 
-  // Validate sheetName against configured couriers. Prevents arbitrary
-  // sheet tab access (e.g. "FinancialData!A1:E5000").
+  const configured = await isConfiguredSheet(sheetName);
+  if (configured === null) return fail(503, 'Could not verify the courier sheet — try again in a moment', req);
+  if (!configured) return fail(403, `Sheet "${sheetName}" is not a configured courier sheet`, req);
   const validSheetNames = (Deno.env.get('ALLOWED_SHEETS') || '').split(',').map(s => s.trim()).filter(Boolean);
   if (validSheetNames.length > 0 && !validSheetNames.includes(sheetName)) {
     return fail(403, `Sheet "${sheetName}" is not a configured courier sheet`, req);
