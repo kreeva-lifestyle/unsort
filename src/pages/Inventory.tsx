@@ -375,7 +375,10 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     try {
     if (selected) {
       if (selected.serial_number && selected.serial_number !== form.serial_number) {
-        const { count, error: cntErr } = await supabase.from('inventory_extras').select('id', { count: 'exact', head: true }).eq('sku', selected.serial_number);
+        // gt(quantity, 0): out-of-stock extras are hidden from the extras list,
+        // so blocking on one would tell the user to "update extras" they
+        // cannot see. Only in-stock (visible, actionable) extras block.
+        const { count, error: cntErr } = await supabase.from('inventory_extras').select('id', { count: 'exact', head: true }).eq('sku', selected.serial_number).gt('quantity', 0);
         if (cntErr) { addToast('Failed to check spare parts — ' + friendlyError(cntErr), 'error'); return; }
         if ((count || 0) > 0) { addToast(`Cannot change SKU — ${count} extra(s) reference "${selected.serial_number}". Update extras first.`, 'error'); return; }
       }

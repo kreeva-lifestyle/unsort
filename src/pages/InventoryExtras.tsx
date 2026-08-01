@@ -92,7 +92,10 @@ export default function InventoryExtras() {
       const counts: Record<string, number> = {};
       const { data: unsorted, error: e2 } = await supabase.from('inventory_items').select('id, serial_number, size, product_id').eq('status', 'unsorted');
       if (e2) { addToast(friendlyError(e2), 'error'); return; }
-      const { data: allComps, error: e3 } = await supabase.from('item_components').select('inventory_item_id, component_id, status');
+      // Server-side status filter: only missing/damaged rows matter for match
+      // counting, and fetching the ENTIRE item_components table grew with
+      // every item ever stocked.
+      const { data: allComps, error: e3 } = await supabase.from('item_components').select('inventory_item_id, component_id, status').in('status', ['missing', 'damaged']);
       if (e3) { addToast(friendlyError(e3), 'error'); return; }
       const missingMap: Record<string, Set<string>> = {};
       type ItemCompsRow = Pick<ItemComponent, 'inventory_item_id' | 'component_id' | 'status'>;
@@ -183,6 +186,13 @@ export default function InventoryExtras() {
     if (!editForm.sku.trim() || !editForm.size || !editForm.location || !editForm.manufacturer.trim()) {
       setError('All mandatory fields (*) are required'); return;
     }
+    // Same size rules the Add form enforces — without them an edit could turn
+    // a Dupatta into size M or a Bottom into N/A, which Add would reject.
+    const en = editingExtra.component_name;
+    if (isDupatta(en) && editForm.size !== 'N/A') { setError('Dupatta must have size "N/A"'); return; }
+    if (!isDupatta(en) && editForm.size === 'N/A') { setError('N/A is only allowed for Dupatta/Orhni/Chunni/Stole'); return; }
+    if (editForm.size === 'Semi-Stitched' && !isLehenga(en) && !isBlouse(en)) { setError('Semi-Stitched is only allowed for Lehenga or Blouse'); return; }
+    if (isBottomType(en) && (editForm.size === 'N/A' || editForm.size === 'Semi-Stitched')) { setError('Bottom/Pant requires a specific size (not N/A or Semi-Stitched)'); return; }
     setSaving(true);
     const { error: err } = await supabase.from('inventory_extras').update({
       sku: editForm.sku.trim(), size: editForm.size, location: editForm.location,
@@ -195,6 +205,7 @@ export default function InventoryExtras() {
   };
 
   const addExtra = async () => {
+    if (saving) return;
     setError('');
     if (!canEdit) { addToast('You do not have permission to add spare parts', 'error'); return; }
     if (!fProductId || !fComponentId || !fSku.trim() || !fSize || !fLocation || !fManufacturer.trim()) { setError('All mandatory fields (*) are required'); return; }
@@ -218,7 +229,28 @@ export default function InventoryExtras() {
       manufacturer: fManufacturer.trim(), quantity: qty, notes: fNotes.trim() || null, created_by: user?.id,
     }).select().maybeSingle();
     if (err || !data) {
-      if (err?.code === '23505') setError('This exact extra (category+component+SKU+size) already exists');
+      if (err?.code === '23505') {
+        // Same part exists. Out-of-stock rows are kept in the DB but hidden
+        // from the list (history + revert need them), so an invisible qty-0
+        // row would otherwise be an inescapable "already exists" trap.
+        // Restock it instead — to the user it looks like the part came back.
+        const { data: existing } = await supabase.from('inventory_extras')
+          .select('id, quantity').eq('product_id', fProductId).eq('component_id', fComponentId)
+          .eq('sku', fSku.trim()).eq('size', fSize).maybeSingle();
+        if (existing && existing.quantity === 0) {
+          const { data: upd, error: upErr } = await supabase.from('inventory_extras')
+            .update({ quantity: qty, location: fLocation, manufacturer: fManufacturer.trim(), notes: fNotes.trim() || null, updated_at: new Date().toISOString() })
+            .eq('id', existing.id).eq('quantity', 0).select().maybeSingle();
+          if (upErr || !upd) { setError(upErr ? friendlyError(upErr) : 'Restock failed — try again'); setSaving(false); return; }
+          const { error: rhErr } = await supabase.from('inventory_extras_history').insert({
+            extra_id: existing.id, action: 'added', quantity_change: qty, quantity_after: qty, reason: 'Restocked', user_id: user?.id,
+          });
+          if (rhErr) addToast('Restocked, but the history log failed — ' + friendlyError(rhErr), 'error');
+          setSaving(false); setShowAdd(false); addToast('Spare part restocked — back in the list', 'success');
+          resetAddForm(); fetchExtras(); return;
+        }
+        setError('This exact part (category+component+SKU+size) already exists — use its Add button to increase quantity');
+      }
       else setError(err ? friendlyError(err) : 'Save failed');
       setSaving(false); return;
     }
@@ -226,7 +258,7 @@ export default function InventoryExtras() {
     const { error: histErr } = await supabase.from('inventory_extras_history').insert({
       extra_id: data.id, action: 'created', quantity_change: qty, quantity_after: qty, user_id: user?.id,
     });
-    if (histErr) setError('Extra created but history log failed — ' + friendlyError(histErr));
+    if (histErr) addToast('Added, but the history log failed — ' + friendlyError(histErr), 'error');
     setSaving(false); setShowAdd(false); addToast('Spare part added', 'success');
     resetAddForm();
     fetchExtras();
@@ -236,23 +268,33 @@ export default function InventoryExtras() {
     if (!adjustExtra || saving) return;
     if (!canEdit) { addToast('You do not have permission to adjust quantities', 'error'); return; }
     const qty = parseInt(adjustQty) || 0;
-    if (qty < 1) return;
+    if (qty < 1) { setError('Enter a quantity of at least 1'); return; }
     setSaving(true);
     const newQty = adjustMode === 'add' ? adjustExtra.quantity + qty : adjustExtra.quantity - qty;
-    if (newQty < 0) { setSaving(false); setError('Cannot go below 0'); return; }
-    if (newQty === 0) {
-      const { error: delErr } = await supabase.from('inventory_extras').delete().eq('id', adjustExtra.id).eq('quantity', adjustExtra.quantity);
-      if (delErr) { setSaving(false); setError(friendlyError(delErr)); return; }
-      setSaving(false); setAdjustExtra(null); setAdjustQty('1'); setAdjustReason(''); addToast('Spare part removed (qty reached 0)', 'success'); setPage(0); fetchExtras();
-      return;
-    }
+    if (newQty < 0) { setSaving(false); setError(`Cannot remove ${qty} — only ${adjustExtra.quantity} in stock`); return; }
+    // Reaching 0 UPDATES to 0, never deletes: the history FK is ON DELETE
+    // CASCADE, so a hard delete here silently destroyed the part's entire
+    // audit trail — including the 'used' records that item-completion
+    // reverts depend on. Qty-0 rows are hidden from the list instead, and
+    // re-adding the same part restocks the hidden row.
     const { data: updated, error: upErr } = await supabase.from('inventory_extras')
       .update({ quantity: newQty, updated_at: new Date().toISOString() })
       .eq('id', adjustExtra.id)
       .eq('quantity', adjustExtra.quantity)
       .select().single();
     if (upErr || !updated) { setSaving(false); setError('Another user just updated this extra. Close and reopen to retry.'); return; }
-    setSaving(false); setAdjustExtra(null); setAdjustQty('1'); setAdjustReason(''); addToast('Quantity adjusted', 'success'); setPage(0); fetchExtras();
+    // The adjustment log — this modal collected a Reason and then threw it
+    // away: no 'added'/'removed' history row was ever written.
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error: histErr } = await supabase.from('inventory_extras_history').insert({
+      extra_id: adjustExtra.id, action: adjustMode === 'add' ? 'added' : 'removed',
+      quantity_change: adjustMode === 'add' ? qty : -qty, quantity_after: newQty,
+      reason: adjustReason.trim() || null, user_id: user?.id,
+    });
+    if (histErr) addToast('Adjusted, but the history log failed — ' + friendlyError(histErr), 'error');
+    setSaving(false); setAdjustExtra(null); setAdjustQty('1'); setAdjustReason('');
+    addToast(newQty === 0 ? 'Out of stock — removed from the list' : 'Quantity adjusted', 'success');
+    setPage(0); fetchExtras();
   };
 
   const completeWithExtra = async () => {
@@ -269,8 +311,9 @@ export default function InventoryExtras() {
       p_reason: null,
     });
     if (error) { setError(friendlyError(error)); setSaving(false); return; }
-    // Qty 0 rows are kept (shown as "Out of stock") so the completion stays
-    // revertable and the usage history keeps its FK.
+    // Qty 0 rows are kept in the DB (the completion stays revertable and the
+    // usage history keeps its FK) but hidden from the list; re-adding the
+    // same part restocks the hidden row.
     setSaving(false); setCompleteItem(null); setMatchExtra(null); addToast('Item completed', 'success'); setPage(0); fetchExtras();
   };
 
@@ -278,6 +321,9 @@ export default function InventoryExtras() {
   const [page, setPage] = useState(0);
   const [perPage, setPerPage] = useState(25);
   const filtered = extras.filter(ex => {
+    // Out-of-stock parts leave the list (the row survives in the DB for
+    // history/reverts, and re-adding the same part restocks it).
+    if (ex.quantity < 1) return false;
     if (catFilter !== 'all' && ex.product_id !== catFilter) return false;
     if (compFilter !== 'all' && ex.component_name !== compFilter) return false;
     if (matchFilter === 'has' && !(matchCounts[ex.id] > 0)) return false;
@@ -314,7 +360,8 @@ export default function InventoryExtras() {
           <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'rgba(14,18,30,.97)', backdropFilter: 'blur(20px)', border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.4)', zIndex: 150, minWidth: 160, overflow: 'hidden' }}>
             <button onClick={() => {
               if (filtered.length === 0) { addToast('No data to export', 'error'); setShowExportMenu(false); return; }
-              const csv = 'SKU,Category,Component,Size,Qty\n' + filtered.map(ex => `${ex.sku},"${ex.product_name}",${ex.component_name},${ex.size},${ex.quantity}`).join('\n');
+              const q = (s: unknown) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+              const csv = 'SKU,Category,Component,Size,Qty\n' + filtered.map(ex => `${q(ex.sku)},${q(ex.product_name)},${q(ex.component_name)},${q(ex.size)},${ex.quantity}`).join('\n');
               const blob = new Blob([csv], { type: 'text/csv' });
               const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = exportName('Spare-Parts', [fileDate()], 'csv'); a.click(); URL.revokeObjectURL(a.href);
               setShowExportMenu(false);
@@ -488,8 +535,8 @@ export default function InventoryExtras() {
             </div>
             <div className="inv-extra-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div>
-                <label style={label}>Initial Quantity</label>
-                <input type="number" min="1" step="1" value={fQty} onKeyDown={e => numericKeyDown(e)} onChange={e => setFQty(e.target.value)} placeholder="0" style={input} />
+                <label style={label}>Initial Quantity *</label>
+                <input type="number" min="1" step="1" value={fQty} onKeyDown={e => numericKeyDown(e)} onChange={e => setFQty(e.target.value)} placeholder="1" style={input} />
               </div>
               <div>
                 <label style={label}>Notes</label>
@@ -576,7 +623,7 @@ export default function InventoryExtras() {
             Use 1 x <b style={{ color: T.tx }}>{completeItem.extra.component_name}</b> to complete
             batch <b style={{ color: T.tx }}>#{completeItem.item.batch_number || 'N/A'}</b>
             (SKU: {completeItem.item.serial_number}, Size: {completeItem.item.size})?
-            {completeItem.extra.quantity <= 1 && <><br/><br/><span style={{ color: T.yl, fontSize: 11 }}>This is the last piece — the extra row will be removed after use.</span></>}
+            {completeItem.extra.quantity <= 1 && <><br/><br/><span style={{ color: T.yl, fontSize: 11 }}>This is the last piece — the part will leave the list after use. Re-adding the same part brings it back.</span></>}
           </div>
           {error && <div style={{ padding: '0 18px 10px', color: T.re, fontSize: 11 }}>{error}</div>}
           <div style={{ padding: '0 18px 18px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
