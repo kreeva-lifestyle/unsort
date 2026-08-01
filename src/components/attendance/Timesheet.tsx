@@ -2,7 +2,7 @@
 // computed Duration (out−in) and per-row diff-vs-fix highlighting, plus
 // employee / status / text filters.
 import { useState, useMemo } from 'react';
-import { T, S } from '../../lib/theme';
+import { T, S, oklchTint } from '../../lib/theme';
 import { AttEmployee, AttEntry, timeToMinutes, minutesToHM, fmtDiffHM } from '../../lib/attendance';
 import AttendanceEntryModal from './EntryModal';
 
@@ -43,6 +43,11 @@ export default function AttendanceTimesheet({ employees, entries, month, onChang
     return { txt: minutesToHM(worked), short: worked < fix, diffMin: worked - fix };
   };
   const diffColor = (m: number) => (m > 0 ? T.gr : m < 0 ? T.re : T.tx3);
+  // Chip tints must be real CSS: tokens are oklch(...) strings, so the old
+  // `${color}22` hex-suffix trick produced an invalid value and the chips
+  // rendered with no background at all.
+  const diffTint = (m: number) => (m > 0 ? oklchTint(0.72, 0.19, 145, 0.14) : m < 0 ? oklchTint(0.63, 0.22, 25, 0.14) : 'rgba(255,255,255,0.06)');
+  const statusTint = (st: string | null) => (st === 'A' ? oklchTint(0.63, 0.22, 25, 0.14) : st === 'WO' ? 'rgba(255,255,255,0.06)' : oklchTint(0.72, 0.19, 145, 0.14));
 
   const monthLabel = new Date(month + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 
@@ -112,14 +117,14 @@ export default function AttendanceTimesheet({ employees, entries, month, onChang
                 <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emp?.name || '—'}</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                   <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>{new Date(e.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} · {e.day}</span>
-                  {e.status && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: `${stColor}22`, color: stColor }}>{e.status}</span>}
+                  {e.status && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: statusTint(e.status), color: stColor }}>{e.status}</span>}
                 </span>
               </div>
               <div style={{ display: 'flex', gap: 8, fontSize: 11, fontFamily: T.mono, color: T.tx2, alignItems: 'center' }}>
                 <span style={{ background: 'rgba(255,255,255,0.03)', padding: '2px 8px', borderRadius: 5 }}>In {e.in_time || '—'}</span>
                 <span style={{ background: 'rgba(255,255,255,0.03)', padding: '2px 8px', borderRadius: 5 }}>Out {e.out_time || '—'}</span>
                 <span style={{ marginLeft: 'auto', color: d ? (d.short ? T.re : T.gr) : T.tx3, fontWeight: 700 }}>{d ? d.txt : '—'}</span>
-                {d && d.diffMin !== 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: `${diffColor(d.diffMin)}22`, color: diffColor(d.diffMin) }}>{fmtDiffHM(d.diffMin)}</span>}
+                {d && d.diffMin !== 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: diffTint(d.diffMin), color: diffColor(d.diffMin) }}>{fmtDiffHM(d.diffMin)}</span>}
               </div>
               {(e.remarks || e.manager_remarks) && (
                 <div style={{ fontSize: 10, color: T.tx3, marginTop: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[e.remarks, e.manager_remarks].filter(Boolean).join(' · ')}</div>

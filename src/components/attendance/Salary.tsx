@@ -29,6 +29,15 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
   const [savingPen, setSavingPen] = useState(false);
   const [payFlow, setPayFlow] = useState(false);
   const [q, setQ] = useState('');
+  // Armed penalty chip: first tap arms, second tap deletes. A single tap on a
+  // tiny chip silently removing a money record was too easy to hit by
+  // accident on a phone.
+  const [armedPen, setArmedPen] = useState<string | null>(null);
+  useEffect(() => {
+    if (!armedPen) return;
+    const t = setTimeout(() => setArmedPen(null), 4000);
+    return () => clearTimeout(t);
+  }, [armedPen]);
 
   const monthLabel = new Date(month + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
   const activeEmployees = useMemo(() => employees.filter(e => e.is_active), [employees]);
@@ -75,6 +84,8 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
     setPenFor(null); setPenAmt(''); setPenReason(''); onChanged();
   };
   const removePenalty = async (p: AttPenalty) => {
+    if (armedPen !== p.id) { setArmedPen(p.id); return; } // first tap arms, second deletes
+    setArmedPen(null);
     const { error } = await supabase.from('attendance_penalties').delete().eq('id', p.id);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     addToast('Penalty removed', 'success'); onChanged();
@@ -163,7 +174,10 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
                   {pens.length > 0 && (
                     <div style={{ marginTop: 5, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                       {pens.map(p => (
-                        <span key={p.id} onClick={() => removePenalty(p)} title="Click to remove" style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', color: T.re, cursor: 'pointer', fontFamily: T.mono }}>−{inr(Number(p.amount))}{p.reason ? ` · ${p.reason}` : ''} ✕</span>
+                        <span key={p.id} onClick={() => removePenalty(p)} title={armedPen === p.id ? 'Tap again to remove' : 'Tap to remove'}
+                          style={{ fontSize: 10, padding: '4px 9px', borderRadius: 5, background: armedPen === p.id ? 'oklch(0.63 0.22 25 / .22)' : 'oklch(0.63 0.22 25 / .08)', border: `1px solid oklch(0.63 0.22 25 / ${armedPen === p.id ? '.55' : '.2'})`, color: T.re, cursor: 'pointer', fontFamily: T.mono, fontWeight: armedPen === p.id ? 700 : 400 }}>
+                          {armedPen === p.id ? `Remove −${inr(Number(p.amount))}? tap again` : <>−{inr(Number(p.amount))}{p.reason ? ` · ${p.reason}` : ''} ✕</>}
+                        </span>
                       ))}
                     </div>
                   )}

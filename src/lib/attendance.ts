@@ -119,7 +119,11 @@ export const computeMonthlySalary = (
     const inMin = timeToMinutes(e?.in_time);
     const outMin = timeToMinutes(e?.out_time);
     let workedMin = 0, dayPay = 0;
-    let status = e?.status || (isSunday ? 'WO' : (inMin !== null && outMin !== null ? 'P' : 'A'));
+    // Default status must match what actually PAYS: out ≤ in (an overnight
+    // punch, or garbage) earns nothing below, so labelling it 'P' showed a
+    // Present day with zero pay — a silent wage discrepancy on the payslip.
+    const paidPunch = inMin !== null && outMin !== null && outMin > inMin;
+    let status = e?.status || (isSunday ? 'WO' : (paidPunch ? 'P' : 'A'));
 
     if (isSunday) {
       // Weekly off. Whether it is PAID is decided in a second pass below, from
@@ -163,7 +167,17 @@ export const computeMonthlySalary = (
   const gross = earned + sundayPay;
   const penaltyTotal = penalties.reduce((s, p) => s + Number(p.amount), 0);
   const finalSalary = Math.round(gross - penaltyTotal); // rounded to the rupee
-  const leaveDays = dim - sundays - workDays;
+  // Leaves are counted only over days that have HAPPENED. The old
+  // dim − sundays − workDays counted every remaining day of the current month
+  // as a leave — opening August on the 1st showed 26 "leaves", and a payslip
+  // printed mid-month carried the same fiction. Past months are unchanged
+  // (every day has elapsed); a fully future month shows 0, not a full sheet
+  // of absences.
+  const now = new Date();
+  const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  let elapsedWorkable = 0;
+  for (const d of days) if (!d.isSunday && d.date <= todayISO) elapsedWorkable++;
+  const leaveDays = Math.max(0, elapsedWorkable - workDays);
 
   return {
     employeeId: emp.id, name: emp.name, salary: emp.salary, fixTimeMinutes: fixMin,
@@ -205,7 +219,10 @@ export const excelCellToDateISO = (v: unknown): string | null => {
 export const excelCellToTime = (v: unknown): string | null => {
   if (v == null || v === '') return null;
   if (typeof v === 'number' && v >= 0 && v < 2) { // Excel time = fraction of a day
-    const min = Math.round((v % 1) * 24 * 60);
+    // % 1440: a fraction like 0.9999999 rounds to 1440 minutes — "24:00" —
+    // which timeToMinutes later rejects, silently turning that punch into an
+    // unpaid absence. Midnight wraps to 00:00 instead.
+    const min = Math.round((v % 1) * 24 * 60) % 1440;
     return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
   }
   const min = timeToMinutes(String(v));
