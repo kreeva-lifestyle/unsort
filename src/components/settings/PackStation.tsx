@@ -13,21 +13,25 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
   const [newCourier, setNewCourier] = useState('');
   const [newSheet, setNewSheet] = useState('');
   const [newCamera, setNewCamera] = useState('');
-  const [delTable, setDelTable] = useState<'packtime_couriers' | 'packtime_cameras'>('packtime_couriers');
+  const [adding, setAdding] = useState(false);
   const { ask, modalProps } = useConfirm();
 
   const fetchData = useCallback(() => {
     supabase.from('packtime_couriers').select('id, name, sheet_name, is_active').order('name').then(({ data }) => setCouriers(data || []));
     supabase.from('packtime_cameras').select('id, number, is_active').order('number').then(({ data }) => setCameras(data || []));
   }, []);
-  const { pendingDel, scheduleDelete, undo, dismiss } = useUndoDelete(delTable, fetchData);
+  // Table is passed per delete call — a shared state variable here used to be
+  // read one render late, sending the first camera delete to the couriers table.
+  const { pendingDel, scheduleDelete, undo, dismiss } = useUndoDelete('packtime_couriers', fetchData);
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const addCourier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCourier.trim() || !newSheet.trim()) return;
+    if (adding || !newCourier.trim() || !newSheet.trim()) return;
     if (couriers.some(c => c.name.toLowerCase() === newCourier.trim().toLowerCase())) { addToast('Courier already exists', 'error'); return; }
+    setAdding(true);
     const { error } = await supabase.from('packtime_couriers').insert({ name: newCourier.trim(), sheet_name: newSheet.trim() });
+    setAdding(false);
     if (error) addToast(friendlyError(error), 'error');
     else { addToast('Courier added!', 'success'); setNewCourier(''); setNewSheet(''); fetchData(); }
   };
@@ -42,28 +46,38 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
     if (!await ask({ title: 'Delete courier?', message: 'This courier will be removed.', confirmLabel: 'Delete', danger: true })) return;
     const c = couriers.find(x => x.id === id);
     const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('courier', c?.name);
-    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this courier`, 'error'); return; }
+    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this courier. Disable it instead.`, 'error'); return; }
     setCouriers(prev => prev.filter(x => x.id !== id));
-    setDelTable('packtime_couriers');
-    scheduleDelete(id, 'Courier deleted');
+    scheduleDelete(id, 'Courier deleted', 'packtime_couriers');
   };
 
   const addCamera = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCamera.trim()) return;
+    if (adding || !newCamera.trim()) return;
+    if (cameras.some(c => String(c.number).trim() === newCamera.trim())) { addToast('Camera already exists', 'error'); return; }
+    setAdding(true);
     const { error } = await supabase.from('packtime_cameras').insert({ number: newCamera.trim() });
+    setAdding(false);
     if (error) addToast(friendlyError(error), 'error');
     else { addToast('Camera added!', 'success'); setNewCamera(''); fetchData(); }
+  };
+
+  // Without this, a camera with scan history was stuck forever: PackTime only
+  // offers is_active cameras, deletion is blocked once any scan references the
+  // number, and there was no way to switch one off.
+  const toggleCamera = async (id: string, active: boolean) => {
+    if (!active) { const activeCount = cameras.filter(c => c.is_active && c.id !== id).length; if (activeCount < 1) { addToast('At least 1 camera must remain active', 'error'); return; } }
+    const { error } = await supabase.from('packtime_cameras').update({ is_active: !active }).eq('id', id);
+    if (error) addToast(friendlyError(error), 'error'); else { addToast(active ? 'Camera disabled' : 'Camera enabled', 'success'); fetchData(); }
   };
 
   const deleteCamera = async (id: string) => {
     if (!await ask({ title: 'Delete camera?', message: 'This camera will be removed.', confirmLabel: 'Delete', danger: true })) return;
     const cam = cameras.find(x => x.id === id);
     const { count } = await supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('camera', cam?.number);
-    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this camera`, 'error'); return; }
+    if ((count || 0) > 0) { addToast(`Cannot delete — ${count} scan(s) reference this camera. Disable it instead.`, 'error'); return; }
     setCameras(prev => prev.filter(x => x.id !== id));
-    setDelTable('packtime_cameras');
-    scheduleDelete(id, 'Camera deleted');
+    scheduleDelete(id, 'Camera deleted', 'packtime_cameras');
   };
 
   return (
@@ -102,10 +116,14 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
           {cameras.map((c, i) => (
             <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: i < cameras.length - 1 ? `1px solid ${T.bd}` : 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: c.is_active ? T.gr : T.tx3, flexShrink: 0 }} />
                 <span style={{ fontSize: 14, fontFamily: T.mono, fontWeight: 600, color: T.tx }}>{c.number}</span>
                 {!c.is_active && <span style={{ fontSize: 8, color: T.tx3, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.03)' }}>disabled</span>}
               </div>
-              <span className="touch44" onClick={() => deleteCamera(c.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <Toggle on={c.is_active} onToggle={() => toggleCamera(c.id, c.is_active)} size="sm" />
+                <span className="touch44" onClick={() => deleteCamera(c.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
+              </div>
             </div>
           ))}
           {cameras.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No cameras configured</div>}
