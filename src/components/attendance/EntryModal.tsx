@@ -42,6 +42,7 @@ export default function AttendanceEntryModal({ employees, month, editing, preset
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
 
   useEffect(() => { document.body.classList.add('modal-open'); return () => document.body.classList.remove('modal-open'); }, []);
 
@@ -144,11 +145,23 @@ export default function AttendanceEntryModal({ employees, month, editing, preset
 
           {err && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{err}</div>}
 
-          <div style={{ display: 'flex', gap: 8 }}>
-            {editing && <button onClick={del} disabled={busy} style={{ ...S.btnDanger, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{deleting ? 'Deleting…' : 'Delete'}</button>}
-            <button onClick={onClose} style={{ ...S.btnGhost, flex: 1 }}>Cancel</button>
-            <button onClick={save} disabled={busy} style={{ ...S.btnPrimary, flex: 1, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{saving ? 'Saving…' : editing ? 'Save' : 'Add'}</button>
-          </div>
+          {/* Deleting a punched day changes that month's pay — confirm in-app,
+              same Keep/act pattern the salary pay screen uses for Unmark. */}
+          {confirmDel && editing ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 12, color: T.tx2, textAlign: 'center' }}>Delete this day's entry? The day becomes an unpaid absence in the salary.</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setConfirmDel(false)} disabled={busy} style={{ ...S.btnGhost, flex: 1, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>Keep</button>
+                <button onClick={del} disabled={busy} style={{ ...S.btnDanger, flex: 1, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{deleting ? 'Deleting…' : 'Delete entry'}</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {editing && <button onClick={() => setConfirmDel(true)} disabled={busy} style={{ ...S.btnDanger, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>Delete</button>}
+              <button onClick={onClose} style={{ ...S.btnGhost, flex: 1 }}>Cancel</button>
+              <button onClick={save} disabled={busy} style={{ ...S.btnPrimary, flex: 1, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{saving ? 'Saving…' : editing ? 'Save' : 'Add'}</button>
+            </div>
+          )}
         </div>
       </div>
     </div>
