@@ -121,9 +121,16 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
   };
 
   const generatePassword = () => {
+    // Cryptographic randomness — Math.random() is a predictable PRNG, and these
+    // are real login passwords (invites + admin resets). Reject-sampling keeps
+    // the distribution uniform over the charset (no modulo bias).
     const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
+    const max = Math.floor(256 / chars.length) * chars.length;
     let pwd = '';
-    for (let i = 0; i < 12; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+    while (pwd.length < 14) {
+      const buf = crypto.getRandomValues(new Uint8Array(32));
+      for (const b of buf) { if (b < max) pwd += chars[b % chars.length]; if (pwd.length === 14) break; }
+    }
     return pwd;
   };
 

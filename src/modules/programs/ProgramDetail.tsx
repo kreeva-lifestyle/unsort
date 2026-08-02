@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { T, S } from '../../lib/theme';
 import { fetchProgramById, fetchMatchings, fetchPriceWithParts } from './lib/supabase-rpc';
 import { toDirectImageUrl } from './lib/image-url-converters';
+import { safeHref } from '../../lib/safeHref';
 import SectionTitle from './components/SectionTitle';
 import FabricBreakdown from './components/FabricBreakdown';
 import ProgramHistory from './ProgramHistory';
@@ -99,7 +100,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
             <img src={imageUrl} alt="" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', background: T.s2 }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11, color: T.tx, fontWeight: 500 }}>Image attached</div>
-              <a href={program.dropbox_gdrive_link || ''} target="_blank" rel="noopener" style={{ fontSize: 10, color: T.ac2, textDecoration: 'none' }}>{t('openOriginal')} ↗</a>
+              <a href={safeHref(program.dropbox_gdrive_link)} target="_blank" rel="noopener" style={{ fontSize: 10, color: T.ac2, textDecoration: 'none' }}>{t('openOriginal')} ↗</a>
             </div>
           </div>
         )}
