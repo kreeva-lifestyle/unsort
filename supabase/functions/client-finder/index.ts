@@ -118,6 +118,21 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(d)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// The `image_url` in a SKU search comes from the SKU's own Dropbox photos, so
+// restrict server-side fetches to https Dropbox hosts. Without this, a signed-in
+// caller could point `image_url` at an arbitrary URL (169.254.169.254, localhost,
+// any internal service) and turn this function into a blind SSRF proxy.
+const MAX_IMAGE_BYTES = 15_000_000;
+function isAllowedDropboxImageUrl(u: string): boolean {
+  try {
+    const url = new URL(u);
+    if (url.protocol !== 'https:') return false;
+    const h = url.hostname.toLowerCase();
+    return h === 'dropbox.com' || h === 'www.dropbox.com'
+      || h.endsWith('.dropbox.com') || h.endsWith('.dropboxusercontent.com');
+  } catch { return false; }
+}
+
 // ── SKU -> image bytes ──────────────────────────────────────────────────────
 // The master sheet's IMAGE column holds a Dropbox FOLDER link (/scl/fo/...),
 // not an image, so it cannot be fetched directly. odette-export's `linkgen`
@@ -546,9 +561,15 @@ Deno.serve(async (req) => {
       const picked = String(body?.image_url || '').trim();
       if (picked) {
         const raw = picked.replace(/([?&])dl=[01]\b/, '$1raw=1');
-        const img = await fetch(raw.includes('raw=1') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}raw=1`);
-        if (!img.ok) return fail(502, `Dropbox returned ${img.status} for that photo`, req);
+        const fetchUrl = raw.includes('raw=1') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}raw=1`;
+        // SSRF guard: only https Dropbox photo links, never an arbitrary URL.
+        if (!isAllowedDropboxImageUrl(fetchUrl)) return fail(400, 'Only Dropbox photo links can be searched', req);
+        const img = await fetch(fetchUrl);
+        if (!img.ok) { try { await img.body?.cancel(); } catch { /* noop */ } return fail(502, `Dropbox returned ${img.status} for that photo`, req); }
+        const clen = Number(img.headers.get('content-length') || 0);
+        if (clen > MAX_IMAGE_BYTES) { try { await img.body?.cancel(); } catch { /* noop */ } return fail(413, 'That photo is too large to search', req); }
         const buf = new Uint8Array(await img.arrayBuffer());
+        if (buf.length > MAX_IMAGE_BYTES) return fail(413, 'That photo is too large to search', req);
         if (buf.length < 512) return fail(502, 'That photo came back empty or as a preview page', req);
         bytes = buf;
       } else {
