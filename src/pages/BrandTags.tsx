@@ -9,6 +9,14 @@ import BrandTagModalNew from '../components/ui/BrandTagModal';
 import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 import { friendlyError } from '../lib/friendlyError';
 import type { BrandTag, BrandTagInsert } from '../types/database';
+// Bundle JsBarcode instead of loading it from a CDN inside the print iframe. A
+// remote <script> with no SRI ran third-party code in the app's own origin every
+// time a label printed; inlining the already-installed dependency removes that
+// CDN-compromise surface and makes label printing work offline. `?raw` gives the
+// minified source as a string at build time. Any literal `</script` inside it
+// would close the iframe's <script> early, so neutralise it once here.
+import jsBarcodeSrc from 'jsbarcode/dist/JsBarcode.all.min.js?raw';
+const JSBARCODE_INLINE = jsBarcodeSrc.replace(/<\/script/gi, '<\\/script');
 
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
@@ -181,7 +189,7 @@ body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000}
 }
 @media screen{.label{border:1px solid #ccc;margin:8px auto}}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+<script>${JSBARCODE_INLINE}<\/script>
 </head><body>${html}
 <script>
 document.querySelectorAll('.barcode svg').forEach(function(svg){
