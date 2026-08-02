@@ -345,6 +345,10 @@ Deno.serve(async (req) => {
 
   if (req.method !== 'POST') return fail(405, 'Method not allowed', req);
 
+  // Presence of *a* header is not authentication — the public anon key ships in
+  // the browser bundle and would pass a bare `if (!auth)` check. Every action
+  // below does its own real verification (callerRole / anon-key-only thumb);
+  // this is only a fast reject for genuinely header-less requests.
   const auth = req.headers.get('authorization') || req.headers.get('apikey') || '';
   if (!auth) return fail(401, 'Unauthorized — missing auth header', req);
 
@@ -357,6 +361,9 @@ Deno.serve(async (req) => {
 
   try {
     if (action === 'dropbox_status') {
+      // Returns the Dropbox app key (OAuth client id) — gate it. Any active user
+      // may see connection status; no role restriction needed for a read.
+      if (!(await callerRole(req))) return fail(401, 'Sign in to DailyOffice first', req);
       const [rt, ck] = await Promise.all([getSecret('dropbox_refresh_token'), getSecret('dropbox_app_key')]);
       return json({ ok: true, connected: !!rt, appKey: ck || undefined }, req);
     }
@@ -750,6 +757,9 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'reconcile') {
+      // Reads master-sheet rows / missing-SKU data — any active user, but not
+      // an unauthenticated anon-key caller.
+      if (!(await callerRole(req))) return fail(401, 'Sign in to DailyOffice first', req);
       const odetteSet = new Set(await readSkuColumn(getSheetId(), ODETTE_TAB));
       const masterId = getMasterSheetId();
       const SOURCE_COL = 'Source Tab'; const MISSING_SIZE_COL = 'Missing Size'; const EXPECTED_COL = 'Expected Odette SKU';
@@ -804,6 +814,10 @@ Deno.serve(async (req) => {
     if (!ALLOWED_TABS.includes(sheetName)) return fail(400, `Sheet tab "${sheetName}" not allowed`, req);
 
     if (action === 'push') {
+      // Data-mutating write to the production ODETTE QTY column — must be a
+      // signed-in active user with a writing role, not merely the anon key.
+      const role = await callerRole(req);
+      if (!role || !['admin', 'manager', 'operator'].includes(role)) return fail(403, 'Only admin/manager/operator can push stock quantities', req);
       const rows = body.rows;
       if (!Array.isArray(rows) || rows.length === 0) return fail(400, 'rows missing or empty', req);
       const qtyMap: Record<string, string | number> = {};
