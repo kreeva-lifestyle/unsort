@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../../lib/theme';
-import { SUPABASE_ANON_KEY } from '../../lib/supabase';
+import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { exportName, fileDate } from '../../lib/exportName';
 
@@ -39,9 +39,13 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
   const reconcile = async () => {
     setLoading(true);
     try {
+      // reconcile now requires a signed-in caller server-side — send the
+      // session token rather than the public anon key.
+      const { data: { session } } = await supabase.auth.getSession();
+      const jwt = session?.access_token || SUPABASE_ANON_KEY;
       const resp = await fetch(ODETTE_EDGE_FN, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}`, 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ action: 'reconcile' }),
       });
       const data = await resp.json();

@@ -127,6 +127,17 @@ const parseOrderSheet = (data: any[], masterRows: BrandTagRow[]): OrderRow[] => 
 
 // ── Build label print HTML (rendered inside an in-app iframe instead of a popup) ─
 const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
+
+// Serialize data for embedding INSIDE an inline <script>. JSON.stringify alone
+// is unsafe there: it leaves `<` intact, so a value containing `</script>` closes
+// the tag and injects markup (a SKU is user data, bulk-imported from Excel).
+// Escaping the `<` character keeps the JS-array literal valid while making that
+// impossible; U+2028/U+2029 are also escaped as they're illegal in JS string
+// literals. The invalid-barcode fallback in the script uses textContent, never
+// innerHTML, so the values are never parsed as HTML at runtime either.
+const scriptJson = (v: unknown) =>
+  JSON.stringify(v).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+
 const buildLabelsHtml = (labels: BrandTagRow[]): string => {
   const html = labels.map(r => {
     const brand = r.brand.replace(/^BRAND NAME:\s*/i, '').trim().toUpperCase();
@@ -175,8 +186,8 @@ body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000}
 <script>
 document.querySelectorAll('.barcode svg').forEach(function(svg){
   var id=svg.id.replace('bc-','');
-  var row=${JSON.stringify(labels.map(r=>({id:r.id,jio:r.jioCode,sku:r.sku})))}.find(function(r){return r.id===id});
-  if(row&&row.jio)try{JsBarcode(svg,row.jio,{format:'CODE128',width:1.5,height:34,displayValue:true,text:row.sku,fontSize:8,font:'Arial',margin:0,textMargin:1})}catch(e){if(svg)svg.outerHTML='<div style="color:#c00;font-size:10px;border:1px dashed #c00;padding:4px;text-align:center">[Invalid barcode: '+(row.sku||row.jio||'?')+']</div>'}
+  var row=${scriptJson(labels.map(r => ({ id: r.id, jio: r.jioCode, sku: r.sku })))}.find(function(r){return r.id===id});
+  if(row&&row.jio)try{JsBarcode(svg,row.jio,{format:'CODE128',width:1.5,height:34,displayValue:true,text:row.sku,fontSize:8,font:'Arial',margin:0,textMargin:1})}catch(e){if(svg){var d=document.createElement('div');d.style.cssText='color:#c00;font-size:10px;border:1px dashed #c00;padding:4px;text-align:center';d.textContent='[Invalid barcode: '+(row.sku||row.jio||'?')+']';svg.replaceWith(d);}}
 });
 <\/script></body></html>`;
 };

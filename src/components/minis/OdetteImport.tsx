@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../../lib/theme';
-import { SUPABASE_ANON_KEY } from '../../lib/supabase';
+import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { exportName, fileDate } from '../../lib/exportName';
 
@@ -29,9 +29,13 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     setPushing(true);
     try {
       const rows = results.map(r => [r.sku, r.flag === 'not_found' ? 'Not Found' : r.flag === 'oos' ? 'Out of Stock' : r.total]);
+      // Push writes to the production sheet, so the edge fn now requires a real
+      // signed-in caller — send the session token, not the public anon key.
+      const { data: { session } } = await supabase.auth.getSession();
+      const jwt = session?.access_token || SUPABASE_ANON_KEY;
       const resp = await fetch(ODETTE_EDGE_FN, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}`, 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ action: 'push', sheetName: SHEET_NAME, rows }),
       });
       const data = await resp.json();
