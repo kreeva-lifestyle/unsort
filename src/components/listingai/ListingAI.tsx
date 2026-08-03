@@ -14,7 +14,9 @@ import MasterFreshness from '../ui/MasterFreshness';
 import { call } from './api';
 import { parseSkuLines } from './skuInput';
 import { HANDOFF_EVENT, readListingHandoff } from './listingHandoff';
-import { useGenerateRun } from './useGenerateRun';
+import { RUN_CAP, useGenerateRun } from './useGenerateRun';
+import { useAutoBatch } from './useAutoBatch';
+import HandoffBanner from './HandoffBanner';
 import TemplateManager from './TemplateManager';
 import TaughtMappingsPage from './TaughtMappingsPage';
 import BulkTeachPage from './bulk/BulkTeachPage';
@@ -33,7 +35,9 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
   const [viewMode, setViewMode] = useState<'main' | 'mappings' | 'bulk' | 'assistant'>('main');
   const [manageOpen, setManageOpen] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
+  const [handoff, setHandoff] = useState<{ seller: string; count: number } | null>(null);
   const gen = useGenerateRun(addToast);
+  const batch = useAutoBatch(gen, addToast);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -55,18 +59,19 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
   // SKU handoff from the Master Assistant ("Generate listings for
   // not-uploaded"). Read on mount (tab mounted fresh after the switch) AND on
   // the event (tab already mounted but hidden) — reading consumes the payload.
+  // Context goes into the persistent banner, not a vanishing toast.
   useEffect(() => {
     const applyHandoff = () => {
       const h = readListingHandoff();
       if (!h) return;
       setViewMode('main');
       setSkuText(h.skus.join('\n'));
-      addToast(`${h.skus.length} not-uploaded SKUs from Master Assistant (${h.seller}) — pick that seller's Listing Template, or add it via Manage Templates`, 'success');
+      setHandoff({ seller: h.seller, count: h.skus.length });
     };
     applyHandoff();
     window.addEventListener(HANDOFF_EVENT, applyHandoff);
     return () => window.removeEventListener(HANDOFF_EVENT, applyHandoff);
-  }, [addToast]);
+  }, []);
 
   const isAdmin = status?.role === 'admin';
   const selected = templates.find(t => t.id === selectedId);
@@ -76,6 +81,8 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
     if (!selected) { addToast('Pick a template first', 'error'); return; }
     const skus = parseSkuLines(skuText);
     if (skus.length === 0) { addToast('Paste at least one SKU', 'error'); return; }
+    // Past the per-run cap the auto-queue runs the whole list batch-by-batch.
+    if (skus.length > RUN_CAP) { batch.start(selected, skus, isAdmin); return; }
     gen.generate(selected, skus, isAdmin);
   };
 
@@ -135,6 +142,11 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
           <button onClick={() => setViewMode('mappings')} style={S.btnGhost}>Taught Mappings</button>
           <button onClick={() => setLinksOpen(true)} style={S.btnGhost}>Image Folders</button>
         </div>
+        {(handoff || batch.active) && (
+          <HandoffBanner seller={handoff?.seller ?? null} count={handoff?.count ?? 0}
+            batch={batch.active ? { current: batch.current, total: batch.total } : null}
+            stopping={batch.stopping} onStop={batch.stop} onDismiss={() => setHandoff(null)} />
+        )}
         <div style={S.fLabel}>SKUs — one per line</div>
         <textarea
           value={skuText}
@@ -149,12 +161,14 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
           <button
             onClick={generate}
-            disabled={gen.generating}
-            style={{ ...S.btnPrimary, pointerEvents: gen.generating ? 'none' : 'auto', opacity: gen.generating ? 0.5 : 1 }}
+            disabled={gen.generating || batch.active}
+            style={{ ...S.btnPrimary, pointerEvents: (gen.generating || batch.active) ? 'none' : 'auto', opacity: (gen.generating || batch.active) ? 0.5 : 1 }}
           >
-            {gen.generating ? `Generating ${gen.progress.done}/${gen.progress.total}…` : `Generate${skuCount ? ` ${Math.min(skuCount, 60)} SKU${skuCount > 1 ? 's' : ''}` : ''}`}
+            {batch.active ? `Batch ${batch.current}/${batch.total} — ${gen.progress.done}/${gen.progress.total}…`
+              : gen.generating ? `Generating ${gen.progress.done}/${gen.progress.total}…`
+              : `Generate${skuCount ? ` ${skuCount} SKU${skuCount > 1 ? 's' : ''}${skuCount > RUN_CAP ? ` (${Math.ceil(skuCount / RUN_CAP)} batches)` : ''}` : ''}`}
           </button>
-          {gen.generating && <span style={{ fontSize: 11, color: T.tx3 }}>Fetching data, photos and writing listings — stay on this screen…</span>}
+          {(gen.generating || batch.active) && <span style={{ fontSize: 11, color: T.tx3 }}>Fetching data, photos and writing listings — stay on this screen…</span>}
         </div>
       </div>
       {gen.preflight && (
