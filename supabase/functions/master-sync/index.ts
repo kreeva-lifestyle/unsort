@@ -24,7 +24,11 @@ const SB_URL = Deno.env.get('SUPABASE_URL')!;
 const SB_SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db = createClient(SB_URL, SB_SVC, { auth: { persistSession: false } });
 
-// Must match listing-ai's MASTER_TABS — the readers reconstruct these names.
+// Known core tabs — kept as a FALLBACK for discovery so a Sheets API hiccup can
+// never shrink the mirror below these. Data tabs are otherwise discovered
+// dynamically: any worksheet whose header row has an SKU column (see
+// discoverDataTabs), so a new brand tab in the master sheet is synced with no
+// code change. listing-ai reads whatever tabs this populates.
 const MASTER_TABS = ['ARYA', 'DRESSTIVE'];
 const LEASE_STALE_MIN = 5;      // a crashed run releases itself after this
 // Fallback cadence when the Drive probe is unavailable (the Drive API is not
@@ -100,6 +104,51 @@ async function readSheetRaw(tab: string): Promise<string[][]> {
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error?.message || `read ${r.status}`);
   return (data.values || []) as string[][];
+}
+
+// Every worksheet title in the spreadsheet — one cheap metadata call.
+async function listTabTitles(): Promise<string[]> {
+  const token = await googleToken();
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId()}?fields=sheets.properties.title`;
+  const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error?.message || `list tabs ${r.status}`);
+  return (data.sheets || []).map((s: any) => String(s?.properties?.title ?? '').trim()).filter(Boolean);
+}
+
+// A worksheet counts as product data when its header row (row 1) has an SKU
+// column — the same signal every reader uses. Reads only row 1, so classifying
+// a helper tab (Instructions, Pivots, dropdown lists) is cheap; those are left
+// out of the mirror entirely.
+async function tabHasSkuColumn(tab: string): Promise<boolean> {
+  const token = await googleToken();
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId()}/values/${encodeURIComponent(tab + '!1:1')}`;
+  const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+  if (!r.ok) return false;
+  const data = await r.json().catch(() => ({}));
+  const headers = ((data.values || [])[0] || []).map((h: any) => String(h ?? '').toLowerCase());
+  return headers.some((h: string) => h.includes('sku'));
+}
+
+// The data tabs to sync. Discovered dynamically; the known core is always kept
+// so a transient Sheets error (list fails, or a core tab momentarily
+// misclassifies) can never drop ARYA/DRESSTIVE from the mirror. Reports every
+// worksheet title it saw (and any skipped as non-data) so the sync response is
+// self-explaining about WHY a tab is or isn't in the mirror.
+async function discoverDataTabs(): Promise<{ dataTabs: string[]; allTabs: string[]; skipped: string[]; discoverError?: string }> {
+  try {
+    const titles = await listTabTitles();
+    const out: string[] = [];
+    const skipped: string[] = [];
+    for (const t of titles) {
+      try { if (await tabHasSkuColumn(t)) out.push(t); else skipped.push(t); }
+      catch { skipped.push(t); }
+    }
+    for (const t of MASTER_TABS) if (!out.includes(t)) out.push(t);
+    return { dataTabs: out, allTabs: titles, skipped };
+  } catch (e) {
+    return { dataTabs: [...MASTER_TABS], allTabs: [], skipped: [], discoverError: (e as Error).message };
+  }
 }
 
 // The whole point of the cheap poll: ~200 bytes instead of the entire sheet.
@@ -334,23 +383,29 @@ Deno.serve(async (req) => {
 
   try {
     if (mode === 'verify') {
+      const disc = await discoverDataTabs();
       const results = [];
-      for (const tab of MASTER_TABS) results.push(await verifyTab(tab));
-      return json({ ok: true, mode, results, clean: results.every((r: any) => r.clean) });
+      for (const tab of disc.dataTabs) results.push(await verifyTab(tab));
+      return json({ ok: true, mode, allTabs: disc.allTabs, skipped: disc.skipped, discoverError: disc.discoverError, results, clean: results.every((r: any) => r.clean) });
     }
 
-    // One probe for the whole spreadsheet, shared by both tabs. `full` probes
+    // One probe for the whole spreadsheet, shared by all tabs. `full` probes
     // too — not to decide anything, but so the stored timestamp stays current
     // and the next `auto` tick can still skip.
     const modified = await driveModifiedTime();
+    const disc = await discoverDataTabs();
+    // A newly-discovered tab has no lease row yet; syncTab's lease UPDATE would
+    // match nothing and skip it forever. Insert a placeholder (idle, defaults)
+    // without disturbing existing rows.
+    await db.from('master_sheet_sync').upsert(disc.dataTabs.map(t => ({ tab: t })), { onConflict: 'tab', ignoreDuplicates: true });
     const results: TabResult[] = [];
-    for (const tab of MASTER_TABS) results.push(await syncTab(tab, mode, modified));
+    for (const tab of disc.dataTabs) results.push(await syncTab(tab, mode, modified));
 
     // NOTE: product_catalog (SKU autosuggest) is NOT refreshed here. It is
     // rebuilt by its own pg_cron job calling refresh_product_catalog(), which
     // skips rows that did not change — so a quiet poll writes nothing and this
     // function needs no redeploy when the catalog's shape changes.
-    return json({ ok: !results.some(r => r.error), mode, probe: modified ? 'drive' : 'none', probeError, results });
+    return json({ ok: !results.some(r => r.error), mode, probe: modified ? 'drive' : 'none', probeError, allTabs: disc.allTabs, skipped: disc.skipped, discoverError: disc.discoverError, results });
   } catch (e) {
     return json({ ok: false, error: (e as Error).message }, 500);
   }
