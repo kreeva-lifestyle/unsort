@@ -10,8 +10,9 @@ import { friendlyError } from '../../../lib/friendlyError';
 import { call } from '../api';
 import { parseSellerSheet, SellerSheet } from './sellerSheetParse';
 import AssistantTables, { AssistantTable } from './AssistantTables';
+import { buildComparisonReport, downloadComparisonWorkbook, ComparisonReport } from './buildReport';
 
-interface Msg { role: 'user' | 'assistant'; text: string; tables?: AssistantTable[]; estUsd?: number }
+interface Msg { role: 'user' | 'assistant'; text: string; tables?: AssistantTable[]; report?: ComparisonReport | null; estUsd?: number }
 
 // The chat renders raw text; the model is told plain-text-only but a slipped
 // markdown token must not show as # / ** noise — strip the common ones.
@@ -65,7 +66,11 @@ export default function MasterAssistant({ onBack, addToast }: {
         if (data?.error === 'no_api_key') throw new Error('Add the Anthropic API key in Settings → Listing AI first');
         throw new Error(String(data?.details || data?.error || `Failed (${status})`));
       }
-      setMsgs(m => [...m, { role: 'assistant', text: plainText(String(data.answer || '')), tables: (data.tables || []) as AssistantTable[], estUsd: Number(data.estUsd || 0) }]);
+      const tables = (data.tables || []) as AssistantTable[];
+      // One-workbook seller report — built from the exact comparison the edge
+      // just computed plus the sheet that produced it (only when one's attached).
+      const report = sheet ? buildComparisonReport(tables, sheet) : null;
+      setMsgs(m => [...m, { role: 'assistant', text: plainText(String(data.answer || '')), tables, report, estUsd: Number(data.estUsd || 0) }]);
       for (const w of (data.warnings || []) as string[]) addToast(w, 'error');
     } catch (e) {
       addToast(friendlyError(e), 'error');
@@ -117,6 +122,12 @@ export default function MasterAssistant({ onBack, addToast }: {
             ) : (
               <div style={{ maxWidth: '95%' }}>
                 <div style={{ padding: '10px 12px', borderRadius: 10, background: T.s2, border: `1px solid ${T.bd}`, fontSize: 12, color: T.tx2, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{m.text}</div>
+                {m.report && (
+                  <button onClick={() => { downloadComparisonWorkbook(m.report!); addToast('Excel report downloaded', 'success'); }}
+                    style={{ ...S.btnPrimary, marginTop: 8, minHeight: 40, fontSize: 12 }}>
+                    ⬇ Download Excel report — Summary + Out of stock + In stock + Not uploaded
+                  </button>
+                )}
                 {m.tables && <AssistantTables tables={m.tables} />}
                 {!!m.estUsd && <div style={{ fontSize: 9, color: T.tx3, marginTop: 3, fontFamily: T.mono }}>~${m.estUsd.toFixed(4)}</div>}
               </div>
