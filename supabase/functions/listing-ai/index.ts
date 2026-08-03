@@ -1618,6 +1618,14 @@ Deno.serve(async (req) => {
           tables.push({ title: `Unknown SKUs - in seller sheet only (${sellerOnly.length})`, columns: ['SKU'], rows: sellerOnly.slice(0, 2000).map(k => [k]) });
           packLines.push(`Sample matched: ${matched.slice(0, 100).join(', ') || '(none)'}`);
           packLines.push(`Sample not-uploaded: ${masterOnly.slice(0, 100).join(', ') || '(none)'}`);
+          // masterSkus is ARYA-first, so a single flat 100-SKU sample buries
+          // every DRESSTIVE (DRS / TF) code past the cut-off - the model then
+          // sees only ARYA numerics and answers as if just ARYA is missing.
+          // Break the not-uploaded set out PER BRAND TAB so each brand's
+          // missing codes reach the model regardless of tab ordering.
+          const notUpByTab = new Map<string, string[]>();
+          for (const k of masterOnly) { const tab = index[k].tab; const arr = notUpByTab.get(tab) || []; arr.push(k); notUpByTab.set(tab, arr); }
+          if (notUpByTab.size > 0) packLines.push(`NOT-UPLOADED by brand tab (master SKUs missing from the seller sheet): ${[...notUpByTab.entries()].map(([tab, ks]) => `${tab}=${ks.length} (e.g. ${ks.slice(0, 15).join(', ')})`).join('  //  ')}. Each brand's full missing list is in the "Not uploaded by seller" table - never imply only one brand is missing when another brand also has NOT-UPLOADED codes here.`);
           packLines.push(`Sample unknown: ${sellerOnly.slice(0, 100).join(', ') || '(none)'}`);
         }
       } else {
