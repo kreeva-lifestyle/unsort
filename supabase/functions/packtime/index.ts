@@ -186,7 +186,15 @@ async function isConfiguredSheet(sheetName: string): Promise<boolean | null> {
 function verifyColumns(header: string[] | undefined): { ok: boolean; info?: string } {
   if (!header || header.length === 0) return { ok: true };
   const expected = ['Count', 'AWB', 'Timestamp', 'Camera'];
-  const mismatch = expected.some((e, i) => (header[i] ?? '').trim().toLowerCase() !== e.toLowerCase());
+  const mismatch = expected.some((e, i) => {
+    const h = (header[i] ?? '').trim().toLowerCase();
+    // Column D is labelled "Camera Number" in the app UI and in real sheets, but
+    // was historically documented as just "Camera" — accept either so a sheet
+    // that follows the UI's own instruction ("D: Camera Number") doesn't get
+    // wrongly flagged as a mismatch. A/B/C stay exact.
+    if (i === 3) return !h.startsWith('camera');
+    return h !== e.toLowerCase();
+  });
   if (!mismatch) return { ok: true };
   return { ok: false, info: `Found headers: ${header.slice(0, 4).map(h => h || '(empty)').join(' | ')}` };
 }
