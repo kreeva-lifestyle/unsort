@@ -201,7 +201,7 @@ const MainApp = () => {
         {mounted.has('listingai') && checkTab('listingai') && <div style={{ display: tab === 'listingai' ? 'block' : 'none' }}><ListingAIPage /></div>}
         {mounted.has('attendance') && checkTab('attendance') && <div style={{ display: tab === 'attendance' ? 'block' : 'none' }}><Attendance /></div>}
         {mounted.has('programs') && checkTab('programs') && <div style={{ display: tab === 'programs' ? 'block' : 'none' }}><ProgramsModule /></div>}
-        {mounted.has('minis') && checkTab('minis') && <div style={{ display: tab === 'minis' ? 'block' : 'none' }}><Minis /></div>}
+        {mounted.has('minis') && checkTab('minis') && <div style={{ display: tab === 'minis' ? 'block' : 'none' }}><Minis navigateTo={setTab} /></div>}
         {mounted.has('printstation') && checkTab('printstation') && <div style={{ display: tab === 'printstation' ? 'block' : 'none' }}><PrintStation /></div>}
         {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage profile={profile} addToast={addToast} /></div>}
         </Suspense>

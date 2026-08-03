@@ -146,10 +146,10 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
         <div style={{ padding: 16, overflowY: 'auto' }}>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={onFile} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
           {!editing && <>
-            <button onClick={() => fileRef.current?.click()} style={{ ...S.btnPrimary, marginBottom: 12 }}>Upload marketplace sheet</button>
+            <button onClick={() => fileRef.current?.click()} style={{ ...S.btnPrimary, marginBottom: 12 }}>Upload Listing Template sheet</button>
             {templates.length === 0 && (
               <div style={{ padding: '30px 10px', textAlign: 'center', color: T.tx3, fontSize: 12 }}>
-                No templates yet — upload the marketplace's blank listing sheet (headers + its dropdown datasets become the template).
+                No Listing Templates yet — upload the blank listing sheet (a marketplace's or a seller's own; headers + any dropdown datasets become the template).
               </div>
             )}
             {templates.map(t => (

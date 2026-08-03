@@ -13,6 +13,7 @@ import Empty from '../ui/Empty';
 import MasterFreshness from '../ui/MasterFreshness';
 import { call } from './api';
 import { parseSkuLines } from './skuInput';
+import { HANDOFF_EVENT, readListingHandoff } from './listingHandoff';
 import { useGenerateRun } from './useGenerateRun';
 import TemplateManager from './TemplateManager';
 import TaughtMappingsPage from './TaughtMappingsPage';
@@ -50,6 +51,22 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
   }, [addToast]);
 
   useEffect(() => { loadStatus(); loadTemplates(); }, [loadStatus, loadTemplates]);
+
+  // SKU handoff from the Master Assistant ("Generate listings for
+  // not-uploaded"). Read on mount (tab mounted fresh after the switch) AND on
+  // the event (tab already mounted but hidden) — reading consumes the payload.
+  useEffect(() => {
+    const applyHandoff = () => {
+      const h = readListingHandoff();
+      if (!h) return;
+      setViewMode('main');
+      setSkuText(h.skus.join('\n'));
+      addToast(`${h.skus.length} not-uploaded SKUs from Master Assistant (${h.seller}) — pick that seller's Listing Template, or add it via Manage Templates`, 'success');
+    };
+    applyHandoff();
+    window.addEventListener(HANDOFF_EVENT, applyHandoff);
+    return () => window.removeEventListener(HANDOFF_EVENT, applyHandoff);
+  }, [addToast]);
 
   const isAdmin = status?.role === 'admin';
   const selected = templates.find(t => t.id === selectedId);
@@ -94,7 +111,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>Listing AI</div>
         <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>
-          Master sheet + Dropbox photo → filled marketplace sheet, fresh wording every run. Price columns are never AI-written — you fill or skip them.
+          Master sheet + Dropbox photo → filled Listing Template, fresh wording every run. Price columns are never AI-written — you fill or skip them.
         </div>
       </div>
       {status && !status.hasKey && (
@@ -108,7 +125,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
         <MasterFreshness />
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 12 }}>
           <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={S.fLabel}>Marketplace template</div>
+            <div style={S.fLabel}>Listing Template</div>
             <select value={selectedId} onChange={e => setSelectedId(e.target.value)} style={{ ...S.fInput, width: '100%' }}>
               <option value="">{templates.length ? 'Choose a template…' : 'No templates yet'}</option>
               {templates.map(t => <option key={t.id} value={t.id}>{t.name}{t.marketplace ? ` — ${t.marketplace}` : ''} ({t.fields.length} fields)</option>)}

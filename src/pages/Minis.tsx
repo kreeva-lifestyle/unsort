@@ -26,7 +26,7 @@ interface UtsavRow { relid: string; vendorno: string; stock: number; leadtime: n
 
 type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'address' | 'trackly' | 'return_labels' | 'ratecard' | 'dropbox_links' | 'forward_dropbox' | 'master_assistant' | 'client_finder';
 
-export default function Minis() {
+export default function Minis({ navigateTo }: { navigateTo?: (tab: string) => void }) {
   const { addToast } = useNotifications();
   const [view, setViewState] = useState<MiniView>('home');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -352,7 +352,7 @@ export default function Minis() {
   // MasterAssistant renders its own back button, so no wrapper `back` here.
   if (view === 'master_assistant') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <MasterAssistant addToast={addToast} onBack={() => { setViewState('home'); window.history.back(); }} />
+      <MasterAssistant addToast={addToast} onBack={() => { setViewState('home'); window.history.back(); }} openListingAI={navigateTo ? () => navigateTo('listingai') : undefined} />
     </div>
   );
 

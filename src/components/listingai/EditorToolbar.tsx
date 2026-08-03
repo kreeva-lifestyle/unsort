@@ -26,7 +26,7 @@ export default function EditorToolbar({ fields, isSaved, onFields, onReupload, a
         addToast(n ? `${n} non-mandatory column(s) skipped — mandatory, fixed, wired, paired and photo columns kept` : 'Nothing to skip — everything left is mandatory, fixed, wired, paired or a photo column', 'success');
       }} style={{ ...S.btnGhost, ...S.btnSm }}>Skip all non-mandatory</button>
       <button onClick={() => onFields(fields.map(f => f.skip ? { ...f, skip: false } : f))} style={{ ...S.btnGhost, ...S.btnSm }}>Fill all</button>
-      {isSaved && <button onClick={onReupload} title="Upload the marketplace's new sheet version — your settings are kept, changes are merged" style={{ ...S.btnGhost, ...S.btnSm }}>Update from new sheet</button>}
+      {isSaved && <button onClick={onReupload} title="Upload this Listing Template's new sheet version — your settings are kept, changes are merged" style={{ ...S.btnGhost, ...S.btnSm }}>Update from new sheet</button>}
       <button onClick={onRules} title='Conditional fills: "WHEN semi-stitched → SET Closure to NA", per-size charts…' style={{ ...S.btnGhost, ...S.btnSm, color: T.ac2, border: '1px solid oklch(0.55 0.22 265 / .35)' }}>⚡ Rules{rulesCount ? ` (${rulesCount})` : ''}</button>
       <span style={{ fontSize: 10, color: T.tx3 }}>{fields.filter(f => f.mandatory).length} mandatory · {fields.filter(f => f.skip).length} skipped</span>
       <span style={{ position: 'relative', flex: 1, minWidth: 130 }}>
