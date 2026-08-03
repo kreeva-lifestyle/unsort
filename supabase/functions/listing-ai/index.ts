@@ -640,7 +640,7 @@ const rawUrl = (url: string) =>
 // Price-like columns are never AI-written: the owner fills them via fixed
 // values, master pairing, wires or rules - with no deterministic source they
 // export empty. The model never sees a price field, so it can't invent one.
-const SENSITIVE_RE = /price|mrp|\bgst\b|\brate\b|cost|amount|margin|commission|\bhsn\b/i;
+const SENSITIVE_RE = /price|mrp|\bgst\b|\brate\b|cost|amount|margin|commission|\bhsn\b|\b(?:cp|tp|sp)\b/i;
 // Master columns that never help the model (links, stock dates, prices).
 const EXCLUDE_SRC = /price|gst|image|out of stock/i;
 
@@ -704,6 +704,11 @@ const sizeTokens = (raw: string): string[] =>
 const isSizeField = (f: Classified) => f.kind === 'direct' && f.masterCol === 'SIZE' && f.allowed.length > 0;
 
 function classifyFields(fields: TplField[], masterHeaders: Map<string, string>): Classified[] {
+  // A Listing Template with NO dropdowns anywhere (e.g. a seller's own plain
+  // sheet) is "master first, AI for the rest": even creative columns (title,
+  // description...) copy verbatim from the master when a same-named master
+  // column exists - only columns with no master match stay AI-written.
+  const noDropdowns = fields.every(f => f.allowed.length === 0 || f.skip);
   return fields.map(f => {
     // Owner-skipped columns are never filled - exported empty, zero cost.
     if (f.skip) return { ...f, kind: 'blank' as const, masterCol: '' };
@@ -729,7 +734,7 @@ function classifyFields(fields: TplField[], masterHeaders: Map<string, string>):
     // with a dropdown it goes through the usual reconciliation). Creative
     // fields are excluded so listings stay fresh.
     const mh = masterHeaders.get(n);
-    if (mh && !CONTENT_RE.test(f.header)) return { ...f, kind: 'direct' as const, masterCol: mh };
+    if (mh && (noDropdowns || !CONTENT_RE.test(f.header))) return { ...f, kind: 'direct' as const, masterCol: mh };
     // Price-like columns with no deterministic source export empty instead
     // of falling through to the AI.
     return { ...f, kind: SENSITIVE_RE.test(f.header) ? 'blank' as const : 'ai' as const, masterCol: '' };

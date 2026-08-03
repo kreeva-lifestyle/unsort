@@ -31,7 +31,7 @@ const normSku = (v: string) => (v || '').trim().toUpperCase();
 type Stock = 'in' | 'out' | 'unknown';
 const OUT_RE = /\b(inactive|out\s*of\s*stock|oos|disabled?|unavailable|sold\s*out|delisted?|discontinued?|hidden|draft|removed|paused)\b/i;
 const IN_RE = /\b(active|in\s*stock|instock|live|enabled?|available|listed|published|online)\b/i;
-const stockClass = (v: string): Stock => {
+export const stockClass = (v: string): Stock => {
   const s = (v || '').trim();
   if (!s) return 'unknown';
   if (OUT_RE.test(s) || /^(no|false|off|0|n)$/i.test(s)) return 'out';

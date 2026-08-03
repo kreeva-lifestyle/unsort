@@ -7,7 +7,7 @@ import type { ListingTemplateField } from '../../types/database';
 
 // Price-like columns: never AI-written (enforced server-side too). The owner
 // fills them via fixed values, pairing, wires or rules; unset exports empty.
-export const SENSITIVE_RE = /price|mrp|\bgst\b|\brate\b|cost|amount|margin|commission|\bhsn\b/i;
+export const SENSITIVE_RE = /price|mrp|\bgst\b|\brate\b|cost|amount|margin|commission|\bhsn\b|\b(?:cp|tp|sp)\b/i;
 
 // Header normalization shared with the edge fn (taught-mapping keys).
 export const normHeader = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, '');

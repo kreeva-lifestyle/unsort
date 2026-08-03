@@ -11,6 +11,7 @@ import { call } from '../api';
 import { parseSellerSheet, SellerSheet } from './sellerSheetParse';
 import AssistantTables, { AssistantTable } from './AssistantTables';
 import { buildComparisonReport, downloadComparisonWorkbook, ComparisonReport } from './buildReport';
+import { activeNotUploadedSkus, writeListingHandoff } from '../listingHandoff';
 
 interface Msg { role: 'user' | 'assistant'; text: string; tables?: AssistantTable[]; report?: ComparisonReport | null; estUsd?: number }
 
@@ -24,9 +25,10 @@ export const plainText = (t: string): string => t
   .replace(/\n{3,}/g, '\n\n')
   .trim();
 
-export default function MasterAssistant({ onBack, addToast }: {
+export default function MasterAssistant({ onBack, addToast, openListingAI }: {
   onBack: () => void;
   addToast: (m: string, t?: string) => void;
+  openListingAI?: () => void;
 }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
@@ -122,12 +124,30 @@ export default function MasterAssistant({ onBack, addToast }: {
             ) : (
               <div style={{ maxWidth: '95%' }}>
                 <div style={{ padding: '10px 12px', borderRadius: 10, background: T.s2, border: `1px solid ${T.bd}`, fontSize: 12, color: T.tx2, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{m.text}</div>
-                {m.report && (
-                  <button onClick={() => { downloadComparisonWorkbook(m.report!); addToast('Excel report downloaded', 'success'); }}
-                    style={{ ...S.btnPrimary, marginTop: 8, minHeight: 40, fontSize: 12 }}>
-                    ⬇ Download Excel report — Summary + Out of stock + In stock + Not uploaded
-                  </button>
-                )}
+                {m.report && (() => {
+                  const genSkus = openListingAI ? activeNotUploadedSkus(m.report) : [];
+                  return (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button onClick={() => { downloadComparisonWorkbook(m.report!); addToast('Excel report downloaded', 'success'); }}
+                          style={{ ...S.btnPrimary, minHeight: 40, fontSize: 12 }}>
+                          ⬇ Download Excel report — Summary + Out of stock + In stock + Not uploaded
+                        </button>
+                        {genSkus.length > 0 && (
+                          <button onClick={() => { writeListingHandoff({ skus: genSkus, seller: m.report!.seller }); openListingAI!(); }}
+                            style={{ ...S.btnGhost, minHeight: 40, fontSize: 12 }}>
+                            ✦ Generate listings for not-uploaded ({genSkus.length})
+                          </button>
+                        )}
+                      </div>
+                      {genSkus.length > 0 && (
+                        <div style={{ fontSize: 10, color: T.tx3, marginTop: 4, lineHeight: 1.5 }}>
+                          Opens Listing AI with these SKUs pre-filled. Pick this seller&rsquo;s own Listing Template there — if it isn&rsquo;t saved yet, upload the seller&rsquo;s blank sheet once via Manage Templates; the filled file downloads in that exact column format. Price columns are never AI-filled.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 {m.tables && <AssistantTables tables={m.tables} />}
                 {!!m.estUsd && <div style={{ fontSize: 9, color: T.tx3, marginTop: 3, fontFamily: T.mono }}>~${m.estUsd.toFixed(4)}</div>}
               </div>
