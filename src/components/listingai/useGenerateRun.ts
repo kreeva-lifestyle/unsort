@@ -11,7 +11,7 @@ import { runValidate, splitIssues, PreflightIssues } from './preflight';
 import type { ListingTemplate, ListingRun } from '../../types/database';
 
 const CHUNK = 3;     // SKUs per edge call (server caps at 5) — keeps each call fast
-const RUN_CAP = 200; // SKUs per run — still a hard bill ceiling per tap, sized for real batches
+export const RUN_CAP = 200; // SKUs per run — still a hard bill ceiling per tap, sized for real batches
 // Chunks used to run strictly one-after-another, so a 60-SKU run was ~20
 // sequential AI calls (~40-60 min). The AI writing time per chunk is
 // irreducible, but chunks are independent — run a few at once instead.
