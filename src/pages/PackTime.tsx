@@ -1020,17 +1020,59 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re44}`, background: 'oklch(0.63 0.22 25 / .08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>↻ Retry</button>
             </div>
           )}
-          {verifyResult && verifyResult.ok && verifyResult.columnsOk === false && (
-            <div style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .06)', border: '1px solid oklch(0.63 0.22 25 / .18)', borderRadius: 8, padding: 12, animation: 'fi .2s ease' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: T.re, marginBottom: 4 }}>Column Mismatch</div>
-              <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.6, marginBottom: 6 }}>{verifyResult.columnsInfo}</div>
-              <div style={{ fontSize: 10, color: T.tx3, lineHeight: 1.6, background: 'rgba(0,0,0,.2)', borderRadius: 6, padding: '8px 10px' }}>
-                Please fix the sheet columns before scanning. Expected order:<br/>
-                <strong style={{ color: T.tx }}>A:</strong> Count &nbsp; <strong style={{ color: T.tx }}>B:</strong> AWB &nbsp; <strong style={{ color: T.tx }}>C:</strong> Timestamp &nbsp; <strong style={{ color: T.tx }}>D:</strong> Camera Number
+          {verifyResult && verifyResult.ok && verifyResult.columnsOk === false && (() => {
+            // Every column PackStation writes to, in order. A-D are validated by
+            // the edge; E (Brand Name) is where brand data is written, listed so
+            // the user sets the whole header row up correctly.
+            const EXPECTED = [
+              { col: 'A', name: 'Count' },
+              { col: 'B', name: 'AWB' },
+              { col: 'C', name: 'Timestamp' },
+              { col: 'D', name: 'Camera Number' },
+              { col: 'E', name: 'Brand Name' },
+            ];
+            // columnsInfo is "Found headers: X | Y | Z | W" (the sheet's first 4
+            // header cells) — parse it so each column shows what the sheet has
+            // vs what it must be, and which one is wrong.
+            const found = String(verifyResult.columnsInfo || '').replace(/^Found headers:\s*/, '').split(' | ');
+            const ok = (i: number, want: string, got: string) => {
+              const g = (got || '').trim().toLowerCase();
+              if (i === 3) return g.startsWith('camera');   // D accepts Camera / Camera Number
+              return g === want.toLowerCase();
+            };
+            return (
+              <div style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .06)', border: '1px solid oklch(0.63 0.22 25 / .18)', borderRadius: 8, padding: 12, animation: 'fi .2s ease' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: T.re, marginBottom: 4 }}>Column Mismatch</div>
+                <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5, marginBottom: 8 }}>
+                  Your sheet&rsquo;s header row (row 1) must be exactly these column names, left to right. Fix the ones marked ✗, then tap Re-check.
+                </div>
+                <div style={{ background: 'rgba(0,0,0,.2)', borderRadius: 6, padding: '8px 10px' }}>
+                  <div style={{ display: 'flex', fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, paddingBottom: 5, borderBottom: `1px solid ${T.bd}`, marginBottom: 5 }}>
+                    <span style={{ width: 26 }}>Col</span>
+                    <span style={{ flex: 1 }}>Should be</span>
+                    <span style={{ flex: 1 }}>Your sheet</span>
+                  </div>
+                  {EXPECTED.map((e, i) => {
+                    const checked = i < 4;                    // edge validates only A-D
+                    const got = i < found.length ? found[i] : '';
+                    const good = checked ? ok(i, e.name, got) : true;
+                    return (
+                      <div key={e.col} style={{ display: 'flex', alignItems: 'center', fontSize: 11, lineHeight: 1.9, color: T.tx2 }}>
+                        <span style={{ width: 26, fontWeight: 700, color: T.tx3 }}>{e.col}</span>
+                        <span style={{ flex: 1, color: T.tx, fontWeight: 600 }}>{e.name}</span>
+                        <span style={{ flex: 1, color: !checked ? T.tx3 : good ? T.gr : T.re, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {checked
+                            ? <>{good ? '✓' : '✗'} {got && got !== '(empty)' ? got : <span style={{ color: T.tx3, fontStyle: 'italic' }}>empty</span>}</>
+                            : <span style={{ fontStyle: 'italic' }}>required</span>}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re44}`, background: 'oklch(0.63 0.22 25 / .08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>↻ Re-check sheet</button>
               </div>
-              <button onClick={handleStart} disabled={verifying} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: `1px solid ${T.re44}`, background: 'oklch(0.63 0.22 25 / .08)', color: T.re, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>↻ Re-check sheet</button>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>
