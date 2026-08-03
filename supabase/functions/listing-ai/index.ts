@@ -1492,22 +1492,46 @@ Deno.serve(async (req) => {
       const packLines: string[] = [];
       const tabCounts = tabs.map(t => `${t.tab}: ${Math.max(0, t.rows.length - 1)} rows`).join(', ');
       packLines.push(`MASTER SHEET: ${masterSkus.length} unique SKUs (${tabCounts}). Columns: ${tabs.map(t => t.headers.filter(Boolean).join(' | ')).join('  //  ')}`);
+      // SKU-code (prefix) breakdown, per brand tab, so "how many DRS / TF / MM
+      // designs" is answerable. Without it the pack carried only totals +
+      // category spread, so the model had no data about code families and had to
+      // refuse prefix questions. Leading letters = the code; a SKU that starts
+      // with a digit (ARYA's 7xxx) is grouped as "(numeric)".
+      const prefixByTab = new Map<string, Map<string, number>>();
+      for (const k of masterSkus) {
+        const m = index[k]; const tab = m.tab;
+        const pm = k.match(/^([A-Za-z]+)/); const p = pm ? pm[1].toUpperCase() : '(numeric)';
+        const inner = prefixByTab.get(tab) || new Map<string, number>();
+        inner.set(p, (inner.get(p) || 0) + 1); prefixByTab.set(tab, inner);
+      }
+      const prefixLines = [...prefixByTab.entries()].map(([tab, inner]) =>
+        `${tab}: ${[...inner.entries()].sort((a, b) => b[1] - a[1]).map(([p, n]) => `${p}=${n}`).join(', ')}`).join('  //  ');
+      packLines.push(`SKU CODE breakdown (leading letters of the SKU, per brand tab; "(numeric)" = starts with a digit): ${prefixLines}. A code the owner names that is NOT listed here has ZERO SKUs in the master — say so plainly rather than guessing.`);
 
       if (seller && sRows.length > 0 && sHeaders.length > 0) {
         // Seller SKU column: alias names first, else the column whose values
         // match the most master SKUs (handles any marketplace export).
-        const aliasRe = /sku|style\s*code|style\s*id|seller\s*sku|vendor|item\s*code|design/i;
-        let skuIdx = sHeaders.findIndex(h => aliasRe.test(h));
-        let bestHits = -1;
+        // Seller SKU column names vary — "Code", "Product Code", "SKU", "SKU
+        // Code", "Style No", "Design Code", "Article", "Item Code" all mean the
+        // SKU. Recognise a broad set by name, but never a code that is clearly
+        // NOT the product id (HSN / GST / colour / bar / pin / size / price...).
+        const NOT_SKU = /\b(hsn|gst|colou?r|bar|pin|postal|zip|country|currency|coupon|promo|discount|state|phone|mobile|contact|pack|size|price|mrp|amount|qty|quantity|weight|date|image|url|link|category|brand)\b/i;
+        const aliasRe = /\b(sku|style|design|article|seller\s*sku|vendor|product\s*(code|id|no|sku)|item\s*(code|id|no)|catalog(ue)?\s*no|art\.?\s*no|code)\b/i;
+        const isAlias = (h: string) => aliasRe.test(h) && !NOT_SKU.test(h);
         // Tiers 1-3 for scoring (an all-size-suffixed sheet must still find
         // its SKU column); the loose tiers stay out of column detection.
         const quickHit = (v: string) => { const n = normSku(v); if (!n) return false; if (index[n] || compactIndex.has(compactSku(n))) return true; const st = stripSkuSize(n); return st !== n && !!st && (!!index[st] || compactIndex.has(compactSku(st))); };
         const hitsOf = (ci: number) => sRows.reduce((n, r) => n + (quickHit(r[ci]) ? 1 : 0), 0);
-        if (skuIdx >= 0) bestHits = hitsOf(skuIdx);
-        for (let ci = 0; ci < sHeaders.length; ci++) {
-          const h = hitsOf(ci);
-          if (h > bestHits) { bestHits = h; skuIdx = ci; }
-        }
+        // Prefer the best-scoring column whose NAME reads like an SKU column, so
+        // a coincidental value overlap elsewhere can't steal a tie...
+        let skuIdx = -1; let bestHits = -1;
+        for (let ci = 0; ci < sHeaders.length; ci++) if (isAlias(sHeaders[ci])) { const h = hitsOf(ci); if (h > bestHits) { bestHits = h; skuIdx = ci; } }
+        // ...then let ANY column win outright on value hits (unnamed/odd headers).
+        for (let ci = 0; ci < sHeaders.length; ci++) { const h = hitsOf(ci); if (h > bestHits) { bestHits = h; skuIdx = ci; } }
+        // A clearly-named SKU column whose values simply aren't in the master yet
+        // (a new seller's own codes) is still the SKU column - use it so the sheet
+        // isn't rejected; the comparison then reports every row as "unknown".
+        if (bestHits <= 0) { const a = sHeaders.findIndex(isAlias); if (a >= 0) { skuIdx = a; bestHits = 1; } }
         if (skuIdx < 0 || bestHits <= 0) {
           packLines.push(`SELLER SHEET "${sName}": ${sRows.length} rows, but NO column matches any master SKU - tell the owner the sheet's SKU column could not be identified and list its columns: ${sHeaders.join(' | ')}`);
         } else {
