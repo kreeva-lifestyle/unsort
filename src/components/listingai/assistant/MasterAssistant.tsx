@@ -45,8 +45,8 @@ export default function MasterAssistant({ onBack, addToast, openListingAI }: {
       try {
         const p = parseSellerSheet(ev.target?.result as ArrayBuffer, f.name);
         setSheet(p);
-        if (p.totalRows > p.rows.length) addToast(`Sheet has ${p.totalRows} rows — using the first ${p.rows.length}`, 'error');
-        else addToast(`${p.name}: ${p.rows.length} rows attached — ask away`, 'success');
+        for (const w of p.warnings) addToast(w, 'error');
+        if (p.warnings.length === 0) addToast(`${p.name}: ${p.rows.length} rows attached — ask away`, 'success');
       } catch (e) { addToast(friendlyError(e), 'error'); }
     };
     reader.readAsArrayBuffer(f);
@@ -62,7 +62,7 @@ export default function MasterAssistant({ onBack, addToast, openListingAI }: {
       const history = msgs.slice(-6).map(m => ({ role: m.role, text: m.text }));
       const { status, data } = await call({
         action: 'assistant', question, history,
-        seller: sheet ? { name: sheet.name, headers: sheet.headers, rows: sheet.rows } : undefined,
+        seller: sheet ? { name: sheet.name, headers: sheet.headers, rows: sheet.rows, totalRows: sheet.totalRows } : undefined,
       });
       if (!data?.ok) {
         if (data?.error === 'no_api_key') throw new Error('Add the Anthropic API key in Settings → Listing AI first');

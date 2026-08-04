@@ -1449,7 +1449,8 @@ Deno.serve(async (req) => {
       }
       const embedKeys = [...compactIndex.keys()].filter(c => c.length >= 5);
       type MatchType = 'exact' | 'format' | 'size' | 'embedded' | 'fuzzy';
-      let deepBudget = 1500; // embedded/fuzzy scan linearly - cap the stragglers
+      let deepBudget = 6000; // embedded/fuzzy scan linearly - cap the stragglers
+      let deepExhausted = false; // when the cap is hit, say so - a silent cut fakes "Unknown"
       const matchSku = (raw: string): { sku: string; type: MatchType } | null => {
         const n = normSku(raw);
         if (!n) return null;
@@ -1462,7 +1463,7 @@ Deno.serve(async (req) => {
           const fs = compactIndex.get(compactSku(stripped));
           if (fs) return { sku: fs, type: 'size' };
         }
-        if (deepBudget-- <= 0) return null;
+        if (deepBudget-- <= 0) { deepExhausted = true; return null; }
         // embedded: catalog name glued on - longest master key inside the
         // value; a tie between DIFFERENT masters is ambiguous -> no match.
         const hay = compactSku(stripped || n);
@@ -1486,15 +1487,24 @@ Deno.serve(async (req) => {
       };
 
       // ---- optional seller sheet (client-parsed; capped there and re-capped here)
+      const SELLER_ROW_CAP = 20000; // sized for full size-variant exports; truncation past it is WARNED, never silent
       const seller = body?.seller && typeof body.seller === 'object' ? body.seller : null;
       const sName = seller ? String(seller.name || 'seller sheet').slice(0, 120) : '';
       const sHeaders: string[] = seller ? (Array.isArray(seller.headers) ? seller.headers : []).slice(0, 30).map((h: unknown) => String(h ?? '').trim().slice(0, 60)) : [];
-      const sRows: string[][] = seller ? (Array.isArray(seller.rows) ? seller.rows : []).slice(0, 4000)
+      const sRows: string[][] = seller ? (Array.isArray(seller.rows) ? seller.rows : []).slice(0, SELLER_ROW_CAP)
         .map((r: unknown) => (Array.isArray(r) ? r : []).slice(0, 30).map((c: unknown) => String(c ?? '').trim().slice(0, 120))) : [];
+      // The client sends the sheet's true row count; a truncated comparison
+      // must say so - every dropped row would otherwise read as "not uploaded".
+      const sTotal = seller ? Math.max(sRows.length, Math.floor(Number(seller.totalRows) || 0), Array.isArray(seller.rows) ? seller.rows.length : 0) : 0;
 
       type Table = { title: string; columns: string[]; rows: string[][] };
+      const TABLE_CAP = 10000; // rows per result table; sliced tables are WARNED below
       const tables: Table[] = [];
       const packLines: string[] = [];
+      if (seller && sTotal > sRows.length) {
+        warnings.push(`Seller sheet truncated: comparing the first ${sRows.length.toLocaleString()} of ${sTotal.toLocaleString()} rows - designs only in the dropped rows will wrongly show as not uploaded.`);
+        packLines.push(`WARNING: the seller sheet was TRUNCATED - only the first ${sRows.length} of ${sTotal} rows are compared. State this clearly in the answer; the "not uploaded" count is an OVERESTIMATE.`);
+      }
       const tabCounts = tabs.map(t => `${t.tab}: ${Math.max(0, t.rows.length - 1)} rows`).join(', ');
       packLines.push(`MASTER SHEET: ${masterSkus.length} unique SKUs (${tabCounts}). Columns: ${tabs.map(t => t.headers.filter(Boolean).join(' | ')).join('  //  ')}`);
       // SKU-code (prefix) breakdown, per brand tab, so "how many DRS / TF / MM
@@ -1558,6 +1568,10 @@ Deno.serve(async (req) => {
             if (TIER_RANK[hit.type] < TIER_RANK[g.type]) g.type = hit.type;
             groups.set(hit.sku, g);
           }
+          if (deepExhausted) {
+            warnings.push('Typo/embedded SKU matching stopped after its 6,000-row budget - some "Unknown" SKUs may actually match. Remove non-product rows from the sheet and re-run for full matching.');
+            packLines.push('WARNING: the typo/embedded matching budget ran out partway through the sheet - treat the Unknown and Not-uploaded counts as upper bounds and say so.');
+          }
           const matched = [...groups.keys()];
           const sellerOnly = [...unknownRows.keys()];
           const masterOnly = masterSkus.filter(k => !groups.has(k));
@@ -1612,15 +1626,25 @@ Deno.serve(async (req) => {
             }
             const sorted = [...combos.entries()].sort((a, b) => b[1].length - a[1].length);
             packLines.push(`CROSS-TAB over the ${matched.length} matched SKUs (exact, computed in code - each combination also has its own SKU table below the answer): ${sorted.map(([key, arr]) => `[${key}]: ${arr.length}`).join(' | ')}`);
-            for (const [key, arr] of sorted.slice(0, 9)) tables.push({ title: `${key} (${arr.length})`, columns: ['SKU'], rows: arr.slice(0, 2000).map(k => [k]) });
+            for (const [key, arr] of sorted.slice(0, 9)) tables.push({ title: `${key} (${arr.length})`, columns: ['SKU'], rows: arr.slice(0, TABLE_CAP).map(k => [k]) });
+            if (sorted.length > 9) warnings.push(`${sorted.length - 9} smaller status combination(s) have counts above but no SKU table - narrow the question to see them.`);
           } else if (mStatusCols.length > 0) {
             packLines.push('No status-like column was found in the SELLER sheet, so no master-vs-seller status cross-tab exists - the not-uploaded breakdown above still uses the master status.');
           }
-          tables.push({ title: `Matched - in master AND seller sheet (${matched.length})`, columns: ['SKU', 'SELLER SKU(S)', 'MATCH', ...sHeaders.filter((_, i) => i !== skuIdx).slice(0, 5), ...mStatusCols.map(c => `MASTER ${c}`)], rows: matched.slice(0, 2000).map(k => { const g = groups.get(k)!; return [k, g.sellerSkus.slice(0, 6).join(', ') + (g.sellerSkus.length > 6 ? ` +${g.sellerSkus.length - 6}` : ''), g.type, ...sHeaders.map((_, i) => i).filter(i => i !== skuIdx).slice(0, 5).map(i => sellerVal(g, i)), ...mStatusCols.map(c => mValOf(k, c))]; }) });
+          // The seller's status column comes FIRST among the carried columns:
+          // its aggregated (MIXED-aware) group value is what the client
+          // workbook reads by header name - it must always make the cut.
+          const sellerColIdxs = [...(sStatusIdx >= 0 ? [sStatusIdx] : []), ...sHeaders.map((_, i) => i).filter(i => i !== skuIdx && i !== sStatusIdx)].slice(0, 5);
+          tables.push({ title: `Matched - in master AND seller sheet (${matched.length})`, columns: ['SKU', 'SELLER SKU(S)', 'MATCH', ...sellerColIdxs.map(i => sHeaders[i]), ...mStatusCols.map(c => `MASTER ${c}`)], rows: matched.slice(0, TABLE_CAP).map(k => { const g = groups.get(k)!; return [k, g.sellerSkus.slice(0, 6).join(', ') + (g.sellerSkus.length > 6 ? ` +${g.sellerSkus.length - 6}` : ''), g.type, ...sellerColIdxs.map(i => sellerVal(g, i)), ...mStatusCols.map(c => mValOf(k, c))]; }) });
           const fuzzies = matched.filter(k => groups.get(k)!.type === 'fuzzy');
-          if (fuzzies.length) tables.push({ title: `Fuzzy matches - verify (${fuzzies.length})`, columns: ['SELLER SKU', 'MATCHED MASTER SKU', ...mStatusCols.map(c => `MASTER ${c}`)], rows: fuzzies.slice(0, 2000).map(k => [groups.get(k)!.sellerSkus.join(', '), k, ...mStatusCols.map(c => mValOf(k, c))]) });
-          tables.push({ title: `Not uploaded by seller - in master only (${masterOnly.length})`, columns: ['SKU', 'BRAND', 'CATEGORY', ...mStatusCols.map(c => `MASTER ${c}`)], rows: masterOnly.slice(0, 2000).map(k => [k, ...brandCat(k), ...mStatusCols.map(c => mValOf(k, c))]) });
-          tables.push({ title: `Unknown SKUs - in seller sheet only (${sellerOnly.length})`, columns: ['SKU'], rows: sellerOnly.slice(0, 2000).map(k => [k]) });
+          if (fuzzies.length) tables.push({ title: `Fuzzy matches - verify (${fuzzies.length})`, columns: ['SELLER SKU', 'MATCHED MASTER SKU', ...mStatusCols.map(c => `MASTER ${c}`)], rows: fuzzies.slice(0, TABLE_CAP).map(k => [groups.get(k)!.sellerSkus.join(', '), k, ...mStatusCols.map(c => mValOf(k, c))]) });
+          tables.push({ title: `Not uploaded by seller - in master only (${masterOnly.length})`, columns: ['SKU', 'BRAND', 'CATEGORY', ...mStatusCols.map(c => `MASTER ${c}`)], rows: masterOnly.slice(0, TABLE_CAP).map(k => [k, ...brandCat(k), ...mStatusCols.map(c => mValOf(k, c))]) });
+          tables.push({ title: `Unknown SKUs - in seller sheet only (${sellerOnly.length})`, columns: ['SKU'], rows: sellerOnly.slice(0, TABLE_CAP).map(k => [k]) });
+          // A sliced table silently corrupts the workbook counts downstream -
+          // name every table that lost rows.
+          for (const [label, n] of [['Matched', matched.length], ['Fuzzy matches', fuzzies.length], ['Not uploaded', masterOnly.length], ['Unknown SKUs', sellerOnly.length]] as [string, number][]) {
+            if (n > TABLE_CAP) warnings.push(`"${label}" table truncated to ${TABLE_CAP.toLocaleString()} of ${n.toLocaleString()} rows - the CSV/workbook misses the rest.`);
+          }
           packLines.push(`Sample matched: ${matched.slice(0, 100).join(', ') || '(none)'}`);
           packLines.push(`Sample not-uploaded: ${masterOnly.slice(0, 100).join(', ') || '(none)'}`);
           // masterSkus is ARYA-first, so a single flat 100-SKU sample buries

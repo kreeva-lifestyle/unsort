@@ -88,6 +88,13 @@ export function buildComparisonReport(tables: AssistantTable[], seller: SellerSh
   const sellerStatus = new Map<string, string>();
   if (statusCol >= 0) for (const r of seller.rows) { const k = normSku(r[skuCol]); if (k && !sellerStatus.has(k)) sellerStatus.set(k, r[statusCol] || ''); }
 
+  // Prefer the edge's aggregated status cell in the matched table (same
+  // header name as the detected seller status column): it is computed over
+  // ALL size-variant rows of the group, while the SELLER SKU(S) cell lists
+  // at most 6 — re-deriving from those 6 could misclassify a design whose
+  // 7th+ variants disagree. "MIXED (...)" means the variants disagree.
+  const iAggStatus = statusCol >= 0 ? mc.indexOf(seller.headers[statusCol]) : -1;
+
   const stockOut: string[][] = [];
   const inStock: string[][] = [];
   let undetermined = 0;
@@ -97,18 +104,27 @@ export function buildComparisonReport(tables: AssistantTable[], seller: SellerSh
     const masterVal = iMasterStatus >= 0 ? (r[iMasterStatus] || '') : '';
     const m = stockClass(masterVal);
 
-    // Seller side: the listed seller SKUs should agree; if they split, we
-    // can't act on it automatically — count it as undetermined.
+    // Seller side: the group's status across ALL its size variants. Never
+    // run a "MIXED (...)" value through stockClass — the words inside the
+    // parens would false-match the in/out regexes.
     let sellerVal = '';
-    const classes = new Set<Stock>();
-    if (statusCol >= 0) for (const s of sellerSkusOf(sellerSkuCell)) {
-      const raw = sellerStatus.get(normSku(s));
-      if (raw == null) continue;
-      if (!sellerVal) sellerVal = raw;
-      classes.add(stockClass(raw));
+    let s: Stock;
+    if (iAggStatus >= 0) {
+      sellerVal = r[iAggStatus] || '';
+      s = /^MIXED\b/i.test(sellerVal.trim()) ? 'unknown' : stockClass(sellerVal);
+    } else {
+      // Fallback (aggregated column absent): derive from the listed seller
+      // SKUs; if they split, we can't act on it — count it as undetermined.
+      const classes = new Set<Stock>();
+      if (statusCol >= 0) for (const sv of sellerSkusOf(sellerSkuCell)) {
+        const raw = sellerStatus.get(normSku(sv));
+        if (raw == null) continue;
+        if (!sellerVal) sellerVal = raw;
+        classes.add(stockClass(raw));
+      }
+      classes.delete('unknown');
+      s = classes.size === 1 ? [...classes][0] : 'unknown';
     }
-    classes.delete('unknown');
-    const s: Stock = classes.size === 1 ? [...classes][0] : 'unknown';
 
     const row = [sku, sellerSkuCell, masterVal || '(blank)', sellerVal || '(blank)'];
     if (m === 'out' && s === 'in') stockOut.push(row);
