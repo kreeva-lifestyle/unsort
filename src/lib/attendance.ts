@@ -27,6 +27,10 @@ export type AttEntry = {
 
 export type AttPenalty = { id: string; employee_id: string; month: string; amount: number; reason: string | null };
 
+// Advance: money given ahead of payday, deducted from the SAME month's final
+// salary (owner's rule) — the exact mirror of a penalty.
+export type AttAdvance = { id: string; employee_id: string; month: string; amount: number; note: string | null };
+
 // One flag row per employee per month = "salary paid". month is first-of-month.
 export type AttSalaryPayment = { id: string; employee_id: string; month: string; paid_at: string; paid_by: string | null };
 
@@ -46,7 +50,7 @@ export type MonthlySalary = {
   // reflected in `earned` — they exist so extra time can be shown everywhere.
   extraMinutes: number; shortMinutes: number;
   earned: number; sundayPay: number; gross: number; penaltyTotal: number;
-  finalSalary: number; days: DayBreakdown[];
+  advanceTotal: number; finalSalary: number; days: DayBreakdown[];
 };
 
 // ── Time helpers ─────────────────────────────────────────────────────────────
@@ -98,6 +102,7 @@ export const computeMonthlySalary = (
   entries: AttEntry[], // this employee's entries for the month
   monthISO: string,
   penalties: AttPenalty[], // this employee's penalties for the month
+  advances: AttAdvance[] = [], // this employee's advances for the month
 ): MonthlySalary => {
   const dim = daysInMonth(monthISO);
   const sundays = sundaysInMonth(monthISO);
@@ -166,7 +171,8 @@ export const computeMonthlySalary = (
   const sundayPay = paidSundays * perDay;
   const gross = earned + sundayPay;
   const penaltyTotal = penalties.reduce((s, p) => s + Number(p.amount), 0);
-  const finalSalary = Math.round(gross - penaltyTotal); // rounded to the rupee
+  const advanceTotal = advances.reduce((s, a) => s + Number(a.amount), 0);
+  const finalSalary = Math.round(gross - penaltyTotal - advanceTotal); // rounded to the rupee
   // Leaves are counted only over days that have HAPPENED. The old
   // dim − sundays − workDays counted every remaining day of the current month
   // as a leave — opening August on the 1st showed 26 "leaves", and a payslip
@@ -185,7 +191,7 @@ export const computeMonthlySalary = (
     perDaySalary: Math.round(perDay * 100) / 100, perHourSalary: Math.round(perHour * 100) / 100,
     earned: Math.round(earned * 100) / 100, sundayPay: Math.round(sundayPay * 100) / 100,
     gross: Math.round(gross * 100) / 100, penaltyTotal: Math.round(penaltyTotal * 100) / 100,
-    finalSalary, days,
+    advanceTotal: Math.round(advanceTotal * 100) / 100, finalSalary, days,
   };
 };
 

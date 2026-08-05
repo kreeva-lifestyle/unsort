@@ -4,7 +4,7 @@
 // doesn't stretch across a wide preview window, and every column header
 // carries the same alignment as its cells (In/Out/Worked/diff/St centred,
 // Day Pay right) so headers sit directly above their values.
-import { AttEmployee, AttPenalty, MonthlySalary, minutesToHM, fmtDiffHM } from '../../lib/attendance';
+import { AttEmployee, AttPenalty, AttAdvance, MonthlySalary, minutesToHM, fmtDiffHM } from '../../lib/attendance';
 
 export const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
 export const inr = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
@@ -12,7 +12,7 @@ export const inr2 = (n: number) => '₹' + n.toLocaleString('en-IN', { minimumFr
 
 const GREEN = '#1a7f37', RED = '#c0392b';
 
-export const payslipBody = (s: MonthlySalary, emp: AttEmployee | undefined, pens: AttPenalty[], monthLabel: string): string => {
+export const payslipBody = (s: MonthlySalary, emp: AttEmployee | undefined, pens: AttPenalty[], advs: AttAdvance[], monthLabel: string): string => {
   const dayRows = s.days.map(d => `<tr${d.isSunday ? ' style="background:#f1f5ff"' : (d.status === 'A' ? ' style="background:#fdeaea"' : (d.diffMin > 0 ? ' style="background:#effaf3"' : ''))}>
     <td>${esc(new Date(d.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }))}</td>
     <td>${esc(d.day)}</td>
@@ -24,6 +24,7 @@ export const payslipBody = (s: MonthlySalary, emp: AttEmployee | undefined, pens
     <td style="text-align:center">${esc(d.status)}</td>
   </tr>`).join('');
   const penRows = pens.map(p => `<div class="pen"><span>Penalty — ${p.reason ? esc(p.reason) : 'no note'}</span><span style="color:${RED};font-weight:600">− ${esc(inr2(Number(p.amount)))}</span></div>`).join('');
+  const advRows = advs.map(a => `<div class="pen" style="background:#eef4fd"><span>Advance${a.note ? ` — ${esc(a.note)}` : ''}</span><span style="color:${RED};font-weight:600">− ${esc(inr2(Number(a.amount)))}</span></div>`).join('');
   return `<div class="slip">
     <div class="head"><div><div class="nm">${esc(s.name)}</div><div class="sub">${esc(emp?.employee_code || '')} · ${esc(monthLabel)}</div></div>
       <div class="final"><div class="fl">Net Salary</div><div class="fv" style="color:${s.finalSalary < 0 ? RED : GREEN}">${esc(inr(s.finalSalary))}</div></div></div>
@@ -41,16 +42,18 @@ export const payslipBody = (s: MonthlySalary, emp: AttEmployee | undefined, pens
       <div class="rule"><span>Gross</span><span>${esc(inr2(s.gross))}</span></div>
       ${penRows}
       ${s.penaltyTotal > 0 ? `<div><span>Total penalties</span><span style="color:${RED};font-weight:700">− ${esc(inr2(s.penaltyTotal))}</span></div>` : ''}
+      ${advRows}
+      ${s.advanceTotal > 0 ? `<div><span>Total advances (already paid out)</span><span style="color:${RED};font-weight:700">− ${esc(inr2(s.advanceTotal))}</span></div>` : ''}
       <div class="final-row" style="color:${s.finalSalary < 0 ? RED : GREEN}"><span>Net Salary (rounded)</span><span>${esc(inr(s.finalSalary))}</span></div>
     </div>
   </div>`;
 };
 
 export const combinedSummary = (shown: MonthlySalary[], monthLabel: string, totalFinal: number): string => {
-  const rowsHtml = shown.map(s => `<tr><td>${esc(s.name)}</td><td class="c">${s.workDays}</td><td class="c">${s.paidSundays}</td><td class="c">${s.leaveDays}</td><td class="c">${esc(minutesToHM(s.totalWorkedMinutes))}</td><td class="c" style="color:${s.extraMinutes > 0 ? GREEN : '#888'};font-weight:600">${s.extraMinutes > 0 ? '+' + esc(minutesToHM(s.extraMinutes)) : '—'}</td><td style="text-align:right">${esc(inr2(s.gross))}</td><td style="text-align:right;color:${RED}">${s.penaltyTotal > 0 ? '− ' + esc(inr2(s.penaltyTotal)) : '—'}</td><td style="text-align:right;font-weight:800">${esc(inr(s.finalSalary))}</td></tr>`).join('');
+  const rowsHtml = shown.map(s => `<tr><td>${esc(s.name)}</td><td class="c">${s.workDays}</td><td class="c">${s.paidSundays}</td><td class="c">${s.leaveDays}</td><td class="c">${esc(minutesToHM(s.totalWorkedMinutes))}</td><td class="c" style="color:${s.extraMinutes > 0 ? GREEN : '#888'};font-weight:600">${s.extraMinutes > 0 ? '+' + esc(minutesToHM(s.extraMinutes)) : '—'}</td><td style="text-align:right">${esc(inr2(s.gross))}</td><td style="text-align:right;color:${RED}">${s.penaltyTotal > 0 ? '− ' + esc(inr2(s.penaltyTotal)) : '—'}</td><td style="text-align:right;color:${RED}">${s.advanceTotal > 0 ? '− ' + esc(inr2(s.advanceTotal)) : '—'}</td><td style="text-align:right;font-weight:800">${esc(inr(s.finalSalary))}</td></tr>`).join('');
   return `<h1>Salary Summary</h1><div class="muted">${esc(monthLabel)} · ${shown.length} employees · Total net ${esc(inr(totalFinal))}</div>
-    <table class="days" style="font-size:11px"><thead><tr><th>Employee</th><th class="c">Work</th><th class="c">Sun</th><th class="c">Leave</th><th class="c">Worked hrs</th><th class="c">Extra</th><th class="r">Gross</th><th class="r">Penalty</th><th class="r">Net</th></tr></thead><tbody>${rowsHtml}
-    <tr style="border-top:2px solid #2d3748;font-weight:800"><td>Total</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="text-align:right">${esc(inr(totalFinal))}</td></tr></tbody></table>
+    <table class="days" style="font-size:11px"><thead><tr><th>Employee</th><th class="c">Work</th><th class="c">Sun</th><th class="c">Leave</th><th class="c">Worked hrs</th><th class="c">Extra</th><th class="r">Gross</th><th class="r">Penalty</th><th class="r">Advance</th><th class="r">Net</th></tr></thead><tbody>${rowsHtml}
+    <tr style="border-top:2px solid #2d3748;font-weight:800"><td>Total</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="text-align:right">${esc(inr(totalFinal))}</td></tr></tbody></table>
     <div style="page-break-after:always"></div>`;
 };
 
