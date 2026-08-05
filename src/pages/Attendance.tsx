@@ -98,7 +98,14 @@ export default function Attendance() {
 
       {showImport && (
         <ImportExcel employees={employees} onClose={() => setShowImport(false)} addToast={addToast}
-          onImported={() => { setShowImport(false); fetchEmployees(); fetchMonth(month); }} />
+          onImported={m => {
+            setShowImport(false); fetchEmployees();
+            // Jump to the month the sheet's dates belong to — importing July
+            // while the picker sits on August (the default is the current
+            // month) looked like "imported successfully but nothing shows".
+            if (m && m !== month) setMonth(m); // the month effect refetches
+            else fetchMonth(month);
+          }} />
       )}
     </div>
   );
