@@ -93,13 +93,16 @@ export default function SalaryPaymentFlow({ employees, salaries, payments, month
             <button onClick={onClose} style={{ ...S.btnPrimary, marginTop: 20 }}>Done</button>
           </div>
         ) : (
-          <div key={emp!.id} className="att-pay-card" style={{ width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+          <div key={emp!.id} className="att-pay-card" style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
             <div style={{ fontSize: 11, color: T.tx3, fontFamily: T.mono, letterSpacing: '0.04em' }}>{index + 1} / {order.length}{emp!.employee_code ? ` · ${emp!.employee_code}` : ''}</div>
             <div style={{ fontSize: 24, fontWeight: 800, fontFamily: T.sora, color: T.tx, margin: '6px 0 4px', display: 'flex', alignItems: 'center', gap: 10 }}>
               {emp!.name}
               {isPaid && <Pill tone="gr" dot>Paid</Pill>}
             </div>
-            <div style={{ width: 220, height: 220, maxWidth: '72vw', maxHeight: '72vw', borderRadius: 14, overflow: 'hidden', background: emp!.qr_image_url ? '#fff' : 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '14px 0' }}>
+            {/* The QR is scanned by a PHONE pointed at this screen — on a
+                desktop monitor it must be large. min() keeps phones (72vw)
+                and short landscape windows (48vh) in check. */}
+            <div style={{ width: 'min(440px, 72vw, 48vh)', height: 'min(440px, 72vw, 48vh)', borderRadius: 14, overflow: 'hidden', background: emp!.qr_image_url ? '#fff' : 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '14px 0' }}>
               {emp!.qr_image_url
                 ? <img src={emp!.qr_image_url} alt={`${emp!.name} payment QR`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 : <div style={{ padding: 20, color: T.tx3, fontSize: 12, lineHeight: 1.5 }}>No payment QR uploaded.<br />Add one in Employees.</div>}
