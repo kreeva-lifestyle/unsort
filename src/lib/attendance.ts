@@ -54,12 +54,21 @@ export type MonthlySalary = {
 };
 
 // ── Time helpers ─────────────────────────────────────────────────────────────
-// "9:52", "09:52:00", "18:26" → minutes since midnight; null on garbage.
+// "9:52", "09:52:00", "18:26", "9:52 AM", "6:26pm" → minutes since midnight;
+// null on garbage. 12-hour support matters: a biometric export in AM/PM used
+// to parse every punch to null, importing a whole month as unpaid absences.
 export const timeToMinutes = (t: string | null | undefined): number | null => {
   if (!t) return null;
-  const m = String(t).trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  const m = String(t).trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AaPp])\.?[Mm]?\.?$|^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
   if (!m) return null;
-  const h = Number(m[1]), min = Number(m[2]);
+  const ampm = m[4] ? m[4].toLowerCase() : null;
+  let h = Number(ampm ? m[1] : m[5]);
+  const min = Number(ampm ? m[2] : m[6]);
+  if (ampm) {
+    if (h < 1 || h > 12) return null;
+    if (ampm === 'a') h = h === 12 ? 0 : h;
+    else h = h === 12 ? 12 : h + 12;
+  }
   if (h > 23 || min > 59) return null;
   return h * 60 + min;
 };
@@ -99,7 +108,9 @@ export const monthFirstDay = (monthISO: string): string => `${monthISO}-01`;
 // ── The engine ───────────────────────────────────────────────────────────────
 export const computeMonthlySalary = (
   emp: AttEmployee,
-  entries: AttEntry[], // this employee's entries for the month
+  entries: AttEntry[], // this employee's entries for the month (MAY include a
+  // few tail days of the previous month — they feed only the Sunday rule,
+  // never pay: the day loop below iterates this month's calendar only)
   monthISO: string,
   penalties: AttPenalty[], // this employee's penalties for the month
   advances: AttAdvance[] = [], // this employee's advances for the month
@@ -111,9 +122,17 @@ export const computeMonthlySalary = (
   const perHour = perDay / (fixMin / 60);
 
   const byDate = new Map(entries.map(e => [e.date, e]));
+  // Worked DATES (ISO), including the previous month's tail: the paid-Sunday
+  // rule looks 6 calendar days back, and judging a straddling week "on this
+  // month only" made the FIRST Sunday of most months mathematically unpayable
+  // — ₹1 perDay silently withheld from perfect-attendance employees.
+  const workedDates = new Set<string>();
+  for (const e of entries) {
+    const i = timeToMinutes(e.in_time), o = timeToMinutes(e.out_time);
+    if (i !== null && o !== null && o > i) workedDates.add(e.date);
+  }
   const [y, m] = monthISO.split('-').map(Number);
   const days: DayBreakdown[] = [];
-  const workedDayNums = new Set<number>(); // day-of-month numbers actually worked
   let workDays = 0, totalWorkedMinutes = 0, earned = 0, extraMinutes = 0, shortMinutes = 0;
 
   for (let d = 1; d <= dim; d++) {
@@ -127,21 +146,32 @@ export const computeMonthlySalary = (
     // Default status must match what actually PAYS: out ≤ in (an overnight
     // punch, or garbage) earns nothing below, so labelling it 'P' showed a
     // Present day with zero pay — a silent wage discrepancy on the payslip.
+    // A STORED 'P' on a non-paying weekday (cleared times, bad punch) is
+    // downgraded to 'A' for the same reason.
     const paidPunch = inMin !== null && outMin !== null && outMin > inMin;
     let status = e?.status || (isSunday ? 'WO' : (paidPunch ? 'P' : 'A'));
+    if (!isSunday && !paidPunch && status === 'P') status = 'A';
 
     if (isSunday) {
-      // Weekly off. Whether it is PAID is decided in a second pass below, from
-      // how many of that week's 6 working days (Mon–Sat) were actually worked.
-      dayPay = 0;
-      status = e?.status || 'WO';
-    } else if (inMin !== null && outMin !== null && outMin > inMin) {
-      workedMin = outMin - inMin;
+      // Weekly off. Whether the off-day PAY applies is decided in a second
+      // pass below. A Sunday actually WORKED additionally pays its hours like
+      // any day (owner's rule: worked hours + Sunday pay) — those hours count
+      // in the month totals, but not in workDays (leave math) or extra/short.
+      if (paidPunch) {
+        workedMin = outMin! - inMin!;
+        dayPay = perHour * (workedMin / 60);
+        totalWorkedMinutes += workedMin;
+        earned += dayPay;
+        status = e?.status || 'POW'; // Present on Weekly Off
+      } else {
+        status = e?.status || 'WO';
+      }
+    } else if (paidPunch) {
+      workedMin = outMin! - inMin!;
       dayPay = perHour * (workedMin / 60);
       workDays++;
       totalWorkedMinutes += workedMin;
       earned += dayPay;
-      workedDayNums.add(d);
       const diff = workedMin - fixMin;
       if (diff > 0) extraMinutes += diff; else shortMinutes += -diff;
     }
@@ -155,17 +185,22 @@ export const computeMonthlySalary = (
   }
 
   // Paid weekly-off rule (6-day work week): a Sunday is paid only if the
-  // employee worked MORE THAN 3 of that week's 6 working days — i.e. the six
-  // calendar days (Mon–Sat) immediately preceding the Sunday. A Sunday whose
-  // week straddles the previous month is judged on this month's days only.
+  // employee worked MORE THAN 3 of that week's 6 working days — the six
+  // calendar days (Mon–Sat) immediately preceding the Sunday, ACROSS the
+  // month boundary (the caller fetches the previous month's tail entries).
+  // On a worked Sunday the off-day pay ADDS to the hours earned above.
   const SUNDAY_MIN_ATTENDANCE = 3; // must work strictly more than this (>= 4)
   let paidSundays = 0;
   for (const day of days) {
     if (!day.isSunday) continue;
     const dNum = Number(day.date.slice(8, 10));
     let workedInWeek = 0;
-    for (let k = 1; k <= 6; k++) if (workedDayNums.has(dNum - k)) workedInWeek++;
-    if (workedInWeek > SUNDAY_MIN_ATTENDANCE) { day.dayPay = perDay; paidSundays++; }
+    for (let k = 1; k <= 6; k++) {
+      const prev = new Date(y, m - 1, dNum - k);
+      const prevISO = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-${String(prev.getDate()).padStart(2, '0')}`;
+      if (workedDates.has(prevISO)) workedInWeek++;
+    }
+    if (workedInWeek > SUNDAY_MIN_ATTENDANCE) { day.dayPay += perDay; paidSundays++; }
   }
 
   const sundayPay = paidSundays * perDay;
@@ -179,11 +214,14 @@ export const computeMonthlySalary = (
   // printed mid-month carried the same fiction. Past months are unchanged
   // (every day has elapsed); a fully future month shows 0, not a full sheet
   // of absences.
+  // Strict < on BOTH sides: today has begun but not finished — an employee
+  // mid-shift with no out-punch yet must not read as a leave on a payslip
+  // printed today, and a completed today must not cancel out a real leave.
   const now = new Date();
   const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  let elapsedWorkable = 0;
-  for (const d of days) if (!d.isSunday && d.date <= todayISO) elapsedWorkable++;
-  const leaveDays = Math.max(0, elapsedWorkable - workDays);
+  let elapsedWorkable = 0, workedBeforeToday = 0;
+  for (const d of days) if (!d.isSunday && d.date < todayISO) { elapsedWorkable++; if (d.workedMin > 0) workedBeforeToday++; }
+  const leaveDays = Math.max(0, elapsedWorkable - workedBeforeToday);
 
   return {
     employeeId: emp.id, name: emp.name, salary: emp.salary, fixTimeMinutes: fixMin,

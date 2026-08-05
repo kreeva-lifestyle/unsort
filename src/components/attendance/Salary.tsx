@@ -36,8 +36,9 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
     return () => clearTimeout(t);
   }, [armed]);
 
-  const monthLabel = new Date(month + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-  const activeEmployees = useMemo(() => employees.filter(e => e.is_active), [employees]);
+  // '-01T00:00:00' parses as LOCAL time — bare '-01' parses as UTC and can
+  // label the payslip/toast with the PREVIOUS month west of UTC.
+  const monthLabel = new Date(month + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
   const entriesByEmp = useMemo(() => {
     const m = new Map<string, AttEntry[]>();
     entries.forEach(e => { const a = m.get(e.employee_id) || []; a.push(e); m.set(e.employee_id, a); });
@@ -55,6 +56,13 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
   }, [advances]);
   const savedByEmp = useMemo(() => new Map(savedSalaries.map(s => [s.employee_id as string, s])), [savedSalaries]);
   const paidByEmp = useMemo(() => new Map(payments.map(p => [p.employee_id, p])), [payments]);
+
+  // Active employees PLUS deactivated ones that still have data this month —
+  // an employee who quit on the 20th and was deactivated must stay payable
+  // (final settlement) instead of vanishing from Salary/payslips/kiosk.
+  const activeEmployees = useMemo(() => employees.filter(e =>
+    e.is_active || entriesByEmp.has(e.id) || pensByEmp.has(e.id) || advByEmp.has(e.id) || paidByEmp.has(e.id)
+  ), [employees, entriesByEmp, pensByEmp, advByEmp, paidByEmp]);
 
   const salaries: MonthlySalary[] = useMemo(() =>
     activeEmployees.map(e => computeMonthlySalary(e, entriesByEmp.get(e.id) || [], month, pensByEmp.get(e.id) || [], advByEmp.get(e.id) || [])),
@@ -83,9 +91,11 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
   };
 
   // ── Manual paid toggle (same records the pay kiosk writes) ─────────────────
+  // Guard is PER ROW: a global guard silently swallowed a tap on employee B
+  // while employee A's round-trip was in flight — a no-op on a money action.
   const [payBusy, setPayBusy] = useState('');
   const togglePaid = async (s: MonthlySalary) => {
-    if (payBusy) return;
+    if (payBusy === s.employeeId) return;
     const isPaid = paidByEmp.has(s.employeeId);
     if (isPaid && armed !== `paid:${s.employeeId}`) { setArmed(`paid:${s.employeeId}`); return; } // unmark = two-tap
     setArmed(null); setPayBusy(s.employeeId);
@@ -108,7 +118,10 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
       work_days: s.workDays, sundays: s.sundays, leave_days: s.leaveDays, total_worked_minutes: s.totalWorkedMinutes,
       per_day_salary: s.perDaySalary, per_hour_salary: s.perHourSalary, earned: s.earned, sunday_pay: s.sundayPay,
       gross: s.gross, penalty_total: s.penaltyTotal, advance_total: s.advanceTotal, final_salary: s.finalSalary,
-      breakdown: { days: s.days }, computed_at: new Date().toISOString(), computed_by: user?.id,
+      // paidSundays/extra/short ride in the jsonb so a saved month can
+      // reproduce the payslip figures without re-running the engine.
+      breakdown: { days: s.days, paidSundays: s.paidSundays, extraMinutes: s.extraMinutes, shortMinutes: s.shortMinutes },
+      computed_at: new Date().toISOString(), computed_by: user?.id,
     }));
     const { error } = await supabase.from('attendance_salaries').upsert(rows, { onConflict: 'employee_id,month' });
     setSaving(false);
@@ -119,7 +132,13 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
   // ── PDF (builders in payslip.ts) ───────────────────────────────────────────
   const slip = (s: MonthlySalary) => payslipBody(s, employees.find(e => e.id === s.employeeId), pensByEmp.get(s.employeeId) || [], advByEmp.get(s.employeeId) || [], monthLabel);
   const exportSingle = (s: MonthlySalary) => setPdfHtml(wrapPdf(slip(s), docTitle('Payslip', s.name, monthLabel)));
-  const exportCombined = () => setPdfHtml(wrapPdf(combinedSummary(shown, monthLabel, totalFinal) + shown.map(slip).join(''), docTitle('Salary-Summary', monthLabel)));
+  // ALWAYS the full month — "Export All" while a search filter was active
+  // used to produce a document claiming to be the month's total while
+  // silently omitting everyone the filter hid.
+  const exportCombined = () => {
+    const allTotal = salaries.reduce((s, x) => s + x.finalSalary, 0);
+    setPdfHtml(wrapPdf(combinedSummary(salaries, monthLabel, allTotal) + salaries.map(slip).join(''), docTitle('Salary-Summary', monthLabel)));
+  };
 
   const kpi = (label: string, value: string, color: string) => (
     <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
@@ -182,6 +201,7 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
                     {paidByEmp.has(s.employeeId) && <Pill tone="gr" dot>Paid</Pill>}
                     {saved && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: drift ? 'oklch(0.78 0.18 75 / .14)' : 'oklch(0.72 0.19 145 / .12)', color: drift ? T.yl : T.gr, fontWeight: 700, textTransform: 'uppercase' }}>{drift ? 'Saved (changed)' : 'Saved'}</span>}
                     {s.salary <= 0 && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .14)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>No salary set</span>}
+                    {employees.find(e => e.id === s.employeeId)?.is_active === false && <span title="Deactivated — shown because this month has data (final settlement)" style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: 'oklch(0.78 0.18 75 / .14)', color: T.yl, fontWeight: 700, textTransform: 'uppercase' }}>Inactive</span>}
                   </div>
                   <div style={{ fontSize: 10, color: T.tx3, marginTop: 3, fontFamily: T.mono }}>
                     {s.workDays}W · {s.paidSundays}/{s.sundays}Sun · {s.leaveDays}L · {minutesToHM(s.totalWorkedMinutes)}h · ₹{s.perDaySalary.toLocaleString('en-IN')}/day · ₹{s.perHourSalary.toLocaleString('en-IN')}/hr

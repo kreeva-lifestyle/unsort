@@ -27,7 +27,9 @@ export default function AdjustModal({ emp, kind, month, monthLabel, onClose, onS
   const save = async () => {
     if (saving) return;
     setErr('');
-    const amount = Number(amt);
+    // Whole rupees: paise amounts made the card's rounded "gross − deduction"
+    // line disagree with the payslip by ₹1.
+    const amount = Math.round(Number(amt));
     if (!Number.isFinite(amount) || amount <= 0) { setErr('Enter an amount greater than 0'); return; }
     if (isPen && !note.trim()) { setErr('Add a note — the employee should know what this deduction is for'); return; }
     setSaving(true);

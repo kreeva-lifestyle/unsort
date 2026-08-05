@@ -31,11 +31,18 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
   const openEdit = (e: AttEmployee) => { setEditing(e); setName(e.name); setCode(e.employee_code || ''); setSalary(String(e.salary)); setFixTime(minutesToHM(e.fix_time_minutes)); setQrUrl(e.qr_image_url || ''); setErr(''); setShowModal(true); };
   const close = () => { setShowModal(false); setEditing(null); setErr(''); };
 
+  // Best-effort delete of a replaced/removed QR object - the bucket is
+  // public, so an orphaned old QR would stay fetchable at its URL forever.
+  const deleteQrObject = (url: string) => {
+    const name = url.split('/').pop();
+    if (name?.startsWith('emp-qr-')) supabase.storage.from('employee-qr').remove([name]).then(() => {}, () => {});
+  };
   const pickQr = async (file: File) => {
     setQrBusy(true);
     const r = await uploadQrImage(file);
     setQrBusy(false);
     if (r.error) { addToast(r.error, 'error'); return; }
+    if (qrUrl && qrUrl !== editing?.qr_image_url) deleteQrObject(qrUrl); // an unsaved upload being replaced
     setQrUrl(r.url!);
   };
 
@@ -47,6 +54,9 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
     if (!Number.isFinite(sal) || sal < 0) { setErr('Enter a valid monthly salary'); return; }
     const fixMin = fixTimeToMinutes(fixTime.trim());
     if (!fixMin) { setErr('Fix time must look like 8:30 (hours:minutes)'); return; }
+    // Sanity ceiling/floor: 0:01 would make perHour = perDay x 60 - one day
+    // would pay hundreds of times the daily rate from a single typo.
+    if (fixMin < 60 || fixMin > 1440) { setErr('Fix time must be between 1:00 and 24:00 hours per day'); return; }
     setSaving(true);
     const payload = { name: name.trim(), employee_code: code.trim() || null, salary: sal, fix_time_minutes: fixMin, qr_image_url: qrUrl || null, updated_at: new Date().toISOString() };
     const { error } = editing
@@ -54,14 +64,19 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
       : await supabase.from('attendance_employees').insert(payload);
     setSaving(false);
     if (error) { setErr(friendlyError(error)); return; }
+    if (editing?.qr_image_url && editing.qr_image_url !== (qrUrl || null)) deleteQrObject(editing.qr_image_url);
     addToast(editing ? 'Employee updated' : 'Employee added', 'success');
     close(); onChanged();
   };
 
+  const [toggling, setToggling] = useState('');
   const toggleActive = async (e: AttEmployee) => {
+    if (toggling) return; // double-click fired two updates + contradictory toasts
+    setToggling(e.id);
     const { error } = await supabase.from('attendance_employees').update({ is_active: !e.is_active, updated_at: new Date().toISOString() }).eq('id', e.id);
+    setToggling('');
     if (error) { addToast(friendlyError(error), 'error'); return; }
-    addToast(e.is_active ? `${e.name} deactivated` : `${e.name} activated`, 'success');
+    addToast(e.is_active ? `${e.name} deactivated — months with data stay on the Salary tab for final settlement` : `${e.name} activated`, 'success');
     onChanged();
   };
 
@@ -89,7 +104,7 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
             </div>
             <div className="att-emp-actions" style={{ display: 'flex', gap: 6 }}>
               <button onClick={() => openEdit(e)} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 10 }}>Edit</button>
-              <button onClick={() => toggleActive(e)} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 10, color: e.is_active ? T.re : T.gr }}>{e.is_active ? 'Deactivate' : 'Activate'}</button>
+              <button onClick={() => toggleActive(e)} disabled={!!toggling} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 10, color: e.is_active ? T.re : T.gr, opacity: toggling === e.id ? 0.5 : 1 }}>{toggling === e.id ? '…' : e.is_active ? 'Deactivate' : 'Activate'}</button>
             </div>
           </div>
         ))}

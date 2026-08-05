@@ -20,8 +20,9 @@ const STATUSES = [
 const hm = (t: string | null | undefined) => (t || '').slice(0, 5); // "09:52:00" -> "09:52"
 const weekday = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' });
 
-export default function AttendanceEntryModal({ employees, month, editing, presetEmployeeId, onClose, onSaved, addToast }: {
+export default function AttendanceEntryModal({ employees, month, editing, presetEmployeeId, existing = [], onClose, onSaved, addToast }: {
   employees: AttEmployee[]; month: string; editing: AttEntry | null; presetEmployeeId?: string;
+  existing?: AttEntry[]; // this month's entries — add mode must not clobber an existing day
   onClose: () => void; onSaved: () => void; addToast: (m: string, t?: string) => void;
 }) {
   const [y, mo] = month.split('-').map(Number);
@@ -52,6 +53,13 @@ export default function AttendanceEntryModal({ employees, month, editing, preset
     if (!empId) { setErr('Choose an employee'); return; }
     if (!date || date < monthMin || date > monthMax) { setErr('Pick a date inside the selected month'); return; }
     if (inT && outT && outT <= inT) { setErr('Out time must be after In time'); return; }
+    // Add mode + the day already exists: the blind upsert would overwrite the
+    // existing punches/remarks with this form's (mostly empty) fields — a
+    // silent wipe. Edit the existing row from the grid instead.
+    if (!editing && existing.some(x => x.employee_id === empId && x.date === date)) {
+      setErr(`${employees.find(e => e.id === empId)?.name || 'This employee'} already has an entry on ${date} — find it in the timesheet and tap it to edit.`);
+      return;
+    }
     setSaving(true);
     const payload = {
       employee_id: empId, date, day: weekday(date),

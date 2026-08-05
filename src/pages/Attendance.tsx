@@ -1,6 +1,6 @@
 // Attendance module shell — owns data fetching (employees, month entries,
 // penalties, saved salaries); the three views are presentational children.
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { T, S } from '../lib/theme';
 import DateInput from '../components/ui/DateInput';
@@ -38,23 +38,34 @@ export default function Attendance() {
   // unmounts the child views, which resets Timesheet's filters/scroll and
   // Salary's search after every one-row edit — so post-edit refreshes are
   // silent; only first load and month changes go loud.
-  const fetchMonth = useCallback(async (m: string, isCurrent: () => boolean = () => true, silent = false) => {
+  // fetchSeq: EVERY fetch (loud, silent, post-import) takes a sequence number
+  // and only the newest may write state. Without it, a silent post-edit
+  // refetch of August landing after a switch to September silently replaced
+  // September's data — and Save Month would then write August numbers under
+  // September. The old isCurrent() guard only covered the month effect.
+  const fetchSeq = useRef(0);
+  const fetchMonth = useCallback(async (m: string, silent = false) => {
+    const seq = ++fetchSeq.current;
     if (!silent) setLoading(true);
     const from = monthFirstDay(m);
     const [y, mo] = m.split('-').map(Number);
     const to = `${m}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}`;
+    // Fetch starts 6 days BEFORE the month: the paid-Sunday rule judges the
+    // 6 calendar days preceding each Sunday, across the month boundary. The
+    // engine never pays out-of-month days; Timesheet filters them out.
+    const tail = new Date(y, mo - 1, -5);
+    const tailFrom = `${tail.getFullYear()}-${String(tail.getMonth() + 1).padStart(2, '0')}-${String(tail.getDate()).padStart(2, '0')}`;
     const [en, pe, ad, sa, pa] = await Promise.all([
-      supabase.from('attendance_entries').select('id, employee_id, date, day, shift_id, in_time, out_time, location_in, location_out, status, remarks, manager_remarks').gte('date', from).lte('date', to).order('date').limit(4000),
+      supabase.from('attendance_entries').select('id, employee_id, date, day, shift_id, in_time, out_time, location_in, location_out, status, remarks, manager_remarks').gte('date', tailFrom).lte('date', to).order('date').limit(4000),
       supabase.from('attendance_penalties').select('id, employee_id, month, amount, reason').eq('month', from),
       supabase.from('attendance_advances').select('id, employee_id, month, amount, note').eq('month', from),
       supabase.from('attendance_salaries').select('id, employee_id, month, days_in_month, work_days, sundays, leave_days, total_worked_minutes, per_day_salary, per_hour_salary, earned, sunday_pay, gross, penalty_total, advance_total, final_salary, computed_at').eq('month', from),
       supabase.from('attendance_salary_payments').select('id, employee_id, month, paid_at, paid_by').eq('month', from),
     ]);
-    // A newer month may have been requested while these were in flight — drop
-    // superseded responses so Salary never computes/saves the wrong month.
-    if (!isCurrent()) return;
+    if (seq !== fetchSeq.current) return; // superseded — never write stale data
     const err = en.error || pe.error || ad.error || sa.error || pa.error;
     if (err) addToast(friendlyError(err), 'error');
+    if ((en.data?.length || 0) >= 4000) addToast('This month has more attendance rows than can be loaded (4,000) — salary figures may be incomplete', 'error');
     setEntries((en.data as AttEntry[]) || []);
     setPenalties((pe.data as AttPenalty[]) || []);
     setAdvances((ad.data as AttAdvance[]) || []);
@@ -64,7 +75,7 @@ export default function Attendance() {
   }, [addToast]);
 
   useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
-  useEffect(() => { let active = true; fetchMonth(month, () => active); return () => { active = false; }; }, [month, fetchMonth]);
+  useEffect(() => { fetchMonth(month); }, [month, fetchMonth]);
 
   const tabBtn = (id: typeof view, label: string) => (
     <button key={id} onClick={() => setView(id)} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: view === id ? T.ac3 : 'transparent', color: view === id ? T.ac2 : T.tx3, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: T.sans, transition: 'background .15s, color .15s' }}>{label}</button>
@@ -87,11 +98,11 @@ export default function Attendance() {
       {loading ? (
         <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}><div className="spinner" /></div>
       ) : view === 'timesheet' ? (
-        <AttendanceTimesheet employees={employees} entries={entries} month={month}
-          onChanged={() => fetchMonth(month, undefined, true)} addToast={addToast} />
+        <AttendanceTimesheet employees={employees} entries={entries.filter(e => e.date >= monthFirstDay(month))} month={month}
+          onChanged={() => fetchMonth(month, true)} addToast={addToast} />
       ) : view === 'salary' ? (
         <AttendanceSalary employees={employees} entries={entries} penalties={penalties} advances={advances} savedSalaries={savedSalaries} payments={payments} month={month}
-          onChanged={() => fetchMonth(month, undefined, true)} addToast={addToast} />
+          onChanged={() => fetchMonth(month, true)} addToast={addToast} />
       ) : (
         <AttendanceEmployees employees={employees} onChanged={fetchEmployees} addToast={addToast} />
       )}
