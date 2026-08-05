@@ -82,6 +82,22 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
     addToast(kind === 'penalty' ? 'Penalty removed' : 'Advance removed', 'success'); onChanged();
   };
 
+  // ── Manual paid toggle (same records the pay kiosk writes) ─────────────────
+  const [payBusy, setPayBusy] = useState('');
+  const togglePaid = async (s: MonthlySalary) => {
+    if (payBusy) return;
+    const isPaid = paidByEmp.has(s.employeeId);
+    if (isPaid && armed !== `paid:${s.employeeId}`) { setArmed(`paid:${s.employeeId}`); return; } // unmark = two-tap
+    setArmed(null); setPayBusy(s.employeeId);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = isPaid
+      ? await supabase.from('attendance_salary_payments').delete().eq('employee_id', s.employeeId).eq('month', monthFirstDay(month))
+      : await supabase.from('attendance_salary_payments').upsert({ employee_id: s.employeeId, month: monthFirstDay(month), paid_by: user?.id }, { onConflict: 'employee_id,month', ignoreDuplicates: true });
+    setPayBusy('');
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    addToast(isPaid ? `${s.name} unmarked` : `${s.name} marked paid`, 'success'); onChanged();
+  };
+
   // ── Save month ─────────────────────────────────────────────────────────────
   const saveMonth = async () => {
     if (saving) return;
@@ -184,10 +200,23 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
                   {deductions > 0 && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono }}>gross {inr(s.gross)} − {inr(deductions)}</div>}
                 </div>
               </div>
-              <div className="att-salary-actions" style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+              <div className="att-salary-actions" style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
                 <button onClick={() => setAdjFor({ emp: employees.find(e => e.id === s.employeeId)!, kind: 'penalty' })} style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 11, color: T.re }}>+ Penalty</button>
                 <button onClick={() => setAdjFor({ emp: employees.find(e => e.id === s.employeeId)!, kind: 'advance' })} style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 11, color: T.bl }}>+ Advance</button>
                 <button onClick={() => exportSingle(s)} style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 11 }}>Payslip PDF</button>
+                {/* Manual paid toggle — no need to walk the pay kiosk for one
+                    person. Unmark is two-tap (removes a money record). */}
+                {canPay && (paidByEmp.has(s.employeeId) ? (
+                  <button onClick={() => togglePaid(s)} disabled={payBusy === s.employeeId}
+                    style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 11, color: T.re, fontWeight: armed === `paid:${s.employeeId}` ? 700 : 400, opacity: payBusy === s.employeeId ? 0.5 : 1 }}>
+                    {payBusy === s.employeeId ? 'Removing…' : armed === `paid:${s.employeeId}` ? 'Unmark paid? tap again' : 'Unmark paid'}
+                  </button>
+                ) : (
+                  <button onClick={() => togglePaid(s)} disabled={payBusy === s.employeeId || s.salary <= 0} title={s.salary <= 0 ? 'Set a monthly salary first' : undefined}
+                    style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 11, color: T.gr, opacity: (payBusy === s.employeeId || s.salary <= 0) ? 0.5 : 1, pointerEvents: (payBusy === s.employeeId || s.salary <= 0) ? 'none' : 'auto' }}>
+                    {payBusy === s.employeeId ? 'Marking…' : '✓ Mark Paid'}
+                  </button>
+                ))}
               </div>
             </div>
           );
