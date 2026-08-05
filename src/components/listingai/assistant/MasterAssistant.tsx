@@ -10,7 +10,8 @@ import { friendlyError } from '../../../lib/friendlyError';
 import { call } from '../api';
 import { parseSellerSheet, SellerSheet } from './sellerSheetParse';
 import AssistantTables, { AssistantTable } from './AssistantTables';
-import { buildComparisonReport, downloadComparisonWorkbook, ComparisonReport } from './buildReport';
+import { buildComparisonReport, ComparisonReport } from './buildReport';
+import { downloadComparisonWorkbook } from './reportWorkbook';
 import { activeNotUploadedSkus, writeListingHandoff } from '../listingHandoff';
 
 interface Msg { role: 'user' | 'assistant'; text: string; tables?: AssistantTable[]; report?: ComparisonReport | null; estUsd?: number }
@@ -35,13 +36,16 @@ export default function MasterAssistant({ onBack, addToast, openListingAI }: {
   const [sheet, setSheet] = useState<SellerSheet | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const fileTokenRef = useRef(0); // two rapid attaches race — only the LATEST read may apply
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'nearest' }); }, [msgs, busy]);
 
   const pickFile = (f: File) => {
+    const token = ++fileTokenRef.current;
     const reader = new FileReader();
     reader.onload = ev => {
+      if (token !== fileTokenRef.current) return;
       try {
         const p = parseSellerSheet(ev.target?.result as ArrayBuffer, f.name);
         setSheet(p);
@@ -49,6 +53,9 @@ export default function MasterAssistant({ onBack, addToast, openListingAI }: {
         if (p.warnings.length === 0) addToast(`${p.name}: ${p.rows.length} rows attached — ask away`, 'success');
       } catch (e) { addToast(friendlyError(e), 'error'); }
     };
+    // A silent read failure would leave the PREVIOUS sheet attached while the
+    // owner believes the new one is — say it loudly.
+    reader.onerror = () => { if (token === fileTokenRef.current) addToast(`Could not read ${f.name} — try attaching it again`, 'error'); };
     reader.readAsArrayBuffer(f);
   };
 
@@ -70,14 +77,20 @@ export default function MasterAssistant({ onBack, addToast, openListingAI }: {
       }
       const tables = (data.tables || []) as AssistantTable[];
       // One-workbook seller report — built from the exact comparison the edge
-      // just computed plus the sheet that produced it (only when one's attached).
-      const report = sheet ? buildComparisonReport(tables, sheet) : null;
+      // just computed plus the sheet that produced it (only when one's
+      // attached). Its OWN try: a report-build throw must not discard the
+      // paid answer. Truncation warnings ride into the workbook Summary.
+      let report: ComparisonReport | null = null;
+      if (sheet) {
+        try { report = buildComparisonReport(tables, sheet, [...sheet.warnings, ...((data.warnings || []) as string[])]); }
+        catch { addToast('Could not build the Excel report — the tables below still have everything', 'error'); }
+      }
       setMsgs(m => [...m, { role: 'assistant', text: plainText(String(data.answer || '')), tables, report, estUsd: Number(data.estUsd || 0) }]);
       for (const w of (data.warnings || []) as string[]) addToast(w, 'error');
     } catch (e) {
       addToast(friendlyError(e), 'error');
       setMsgs(m => m.slice(0, -1)); // question stays in the box for a retry
-      setInput(question);
+      setInput(prev => prev || question); // never clobber text typed while waiting
     }
     setBusy(false);
   };

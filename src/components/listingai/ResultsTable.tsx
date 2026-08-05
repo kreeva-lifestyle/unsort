@@ -19,7 +19,9 @@ export default function ResultsTable({ headers, kinds, rows, usage, cost, templa
   addToast: (m: string, t?: string) => void;
 }) {
   const [exporting, setExporting] = useState(false);
-  let previewIdx = headers.findIndex((h, ix) => kinds[ix] === 'ai' && /title|product\s*name/i.test(h));
+  // 'direct' included: on a no-dropdown Listing Template the Title copies
+  // from the master (kind 'direct') — it is still the best row preview.
+  let previewIdx = headers.findIndex((h, ix) => (kinds[ix] === 'ai' || kinds[ix] === 'direct') && /title|product\s*name/i.test(h));
   if (previewIdx < 0) previewIdx = kinds.findIndex(k => k === 'ai');
   const ok = rows.filter(r => r.status === 'ok');
 

@@ -39,7 +39,16 @@ export async function exportFilledXlsx(headers: string[], rows: GenRow[], tpl: T
           // (the sheet may have gaps or extra columns we must not disturb).
           const grid = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false, defval: '' });
           const sheetHdr = ((grid[headerRowIdx] || []) as unknown[]).map(h => String(h ?? '').trim().toLowerCase());
-          const colFor = headers.map(h => sheetHdr.indexOf(h.trim().toLowerCase()));
+          // Duplicate header names are real on marketplace sheets (two "Size"
+          // columns): consume each sheet index once so the 2nd generated
+          // column maps to the 2nd sheet column instead of overwriting the 1st.
+          const used = new Set<number>();
+          const colFor = headers.map(h => {
+            const want = h.trim().toLowerCase();
+            const c = sheetHdr.findIndex((sh, i) => sh === want && !used.has(i));
+            if (c >= 0) used.add(c);
+            return c;
+          });
           const matched = colFor.filter(c => c >= 0).length;
           // Zero alignment = the stored template's headers no longer match this
           // run (renamed/re-uploaded since). Injecting nothing would download a

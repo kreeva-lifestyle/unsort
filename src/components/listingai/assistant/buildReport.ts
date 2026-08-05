@@ -1,6 +1,6 @@
 // Turns the Master Assistant's on-screen comparison tables + the raw seller
-// sheet into ONE downloadable Excel workbook (Summary + three action sheets),
-// so the owner hands the seller a single file instead of stitching CSVs.
+// sheet into the ComparisonReport behind the one-workbook Excel download
+// (see reportWorkbook.ts) and the Listing AI handoff.
 //
 // Everything is compared against the offline master sheet. The master's STOCK
 // STATUS is ACTIVE / INACTIVE; ACTIVE = in stock, INACTIVE = out of stock. The
@@ -9,8 +9,6 @@
 //
 // This is deterministic set math over data already computed server-side (the
 // edge fn matched every SKU with its fuzzy ladder); the AI never touches it.
-import * as XLSX from 'xlsx';
-import { exportName, fileDate } from '../../../lib/exportName';
 import type { AssistantTable } from './AssistantTables';
 import type { SellerSheet } from './sellerSheetParse';
 
@@ -20,33 +18,37 @@ export interface ComparisonReport {
   stockOut: string[][];             // seller must mark these OUT of stock
   inStock: string[][];              // seller must put these back IN stock
   notUploaded: string[][];          // in the master, missing from the seller sheet
-  matched: number;
+  matched: number;                  // TRUE count (from the table title, not the capped rows)
   undetermined: number;             // matched, but status missing/mixed on one side
+  warnings: string[];               // truncation/degradation notes — baked into the workbook
 }
 
 const normSku = (v: string) => (v || '').trim().toUpperCase();
 
-// A stock/status value → in stock / out of stock / can't tell. Out-of-stock
-// words are tested first so "Inactive" never trips the "active" branch.
+// A stock/status value → in stock / out of stock / can't tell. Negations
+// ("Not Available", "Not Active", "not in stock") are tested FIRST — their
+// inner positive word would otherwise trip the IN branch. Then out-of-stock
+// words, so "Inactive" never trips "active".
 type Stock = 'in' | 'out' | 'unknown';
+const NOT_RE = /\bnot?\b[\s-]*(available|active|live|enabled?|published|listed|online|sell?able|in\s*stock)/i;
 const OUT_RE = /\b(inactive|out\s*of\s*stock|oos|disabled?|unavailable|sold\s*out|delisted?|discontinued?|hidden|draft|removed|paused)\b/i;
 const IN_RE = /\b(active|in\s*stock|instock|live|enabled?|available|listed|published|online)\b/i;
 export const stockClass = (v: string): Stock => {
   const s = (v || '').trim();
   if (!s) return 'unknown';
-  if (OUT_RE.test(s) || /^(no|false|off|0|n)$/i.test(s)) return 'out';
+  if (NOT_RE.test(s) || OUT_RE.test(s) || /^(no|false|off|0|n)$/i.test(s)) return 'out';
   if (IN_RE.test(s) || /^(yes|true|on|1|y)$/i.test(s)) return 'in';
   return 'unknown';
 };
 
 const findTable = (tables: AssistantTable[], re: RegExp) => tables.find(t => re.test(t.title));
-// The seller SKU string in a matched row is capped (e.g. "745, 745-XL +3");
-// split it, drop the "+N more" marker.
-const sellerSkusOf = (cell: string) => (cell || '').split(',').map(s => s.trim()).filter(s => s && !s.startsWith('+'));
+// The seller SKU string in a matched row is capped with a SPACE-separated
+// "+N" marker ("745, 745-XL +3") — strip it BEFORE splitting on commas.
+const sellerSkusOf = (cell: string) => (cell || '').replace(/\s\+\d+$/, '').split(',').map(s => s.trim()).filter(Boolean);
 
 // Build the report from the edge tables + the seller sheet that produced them.
 // Returns null when no seller comparison was run (no Matched table).
-export function buildComparisonReport(tables: AssistantTable[], seller: SellerSheet): ComparisonReport | null {
+export function buildComparisonReport(tables: AssistantTable[], seller: SellerSheet, warnings: string[]): ComparisonReport | null {
   const matchedT = findTable(tables, /^Matched - in master/);
   if (!matchedT) return null;
   const notUpT = findTable(tables, /^Not uploaded by seller/);
@@ -54,8 +56,15 @@ export function buildComparisonReport(tables: AssistantTable[], seller: SellerSh
 
   const mc = matchedT.columns;
   const iSellerSku = mc.indexOf('SELLER SKU(S)');
-  let iMasterStatus = mc.indexOf('MASTER STOCK STATUS');
-  if (iMasterStatus < 0) iMasterStatus = mc.findIndex(c => c.startsWith('MASTER '));
+  // Master columns are the CONTIGUOUS TAIL of the matched table. A seller
+  // column that happens to start with "MASTER " (ALL-CAPS exports) must not
+  // hijack the lookup — find the tail start first, search only inside it.
+  const tail = mc.findIndex((c, i) => i >= 3 && c.startsWith('MASTER ') && mc.slice(i).every(x => x.startsWith('MASTER ')));
+  let iMasterStatus = -1;
+  if (tail >= 0) {
+    const j = mc.slice(tail).indexOf('MASTER STOCK STATUS');
+    iMasterStatus = j >= 0 ? tail + j : tail; // first master col = the edge's primary status col
+  }
 
   // Which seller column is the SKU? The one whose values overlap the SKUs the
   // edge already resolved (matched seller SKUs + unknown SKUs) — mirrors the
@@ -70,30 +79,37 @@ export function buildComparisonReport(tables: AssistantTable[], seller: SellerSh
     if (n > bestHits) { bestHits = n; skuCol = ci; }
   }
 
-  // Which seller column is the stock/status? Prefer a status-named column;
-  // among candidates, the one whose values actually read as in/out stock
-  // (also finds it in a header-less export where names are "COL 3").
+  // Which seller column is the stock/status? NAME evidence is required — a
+  // value-only pick let a "COD Available" Y/N column drive the whole workbook.
+  // Headerless sheets (synthesized "COL n" names) have no names to test, so
+  // they fall back to value scoring with a MAJORITY threshold instead.
   const NAME_RE = /status|active|live|state|stock|availab|enabl|inventory/i;
+  const headerless = seller.headers.every(h => /^COL \d+$/.test(h));
   let statusCol = -1, bestScore = -1;
   for (let ci = 0; ci < seller.headers.length; ci++) {
     if (ci === skuCol) continue;
+    if (!headerless && !NAME_RE.test(seller.headers[ci])) continue;
     let classifiable = 0;
     for (const r of seller.rows) if (stockClass(r[ci]) !== 'unknown') classifiable++;
-    if (classifiable === 0) continue;
-    const score = (NAME_RE.test(seller.headers[ci]) ? 1_000_000 : 0) + classifiable;
-    if (score > bestScore) { bestScore = score; statusCol = ci; }
+    if (classifiable === 0 || (headerless && classifiable * 2 < seller.rows.length)) continue;
+    if (classifiable > bestScore) { bestScore = classifiable; statusCol = ci; }
   }
 
   // seller SKU -> its raw stock/status value (first row wins on duplicates).
   const sellerStatus = new Map<string, string>();
   if (statusCol >= 0) for (const r of seller.rows) { const k = normSku(r[skuCol]); if (k && !sellerStatus.has(k)) sellerStatus.set(k, r[statusCol] || ''); }
 
-  // Prefer the edge's aggregated status cell in the matched table (same
-  // header name as the detected seller status column): it is computed over
-  // ALL size-variant rows of the group, while the SELLER SKU(S) cell lists
-  // at most 6 — re-deriving from those 6 could misclassify a design whose
-  // 7th+ variants disagree. "MIXED (...)" means the variants disagree.
-  const iAggStatus = statusCol >= 0 ? mc.indexOf(seller.headers[statusCol]) : -1;
+  // Prefer the edge's aggregated status cell: it is computed over ALL size-
+  // variant rows of the group, while SELLER SKU(S) lists at most 6. The edge
+  // carries its validated status column FIRST (mc[3]); match positionally,
+  // then by name — but never past the master tail (a master column sharing
+  // the name must not win). "MIXED (...)" means the variants disagree.
+  const statusHdr = statusCol >= 0 ? seller.headers[statusCol] : '';
+  let iAggStatus = -1;
+  if (statusCol >= 0) {
+    if (mc[3] === statusHdr) iAggStatus = 3;
+    else { const j = mc.indexOf(statusHdr); iAggStatus = j >= 3 && (tail < 0 || j < tail) ? j : -1; }
+  }
 
   const stockOut: string[][] = [];
   const inStock: string[][] = [];
@@ -136,49 +152,20 @@ export function buildComparisonReport(tables: AssistantTable[], seller: SellerSh
   if (notUpT) {
     const nc = notUpT.columns;
     const iCat = nc.indexOf('CATEGORY');
-    const iSt = nc.indexOf('MASTER STOCK STATUS');
+    // The master's status header isn't always literally "STOCK STATUS"
+    // ("STATUS", "LISTING STATUS"...) — fall back to the first MASTER column
+    // (safe here: this table carries no seller columns).
+    let iSt = nc.indexOf('MASTER STOCK STATUS');
+    if (iSt < 0) iSt = nc.findIndex(c => c.startsWith('MASTER '));
     for (const r of notUpT.rows) notUploaded.push([r[0] || '', iCat >= 0 ? (r[iCat] || '') : '', iSt >= 0 ? (r[iSt] || '') : '']);
   }
+
+  // The table ROWS are capped server-side; the title carries the true count.
+  const matched = Number((matchedT.title.match(/\((\d+)\)\s*$/) || [])[1] || matchedT.rows.length);
 
   return {
     seller: seller.name,
     sellerStatusCol: statusCol >= 0 ? seller.headers[statusCol] : null,
-    stockOut, inStock, notUploaded,
-    matched: matchedT.rows.length,
-    undetermined,
+    stockOut, inStock, notUploaded, matched, undetermined, warnings,
   };
-}
-
-// Build the single .xlsx workbook and trigger the download.
-export function downloadComparisonWorkbook(rep: ComparisonReport): void {
-  const wb = XLSX.utils.book_new();
-
-  const summary: (string | number)[][] = [
-    ['MASTER ASSISTANT — SELLER STOCK COMPARISON'],
-    [`Seller sheet: ${rep.seller}`],
-    [`Generated: ${fileDate()}`],
-    [],
-    ['Everything below is compared against your offline MASTER sheet.'],
-    ['ACTIVE = In stock.   INACTIVE = Out of stock.   Brand is ignored.'],
-    [`Matched products (in both master and seller sheet): ${rep.matched}`],
-    [],
-    ['SHEET', 'WHAT TO DO', 'COUNT'],
-    ['2. Mark Out of Stock', 'OUT of stock in the master (INACTIVE) but the seller still shows them IN stock — the seller must mark these OUT of stock.', rep.stockOut.length],
-    ['3. Mark In Stock', 'IN stock in the master (ACTIVE) but the seller shows them OUT of stock — the seller must put these back IN stock.', rep.inStock.length],
-    ['4. Not Uploaded', 'In the master but not in the seller sheet at all. Upload the ones that are ACTIVE.', rep.notUploaded.length],
-    [],
-    rep.sellerStatusCol
-      ? [`Seller stock column used for the comparison: "${rep.sellerStatusCol}".`]
-      : ['NOTE: no stock/status column was found in the seller sheet, so "Mark Out of Stock" and "Mark In Stock" are empty. Add an Active/Inactive (or In Stock/Out of Stock) column to the seller sheet and re-run to get those.'],
-    ...(rep.undetermined ? [[`${rep.undetermined} matched products could not be classified (status missing or mixed across sizes) — review them by hand.`]] : []),
-  ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
-
-  const add = (name: string, cols: string[], rows: string[][]) =>
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cols, ...(rows.length ? rows : [cols.map(() => '')])]), name);
-  add('Mark Out of Stock', ['SKU', 'SELLER SKU(S)', 'MASTER STATUS', 'SELLER STATUS'], rep.stockOut);
-  add('Mark In Stock', ['SKU', 'SELLER SKU(S)', 'MASTER STATUS', 'SELLER STATUS'], rep.inStock);
-  add('Not Uploaded', ['SKU', 'CATEGORY', 'MASTER STATUS'], rep.notUploaded);
-
-  XLSX.writeFile(wb, exportName('Seller-Comparison', [rep.seller.replace(/\.[^.]+$/, ''), fileDate()], 'xlsx'));
 }
