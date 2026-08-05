@@ -1,43 +1,40 @@
 // Salary view — runs the engine per active employee for the month, lets the
-// owner add penalties (each with a mandatory note so the employee knows what
-// the deduction is for), stores the month's results, and exports in-depth PDF
-// payslips (single or combined; HTML builders live in payslip.ts).
+// owner add penalties and advances (both deduct from this month's net; the
+// modal lives in AdjustModal.tsx), stores the month's results, and exports
+// in-depth PDF payslips (single or combined; HTML builders in payslip.ts).
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S, Pill } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
-import { numericKeyDown } from '../../lib/numericInput';
 import { useAuth } from '../../hooks/useAuth';
-import { AttEmployee, AttEntry, AttPenalty, AttSalaryPayment, MonthlySalary, computeMonthlySalary, minutesToHM, monthFirstDay } from '../../lib/attendance';
+import { AttEmployee, AttEntry, AttPenalty, AttAdvance, AttSalaryPayment, MonthlySalary, computeMonthlySalary, minutesToHM, monthFirstDay } from '../../lib/attendance';
 import { payslipBody, combinedSummary, wrapPdf, inr } from './payslip';
 import SalaryPaymentFlow from './SalaryPaymentFlow';
+import AdjustModal from './AdjustModal';
 import { docTitle } from '../../lib/exportName';
 
-export default function AttendanceSalary({ employees, entries, penalties, savedSalaries, payments, month, onChanged, addToast }: {
-  employees: AttEmployee[]; entries: AttEntry[]; penalties: AttPenalty[];
+export default function AttendanceSalary({ employees, entries, penalties, advances, savedSalaries, payments, month, onChanged, addToast }: {
+  employees: AttEmployee[]; entries: AttEntry[]; penalties: AttPenalty[]; advances: AttAdvance[];
   savedSalaries: Record<string, unknown>[]; payments: AttSalaryPayment[]; month: string;
   onChanged: () => void; addToast: (m: string, t?: string) => void;
 }) {
   const { profile } = useAuth();
   const canPay = ['admin', 'manager', 'operator'].includes(profile?.role);
   const [pdfHtml, setPdfHtml] = useState<string | null>(null);
-  const [penFor, setPenFor] = useState<AttEmployee | null>(null);
-  const [penAmt, setPenAmt] = useState('');
-  const [penReason, setPenReason] = useState('');
+  const [adjFor, setAdjFor] = useState<{ emp: AttEmployee; kind: 'penalty' | 'advance' } | null>(null);
   const [saving, setSaving] = useState(false);
-  const [savingPen, setSavingPen] = useState(false);
   const [payFlow, setPayFlow] = useState(false);
   const [q, setQ] = useState('');
-  // Armed penalty chip: first tap arms, second tap deletes. A single tap on a
-  // tiny chip silently removing a money record was too easy to hit by
-  // accident on a phone.
-  const [armedPen, setArmedPen] = useState<string | null>(null);
+  // Armed money chip ("kind:id"): first tap arms, second tap deletes. A single
+  // tap on a tiny chip silently removing a money record was too easy to hit
+  // by accident on a phone.
+  const [armed, setArmed] = useState<string | null>(null);
   useEffect(() => {
-    if (!armedPen) return;
-    const t = setTimeout(() => setArmedPen(null), 4000);
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(null), 4000);
     return () => clearTimeout(t);
-  }, [armedPen]);
+  }, [armed]);
 
   const monthLabel = new Date(month + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
   const activeEmployees = useMemo(() => employees.filter(e => e.is_active), [employees]);
@@ -51,12 +48,17 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
     penalties.forEach(p => { const a = m.get(p.employee_id) || []; a.push(p); m.set(p.employee_id, a); });
     return m;
   }, [penalties]);
+  const advByEmp = useMemo(() => {
+    const m = new Map<string, AttAdvance[]>();
+    advances.forEach(a => { const arr = m.get(a.employee_id) || []; arr.push(a); m.set(a.employee_id, arr); });
+    return m;
+  }, [advances]);
   const savedByEmp = useMemo(() => new Map(savedSalaries.map(s => [s.employee_id as string, s])), [savedSalaries]);
   const paidByEmp = useMemo(() => new Map(payments.map(p => [p.employee_id, p])), [payments]);
 
   const salaries: MonthlySalary[] = useMemo(() =>
-    activeEmployees.map(e => computeMonthlySalary(e, entriesByEmp.get(e.id) || [], month, pensByEmp.get(e.id) || [])),
-    [activeEmployees, entriesByEmp, pensByEmp, month]);
+    activeEmployees.map(e => computeMonthlySalary(e, entriesByEmp.get(e.id) || [], month, pensByEmp.get(e.id) || [], advByEmp.get(e.id) || [])),
+    [activeEmployees, entriesByEmp, pensByEmp, advByEmp, month]);
 
   const shown = useMemo(() => {
     const sq = q.toLowerCase().trim();
@@ -66,29 +68,18 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
   const totalFinal = shown.reduce((s, x) => s + x.finalSalary, 0);
   const totalExtraMin = shown.reduce((s, x) => s + x.extraMinutes, 0);
   const totalPenalty = shown.reduce((s, x) => s + x.penaltyTotal, 0);
+  const totalAdvance = shown.reduce((s, x) => s + x.advanceTotal, 0);
 
-  useEffect(() => { document.body.classList.toggle('modal-open', !!penFor || !!pdfHtml || payFlow); return () => document.body.classList.remove('modal-open'); }, [penFor, pdfHtml, payFlow]);
+  useEffect(() => { document.body.classList.toggle('modal-open', !!pdfHtml || payFlow); return () => document.body.classList.remove('modal-open'); }, [pdfHtml, payFlow]);
 
-  // ── Penalty ────────────────────────────────────────────────────────────────
-  const savePenalty = async () => {
-    if (!penFor || savingPen) return;
-    const amt = Number(penAmt);
-    if (!Number.isFinite(amt) || amt <= 0) { addToast('Enter a penalty amount greater than 0', 'error'); return; }
-    if (!penReason.trim()) { addToast('Add a note — the employee should know what this deduction is for', 'error'); return; }
-    setSavingPen(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from('attendance_penalties').insert({ employee_id: penFor.id, month: monthFirstDay(month), amount: amt, reason: penReason.trim() || null, created_by: user?.id });
-    setSavingPen(false);
+  // ── Remove a penalty/advance chip (two-tap) ────────────────────────────────
+  const removeAdjust = async (kind: 'penalty' | 'advance', id: string) => {
+    const key = `${kind}:${id}`;
+    if (armed !== key) { setArmed(key); return; } // first tap arms, second deletes
+    setArmed(null);
+    const { error } = await supabase.from(kind === 'penalty' ? 'attendance_penalties' : 'attendance_advances').delete().eq('id', id);
     if (error) { addToast(friendlyError(error), 'error'); return; }
-    addToast(`Penalty ${inr(amt)} added for ${penFor.name}`, 'success');
-    setPenFor(null); setPenAmt(''); setPenReason(''); onChanged();
-  };
-  const removePenalty = async (p: AttPenalty) => {
-    if (armedPen !== p.id) { setArmedPen(p.id); return; } // first tap arms, second deletes
-    setArmedPen(null);
-    const { error } = await supabase.from('attendance_penalties').delete().eq('id', p.id);
-    if (error) { addToast(friendlyError(error), 'error'); return; }
-    addToast('Penalty removed', 'success'); onChanged();
+    addToast(kind === 'penalty' ? 'Penalty removed' : 'Advance removed', 'success'); onChanged();
   };
 
   // ── Save month ─────────────────────────────────────────────────────────────
@@ -100,7 +91,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
       employee_id: s.employeeId, month: monthFirstDay(month), days_in_month: s.daysInMonth,
       work_days: s.workDays, sundays: s.sundays, leave_days: s.leaveDays, total_worked_minutes: s.totalWorkedMinutes,
       per_day_salary: s.perDaySalary, per_hour_salary: s.perHourSalary, earned: s.earned, sunday_pay: s.sundayPay,
-      gross: s.gross, penalty_total: s.penaltyTotal, final_salary: s.finalSalary,
+      gross: s.gross, penalty_total: s.penaltyTotal, advance_total: s.advanceTotal, final_salary: s.finalSalary,
       breakdown: { days: s.days }, computed_at: new Date().toISOString(), computed_by: user?.id,
     }));
     const { error } = await supabase.from('attendance_salaries').upsert(rows, { onConflict: 'employee_id,month' });
@@ -110,9 +101,27 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
   };
 
   // ── PDF (builders in payslip.ts) ───────────────────────────────────────────
-  const slip = (s: MonthlySalary) => payslipBody(s, employees.find(e => e.id === s.employeeId), pensByEmp.get(s.employeeId) || [], monthLabel);
+  const slip = (s: MonthlySalary) => payslipBody(s, employees.find(e => e.id === s.employeeId), pensByEmp.get(s.employeeId) || [], advByEmp.get(s.employeeId) || [], monthLabel);
   const exportSingle = (s: MonthlySalary) => setPdfHtml(wrapPdf(slip(s), docTitle('Payslip', s.name, monthLabel)));
   const exportCombined = () => setPdfHtml(wrapPdf(combinedSummary(shown, monthLabel, totalFinal) + shown.map(slip).join(''), docTitle('Salary-Summary', monthLabel)));
+
+  const kpi = (label: string, value: string, color: string) => (
+    <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
+      <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 17, fontWeight: 800, fontFamily: T.sora, color, marginTop: 2 }}>{value}</div>
+    </div>
+  );
+  // Deduction chip (penalty = red, advance = blue) with two-tap remove.
+  const chip = (kind: 'penalty' | 'advance', id: string, amount: number, note: string | null) => {
+    const isArmed = armed === `${kind}:${id}`;
+    const c = kind === 'penalty' ? '0.63 0.22 25' : '0.62 0.17 245';
+    return (
+      <span key={`${kind}:${id}`} onClick={() => removeAdjust(kind, id)} title={isArmed ? 'Tap again to remove' : 'Tap to remove'}
+        style={{ fontSize: 10, padding: '4px 9px', borderRadius: 5, background: `oklch(${c} / ${isArmed ? '.22' : '.08'})`, border: `1px solid oklch(${c} / ${isArmed ? '.55' : '.2'})`, color: kind === 'penalty' ? T.re : T.bl, cursor: 'pointer', fontFamily: T.mono, fontWeight: isArmed ? 700 : 400 }}>
+        {isArmed ? `Remove −${inr(amount)}? tap again` : <>−{inr(amount)}{kind === 'advance' ? ' adv' : ''}{note ? ` · ${note}` : ''} ✕</>}
+      </span>
+    );
+  };
 
   return (
     <div>
@@ -129,22 +138,11 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
       </div>
 
       <div className="att-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8, marginBottom: 10 }}>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
-          <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Employees</div>
-          <div style={{ fontSize: 17, fontWeight: 800, fontFamily: T.sora, color: T.tx, marginTop: 2 }}>{shown.length}</div>
-        </div>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
-          <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Total Net</div>
-          <div style={{ fontSize: 17, fontWeight: 800, fontFamily: T.sora, color: T.gr, marginTop: 2 }}>{inr(totalFinal)}</div>
-        </div>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
-          <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Extra Time</div>
-          <div style={{ fontSize: 17, fontWeight: 800, fontFamily: T.sora, color: totalExtraMin > 0 ? T.gr : T.tx3, marginTop: 2 }}>{totalExtraMin > 0 ? `+${minutesToHM(totalExtraMin)}h` : '—'}</div>
-        </div>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
-          <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Penalties</div>
-          <div style={{ fontSize: 17, fontWeight: 800, fontFamily: T.sora, color: totalPenalty > 0 ? T.re : T.tx3, marginTop: 2 }}>{totalPenalty > 0 ? `− ${inr(totalPenalty)}` : '—'}</div>
-        </div>
+        {kpi('Employees', String(shown.length), T.tx)}
+        {kpi('Total Net', inr(totalFinal), T.gr)}
+        {kpi('Extra Time', totalExtraMin > 0 ? `+${minutesToHM(totalExtraMin)}h` : '—', totalExtraMin > 0 ? T.gr : T.tx3)}
+        {kpi('Penalties', totalPenalty > 0 ? `− ${inr(totalPenalty)}` : '—', totalPenalty > 0 ? T.re : T.tx3)}
+        {kpi('Advances', totalAdvance > 0 ? `− ${inr(totalAdvance)}` : '—', totalAdvance > 0 ? T.bl : T.tx3)}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 12px' }}>
           <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Month</div>
           <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, color: T.tx2, marginTop: 4 }}>{monthLabel}</div>
@@ -157,6 +155,8 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
           const savedFinal = saved ? Number(saved.final_salary) : null;
           const drift = savedFinal !== null && savedFinal !== s.finalSalary;
           const pens = pensByEmp.get(s.employeeId) || [];
+          const advs = advByEmp.get(s.employeeId) || [];
+          const deductions = s.penaltyTotal + s.advanceTotal;
           return (
             <div key={s.employeeId} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
@@ -171,25 +171,22 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
                     {s.workDays}W · {s.paidSundays}/{s.sundays}Sun · {s.leaveDays}L · {minutesToHM(s.totalWorkedMinutes)}h · ₹{s.perDaySalary.toLocaleString('en-IN')}/day · ₹{s.perHourSalary.toLocaleString('en-IN')}/hr
                     {s.extraMinutes > 0 && <span style={{ color: T.gr, fontWeight: 700 }}> · +{minutesToHM(s.extraMinutes)}h extra</span>}
                   </div>
-                  {pens.length > 0 && (
+                  {(pens.length > 0 || advs.length > 0) && (
                     <div style={{ marginTop: 5, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                      {pens.map(p => (
-                        <span key={p.id} onClick={() => removePenalty(p)} title={armedPen === p.id ? 'Tap again to remove' : 'Tap to remove'}
-                          style={{ fontSize: 10, padding: '4px 9px', borderRadius: 5, background: armedPen === p.id ? 'oklch(0.63 0.22 25 / .22)' : 'oklch(0.63 0.22 25 / .08)', border: `1px solid oklch(0.63 0.22 25 / ${armedPen === p.id ? '.55' : '.2'})`, color: T.re, cursor: 'pointer', fontFamily: T.mono, fontWeight: armedPen === p.id ? 700 : 400 }}>
-                          {armedPen === p.id ? `Remove −${inr(Number(p.amount))}? tap again` : <>−{inr(Number(p.amount))}{p.reason ? ` · ${p.reason}` : ''} ✕</>}
-                        </span>
-                      ))}
+                      {pens.map(p => chip('penalty', p.id, Number(p.amount), p.reason))}
+                      {advs.map(a => chip('advance', a.id, Number(a.amount), a.note))}
                     </div>
                   )}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5 }}>Net Salary</div>
                   <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.sora, color: s.finalSalary < 0 ? T.re : T.gr }}>{inr(s.finalSalary)}</div>
-                  {s.penaltyTotal > 0 && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono }}>gross {inr(s.gross)} − {inr(s.penaltyTotal)}</div>}
+                  {deductions > 0 && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono }}>gross {inr(s.gross)} − {inr(deductions)}</div>}
                 </div>
               </div>
               <div className="att-salary-actions" style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                <button onClick={() => { setPenFor(employees.find(e => e.id === s.employeeId) || null); setPenAmt(''); setPenReason(''); }} style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 11, color: T.re }}>+ Penalty</button>
+                <button onClick={() => setAdjFor({ emp: employees.find(e => e.id === s.employeeId)!, kind: 'penalty' })} style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 11, color: T.re }}>+ Penalty</button>
+                <button onClick={() => setAdjFor({ emp: employees.find(e => e.id === s.employeeId)!, kind: 'advance' })} style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 11, color: T.bl }}>+ Advance</button>
                 <button onClick={() => exportSingle(s)} style={{ ...S.btnGhost, padding: '5px 12px', fontSize: 11 }}>Payslip PDF</button>
               </div>
             </div>
@@ -198,30 +195,11 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
         {shown.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12, border: `1px solid ${T.bd}`, borderRadius: 10 }}>No active employees{q ? ' match your search' : ''}. Add employees and import a timesheet.</div>}
       </div>
 
-      {/* Penalty modal */}
-      {penFor && createPortal((
-        <div style={{ ...S.modalOverlay }} onClick={() => setPenFor(null)}>
-          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380 }} onClick={ev => ev.stopPropagation()}>
-            <div style={S.modalHead}><div style={S.modalTitle}>Penalty — {penFor.name}</div><span onClick={() => setPenFor(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span></div>
-            <div style={{ padding: 16 }}>
-              <div style={{ fontSize: 11, color: T.tx3, marginBottom: 10 }}>Deduct for time-passing / policy breach during {monthLabel}. Subtracts from the net salary.</div>
-              <div style={{ marginBottom: 10 }}>
-                <label style={S.fLabel}>Amount (₹)</label>
-                <input type="number" min="1" value={penAmt} onKeyDown={e => numericKeyDown(e)} onChange={e => setPenAmt(e.target.value)} placeholder="500" autoFocus style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
-              </div>
-              <div style={{ marginBottom: 12 }}>
-                <label style={S.fLabel}>Note — what is this deduction for?</label>
-                <input value={penReason} onChange={e => setPenReason(e.target.value)} placeholder="e.g. Late 3 days / idle during shift" style={{ ...S.fInput, width: '100%' }} />
-                <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>Required — shown on the payslip and pay screen so the employee understands the deduction.</div>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setPenFor(null)} style={{ ...S.btnGhost, flex: 1 }}>Cancel</button>
-                <button onClick={savePenalty} disabled={savingPen} style={{ ...S.btnDanger, flex: 1, pointerEvents: savingPen ? 'none' : 'auto', opacity: savingPen ? 0.5 : 1 }}>{savingPen ? 'Adding…' : 'Add Penalty'}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ), document.body)}
+      {/* Penalty / Advance modal */}
+      {adjFor && (
+        <AdjustModal emp={adjFor.emp} kind={adjFor.kind} month={month} monthLabel={monthLabel}
+          onClose={() => setAdjFor(null)} onSaved={() => { setAdjFor(null); onChanged(); }} addToast={addToast} />
+      )}
 
       {/* PDF preview overlay */}
       {pdfHtml && createPortal((
@@ -246,7 +224,7 @@ export default function AttendanceSalary({ employees, entries, penalties, savedS
       {/* Salary payment kiosk */}
       {payFlow && (
         <SalaryPaymentFlow employees={activeEmployees} salaries={salaries} payments={payments} month={month}
-          penaltiesByEmp={pensByEmp} onClose={() => { setPayFlow(false); onChanged(); }} addToast={addToast} />
+          penaltiesByEmp={pensByEmp} advancesByEmp={advByEmp} onClose={() => { setPayFlow(false); onChanged(); }} addToast={addToast} />
       )}
     </div>
   );

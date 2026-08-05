@@ -6,7 +6,7 @@ import { T, S } from '../lib/theme';
 import DateInput from '../components/ui/DateInput';
 import { friendlyError } from '../lib/friendlyError';
 import { useNotifications } from '../hooks/useNotifications';
-import { AttEmployee, AttEntry, AttPenalty, AttSalaryPayment, monthFirstDay } from '../lib/attendance';
+import { AttEmployee, AttEntry, AttPenalty, AttAdvance, AttSalaryPayment, monthFirstDay } from '../lib/attendance';
 import AttendanceEmployees from '../components/attendance/Employees';
 import AttendanceTimesheet from '../components/attendance/Timesheet';
 import AttendanceSalary from '../components/attendance/Salary';
@@ -21,6 +21,7 @@ export default function Attendance() {
   const [employees, setEmployees] = useState<AttEmployee[]>([]);
   const [entries, setEntries] = useState<AttEntry[]>([]);
   const [penalties, setPenalties] = useState<AttPenalty[]>([]);
+  const [advances, setAdvances] = useState<AttAdvance[]>([]);
   const [savedSalaries, setSavedSalaries] = useState<Record<string, unknown>[]>([]);
   const [payments, setPayments] = useState<AttSalaryPayment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,24 +34,30 @@ export default function Attendance() {
     setEmployees((data as AttEmployee[]) || []);
   }, [addToast]);
 
-  const fetchMonth = useCallback(async (m: string, isCurrent: () => boolean = () => true) => {
-    setLoading(true);
+  // silent: refresh data WITHOUT the loading spinner. The spinner swap
+  // unmounts the child views, which resets Timesheet's filters/scroll and
+  // Salary's search after every one-row edit — so post-edit refreshes are
+  // silent; only first load and month changes go loud.
+  const fetchMonth = useCallback(async (m: string, isCurrent: () => boolean = () => true, silent = false) => {
+    if (!silent) setLoading(true);
     const from = monthFirstDay(m);
     const [y, mo] = m.split('-').map(Number);
     const to = `${m}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}`;
-    const [en, pe, sa, pa] = await Promise.all([
+    const [en, pe, ad, sa, pa] = await Promise.all([
       supabase.from('attendance_entries').select('id, employee_id, date, day, shift_id, in_time, out_time, location_in, location_out, status, remarks, manager_remarks').gte('date', from).lte('date', to).order('date').limit(4000),
       supabase.from('attendance_penalties').select('id, employee_id, month, amount, reason').eq('month', from),
-      supabase.from('attendance_salaries').select('id, employee_id, month, days_in_month, work_days, sundays, leave_days, total_worked_minutes, per_day_salary, per_hour_salary, earned, sunday_pay, gross, penalty_total, final_salary, computed_at').eq('month', from),
+      supabase.from('attendance_advances').select('id, employee_id, month, amount, note').eq('month', from),
+      supabase.from('attendance_salaries').select('id, employee_id, month, days_in_month, work_days, sundays, leave_days, total_worked_minutes, per_day_salary, per_hour_salary, earned, sunday_pay, gross, penalty_total, advance_total, final_salary, computed_at').eq('month', from),
       supabase.from('attendance_salary_payments').select('id, employee_id, month, paid_at, paid_by').eq('month', from),
     ]);
     // A newer month may have been requested while these were in flight — drop
     // superseded responses so Salary never computes/saves the wrong month.
     if (!isCurrent()) return;
-    const err = en.error || pe.error || sa.error || pa.error;
+    const err = en.error || pe.error || ad.error || sa.error || pa.error;
     if (err) addToast(friendlyError(err), 'error');
     setEntries((en.data as AttEntry[]) || []);
     setPenalties((pe.data as AttPenalty[]) || []);
+    setAdvances((ad.data as AttAdvance[]) || []);
     setSavedSalaries((sa.data as Record<string, unknown>[]) || []);
     setPayments((pa.data as AttSalaryPayment[]) || []);
     setLoading(false);
@@ -81,10 +88,10 @@ export default function Attendance() {
         <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}><div className="spinner" /></div>
       ) : view === 'timesheet' ? (
         <AttendanceTimesheet employees={employees} entries={entries} month={month}
-          onChanged={() => fetchMonth(month)} addToast={addToast} />
+          onChanged={() => fetchMonth(month, undefined, true)} addToast={addToast} />
       ) : view === 'salary' ? (
-        <AttendanceSalary employees={employees} entries={entries} penalties={penalties} savedSalaries={savedSalaries} payments={payments} month={month}
-          onChanged={() => fetchMonth(month)} addToast={addToast} />
+        <AttendanceSalary employees={employees} entries={entries} penalties={penalties} advances={advances} savedSalaries={savedSalaries} payments={payments} month={month}
+          onChanged={() => fetchMonth(month, undefined, true)} addToast={addToast} />
       ) : (
         <AttendanceEmployees employees={employees} onChanged={fetchEmployees} addToast={addToast} />
       )}

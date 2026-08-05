@@ -52,11 +52,15 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result>(null);
   const [fileName, setFileName] = useState('');
+  // Inline error mirror of the failure toasts (modal contract): the message
+  // must live INSIDE the modal too, never only in a transient toast.
+  const [err, setErr] = useState('');
+  const fail = (msg: string) => { setErr(msg); addToast(msg, 'error'); setBusy(false); };
 
   useEffect(() => { document.body.classList.toggle('modal-open', true); return () => document.body.classList.remove('modal-open'); }, []);
 
   const handleFile = async (file: File) => {
-    setBusy(true); setResult(null); setFileName(file.name);
+    setBusy(true); setResult(null); setErr(''); setFileName(file.name);
     try {
       // CSV is parsed as raw text — SheetJS's CSV reader coerces "01/06/2026"
       // (dd/mm) into a US mm/dd date serial at read time, silently swapping
@@ -70,7 +74,7 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
         const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
         rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null });
       }
-      if (rows.length < 2) { addToast('Sheet has no data rows', 'error'); setBusy(false); return; }
+      if (rows.length < 2) { fail('Sheet has no data rows'); return; }
 
       // Resolve columns from the header row.
       const header = (rows[0] as unknown[]).map(h => norm(String(h ?? '')));
@@ -78,7 +82,7 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
       for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
         col[field] = header.findIndex(h => aliases.includes(h));
       }
-      if (col.name < 0 || col.date < 0) { addToast('Could not find "Employee Name" and "Date" columns in the sheet header', 'error'); setBusy(false); return; }
+      if (col.name < 0 || col.date < 0) { fail('Could not find "Employee Name" and "Date" columns in the sheet header'); return; }
 
       const get = (r: unknown[], f: string) => (col[f] >= 0 ? r[col[f]] : null);
       const skipped: { row: number; reason: string }[] = [];
@@ -117,7 +121,7 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
         const { data: created, error: cErr } = await supabase.from('attendance_employees')
           .insert([...toCreate.values()].map(v => ({ name: v.name, employee_code: v.code, salary: 0, fix_time_minutes: 510 })))
           .select('id, employee_code, name, salary, fix_time_minutes, is_active');
-        if (cErr) { addToast('Could not create new employees — ' + friendlyError(cErr), 'error'); setBusy(false); return; }
+        if (cErr) { fail('Could not create new employees — ' + friendlyError(cErr)); return; }
         (created as AttEmployee[] || []).forEach(e => {
           if (e.employee_code) byCode.set(e.employee_code.trim().toLowerCase(), e);
           const k = e.name.trim().toLowerCase();
@@ -162,12 +166,13 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
       for (let i = 0; i < toUpsert.length; i += 500) {
         const batch = toUpsert.slice(i, i + 500);
         const { error } = await supabase.from('attendance_entries').upsert(batch, { onConflict: 'employee_id,date' });
-        if (error) { addToast(`Row batch failed — ${friendlyError(error)}`, 'error'); setBusy(false); return; }
+        if (error) { fail(`Row batch failed — ${friendlyError(error)}`); return; }
         inserted += batch.length;
       }
       setResult({ inserted, employeesCreated, skipped });
       addToast(`Imported ${inserted} entr${inserted === 1 ? 'y' : 'ies'}${employeesCreated ? `, ${employeesCreated} new employee(s)` : ''}${skipped.length ? `, ${skipped.length} skipped` : ''}`, skipped.length ? 'error' : 'success');
     } catch (e) {
+      setErr('Could not read the file — ' + friendlyError(e));
       addToast('Could not read the file — ' + friendlyError(e), 'error');
     } finally { setBusy(false); }
   };
@@ -183,6 +188,7 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
           <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5, marginBottom: 12 }}>
             Upload the .xlsx with columns like <b>Employee ID, Employee Name, Date, Day, In Time, Out Time, Status, Remarks, Manager's Remarks</b>. Column order doesn't matter. New names become employees (set their salary in the Employees tab). Re-importing the same month updates existing rows.
           </div>
+          {err && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{err}</div>}
           {!result && (
             <label style={{ display: 'block', border: `1px dashed ${T.bd2}`, borderRadius: 10, padding: 24, textAlign: 'center', cursor: busy ? 'default' : 'pointer', background: 'rgba(255,255,255,0.02)' }}>
               <input type="file" accept=".xlsx,.xls,.csv" disabled={busy} style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
