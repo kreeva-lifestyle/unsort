@@ -7,18 +7,26 @@ import { exportName, fileDate } from '../../../lib/exportName';
 
 export interface AssistantTable { title: string; columns: string[]; rows: string[][] }
 
-const csvCell = (v: string) => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+// Quote AND neutralise formula injection: seller-sheet cells flow into this
+// CSV and Excel executes a leading = + - @ on open.
+const csvCell = (v: string) => {
+  const s = /^[=+\-@]/.test(v) ? `'${v}` : v;
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
 
 export default function AssistantTables({ tables }: { tables: AssistantTable[] }) {
   const [open, setOpen] = useState<Record<number, boolean>>({});
   if (!tables.length) return null;
 
-  const exportCsv = (t: AssistantTable) => {
+  // ti in the name: cross-tab combo titles share their first 40 chars, so
+  // several exports would otherwise collide on the same filename.
+  const exportCsv = (t: AssistantTable, ti: number) => {
     const csv = [t.columns.map(csvCell).join(','), ...t.rows.map(r => r.map(csvCell).join(','))].join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     const a = document.createElement('a');
-    a.href = url; a.download = exportName('Master-Assistant', [t.title, fileDate()], 'csv'); a.click();
-    URL.revokeObjectURL(url);
+    a.href = url; a.download = exportName('Master-Assistant', [t.title, `t${ti + 1}`, fileDate()], 'csv');
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000); // sync revoke breaks Safari/Firefox
   };
 
   return (
@@ -30,7 +38,7 @@ export default function AssistantTables({ tables }: { tables: AssistantTable[] }
               style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: T.tx2, fontSize: 11, fontWeight: 600, minHeight: 28 }}>
               {open[ti] ? '▾' : '▸'} {t.title}
             </button>
-            {t.rows.length > 0 && <button onClick={() => exportCsv(t)} style={{ ...S.btnGhost, ...S.btnSm }}>CSV</button>}
+            {t.rows.length > 0 && <button onClick={() => exportCsv(t, ti)} style={{ ...S.btnGhost, ...S.btnSm }}>CSV</button>}
           </div>
           {open[ti] && (t.rows.length === 0
             ? <div style={{ padding: '4px 12px 10px', fontSize: 11, color: T.tx3 }}>Empty.</div>

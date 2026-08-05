@@ -13,11 +13,12 @@ import type { RunTpl } from './useGenerateRun';
 const fiveDaysAgo = () => new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString();
 const fmtWhen = (iso: string) => new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-export default function RunHistory({ templates, refreshKey, onOpen, addToast }: {
+export default function RunHistory({ templates, refreshKey, onOpen, addToast, busy = false }: {
   templates: ListingTemplate[];
   refreshKey: number; // bumped after each saved run
   onOpen: (run: ListingRun, tpl: RunTpl) => void;
   addToast: (m: string, t?: string) => void;
+  busy?: boolean; // a run/queue is live — opening a saved run would overwrite its state
 }) {
   const [runs, setRuns] = useState<ListingRun[]>([]);
   const [opening, setOpening] = useState('');
@@ -79,8 +80,8 @@ export default function RunHistory({ templates, refreshKey, onOpen, addToast }: 
             <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{r.ok_count ?? 0} row(s)</span>
             {Number(r.est_usd) > 0 && <span style={{ fontSize: 10, color: T.gr, fontFamily: T.mono }}>${Number(r.est_usd).toFixed(3)}</span>}
             <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-              <button onClick={() => open(r)} disabled={!!opening}
-                style={{ ...S.btnGhost, ...S.btnSm, color: T.ac2, pointerEvents: opening ? 'none' : 'auto', opacity: opening === r.id ? 0.5 : 1 }}>
+              <button onClick={() => open(r)} disabled={!!opening || busy} title={busy ? 'Wait for the current generation to finish' : undefined}
+                style={{ ...S.btnGhost, ...S.btnSm, color: T.ac2, pointerEvents: (opening || busy) ? 'none' : 'auto', opacity: opening === r.id || busy ? 0.5 : 1 }}>
                 {opening === r.id ? 'Opening…' : 'Open'}
               </button>
               {confirmDel === r.id ? (

@@ -5,7 +5,7 @@
 // columns are never AI-written - the owner fills them via fixed values,
 // pairing, wires or rules (enforced server-side). Runs are saved for
 // 5 days (Recent runs) so a reload never loses a generated sheet.
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
@@ -38,6 +38,10 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
   const [handoff, setHandoff] = useState<{ seller: string; count: number } | null>(null);
   const gen = useGenerateRun(addToast);
   const batch = useAutoBatch(gen, addToast);
+  // busy = a run/queue/pending preflight owns the screen state.
+  const busy = gen.generating || batch.active || !!gen.preflight;
+  const busyRef = useRef(false);
+  busyRef.current = busy;
 
   const loadStatus = useCallback(async () => {
     try {
@@ -64,6 +68,8 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
     const applyHandoff = () => {
       const h = readListingHandoff();
       if (!h) return;
+      // Never replace the SKU box mid-run — the queue owns it right now.
+      if (busyRef.current) { addToast('A generation is running — finish or stop it before sending new SKUs from Master Assistant', 'error'); return; }
       setViewMode('main');
       setSkuText(h.skus.join('\n'));
       setHandoff({ seller: h.seller, count: h.skus.length });
@@ -139,7 +145,10 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
             </select>
           </div>
           <button onClick={() => setManageOpen(true)} style={S.btnGhost}>Manage Templates</button>
-          <button onClick={() => setViewMode('mappings')} style={S.btnGhost}>Taught Mappings</button>
+          {/* Leaving the main view mid-run would hide the preflight panel and
+              the Stop button — the queue would hang invisibly. */}
+          <button onClick={() => setViewMode('mappings')} disabled={busy} title={busy ? 'Wait for the current generation to finish' : undefined}
+            style={{ ...S.btnGhost, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>Taught Mappings</button>
           <button onClick={() => setLinksOpen(true)} style={S.btnGhost}>Image Folders</button>
         </div>
         {(handoff || batch.active) && (
@@ -161,10 +170,10 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
           <button
             onClick={generate}
-            disabled={gen.generating || batch.active}
-            style={{ ...S.btnPrimary, pointerEvents: (gen.generating || batch.active) ? 'none' : 'auto', opacity: (gen.generating || batch.active) ? 0.5 : 1 }}
+            disabled={busy}
+            style={{ ...S.btnPrimary, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}
           >
-            {batch.active ? `Batch ${batch.current}/${batch.total} — ${gen.progress.done}/${gen.progress.total}…`
+            {batch.active ? `Batch ${batch.current}/${batch.total} — ${gen.generating ? `${gen.progress.done}/${gen.progress.total}…` : 'pre-checking…'}`
               : gen.generating ? `Generating ${gen.progress.done}/${gen.progress.total}…`
               : `Generate${skuCount ? ` ${skuCount} SKU${skuCount > 1 ? 's' : ''}${skuCount > RUN_CAP ? ` (${Math.ceil(skuCount / RUN_CAP)} batches)` : ''}` : ''}`}
           </button>
@@ -177,7 +186,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
       {gen.rows.length > 0 && gen.runTpl && (
         <ResultsTable headers={gen.headers} kinds={gen.kinds} rows={gen.rows} usage={gen.usage} cost={gen.cost} template={gen.runTpl} addToast={addToast} />
       )}
-      <RunHistory templates={templates} refreshKey={gen.savedCount} onOpen={gen.loadRun} addToast={addToast} />
+      <RunHistory templates={templates} refreshKey={gen.savedCount} onOpen={gen.loadRun} addToast={addToast} busy={busy} />
       <TemplateManager open={manageOpen} onClose={() => { setManageOpen(false); loadTemplates(); }} templates={templates} refresh={loadTemplates} addToast={addToast} />
       <ImageFolders open={linksOpen} onClose={() => setLinksOpen(false)} addToast={addToast} />
     </div>

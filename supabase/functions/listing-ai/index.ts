@@ -708,7 +708,12 @@ function classifyFields(fields: TplField[], masterHeaders: Map<string, string>):
   // sheet) is "master first, AI for the rest": even creative columns (title,
   // description...) copy verbatim from the master when a same-named master
   // column exists - only columns with no master match stay AI-written.
-  const noDropdowns = fields.every(f => f.allowed.length === 0 || f.skip);
+  // SKIPPED dropdown columns still count as dropdowns: a real marketplace
+  // template with its dropdowns skipped must NOT flip into master-copy mode
+  // (verbatim descriptions across marketplaces = duplicate content). Residual:
+  // a template whose only dropdowns exceed the 500-value cap is zeroed at
+  // load and reads as no-dropdown here - accepted, such sheets are seller-own.
+  const noDropdowns = fields.every(f => f.allowed.length === 0);
   return fields.map(f => {
     // Owner-skipped columns are never filled - exported empty, zero cost.
     if (f.skip) return { ...f, kind: 'blank' as const, masterCol: '' };
@@ -1501,10 +1506,6 @@ Deno.serve(async (req) => {
       const TABLE_CAP = 10000; // rows per result table; sliced tables are WARNED below
       const tables: Table[] = [];
       const packLines: string[] = [];
-      if (seller && sTotal > sRows.length) {
-        warnings.push(`Seller sheet truncated: comparing the first ${sRows.length.toLocaleString()} of ${sTotal.toLocaleString()} rows - designs only in the dropped rows will wrongly show as not uploaded.`);
-        packLines.push(`WARNING: the seller sheet was TRUNCATED - only the first ${sRows.length} of ${sTotal} rows are compared. State this clearly in the answer; the "not uploaded" count is an OVERESTIMATE.`);
-      }
       const tabCounts = tabs.map(t => `${t.tab}: ${Math.max(0, t.rows.length - 1)} rows`).join(', ');
       packLines.push(`MASTER SHEET: ${masterSkus.length} unique SKUs (${tabCounts}). Columns: ${tabs.map(t => t.headers.filter(Boolean).join(' | ')).join('  //  ')}`);
       // SKU-code (prefix) breakdown, per brand tab, so "how many DRS / TF / MM
@@ -1524,6 +1525,13 @@ Deno.serve(async (req) => {
       packLines.push(`SKU CODE breakdown (leading letters of the SKU, per brand tab; "(numeric)" = starts with a digit): ${prefixLines}. A code the owner names that is NOT listed here has ZERO SKUs in the master — say so plainly rather than guessing.`);
 
       if (seller && sRows.length > 0 && sHeaders.length > 0) {
+        // Inside the guard on purpose: without a usable seller sheet the pack
+        // says "no seller sheet attached" and a truncation line here would
+        // contradict it in the same prompt.
+        if (sTotal > sRows.length) {
+          warnings.push(`Seller sheet truncated: comparing the first ${sRows.length.toLocaleString()} of ${sTotal.toLocaleString()} rows - designs only in the dropped rows will wrongly show as not uploaded.`);
+          packLines.push(`WARNING: the seller sheet was TRUNCATED - only the first ${sRows.length} of ${sTotal} rows are compared. State this clearly in the answer; the "not uploaded" count is an OVERESTIMATE.`);
+        }
         // Seller SKU column: alias names first, else the column whose values
         // match the most master SKUs (handles any marketplace export).
         // Seller SKU column names vary — "Code", "Product Code", "SKU", "SKU
@@ -1569,7 +1577,7 @@ Deno.serve(async (req) => {
             groups.set(hit.sku, g);
           }
           if (deepExhausted) {
-            warnings.push('Typo/embedded SKU matching stopped after its 6,000-row budget - some "Unknown" SKUs may actually match. Remove non-product rows from the sheet and re-run for full matching.');
+            warnings.push('Typo/embedded SKU matching stopped after 6,000 hard-to-match values - some "Unknown" SKUs may actually match. Remove non-product rows from the sheet and re-ask for full matching.');
             packLines.push('WARNING: the typo/embedded matching budget ran out partway through the sheet - treat the Unknown and Not-uploaded counts as upper bounds and say so.');
           }
           const matched = [...groups.keys()];
@@ -1615,7 +1623,19 @@ Deno.serve(async (req) => {
           // Cross-tab master-status x seller-status over matched SKUs, one
           // exportable SKU table per combination - "active in master but
           // inactive in seller" becomes a ready-made table, never a guess.
-          const sStatusIdx = sHeaders.findIndex((h, i) => i !== skuIdx && STATUS_RE.test(h));
+          // Name match alone is not enough - a "State" (shipping state) or
+          // "Stock Qty" column would win, drive a junk cross-tab AND push the
+          // real status column out of the five carried into the matched table
+          // (the client workbook reads the first one). Require that a
+          // candidate's group values actually read as in/out stock; best wins.
+          const IN_OUT_RE = /\b(inactive|active|live|enabled?|disabled?|unavailable|available|sold\s*out|delisted?|discontinued?|paused|hidden|draft|removed|(in|out\s*of)\s*stock|instock|oos|listed|published|online)\b|^(yes|no|y|n|true|false|0|1|on|off)$/i;
+          let sStatusIdx = -1, sStatusHits = 0;
+          for (let ci = 0; ci < sHeaders.length; ci++) {
+            if (ci === skuIdx || !STATUS_RE.test(sHeaders[ci])) continue;
+            let hits = 0;
+            for (const g of groups.values()) if (IN_OUT_RE.test(sellerVal(g, ci).trim())) hits++;
+            if (hits > sStatusHits) { sStatusHits = hits; sStatusIdx = ci; }
+          }
           if (mStatusCols.length > 0 && sStatusIdx >= 0) {
             const combos = new Map<string, string[]>();
             for (const k of matched) {
@@ -1626,7 +1646,10 @@ Deno.serve(async (req) => {
             }
             const sorted = [...combos.entries()].sort((a, b) => b[1].length - a[1].length);
             packLines.push(`CROSS-TAB over the ${matched.length} matched SKUs (exact, computed in code - each combination also has its own SKU table below the answer): ${sorted.map(([key, arr]) => `[${key}]: ${arr.length}`).join(' | ')}`);
-            for (const [key, arr] of sorted.slice(0, 9)) tables.push({ title: `${key} (${arr.length})`, columns: ['SKU'], rows: arr.slice(0, TABLE_CAP).map(k => [k]) });
+            for (const [key, arr] of sorted.slice(0, 9)) {
+              tables.push({ title: `${key} (${arr.length})`, columns: ['SKU'], rows: arr.slice(0, TABLE_CAP).map(k => [k]) });
+              if (arr.length > TABLE_CAP) warnings.push(`Cross-tab table "${key}" truncated to ${TABLE_CAP.toLocaleString()} of ${arr.length.toLocaleString()} SKUs.`);
+            }
             if (sorted.length > 9) warnings.push(`${sorted.length - 9} smaller status combination(s) have counts above but no SKU table - narrow the question to see them.`);
           } else if (mStatusCols.length > 0) {
             packLines.push('No status-like column was found in the SELLER sheet, so no master-vs-seller status cross-tab exists - the not-uploaded breakdown above still uses the master status.');
@@ -1642,7 +1665,7 @@ Deno.serve(async (req) => {
           tables.push({ title: `Unknown SKUs - in seller sheet only (${sellerOnly.length})`, columns: ['SKU'], rows: sellerOnly.slice(0, TABLE_CAP).map(k => [k]) });
           // A sliced table silently corrupts the workbook counts downstream -
           // name every table that lost rows.
-          for (const [label, n] of [['Matched', matched.length], ['Fuzzy matches', fuzzies.length], ['Not uploaded', masterOnly.length], ['Unknown SKUs', sellerOnly.length]] as [string, number][]) {
+          for (const [label, n] of [['Matched - in master AND seller sheet', matched.length], ['Fuzzy matches - verify', fuzzies.length], ['Not uploaded by seller', masterOnly.length], ['Unknown SKUs - in seller sheet only', sellerOnly.length]] as [string, number][]) {
             if (n > TABLE_CAP) warnings.push(`"${label}" table truncated to ${TABLE_CAP.toLocaleString()} of ${n.toLocaleString()} rows - the CSV/workbook misses the rest.`);
           }
           packLines.push(`Sample matched: ${matched.slice(0, 100).join(', ') || '(none)'}`);
@@ -2088,7 +2111,14 @@ Deno.serve(async (req) => {
       // Price-like columns never join the AI schema - an unresolved value
       // exports empty rather than letting the model pick one.
       const liveMapped = mappedFields.filter(f => !deterministic.has(f.header) && !SENSITIVE_RE.test(f.header));
-      const schemaFields = [...aiFields, ...liveMapped];
+      // "Master first, AI for the rest", honored PER ROW: a creative column
+      // copying the master verbatim (no-dropdown template / explicit pairing)
+      // must not export a BLANK listing when a SKU's master cell is empty -
+      // those columns join the AI schema and the AI fills only the gaps
+      // (row assembly below prefers the master value when present).
+      const gapFill = classified.filter(f => f.kind === 'direct' && f.allowed.length === 0 && CONTENT_RE.test(f.header)
+        && live.some(it => !masterVal(it, f.masterCol)));
+      const schemaFields = [...aiFields, ...liveMapped, ...gapFill];
       const aiValues: Record<string, Record<string, string>> = {};
       let usage: Usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
       const model = await getModel();
@@ -2208,7 +2238,8 @@ Deno.serve(async (req) => {
           }
           if (f.kind === 'direct') {
             const mv = masterVal(it, f.masterCol);
-            if (!f.allowed.length) return resolveVal(f, mv) ?? mv;
+            // Empty master cell on a gap-fill column -> the AI's value.
+            if (!f.allowed.length) return (resolveVal(f, mv) ?? mv) || String(av[f.header] ?? '');
             return resolveVal(f, mv) ?? String(av[f.header] ?? '');
           }
           return String(av[f.header] ?? '');

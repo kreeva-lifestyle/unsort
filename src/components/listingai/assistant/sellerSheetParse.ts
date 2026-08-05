@@ -38,14 +38,18 @@ export function parseSellerSheet(data: ArrayBuffer, name: string): SellerSheet {
     warnings.push(`Sheet has ${rawHeader.length} columns — only the first ${COL_CAP} are compared. Dropped: ${dropped.slice(0, 6).join(', ')}${dropped.length > 6 ? ` +${dropped.length - 6} more` : ''}. If the SKU or status column is among these, move it left and re-attach.`);
   }
 
-  // Headerless exports are common ("2901,inactive" as row 1): when most of
-  // the would-be header cells are pure numbers, that row is DATA — keep it
-  // and synthesize COL 1..N names (the edge auto-detects the SKU column by
-  // matching values against the master, so names don't matter).
-  let headers = rawHeader.slice(0, COL_CAP).map(h => cellText(h).slice(0, 60));
+  // Headerless exports are common ("2901,inactive" as row 1): when the row
+  // STARTS with a number and most cells are pure numbers, that row is DATA —
+  // keep it and synthesize COL 1..N names (the edge auto-detects the SKU
+  // column by matching values against the master, so names don't matter).
+  // The first-cell check protects real size-grid headers like
+  // [SKU, Status, 32, 34, 36, 38], which are >50% numeric but start with text.
+  // Headers are trimmed AFTER the 60-char slice so they byte-match the edge's
+  // re-trim (a trailing space here used to break the status-column lookup).
+  let headers = rawHeader.slice(0, COL_CAP).map(h => cellText(h).slice(0, 60).trim());
   const nonEmpty = headers.filter(Boolean);
   const numeric = nonEmpty.filter(h => /^\d+(\.\d+)?$/.test(h));
-  const headerless = nonEmpty.length > 0 && numeric.length * 2 >= nonEmpty.length;
+  const headerless = nonEmpty.length > 0 && /^\d/.test(nonEmpty[0]) && numeric.length * 2 >= nonEmpty.length;
   if (headerless) headers = headers.map((_, i) => `COL ${i + 1}`);
 
   // totalRows counts the NON-BLANK data rows of the whole grid (blank rows

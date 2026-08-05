@@ -69,7 +69,7 @@ export function useGenerateRun(addToast: (m: string, t?: string) => void) {
     let issues: PreflightIssues | null = null;
     try {
       setGenerating(true); // covers the validate round-trip so Generate can't double-fire
-      issues = splitIssues(await runValidate(skus, selected.id), skus);
+      issues = splitIssues(await runValidate(skus, selected.id, addToast), skus);
     } catch { addToast("Couldn't pre-check the SKUs — continuing without the check", 'error'); }
     finally { setGenerating(false); }
     if (issues && (issues.notInMaster.length > 0 || issues.mismatched.length > 0)) {
@@ -103,9 +103,8 @@ export function useGenerateRun(addToast: (m: string, t?: string) => void) {
     const slots: (GenRow[] | null)[] = new Array(chunks.length).fill(null);
     const tot: GenUsage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
     let lastHeaders: string[] = [], lastKinds: string[] = [], model = '';
-    let cacheWarned = false;
-    let usd = 0, saved = 0;
-    let doneSkus = 0;
+    let cacheWarned = false, usd = 0, saved = 0, doneSkus = 0;
+    const warnSet = new Set<string>(); // chunk warnings dedupe — a stale-mirror note repeats per chunk
     const failedSkus: string[] = []; // chunks that errored (after one retry) — the rest of the run continues
     let fatal = '';                  // config-level error (bad key, no access) — pointless to keep going
     let failToasts = 0;              // cap error toasts so a dying run doesn't bury the screen
@@ -141,7 +140,7 @@ export function useGenerateRun(addToast: (m: string, t?: string) => void) {
       setRows(slots.filter(Boolean).flat() as GenRow[]);
       setUsage({ ...tot }); setCost({ usd, saved });
       setProgress({ done: doneSkus, total: skus.length });
-      for (const w of (data.warnings || []) as string[]) addToast(w, 'error');
+      for (const w of (data.warnings || []) as string[]) warnSet.add(w);
       return String(data.messageId || '');
     };
     const chunkFailed = (idx: number, e: unknown) => {
@@ -170,6 +169,7 @@ export function useGenerateRun(addToast: (m: string, t?: string) => void) {
         await Promise.all(Array.from({ length: Math.min(WORKERS, chunks.length - 1) }, () => worker()));
       }
       if (fatal) addToast(fatal, 'error');
+      for (const w of warnSet) addToast(w, 'error');
       const acc = slots.filter(Boolean).flat() as GenRow[];
       if (acc.length > 0) {
         const okCount = acc.filter(r => r.status === 'ok').length;

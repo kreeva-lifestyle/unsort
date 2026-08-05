@@ -24,7 +24,7 @@ export interface ValidateResult {
 // flagged before a single token is spent.
 const VALIDATE_BATCH = 60;
 
-export async function runValidate(items: SkuLine[], templateId: string): Promise<ValidateResult> {
+export async function runValidate(items: SkuLine[], templateId: string, addToast?: (m: string, t?: string) => void): Promise<ValidateResult> {
   let merged: ValidateResult | null = null;
   for (let i = 0; i < items.length; i += VALIDATE_BATCH) {
     const batch = items.slice(i, i + VALIDATE_BATCH);
@@ -37,6 +37,10 @@ export async function runValidate(items: SkuLine[], templateId: string): Promise
       if (v.warnings?.length) merged.warnings = [...(merged.warnings || []), ...v.warnings];
     }
   }
+  // A degraded master read (stale mirror, unreadable tab) makes perfectly
+  // valid SKUs come back "not in master" — the owner MUST see why before the
+  // panel talks them into removing those SKUs from the run.
+  for (const w of [...new Set(merged?.warnings || [])]) addToast?.(w, 'error');
   return merged || { templateCategory: null, templateCategoryLabel: null, categorySource: null, results: [] };
 }
 
