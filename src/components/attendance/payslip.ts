@@ -34,8 +34,8 @@ export const payslipBody = (s: MonthlySalary, emp: AttEmployee | undefined, pens
       <div><span>Worked days</span><span>${s.workDays}</span></div>
       <div><span>Paid Sundays</span><span>${s.paidSundays} of ${s.sundays} × ${esc(inr2(s.perDaySalary))} = ${esc(inr2(s.sundayPay))}</span></div>
       <div><span>Leave days (unpaid)</span><span>${s.leaveDays}</span></div>
-      <div><span>Total worked hours</span><span>${esc(minutesToHM(s.totalWorkedMinutes))}</span></div>
-      ${s.extraMinutes > 0 ? `<div><span>Extra time worked (paid in day pay)</span><span style="color:${GREEN};font-weight:600">+${esc(minutesToHM(s.extraMinutes))}</span></div>` : ''}
+      <div><span>Total worked hours (includes extra time)</span><span>${esc(minutesToHM(s.totalWorkedMinutes))}</span></div>
+      ${s.extraMinutes > 0 ? `<div><span>Extra time worked (already in hours &amp; day pay above)</span><span style="color:${GREEN};font-weight:600">+${esc(minutesToHM(s.extraMinutes))}</span></div>` : ''}
       ${s.shortMinutes > 0 ? `<div><span>Short time (below fix)</span><span style="color:${RED}">−${esc(minutesToHM(s.shortMinutes))}</span></div>` : ''}
       <div class="rule"><span>Earned (worked)</span><span>${esc(inr2(s.earned))}</span></div>
       <div><span>Sunday pay</span><span>+ ${esc(inr2(s.sundayPay))}</span></div>

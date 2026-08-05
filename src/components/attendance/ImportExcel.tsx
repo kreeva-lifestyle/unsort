@@ -10,7 +10,11 @@ import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { AttEmployee, excelCellToDateISO, excelCellToTime } from '../../lib/attendance';
 
-type Result = { inserted: number; employeesCreated: number; skipped: { row: number; reason: string }[] } | null;
+// month: the dominant YYYY-MM of the imported rows — the page jumps there
+// after Done. Importing July while the picker sits on August (the default is
+// the current month) used to look like "imported successfully but the
+// timesheet is empty".
+type Result = { inserted: number; employeesCreated: number; skipped: { row: number; reason: string }[]; month: string | null } | null;
 
 // Minimal RFC-4180 CSV → string cells (quotes, embedded commas/newlines).
 // Cells stay strings so dd/mm dates are not date-guessed (see handleFile).
@@ -47,7 +51,7 @@ const HEADER_ALIASES: Record<string, string[]> = {
 };
 
 export default function ImportExcel({ employees, onClose, onImported, addToast }: {
-  employees: AttEmployee[]; onClose: () => void; onImported: () => void; addToast: (m: string, t?: string) => void;
+  employees: AttEmployee[]; onClose: () => void; onImported: (entriesMonth?: string | null) => void; addToast: (m: string, t?: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result>(null);
@@ -169,7 +173,11 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
         if (error) { fail(`Row batch failed — ${friendlyError(error)}`); return; }
         inserted += batch.length;
       }
-      setResult({ inserted, employeesCreated, skipped });
+      // Dominant month of the imported rows (mode) — where the data now lives.
+      const monthCounts = new Map<string, number>();
+      for (const r of toUpsert) { const k = r.date.slice(0, 7); monthCounts.set(k, (monthCounts.get(k) || 0) + 1); }
+      const domMonth = [...monthCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+      setResult({ inserted, employeesCreated, skipped, month: domMonth });
       addToast(`Imported ${inserted} entr${inserted === 1 ? 'y' : 'ies'}${employeesCreated ? `, ${employeesCreated} new employee(s)` : ''}${skipped.length ? `, ${skipped.length} skipped` : ''}`, skipped.length ? 'error' : 'success');
     } catch (e) {
       setErr('Could not read the file — ' + friendlyError(e));
@@ -200,6 +208,7 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
             <div>
               <div style={{ background: 'oklch(0.72 0.19 145 / .06)', border: '1px solid oklch(0.72 0.19 145 / .2)', borderRadius: 8, padding: 12, marginBottom: 10 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: T.gr }}>{result.inserted} entries imported</div>
+                {result.month && <div style={{ fontSize: 11, color: T.tx2, marginTop: 4 }}>The sheet's dates are in <b>{new Date(result.month + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</b> — the timesheet will switch to that month.</div>}
                 {result.employeesCreated > 0 && <div style={{ fontSize: 11, color: T.tx2, marginTop: 4 }}>{result.employeesCreated} new employee(s) created — set their salary + fix time in the Employees tab.</div>}
               </div>
               {result.skipped.length > 0 && (
@@ -209,7 +218,7 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
                   {result.skipped.length > 30 && <div style={{ fontSize: 10, color: T.tx3 }}>…and {result.skipped.length - 30} more</div>}
                 </div>
               )}
-              <button onClick={onImported} style={{ ...S.btnPrimary, width: '100%' }}>Done</button>
+              <button onClick={() => onImported(result.month)} style={{ ...S.btnPrimary, width: '100%' }}>Done</button>
             </div>
           )}
         </div>
