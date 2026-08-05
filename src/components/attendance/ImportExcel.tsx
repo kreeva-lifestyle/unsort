@@ -14,7 +14,7 @@ import { AttEmployee, excelCellToDateISO, excelCellToTime } from '../../lib/atte
 // after Done. Importing July while the picker sits on August (the default is
 // the current month) used to look like "imported successfully but the
 // timesheet is empty".
-type Result = { inserted: number; employeesCreated: number; skipped: { row: number; reason: string }[]; month: string | null } | null;
+type Result = { inserted: number; employeesCreated: number; skipped: { row: number; reason: string }[]; month: string | null; warnings: string[] } | null;
 
 // Minimal RFC-4180 CSV → string cells (quotes, embedded commas/newlines).
 // Cells stay strings so dd/mm dates are not date-guessed (see handleFile).
@@ -27,7 +27,8 @@ const parseCSV = (text: string): string[][] => {
     else if (c === '"') q = true;
     else if (c === ',') { row.push(cell); cell = ''; }
     else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
-    else if (c !== '\r') cell += c;
+    else if (c === '\r') { if (t[i + 1] !== '\n') { row.push(cell); rows.push(row); row = []; cell = ''; } } // lone-CR = newline; CRLF handled by the \n branch
+    else cell += c;
   }
   if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
   return rows;
@@ -84,20 +85,28 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
       const header = (rows[0] as unknown[]).map(h => norm(String(h ?? '')));
       const col: Record<string, number> = {};
       for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
-        col[field] = header.findIndex(h => aliases.includes(h));
+        // Alias PRIORITY, not leftmost column: a serial "ID" column before
+        // "Employee ID" used to hijack the code field.
+        col[field] = aliases.map(a => header.indexOf(a)).find(i => i >= 0) ?? -1;
       }
       if (col.name < 0 || col.date < 0) { fail('Could not find "Employee Name" and "Date" columns in the sheet header'); return; }
 
       const get = (r: unknown[], f: string) => (col[f] >= 0 ? r[col[f]] : null);
       const skipped: { row: number; reason: string }[] = [];
 
+      // FRESH employee list, not the prop: after a failed import the prop is
+      // stale (employees created moments ago are missing from it), so a retry
+      // re-created them and hit the unique-name index on every attempt.
+      const { data: freshEmp } = await supabase.from('attendance_employees')
+        .select('id, employee_code, name, salary, fix_time_minutes, is_active, qr_image_url').order('name');
+      const empList = (freshEmp as AttEmployee[] | null) || employees;
+
       // Employee resolution keys on the Employee ID (stable across renames)
-      // first, then falls back to name. Names shared by >1 employee are
-      // ambiguous and can only be resolved by code.
-      const byCode = new Map(employees.filter(e => e.employee_code).map(e => [e.employee_code!.trim().toLowerCase(), e]));
+      // first, then falls back to name.
+      const byCode = new Map(empList.filter(e => e.employee_code).map(e => [e.employee_code!.trim().toLowerCase(), e]));
       const nameByLower = new Map<string, AttEmployee>();
       const ambiguousNames = new Set<string>();
-      for (const e of employees) {
+      for (const e of empList) {
         const k = e.name.trim().toLowerCase();
         if (nameByLower.has(k)) ambiguousNames.add(k); else nameByLower.set(k, e);
       }
@@ -118,7 +127,7 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
         const code = String(get(rows[i], 'code') ?? '').trim();
         if (!nm) continue;
         if (resolve(code, nm)) continue;
-        const key = (code || nm).toLowerCase();
+        const key = nm.trim().toLowerCase(); // the unique index is on lower(trim(name))
         if (!toCreate.has(key)) toCreate.set(key, { name: nm, code: code || null });
       }
       if (toCreate.size > 0) {
@@ -144,6 +153,7 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
       type EntryRow = { employee_id: string; date: string; day?: string | null; shift_id?: string | null; in_time?: string | null; out_time?: string | null; location_in?: string | null; location_out?: string | null; status?: string | null; remarks?: string | null; manager_remarks?: string | null };
       const seen = new Set<string>();
       const toUpsert: EntryRow[] = [];
+      let badTimes = 0, overnight = 0; // unreadable time cells / out <= in punches
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
         const nm = String(get(r, 'name') ?? '').trim();
@@ -160,25 +170,46 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
         const row: EntryRow = { employee_id: emp.id, date: dateISO };
         for (const [field, srcKey, kind] of optionalFields) {
           if (col[srcKey] < 0) continue; // column absent → don't clobber on conflict
-          (row as Record<string, string | null>)[field] = kind === 'time' ? excelCellToTime(get(r, srcKey)) : str(srcKey);
+          if (kind === 'time') {
+            const raw = get(r, srcKey);
+            const t = excelCellToTime(raw);
+            // Non-empty cell that didn't parse = a punch about to silently
+            // become an unpaid absence — count it and tell the owner.
+            if (t === null && raw != null && String(raw).trim() !== '') badTimes++;
+            (row as Record<string, string | null>)[field] = t;
+          } else {
+            (row as Record<string, string | null>)[field] = str(srcKey);
+          }
         }
+        if (row.in_time && row.out_time && row.out_time <= row.in_time) overnight++;
         toUpsert.push(row);
       }
 
-      // Upsert in batches of 500 on the (employee_id, date) unique key.
-      let inserted = 0;
-      for (let i = 0; i < toUpsert.length; i += 500) {
-        const batch = toUpsert.slice(i, i + 500);
-        const { error } = await supabase.from('attendance_entries').upsert(batch, { onConflict: 'employee_id,date' });
-        if (error) { fail(`Row batch failed — ${friendlyError(error)}`); return; }
-        inserted += batch.length;
-      }
       // Dominant month of the imported rows (mode) — where the data now lives.
       const monthCounts = new Map<string, number>();
       for (const r of toUpsert) { const k = r.date.slice(0, 7); monthCounts.set(k, (monthCounts.get(k) || 0) + 1); }
       const domMonth = [...monthCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-      setResult({ inserted, employeesCreated, skipped, month: domMonth });
-      addToast(`Imported ${inserted} entr${inserted === 1 ? 'y' : 'ies'}${employeesCreated ? `, ${employeesCreated} new employee(s)` : ''}${skipped.length ? `, ${skipped.length} skipped` : ''}`, skipped.length ? 'error' : 'success');
+      const warns: string[] = [];
+      if (monthCounts.size > 1) warns.push(`Sheet spans ${monthCounts.size} months (${[...monthCounts.entries()].map(([k, n]) => `${k}: ${n} rows`).join(', ')}) — the timesheet will show ${domMonth}; check the other month(s) with the month picker.`);
+      if (badTimes > 0) warns.push(`${badTimes} time value(s) could not be read and were left blank — those punches count as unpaid until fixed. Times should look like 9:52, 09:52:00 or 9:52 AM.`);
+      if (overnight > 0) warns.push(`${overnight} row(s) have Out ≤ In (overnight or swapped punches) — those days earn nothing. Overnight shifts are not supported; fix the times in the timesheet.`);
+
+      // Upsert in batches of 500 on the (employee_id, date) unique key. On a
+      // mid-way failure the earlier batches ARE committed — say so, and note
+      // that re-importing the same file is safe (rows update, never duplicate).
+      let inserted = 0;
+      for (let i = 0; i < toUpsert.length; i += 500) {
+        const batch = toUpsert.slice(i, i + 500);
+        const { error } = await supabase.from('attendance_entries').upsert(batch, { onConflict: 'employee_id,date' });
+        if (error) {
+          setResult({ inserted, employeesCreated, skipped, month: inserted > 0 ? domMonth : null, warnings: warns });
+          fail(`Import stopped after ${inserted} of ${toUpsert.length} rows — ${friendlyError(error)}. The saved rows are kept; re-importing the same file is safe (it updates, never duplicates).`);
+          return;
+        }
+        inserted += batch.length;
+      }
+      setResult({ inserted, employeesCreated, skipped, month: domMonth, warnings: warns });
+      addToast(`Imported ${inserted} entr${inserted === 1 ? 'y' : 'ies'}${employeesCreated ? `, ${employeesCreated} new employee(s)` : ''}${skipped.length ? `, ${skipped.length} skipped` : ''}`, (skipped.length || warns.length) ? 'error' : 'success');
     } catch (e) {
       setErr('Could not read the file — ' + friendlyError(e));
       addToast('Could not read the file — ' + friendlyError(e), 'error');
@@ -194,7 +225,7 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
         </div>
         <div style={{ padding: 16 }}>
           <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.5, marginBottom: 12 }}>
-            Upload the .xlsx with columns like <b>Employee ID, Employee Name, Date, Day, In Time, Out Time, Status, Remarks, Manager's Remarks</b>. Column order doesn't matter. New names become employees (set their salary in the Employees tab). Re-importing the same month updates existing rows.
+            Upload the .xlsx with columns like <b>Employee ID, Employee Name, Date, Day, In Time, Out Time, Status, Remarks, Manager's Remarks</b>. Column order doesn't matter. New names become employees (set their salary in the Employees tab). Re-importing the same month updates existing rows — including overwriting hand-edits in any column the sheet contains.
           </div>
           {err && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{err}</div>}
           {!result && (
@@ -208,9 +239,14 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
             <div>
               <div style={{ background: 'oklch(0.72 0.19 145 / .06)', border: '1px solid oklch(0.72 0.19 145 / .2)', borderRadius: 8, padding: 12, marginBottom: 10 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: T.gr }}>{result.inserted} entries imported</div>
-                {result.month && <div style={{ fontSize: 11, color: T.tx2, marginTop: 4 }}>The sheet's dates are in <b>{new Date(result.month + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</b> — the timesheet will switch to that month.</div>}
+                {result.month && <div style={{ fontSize: 11, color: T.tx2, marginTop: 4 }}>The sheet's dates are in <b>{new Date(result.month + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</b> — the timesheet will switch to that month.</div>}
                 {result.employeesCreated > 0 && <div style={{ fontSize: 11, color: T.tx2, marginTop: 4 }}>{result.employeesCreated} new employee(s) created — set their salary + fix time in the Employees tab.</div>}
               </div>
+              {result.warnings.length > 0 && (
+                <div style={{ background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .2)', borderRadius: 8, padding: 10, marginBottom: 10 }}>
+                  {result.warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: T.yl, marginBottom: 3 }}>⚠ {w}</div>)}
+                </div>
+              )}
               {result.skipped.length > 0 && (
                 <div style={{ background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .2)', borderRadius: 8, padding: 10, marginBottom: 10, maxHeight: 160, overflowY: 'auto' }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: T.yl, marginBottom: 4 }}>{result.skipped.length} row(s) skipped</div>

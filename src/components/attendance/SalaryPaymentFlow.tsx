@@ -19,7 +19,7 @@ export default function SalaryPaymentFlow({ employees, salaries, payments, month
 }) {
   const salaryByEmp = useMemo(() => new Map(salaries.map(s => [s.employeeId, s])), [salaries]);
   const order = employees; // parent passes active + name-sorted employees
-  const monthLabel = new Date(month + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  const monthLabel = new Date(month + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 
   const [index, setIndex] = useState(0);
   const [paid, setPaid] = useState<Map<string, string>>(() => new Map(payments.map(p => [p.employee_id, p.paid_at])));

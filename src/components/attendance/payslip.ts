@@ -14,7 +14,7 @@ const GREEN = '#1a7f37', RED = '#c0392b';
 
 export const payslipBody = (s: MonthlySalary, emp: AttEmployee | undefined, pens: AttPenalty[], advs: AttAdvance[], monthLabel: string): string => {
   const dayRows = s.days.map(d => `<tr${d.isSunday ? ' style="background:#f1f5ff"' : (d.status === 'A' ? ' style="background:#fdeaea"' : (d.diffMin > 0 ? ' style="background:#effaf3"' : ''))}>
-    <td>${esc(new Date(d.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }))}</td>
+    <td>${esc(new Date(d.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }))}</td>
     <td>${esc(d.day)}</td>
     <td style="text-align:center">${esc(d.in_time || '—')}</td>
     <td style="text-align:center">${esc(d.out_time || '—')}</td>

@@ -20,7 +20,7 @@ export default function AttendanceTimesheet({ employees, entries, month, onChang
   const empById = useMemo(() => new Map(employees.map(e => [e.id, e])), [employees]);
   const fixById = useMemo(() => new Map(employees.map(e => [e.id, e.fix_time_minutes])), [employees]);
 
-  const statuses = useMemo(() => [...new Set(entries.map(e => e.status).filter(Boolean) as string[])].sort(), [entries]);
+  const statuses = useMemo(() => [...new Set([...entries.map(e => e.status).filter(Boolean) as string[], ...(statusFilter ? [statusFilter] : [])])].sort(), [entries, statusFilter]);
 
   const rows = useMemo(() => {
     const sq = q.toLowerCase().trim();
@@ -47,9 +47,9 @@ export default function AttendanceTimesheet({ employees, entries, month, onChang
   // `${color}22` hex-suffix trick produced an invalid value and the chips
   // rendered with no background at all.
   const diffTint = (m: number) => (m > 0 ? oklchTint(0.72, 0.19, 145, 0.14) : m < 0 ? oklchTint(0.63, 0.22, 25, 0.14) : 'rgba(255,255,255,0.06)');
-  const statusTint = (st: string | null) => (st === 'A' ? oklchTint(0.63, 0.22, 25, 0.14) : st === 'WO' ? 'rgba(255,255,255,0.06)' : oklchTint(0.72, 0.19, 145, 0.14));
+  const statusTint = (st: string | null) => (st === 'A' ? oklchTint(0.63, 0.22, 25, 0.14) : st === 'P' || st === 'POW' ? oklchTint(0.72, 0.19, 145, 0.14) : 'rgba(255,255,255,0.06)');
 
-  const monthLabel = new Date(month + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  const monthLabel = new Date(month + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 
   return (
     <div>
@@ -100,7 +100,7 @@ export default function AttendanceTimesheet({ employees, entries, month, onChang
                 </tr>
               );
             })}
-            {rows.length === 0 && <tr><td colSpan={10} style={{ ...S.tdStyle, textAlign: 'center', color: T.tx3, padding: 30 }}>No entries for {monthLabel}. Use Import Excel, or “+ Add Entry”, to add the timesheet.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={10} style={{ ...S.tdStyle, textAlign: 'center', color: T.tx3, padding: 30 }}>{(empFilter || statusFilter || q) ? <>No entries match the current filters. <span onClick={() => { setEmpFilter(''); setStatusFilter(''); setQ(''); }} style={{ color: T.ac2, cursor: 'pointer', textDecoration: 'underline' }}>Clear filters</span></> : <>No entries for {monthLabel}. Use Import Excel, or “+ Add Entry”, to add the timesheet.</>}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -110,13 +110,13 @@ export default function AttendanceTimesheet({ employees, entries, month, onChang
         {rows.map(e => {
           const d = dur(e);
           const emp = empById.get(e.employee_id);
-          const stColor = e.status === 'A' ? T.re : e.status === 'WO' ? T.tx3 : T.gr;
+          const stColor = e.status === 'A' ? T.re : e.status === 'P' || e.status === 'POW' ? T.gr : e.status === 'WO' ? T.tx3 : T.tx2;
           return (
             <div key={e.id} onClick={() => setEditing(e)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '11px 13px', cursor: 'pointer' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 7 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emp?.name || '—'}</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                  <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>{new Date(e.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} · {e.day}</span>
+                  <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>{new Date(e.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} · {e.day || new Date(e.date).toLocaleDateString('en-IN', { weekday: 'short' })}</span>
                   {e.status && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: statusTint(e.status), color: stColor }}>{e.status}</span>}
                 </span>
               </div>
@@ -132,14 +132,14 @@ export default function AttendanceTimesheet({ employees, entries, month, onChang
             </div>
           );
         })}
-        {rows.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 12 }}>No entries for {monthLabel}. Tap + to add one.</div>}
+        {rows.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{(empFilter || statusFilter || q) ? <>No entries match the filters. <span onClick={() => { setEmpFilter(''); setStatusFilter(''); setQ(''); }} style={{ color: T.ac2, textDecoration: 'underline' }}>Clear filters</span></> : <>No entries for {monthLabel}. Tap + to add one.</>}</div>}
       </div>
 
       {/* Mobile add FAB */}
       <button className="fab mobile-only" onClick={() => setAdding(true)} aria-label="Add attendance entry">+</button>
 
       {(adding || editing) && (
-        <AttendanceEntryModal employees={employees} month={month} editing={editing}
+        <AttendanceEntryModal employees={employees} month={month} editing={editing} existing={entries}
           onClose={closeModal} onSaved={() => { closeModal(); onChanged(); }} addToast={addToast} />
       )}
     </div>
