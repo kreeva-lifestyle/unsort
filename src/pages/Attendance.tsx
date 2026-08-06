@@ -89,10 +89,14 @@ export default function Attendance() {
           {tabBtn('salary', 'Salary')}
           {tabBtn('employees', 'Employees')}
         </div>
-        <div className="att-controls" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <DateInput type="month" value={month} onChange={e => e.target.value && setMonth(e.target.value)} aria-label="Month" />
-          <button onClick={() => setShowImport(true)} style={S.btnPrimary}>Import Excel</button>
-        </div>
+        {/* The employee roster is month-independent — a month picker and an
+            Excel import there only invite the wrong action. */}
+        {view !== 'employees' && (
+          <div className="att-controls" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <DateInput type="month" value={month} onChange={e => e.target.value && setMonth(e.target.value)} aria-label="Month" />
+            <button onClick={() => setShowImport(true)} style={S.btnPrimary}>Import Excel</button>
+          </div>
+        )}
       </div>
 
       {loading ? (
