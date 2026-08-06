@@ -13,12 +13,13 @@ export const inr2 = (n: number) => '₹' + n.toLocaleString('en-IN', { minimumFr
 const GREEN = '#1a7f37', RED = '#c0392b';
 
 export const payslipBody = (s: MonthlySalary, emp: AttEmployee | undefined, pens: AttPenalty[], advs: AttAdvance[], monthLabel: string): string => {
-  const dayRows = s.days.map(d => `<tr${d.isSunday ? ' style="background:#f1f5ff"' : (d.status === 'A' ? ' style="background:#fdeaea"' : (d.diffMin > 0 ? ' style="background:#effaf3"' : ''))}>
+  // A day past the leaving date is neither present nor absent — grey, not red.
+  const dayRows = s.days.map(d => `<tr${d.status === 'LFT' ? ' style="background:#f7fafc;color:#a0aec0"' : d.isSunday ? ' style="background:#f1f5ff"' : (d.status === 'A' ? ' style="background:#fdeaea"' : (d.diffMin > 0 ? ' style="background:#effaf3"' : ''))}>
     <td>${esc(new Date(d.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }))}</td>
     <td>${esc(d.day)}</td>
     <td style="text-align:center">${esc(d.in_time || '—')}</td>
     <td style="text-align:center">${esc(d.out_time || '—')}</td>
-    <td style="text-align:center">${d.workedMin > 0 ? esc(minutesToHM(d.workedMin)) : (d.isSunday ? 'WO' : '—')}</td>
+    <td style="text-align:center">${d.workedMin > 0 ? esc(minutesToHM(d.workedMin)) : (d.status === 'LFT' ? '—' : d.isSunday ? 'WO' : '—')}</td>
     <td style="text-align:center;font-weight:600;color:${d.diffMin < 0 ? RED : d.diffMin > 0 ? GREEN : '#888'}">${d.workedMin > 0 ? esc(fmtDiffHM(d.diffMin)) : '—'}</td>
     <td style="text-align:right">${d.dayPay > 0 ? esc(inr2(d.dayPay)) : '—'}</td>
     <td style="text-align:center">${esc(d.status)}</td>
@@ -28,7 +29,7 @@ export const payslipBody = (s: MonthlySalary, emp: AttEmployee | undefined, pens
   return `<div class="slip">
     <div class="head"><div><div class="nm">${esc(s.name)}</div><div class="sub">${esc(emp?.employee_code || '')} · ${esc(monthLabel)}</div></div>
       <div class="final"><div class="fl">Net Salary</div><div class="fv" style="color:${s.finalSalary < 0 ? RED : GREEN}">${esc(inr(s.finalSalary))}</div></div></div>
-    <div class="basis">Monthly salary ${esc(inr(s.salary))} · Fix time ${esc(minutesToHM(s.fixTimeMinutes))}/day · Days in month ${s.daysInMonth} (calendar) · Per-day ${esc(inr2(s.perDaySalary))} · Per-hour ${esc(inr2(s.perHourSalary))}</div>
+    <div class="basis">Monthly salary ${esc(inr(s.salary))} · Fix time ${esc(minutesToHM(s.fixTimeMinutes))}/day · Days in month ${s.daysInMonth} (calendar) · Per-day ${esc(inr2(s.perDaySalary))} · Per-hour ${esc(inr2(s.perHourSalary))}${s.leftOn ? ` · <b>Left on ${esc(new Date(s.leftOn + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }))}</b> — nothing accrues after that day` : ''}</div>
     <table class="days"><thead><tr><th>Date</th><th>Day</th><th class="c">In</th><th class="c">Out</th><th class="c">Worked</th><th class="c">+/− vs fix</th><th class="r">Day Pay</th><th class="c">St</th></tr></thead><tbody>${dayRows}</tbody></table>
     <div class="totals">
       <div><span>Worked days</span><span>${s.workDays}</span></div>

@@ -20,3 +20,11 @@ export async function uploadQrImage(file: File): Promise<{ url?: string; error?:
   const { data } = supabase.storage.from('employee-qr').getPublicUrl(path);
   return { url: data.publicUrl };
 }
+
+// Best-effort delete of a replaced/removed QR object — the bucket is public, so
+// an orphaned old QR would stay fetchable at its URL forever. Fire-and-forget:
+// a storage hiccup must never block saving the employee.
+export function deleteQrObject(url: string) {
+  const name = url.split('/').pop();
+  if (name?.startsWith('emp-qr-')) supabase.storage.from('employee-qr').remove([name]).then(() => {}, () => {});
+}
