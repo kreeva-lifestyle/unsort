@@ -8,6 +8,7 @@ import { friendlyError } from '../../lib/friendlyError';
 import { numericKeyDown } from '../../lib/numericInput';
 import { uploadQrImage } from '../../lib/qrUpload';
 import { AttEmployee, fixTimeToMinutes, minutesToHM } from '../../lib/attendance';
+import { useBackClose } from '../../hooks/useBackClose';
 
 export default function AttendanceEmployees({ employees, onChanged, addToast }: {
   employees: AttEmployee[]; onChanged: () => void; addToast: (m: string, t?: string) => void;
@@ -26,6 +27,9 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { document.body.classList.toggle('modal-open', showModal); return () => document.body.classList.remove('modal-open'); }, [showModal]);
+  // Two levels: Back closes the QR lightbox first, then the editor modal.
+  useBackClose(showModal, () => close());
+  useBackClose(qrZoom, () => setQrZoom(false));
 
   const openAdd = () => { setEditing(null); setName(''); setCode(''); setSalary(''); setFixTime('8:30'); setQrUrl(''); setErr(''); setShowModal(true); };
   const openEdit = (e: AttEmployee) => { setEditing(e); setName(e.name); setCode(e.employee_code || ''); setSalary(String(e.salary)); setFixTime(minutesToHM(e.fix_time_minutes)); setQrUrl(e.qr_image_url || ''); setErr(''); setShowModal(true); };

@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
+import { useBackClose } from '../../hooks/useBackClose';
 import { friendlyError } from '../../lib/friendlyError';
 import type { ListingFolder } from '../../types/database';
 
@@ -29,6 +30,7 @@ export default function ImageFolders({ open, onClose, addToast }: {
     document.body.classList.toggle('modal-open', open);
     return () => document.body.classList.remove('modal-open');
   }, [open]);
+  useBackClose(open, () => onClose());
   useEffect(() => { if (open) load(); else { setLink(''); setSaving(false); setConfirmDel(''); } }, [open, load]);
 
   if (!open) return null;

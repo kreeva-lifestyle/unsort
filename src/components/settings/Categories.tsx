@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
+import { useBackClose } from '../../hooks/useBackClose';
 import { friendlyError } from '../../lib/friendlyError';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
@@ -18,6 +19,8 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
     document.body.classList.toggle('modal-open', showModal || showCompModal);
     return () => { document.body.classList.remove('modal-open'); };
   }, [showModal, showCompModal]);
+  useBackClose(showModal, () => setShowModal(false));
+  useBackClose(showCompModal, () => setShowCompModal(false));
   const [newComps, setNewComps] = useState<string[]>(['']);
   const [saving, setSaving] = useState(false);
   // One close path for the Add/Edit modal - resets ALL form state so a

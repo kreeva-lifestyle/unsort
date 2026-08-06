@@ -9,6 +9,7 @@ import { T, S } from '../../lib/theme';
 import DateInput from '../ui/DateInput';
 import { friendlyError } from '../../lib/friendlyError';
 import { AttEmployee, AttEntry } from '../../lib/attendance';
+import { useBackClose } from '../../hooks/useBackClose';
 
 const STATUSES = [
   { v: 'P', label: 'P — Present' },
@@ -46,6 +47,8 @@ export default function AttendanceEntryModal({ employees, month, editing, preset
   const [confirmDel, setConfirmDel] = useState(false);
 
   useEffect(() => { document.body.classList.add('modal-open'); return () => document.body.classList.remove('modal-open'); }, []);
+  // Device Back closes this instead of leaving the page behind it.
+  useBackClose(true, () => onClose());
 
   const save = async () => {
     if (saving || deleting) return;

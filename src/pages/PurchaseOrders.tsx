@@ -9,6 +9,7 @@ import { printOrQueue } from '../lib/printQueue';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import { T, S, PO_STATUS_COLORS } from '../lib/theme';
+import { useBackClose } from '../hooks/useBackClose';
 import { friendlyError } from '../lib/friendlyError';
 import POList, { type PORow } from '../components/purchaseorders/POList';
 import POForm, { type EditingPO } from '../components/purchaseorders/POForm';
@@ -113,6 +114,8 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   }, [fetchPos]);
 
   useEffect(() => { document.body.classList.toggle('modal-open', !!printData); return () => { document.body.classList.remove('modal-open'); }; }, [printData]);
+  useBackClose(!!detail, () => setDetail(null));
+  useBackClose(!!printData, () => setPrintData(null));
 
   // Load full items + receipts + audit for a PO, then open the detail panel.
   const openDetail = useCallback(async (poRow: PurchaseOrder) => {

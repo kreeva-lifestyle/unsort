@@ -16,6 +16,7 @@ import Empty from '../components/ui/Empty';
 import { SkeletonRows } from '../components/ui/Skeleton';
 
 import { T, S } from '../lib/theme';
+import { useBackClose } from '../hooks/useBackClose';
 import DateInput from '../components/ui/DateInput';
 import type {
   CashExpense,
@@ -159,6 +160,14 @@ export default function CashBook() {
     document.body.classList.toggle('modal-open', open);
     return () => { document.body.classList.remove('modal-open'); };
   }, [showHandover, viewingHandover, confirmingHandover, rejectingHandover, cancellingHandover, showAdd, confirmDelete, correctingExpense]);
+  useBackClose(showAdd, () => setShowAdd(false));
+  useBackClose(showHandover, () => setShowHandover(false));
+  useBackClose(!!viewingHandover, () => setViewingHandover(null));
+  useBackClose(!!confirmingHandover, () => setConfirmingHandover(null));
+  useBackClose(!!rejectingHandover, () => setRejectingHandover(null));
+  useBackClose(!!cancellingHandover, () => setCancellingHandover(null));
+  useBackClose(!!confirmDelete, () => setConfirmDelete(null));
+  useBackClose(!!correctingExpense, () => setCorrectingExpense(null));
 
   // Load active users for handover recipient dropdown
   useEffect(() => {

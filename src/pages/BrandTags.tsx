@@ -21,6 +21,7 @@ const JSBARCODE_INLINE = jsBarcodeSrc.replace(/<\/script/gi, '<\\/script');
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
 import { T, S } from '../lib/theme';
+import { useBackClose } from '../hooks/useBackClose';
 import { exportName, fileDate, docTitle } from '../lib/exportName';
 
 const btnGhost: React.CSSProperties = S.btnGhost;
@@ -292,6 +293,10 @@ export default function BrandTagPrinter() {
     document.body.classList.toggle('modal-open', hasModal);
     return () => { document.body.classList.remove('modal-open'); };
   }, [modalRow, orderRows, confirmDel]);
+  useBackClose(!!orderRows, () => setOrderRows(null));
+  useBackClose(!!modalRow, () => setModalRow(null));
+  useBackClose(!!confirmDel, () => setConfirmDel(null));
+  useBackClose(!!printHtml, () => setPrintHtml(null));
 
   // Smart realtime: apply individual row changes without re-fetching entire page
   useEffect(() => {

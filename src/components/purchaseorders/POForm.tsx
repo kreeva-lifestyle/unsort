@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
+import { useBackClose } from '../../hooks/useBackClose';
 import { friendlyError } from '../../lib/friendlyError';
 import { numericKeyDown } from '../../lib/numericInput';
 import { poAuditLog } from './poAudit';
@@ -49,6 +50,7 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { document.body.classList.add('modal-open'); return () => { document.body.classList.remove('modal-open'); }; }, []);
+  useBackClose(true, () => onClose());
 
   // Live preview — the server is authoritative, this just mirrors its formula.
   const subtotal = items.reduce((s, it) => s + num(it.quantity) * num(it.rate), 0);

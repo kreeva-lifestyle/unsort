@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { AttEmployee, excelCellToDateISO, excelCellToTime } from '../../lib/attendance';
+import { useBackClose } from '../../hooks/useBackClose';
 
 // month: the dominant YYYY-MM of the imported rows — the page jumps there
 // after Done. Importing July while the picker sits on August (the default is
@@ -63,6 +64,11 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
   const fail = (msg: string) => { setErr(msg); addToast(msg, 'error'); setBusy(false); };
 
   useEffect(() => { document.body.classList.toggle('modal-open', true); return () => document.body.classList.remove('modal-open'); }, []);
+  // Back dismisses this overlay instead of leaving the page (or closing the
+  // PWA). Deliberately NOT gated on `busy`: gating would tear the history
+  // entry down the moment an import starts and navigate the app away. The
+  // upsert is already batched + idempotent, so closing early is safe.
+  useBackClose(true, () => { onClose(); });
 
   const handleFile = async (file: File) => {
     setBusy(true); setResult(null); setErr(''); setFileName(file.name);

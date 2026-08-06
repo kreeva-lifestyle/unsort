@@ -71,7 +71,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
   const iconBtn: React.CSSProperties = { width: 26, height: 26, borderRadius: 6, border: `1px solid ${T.bd}`, background: 'transparent', color: T.tx2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: T.transition };
 
   return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '24px 28px' }}>
+    <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '24px 28px' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>

@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
+import { useBackClose } from '../../hooks/useBackClose';
 
 export interface ConfirmOptions {
   title: string;
@@ -32,6 +33,9 @@ export default function ConfirmModal({
   onCancel,
 }: ConfirmModalProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+
+  // Device Back answers the confirm the safe way — cancel, never confirm.
+  useBackClose(open, () => onCancel());
 
   useEffect(() => {
     if (!open) return;

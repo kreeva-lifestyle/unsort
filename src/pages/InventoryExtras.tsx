@@ -7,6 +7,7 @@ import { printOrQueue } from '../lib/printQueue';
 import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
 
 import { T, S } from '../lib/theme';
+import { useBackClose } from '../hooks/useBackClose';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import SwipeRow from '../components/ui/SwipeRow';
@@ -80,6 +81,12 @@ export default function InventoryExtras() {
     document.body.classList.toggle('modal-open', hasModal);
     return () => { document.body.classList.remove('modal-open'); };
   }, [showAdd, adjustExtra, matchExtra, completeItem, editingExtra, exportHtml]);
+  useBackClose(showAdd, () => setShowAdd(false));
+  useBackClose(!!editingExtra, () => setEditingExtra(null));
+  useBackClose(!!adjustExtra, () => setAdjustExtra(null));
+  useBackClose(!!matchExtra, () => setMatchExtra(null));
+  useBackClose(!!completeItem, () => setCompleteItem(null));
+  useBackClose(!!exportHtml, () => setExportHtml(null));
 
   useEffect(() => () => { if (skuTimer.current) clearTimeout(skuTimer.current); }, []);
 

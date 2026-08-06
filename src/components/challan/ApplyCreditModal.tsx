@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { useAuth } from '../../hooks/useAuth';
 import { T, S } from '../../lib/theme';
+import { useBackClose } from '../../hooks/useBackClose';
 import { numericKeyDown } from '../../lib/numericInput';
 import { SkeletonRows } from '../ui/Skeleton';
 import type { CashChallan } from '../../types/database';
@@ -35,6 +36,8 @@ export default function ApplyCreditModal({ challan: c, onClose, onDone, addToast
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { document.body.classList.add('modal-open'); return () => document.body.classList.remove('modal-open'); }, []);
+  // Device Back closes the credit form, not the challan screen behind it.
+  useBackClose(true, () => { if (!saving) onClose(); });
 
   // Counterparts: same customer, not voided, with money still open on them.
   useEffect(() => {

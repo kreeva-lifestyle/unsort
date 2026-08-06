@@ -23,7 +23,9 @@ export default function PasswordReset() {
 
   const goToLogin = () => {
     supabase.auth.signOut();
-    window.location.hash = '';
+    // replace, not assign: setting location.hash pushes an entry, so Back from
+    // the login screen re-entered the recovery link and reopened this form.
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
     window.location.reload();
   };
 

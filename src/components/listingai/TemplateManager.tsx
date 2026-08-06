@@ -7,6 +7,7 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
+import { useBackClose } from '../../hooks/useBackClose';
 import { friendlyError } from '../../lib/friendlyError';
 import { fetchMasterColumns } from './api';
 import { parseTemplateFile } from './templateParse';
@@ -41,6 +42,11 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { document.body.classList.toggle('modal-open', open); return () => document.body.classList.remove('modal-open'); }, [open]);
+  // Back runs the same guard as ×: an unsaved template asks before leaving.
+  // The layer stands down while the confirm is up and re-arms if the user
+  // keeps editing, so Back never falls through to the page underneath.
+  useBackClose(open && !confirmClose, () => { if (editing) requestLeave(); else onClose(); });
+  useBackClose(confirmClose, () => setConfirmClose(false));
   useEffect(() => { if (!open) { setEditing(null); setMergeInfo(''); setSaving(false); setConfirmDel(''); setShowRules(false); setFieldQ(''); setConfirmClose(false); } }, [open]);
   // Master headers for the ⤓ pairing select — best-effort, once per open.
   useEffect(() => { if (open && editing && !masterCols.length) fetchMasterColumns().then(setMasterCols).catch(e => { setMasterCols([]); addToast(`Couldn't load master columns — "fill from master" pairing is unavailable: ${friendlyError(e)}`, 'error'); }); }, [open, editing, masterCols.length]);

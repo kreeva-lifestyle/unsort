@@ -43,7 +43,10 @@ main { -webkit-overflow-scrolling: touch; overflow-y: auto !important; }
 }
 
 /* Page transitions — slide-in from right (app-like) */
-.page-pad, main > div > div { animation: pageIn 220ms cubic-bezier(.2,.9,.3,1) both; }
+.page-pad, main > div > div { animation: pageIn 220ms cubic-bezier(.2,.9,.3,1); }
+/* NOTE: no `both` fill-mode on purpose — a retained transform:translateX(0)
+   turns each page root into a containing block for position:fixed children,
+   which un-pinned the FABs and the inventory filter popover on iOS. */
 @keyframes pageIn { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
 
 /* Prevent iOS zoom on input focus — force 16px minimum on mobile.
@@ -492,7 +495,7 @@ body.modal-open .fab { display: none !important; }
   .prg-list-desktop { display: none !important; }
   .prg-list-mobile { display: block !important; }
   /* Detail — reduce padding, bottom clearance */
-  .prg-detail { padding: 14px 12px 80px !important; }
+  .prg-detail { padding: 14px 12px calc(var(--nav-h) + 14px) !important; }
   .prg-detail-grid { grid-template-columns: 1fr !important; }
   .prg-matching-grid { grid-template-columns: 1fr !important; }
   .prg-matching-grid > button { grid-column: 1 !important; }

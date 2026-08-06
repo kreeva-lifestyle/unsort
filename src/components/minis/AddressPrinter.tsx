@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
+import { useBackClose } from '../../hooks/useBackClose';
 import { printOrQueue } from '../../lib/printQueue';
 import SwipeRow from '../ui/SwipeRow';
 import { docTitle, fileDate } from '../../lib/exportName';
@@ -35,6 +36,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
     document.body.classList.toggle('modal-open', showAdd);
     return () => { document.body.classList.remove('modal-open'); };
   }, [showAdd]);
+  useBackClose(showAdd, () => setShowAdd(false));
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [perPage, setPerPage] = useState(25);

@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
+import { useBackClose } from '../../hooks/useBackClose';
 import { friendlyError } from '../../lib/friendlyError';
 import { numericKeyDown } from '../../lib/numericInput';
 import DateInput from '../ui/DateInput';
@@ -37,6 +38,7 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { document.body.classList.add('modal-open'); return () => { document.body.classList.remove('modal-open'); }; }, []);
+  useBackClose(true, () => onClose());
 
   const submit = async () => {
     if (saving) return;

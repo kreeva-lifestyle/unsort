@@ -2,6 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import JsBarcode from 'jsbarcode';
 import { T, S } from '../../lib/theme';
+import { useBackClose } from '../../hooks/useBackClose';
 import { numericKeyDown } from '../../lib/numericInput';
 import SkuInput from './SkuInput';
 
@@ -43,6 +44,7 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
     document.body.classList.add('modal-open');
     return () => document.body.classList.remove('modal-open');
   }, []);
+  useBackClose(true, () => onClose());
 
   React.useEffect(() => {
     if (!barcodeRef.current || !form.jioCode) return;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
+import { useBackClose } from '../../hooks/useBackClose';
 import { printOrQueue } from '../../lib/printQueue';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
@@ -137,6 +138,9 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
     document.body.classList.toggle('modal-open', showModal || !!printHtml || !!confirmDelete);
     return () => { document.body.classList.remove('modal-open'); };
   }, [showModal, printHtml, confirmDelete]);
+  useBackClose(showModal, () => setShowModal(false));
+  useBackClose(!!printHtml, () => setPrintHtml(null));
+  useBackClose(!!confirmDelete, () => setConfirmDelete(null));
 
   const filtered = useMemo(() => {
     if (!search.trim()) return labels;
