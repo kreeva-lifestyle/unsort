@@ -5,6 +5,7 @@ import { SUPABASE_ANON_KEY, supabase } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
 import { friendlyError } from '../lib/friendlyError';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
+import { useBackClose } from '../hooks/useBackClose';
 import AddressPrinter from '../components/minis/AddressPrinter';
 import CbazaarImport from '../components/minis/CbazaarImport';
 import OdetteImport from '../components/minis/OdetteImport';
@@ -26,7 +27,7 @@ interface UtsavRow { relid: string; vendorno: string; stock: number; leadtime: n
 
 type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'address' | 'trackly' | 'return_labels' | 'ratecard' | 'dropbox_links' | 'forward_dropbox' | 'master_assistant' | 'client_finder';
 
-export default function Minis({ navigateTo }: { navigateTo?: (tab: string) => void }) {
+export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab: string) => void; active?: boolean }) {
   const { addToast } = useNotifications();
   const [view, setViewState] = useState<MiniView>('home');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -70,10 +71,7 @@ export default function Minis({ navigateTo }: { navigateTo?: (tab: string) => vo
     addToast(`Restored ${displaySku}`, 'success');
   };
 
-  const setView = useCallback((v: MiniView) => {
-    setViewState(v);
-    if (v !== 'home') window.history.pushState({ miniView: v }, '');
-  }, []);
+  const setView = useCallback((v: MiniView) => setViewState(v), []);
 
   const viewLabels: Record<MiniView, string | null> = { home: null, cbazaar: 'Cbazaar Import', odette: 'Odette Import', address: 'LabelMaker', utsav: 'Utsav Import', trackly: 'Trackly', return_labels: 'Product QC Labels', ratecard: 'RateCard Studio', dropbox_links: 'Dropbox Link Generator', forward_dropbox: 'Forward → Dropbox', master_assistant: 'Master Assistant', client_finder: 'Client Finder' };
   const { set: setBreadcrumb } = useBreadcrumb();
@@ -82,11 +80,13 @@ export default function Minis({ navigateTo }: { navigateTo?: (tab: string) => vo
     return () => setBreadcrumb(null);
   }, [view, setBreadcrumb]);
 
-  useEffect(() => {
-    const onPop = () => setViewState('home');
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
+  // One owned history entry while a tool is open: Back closes the tool and
+  // nothing else. (The old bare popstate listener fired for EVERY Back in the
+  // app — including ones in other tabs — silently discarding open tool state.)
+  useBackClose(view !== 'home', () => setViewState('home'));
+  // Leaving the tab closes the tool, so returning shows the grid, not a
+  // half-used tool from an hour ago.
+  useEffect(() => { if (!active) setViewState('home'); }, [active]);
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -271,7 +271,7 @@ export default function Minis({ navigateTo }: { navigateTo?: (tab: string) => vo
     }
   };
 
-  const back = <button onClick={() => { setViewState('home'); window.history.back(); }} style={{ ...S.btnGhost, padding: '6px 10px' }} aria-label="Back">
+  const back = <button onClick={() => setView('home')} style={{ ...S.btnGhost, padding: '6px 10px' }} aria-label="Back">
     <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
   </button>;
 
@@ -305,7 +305,7 @@ export default function Minis({ navigateTo }: { navigateTo?: (tab: string) => vo
 
   if (view === 'trackly') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <Trackly addToast={addToast} onBack={() => setViewState('home')} />
+      <Trackly addToast={addToast} onBack={() => setView('home')} />
       <div style={{ margin: '20px 0 12px', paddingTop: 16, borderTop: `1px solid ${T.bd}` }}>
         <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 2 }}>Image Link Check</div>
         <div style={{ fontSize: 11, color: T.tx3 }}>Find broken, deleted or empty Dropbox image links on the master sheet (active products) — with the exact sheet row to fix</div>
@@ -331,7 +331,7 @@ export default function Minis({ navigateTo }: { navigateTo?: (tab: string) => vo
   if (view === 'forward_dropbox') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ marginBottom: 14 }}>{back}</div>
-      <ForwardDropbox addToast={addToast} onBack={() => setViewState('home')} />
+      <ForwardDropbox addToast={addToast} onBack={() => setView('home')} />
     </div>
   );
 
@@ -352,7 +352,7 @@ export default function Minis({ navigateTo }: { navigateTo?: (tab: string) => vo
   // MasterAssistant renders its own back button, so no wrapper `back` here.
   if (view === 'master_assistant') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <MasterAssistant addToast={addToast} onBack={() => { setViewState('home'); window.history.back(); }} openListingAI={navigateTo ? () => navigateTo('listingai') : undefined} />
+      <MasterAssistant addToast={addToast} onBack={() => setView('home')} openListingAI={navigateTo ? () => navigateTo('listingai') : undefined} />
     </div>
   );
 

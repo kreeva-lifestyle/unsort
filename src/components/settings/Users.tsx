@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
+import { useBackClose } from '../../hooks/useBackClose';
 import Toggle from '../ui/Toggle';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
@@ -26,6 +27,8 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     document.body.classList.toggle('modal-open', showInvite);
     return () => { document.body.classList.remove('modal-open'); };
   }, [showInvite]);
+  useBackClose(showInvite, () => setShowInvite(false));
+  useBackClose(!!resetResult, () => setResetResult(null));
 
   const fetchUsers = () => { supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at, module_access').order('created_at', { ascending: false }).then(({ data, error }) => { if (error) addToast('Failed to load users — ' + friendlyError(error), 'error'); setUsers(data || []); setLoading(false); }); };
   useEffect(() => {

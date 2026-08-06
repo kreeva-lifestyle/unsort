@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { numericKeyDown } from '../../lib/numericInput';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
+import { useBackClose } from '../../hooks/useBackClose';
 import SectionTitle from './components/SectionTitle';
 import FabricBreakdown from './components/FabricBreakdown';
 import MatchingCompanyRepeater from './components/MatchingCompanyRepeater';
@@ -30,6 +31,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
     document.body.classList.add('modal-open');
     return () => { document.body.classList.remove('modal-open'); };
   }, []);
+  useBackClose(true, () => onClose());
   const isSkuError = error === 'skuRequired';
   const [workParts, setWorkParts] = useState<PricePartRow[]>(initialWorkParts?.length ? initialWorkParts : [{ ...EMPTY_WORK_PART }]);
   const [fabricParts, setFabricParts] = useState<PricePartRow[]>(initialFabricParts?.length ? initialFabricParts : [{ ...EMPTY_FABRIC_PART }]);

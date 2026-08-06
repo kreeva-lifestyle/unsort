@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { T, Icon } from '../lib/theme';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
+import { useBackClose } from '../hooks/useBackClose';
 import MyProfileSettings from '../components/settings/MyProfile';
 import CategoriesSettings from '../components/settings/Categories';
 import LocationsSettings from '../components/settings/Locations';
@@ -15,7 +16,7 @@ import ListingAISettings from '../components/settings/ListingAISettings';
 
 const TAB_ICONS: Record<string, string> = { myprofile: 'user', categories: 'grid', locations: 'pin', brands: 'tag', users: 'users', packtime: 'scan', printers: 'print', listingai: 'cpu' };
 
-export default function Settings({ profile, addToast }: { profile: any; addToast: (msg: string, type?: string) => void }) {
+export default function Settings({ profile, addToast, active = true }: { profile: any; addToast: (msg: string, type?: string) => void; active?: boolean }) {
   const isAdmin = profile?.role === 'admin';
   const isManager = profile?.role === 'manager';
   const canManage = isAdmin || isManager;
@@ -25,6 +26,9 @@ export default function Settings({ profile, addToast }: { profile: any; addToast
   if (canManage) tabs.push({ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }, { id: 'brands', label: 'Brands' });
   if (isAdmin) tabs.push({ id: 'users', label: 'Users' }, { id: 'packtime', label: 'PackStation' }, { id: 'payment', label: 'Payment QR' }, { id: 'listingai', label: 'Listing AI' }, { id: 'errorlogs', label: 'Error Logs' });
   const [tab, setTab] = useState('myprofile');
+  // Back returns to My Profile instead of leaving Settings entirely.
+  useBackClose(tab !== 'myprofile', () => setTab('myprofile'));
+  useEffect(() => { if (!active) setTab('myprofile'); }, [active]);
   const { set: setBreadcrumb } = useBreadcrumb();
   const tabLabel = tabs.find(t => t.id === tab)?.label || '';
   useEffect(() => { setBreadcrumb([tabLabel]); return () => setBreadcrumb(null); }, [tabLabel, setBreadcrumb]);

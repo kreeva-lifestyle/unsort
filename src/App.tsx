@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef, Component, Suspense, lazy } from 'react';
 import { friendlyError } from './lib/friendlyError';
 
 // Preload logo immediately for short-link pages — fires before React renders anything,
@@ -81,6 +81,7 @@ import { T, S, Icon } from './lib/theme';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { NotificationProvider, useNotifications } from './hooks/useNotifications';
 import { BreadcrumbProvider } from './hooks/useBreadcrumb';
+import { closeAllLayers, closeTopLayer, useBackClose } from './hooks/useBackClose';
 
 import { TAB_IDS, canAccessTab, getFirstAllowedTab } from './lib/tabs';
 import { initGlobalPrintMode } from './lib/printQueue';
@@ -112,16 +113,36 @@ const MainApp = () => {
   const setTab = (t: string) => {
     if (!(TAB_IDS as readonly string[]).includes(t)) t = fallback();
     if (!checkTab(t)) t = fallback();
+    // Modals/overlays are portalled to document.body, i.e. OUTSIDE the hidden
+    // page wrapper — without this they stay painted over the next tab.
+    closeAllLayers();
+    setMobileMenu(false);
     const newHash = `#/${t}`;
     if (window.location.hash !== newHash) window.history.pushState(null, '', newHash);
     setTabState(t);
   };
 
-  // Browser back/forward support
+  // The mobile "More" drawer gets its own history entry, so Back shuts it
+  // instead of navigating away with the drawer still covering the screen.
+  useBackClose(mobileMenu, () => setMobileMenu(false));
+
+  // Browser back/forward + address-bar hash edits. hashchange is required:
+  // typing #/settings or clicking an in-page #/ link fires ONLY hashchange,
+  // never popstate, so those navigations used to do nothing.
   useEffect(() => {
-    const onPop = () => { const t = getTabFromHash(); setTabState(checkTab(t) ? t : fallback()); };
+    const onPop = () => {
+      setMobileMenu(false); // the drawer used to stay open across a Back
+      const t = getTabFromHash();
+      if (checkTab(t)) { setTabState(t); return; }
+      // Rejected tab: rewrite the URL too, otherwise the address bar keeps
+      // advertising a page the user can't open and Back gets stuck on it.
+      const f = fallback();
+      window.history.replaceState(null, '', `#/${f}`);
+      setTabState(f);
+    };
     window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
+    window.addEventListener('hashchange', onPop);
+    return () => { window.removeEventListener('popstate', onPop); window.removeEventListener('hashchange', onPop); };
   }, [profile]);
 
   // Global keyboard shortcuts
@@ -129,7 +150,12 @@ const MainApp = () => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
       const mod = e.metaKey || e.ctrlKey;
-      if (e.key === 'Escape') { document.querySelector<HTMLElement>('.modal-inner span[style*="cursor: pointer"]')?.click(); return; }
+      if (e.key === 'Escape') {
+        // Registered layers first (works for full-screen overlays too); fall
+        // back to the old DOM guess for modals not yet on the hook.
+        if (!closeTopLayer()) document.querySelector<HTMLElement>('.modal-inner span[style*="cursor: pointer"]')?.click();
+        return;
+      }
       if (mod && e.key === 'f') { e.preventDefault(); document.querySelector<HTMLInputElement>('input[type="text"][placeholder*="earch"], input[type="search"]')?.focus(); return; }
       if (mod && e.key === 'n') { e.preventDefault(); document.querySelector<HTMLElement>('.fab')?.click(); return; }
     };
@@ -144,14 +170,35 @@ const MainApp = () => {
   }, []);
 
   // Redirect to dashboard if current tab became unauthorized after profile loads
-  useEffect(() => { if (profile && !checkTab(tab)) setTab(fallback()); }, [profile]);
+  useEffect(() => {
+    if (!profile || checkTab(tab)) return;
+    const f = fallback();
+    window.history.replaceState(null, '', `#/${f}`); // replace: don't burn a Back press
+    setTabState(f);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
 
   // Load the global print mode (shared across all users) + keep it live
   useEffect(() => { if (!profile) return; return initGlobalPrintMode(); }, [profile]);
 
+  // Per-tab scroll memory. All pages share the single <main> scroller, so
+  // without this, switching tabs left you at the previous page's offset.
+  const mainRef = useRef<HTMLElement>(null);
+  const scrollByTab = useRef<Record<string, number>>({});
+  const prevTab = useRef(tab);
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    if (prevTab.current !== tab) {
+      scrollByTab.current[prevTab.current] = el.scrollTop;
+      prevTab.current = tab;
+      el.scrollTop = scrollByTab.current[tab] ?? 0;
+    }
+  }, [tab]);
+
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', purchaseorders: 'Purchase Orders', listingai: 'Listing AI', programs: 'Programs', minis: 'Minis', printstation: 'Print Station', settings: 'Settings' };
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', purchaseorders: 'Purchase Orders', listingai: 'Listing AI', programs: 'Programs', minis: 'Minis', printstation: 'Print Station', attendance: 'Attendance', settings: 'Settings' };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
@@ -184,26 +231,36 @@ const MainApp = () => {
           </div>
         ))}
         {/* More — opens full sidebar drawer for Brand Tags / Settings / anything else */}
-        <div onClick={() => setMobileMenu(true)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: mobileMenu ? T.ac : T.tx3, fontSize: 9, fontWeight: 500 }}>
+        <div onClick={() => setMobileMenu(true)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '2px 16px', color: (mobileMenu || !['dashboard', 'inventory', 'packtime', 'challan'].includes(tab)) ? T.ac : T.tx3, fontSize: 9, fontWeight: 500 }}>
           <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' }}><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
           <span>More</span>
         </div>
       </div>
       <HeaderComponent title={titles[tab]} onNotifClick={handleNotifClick} notifications={notifications} markAsRead={markAsRead} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(o => !o)} />
-      <main style={{ flex: 1, overflow: 'auto' }}>
+      <main ref={mainRef} style={{ flex: 1, overflow: 'auto' }}>
         <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}><div className="spinner" /></div>}>
-        {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard navigateTo={setTab} /></div>}
-        {mounted.has('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
+        {mounted.has('dashboard') && checkTab('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard navigateTo={setTab} /></div>}
+        {mounted.has('inventory') && checkTab('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
         {mounted.has('brandtag') && checkTab('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
         {mounted.has('packtime') && checkTab('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime active={tab === 'packtime'} /></div>}
         {mounted.has('challan') && checkTab('challan') && <div style={{ display: tab === 'challan' ? 'block' : 'none' }}><CashChallan active={tab === 'challan'} /></div>}
         {mounted.has('purchaseorders') && checkTab('purchaseorders') && <div style={{ display: tab === 'purchaseorders' ? 'block' : 'none' }}><PurchaseOrders active={tab === 'purchaseorders'} /></div>}
-        {mounted.has('listingai') && checkTab('listingai') && <div style={{ display: tab === 'listingai' ? 'block' : 'none' }}><ListingAIPage /></div>}
-        {mounted.has('attendance') && checkTab('attendance') && <div style={{ display: tab === 'attendance' ? 'block' : 'none' }}><Attendance /></div>}
-        {mounted.has('programs') && checkTab('programs') && <div style={{ display: tab === 'programs' ? 'block' : 'none' }}><ProgramsModule /></div>}
-        {mounted.has('minis') && checkTab('minis') && <div style={{ display: tab === 'minis' ? 'block' : 'none' }}><Minis navigateTo={setTab} /></div>}
+        {mounted.has('listingai') && checkTab('listingai') && <div style={{ display: tab === 'listingai' ? 'block' : 'none' }}><ListingAIPage active={tab === 'listingai'} /></div>}
+        {mounted.has('attendance') && checkTab('attendance') && <div style={{ display: tab === 'attendance' ? 'block' : 'none' }}><Attendance active={tab === 'attendance'} /></div>}
+        {mounted.has('programs') && checkTab('programs') && <div style={{ display: tab === 'programs' ? 'block' : 'none' }}><ProgramsModule active={tab === 'programs'} /></div>}
+        {mounted.has('minis') && checkTab('minis') && <div style={{ display: tab === 'minis' ? 'block' : 'none' }}><Minis navigateTo={setTab} active={tab === 'minis'} /></div>}
         {mounted.has('printstation') && checkTab('printstation') && <div style={{ display: tab === 'printstation' ? 'block' : 'none' }}><PrintStation /></div>}
-        {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage profile={profile} addToast={addToast} /></div>}
+        {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage profile={profile} addToast={addToast} active={tab === 'settings'} /></div>}
+        {/* The content area used to render literally nothing when the tab was
+            gated and `profile` never loaded — a permanent blank screen with no
+            way back except the sidebar. */}
+        {!checkTab(tab) && (
+          <div style={{ padding: 60, textAlign: 'center', color: T.tx3, fontSize: 13, lineHeight: 1.7 }}>
+            {profile
+              ? <>You don’t have access to this page.<br /><span onClick={() => setTab(fallback())} style={{ color: T.ac2, cursor: 'pointer', textDecoration: 'underline' }}>Go to {titles[fallback()] || 'Home'}</span></>
+              : <><div className="spinner" style={{ margin: '0 auto 14px' }} />Loading your profile…</>}
+          </div>
+        )}
         </Suspense>
       </main>
     </div>

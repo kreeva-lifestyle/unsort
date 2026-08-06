@@ -3,11 +3,11 @@
 import { useNotifications } from '../hooks/useNotifications';
 import ListingAI from '../components/listingai/ListingAI';
 
-export default function ListingAIPage() {
+export default function ListingAIPage({ active = true }: { active?: boolean }) {
   const { addToast } = useNotifications();
   return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <ListingAI addToast={addToast} />
+      <ListingAI addToast={addToast} active={active} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import SwipeRow from '../components/ui/SwipeRow';
 import { friendlyError } from '../lib/friendlyError';
 import { safeHref } from '../lib/safeHref';
 import { useAuth } from '../hooks/useAuth';
+import { useBackClose } from '../hooks/useBackClose';
 import { useNotifications } from '../hooks/useNotifications';
 import { printOrQueue } from '../lib/printQueue';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
@@ -125,7 +126,14 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     return () => { document.body.classList.remove('modal-open'); };
   }, [showModal, showCompModal, matchResult, showCompleteModal, showIntel, exportPdfHtml]);
 
-  useEffect(() => { if (active) setShowExtras(false); }, [active]);
+    // Every one of these is createPortal(..., document.body) — i.e. OUTSIDE the
+  // display:none page wrapper — so leaving the tab must close them or they
+  // stay painted over the next page with the scroll still locked.
+  useEffect(() => {
+    if (active) return;
+    setShowExtras(false); setShowModal(false); setShowCompModal(false);
+    setShowCompleteModal(null); setShowIntel(false); setMatchResult(null);
+  }, [active]);
 
   const { set: setBreadcrumb } = useBreadcrumb();
   useEffect(() => {
@@ -234,12 +242,13 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Browser back button support
-  useEffect(() => {
-    const onPop = () => { if (showExtras) setShowExtras(false); };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, [showExtras]);
+  // Device Back unwinds one layer at a time: modal → Extras sub-view → tab.
+  useBackClose(showExtras, () => setShowExtras(false));
+  useBackClose(showModal, () => setShowModal(false));
+  useBackClose(showCompModal, () => setShowCompModal(false));
+  useBackClose(!!showCompleteModal, () => setShowCompleteModal(null));
+  useBackClose(showIntel, () => setShowIntel(false));
+  useBackClose(!!matchResult, () => setMatchResult(null));
 
   // Open item detail from notification click
   useEffect(() => {
@@ -772,7 +781,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             {showMore && <><div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setShowMore(false)} />
             <div className="inv-more-dropdown" style={{ position: 'absolute', right: 0, top: '100%', zIndex: 10, background: T.s2, border: `1px solid ${T.bd}`, borderRadius: 8, padding: 6, display: 'flex', flexDirection: 'column' as const, gap: 4, minWidth: 160 }}>
               {!isCompletedView && <button onClick={() => { setShowMore(false); computeIntel(); }} style={{ ...S.btnGhost, width: '100%', justifyContent: 'flex-start', border: 'none', background: 'oklch(0.78 0.18 75 / .05)', color: T.yl, fontWeight: 600 }} title="Find cross-size completion possibilities">Find Pairs</button>}
-              {profile?.module_access?.extras !== false && <button onClick={() => { setShowMore(false); setShowExtras(true); window.history.pushState({ view: 'extras' }, ''); }} style={{ ...S.btnGhost, width: '100%', justifyContent: 'flex-start', border: 'none', background: 'linear-gradient(135deg, oklch(0.55 0.22 265 / .08), oklch(0.77 0.14 230 / .06))', color: T.ac2, fontWeight: 600, gap: 6 }} title="Manage spare parts">
+              {profile?.module_access?.extras !== false && <button onClick={() => { setShowMore(false); setShowExtras(true); }} style={{ ...S.btnGhost, width: '100%', justifyContent: 'flex-start', border: 'none', background: 'linear-gradient(135deg, oklch(0.55 0.22 265 / .08), oklch(0.77 0.14 230 / .06))', color: T.ac2, fontWeight: 600, gap: 6 }} title="Manage spare parts">
                 <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, flexShrink: 0 }}><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" /></svg>
                 Spare Parts
               </button>}
@@ -780,7 +789,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           </div>}
         </div>
       </div>
-      {showExtras && profile?.module_access?.extras !== false ? <><div style={{ marginBottom: 10 }}><button onClick={() => { setShowExtras(false); window.history.back(); }} style={S.btnGhost}>← Back to Inventory</button></div><InventoryExtras /></> : <>
+      {showExtras && profile?.module_access?.extras !== false ? <><div style={{ marginBottom: 10 }}><button onClick={() => { setShowExtras(false); }} style={S.btnGhost}>← Back to Inventory</button></div><InventoryExtras /></> : <>
       {/* Preset chips + search + Filters popover — Brand Tags glass-card aesthetic */}
       <div className="filter-bar" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: activeFilterCount > 0 ? 10 : 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {/* Search */}

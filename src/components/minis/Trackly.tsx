@@ -7,6 +7,7 @@ import { copyToClipboard } from '../../lib/clipboard';
 import type { ShortLink } from '../../types/database';
 import TracklyAnalytics from './TracklyAnalytics';
 import SwipeRow from '../ui/SwipeRow';
+import { useBackClose } from '../../hooks/useBackClose';
 
 const LINK_LIMIT = 500;
 const COLS = 'id, short_code, long_url, title, clicks, created_by, created_at, updated_at';
@@ -51,6 +52,11 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
     document.body.classList.toggle('modal-open', showAdd);
     return () => { document.body.classList.remove('modal-open'); };
   }, [showAdd]);
+
+  // Device Back: analytics → list, add-form → list. Without an owned layer the
+  // analytics view pushed an entry nobody popped, so Back jumped two levels.
+  useBackClose(!!analyticsLink, () => setAnalyticsLink(null));
+  useBackClose(showAdd, () => setShowAdd(false));
 
   const fetchLinks = useCallback(async () => {
     const { data, error } = await supabase.from('short_links').select(COLS).order('created_at', { ascending: false }).limit(LINK_LIMIT);
@@ -125,7 +131,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
         {paged.map((l, i) => (
           <SwipeRow key={l.id} actions={[
             { label: 'Print', color: '#6366F1', onClick: () => copyLink(l.short_code) },
-            { label: 'View', color: '#22C55E', onClick: () => { setAnalyticsLink(l); window.history.pushState({ view: 'short-analytics' }, ''); } },
+            { label: 'View', color: '#22C55E', onClick: () => { setAnalyticsLink(l); } },
             ...(l.short_code === PROTECTED_CODE ? [] : [{ label: 'Del', color: '#EF4444', onClick: () => deleteLink(l.id) }]),
           ]} hint={i === 0} hintKey="trackly">
           <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '12px 14px', transition: 'border-color .15s' }}
@@ -147,7 +153,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
             </div>
             <div className="desktop-only" style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
               <span onClick={e => { e.stopPropagation(); copyLink(l.short_code); }} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', minHeight: 32 }}>Copy</span>
-              <span onClick={e => { e.stopPropagation(); setAnalyticsLink(l); window.history.pushState({ view: 'short-analytics' }, ''); }} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .2)', minHeight: 32 }}>Analytics</span>
+              <span onClick={e => { e.stopPropagation(); setAnalyticsLink(l); }} style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'pointer', color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .2)', minHeight: 32 }}>Analytics</span>
               {l.short_code === PROTECTED_CODE
                 ? <span style={{ ...S.btnGhost, padding: '7px 12px', fontSize: 11, cursor: 'default', color: T.tx3, display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 32 }} title="This link is protected and cannot be deleted"><svg viewBox="0 0 24 24" style={{ width: 11, height: 11, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>Protected</span>
                 : <span onClick={e => { e.stopPropagation(); deleteLink(l.id); }} style={{ ...S.btnDanger, padding: '7px 12px', fontSize: 11, cursor: 'pointer', minHeight: 32 }}>Delete</span>}

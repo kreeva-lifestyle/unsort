@@ -6,6 +6,7 @@ import { printOrQueue } from '../lib/printQueue';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
+import { useBackClose } from '../hooks/useBackClose';
 import ChallanAnalytics from '../components/challan/ChallanAnalytics';
 import ChallanLedger from '../components/challan/ChallanLedger';
 import ChallanForm from '../components/challan/ChallanForm';
@@ -279,20 +280,25 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     }
   }, [active]);
 
-  // Browser back button support
-  useEffect(() => {
-    const onPop = () => {
-      if (showModal) { closeModal(); return; }
-      if (viewingChallan) { setViewingChallan(null); return; }
-      if (ledgerDetail) { setLedgerDetail(null); return; }
-      if (showLedger) { setShowLedger(false); setLedgerSearch(''); return; }
-      if (showAnalytics) { setShowAnalytics(false); return; }
-      if (showCashBook) { setShowCashBook(false); return; }
-    };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showModal, viewingChallan, ledgerDetail, showLedger, showAnalytics, showCashBook]);
+  // Device/browser Back closes one layer at a time. Declared bottom-up so the
+  // history entries stack in the same order the user opened them.
+  useBackClose(showCashBook, () => setShowCashBook(false));
+  useBackClose(showAnalytics, () => setShowAnalytics(false));
+  useBackClose(showLedger, () => { setShowLedger(false); setLedgerSearch(''); });
+  useBackClose(!!ledgerDetail, () => setLedgerDetail(null));
+  useBackClose(!!viewingChallan, () => setViewingChallan(null));
+  // Back closes the form but KEEPS the auto-saved draft: closeModal() calls
+  // clearDraft(), which wiped a half-typed challan (and the 24h restore safety
+  // net) on one reflex gesture. Discard stays explicit.
+  useBackClose(showModal, () => setShowModal(false));
+  useBackClose(showBulkPay, () => setShowBulkPay(false));
+  useBackClose(showBulkUnpay, () => setShowBulkUnpay(false));
+  useBackClose(!!confirmAction, () => setConfirmAction(null));
+  useBackClose(!!auditTrail, () => setAuditTrail(null));
+  useBackClose(!!reminderChallan, () => setReminderChallan(null));
+  useBackClose(showErpReminder, () => setShowErpReminder(false));
+  useBackClose(!!ledgerPdfHtml, () => setLedgerPdfHtml(null));
+  useBackClose(!!printHtml, () => setPrintHtml(null));
 
   // ── Realtime sync — multi-user safety ──────────────────────────────────────
   // INSERT/DELETE instant; UPDATE debounced 500ms to coalesce bulk operations.
@@ -575,7 +581,6 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setLedgerDetail(cust);
     setLedgerFrom('');
     setLedgerTo('');
-    window.history.pushState({ view: 'ledger-detail' }, '');
     await fetchLedgerDetailWithRange(cust, '', '');
   }, [fetchLedgerDetailWithRange]);
 
@@ -999,7 +1004,6 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // regardless of any legacy 'unpaid' row created under the old dropdown.
     setChallanStatus(c.is_return ? 'paid' : c.status);
     setShowModal(true);
-    window.history.pushState({ view: 'challan-edit' }, '');
   };
 
   const closeModal = () => {
@@ -1294,12 +1298,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Cash Book Screen ───────────────────────────────────────────────────────
   if (showCashBook && profile?.module_access?.cashbook !== false) return (
-    <div>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { setShowCashBook(false); window.history.back(); }} style={S.btnGhost}>← Back</button></div><CashBook /></div>
+    <div>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { setShowCashBook(false); }} style={S.btnGhost}>← Back</button></div><CashBook /></div>
   );
 
   // ── Analytics Screen ───────────────────────────────────────────────────────
   if (showAnalytics) return (
-    <>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { setShowAnalytics(false); window.history.back(); }} style={S.btnGhost}>← Back</button></div><ChallanAnalytics
+    <>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { setShowAnalytics(false); }} style={S.btnGhost}>← Back</button></div><ChallanAnalytics
       analytics={analytics}
       from={analyticsFrom}
       to={analyticsTo}
@@ -1311,7 +1315,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Ledger (list + detail) — extracted to components/challan/ChallanLedger.tsx ──
   if (showLedger) return (
-    <>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { setShowLedger(false); setLedgerSearch(''); window.history.back(); }} style={S.btnGhost}>← Back</button></div><ChallanLedger
+    <>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { if (ledgerDetail) { setLedgerDetail(null); return; } setShowLedger(false); setLedgerSearch(''); }} style={S.btnGhost}>← Back</button></div><ChallanLedger
       detailName={ledgerDetail?.name ?? null}
       detailId={ledgerDetail?.id ?? null}
       customers={ledgerCustomers}
@@ -1408,10 +1412,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             btnSm pills looked undersized next to the primary CTA). Order runs
             plain views → tinted sibling module → primary action. */}
         <div className="challan-nav-btns" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={async () => { if (viewOpening) return; setViewOpening('analytics'); await fetchAnalytics(); setViewOpening(null); setShowAnalytics(true); window.history.pushState({ view: 'analytics' }, ''); }} style={{ ...S.btnGhost, opacity: viewOpening === 'analytics' ? 0.6 : 1 }}>{viewOpening === 'analytics' ? 'Opening…' : 'Analytics'}</button>
-          <button onClick={async () => { if (viewOpening) return; setViewOpening('ledger'); await fetchLedger(); setViewOpening(null); setShowLedger(true); window.history.pushState({ view: 'ledger' }, ''); }} style={{ ...S.btnGhost, opacity: viewOpening === 'ledger' ? 0.6 : 1 }}>{viewOpening === 'ledger' ? 'Opening…' : 'Ledger'}</button>
-          {profile?.module_access?.cashbook !== false && <button onClick={() => { setShowCashBook(true); window.history.pushState({ view: 'cashbook' }, ''); }} style={{ ...S.btnGhost, color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .25)', background: 'oklch(0.72 0.19 145 / .06)' }}>Cash Book</button>}
-          <button onClick={() => { setShowModal(true); window.history.pushState({ view: 'challan-new' }, ''); }} style={S.btnPrimary} className="desktop-only">+ New Challan</button>
+          <button onClick={async () => { if (viewOpening) return; setViewOpening('analytics'); await fetchAnalytics(); setViewOpening(null); setShowAnalytics(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'analytics' ? 0.6 : 1 }}>{viewOpening === 'analytics' ? 'Opening…' : 'Analytics'}</button>
+          <button onClick={async () => { if (viewOpening) return; setViewOpening('ledger'); await fetchLedger(); setViewOpening(null); setShowLedger(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'ledger' ? 0.6 : 1 }}>{viewOpening === 'ledger' ? 'Opening…' : 'Ledger'}</button>
+          {profile?.module_access?.cashbook !== false && <button onClick={() => { setShowCashBook(true); }} style={{ ...S.btnGhost, color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .25)', background: 'oklch(0.72 0.19 145 / .06)' }}>Cash Book</button>}
+          <button onClick={() => { setShowModal(true); }} style={S.btnPrimary} className="desktop-only">+ New Challan</button>
         </div>
       </div>
 
@@ -1446,7 +1450,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         selectedIds={selectedIds}
         onToggleSelect={toggleSelect}
         onOpenEmpty={() => setShowModal(true)}
-        onOpenDetail={(c) => { setViewingChallan(c); window.history.pushState({ view: 'challan-detail' }, ''); }}
+        onOpenDetail={(c) => { setViewingChallan(c); }}
         onPrint={printChallan}
         onRemind={sendReminder}
         onCreateReturn={(c) => { setIsReturn(true); setChallanStatus('paid'); setAmountPaid(0); setPaymentMode(''); setPaymentDate(''); selectReturnSource(c); setShowModal(true); }}
@@ -1609,7 +1613,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           anchors position:fixed children to the scroll box, dropping the FAB
           into the content (it landed on the pagination bar). */}
       {active !== false && !viewingChallan && !showLedger && !showAnalytics && !showCashBook && !showModal && createPortal(
-        <button className="fab" aria-label="Add new challan" onClick={() => { setShowModal(true); window.history.pushState({ view: 'challan-new' }, ''); }}>+</button>,
+        <button className="fab" aria-label="Add new challan" onClick={() => { setShowModal(true); }}>+</button>,
         document.body,
       )}
     </div>

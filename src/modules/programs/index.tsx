@@ -7,9 +7,10 @@ import ProgramForm from './ProgramForm';
 import ProgramDetail from './ProgramDetail';
 import PDFExport from './PDFExport';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useBackClose } from '../../hooks/useBackClose';
 import type { Program, PricePartRow } from './types';
 
-export default function ProgramsModule() {
+export default function ProgramsModule({ active = true }: { active?: boolean }) {
   const { t } = useT();
   const { addToast } = useNotifications();
   const [view, setView] = useState<'list' | 'detail'>('list');
@@ -19,15 +20,11 @@ export default function ProgramsModule() {
   const [editWorkParts, setEditWorkParts] = useState<PricePartRow[] | undefined>();
   const [editFabricParts, setEditFabricParts] = useState<PricePartRow[] | undefined>();
 
-  // Browser back button support
-  useEffect(() => {
-    const onPop = () => {
-      if (showForm) { setShowForm(false); return; }
-      if (view === 'detail') { setView('list'); setDetailId(null); return; }
-    };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, [showForm, view]);
+  // Owned levels: Back closes the form, then the detail — and closing from
+  // inside drops the same entry, so Back is never a dead press afterwards.
+  useBackClose(view === 'detail', () => { setView('list'); setDetailId(null); });
+  useBackClose(showForm, () => setShowForm(false));
+  useEffect(() => { if (!active) { setShowForm(false); setView('list'); setDetailId(null); } }, [active]);
 
   const form = useProgramForm(() => {
     addToast(t('saved'), 'success');
@@ -39,7 +36,6 @@ export default function ProgramsModule() {
     setEditFabricParts(undefined);
     form.open();
     setShowForm(true);
-    window.history.pushState({ view: 'program-form' }, '');
   };
 
   const handleEdit = async (p: Program, matchings: { company_name: string; matching_label: string }[]) => {
@@ -63,10 +59,9 @@ export default function ProgramsModule() {
     setEditFabricParts(fb.length > 0 ? fb : undefined);
     form.open(p, matchings);
     setShowForm(true);
-    window.history.pushState({ view: 'program-form' }, '');
   };
 
-  const handleView = (p: Program) => { setDetailId(p.id); setView('detail'); window.history.pushState({ view: 'program-detail' }, ''); };
+  const handleView = (p: Program) => { setDetailId(p.id); setView('detail'); };
 
   const handleDetailEdit = async (p: Program, matchings: { company_name: string; matching_label: string }[]) => {
     await handleEdit(p, matchings);

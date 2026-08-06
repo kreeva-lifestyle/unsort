@@ -4,6 +4,7 @@ import { BarcodeDetector } from 'barcode-detector/ponyfill';
 import { supabase, SUPABASE_ANON_KEY } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
+import { useBackClose } from '../hooks/useBackClose';
 import { friendlyError } from '../lib/friendlyError';
 
 const EDGE_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packtime';
@@ -707,12 +708,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     return () => setBreadcrumb(null);
   }, [showHistory, setBreadcrumb]);
 
-  // Browser back button support
-  useEffect(() => {
-    const onPop = () => { if (showHistory) setShowHistory(false); };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, [showHistory]);
+  // Device Back leaves the history view, not the page. Owned by this layer
+  // only — the shared stack keeps other mounted tabs out of it.
+  useBackClose(showHistory, () => setShowHistory(false));
 
   const deleteHistoryScan = async (id: string) => {
     const record = historyData.find(r => r.id === id);
@@ -777,7 +775,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <div style={{ fontSize: 11, color: T.tx3 }}>{historyDateFrom && historyDateTo ? `${historyTotal} records · ${historyDateFrom} to ${historyDateTo}` : 'Pick a date range to view scans'}</div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button onClick={() => { setShowHistory(false); window.history.back(); }} style={{ ...S.btnGhost, minHeight: 44 }}>← Back</button>
+          <button onClick={() => { setShowHistory(false); }} style={{ ...S.btnGhost, minHeight: 44 }}>← Back</button>
           <button className="desktop-only" onClick={() => { setExporting(true); exportHistory().finally(() => setExporting(false)); }} disabled={exporting || !historyDateFrom || !historyDateTo} title={!historyDateFrom || !historyDateTo ? 'Select a date range first' : 'Export filtered records to CSV'} style={{ ...S.btnGhost, minHeight: 44, opacity: exporting || !historyDateFrom || !historyDateTo ? 0.4 : 1, cursor: exporting || !historyDateFrom || !historyDateTo ? 'not-allowed' : 'pointer', pointerEvents: exporting || !historyDateFrom || !historyDateTo ? 'none' : 'auto' }}>{exporting ? 'Exporting...' : 'Export'}</button>
         </div>
       </div>
@@ -941,7 +939,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   if (isDesktop && !showHistory && !started) return (
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 14 }}>
-        <button onClick={() => { const d = new Date(); setHistoryDateTo(localISODate(d)); d.setDate(d.getDate()-6); setHistoryDateFrom(localISODate(d)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={S.btnGhost}>History</button>
+        <button onClick={() => { const d = new Date(); setHistoryDateTo(localISODate(d)); d.setDate(d.getDate()-6); setHistoryDateFrom(localISODate(d)); setShowHistory(true); }} style={S.btnGhost}>History</button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12 }}>
         <svg viewBox="0 0 24 24" style={{ width: 48, height: 48, fill: 'none', stroke: T.tx3, strokeWidth: 1.2, marginBottom: 16, opacity: 0.5 }}><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M12 18h.01" /></svg>
@@ -957,7 +955,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {dbFails > 0 && <span style={{ fontSize: 9, color: T.re, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'oklch(0.63 0.22 25 / .1)', border: '1px solid oklch(0.63 0.22 25 / .2)' }}>{dbFails} DB save failed</span>}
-          <button onClick={() => { const d = new Date(); setHistoryDateTo(localISODate(d)); d.setDate(d.getDate()-6); setHistoryDateFrom(localISODate(d)); setShowHistory(true); window.history.pushState({ view: 'packstation-history' }, ''); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
+          <button onClick={() => { const d = new Date(); setHistoryDateTo(localISODate(d)); d.setDate(d.getDate()-6); setHistoryDateFrom(localISODate(d)); setShowHistory(true); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans }}>History</button>
         </div>
       </div>
 

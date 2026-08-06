@@ -12,6 +12,7 @@ import { AttEmployee, AttEntry, AttPenalty, AttAdvance, AttSalaryPayment, Monthl
 import { payslipBody, combinedSummary, wrapPdf, inr } from './payslip';
 import SalaryPaymentFlow from './SalaryPaymentFlow';
 import AdjustModal from './AdjustModal';
+import { useBackClose } from '../../hooks/useBackClose';
 import { docTitle } from '../../lib/exportName';
 
 export default function AttendanceSalary({ employees, entries, penalties, advances, savedSalaries, payments, month, onChanged, addToast }: {
@@ -79,6 +80,8 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
   const totalAdvance = shown.reduce((s, x) => s + x.advanceTotal, 0);
 
   useEffect(() => { document.body.classList.toggle('modal-open', !!pdfHtml || payFlow); return () => document.body.classList.remove('modal-open'); }, [pdfHtml, payFlow]);
+  // Back dismisses this overlay instead of leaving the page (or closing the PWA).
+  useBackClose(!!pdfHtml, () => { setPdfHtml(null); });
 
   // ── Remove a penalty/advance chip (two-tap) ────────────────────────────────
   const removeAdjust = async (kind: 'penalty' | 'advance', id: string) => {

@@ -14,6 +14,7 @@ import MasterFreshness from '../ui/MasterFreshness';
 import { call } from './api';
 import { parseSkuLines } from './skuInput';
 import { HANDOFF_EVENT, readListingHandoff } from './listingHandoff';
+import { useBackClose } from '../../hooks/useBackClose';
 import { RUN_CAP, useGenerateRun } from './useGenerateRun';
 import { useAutoBatch } from './useAutoBatch';
 import HandoffBanner from './HandoffBanner';
@@ -26,7 +27,7 @@ import PreflightPanel from './PreflightPanel';
 import RunHistory from './RunHistory';
 import type { ListingTemplate } from '../../types/database';
 
-export default function ListingAI({ addToast }: { addToast: (m: string, t?: string) => void }) {
+export default function ListingAI({ addToast, active = true }: { addToast: (m: string, t?: string) => void; active?: boolean }) {
   const [status, setStatus] = useState<{ hasKey: boolean; role: string } | null>(null);
   const [statusErr, setStatusErr] = useState('');
   const [templates, setTemplates] = useState<ListingTemplate[]>([]);
@@ -42,6 +43,12 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
   const busy = gen.generating || batch.active || !!gen.preflight;
   const busyRef = useRef(false);
   busyRef.current = busy;
+
+  // Two owned levels so Back walks main ← mappings ← bulk one step at a time.
+  // Before this the sub-pages had no history entry at all: Back skipped them
+  // entirely and left the tab (or closed the PWA).
+  useBackClose(viewMode !== 'main', () => setViewMode('main'));
+  useBackClose(viewMode === 'bulk', () => setViewMode('mappings'));
 
   const loadStatus = useCallback(async () => {
     try {
@@ -59,6 +66,7 @@ export default function ListingAI({ addToast }: { addToast: (m: string, t?: stri
   }, [addToast]);
 
   useEffect(() => { loadStatus(); loadTemplates(); }, [loadStatus, loadTemplates]);
+  useEffect(() => { if (!active) setViewMode('main'); }, [active]);
 
   // SKU handoff from the Master Assistant ("Generate listings for
   // not-uploaded"). Read on mount (tab mounted fresh after the switch) AND on
