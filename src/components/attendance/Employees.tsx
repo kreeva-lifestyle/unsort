@@ -1,14 +1,19 @@
 // Employee master — name, monthly salary, fixed daily time (the three
 // columns of the owner's Employee sheet), plus code + active flag.
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { numericKeyDown } from '../../lib/numericInput';
-import { uploadQrImage } from '../../lib/qrUpload';
+import { deleteQrObject } from '../../lib/qrUpload';
 import { AttEmployee, fixTimeToMinutes, minutesToHM } from '../../lib/attendance';
 import { useBackClose } from '../../hooks/useBackClose';
+import DateInput from '../ui/DateInput';
+import LeaveDateModal from './LeaveDateModal';
+import QrField from './QrField';
+
+const prettyDate = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
 export default function AttendanceEmployees({ employees, onChanged, addToast }: {
   employees: AttEmployee[]; onChanged: () => void; addToast: (m: string, t?: string) => void;
@@ -20,35 +25,16 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
   const [salary, setSalary] = useState('');
   const [fixTime, setFixTime] = useState('8:30');
   const [qrUrl, setQrUrl] = useState('');
-  const [qrBusy, setQrBusy] = useState(false);
-  const [qrZoom, setQrZoom] = useState(false);
+  const [leftOn, setLeftOn] = useState('');
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { document.body.classList.toggle('modal-open', showModal); return () => document.body.classList.remove('modal-open'); }, [showModal]);
-  // Two levels: Back closes the QR lightbox first, then the editor modal.
   useBackClose(showModal, () => close());
-  useBackClose(qrZoom, () => setQrZoom(false));
 
-  const openAdd = () => { setEditing(null); setName(''); setCode(''); setSalary(''); setFixTime('8:30'); setQrUrl(''); setErr(''); setShowModal(true); };
-  const openEdit = (e: AttEmployee) => { setEditing(e); setName(e.name); setCode(e.employee_code || ''); setSalary(String(e.salary)); setFixTime(minutesToHM(e.fix_time_minutes)); setQrUrl(e.qr_image_url || ''); setErr(''); setShowModal(true); };
+  const openAdd = () => { setEditing(null); setName(''); setCode(''); setSalary(''); setFixTime('8:30'); setQrUrl(''); setLeftOn(''); setErr(''); setShowModal(true); };
+  const openEdit = (e: AttEmployee) => { setEditing(e); setName(e.name); setCode(e.employee_code || ''); setSalary(String(e.salary)); setFixTime(minutesToHM(e.fix_time_minutes)); setQrUrl(e.qr_image_url || ''); setLeftOn(e.left_on || ''); setErr(''); setShowModal(true); };
   const close = () => { setShowModal(false); setEditing(null); setErr(''); };
-
-  // Best-effort delete of a replaced/removed QR object - the bucket is
-  // public, so an orphaned old QR would stay fetchable at its URL forever.
-  const deleteQrObject = (url: string) => {
-    const name = url.split('/').pop();
-    if (name?.startsWith('emp-qr-')) supabase.storage.from('employee-qr').remove([name]).then(() => {}, () => {});
-  };
-  const pickQr = async (file: File) => {
-    setQrBusy(true);
-    const r = await uploadQrImage(file);
-    setQrBusy(false);
-    if (r.error) { addToast(r.error, 'error'); return; }
-    if (qrUrl && qrUrl !== editing?.qr_image_url) deleteQrObject(qrUrl); // an unsaved upload being replaced
-    setQrUrl(r.url!);
-  };
 
   const save = async () => {
     if (saving) return;
@@ -62,7 +48,9 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
     // would pay hundreds of times the daily rate from a single typo.
     if (fixMin < 60 || fixMin > 1440) { setErr('Fix time must be between 1:00 and 24:00 hours per day'); return; }
     setSaving(true);
-    const payload = { name: name.trim(), employee_code: code.trim() || null, salary: sal, fix_time_minutes: fixMin, qr_image_url: qrUrl || null, updated_at: new Date().toISOString() };
+    // left_on only travels with an already-inactive employee: an active one has
+    // no leaving date, and blanking it here would silently un-cap their salary.
+    const payload = { name: name.trim(), employee_code: code.trim() || null, salary: sal, fix_time_minutes: fixMin, qr_image_url: qrUrl || null, updated_at: new Date().toISOString(), ...(editing && !editing.is_active ? { left_on: leftOn || null } : {}) };
     const { error } = editing
       ? await supabase.from('attendance_employees').update(payload).eq('id', editing.id)
       : await supabase.from('attendance_employees').insert(payload);
@@ -74,13 +62,30 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
   };
 
   const [toggling, setToggling] = useState('');
-  const toggleActive = async (e: AttEmployee) => {
+  const [deactivating, setDeactivating] = useState<AttEmployee | null>(null);
+
+  // Deactivating asks for the last working day (the salary cutoff); activating
+  // clears it, because the person is employed again from now on.
+  const deactivate = async (e: AttEmployee, date: string) => {
     if (toggling) return; // double-click fired two updates + contradictory toasts
     setToggling(e.id);
-    const { error } = await supabase.from('attendance_employees').update({ is_active: !e.is_active, updated_at: new Date().toISOString() }).eq('id', e.id);
+    const { error } = await supabase.from('attendance_employees')
+      .update({ is_active: false, left_on: date, updated_at: new Date().toISOString() }).eq('id', e.id);
     setToggling('');
     if (error) { addToast(friendlyError(error), 'error'); return; }
-    addToast(e.is_active ? `${e.name} deactivated — months with data stay on the Salary tab for final settlement` : `${e.name} activated`, 'success');
+    setDeactivating(null);
+    addToast(`${e.name} deactivated — salary stops after ${prettyDate(date)}; months up to it stay on the Salary tab`, 'success');
+    onChanged();
+  };
+
+  const activate = async (e: AttEmployee) => {
+    if (toggling) return;
+    setToggling(e.id);
+    const { error } = await supabase.from('attendance_employees')
+      .update({ is_active: true, left_on: null, updated_at: new Date().toISOString() }).eq('id', e.id);
+    setToggling('');
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    addToast(`${e.name} activated`, 'success');
     onChanged();
   };
 
@@ -98,9 +103,14 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
               <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, display: 'flex', alignItems: 'center', gap: 6 }}>
                 {e.name}
                 {e.employee_code ? <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{e.employee_code}</span> : null}
-                {e.qr_image_url && <span title="Payment QR uploaded" style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: T.ac3, color: T.ac2 }}>QR</span>}
+                {e.qr_image_url && e.is_active && <span title="Payment QR uploaded" style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: T.ac3, color: T.ac2 }}>QR</span>}
               </div>
-              <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>Fix time {minutesToHM(e.fix_time_minutes)} hrs/day{!e.is_active ? ' · inactive' : ''}</div>
+              <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>
+                Fix time {minutesToHM(e.fix_time_minutes)} hrs/day
+                {!e.is_active && (e.left_on
+                  ? <span style={{ color: T.yl }}> · left {prettyDate(e.left_on)}</span>
+                  : <span style={{ color: T.yl }}> · inactive, no leaving date set</span>)}
+              </div>
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: e.salary > 0 ? T.tx : T.re }}>₹{Number(e.salary).toLocaleString('en-IN')}</div>
@@ -108,7 +118,7 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
             </div>
             <div className="att-emp-actions" style={{ display: 'flex', gap: 6 }}>
               <button onClick={() => openEdit(e)} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 10 }}>Edit</button>
-              <button onClick={() => toggleActive(e)} disabled={!!toggling} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 10, color: e.is_active ? T.re : T.gr, opacity: toggling === e.id ? 0.5 : 1 }}>{toggling === e.id ? '…' : e.is_active ? 'Deactivate' : 'Activate'}</button>
+              <button onClick={() => (e.is_active ? setDeactivating(e) : activate(e))} disabled={!!toggling} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 10, color: e.is_active ? T.re : T.gr, opacity: toggling === e.id ? 0.5 : 1 }}>{toggling === e.id ? '…' : e.is_active ? 'Deactivate' : 'Activate'}</button>
             </div>
           </div>
         ))}
@@ -141,18 +151,16 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
                 <label style={S.fLabel}>Fix Time (hours:minutes per day)</label>
                 <input value={fixTime} onChange={e => setFixTime(e.target.value)} placeholder="8:30" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
               </div>
+              {editing && !editing.is_active && (
+                <div style={{ marginBottom: 12 }}>
+                  <label style={S.fLabel}>Last working day</label>
+                  <DateInput value={leftOn} onChange={e => setLeftOn(e.target.value)} style={{ width: '100%' }} />
+                  <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>Salary accrues up to and including this day. Clearing it lets the old months pay again — set it right rather than blank.</div>
+                </div>
+              )}
               <div style={{ marginBottom: 12 }}>
                 <label style={S.fLabel}>Payment QR</label>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <div onClick={() => qrUrl && setQrZoom(true)} title={qrUrl ? 'Click to zoom' : undefined} style={{ width: 72, height: 72, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: qrUrl ? '#fff' : 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: qrUrl ? 'zoom-in' : 'default' }}>
-                    {qrUrl ? <img src={qrUrl} alt="Payment QR" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 9, color: T.tx3, textAlign: 'center', padding: 4 }}>No QR</span>}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickQr(f); e.target.value = ''; }} />
-                    <button type="button" onClick={() => fileRef.current?.click()} disabled={qrBusy} style={{ ...S.btnGhost, padding: '6px 12px', fontSize: 11, pointerEvents: qrBusy ? 'none' : 'auto', opacity: qrBusy ? 0.5 : 1 }}>{qrBusy ? 'Uploading…' : qrUrl ? 'Change QR' : 'Upload QR'}</button>
-                    {qrUrl && !qrBusy && <button type="button" onClick={() => setQrUrl('')} style={{ background: 'none', border: 'none', color: T.re, fontSize: 10, cursor: 'pointer', padding: 0, textAlign: 'left' }}>Remove</button>}
-                  </div>
-                </div>
+                <QrField value={qrUrl} savedUrl={editing?.qr_image_url ?? null} onChange={setQrUrl} addToast={addToast} />
                 <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>Shown in the salary payment screen so you can scan &amp; pay.</div>
               </div>
               {err && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{err}</div>}
@@ -165,15 +173,11 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
         </div>
       ), document.body)}
 
-      {/* QR lightbox — tap anywhere to close */}
-      {qrZoom && qrUrl && createPortal((
-        <div onClick={() => setQrZoom(false)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(4,6,12,.88)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, cursor: 'zoom-out', padding: 20 }}>
-          <div style={{ background: '#fff', borderRadius: 14, padding: 14, maxWidth: 'min(86vw, 480px)', maxHeight: '76vh', display: 'flex' }}>
-            <img src={qrUrl} alt="Payment QR" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-          </div>
-          <div style={{ fontSize: 11, color: T.tx3 }}>Tap anywhere to close</div>
-        </div>
-      ), document.body)}
+      {deactivating && (
+        <LeaveDateModal emp={deactivating} busy={toggling === deactivating.id}
+          onCancel={() => setDeactivating(null)} onConfirm={d => deactivate(deactivating, d)} />
+      )}
+
     </div>
   );
 }

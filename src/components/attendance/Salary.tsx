@@ -15,6 +15,8 @@ import AdjustModal from './AdjustModal';
 import { useBackClose } from '../../hooks/useBackClose';
 import { docTitle } from '../../lib/exportName';
 
+const leftLabel = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+
 export default function AttendanceSalary({ employees, entries, penalties, advances, savedSalaries, payments, month, onChanged, addToast }: {
   employees: AttEmployee[]; entries: AttEntry[]; penalties: AttPenalty[]; advances: AttAdvance[];
   savedSalaries: Record<string, unknown>[]; payments: AttSalaryPayment[]; month: string;
@@ -58,12 +60,26 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
   const savedByEmp = useMemo(() => new Map(savedSalaries.map(s => [s.employee_id as string, s])), [savedSalaries]);
   const paidByEmp = useMemo(() => new Map(payments.map(p => [p.employee_id, p])), [payments]);
 
+  // Employees whose entries fall INSIDE this month. entriesByEmp also carries
+  // the previous month's 6-day tail (it feeds the Sunday rule), so testing it
+  // directly kept someone who left in July on August's list forever.
+  const monthStart = monthFirstDay(month);
+  const hasMonthEntries = useMemo(() => {
+    const set = new Set<string>();
+    entries.forEach(e => { if (e.date >= monthStart) set.add(e.employee_id); });
+    return set;
+  }, [entries, monthStart]);
+
   // Active employees PLUS deactivated ones that still have data this month —
-  // an employee who quit on the 20th and was deactivated must stay payable
-  // (final settlement) instead of vanishing from Salary/payslips/kiosk.
-  const activeEmployees = useMemo(() => employees.filter(e =>
-    e.is_active || entriesByEmp.has(e.id) || pensByEmp.has(e.id) || advByEmp.has(e.id) || paidByEmp.has(e.id)
-  ), [employees, entriesByEmp, pensByEmp, advByEmp, paidByEmp]);
+  // an employee who quit on the 20th must stay payable (final settlement)
+  // instead of vanishing from Salary/payslips/kiosk. But once their leaving
+  // date is behind the whole month they are gone, unless money is still
+  // attached to them here (a penalty, an advance, or a recorded payment).
+  const activeEmployees = useMemo(() => employees.filter(e => {
+    const money = pensByEmp.has(e.id) || advByEmp.has(e.id) || paidByEmp.has(e.id);
+    if (e.left_on && e.left_on < monthStart) return money;
+    return e.is_active || hasMonthEntries.has(e.id) || money;
+  }), [employees, hasMonthEntries, pensByEmp, advByEmp, paidByEmp, monthStart]);
 
   const salaries: MonthlySalary[] = useMemo(() =>
     activeEmployees.map(e => computeMonthlySalary(e, entriesByEmp.get(e.id) || [], month, pensByEmp.get(e.id) || [], advByEmp.get(e.id) || [])),
@@ -204,7 +220,7 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
                     {paidByEmp.has(s.employeeId) && <Pill tone="gr" dot>Paid</Pill>}
                     {saved && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: drift ? 'oklch(0.78 0.18 75 / .14)' : 'oklch(0.72 0.19 145 / .12)', color: drift ? T.yl : T.gr, fontWeight: 700, textTransform: 'uppercase' }}>{drift ? 'Saved (changed)' : 'Saved'}</span>}
                     {s.salary <= 0 && <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .14)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>No salary set</span>}
-                    {employees.find(e => e.id === s.employeeId)?.is_active === false && <span title="Deactivated — shown because this month has data (final settlement)" style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: 'oklch(0.78 0.18 75 / .14)', color: T.yl, fontWeight: 700, textTransform: 'uppercase' }}>Inactive</span>}
+                    {employees.find(e => e.id === s.employeeId)?.is_active === false && <span title={s.leftOn ? `Left on ${leftLabel(s.leftOn)} — nothing accrues after that day` : 'Deactivated with no leaving date — salary still accrues; set the date from Employees → Edit'} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: 'oklch(0.78 0.18 75 / .14)', color: T.yl, fontWeight: 700, textTransform: 'uppercase' }}>{s.leftOn ? `Left ${leftLabel(s.leftOn)}` : 'Inactive · no leaving date'}</span>}
                   </div>
                   <div style={{ fontSize: 10, color: T.tx3, marginTop: 3, fontFamily: T.mono }}>
                     {s.workDays}W · {s.paidSundays}/{s.sundays}Sun · {s.leaveDays}L · {minutesToHM(s.totalWorkedMinutes)}h · ₹{s.perDaySalary.toLocaleString('en-IN')}/day · ₹{s.perHourSalary.toLocaleString('en-IN')}/hr

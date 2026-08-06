@@ -71,6 +71,9 @@ export default function SalaryPaymentFlow({ employees, salaries, payments, month
   const sal: MonthlySalary | undefined = emp ? salaryByEmp.get(emp.id) : undefined;
   const isPaid = emp ? paid.has(emp.id) : false;
   const noSalary = !!sal && sal.salary <= 0;
+  // Owner's rule: no payment QR for someone who has left. Scanning a former
+  // employee's QR on the pay screen is exactly the mistake to design out.
+  const showQr = !!emp?.qr_image_url && emp.is_active !== false;
   const btnBusy = { pointerEvents: busy ? 'none' as const : 'auto' as const, opacity: busy ? 0.5 : 1 };
 
   return createPortal((
@@ -105,10 +108,15 @@ export default function SalaryPaymentFlow({ employees, salaries, payments, month
             {/* The QR is scanned by a PHONE pointed at this screen — on a
                 desktop monitor it must be large. min() keeps phones (72vw)
                 and short landscape windows (48vh) in check. */}
-            <div style={{ width: 'min(440px, 72vw, 48vh)', height: 'min(440px, 72vw, 48vh)', borderRadius: 14, overflow: 'hidden', background: emp!.qr_image_url ? '#fff' : 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '14px 0' }}>
-              {emp!.qr_image_url
-                ? <img src={emp!.qr_image_url} alt={`${emp!.name} payment QR`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                : <div style={{ padding: 20, color: T.tx3, fontSize: 12, lineHeight: 1.5 }}>No payment QR uploaded.<br />Add one in Employees.</div>}
+            <div style={{ width: 'min(440px, 72vw, 48vh)', height: 'min(440px, 72vw, 48vh)', borderRadius: 14, overflow: 'hidden', background: showQr ? '#fff' : 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '14px 0' }}>
+              {showQr
+                ? <img src={emp!.qr_image_url!} alt={`${emp!.name} payment QR`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                : emp!.is_active === false
+                  ? <div style={{ padding: 20, color: T.yl, fontSize: 12, lineHeight: 1.6, textAlign: 'center' }}>
+                      Former employee{emp!.left_on ? <> — left on {new Date(emp!.left_on + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</> : ''}.
+                      <div style={{ color: T.tx3, marginTop: 8 }}>The payment QR is hidden. Settle any final amount the way you agreed, then mark it paid.</div>
+                    </div>
+                  : <div style={{ padding: 20, color: T.tx3, fontSize: 12, lineHeight: 1.5 }}>No payment QR uploaded.<br />Add one in Employees.</div>}
             </div>
             <div style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Net Salary</div>
             <div style={{ fontSize: 34, fontWeight: 800, fontFamily: T.sora, color: noSalary ? T.yl : (sal && sal.finalSalary < 0 ? T.re : T.tx), lineHeight: 1.1, marginTop: 2 }}>{sal ? inr(sal.finalSalary) : '—'}</div>

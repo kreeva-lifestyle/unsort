@@ -16,6 +16,9 @@ export type AttEmployee = {
   id: string; employee_code: string | null; name: string;
   salary: number; fix_time_minutes: number; is_active: boolean;
   qr_image_url: string | null;
+  // Last day of service (ISO date) — salary accrues up to and INCLUDING this
+  // day and nothing after it. null = still employed.
+  left_on: string | null;
 };
 
 export type AttEntry = {
@@ -51,6 +54,9 @@ export type MonthlySalary = {
   extraMinutes: number; shortMinutes: number;
   earned: number; sundayPay: number; gross: number; penaltyTotal: number;
   advanceTotal: number; finalSalary: number; days: DayBreakdown[];
+  // Echoed back so payslips, cards and the pay kiosk can say WHY a month is
+  // short (or empty) without re-reading the employee row.
+  leftOn: string | null;
 };
 
 // ── Time helpers ─────────────────────────────────────────────────────────────
@@ -121,6 +127,12 @@ export const computeMonthlySalary = (
   const perDay = emp.salary / dim;
   const perHour = perDay / (fixMin / 60);
 
+  // Last day of service. Everything after it earns nothing: no hours, no
+  // weekly-off pay, and it is not an unpaid "leave" either — the person simply
+  // wasn't employed. A stale punch dated after the exit can't resurrect pay.
+  const leftOn = emp.left_on || null;
+  const served = (dateISO: string) => !leftOn || dateISO <= leftOn;
+
   const byDate = new Map(entries.map(e => [e.date, e]));
   // Worked DATES (ISO), including the previous month's tail: the paid-Sunday
   // rule looks 6 calendar days back, and judging a straddling week "on this
@@ -129,7 +141,7 @@ export const computeMonthlySalary = (
   const workedDates = new Set<string>();
   for (const e of entries) {
     const i = timeToMinutes(e.in_time), o = timeToMinutes(e.out_time);
-    if (i !== null && o !== null && o > i) workedDates.add(e.date);
+    if (i !== null && o !== null && o > i && served(e.date)) workedDates.add(e.date);
   }
   const [y, m] = monthISO.split('-').map(Number);
   const days: DayBreakdown[] = [];
@@ -148,7 +160,8 @@ export const computeMonthlySalary = (
     // Present day with zero pay — a silent wage discrepancy on the payslip.
     // A STORED 'P' on a non-paying weekday (cleared times, bad punch) is
     // downgraded to 'A' for the same reason.
-    const paidPunch = inMin !== null && outMin !== null && outMin > inMin;
+    const inService = served(dateISO);
+    const paidPunch = inService && inMin !== null && outMin !== null && outMin > inMin;
     let status = e?.status || (isSunday ? 'WO' : (paidPunch ? 'P' : 'A'));
     if (!isSunday && !paidPunch && status === 'P') status = 'A';
 
@@ -175,6 +188,10 @@ export const computeMonthlySalary = (
       const diff = workedMin - fixMin;
       if (diff > 0) extraMinutes += diff; else shortMinutes += -diff;
     }
+    // Past the leaving date the day is neither present nor absent — the person
+    // wasn't employed. LFT keeps the payslip honest instead of printing a
+    // month of fake absences (or a weekly off) after someone left.
+    if (!inService) status = 'LFT';
     days.push({
       date: dateISO,
       day: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][jsDay],
@@ -192,7 +209,7 @@ export const computeMonthlySalary = (
   const SUNDAY_MIN_ATTENDANCE = 3; // must work strictly more than this (>= 4)
   let paidSundays = 0;
   for (const day of days) {
-    if (!day.isSunday) continue;
+    if (!day.isSunday || !served(day.date)) continue;
     const dNum = Number(day.date.slice(8, 10));
     let workedInWeek = 0;
     for (let k = 1; k <= 6; k++) {
@@ -220,7 +237,7 @@ export const computeMonthlySalary = (
   const now = new Date();
   const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   let elapsedWorkable = 0, workedBeforeToday = 0;
-  for (const d of days) if (!d.isSunday && d.date < todayISO) { elapsedWorkable++; if (d.workedMin > 0) workedBeforeToday++; }
+  for (const d of days) if (!d.isSunday && d.date < todayISO && served(d.date)) { elapsedWorkable++; if (d.workedMin > 0) workedBeforeToday++; }
   const leaveDays = Math.max(0, elapsedWorkable - workedBeforeToday);
 
   return {
@@ -229,7 +246,7 @@ export const computeMonthlySalary = (
     perDaySalary: Math.round(perDay * 100) / 100, perHourSalary: Math.round(perHour * 100) / 100,
     earned: Math.round(earned * 100) / 100, sundayPay: Math.round(sundayPay * 100) / 100,
     gross: Math.round(gross * 100) / 100, penaltyTotal: Math.round(penaltyTotal * 100) / 100,
-    advanceTotal: Math.round(advanceTotal * 100) / 100, finalSalary, days,
+    advanceTotal: Math.round(advanceTotal * 100) / 100, finalSalary, days, leftOn,
   };
 };
 
