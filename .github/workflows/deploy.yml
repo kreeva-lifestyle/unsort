@@ -3,11 +3,13 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
-  # Manual re-run. Needed on 2026-08-06: the build for 68dab1f sat queued for
-  # 15 minutes without ever being assigned a runner (runner_id 0), then GitHub
-  # cancelled it and skipped the deploy — main was merged but the site was
-  # never rebuilt. Nothing in the repo failed. If that happens again, re-run
-  # from the Actions tab; a push to main also re-triggers this workflow.
+  # Manual re-run. Needed on 2026-08-06, three times in one evening: two builds
+  # sat queued for 15 minutes without ever being assigned a runner (runner_id
+  # 0) and were auto-cancelled, and one publish step died on an OIDC 503
+  # ("overflow") from GitHub's token service. Nothing in the repo failed in any
+  # of them. If a deploy is cancelled or fails with those symptoms, it is
+  # GitHub-side congestion: re-run from the Actions tab once it clears; a push
+  # to main also re-triggers this workflow.
   workflow_dispatch:
 
 permissions:
