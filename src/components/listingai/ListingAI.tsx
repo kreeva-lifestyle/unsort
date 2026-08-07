@@ -199,7 +199,8 @@ export default function ListingAI({ addToast, active = true }: { addToast: (m: s
         <PreflightPanel issues={gen.preflight.issues} generating={gen.generating} onConfirm={gen.confirmPreflight} />
       )}
       {gen.rows.length > 0 && gen.runTpl && (
-        <ResultsTable headers={gen.headers} kinds={gen.kinds} rows={gen.rows} usage={gen.usage} cost={gen.cost} template={gen.runTpl} addToast={addToast} />
+        <ResultsTable headers={gen.headers} kinds={gen.kinds} rows={gen.rows} usage={gen.usage} cost={gen.cost} template={gen.runTpl} addToast={addToast}
+          onClear={busy ? undefined : gen.clear} />
       )}
       <RunHistory templates={templates} refreshKey={gen.savedCount} onOpen={gen.loadRun} addToast={addToast} busy={busy} />
       <TemplateManager open={manageOpen} onClose={() => { setManageOpen(false); loadTemplates(); }} templates={templates} refresh={loadTemplates} addToast={addToast} />

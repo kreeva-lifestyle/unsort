@@ -51,6 +51,10 @@ export function useGenerateRun(addToast: (m: string, t?: string) => void) {
     setRunTpl(tpl);
   };
 
+  // "Done with these results" — dismiss the grid. Safe: every run is already
+  // in Recent runs, so nothing is lost.
+  const clear = () => { setRows([]); setHeaders([]); setKinds([]); setUsage(null); setCost({ usd: 0, saved: 0 }); setRunTpl(null); };
+
   // Pre-AI preflight state: issues found by the free validate call, plus what
   // we need to continue after the owner's choice.
   const [preflight, setPreflight] = useState<{ tpl: ListingTemplate; skus: SkuLine[]; isAdmin: boolean; issues: PreflightIssues } | null>(null);
@@ -202,5 +206,5 @@ export function useGenerateRun(addToast: (m: string, t?: string) => void) {
     } finally { setGenerating(false); }
   };
 
-  return { generating, progress, headers, kinds, rows, usage, cost, runTpl, savedCount, generate, loadRun, preflight, confirmPreflight };
+  return { generating, progress, headers, kinds, rows, usage, cost, runTpl, savedCount, generate, loadRun, clear, preflight, confirmPreflight };
 }
