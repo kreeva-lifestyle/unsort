@@ -18,6 +18,7 @@ import { useBackClose } from '../../hooks/useBackClose';
 import { RUN_CAP, useGenerateRun } from './useGenerateRun';
 import { useAutoBatch } from './useAutoBatch';
 import HandoffBanner from './HandoffBanner';
+import MasterFetch from './MasterFetch';
 import TemplateManager from './TemplateManager';
 import TaughtMappingsPage from './TaughtMappingsPage';
 import BulkTeachPage from './bulk/BulkTeachPage';
@@ -158,6 +159,8 @@ export default function ListingAI({ addToast, active = true }: { addToast: (m: s
           <button onClick={() => setViewMode('mappings')} disabled={busy} title={busy ? 'Wait for the current generation to finish' : undefined}
             style={{ ...S.btnGhost, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>Taught Mappings</button>
           <button onClick={() => setLinksOpen(true)} style={S.btnGhost}>Image Folders</button>
+          <MasterFetch busy={busy} hasSkus={skuCount > 0} addToast={addToast}
+            onPick={(skus) => { setSkuText(skus.join('\n')); setHandoff(null); }} />
         </div>
         {(handoff || batch.active) && (
           <HandoffBanner seller={handoff?.seller ?? null} count={handoff?.count ?? 0}
