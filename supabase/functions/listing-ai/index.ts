@@ -1,4 +1,12 @@
-// listing-ai Edge Function - AI Listing Module backend (v36).
+// listing-ai Edge Function - AI Listing Module backend (v37).
+//
+// v37: `master_picker` action - Listing AI's "Fetch from Master" button.
+// Meta mode (no args) returns the category x brand matrix of ACTIVE design
+// counts; SKU mode (brand + category) returns that slice's ACTIVE SKUs so
+// the owner can load a whole category into the SKU box without pasting.
+// ACTIVE-only by design: generating listings for designs that cannot ship
+// is pure AI spend. Rows whose text names no garment go into an
+// "Uncategorised" bucket instead of becoming unreachable.
 //
 // v36: the master sheet is read from its Postgres MIRROR (master_sheet_rows,
 // filled by the master-sync function on a pg_cron poll) instead of the Sheets
@@ -1275,6 +1283,62 @@ Deno.serve(async (req) => {
       const { tabs, masterHeaders } = await readMasterTabs(warnings);
       if (tabs.length === 0) return fail(502, 'Could not read the master sheet', req, warnings.join('; '));
       return json({ ok: true, columns: [...masterHeaders.values()].sort() }, req);
+    }
+
+    // Listing AI "Fetch from Master": pick a brand + category, get that
+    // slice's ACTIVE SKUs. Without brand/category it returns the counts the
+    // picker renders; with both it returns the SKU list itself.
+    if (action === 'master_picker') {
+      const role = await callerRole(req);
+      if (!role || !['admin', 'manager'].includes(role)) return fail(403, 'Only admin or manager can use Listing AI', req);
+      const warnings: string[] = [];
+      const { tabs } = await readMasterTabs(warnings);
+      if (tabs.length === 0) return fail(502, 'Could not read the master sheet', req, warnings.join('; '));
+      // Negations FIRST: "INACTIVE" / "NOT ACTIVE" must never read as active.
+      const isActive = (v: string) => {
+        const t = String(v || '').trim();
+        if (!t || /\b(inactive|not\s*active|out\s*of\s*stock|discontinued?|delisted?|sold\s*out)\b/i.test(t)) return false;
+        return /\b(active|in\s*stock|instock|live)\b/i.test(t);
+      };
+      // One pass over the mirror: per tab, per detected category, the ACTIVE
+      // SKUs. First tab wins on a duplicate SKU, same rule as buildSkuIndex.
+      const byTab = new Map<string, Map<string, string[]>>();
+      const seenPk = new Set<string>();
+      for (const t of tabs) {
+        const skuIdx = skuColIndex(t.headers);
+        const stIdx = t.headers.findIndex(h => /status/i.test(String(h || '')));
+        const bucket = new Map<string, string[]>();
+        byTab.set(t.tab, bucket);
+        if (stIdx < 0) { warnings.push(`Tab "${t.tab}" has no status column - its SKUs cannot be filtered to ACTIVE and were left out.`); continue; }
+        for (let i = 1; i < t.rows.length; i++) {
+          const sku = normSku(t.rows[i][skuIdx]);
+          if (!sku || seenPk.has(sku)) continue;
+          seenPk.add(sku);
+          if (!isActive(String(t.rows[i][stIdx] ?? ''))) continue;
+          const cat = detectCategory(rowTextOf({ tab: t.tab, headers: t.headers, row: t.rows[i] })) || 'other';
+          const arr = bucket.get(cat) || [];
+          arr.push(sku);
+          bucket.set(cat, arr);
+        }
+      }
+      const brand = String(body?.brand || '').trim().toUpperCase();
+      const category = String(body?.category || '').trim();
+      if (brand && category) {
+        const tabName = MASTER_TABS.find(tb => brandOfTab(tb) === brand);
+        if (!tabName || !byTab.has(tabName)) return fail(400, 'Pick ARYA or DRESSTIVE', req);
+        const label = category === 'other' ? 'Uncategorised' : (catLabel(category) || category);
+        const skus = byTab.get(tabName)!.get(category) || [];
+        if (skus.length === 0) return fail(404, `No ACTIVE ${label} designs on ${brand} right now`, req);
+        // Above the cap the load is TRUNCATED and says so - the auto-batch
+        // queue handles anything under it, however large.
+        const PICKER_CAP = 4000;
+        if (skus.length > PICKER_CAP) warnings.push(`${skus.length} SKUs match - loaded the first ${PICKER_CAP}; run the rest separately.`);
+        return json({ ok: true, skus: skus.slice(0, PICKER_CAP), brand, category, categoryLabel: label, warnings }, req);
+      }
+      const categories = [...CATEGORIES.map(c => ({ id: c.id, label: c.label })), { id: 'other', label: 'Uncategorised' }]
+        .map(c => ({ ...c, counts: Object.fromEntries([...byTab.entries()].map(([tb, bucket]) => [brandOfTab(tb), (bucket.get(c.id) || []).length])) }))
+        .filter(c => Object.values(c.counts).some(n => (n as number) > 0));
+      return json({ ok: true, categories, brands: MASTER_TABS.map(tb => brandOfTab(tb)), warnings }, req);
     }
 
     // Free pre-generation check: is each SKU in the master sheet, and does
