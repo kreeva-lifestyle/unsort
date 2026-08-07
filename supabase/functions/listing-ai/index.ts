@@ -1,4 +1,10 @@
-// listing-ai Edge Function - AI Listing Module backend (v38).
+// listing-ai Edge Function - AI Listing Module backend (v39).
+//
+// v39: `spellcheck` action - deterministic master-sheet spelling report for
+// the Master Assistant. Flags garment/fabric words typed within 1-2 edits of
+// the known vocabulary (lehengha -> lehenga), grouped by word x column with
+// counts + example SKUs. Identifier/link columns are never scanned. Report
+// only: the sheet sync stays one-way, the owner fixes Google Sheets by hand.
 //
 // v38: IMAGE_COL_RE also matches a BARE "image" header (Mirraw's main photo
 // column) so it is filled with an ordered raw= share link like its
@@ -1348,6 +1354,92 @@ Deno.serve(async (req) => {
         .map(c => ({ ...c, counts: Object.fromEntries([...byTab.entries()].map(([tb, bucket]) => [brandOfTab(tb), (bucket.get(c.id) || []).length])) }))
         .filter(c => Object.values(c.counts).some(n => (n as number) > 0));
       return json({ ok: true, categories, brands: MASTER_TABS.map(tb => brandOfTab(tb)), warnings }, req);
+    }
+
+    // Master-sheet spelling check (Master Assistant). Deterministic, zero AI:
+    // tokenize the PROSE columns of the mirrored master and flag words within
+    // edit distance of the garment/fabric vocabulary. The sheet sync stays
+    // one-way — this only REPORTS; the owner fixes the Google sheet by hand
+    // and the next sync brings the corrections in. Identifier/link/number
+    // columns (IMAGE, SKU, prices…) are never scanned, so a URL or code can't
+    // read as a typo. Precision over recall: only words of 5+ letters, same
+    // first letter, distance 1 (2 only when both words have 7+ letters) —
+    // that catches lehengha/lehega/legenga/dupattta without flagging real
+    // words like "formal".
+    if (action === 'spellcheck') {
+      const role = await callerRole(req);
+      if (!role || !['admin', 'manager'].includes(role)) return fail(403, 'Only admin or manager can use the Master Assistant', req);
+      const warnings: string[] = [];
+      const { tabs } = await readMasterTabs(warnings);
+      if (tabs.length === 0) return fail(502, 'Could not read the master sheet', req, warnings.join('; '));
+      const SKIP_COL = /image|link|url|price|mrp|\bgst\b|hsn|qty|quantity|amount|date|\bsku\b|catalog|status|stock|\bno\b/i;
+      const VOCAB = [
+        'lehenga', 'choli', 'dupatta', 'chunni', 'kurta', 'kurti', 'saree', 'anarkali', 'sharara',
+        'gharara', 'palazzo', 'blouse', 'salwar', 'kameez', 'churidar', 'gowns', 'dress',
+        'cotton', 'georgette', 'chiffon', 'organza', 'velvet', 'rayon', 'viscose', 'crepe',
+        'brocade', 'jacquard', 'banarasi', 'chanderi', 'taffeta', 'satin', 'fabric',
+        // NOT here on purpose: 'woven' (1 edit from "women") and 'printed'
+        // (2 from "painted") — real words would flag. Precision over recall.
+        'embroidery', 'embroidered', 'embellished', 'sequins', 'sequin', 'zardozi', 'mirror',
+        'thread', 'stitched', 'unstitched', 'bandhani', 'phulkari',
+        'chikankari', 'sleeve', 'sleeves', 'sleeveless', 'neckline', 'drawstring', 'lining',
+      ].filter(w => w.length >= 5);
+      const vocabSet = new Set(VOCAB);
+      // Real words one edit from a vocab word - never flag these.
+      const SAFE = new Set(['living']);
+      const dist = (a: string, b: string, max: number): number => {
+        if (Math.abs(a.length - b.length) > max) return max + 1;
+        let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+        for (let i = 1; i <= a.length; i++) {
+          const cur = [i];
+          let rowMin = i;
+          for (let j = 1; j <= b.length; j++) {
+            cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+            if (cur[j] < rowMin) rowMin = cur[j];
+          }
+          if (rowMin > max) return max + 1;
+          prev = cur;
+        }
+        return prev[b.length];
+      };
+      interface Hit { wrote: string; suggest: string; tab: string; column: string; count: number; skus: string[] }
+      const hits = new Map<string, Hit>();
+      const FINDING_CAP = 300;
+      let capped = false;
+      for (const t of tabs) {
+        const skuIdx = skuColIndex(t.headers);
+        const scanCols = t.headers.map((h, i) => ({ h: String(h || '').trim(), i })).filter(c => c.h && !SKIP_COL.test(c.h));
+        for (let r = 1; r < t.rows.length; r++) {
+          const sku = normSku(t.rows[r][skuIdx]) || `row ${r + 1}`;
+          for (const { h, i } of scanCols) {
+            const text = String(t.rows[r][i] ?? '');
+            if (!text) continue;
+            for (const raw of text.toLowerCase().split(/[^a-z]+/)) {
+              if (raw.length < 5) continue;
+              const word = raw.endsWith('s') && vocabSet.has(raw.slice(0, -1)) ? raw.slice(0, -1) : raw;
+              if (vocabSet.has(word) || SAFE.has(word)) continue;
+              let best = '', bestD = 3;
+              for (const v of VOCAB) {
+                if (v[0] !== word[0]) continue;
+                const max = word.length >= 7 && v.length >= 7 ? 2 : 1;
+                const d = dist(word, v, max);
+                if (d <= max && d < bestD) { bestD = d; best = v; }
+              }
+              if (!best) continue;
+              const key = `${word}|${best}|${t.tab}|${h}`;
+              const hit = hits.get(key);
+              if (hit) { hit.count++; if (hit.skus.length < 8 && !hit.skus.includes(sku)) hit.skus.push(sku); }
+              else if (hits.size >= FINDING_CAP) capped = true;
+              else hits.set(key, { wrote: word, suggest: best, tab: t.tab, column: h, count: 1, skus: [sku] });
+            }
+          }
+        }
+      }
+      if (capped) warnings.push(`More than ${FINDING_CAP} distinct misspellings — fix these first and run the check again.`);
+      const rows = [...hits.values()].sort((a, b) => b.count - a.count)
+        .map(f => [f.wrote, f.suggest, f.tab, f.column, String(f.count), f.skus.join(', ') + (f.count > f.skus.length ? ` +${f.count - f.skus.length} more` : '')]);
+      const table = { title: `Suspected misspellings (${rows.length})`, columns: ['WROTE', 'SHOULD BE', 'TAB', 'COLUMN', 'ROWS', 'EXAMPLE SKUS'], rows };
+      return json({ ok: true, findings: rows.length, table, warnings }, req);
     }
 
     // Free pre-generation check: is each SKU in the master sheet, and does
