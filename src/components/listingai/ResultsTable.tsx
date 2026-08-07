@@ -9,7 +9,7 @@ import type { ListingTemplate } from '../../types/database';
 
 const fmtK = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 
-export default function ResultsTable({ headers, kinds, rows, usage, cost, template, addToast }: {
+export default function ResultsTable({ headers, kinds, rows, usage, cost, template, addToast, onClear }: {
   headers: string[];
   kinds: string[];
   rows: GenRow[];
@@ -17,6 +17,7 @@ export default function ResultsTable({ headers, kinds, rows, usage, cost, templa
   cost: { usd: number; saved: number };
   template: Pick<ListingTemplate, 'id' | 'name' | 'file_name' | 'sheet_name' | 'header_row'>;
   addToast: (m: string, t?: string) => void;
+  onClear?: () => void; // absent while a run/queue owns the grid
 }) {
   const [exporting, setExporting] = useState(false);
   // 'direct' included: on a no-dropdown Listing Template the Title copies
@@ -53,7 +54,13 @@ export default function ResultsTable({ headers, kinds, rows, usage, cost, templa
     <div style={{ marginTop: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Results</div>
-        <button onClick={exportSheet} disabled={exporting} style={{ ...S.btnGhost, ...S.btnSm, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)', pointerEvents: exporting ? 'none' : 'auto', opacity: exporting ? 0.5 : 1 }}>{exporting ? 'Exporting…' : `Export ${ok.length} to Excel`}</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {onClear && (
+            <button onClick={() => { onClear(); addToast('Results cleared — the run stays in Recent runs for 5 days', 'success'); }}
+              style={{ ...S.btnGhost, ...S.btnSm }}>Clear</button>
+          )}
+          <button onClick={exportSheet} disabled={exporting} style={{ ...S.btnGhost, ...S.btnSm, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)', pointerEvents: exporting ? 'none' : 'auto', opacity: exporting ? 0.5 : 1 }}>{exporting ? 'Exporting…' : `Export ${ok.length} to Excel`}</button>
+        </div>
       </div>
       <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.01)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}>
