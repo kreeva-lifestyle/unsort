@@ -190,8 +190,8 @@ export default function ListingAI({ addToast, active = true }: { addToast: (m: s
               : `Generate${skuCount ? ` ${skuCount} SKU${skuCount > 1 ? 's' : ''}${skuCount > RUN_CAP ? ` (${Math.ceil(skuCount / RUN_CAP)} batches)` : ''}` : ''}`}
           </button>
           {(gen.generating || batch.active) && (
-            <RunEta done={gen.progress.done} total={gen.progress.total} skuCount={skuCount}
-              batch={batch.active ? { current: batch.current, total: batch.total } : null} />
+            <RunEta done={gen.progress.done} total={gen.progress.total}
+              batch={batch.active ? { current: batch.current, skusTotal: batch.skusTotal } : null} />
           )}
         </div>
       </div>

@@ -33,14 +33,20 @@ export default function MasterFetch({ busy, hasSkus, onPick, addToast }: {
   // open, so a master-sync that ran in between is reflected.
   useEffect(() => {
     if (!open) { setMeta(null); setErr(''); setCategory(''); setBrand(''); setLoading(false); return; }
+    // Stale guard: closing while the counts fetch is in flight must not let
+    // the late response repopulate the just-reset state (or toast warnings
+    // for a modal that is no longer on screen).
+    let stale = false;
     (async () => {
       try {
         const { status, data } = await call({ action: 'master_picker' });
+        if (stale) return;
         if (!data?.ok) throw new Error(String(data?.details || data?.error || `Failed (${status})`));
         setMeta({ categories: data.categories || [], brands: data.brands || [] });
         for (const w of (data.warnings || []) as string[]) addToast(w, 'error');
-      } catch (e) { setErr(friendlyError(e)); }
+      } catch (e) { if (!stale) setErr(friendlyError(e)); }
     })();
+    return () => { stale = true; };
   }, [open, addToast]);
 
   const cat = meta?.categories.find(c => c.id === category);
