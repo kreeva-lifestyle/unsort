@@ -44,6 +44,12 @@ export function resolveSheetPart(workbookXml: string, relsXml: string, sheetName
 function setCell(inner: string, ref: string, col: number, value: string): string {
   const re = new RegExp('<c r="' + ref + '"([^>]*?)(?:/>|>[\\s\\S]*?</c>)');
   const m = re.exec(inner);
+  // A cell that carries a FORMULA is the sheet's own computed value (e.g.
+  // Mirraw's sub_type: "DO NOT CHANGE THIS COLUMN", =IF(...) in every data
+  // row). Overwriting it with text would also orphan its calcChain entry —
+  // Excel then opens the file with a "repaired records" warning. The sheet's
+  // formula wins; our value for that one cell is dropped.
+  if (m && /<f[\s>]/.test(m[0])) return inner;
   const sMatch = m && /\ss="(\d+)"/.exec(m[1]);
   const sAttr = sMatch ? ' s="' + sMatch[1] + '"' : '';
   const cell = '<c r="' + ref + '"' + sAttr + ' t="inlineStr"><is><t xml:space="preserve">' + escapeXml(value) + '</t></is></c>';
