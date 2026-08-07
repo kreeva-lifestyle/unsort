@@ -19,6 +19,7 @@ import { RUN_CAP, useGenerateRun } from './useGenerateRun';
 import { useAutoBatch } from './useAutoBatch';
 import HandoffBanner from './HandoffBanner';
 import MasterFetch from './MasterFetch';
+import RunEta from './RunEta';
 import TemplateManager from './TemplateManager';
 import TaughtMappingsPage from './TaughtMappingsPage';
 import BulkTeachPage from './bulk/BulkTeachPage';
@@ -188,7 +189,10 @@ export default function ListingAI({ addToast, active = true }: { addToast: (m: s
               : gen.generating ? `Generating ${gen.progress.done}/${gen.progress.total}…`
               : `Generate${skuCount ? ` ${skuCount} SKU${skuCount > 1 ? 's' : ''}${skuCount > RUN_CAP ? ` (${Math.ceil(skuCount / RUN_CAP)} batches)` : ''}` : ''}`}
           </button>
-          {(gen.generating || batch.active) && <span style={{ fontSize: 11, color: T.tx3 }}>Fetching data, photos and writing listings — stay on this screen…</span>}
+          {(gen.generating || batch.active) && (
+            <RunEta done={gen.progress.done} total={gen.progress.total} skuCount={skuCount}
+              batch={batch.active ? { current: batch.current, total: batch.total } : null} />
+          )}
         </div>
       </div>
       {gen.preflight && (
