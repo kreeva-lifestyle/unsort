@@ -95,6 +95,25 @@ export default function MasterAssistant({ onBack, addToast, openListingAI }: {
     setBusy(false);
   };
 
+  // Deterministic spelling report over the mirrored master — zero AI. The
+  // sheet sync is one-way, so this only reports; the owner fixes the Google
+  // sheet (find & replace) and the next sync brings the corrections in.
+  const spellCheck = async () => {
+    if (busy) return;
+    setBusy(true);
+    setMsgs(m => [...m, { role: 'user', text: 'Check the master sheet for spelling mistakes' }]);
+    try {
+      const { status, data } = await call({ action: 'spellcheck' });
+      if (!data?.ok) throw new Error(String(data?.details || data?.error || `Failed (${status})`));
+      const n = Number(data.findings || 0);
+      const text = n === 0
+        ? 'No suspected misspellings found in the master sheet’s text columns. Link, SKU and price columns are never scanned.'
+        : `${n} suspected misspelling${n > 1 ? 's' : ''} found — table below (CSV exportable). Fix them in the Google master sheet with find & replace; the app picks the corrections up on the next sync, within minutes. Link, SKU and price columns were not scanned, and this list is a suggestion — a catalog or trade name can look like a typo, so skip anything that’s actually intended.`;
+      setMsgs(m => [...m, { role: 'assistant', text, tables: n > 0 ? [data.table as AssistantTable] : [], warnings: (data.warnings || []) as string[] }]);
+    } catch (e) { addToast(friendlyError(e), 'error'); setMsgs(m => m.slice(0, -1)); }
+    setBusy(false);
+  };
+
   const idea = (q: string) => (
     <button key={q} onClick={() => send(q)} disabled={busy}
       style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, fontSize: 11, textAlign: 'left', opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }}>{q}</button>
@@ -123,6 +142,8 @@ export default function MasterAssistant({ onBack, addToast, openListingAI }: {
           <button onClick={() => fileRef.current?.click()} style={{ ...S.btnGhost, minHeight: 44 }}>+ Attach seller sheet (Excel/CSV)</button>
         )}
         {sheet && <button onClick={() => fileRef.current?.click()} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 36 }}>Replace</button>}
+        <button onClick={spellCheck} disabled={busy} title="Scan the master sheet's text columns for misspelled garment/fabric words — free, no AI"
+          style={{ ...S.btnGhost, minHeight: 44, opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }}>Spelling check</button>
       </div>
 
       {/* conversation */}
