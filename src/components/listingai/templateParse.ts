@@ -15,7 +15,7 @@ export const normHeader = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, '
 // Image-slot columns (same rule as the edge fn): filled with Dropbox links
 // in code at zero AI cost, so bulk actions should never skip them.
 export const isImageColumn = (h: string) =>
-  /(front|side|back|additional)\s*image|image\s*\d|look\s*shot|detail\s*angle/i.test(h) && !/certificate|\bbis\b|document/i.test(h);
+  /(front|side|back|additional)\s*image|image\s*\d|look\s*shot|detail\s*angle|^\s*image\s*$/i.test(h) && !/certificate|\bbis\b|document/i.test(h);
 
 export interface ParsedTemplate {
   sheetName: string;
@@ -51,6 +51,19 @@ export async function parseTemplateFile(buf: ArrayBuffer, pickSheet?: string): P
   }
   const headerRow = (bestGrid[headerIdx] || []) as unknown[];
   const dropdowns = await extractDropdowns(buf, wb, sheetName);
+  // Columns pre-seeded with FORMULAS in the data rows (Mirraw's sub_type:
+  // "DO NOT CHANGE THIS COLUMN", =IF(...) on every row) are the sheet's own
+  // computed cells — auto-skip them so no run spends AI on them, and the
+  // export injector leaves their formulas standing.
+  const ws = wb.Sheets[sheetName];
+  const wsRange = ws?.['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : null;
+  const hasFormula = (colIdx: number): boolean => {
+    if (!wsRange) return false;
+    for (let R = headerIdx + 1; R <= Math.min(wsRange.e.r, headerIdx + 30); R++) {
+      if (ws[XLSX.utils.encode_cell({ r: R, c: colIdx })]?.f) return true;
+    }
+    return false;
+  };
   const seen = new Set<string>();
   const fields: ListingTemplateField[] = [];
   headerRow.forEach((c, colIdx) => {
@@ -61,10 +74,12 @@ export async function parseTemplateFile(buf: ArrayBuffer, pickSheet?: string): P
     // A single-value dropdown (e.g. Myntra's articleType = "Lehenga Choli")
     // is a constant: pre-pin it as the fixed value — filled in code, zero AI
     // cost. A "*" in the header is the common mandatory marker.
+    const fx = hasFormula(colIdx);
     fields.push({
-      header, mandatory: header.includes('*'), hint: '',
+      header, mandatory: header.includes('*'), hint: fx ? 'Auto-calculated by the sheet — its formula is kept, nothing is written here' : '',
+      ...(fx ? { skip: true } : {}),
       ...(allowed?.length ? { allowed } : {}),
-      ...(allowed?.length === 1 ? { fixed: allowed[0] } : {}),
+      ...(allowed?.length === 1 && !fx ? { fixed: allowed[0] } : {}),
     });
   });
   return { sheetName, headerRow: headerIdx, fields, sheetNames: wb.SheetNames };

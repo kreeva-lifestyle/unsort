@@ -32,6 +32,7 @@ export default function ResultsTable({ headers, kinds, rows, usage, cost, templa
     try {
       const res = await exportFilledXlsx(headers, ok, template);
       const skipTail = rows.length - ok.length ? ` — ${rows.length - ok.length} SKU(s) skipped (see status)` : '';
+      if (res.overflow) addToast(`${res.overflow} row(s) went past the template's pre-formatted area — dropdowns/validations don't apply to them. Split the run or ask the marketplace for a longer sheet.`, 'error');
       if (res.formatted) {
         const unmatched = res.total - res.matched;
         // Unmatched columns are a real, silent data loss on the marketplace

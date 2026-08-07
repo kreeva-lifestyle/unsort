@@ -20,7 +20,7 @@ type TplRef = Pick<ListingTemplate, 'id' | 'name' | 'file_name' | 'sheet_name' |
 // template's headers no longer match this run — we fell back to a plain sheet
 // rather than download an empty formatted file). `hadTemplate` distinguishes a
 // deliberate plain export (old fileless template) from a fallback.
-export interface ExportResult { formatted: boolean; matched: number; total: number; hadTemplate: boolean }
+export interface ExportResult { formatted: boolean; matched: number; total: number; hadTemplate: boolean; overflow?: number }
 
 export async function exportFilledXlsx(headers: string[], rows: GenRow[], tpl: TplRef): Promise<ExportResult> {
   const values = rows.map(r => r.values);
@@ -55,7 +55,16 @@ export async function exportFilledXlsx(headers: string[], rows: GenRow[], tpl: T
           // pristine empty template; fall back to the plain sheet so the data
           // still leaves with the owner, and report it.
           if (matched > 0) {
-            const firstDataRow = headerRowIdx + 2; // rows start directly under the header (1-based)
+            // First data row = the first EMPTY row below the header, not
+            // blindly header+1: marketplace sheets (e.g. Mirraw) put an
+            // instruction/help row under the header, and writing there would
+            // overwrite it AND land listing #1 above every validation range
+            // (they start where the data does). Rows pre-seeded only with
+            // formulas read as empty here (cached values are '') — correct,
+            // those ARE the data rows.
+            let dataIdx = headerRowIdx + 1; // zero-based candidate
+            while (dataIdx < grid.length && ((grid[dataIdx] || []) as unknown[]).some(c => String(c ?? '').trim() !== '')) dataIdx++;
+            const firstDataRow = dataIdx + 1; // 1-based
             const writes: CellWrite[] = [];
             values.forEach((vals, i) => {
               vals.forEach((v, j) => {
@@ -67,13 +76,22 @@ export async function exportFilledXlsx(headers: string[], rows: GenRow[], tpl: T
             const files = unzipSync(new Uint8Array(buf));
             const part = resolveSheetPart(strFromU8(files['xl/workbook.xml']), strFromU8(files['xl/_rels/workbook.xml.rels']), tpl.sheet_name!);
             if (part && files[part]) {
-              files[part] = strToU8(injectCells(strFromU8(files[part]), writes));
+              const sheetXml = strFromU8(files[part]);
+              // Rows past the sheet's pre-formatted box (its declared
+              // dimension) lose the template's dropdowns/validations — the
+              // marketplace usually validates only that far. Report, never
+              // silently: with size expansion a 200-SKU run can outgrow a
+              // 1000-row template.
+              const dimEnd = parseInt((/<dimension ref="[A-Za-z]+\d+:[A-Za-z]+(\d+)"/.exec(sheetXml) || [])[1] || '0', 10);
+              const lastRow = firstDataRow + values.length - 1;
+              const overflow = dimEnd > 0 && lastRow > dimEnd ? lastRow - dimEnd : 0;
+              files[part] = strToU8(injectCells(sheetXml, writes));
               const out = zipSync(files, { level: 6 });
               const url = URL.createObjectURL(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
               const a = document.createElement('a');
               a.href = url; a.download = exportName('Listings', [tpl.name, fileDate()], (tpl.file_name!.split('.').pop() || 'xlsx')); a.click();
               setTimeout(() => URL.revokeObjectURL(url), 1000);
-              return { formatted: true, matched, total: headers.length, hadTemplate };
+              return { formatted: true, matched, total: headers.length, hadTemplate, overflow };
             }
           }
         }

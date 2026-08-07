@@ -1,4 +1,9 @@
-// listing-ai Edge Function - AI Listing Module backend (v37).
+// listing-ai Edge Function - AI Listing Module backend (v38).
+//
+// v38: IMAGE_COL_RE also matches a BARE "image" header (Mirraw's main photo
+// column) so it is filled with an ordered raw= share link like its
+// image1..3 siblings, instead of falling through to a same-name master copy
+// (which pasted the dl=0 Dropbox PAGE link - not an image URL).
 //
 // v37: `master_picker` action - Listing AI's "Fetch from Master" button.
 // Meta mode (no args) returns the category x brand matrix of ACTIVE design
@@ -675,7 +680,11 @@ const DIRECT_MAP: [RegExp, string][] = [
 // Marketplace image-slot columns (Front Image, Side Image, Additional Image
 // 1...): filled with ordered Dropbox share links, never by the AI. Document
 // URLs like "BIS Certificate Image URL" must NOT get product photos.
-const IMAGE_COL_RE = /(front|side|back|additional)\s*image|image\s*\d|look\s*shot|detail\s*angle/i;
+// `^image$` (bare) covers marketplaces like Mirraw whose MAIN photo column is
+// literally named "image" — without it the column fell through to a master
+// same-name copy and got the sheet's dl=0 Dropbox PAGE link instead of a
+// direct raw= photo link like its image1..3 siblings.
+const IMAGE_COL_RE = /(front|side|back|additional)\s*image|image\s*\d|look\s*shot|detail\s*angle|^\s*image\s*$/i;
 const NOT_IMAGE_COL_RE = /certificate|\bbis\b|document/i;
 
 // Creative fields stay AI-written even when a same-named master column
