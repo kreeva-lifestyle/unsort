@@ -11,7 +11,10 @@ import { SkuLine } from './skuInput';
 import type { ListingTemplate } from '../../types/database';
 
 export function useAutoBatch(gen: ReturnType<typeof useGenerateRun>, addToast: (m: string, t?: string) => void) {
-  const [state, setState] = useState<{ current: number; total: number } | null>(null);
+  // skusTotal is snapshotted from the STARTED queue — the textarea stays
+  // editable mid-run, so a live count would let a stray edit corrupt the
+  // whole-queue ETA while the batches keep running on the captured list.
+  const [state, setState] = useState<{ current: number; total: number; skusTotal: number } | null>(null);
   const [stopping, setStopping] = useState(false);
   // Ref mirror of the gen state — waitIdle polls it without stale closures.
   const genRef = useRef(gen);
@@ -52,7 +55,7 @@ export function useAutoBatch(gen: ReturnType<typeof useGenerateRun>, addToast: (
           addToast(`Auto-run stopped — batches ${i + 1}–${batches.length} were not run; their SKUs are still in the box`, 'success');
           return;
         }
-        setState({ current: i + 1, total: batches.length });
+        setState({ current: i + 1, total: batches.length, skusTotal: skus.length });
         // Identity snapshot: run() always replaces `rows`, a cancelled
         // preflight never touches it — so "rows changed but savedCount
         // didn't" means the batch GENERATED data that failed to save.
@@ -80,5 +83,5 @@ export function useAutoBatch(gen: ReturnType<typeof useGenerateRun>, addToast: (
   // without throwing away its spend).
   const stop = () => { stopRef.current = true; setStopping(true); };
 
-  return { active: !!state, current: state?.current ?? 0, total: state?.total ?? 0, stopping, start, stop };
+  return { active: !!state, current: state?.current ?? 0, total: state?.total ?? 0, skusTotal: state?.skusTotal ?? 0, stopping, start, stop };
 }

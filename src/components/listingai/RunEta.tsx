@@ -8,13 +8,14 @@ import { useRef } from 'react';
 import { T } from '../../lib/theme';
 import { RUN_CAP } from './useGenerateRun';
 
-export default function RunEta({ done, total, batch, skuCount }: {
+export default function RunEta({ done, total, batch }: {
   done: number; total: number;
-  batch: { current: number; total: number } | null;
-  skuCount: number;
+  // skusTotal is the queue's SNAPSHOT of the list it runs — never the live
+  // textarea count, which stays editable mid-run and would corrupt the ETA.
+  batch: { current: number; skusTotal: number } | null;
 }) {
   const doneAll = batch ? (batch.current - 1) * RUN_CAP + done : done;
-  const totalAll = batch ? Math.max(skuCount, doneAll) : total;
+  const totalAll = batch ? Math.max(batch.skusTotal, doneAll) : total;
   const samples = useRef<{ t: number; n: number }[]>([]);
   // A fresh run/queue starts the sampling over (progress counts backwards).
   if (samples.current.length && doneAll < samples.current[samples.current.length - 1].n) samples.current = [];

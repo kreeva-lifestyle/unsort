@@ -66,6 +66,12 @@ export function useGenerateRun(addToast: (m: string, t?: string) => void) {
     let skus = allSkus;
     if (skus.length > RUN_CAP) { addToast(`Capped to the first ${RUN_CAP} SKUs (of ${skus.length}) — run again for the rest`, 'error'); skus = skus.slice(0, RUN_CAP); }
     setPreflight(null);
+    // Reset progress NOW, not in run(): between auto-batches the previous
+    // batch's finished {done,total} would otherwise be read against the NEW
+    // batch number (RunEta), overshooting by a whole batch and then jumping
+    // backwards — which reads as a new run and wipes the ETA rate window.
+    // Same-tick with the queue's setState, so no render sees the stale pair.
+    setProgress({ done: 0, total: skus.length });
     let issues: PreflightIssues | null = null;
     try {
       setGenerating(true); // covers the validate round-trip so Generate can't double-fire
