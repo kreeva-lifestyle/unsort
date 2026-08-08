@@ -32,6 +32,7 @@ export async function runBulk(
   skus: string[],
   mode: 'combine' | 'separate',
   onUpdate: (rows: BulkRow[], done: number) => void,
+  rootUrl = '', // scope the search to one Settings folder — '' = all
 ): Promise<BulkRow[]> {
   const rows: BulkRow[] = skus.map(s => ({ sku: s, status: 'pending', links: [] }));
   onUpdate([...rows], 0);
@@ -40,7 +41,7 @@ export async function runBulk(
     while (cursor < rows.length) {
       const i = cursor++;
       try {
-        const { status, data } = await call({ action: 'linkgen', sku: rows[i].sku, mode });
+        const { status, data } = await call({ action: 'linkgen', sku: rows[i].sku, mode, rootUrl: rootUrl || undefined });
         if (data.ok) rows[i] = { ...rows[i], status: 'ok', links: (data.links || []).filter((l: GenLink) => l.url), message: data.note };
         else rows[i] = { ...rows[i], status: 'error', message: explainGen(data, status) };
       } catch (e) { rows[i] = { ...rows[i], status: 'error', message: friendlyError(e) }; }
