@@ -16,6 +16,15 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   if ((code === '23505' || l.includes('duplicate key')) && l.includes('link_check_approvals')) return 'This link is already marked correct.';
   if (code === '23505' || l.includes('duplicate key')) return 'A record with these details already exists.';
   if (code === '23503' || l.includes('foreign key')) return 'Cannot complete — this item is still referenced elsewhere.';
+  // apply_return_credit's guidance messages are already human and DATED
+  // ("Apply this credit on or after 09 Aug 2026") — show them verbatim, and
+  // before the length fallback below can swallow them.
+  if (l.includes('apply this credit on or after') || l.includes('unless that handover is reopened')) return msg;
+  // The generic challan-lock trigger fires from OTHER paths too (edit/delete
+  // forms) with terse text — translate it into what the user can actually do.
+  if (l.includes('counted inside a confirmed or pending cash handover')) {
+    return 'This challan’s money falls inside a cash-handover period that was already counted (or is awaiting confirmation). Sealed periods can’t change — try again after the period ends, or ask an admin to reopen that handover.';
+  }
   if (l.includes('cash handover period') || l.includes('confirmed and is a permanent') || l.includes('permanent financial record') || l.includes('period start of a confirmed or pending')) return msg; // Pass through specific lock-period errors
   if (l.includes('chk_challan_status')) return 'Invalid challan status — Draft challans are no longer supported. Refresh the app to get the latest version.';
   if (l.includes('chk_return_requires_source')) return 'Returns must be linked to a source invoice.';
