@@ -1,9 +1,7 @@
-// The up-front folder question for the Link Generator: shown BEFORE any
-// search when more than one Settings folder is enabled and none is committed
-// yet — the owner's rule is "ask first, then perform", so the search may not
-// start until a folder is chosen. Picking a folder commits it (remembered,
-// shown in the toolbar select); "All folders" applies to this run only, so
-// the question comes back next time.
+// The up-front folder question for the Link Generator: a POPUP before EVERY
+// search whenever more than one Settings folder is enabled — the owner's
+// rule is "ask each time, as simple as that". Nothing is remembered; every
+// Generate / bulk run asks again.
 import { createPortal } from 'react-dom';
 import { useEffect } from 'react';
 import { T, S } from '../../../lib/theme';
@@ -30,7 +28,7 @@ export default function FolderAskModal({ roots, onPick, onClose }: {
         </div>
         <div style={{ padding: 16 }}>
           <div style={{ fontSize: 11, color: T.tx3, marginBottom: 10 }}>
-            The SKU is searched only inside the folder you pick (from Settings). Your pick is remembered — change it anytime in the toolbar.
+            The SKU is searched only inside the folder you pick (from Settings).
           </div>
           {roots.map(r => (
             <button key={r.url} onClick={() => onPick(r.url)}
@@ -40,7 +38,7 @@ export default function FolderAskModal({ roots, onPick, onClose }: {
           ))}
           <button onClick={() => onPick('')}
             style={{ ...S.btnGhost, display: 'block', width: '100%', textAlign: 'left', minHeight: 44, padding: '11px 12px', fontSize: 11, color: T.tx3 }}>
-            All folders — just this run (asks again next time)
+            All folders — search everywhere
           </button>
         </div>
       </div>
