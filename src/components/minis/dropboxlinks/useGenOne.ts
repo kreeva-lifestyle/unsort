@@ -12,7 +12,7 @@ import { call, explainGen, GenResult } from './api';
 export type Mode = 'combine' | 'separate';
 export type Pair = { combine: GenResult | null; separate: GenResult | null };
 
-export function useGenOne(mode: Mode, sku: string, addToast: (m: string, t?: string) => void) {
+export function useGenOne(mode: Mode, sku: string, addToast: (m: string, t?: string) => void, rootUrl = '') {
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<Pair | null>(null);
   // The mode still being fetched in the background, so toggling to it can show a
@@ -32,7 +32,10 @@ export function useGenOne(mode: Mode, sku: string, addToast: (m: string, t?: str
     setBusy(true); if (!folderPath) setResults(null);
     const toRes = (r: { status: number; data: any }): GenResult =>
       r.data.ok ? r.data : { ok: false, sku: s, error: explainGen(r.data, r.status), folder: r.data.folder, candidates: r.data.candidates };
-    const fetchMode = (m: Mode) => call({ action: 'linkgen', sku: s, mode: m, folder: folderPath || undefined });
+    // rootUrl scopes the server-side search to ONE Settings folder (the
+    // owner's up-front pick) so a SKU present in two roots never stalls on
+    // "found in 2 places".
+    const fetchMode = (m: Mode) => call({ action: 'linkgen', sku: s, mode: m, folder: folderPath || undefined, rootUrl: rootUrl || undefined });
     const other: Mode = mode === 'combine' ? 'separate' : 'combine';
 
     setPending(other);

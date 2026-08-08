@@ -497,8 +497,16 @@ Deno.serve(async (req) => {
       let token = '';
       try { token = await getDropboxToken(); }
       catch (e) { if ((e as Error).message === 'dropbox_not_connected') return json({ ok: false, error: 'dropbox_not_connected' }, req, 409); return fail(500, 'Dropbox auth failed', req, (e as Error).message); }
-      const roots = (await loadGenRoots()).filter(r => r.enabled !== false && r.url);
-      if (roots.length === 0) return json({ ok: false, error: 'no_roots' }, req, 409);
+      const allRoots = (await loadGenRoots()).filter(r => r.enabled !== false && r.url);
+      if (allRoots.length === 0) return json({ ok: false, error: 'no_roots' }, req, 409);
+      // Owner's up-front folder pick (client select fed by the Settings
+      // roots): scope the search to that ONE root so a SKU folder that exists
+      // under two roots resolves without the "found in 2 places" stall.
+      // Validated against the stored list — an arbitrary URL can't widen the
+      // search surface.
+      const wantRoot = String(body?.rootUrl || '').trim();
+      const roots = wantRoot ? allRoots.filter(r => r.url === wantRoot) : allRoots;
+      if (roots.length === 0) return json({ ok: false, sku, error: 'That search folder is no longer in Settings — pick a folder again' }, req);
       const rootPaths: string[] = [];
       for (const r of roots) {
         const hit = genRootCache[r.url];

@@ -8,7 +8,7 @@ import { useState, useEffect, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { useAuth } from '../../../hooks/useAuth';
-import { call, WriteResult } from './api';
+import { call, GenRoot, WriteResult } from './api';
 import { runBulk, parseSkuText, parseSkuFile, exportBulkXlsx, BulkRow, BULK_CAP } from './bulk';
 import { useGenOne, Mode } from './useGenOne';
 import LinkResult from './LinkResult';
@@ -20,7 +20,13 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
   const canSave = ['admin', 'manager', 'operator'].includes((profile?.role as string) || '');
   const [mode, setMode] = useState<Mode>('combine');
   const [sku, setSku] = useState('');
-  const { busy, results, pending, genOne } = useGenOne(mode, sku, addToast);
+  // The owner's up-front folder pick (per the Settings roots): scopes every
+  // search to ONE folder so a SKU present in two roots never stalls on
+  // "found in 2 places". '' = search all. Remembered across visits.
+  const [rootUrl, setRootUrlState] = useState(() => localStorage.getItem('dbx_linkgen_root') || '');
+  const setRootUrl = (v: string) => { setRootUrlState(v); localStorage.setItem('dbx_linkgen_root', v); };
+  const [roots, setRoots] = useState<GenRoot[]>([]);
+  const { busy, results, pending, genOne } = useGenOne(mode, sku, addToast, rootUrl);
   const [savingSheet, setSavingSheet] = useState(false);
   const [rootCount, setRootCount] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -37,7 +43,13 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
   const fileRef = useRef<HTMLInputElement>(null);
 
   const refreshRoots = () => call({ action: 'linkgen_roots', op: 'list' }).then(({ data }) => {
-    if (data.ok) setRootCount((data.roots || []).filter((r: any) => r.enabled !== false).length);
+    if (!data.ok) return;
+    const enabled = ((data.roots || []) as GenRoot[]).filter(r => r.enabled !== false);
+    setRoots(enabled);
+    setRootCount(enabled.length);
+    // A remembered pick that was deleted/disabled in Settings falls back to
+    // all folders instead of silently scoping to nothing.
+    setRootUrlState(prev => { if (prev && !enabled.some(r => r.url === prev)) { localStorage.setItem('dbx_linkgen_root', ''); return ''; } return prev; });
   }).catch(() => {});
   useEffect(() => { refreshRoots(); }, []);
 
@@ -50,7 +62,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
     let skus = skusIn;
     if (skus.length > BULK_CAP) { addToast(`${skus.length} SKUs — doing the first ${BULK_CAP}`, 'info'); skus = skus.slice(0, BULK_CAP); }
     setBulkBusy(true); setBulkMode(mode); setProgress({ done: 0, total: skus.length });
-    const rows = await runBulk(skus, mode, (r, done) => { setBulk(r); setProgress({ done, total: skus.length }); });
+    const rows = await runBulk(skus, mode, (r, done) => { setBulk(r); setProgress({ done, total: skus.length }); }, rootUrl);
     const ok = rows.filter(r => r.status === 'ok').length;
     addToast(`${ok} of ${rows.length} SKUs got links${ok < rows.length ? ' — see the list' : ''}`, ok > 0 ? 'success' : 'error');
     setBulkBusy(false);
@@ -110,6 +122,14 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
         {modeBtn('combine', 'Combine', 'One link for the whole SKU folder')}
         {modeBtn('separate', 'Separate', 'A link for every image inside the SKU folder')}
         <span style={{ fontSize: 10, color: T.tx3 }}>{mode === 'combine' ? 'One link per SKU (whole folder)' : 'One link per image in the folder'} · tap to switch</span>
+        {roots.length > 1 && (
+          <select value={rootUrl} onChange={e => setRootUrl(e.target.value)}
+            title="Which Settings folder to search — picked up front so a SKU found in two folders never stalls"
+            style={{ ...S.fInput, width: 'auto', minWidth: 130 }}>
+            <option value="">All folders</option>
+            {roots.map(r => <option key={r.url} value={r.url}>{r.label || r.url.slice(-18)}</option>)}
+          </select>
+        )}
         <button onClick={() => setShowSettings(s => !s)} style={{ ...S.btnGhost, minHeight: 36, marginLeft: 'auto' }}>{showSettings ? 'Close Settings' : 'Settings'}</button>
       </div>
       {rootCount === 0 && (
@@ -146,7 +166,10 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
         </div>
       )}
 
-      {active && <LinkResult result={active} saveUrl={saveUrl} canSave={canSave} saving={savingSheet} busy={busy} onPickCandidate={genOne} onCopy={copy} onSave={url => saveToSheet(url, active.sku)} />}
+      {/* Save-to-sheet only in Combine view (owner's rule) — the sheet's IMAGE
+          column takes the FOLDER link, and offering it while per-image links
+          are on screen invited saving the wrong thing. Bulk gates the same. */}
+      {active && <LinkResult result={active} saveUrl={mode === 'combine' ? saveUrl : undefined} canSave={canSave} saving={savingSheet} busy={busy} onPickCandidate={genOne} onCopy={copy} onSave={url => saveToSheet(url, active.sku)} />}
       {activeLoading && (
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 14, marginBottom: 12, maxWidth: 720, fontSize: 11, color: T.tx3 }}>
           Generating {mode === 'combine' ? 'the folder link' : 'a link per image'}…
