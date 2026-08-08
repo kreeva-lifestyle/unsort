@@ -53,8 +53,10 @@ export default function LinkResult({ result, saveUrl, canSave, saving, busy, onP
           </> : <span style={{ fontSize: 10, color: T.re }}>{l.error || 'failed'}</span>}
         </div>
       ))}
+      {/* CRLF, not LF: Windows Excel splits pasted rows on \r\n — with bare
+          \n the whole list can land in ONE row/cell instead of a column. */}
       {result.ok && goodLinks.length > 1 && (
-        <button onClick={() => onCopy(goodLinks.map(l => l.url).join('\n'), 'All links')} style={{ ...S.btnGhost, marginTop: 8, padding: '4px 10px', fontSize: 10 }}>Copy all</button>
+        <button onClick={() => onCopy(goodLinks.map(l => l.url).join('\r\n'), 'All links')} style={{ ...S.btnGhost, marginTop: 8, padding: '4px 10px', fontSize: 10 }}>Copy all</button>
       )}
       {result.note && <div style={{ fontSize: 10, color: T.yl, marginTop: 8 }}>{result.note}</div>}
     </div>
