@@ -22,13 +22,10 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
   const canSave = ['admin', 'manager', 'operator'].includes((profile?.role as string) || '');
   const [mode, setMode] = useState<Mode>('combine');
   const [sku, setSku] = useState('');
-  // The owner's up-front folder pick (per the Settings roots): scopes every
-  // search to ONE folder so a SKU present in two roots never stalls on
-  // "found in 2 places". '' = search all. Remembered across visits.
-  const [rootUrl, setRootUrlState] = useState(() => localStorage.getItem('dbx_linkgen_root') || '');
-  const setRootUrl = (v: string) => { setRootUrlState(v); localStorage.setItem('dbx_linkgen_root', v); };
+  // Folder choice is asked in a POPUP before EVERY search (owner's rule — no
+  // remembered pick, no toolbar select). roots feeds the popup's options.
   const [roots, setRoots] = useState<GenRoot[]>([]);
-  const { busy, results, pending, genOne } = useGenOne(mode, sku, addToast, rootUrl);
+  const { busy, results, pending, genOne } = useGenOne(mode, sku, addToast);
   const { savingSheet, bulkSaving, saveToSheet, saveAllToSheet } = useSheetSave(addToast);
   const [rootCount, setRootCount] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -48,9 +45,6 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
     const enabled = ((data.roots || []) as GenRoot[]).filter(r => r.enabled !== false);
     setRoots(enabled);
     setRootCount(enabled.length);
-    // A remembered pick that was deleted/disabled in Settings falls back to
-    // all folders instead of silently scoping to nothing.
-    setRootUrlState(prev => { if (prev && !enabled.some(r => r.url === prev)) { localStorage.setItem('dbx_linkgen_root', ''); return ''; } return prev; });
   }).catch(() => {});
   useEffect(() => { refreshRoots(); }, []);
 
@@ -59,15 +53,14 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
     catch { addToast('Could not copy — long-press the link instead', 'error'); }
   };
 
-  // ASK-FIRST gate (owner's rule): with several Settings folders and none
-  // committed, the folder question comes BEFORE any search — never after.
-  // The pending run waits for the modal's answer.
+  // ASK-FIRST gate (owner's rule): with several Settings folders, the folder
+  // popup comes before EVERY search. The pending run waits for the answer.
   const [pendingGen, setPendingGen] = useState<{ kind: 'one' } | { kind: 'bulk'; skus: string[] } | null>(null);
-  const mustAsk = roots.length > 1 && !rootUrl;
+  const mustAsk = roots.length > 1;
 
-  const doBulk = async (skus: string[], rootOverride?: string) => {
+  const doBulk = async (skus: string[], rootOverride = '') => {
     setBulkBusy(true); setBulkMode(mode); setProgress({ done: 0, total: skus.length });
-    const rows = await runBulk(skus, mode, (r, done) => { setBulk(r); setProgress({ done, total: skus.length }); }, rootOverride ?? rootUrl);
+    const rows = await runBulk(skus, mode, (r, done) => { setBulk(r); setProgress({ done, total: skus.length }); }, rootOverride);
     const ok = rows.filter(r => r.status === 'ok').length;
     addToast(`${ok} of ${rows.length} SKUs got links${ok < rows.length ? ' — see the list' : ''}`, ok > 0 ? 'success' : 'error');
     setBulkBusy(false);
@@ -82,7 +75,6 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
   const onAskPick = (url: string) => {
     const p = pendingGen;
     setPendingGen(null);
-    if (url) setRootUrl(url); // a real folder commits; '' stays ask-each-time
     if (!p) return;
     if (p.kind === 'one') genOne(undefined, url);
     else doBulk(p.skus, url);
@@ -113,14 +105,6 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
         {modeBtn('combine', 'Combine', 'One link for the whole SKU folder')}
         {modeBtn('separate', 'Separate', 'A link for every image inside the SKU folder')}
         <span style={{ fontSize: 10, color: T.tx3 }}>{mode === 'combine' ? 'One link per SKU (whole folder)' : 'One link per image in the folder'} · tap to switch</span>
-        {roots.length > 1 && (
-          <select value={rootUrl} onChange={e => setRootUrl(e.target.value)}
-            title="Which Settings folder to search — picked up front so a SKU found in two folders never stalls"
-            style={{ ...S.fInput, width: 'auto', minWidth: 130 }}>
-            <option value="">Ask each time</option>
-            {roots.map(r => <option key={r.url} value={r.url}>{r.label || r.url.slice(-18)}</option>)}
-          </select>
-        )}
         <button onClick={() => setShowSettings(s => !s)} style={{ ...S.btnGhost, minHeight: 36, marginLeft: 'auto' }}>{showSettings ? 'Close Settings' : 'Settings'}</button>
       </div>
       {rootCount === 0 && (

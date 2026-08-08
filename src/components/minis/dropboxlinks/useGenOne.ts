@@ -12,7 +12,7 @@ import { call, explainGen, GenResult } from './api';
 export type Mode = 'combine' | 'separate';
 export type Pair = { combine: GenResult | null; separate: GenResult | null };
 
-export function useGenOne(mode: Mode, sku: string, addToast: (m: string, t?: string) => void, rootUrl = '') {
+export function useGenOne(mode: Mode, sku: string, addToast: (m: string, t?: string) => void) {
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<Pair | null>(null);
   // The mode still being fetched in the background, so toggling to it can show a
@@ -22,9 +22,10 @@ export function useGenOne(mode: Mode, sku: string, addToast: (m: string, t?: str
   // newer one now that the two modes resolve independently.
   const runId = useRef(0);
 
-  // rootOverride: the folder chosen in the ask-first modal for THIS run —
-  // state hasn't re-rendered the hook yet, so the value rides in directly.
-  const genOne = async (folderPath?: string, rootOverride?: string) => {
+  // rootOverride: the folder chosen in the ask-first popup for THIS run
+  // ('' = all folders). A candidate pick (folderPath) carries no override —
+  // the picked path is validated against every root server-side.
+  const genOne = async (folderPath?: string, rootOverride = '') => {
     const cur = results?.combine?.sku || results?.separate?.sku || '';
     const s = (folderPath ? cur || sku : sku).trim().toUpperCase();
     if (busy || !s) return;
@@ -34,11 +35,7 @@ export function useGenOne(mode: Mode, sku: string, addToast: (m: string, t?: str
     setBusy(true); if (!folderPath) setResults(null);
     const toRes = (r: { status: number; data: any }): GenResult =>
       r.data.ok ? r.data : { ok: false, sku: s, error: explainGen(r.data, r.status), folder: r.data.folder, candidates: r.data.candidates };
-    // rootUrl scopes the server-side search to ONE Settings folder (the
-    // owner's up-front pick) so a SKU present in two roots never stalls on
-    // "found in 2 places".
-    const effRoot = rootOverride ?? rootUrl;
-    const fetchMode = (m: Mode) => call({ action: 'linkgen', sku: s, mode: m, folder: folderPath || undefined, rootUrl: effRoot || undefined });
+    const fetchMode = (m: Mode) => call({ action: 'linkgen', sku: s, mode: m, folder: folderPath || undefined, rootUrl: rootOverride || undefined });
     const other: Mode = mode === 'combine' ? 'separate' : 'combine';
 
     setPending(other);
