@@ -180,8 +180,8 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
                   <tr key={i}>
                     <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
                     <td style={{ ...S.tdStyle, color: r.status === 'ok' ? T.gr : r.status === 'error' ? T.re : T.tx3, fontSize: 11 }}>{r.status === 'pending' ? '…' : r.status === 'ok' ? `✓ ${r.links.length} link${r.links.length === 1 ? '' : 's'}` : r.message}</td>
-                    {/* \r\n so Excel pastes one link per ROW (see LinkResult). */}
-                    <td style={S.tdStyle}>{r.links.length > 0 && <button onClick={() => copy(r.links.map(l => l.url).join('\r\n'), `${r.sku} links`)} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 10 }}>Copy</button>}</td>
+                    {/* TAB-joined: pastes ACROSS one row (image1..N columns) — see LinkResult. */}
+                    <td style={S.tdStyle}>{r.links.length > 0 && <button onClick={() => copy(r.links.map(l => l.url).join('\t'), `${r.sku} links`)} style={{ ...S.btnGhost, padding: '4px 10px', fontSize: 10 }}>Copy</button>}</td>
                   </tr>
                 ))}
               </tbody>
