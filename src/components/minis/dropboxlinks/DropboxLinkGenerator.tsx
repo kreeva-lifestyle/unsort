@@ -153,7 +153,19 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
 
       {bulk && bulk.length > 0 && (
         <>
-          {canSave && !bulkBusy && bulkMode === 'combine' && bulk.some(r => r.status === 'ok') && (
+          {/* The table holds the links of the run that MADE it — flipping the
+              mode toggle must not silently re-spend a whole bulk run, so it
+              re-generates nothing. Say that, or an export after toggling
+              looks like the toggle "didn't work" (owner's report). */}
+          {!bulkBusy && bulkMode !== mode && (
+            <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 8, padding: '8px 12px', marginBottom: 8, fontSize: 11, color: T.tx2 }}>
+              These bulk links are <b>{bulkMode === 'combine' ? 'Combine (one folder link per SKU)' : 'Separate (one link per image)'}</b> — switching the toggle doesn&rsquo;t change them. Press <b>Generate</b> again to get {mode === 'combine' ? 'Combine' : 'Separate'} links.
+            </div>
+          )}
+          {/* BOTH gates: bulkMode (the table really holds folder links — data
+              safety) AND the live toggle (owner's rule: no sheet-save
+              anywhere while Separate is selected). */}
+          {canSave && !bulkBusy && mode === 'combine' && bulkMode === 'combine' && bulk.some(r => r.status === 'ok') && (
             <button onClick={() => saveAllToSheet(bulk)} disabled={bulkSaving} style={{ ...S.btnGhost, marginBottom: 8, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)', background: 'oklch(0.77 0.14 230 / .06)', pointerEvents: bulkSaving ? 'none' : 'auto', opacity: bulkSaving ? 0.5 : 1 }}>{bulkSaving ? 'Saving…' : 'Save all to master sheet'}</button>
           )}
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}` }}>
