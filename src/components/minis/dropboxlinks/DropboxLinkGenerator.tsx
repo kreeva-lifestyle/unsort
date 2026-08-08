@@ -8,11 +8,13 @@ import { useState, useEffect, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { useAuth } from '../../../hooks/useAuth';
-import { call, GenRoot, WriteResult } from './api';
+import { call, GenRoot } from './api';
+import { useSheetSave } from './useSheetSave';
 import { runBulk, parseSkuText, parseSkuFile, exportBulkXlsx, BulkRow, BULK_CAP } from './bulk';
 import { useGenOne, Mode } from './useGenOne';
 import LinkResult from './LinkResult';
 import RootSettings from './RootSettings';
+import FolderAskModal from './FolderAskModal';
 import SkuInput from '../../ui/SkuInput';
 
 export default function DropboxLinkGenerator({ addToast }: { addToast: (m: string, t?: string) => void }) {
@@ -27,7 +29,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
   const setRootUrl = (v: string) => { setRootUrlState(v); localStorage.setItem('dbx_linkgen_root', v); };
   const [roots, setRoots] = useState<GenRoot[]>([]);
   const { busy, results, pending, genOne } = useGenOne(mode, sku, addToast, rootUrl);
-  const [savingSheet, setSavingSheet] = useState(false);
+  const { savingSheet, bulkSaving, saveToSheet, saveAllToSheet } = useSheetSave(addToast);
   const [rootCount, setRootCount] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showPaste, setShowPaste] = useState(false);
@@ -38,7 +40,6 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
   // image) could be written into the master sheet as if they were folder links.
   const [bulkMode, setBulkMode] = useState<Mode>('combine');
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [bulkSaving, setBulkSaving] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -58,49 +59,39 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
     catch { addToast('Could not copy — long-press the link instead', 'error'); }
   };
 
-  const startBulk = async (skusIn: string[]) => {
-    let skus = skusIn;
-    if (skus.length > BULK_CAP) { addToast(`${skus.length} SKUs — doing the first ${BULK_CAP}`, 'info'); skus = skus.slice(0, BULK_CAP); }
+  // ASK-FIRST gate (owner's rule): with several Settings folders and none
+  // committed, the folder question comes BEFORE any search — never after.
+  // The pending run waits for the modal's answer.
+  const [pendingGen, setPendingGen] = useState<{ kind: 'one' } | { kind: 'bulk'; skus: string[] } | null>(null);
+  const mustAsk = roots.length > 1 && !rootUrl;
+
+  const doBulk = async (skus: string[], rootOverride?: string) => {
     setBulkBusy(true); setBulkMode(mode); setProgress({ done: 0, total: skus.length });
-    const rows = await runBulk(skus, mode, (r, done) => { setBulk(r); setProgress({ done, total: skus.length }); }, rootUrl);
+    const rows = await runBulk(skus, mode, (r, done) => { setBulk(r); setProgress({ done, total: skus.length }); }, rootOverride ?? rootUrl);
     const ok = rows.filter(r => r.status === 'ok').length;
     addToast(`${ok} of ${rows.length} SKUs got links${ok < rows.length ? ' — see the list' : ''}`, ok > 0 ? 'success' : 'error');
     setBulkBusy(false);
+  };
+  const startBulk = (skusIn: string[]) => {
+    let skus = skusIn;
+    if (skus.length > BULK_CAP) { addToast(`${skus.length} SKUs — doing the first ${BULK_CAP}`, 'info'); skus = skus.slice(0, BULK_CAP); }
+    if (mustAsk) { setPendingGen({ kind: 'bulk', skus }); return; }
+    doBulk(skus);
+  };
+  const requestGenOne = () => { if (mustAsk) { setPendingGen({ kind: 'one' }); return; } genOne(); };
+  const onAskPick = (url: string) => {
+    const p = pendingGen;
+    setPendingGen(null);
+    if (url) setRootUrl(url); // a real folder commits; '' stays ask-each-time
+    if (!p) return;
+    if (p.kind === 'one') genOne(undefined, url);
+    else doBulk(p.skus, url);
   };
   const runPaste = () => { const skus = parseSkuText(pasteText); if (!skus.length) { addToast('Paste at least one SKU', 'error'); return; } startBulk(skus); };
   const importFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = ev => { try { const skus = parseSkuFile(ev.target?.result as ArrayBuffer); if (!skus.length) { addToast('Column A has no SKUs', 'error'); return; } startBulk(skus); } catch (e) { addToast(friendlyError(e), 'error'); } };
     reader.readAsArrayBuffer(file);
-  };
-
-  const saveToSheet = async (url: string, sku0: string) => {
-    if (savingSheet) return; setSavingSheet(true);
-    try {
-      const { data } = await call({ action: 'linkgen_writesheet', items: [{ sku: sku0, url }] }) as { data: WriteResult };
-      if (data.ok) addToast(`Saved to ${data.written?.[0]?.tab || 'sheet'} ${data.written?.[0]?.cell?.split('!')[1] || ''}`.trim(), 'success');
-      else if (data.error === 'sku_not_found') addToast(`${sku0} is not in the master sheet`, 'error');
-      else if (data.error === 'sku_ambiguous') addToast(`${sku0} exists in BOTH master tabs — update the sheet manually to be safe`, 'error');
-      else addToast(friendlyError(data.error || 'Could not save to the sheet'), 'error');
-    } catch (e) { addToast(friendlyError(e), 'error'); }
-    setSavingSheet(false);
-  };
-  const saveAllToSheet = async () => {
-    if (bulkSaving || !bulk) return;
-    const items = bulk.filter(r => r.status === 'ok' && r.links[0]?.url).map(r => ({ sku: r.sku, url: r.links[0].url }));
-    if (!items.length) { addToast('No folder links to save', 'error'); return; }
-    setBulkSaving(true);
-    try {
-      const { data } = await call({ action: 'linkgen_writesheet', items }) as { data: WriteResult };
-      const skipped = [
-        data.notFound?.length ? `${data.notFound.length} not in sheet` : '',
-        data.ambiguous?.length ? `${data.ambiguous.length} in both tabs (skipped: ${data.ambiguous.join(', ')})` : '',
-      ].filter(Boolean).join(' · ');
-      if (data.ok) addToast(`Saved ${data.skuCount ?? data.count} SKU${(data.skuCount ?? data.count) === 1 ? '' : 's'} to the master sheet${skipped ? ` — ${skipped}` : ''}`, 'success');
-      else if (data.error === 'sku_not_found' || data.error === 'sku_ambiguous') addToast(`Nothing saved — ${skipped || 'no matching SKUs in the master sheet'}`, 'error');
-      else addToast(friendlyError(data.error || 'Could not save to the sheet'), 'error');
-    } catch (e) { addToast(friendlyError(e), 'error'); }
-    setBulkSaving(false);
   };
 
   const modeBtn = (m: Mode, label: string, hint: string) => (
@@ -126,7 +117,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
           <select value={rootUrl} onChange={e => setRootUrl(e.target.value)}
             title="Which Settings folder to search — picked up front so a SKU found in two folders never stalls"
             style={{ ...S.fInput, width: 'auto', minWidth: 130 }}>
-            <option value="">All folders</option>
+            <option value="">Ask each time</option>
             {roots.map(r => <option key={r.url} value={r.url}>{r.label || r.url.slice(-18)}</option>)}
           </select>
         )}
@@ -144,10 +135,10 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
           that block the moment a SKU resolves. Centring would instead drop them
           below the input they sit next to. */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <SkuInput value={sku} onChange={setSku} onKeyDown={e => { if (e.key === 'Enter') genOne(); }} placeholder="Enter SKU e.g. 15003" style={{ ...S.fInput, width: 200, fontFamily: T.mono }} />
+        <SkuInput value={sku} onChange={setSku} onKeyDown={e => { if (e.key === 'Enter') requestGenOne(); }} placeholder="Enter SKU e.g. 15003" style={{ ...S.fInput, width: 200, fontFamily: T.mono }} />
         {/* minHeight 36 matches S.fInput's height — the btn recipes set none and
             land at ~32px. Same as modeBtn above. */}
-        <button onClick={() => genOne()} disabled={busy || !sku.trim()} style={{ ...S.btnPrimary, minHeight: 36, pointerEvents: busy ? 'none' : 'auto', opacity: busy || !sku.trim() ? 0.5 : 1 }}>{busy ? 'Generating…' : 'Generate Link'}</button>
+        <button onClick={requestGenOne} disabled={busy || !sku.trim()} style={{ ...S.btnPrimary, minHeight: 36, pointerEvents: busy ? 'none' : 'auto', opacity: busy || !sku.trim() ? 0.5 : 1 }}>{busy ? 'Generating…' : 'Generate Link'}</button>
         <button onClick={() => setShowPaste(p => !p)} style={{ ...S.btnGhost, minHeight: 36, color: T.ac2, border: '1px solid oklch(0.55 0.22 265 / .2)' }}>{showPaste ? 'Hide paste' : 'Paste SKUs'}</button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) importFile(f); e.target.value = ''; }} />
         <button onClick={() => fileRef.current?.click()} disabled={bulkBusy} style={{ ...S.btnGhost, minHeight: 36, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)', pointerEvents: bulkBusy ? 'none' : 'auto', opacity: bulkBusy ? 0.5 : 1 }}>{bulkBusy ? `Bulk… ${progress.done}/${progress.total}` : 'Bulk from Excel'}</button>
@@ -179,7 +170,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
       {bulk && bulk.length > 0 && (
         <>
           {canSave && !bulkBusy && bulkMode === 'combine' && bulk.some(r => r.status === 'ok') && (
-            <button onClick={saveAllToSheet} disabled={bulkSaving} style={{ ...S.btnGhost, marginBottom: 8, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)', background: 'oklch(0.77 0.14 230 / .06)', pointerEvents: bulkSaving ? 'none' : 'auto', opacity: bulkSaving ? 0.5 : 1 }}>{bulkSaving ? 'Saving…' : 'Save all to master sheet'}</button>
+            <button onClick={() => saveAllToSheet(bulk)} disabled={bulkSaving} style={{ ...S.btnGhost, marginBottom: 8, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)', background: 'oklch(0.77 0.14 230 / .06)', pointerEvents: bulkSaving ? 'none' : 'auto', opacity: bulkSaving ? 0.5 : 1 }}>{bulkSaving ? 'Saving…' : 'Save all to master sheet'}</button>
           )}
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}` }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}>
@@ -201,6 +192,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
       {!active && !activeLoading && !bulk && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Enter a SKU and press Generate — or paste / import an Excel of SKUs for bulk links.</div>}
 
       {showSettings && <RootSettings addToast={addToast} onChanged={refreshRoots} />}
+      {pendingGen && <FolderAskModal roots={roots} onPick={onAskPick} onClose={() => setPendingGen(null)} />}
     </div>
   );
 }

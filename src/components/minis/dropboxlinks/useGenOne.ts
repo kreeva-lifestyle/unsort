@@ -22,7 +22,9 @@ export function useGenOne(mode: Mode, sku: string, addToast: (m: string, t?: str
   // newer one now that the two modes resolve independently.
   const runId = useRef(0);
 
-  const genOne = async (folderPath?: string) => {
+  // rootOverride: the folder chosen in the ask-first modal for THIS run —
+  // state hasn't re-rendered the hook yet, so the value rides in directly.
+  const genOne = async (folderPath?: string, rootOverride?: string) => {
     const cur = results?.combine?.sku || results?.separate?.sku || '';
     const s = (folderPath ? cur || sku : sku).trim().toUpperCase();
     if (busy || !s) return;
@@ -35,7 +37,8 @@ export function useGenOne(mode: Mode, sku: string, addToast: (m: string, t?: str
     // rootUrl scopes the server-side search to ONE Settings folder (the
     // owner's up-front pick) so a SKU present in two roots never stalls on
     // "found in 2 places".
-    const fetchMode = (m: Mode) => call({ action: 'linkgen', sku: s, mode: m, folder: folderPath || undefined, rootUrl: rootUrl || undefined });
+    const effRoot = rootOverride ?? rootUrl;
+    const fetchMode = (m: Mode) => call({ action: 'linkgen', sku: s, mode: m, folder: folderPath || undefined, rootUrl: effRoot || undefined });
     const other: Mode = mode === 'combine' ? 'separate' : 'combine';
 
     setPending(other);
