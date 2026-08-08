@@ -543,7 +543,12 @@ Deno.serve(async (req) => {
         const uniq = found.filter((f: any) => { const k = f.path_lower; if (seen.has(k)) return false; seen.add(k); return true; });
         const exact = uniq.filter((f: any) => normSku(f.name) === sku);
         const cands = exact.length ? exact : uniq.filter((f: any) => nameMatchesSku(f.name, sku) && normSku(f.name).length >= sku.length);
-        if (cands.length === 0) return json({ ok: false, sku, error: `No folder named "${sku}" found in the configured search folders` }, req);
+        // A SCOPED miss must say which folder was searched — "not found in the
+        // configured search folders" reads as a broken feature when the SKU
+        // simply lives in one of the OTHER folders.
+        if (cands.length === 0) return json({ ok: false, sku, error: wantRoot
+          ? `No folder named "${sku}" inside "${roots[0].label || 'the selected folder'}" — switch the folder picker to another folder (or All folders) and try again`
+          : `No folder named "${sku}" found in the configured search folders` }, req);
         if (cands.length > 1) return json({ ok: false, sku, error: `"${sku}" was found in ${cands.length} places — tap the folder you want:`, candidates: cands.slice(0, 6).map((c: any) => ({ name: c.name, path: c.path_lower, display: c.path_display })) }, req);
         folder = cands[0];
       }
