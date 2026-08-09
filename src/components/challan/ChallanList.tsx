@@ -1,6 +1,6 @@
 // Challan list — search/filter row + collapsible filter bar + per-row table.
 // Extracted from CashChallan.tsx; parent owns state & action callbacks.
-import { T, S } from '../../lib/theme';
+import { T, S, Icon } from '../../lib/theme';
 import Empty from '../ui/Empty';
 import SwipeRow from '../ui/SwipeRow';
 import DateInput from '../ui/DateInput';
@@ -182,7 +182,7 @@ export default function ChallanList(p: Props) {
                     <div style={{ fontWeight: 600, fontSize: 13, color: T.tx }}>{c.customer_name}</div>
                     {c.customer_phone && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>+91 {c.customer_phone.replace(/^91/, '').replace(/(\d{5})(\d{5})/, '$1 $2')}</div>}
                     <div style={{ display: 'flex', gap: 4, marginTop: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {isRet && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}>Return{srcNum(c) ? ` of #${srcNum(c)}` : ''}</span>}
+                      {isRet && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}><Icon name="return" size={8} /> Return{srcNum(c) ? ` of #${srcNum(c)}` : ''}</span>}
                       {(c.tags || []).map(t => <span key={t} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: T.ac3, color: T.ac2, fontWeight: 600 }}>{t}</span>)}
                       {c.notes && <span title={c.notes} style={{ display: 'inline-flex', alignItems: 'center', opacity: 0.4 }}><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.tx3, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg></span>}
                     </div>

@@ -1,7 +1,7 @@
 // Customer ledger list + detail — extracted from CashChallan.tsx for
 // god-component split (audit P0). Parent owns the data fetch; this
 // component just renders.
-import { T, S } from '../../lib/theme';
+import { T, S, Icon } from '../../lib/theme';
 import DateInput from '../ui/DateInput';
 import type { CashChallan } from '../../types/database';
 import { exportName, fileDate } from '../../lib/exportName';
@@ -110,7 +110,7 @@ export default function ChallanLedger({
                     <span style={{ fontSize: 10, fontFamily: T.mono, color: T.tx3 }}>#{c.challan_number}</span>
                     <span style={{ fontSize: 9, color: T.tx3 }}>{new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
                     <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: sc.bg, color: sc.color, fontWeight: 600, textTransform: 'uppercase' as const }}>{c.status}</span>
-                    {isRet && <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' as const }}>↩ Return</span>}
+                    {isRet && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, padding: '2px 6px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' as const }}><Icon name="return" size={9} /> Return</span>}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>

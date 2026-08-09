@@ -367,6 +367,9 @@ export const Pill = ({ tone = 'neutral', dot, children, style }: { tone?: PillTo
 // 12 hand-rolled 24×24 stroke-1.8 icons. For anything not here,
 // use Lucide at stroke-width 1.8.
 const ICON_PATHS: Record<string, string> = {
+  // U-turn arrow for return challans — the ↩ CHARACTER renders as an emoji
+  // on iOS, so badges draw this stroke icon instead (owner's rule: no emoji).
+  return:   'M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3',
   grid:     'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
   box:      'M21 8l-9-5-9 5v8l9 5 9-5V8zM3 8l9 5M12 22V13M21 8l-9 5',
   tag:      'M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82zM7 7h.01',
