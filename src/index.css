@@ -500,3 +500,29 @@ body.modal-open .fab { display: none !important; }
   .prg-matching-grid { grid-template-columns: 1fr !important; }
   .prg-matching-grid > button { grid-column: 1 !important; }
 }
+
+/* ---- Challan form: mobile-first creation flow ---------------------------- */
+/* The collapsible extras section (shipping/tags/notes) — native <details>,
+   two spans swapped by [open] so the +/− indicator needs no JS. */
+.challan-extras summary { list-style: none; cursor: pointer; }
+.challan-extras summary::-webkit-details-marker { display: none; }
+.challan-extras .x-open { display: none; }
+.challan-extras[open] .x-open { display: inline; }
+.challan-extras[open] .x-closed { display: none; }
+/* Per-line net + sticky save bar exist only on mobile. */
+.challan-line-total { display: none; }
+.challan-savebar { display: none; }
+@media (max-width: 768px) {
+  /* Sticky total + save above the bottom nav: the number the user is
+     building toward stays under the thumb for the whole form. */
+  .challan-savebar { display: flex; position: fixed; left: 0; right: 0; bottom: var(--nav-h); z-index: 90; align-items: center; gap: 12px; padding: 10px 14px; background: rgba(8, 11, 20, 0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid rgba(255, 255, 255, 0.07); }
+  .challan-save-inline { display: none !important; }
+  /* Clearance for nav + savebar (overrides the older 80px rule above). */
+  .challan-form { padding-bottom: calc(var(--nav-h) + 92px) !important; }
+  /* Status/Mode/Amount/Date: 4-across is unreadable at 393px — go 2×2. */
+  .challan-form-grid-4 { grid-template-columns: 1fr 1fr !important; }
+  /* Recent customers: one swipeable row instead of a two-row pill wall. */
+  .challan-recent { flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .challan-recent::-webkit-scrollbar { display: none; }
+  .challan-line-total { display: flex !important; }
+}
