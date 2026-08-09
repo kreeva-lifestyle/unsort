@@ -429,7 +429,9 @@ export default function ChallanForm(p: ChallanFormProps) {
             desktop (CSS), where the inline button above shows instead. */}
         <div className="challan-savebar">
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.08em', fontWeight: 600 }}>{p.items.filter(it => it.sku.trim()).length || p.items.length} item{(p.items.filter(it => it.sku.trim()).length || p.items.length) === 1 ? '' : 's'} · Total</div>
+            {(() => { const n = p.items.filter(it => it.sku.trim() || Number(it.price) > 0).length; return (
+            <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.08em', fontWeight: 600 }}>{n} item{n === 1 ? '' : 's'} · Total</div>
+            ); })()}
             <div style={{ fontFamily: T.sora, fontWeight: 800, fontSize: 17, color: p.grandTotal < 0 ? T.re : (p.isReturn ? T.re : T.gr), lineHeight: 1.2 }}>{p.isReturn && p.grandTotal > 0 ? '−' : ''}{p.grandTotal < 0 ? '−' : ''}₹{Math.abs(p.grandTotal).toLocaleString('en-IN')}</div>
           </div>
           <button onClick={p.onSave} disabled={p.saving} style={{ padding: '11px 22px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', minHeight: 44, cursor: p.saving ? 'not-allowed' : 'pointer', opacity: p.saving ? 0.6 : 1, whiteSpace: 'nowrap' as const }}>{saveLabel}</button>

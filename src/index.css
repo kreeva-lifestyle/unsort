@@ -515,7 +515,13 @@ body.modal-open .fab { display: none !important; }
 @media (max-width: 768px) {
   /* Sticky total + save above the bottom nav: the number the user is
      building toward stays under the thumb for the whole form. */
-  .challan-savebar { display: flex; position: fixed; left: 0; right: 0; bottom: var(--nav-h); z-index: 90; align-items: center; gap: 12px; padding: 10px 14px; background: rgba(8, 11, 20, 0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid rgba(255, 255, 255, 0.07); }
+  /* Anchored to the SCREEN bottom, with the nav's height as internal bottom
+     padding: the nav (z-102) overlays that padded zone, so the bar reads as
+     sitting flush on top of it — and if the nav is ever absent or mid-
+     transition, the bar's own background fills to the edge. Anchoring to
+     bottom: var(--nav-h) instead left a see-through gap on devices where the
+     two measurements disagreed (owner's screenshot). */
+  .challan-savebar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 90; align-items: center; gap: 12px; padding: 10px 14px calc(var(--nav-h) + 10px); background: rgba(8, 11, 20, 0.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid rgba(255, 255, 255, 0.07); }
   .challan-save-inline { display: none !important; }
   /* Clearance for nav + savebar (overrides the older 80px rule above). */
   .challan-form { padding-bottom: calc(var(--nav-h) + 92px) !important; }
