@@ -2,10 +2,10 @@
 // Parent owns all state and the submit logic; this component is just render + event routing.
 // Wide prop surface is intentional — keeps state in one place without introducing a context.
 import { useRef, useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import DateInput from '../ui/DateInput';
+import AuditTrailModal from './AuditTrailModal';
 import SkuInput from '../ui/SkuInput';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
@@ -179,7 +179,7 @@ export default function ChallanForm(p: ChallanFormProps) {
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
           {/* Recent customers */}
           {!p.editing && recentCustomers.length > 0 && !p.customerName && (
-            <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+            <div className="challan-recent" style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
               {recentCustomers.map(c => (
                 <span key={c.name} onClick={() => { p.setCustomerName(c.name); if (c.id) { p.setSelectedCustomerId(c.id); supabase.from('cash_challan_customers').select('phone').eq('name', c.name).maybeSingle().then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); if (data?.phone) p.setCustomerPhone(data.phone); }); } p.setCustomerSuggestions([]); }}
                   style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', background: T.ac3, border: `1px solid ${T.ac3}`, color: T.ac2, whiteSpace: 'nowrap' }}>{c.name}</span>
@@ -301,6 +301,13 @@ export default function ChallanForm(p: ChallanFormProps) {
                     />
                   </div>
                   <button onClick={() => { if (p.items.length > 1) p.setItems(p.items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }} aria-label="Remove item">×</button>
+                  {/* Mobile-only line net: on the stacked card layout the eye
+                      has no row to sum — confirm each line as it is typed. */}
+                  {q > 0 && pr > 0 && (
+                    <div className="challan-line-total" style={{ width: '100%', justifyContent: 'flex-end', fontFamily: T.mono, fontSize: 11, color: T.tx2 }}>
+                      = ₹{(q * pr - (it.discount_type === 'percentage' ? q * pr * d / 100 : Math.min(d, q * pr))).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </div>
+                  )}
                 </div>
                 {err && <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.re, borderBottom: `1px solid ${T.bd}`, background: 'oklch(0.63 0.22 25 / .04)', display: 'flex', alignItems: 'center', gap: 5 }}>⚠ {err}</div>}
                 {!err && d > 0 && q > 0 && pr > 0 && (() => { const pct = it.discount_type === 'percentage' ? d : (d / (q * pr)) * 100; return pct > 10 ? <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.yl, borderBottom: `1px solid ${T.bd}`, background: 'oklch(0.78 0.18 75 / .04)', display: 'flex', alignItems: 'center', gap: 5 }}>High discount: {Math.round(pct)}% off this item</div> : null; })()}
@@ -310,8 +317,17 @@ export default function ChallanForm(p: ChallanFormProps) {
             {!(p.isReturn && p.returnSource) && <button onClick={() => p.setItems([...p.items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }])} style={{ width: '100%', padding: '7px', border: 'none', background: T.ac3, color: T.ac2, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ Add Item (or press Enter on last row)</button>}
           </div>
 
-          {/* Shipping + Tags + Notes — returns never carry shipping charges */}
-          <div className="challan-form-grid-3" style={{ display: 'grid', gridTemplateColumns: p.isReturn ? '1fr 1fr' : '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+          {/* Shipping + Tags + Notes fold away — most challans never touch
+              them, and on a phone they were three fields of scroll between the
+              items and the payment section. Kept OPEN whenever they carry a
+              value (native <details>; React only pins it open in that case). */}
+          <details className="challan-extras" {...((p.shippingCharges > 0 || p.tags.trim() || p.notes.trim()) ? { open: true } : {})} style={{ marginBottom: 10 }}>
+            <summary style={{ ...S.fLabel, color: T.ac2, padding: '6px 0', userSelect: 'none' as const }}>
+              <span className="x-closed">+ </span><span className="x-open">− </span>
+              {p.isReturn ? 'Tags · Notes' : 'Shipping · Tags · Notes'}
+              {p.shippingCharges > 0 && <span style={{ marginLeft: 6, color: T.bl, textTransform: 'none' as const }}>₹{p.shippingCharges.toLocaleString('en-IN')} shipping</span>}
+            </summary>
+          <div className="challan-form-grid-3" style={{ display: 'grid', gridTemplateColumns: p.isReturn ? '1fr 1fr' : '1fr 1fr 1fr', gap: 8 }}>
             {!p.isReturn && <div>
               <label style={lbl}>Shipping/Porter</label>
               <input type="number" min="0" value={p.shippingCharges || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setShippingCharges(Math.max(0, Number(e.target.value)))} placeholder="Amount" style={{ ...inp, fontFamily: T.mono, fontSize: 11, border: p.shippingCharges < 0 ? `1px solid ${T.reAA}` : `1px solid ${T.bd}` }} />
@@ -326,6 +342,7 @@ export default function ChallanForm(p: ChallanFormProps) {
               <textarea value={p.notes} onChange={e => p.setNotes(e.target.value)} placeholder="Add notes about this challan..." rows={2} style={{ ...inp, height: 'auto', fontSize: 11, resize: 'vertical', lineHeight: 1.5 }} />
             </div>
           </div>
+          </details>
 
           {/* Status + Payment. Returns are credits (no cash) — the return reduces
               the customer's balance, so no refund mode/amount/date is collected. */}
@@ -405,31 +422,22 @@ export default function ChallanForm(p: ChallanFormProps) {
         </div>
 
         {p.formError && <div style={{ background: 'oklch(0.63 0.22 25 / .15)', borderLeft: `4px solid ${T.re}`, borderRadius: 6, padding: '10px 14px', fontSize: 11, color: T.tx, marginBottom: 8 }}>{p.formError}</div>}
-        <button onClick={p.onSave} disabled={p.saving} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: p.saving ? 'not-allowed' : 'pointer', boxShadow: `0 4px 16px ${T.ac3}`, opacity: p.saving ? 0.6 : 1 }}>{p.saving ? 'Saving...' : p.editing ? (p.isReturn ? 'Update Return' : 'Update Challan') : (p.isReturn ? 'Create Return' : 'Create Challan')}</button>
+        {(() => { const saveLabel = p.saving ? 'Saving...' : p.editing ? (p.isReturn ? 'Update Return' : 'Update Challan') : (p.isReturn ? 'Create Return' : 'Create Challan'); return (<>
+        <button className="challan-save-inline" onClick={p.onSave} disabled={p.saving} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', cursor: p.saving ? 'not-allowed' : 'pointer', boxShadow: `0 4px 16px ${T.ac3}`, opacity: p.saving ? 0.6 : 1 }}>{saveLabel}</button>
+        {/* Mobile: the total + save travel WITH the thumb — no more scrolling
+            past payment fields to learn what the challan adds up to. Hidden on
+            desktop (CSS), where the inline button above shows instead. */}
+        <div className="challan-savebar">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.08em', fontWeight: 600 }}>{p.items.filter(it => it.sku.trim()).length || p.items.length} item{(p.items.filter(it => it.sku.trim()).length || p.items.length) === 1 ? '' : 's'} · Total</div>
+            <div style={{ fontFamily: T.sora, fontWeight: 800, fontSize: 17, color: p.grandTotal < 0 ? T.re : (p.isReturn ? T.re : T.gr), lineHeight: 1.2 }}>{p.isReturn && p.grandTotal > 0 ? '−' : ''}{p.grandTotal < 0 ? '−' : ''}₹{Math.abs(p.grandTotal).toLocaleString('en-IN')}</div>
+          </div>
+          <button onClick={p.onSave} disabled={p.saving} style={{ padding: '11px 22px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, color: '#fff', minHeight: 44, cursor: p.saving ? 'not-allowed' : 'pointer', opacity: p.saving ? 0.6 : 1, whiteSpace: 'nowrap' as const }}>{saveLabel}</button>
+        </div>
+        </>); })()}
       </div>
 
-      {/* Audit Trail Modal */}
-      {p.auditTrail && createPortal(
-        <div style={S.modalOverlay}>
-          <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', padding: '18px 16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Audit Trail</span>
-              <button onClick={() => p.setAuditTrail(null)} style={{ ...S.btnGhost, ...S.btnSm }}>Close</button>
-            </div>
-            {p.auditTrail.length === 0 && <div style={{ padding: 16, textAlign: 'center' as const, color: T.tx3, fontSize: 11 }}>No history for this challan.</div>}
-            {p.auditTrail.map(a => (
-              <div key={a.id} style={{ padding: '8px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: a.action === 'VOID' ? 'oklch(0.63 0.22 25 / 0.12)' : a.action === 'CREATE' ? 'oklch(0.72 0.19 145 / 0.12)' : T.ac3, color: a.action === 'VOID' ? T.re : a.action === 'CREATE' ? T.gr : T.ac2, fontWeight: 700 }}>{a.action}</span>
-                  <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono }}>{a.created_at ? new Date(a.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
-                </div>
-                <div style={{ color: T.tx2, fontSize: 11 }}>{a.details}</div>
-              </div>
-            ))}
-          </div>
-        </div>,
-        document.body
-      )}
+      {p.auditTrail && <AuditTrailModal trail={p.auditTrail} onClose={() => p.setAuditTrail(null)} />}
     </div>
   );
 }
