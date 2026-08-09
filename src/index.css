@@ -522,6 +522,12 @@ body.modal-open .fab { display: none !important; }
      bottom: var(--nav-h) instead left a see-through gap on devices where the
      two measurements disagreed (owner's screenshot). */
   .challan-savebar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 90; align-items: center; gap: 12px; padding: 10px 14px calc(var(--nav-h) + 10px); background: rgba(8, 11, 20, 0.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid rgba(255, 255, 255, 0.07); }
+  /* The form view ALWAYS carries body.modal-open (CashChallan owns the body
+     class), and modal-open hides the bottom nav — so on this screen the bar
+     hugs the true bottom with only home-indicator clearance. The nav-height
+     padding above stays as the fallback for any state where the nav shows. */
+  body.modal-open .challan-savebar { padding-bottom: max(12px, var(--sab)); }
+  body.modal-open .challan-form { padding-bottom: 120px !important; }
   .challan-save-inline { display: none !important; }
   /* Clearance for nav + savebar (overrides the older 80px rule above). */
   .challan-form { padding-bottom: calc(var(--nav-h) + 92px) !important; }
