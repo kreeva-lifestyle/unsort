@@ -2,6 +2,8 @@
 //   Find via Photo  - upload a product photo (or pick a SKU) and get the
 //                     websites that have posted that image (all state below).
 //   Find via Google - the downloadable Maps lead-generation tool (GoogleLeads).
+//   Find via Social Ads - Meta Ad Library keyword search: the brands actively
+//                     advertising a product per country (SocialAds).
 //
 // The engine is Google Cloud Vision WEB_DETECTION, not a language model: no LLM
 // can reverse image search, because none has an image index behind it. The UI
@@ -16,8 +18,9 @@ import { call, explain, fileToB64, type Hit, type FolderCandidate } from './api'
 import { exportHitsXlsx } from './exportHits';
 import HitList from './HitList';
 import GoogleLeads from './GoogleLeads';
+import SocialAds from './SocialAds';
 
-type Finder = 'photo' | 'google';
+type Finder = 'photo' | 'google' | 'ads';
 type Mode = 'upload' | 'sku';
 
 /** A picked photo plus the blob URL showing it. Kept as one object so the two
@@ -223,18 +226,20 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
     <div style={{ fontFamily: T.sans, color: T.tx }}>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-          {(['photo', 'google'] as Finder[]).map(f => (
+          {(['photo', 'google', 'ads'] as Finder[]).map(f => (
             <button
               key={f}
               onClick={() => setFinder(f)}
               style={{ ...(finder === f ? S.btnPrimary : S.btnGhost), flex: 1, minHeight: 44 }}
             >
-              {f === 'photo' ? 'Find via Photo' : 'Find via Google'}
+              {f === 'photo' ? 'Find via Photo' : f === 'google' ? 'Find via Google' : 'Find via Social Ads'}
             </button>
           ))}
         </div>
 
         {finder === 'google' && <GoogleLeads />}
+
+        {finder === 'ads' && <SocialAds addToast={addToast} />}
 
         {finder === 'photo' && (<>
         <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.6, marginBottom: 12 }}>
