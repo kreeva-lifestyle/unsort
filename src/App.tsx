@@ -229,7 +229,21 @@ const MainApp = () => {
     };
     vv.addEventListener('resize', recover);
     window.addEventListener('focusout', recover, true);
-    return () => { clearTimeout(t); vv.removeEventListener('resize', recover); window.removeEventListener('focusout', recover, true); };
+    // The in-call shrink (iOS reserves call-bar space from standalone PWAs,
+    // owner's screenshot: green call ring + bottom strip) sometimes announces
+    // its end via window resize / app foregrounding — recover on those too.
+    // While the call RUNS the space is iOS's, not ours; nothing to reclaim.
+    window.addEventListener('resize', recover);
+    window.addEventListener('pageshow', recover);
+    document.addEventListener('visibilitychange', recover);
+    return () => {
+      clearTimeout(t);
+      vv.removeEventListener('resize', recover);
+      window.removeEventListener('focusout', recover, true);
+      window.removeEventListener('resize', recover);
+      window.removeEventListener('pageshow', recover);
+      document.removeEventListener('visibilitychange', recover);
+    };
   }, []);
 
   // height (NOT minHeight): a child's percentage height cannot resolve against
