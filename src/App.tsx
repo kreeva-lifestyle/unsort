@@ -207,6 +207,31 @@ const MainApp = () => {
   });
   useEffect(() => { try { localStorage.setItem('sidebarOpen', sidebarOpen ? '1' : '0'); } catch { /* private mode */ } }, [sidebarOpen]);
 
+  // iOS standalone: after the keyboard closes, the fixed-position viewport can
+  // STAY SHRUNK — the whole shell (bottom nav included) floats above the
+  // screen edge with a dead strip below it until the app is relaunched (the
+  // owner photographed exactly this; the CSS itself measures correct). When
+  // the visual viewport reports full height again, nudge scroll and re-pin
+  // the #root fixed frame so iOS recomputes the fixed-position viewport.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let t: ReturnType<typeof setTimeout>;
+    const recover = () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        if (Math.abs(vv.height + vv.offsetTop - window.innerHeight) < 2) {
+          window.scrollTo(0, 0);
+          const r = document.getElementById('root');
+          if (r) { r.style.bottom = '0.5px'; requestAnimationFrame(() => { r.style.bottom = '0'; }); }
+        }
+      }, 120);
+    };
+    vv.addEventListener('resize', recover);
+    window.addEventListener('focusout', recover, true);
+    return () => { clearTimeout(t); vv.removeEventListener('resize', recover); window.removeEventListener('focusout', recover, true); };
+  }, []);
+
   // height (NOT minHeight): a child's percentage height cannot resolve against
   // an auto-height parent per spec — WebKit enforces this, so with minHeight
   // the .main-area 100% collapsed and scrolling died in Safari.
