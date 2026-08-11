@@ -83,9 +83,11 @@ export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
       lastMoveT.current = e.timeStamp;
       velocity.current = 0;
       locked.current = null;
-      // Kill any running animation so drag feels instant
+      // Kill any running animation so drag feels instant. Only when the row
+      // is NOT at rest: getComputedStyle forces a style flush, and paying it
+      // on every touchstart added a hitch at the start of every scroll.
       const el = contentRef.current;
-      if (el) {
+      if (el && (currentX.current !== 0 || isOpenRef.current)) {
         const mx = new DOMMatrix(getComputedStyle(el).transform);
         currentX.current = mx.m41;
         el.style.transition = 'none';
@@ -207,7 +209,12 @@ export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
   if (!isMobile()) return <>{children}</>;
 
   return (
-    <div ref={rowRef} style={{ position: 'relative', overflow: 'hidden' }}>
+    // touch-action: pan-y is the scroll-smoothness contract: without it the
+    // non-passive touchmove above forces the browser to wait for JS on EVERY
+    // vertical scroll frame through a row (it might preventDefault) — janky
+    // scrolling on any list of SwipeRows. pan-y hands vertical panning to the
+    // compositor; horizontal moves still arrive cancellable.
+    <div ref={rowRef} style={{ position: 'relative', overflow: 'hidden', touchAction: 'pan-y' }}>
       <div ref={contentRef} style={{ position: 'relative', zIndex: 1, background: isOpen ? '#0d1220' : '#060810', willChange: 'transform' }}>
         {children}
       </div>
