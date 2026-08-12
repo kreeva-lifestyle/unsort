@@ -1,18 +1,20 @@
-// Dropbox Uploader — any signed-in user sends any file to Dropbox, choosing
-// the destination folder EVERY time (nothing is remembered, by design: the
-// wrong folder is worse than one extra tap). Files upload one at a time with
-// live progress; each row keeps its own outcome so a failure in the middle of
-// a batch never hides what already succeeded.
+// Dropbox Uploader — any signed-in user sends any file anywhere in the
+// connected Dropbox, choosing the destination EVERY time (nothing remembered,
+// by design: the wrong folder is worse than one extra tap). Files upload one
+// at a time with live progress; each row keeps its own outcome so a failure
+// mid-batch never hides what already succeeded.
 //
-// Destinations are the folders an admin configured (Link Generator search
-// folders + the Forward→Dropbox folder), enforced server-side — a browser
-// cannot name an arbitrary Dropbox path.
+// The whole Dropbox is browsable (owner's call), with the configured folders
+// as quick jumps. Reach is broad but the writes are ADD-ONLY: the server
+// commits with mode 'add' + autorename, so an upload can create a file but
+// never overwrite or delete one.
 import { useState, useEffect, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { call } from '../dropboxlinks/api';
 import { uploadFile, errText, humanBytes, MAX_FILE, type UpFolder, type UpItem } from './api';
 import UploadRow from './UploadRow';
+import FolderPicker from './FolderPicker';
 
 const keyOf = (f: File) => `${f.name}|${f.size}|${f.lastModified}`;
 
@@ -20,6 +22,7 @@ export default function DropboxUploader({ addToast }: { addToast: (m: string, t?
   const [folders, setFolders] = useState<UpFolder[] | null>(null);
   const [folderErr, setFolderErr] = useState('');
   const [dest, setDest] = useState('');
+  const [destLabel, setDestLabel] = useState('Dropbox');
   const [sub, setSub] = useState('');
   const [items, setItems] = useState<UpItem[]>([]);
   const [busy, setBusy] = useState(false);
@@ -35,12 +38,12 @@ export default function DropboxUploader({ addToast }: { addToast: (m: string, t?
     call({ action: 'up_folders' }).then(({ status, data }) => {
       if (stale) return;
       const d = data as Record<string, unknown>;
+      // Shortcuts are a convenience, not a requirement: the picker browses the
+      // whole Dropbox regardless, so "none configured" is not an error.
       if (d?.ok) setFolders((d.folders as UpFolder[]) || []);
-      else setFolderErr(String(d?.error) === 'dropbox_not_connected'
-        ? 'Dropbox is not connected — an admin can connect it in Trackly → Image Link Check.'
-        : String(d?.error) === 'no_folders'
-          ? 'No upload folders are configured yet — an admin can add them in Minis → Dropbox Link Generator → Settings.'
-          : String(d?.details || d?.error || `Could not load the folders (${status})`));
+      else if (String(d?.error) === 'no_folders') setFolders([]);
+      else if (String(d?.error) === 'dropbox_not_connected') setFolderErr('Dropbox is not connected — an admin can connect it in Trackly → Image Link Check.');
+      else setFolderErr(String(d?.details || d?.error || `Could not load the quick folders (${status})`));
     }).catch(e => { if (!stale) setFolderErr(friendlyError(e)); });
     return () => { stale = true; };
   }, []);
@@ -65,7 +68,6 @@ export default function DropboxUploader({ addToast }: { addToast: (m: string, t?
 
   const runQueue = async (ids?: string[]) => {
     if (busy) return;
-    if (!dest) { addToast('Choose the Dropbox folder to upload into', 'error'); return; }
     const queue = (ids ? items.filter(i => ids.includes(i.id)) : items).filter(i => i.state === 'queued' || i.state === 'error' || i.state === 'cancelled');
     if (queue.length === 0) { addToast('Add a file first', 'error'); return; }
     setBusy(true);
@@ -101,17 +103,17 @@ export default function DropboxUploader({ addToast }: { addToast: (m: string, t?
     <div style={{ fontFamily: T.sans, color: T.tx }}>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16, marginBottom: 12 }}>
         <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.6, marginBottom: 12 }}>
-          Send any file straight to Dropbox. Pick the destination folder each time — nothing is remembered, so a file never lands somewhere by accident.
+          Send any file straight to Dropbox. Browse to any folder in the account — the folder you are standing in is where the files land, and nothing is remembered between visits.
         </div>
 
         {folderErr && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{folderErr}</div>}
 
         <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Upload into <span style={{ color: T.re }}>*</span></label>
-        <select value={dest} onChange={e => setDest(e.target.value)} disabled={busy || !folders?.length}
-          style={{ ...S.fInput, width: '100%', marginBottom: 10, opacity: busy ? 0.6 : 1 }}>
-          <option value="">{folders === null ? 'Loading folders…' : folders.length ? 'Choose a folder…' : 'No folders available'}</option>
-          {(folders || []).map(f => <option key={f.path} value={f.path}>{f.label}</option>)}
-        </select>
+        <FolderPicker shortcuts={folders || []} disabled={busy}
+          onPick={(p, label) => { setDest(p); setDestLabel(label); }} />
+        <div style={{ fontSize: 11, color: T.tx2, margin: '8px 0 12px', lineHeight: 1.5 }}>
+          Files land in <b style={{ color: T.ac2 }}>{destLabel}{sub.trim() ? ` / ${sub.trim()}` : ''}</b>
+        </div>
 
         <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>Subfolder <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0, fontSize: 9, color: T.tx3 }}>optional — created if new, e.g. DRS300</span></label>
         <input value={sub} onChange={e => setSub(e.target.value)} disabled={busy} placeholder="Leave blank to upload into the folder itself"
@@ -131,8 +133,8 @@ export default function DropboxUploader({ addToast }: { addToast: (m: string, t?
 
         {items.length > 0 && (
           <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-            <button onClick={() => runQueue()} disabled={busy || !pending || !dest}
-              style={{ ...S.btnPrimary, minHeight: 40, flex: 1, minWidth: 160, pointerEvents: busy ? 'none' : 'auto', opacity: busy || !pending || !dest ? 0.5 : 1 }}>
+            <button onClick={() => runQueue()} disabled={busy || !pending}
+              style={{ ...S.btnPrimary, minHeight: 40, flex: 1, minWidth: 160, pointerEvents: busy ? 'none' : 'auto', opacity: busy || !pending ? 0.5 : 1 }}>
               {busy ? 'Uploading…' : `Upload ${pending} file${pending === 1 ? '' : 's'}`}
             </button>
             {busy && <button onClick={stopAll} style={{ ...S.btnDanger, minHeight: 40 }}>Stop</button>}
