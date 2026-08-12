@@ -7,6 +7,9 @@
 //   fwd_folder { op:'list'|'save' } — signed-in. The single shared Dropbox
 //      folder that Forward→Dropbox uploads into (vault dropbox_fwd_folder).
 //      Any signed-in user may set it (owner's call), mirroring linkgen_roots.
+//   up_folders / up_link / up_relay — signed-in. Dropbox Uploader (Minis):
+//      the configured destination folders, a short-lived direct-upload link
+//      (browser → Dropbox), and the small-file relay fallback.
 //   fwd_upload { dataUrl, dateStr } — signed-in. Uploads one compressed JPEG
 //      into that folder, named <date>.jpg (same-day → <date> (2).jpg …). Needs
 //      the Dropbox token's files.content.write scope (in the connect URL).
@@ -307,6 +310,41 @@ async function loadFwdFolder(): Promise<{ url: string; path: string; display?: s
   try { const o = raw ? JSON.parse(raw) : null; return o && o.path ? o : null; } catch { return null; }
 }
 
+// Dropbox Uploader destinations: the folders a user may upload INTO. Exactly
+// the folders an admin already configured (Link Generator search folders +
+// the Forward→Dropbox folder) - never an arbitrary path from the client, so a
+// signed-in user cannot write anywhere in the connected Dropbox.
+async function uploadDests(token: string): Promise<{ label: string; path: string }[]> {
+  const out: { label: string; path: string }[] = [];
+  const seen = new Set<string>();
+  const add = (label: string, path: string) => {
+    const k = path.toLowerCase();
+    if (!path || seen.has(k)) return;
+    seen.add(k);
+    out.push({ label: label || path.split('/').pop() || path, path });
+  };
+  const fwd = await loadFwdFolder();
+  if (fwd?.path) add(fwd.display || 'Documents (Forward folder)', fwd.path);
+  for (const r of (await loadGenRoots()).filter(r => r.enabled !== false && r.url)) {
+    const hit = genRootCache[r.url];
+    let p = hit && Date.now() - hit.at < ROOT_TTL_MS ? hit.p : '';
+    if (!p) {
+      const meta = await dbx(token, 'sharing/get_shared_link_metadata', { url: r.url });
+      p = meta.data?.path_lower || '';
+      if (meta.status >= 400 || !p) { delete genRootCache[r.url]; continue; }
+      genRootCache[r.url] = { p, at: Date.now() };
+    }
+    add(r.label, p);
+  }
+  return out;
+}
+
+// One path segment, Dropbox-safe: no separators, no reserved characters, no
+// control bytes, no leading/trailing dots or spaces (Dropbox rejects those).
+const cleanSeg = (v: string): string =>
+  String(v || '').replace(/[\\/:?*"<>|]/g, '').replace(/[\x00-\x1f\x7f]/g, '')
+    .replace(/^[.\s]+/, '').replace(/[.\s]+$/, '').slice(0, 120);
+
 async function ensureSharedLink(token: string, path: string): Promise<{ url?: string; error?: string; needsReconnect?: boolean; rateLimited?: boolean }> {
   const ll = await dbx(token, 'sharing/list_shared_links', { path, direct_only: true });
   if (ll.status === 429) return { error: 'Rate limited — try again in a minute', rateLimited: true };
@@ -457,6 +495,119 @@ Deno.serve(async (req) => {
         const errText = (await up.text().catch(() => '')).trim();
         if (up.status === 401 || /missing_scope/.test(errText)) return json({ ok: false, error: 'needs_write_scope' }, req);
         return json({ ok: false, error: `Dropbox upload failed (${up.status})`, details: errText.slice(0, 400) }, req);
+      }
+      const ud = await up.json().catch(() => ({} as any));
+      return json({ ok: true, name: ud?.name || name, path: ud?.path_display || path }, req);
+    }
+
+    // ── Dropbox Uploader (Minis) ─────────────────────────────────────────
+    // Any signed-in user uploads any file, pointing at the destination folder
+    // EVERY time (nothing remembered). Two transports, and the client picks by
+    // MEASUREMENT rather than hope:
+    //   up_link  - a short-lived Dropbox temporary upload link; the BROWSER
+    //              sends the bytes straight to Dropbox. Real progress events,
+    //              150MB ceiling, and the refresh token never leaves here.
+    //   up_relay - fallback for a browser that cannot reach Dropbox directly
+    //              (locked-down network / CORS): the bytes come through this
+    //              function instead. Capped far below the platform's request
+    //              ceiling, which was MEASURED, not assumed: 15MB and 25MB
+    //              bodies are refused upstream with a 502 before this code
+    //              ever runs, so a big file must never take this path.
+    // Secret-gated end-to-end self-test of the upload mechanism (same shape as
+    // client-finder's `ping`): resolve a destination, mint a temporary upload
+    // link, PUSH real bytes through that link, confirm the commit, then delete
+    // the test file. Proves the Dropbox scope, the link minting and the commit
+    // path BEFORE anyone taps Upload — the browser-side CORS leg is the only
+    // part it cannot cover, and the client falls back to the relay for that.
+    if (action === 'up_selftest') {
+      const secret = (req.headers.get('x-up-secret') || '').trim();
+      const want = String((await getSecret('uploader_selftest_secret')) || '');
+      if (!want || secret !== want) return fail(403, 'Self-test requires the shared secret', req);
+      const steps: string[] = [];
+      try {
+        const token = await getDropboxToken();
+        steps.push('dropbox token: ok');
+        const dests = await uploadDests(token);
+        steps.push(`destinations: ${dests.length} (${dests.map(d => d.label).join(', ').slice(0, 160)})`);
+        if (!dests.length) return json({ ok: false, steps, error: 'no destinations configured' }, req);
+        const path = `${dests[0].path}/_dailyoffice_selftest/${Date.now()}.txt`;
+        const tul = await dbx(token, 'files/get_temporary_upload_link', {
+          commit_info: { path, mode: 'add', autorename: true, mute: true }, duration: 300,
+        });
+        if (tul.status >= 400 || !tul.data?.link) return json({ ok: false, steps, error: `temporary link refused (${tul.status})`, details: String(tul.data?.error_summary || '') }, req);
+        steps.push('temporary upload link: minted');
+        const bytes = new TextEncoder().encode('DailyOffice uploader self-test');
+        const put = await fetch(String(tul.data.link), { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: new Blob([bytes]) });
+        const putText = (await put.text().catch(() => '')).slice(0, 200);
+        if (!put.ok) return json({ ok: false, steps, error: `upload through the link failed (${put.status})`, details: putText }, req);
+        steps.push('bytes uploaded through the link: ok');
+        const del = await dbx(token, 'files/delete_v2', { path });
+        steps.push(`test file cleaned up: ${del.status < 300 ? 'ok' : `left behind (${del.status})`}`);
+        return json({ ok: true, steps, path }, req);
+      } catch (e) {
+        return json({ ok: false, steps, error: (e as Error).message || 'self-test failed' }, req);
+      }
+    }
+
+    if (action === 'up_folders') {
+      if (!(await callerRole(req))) return fail(401, 'Sign in to DailyOffice first', req);
+      let token = '';
+      try { token = await getDropboxToken(); }
+      catch (e) { if ((e as Error).message === 'dropbox_not_connected') return json({ ok: false, error: 'dropbox_not_connected' }, req, 409); return fail(500, 'Dropbox auth failed', req, (e as Error).message); }
+      const folders = await uploadDests(token);
+      if (folders.length === 0) return json({ ok: false, error: 'no_folders' }, req, 409);
+      return json({ ok: true, folders }, req);
+    }
+
+    if (action === 'up_link' || action === 'up_relay') {
+      if (!(await callerRole(req))) return fail(401, 'Sign in to DailyOffice first', req);
+      const wantPath = String(body?.folderPath || '').trim().toLowerCase();
+      const name = cleanSeg(String(body?.name || ''));
+      if (!wantPath) return fail(400, 'Pick a destination folder', req);
+      if (!name) return fail(400, 'That file name cannot be used', req);
+      let token = '';
+      try { token = await getDropboxToken(); }
+      catch (e) { if ((e as Error).message === 'dropbox_not_connected') return json({ ok: false, error: 'dropbox_not_connected' }, req, 409); return fail(500, 'Dropbox auth failed', req, (e as Error).message); }
+      // The destination must be one the admin configured - the client's path
+      // is matched against that list, never trusted.
+      const dests = await uploadDests(token);
+      const dest = dests.find(d => d.path.toLowerCase() === wantPath);
+      if (!dest) return fail(403, 'That folder is not one of the configured upload folders', req);
+      // Optional subfolder ("DRS300", "invoices/august"): Dropbox creates
+      // missing parents on upload. Depth-capped; empty and ".." segments drop.
+      const sub = String(body?.subPath || '').split('/').map(cleanSeg).filter(Boolean).slice(0, 4);
+      const path = [dest.path, ...sub, name].join('/');
+
+      if (action === 'up_link') {
+        const size = Number(body?.size || 0);
+        if (size > 150_000_000) return fail(413, 'Dropbox accepts up to 150 MB per file this way — split it or upload from the Dropbox app', req);
+        const tul = await dbx(token, 'files/get_temporary_upload_link', {
+          commit_info: { path, mode: 'add', autorename: true, mute: true },
+          duration: 3600,
+        });
+        if (tul.status === 401 || /missing_scope/.test(String(tul.data?.error_summary || ''))) return json({ ok: false, error: 'needs_write_scope' }, req);
+        if (tul.status >= 400 || !tul.data?.link) return json({ ok: false, error: `Dropbox refused the upload link (${tul.status})`, details: String(tul.data?.error_summary || '').slice(0, 300) }, req);
+        return json({ ok: true, link: tul.data.link, path }, req);
+      }
+
+      // up_relay: base64 body. 5MB of file is ~6.7MB of JSON — comfortably
+      // under the measured ceiling, and the client only ever falls back here
+      // for files that small.
+      const b64 = String(body?.b64 || '').replace(/^data:[^;]+;base64,/, '');
+      if (!b64) return fail(400, 'No file content received', req);
+      if (b64.length > 7_000_000) return fail(413, 'Too large to send this way — this file needs the direct upload path', req);
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const up = await fetch('https://content.dropboxapi.com/2/files/upload', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'Dropbox-API-Arg': asciiArg({ path, mode: 'add', autorename: true, mute: true }) },
+        body: new Blob([bytes], { type: 'application/octet-stream' }),
+      });
+      if (!up.ok) {
+        const errText = (await up.text().catch(() => '')).trim();
+        if (up.status === 401 || /missing_scope/.test(errText)) return json({ ok: false, error: 'needs_write_scope' }, req);
+        return json({ ok: false, error: `Dropbox upload failed (${up.status})`, details: errText.slice(0, 300) }, req);
       }
       const ud = await up.json().catch(() => ({} as any));
       return json({ ok: true, name: ud?.name || name, path: ud?.path_display || path }, req);
