@@ -7,9 +7,10 @@
 //   fwd_folder { op:'list'|'save' } — signed-in. The single shared Dropbox
 //      folder that Forward→Dropbox uploads into (vault dropbox_fwd_folder).
 //      Any signed-in user may set it (owner's call), mirroring linkgen_roots.
-//   up_folders / up_link / up_relay — signed-in. Dropbox Uploader (Minis):
-//      the configured destination folders, a short-lived direct-upload link
-//      (browser → Dropbox), and the small-file relay fallback.
+//   up_browse / up_folders / up_link / up_relay — signed-in. Dropbox Uploader
+//      (Minis): browse the whole Dropbox one level at a time, the configured
+//      folders as quick jumps, a short-lived direct-upload link (browser →
+//      Dropbox), and the small-file relay fallback.
 //   fwd_upload { dataUrl, dateStr } — signed-in. Uploads one compressed JPEG
 //      into that folder, named <date>.jpg (same-day → <date> (2).jpg …). Needs
 //      the Dropbox token's files.content.write scope (in the connect URL).
@@ -341,6 +342,14 @@ async function uploadDests(token: string): Promise<{ label: string; path: string
 
 // One path segment, Dropbox-safe: no separators, no reserved characters, no
 // control bytes, no leading/trailing dots or spaces (Dropbox rejects those).
+// Dropbox path shape: '' is the ROOT (list_folder's own convention), anything
+// else is '/a/b' with no trailing slash.
+const normPath = (v: string): string => {
+  const t = String(v || '').trim();
+  if (!t || t === '/') return '';
+  return (t.startsWith('/') ? t : `/${t}`).replace(/\/+$/, '');
+};
+
 const cleanSeg = (v: string): string =>
   String(v || '').replace(/[\\/:?*"<>|]/g, '').replace(/[\x00-\x1f\x7f]/g, '')
     .replace(/^[.\s]+/, '').replace(/[.\s]+$/, '').slice(0, 120);
@@ -549,6 +558,40 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Browse the WHOLE connected Dropbox, one level at a time ('' = root).
+    // Folders only: this picker exists to choose a destination, and listing
+    // thousands of files would bury the folders it is here to show.
+    if (action === 'up_browse') {
+      if (!(await callerRole(req))) return fail(401, 'Sign in to DailyOffice first', req);
+      let token = '';
+      try { token = await getDropboxToken(); }
+      catch (e) { if ((e as Error).message === 'dropbox_not_connected') return json({ ok: false, error: 'dropbox_not_connected' }, req, 409); return fail(500, 'Dropbox auth failed', req, (e as Error).message); }
+      const path = normPath(String(body?.path || ''));
+      const folders: { name: string; path: string }[] = [];
+      const collect = (entries: unknown[]) => {
+        for (const e of (entries || []) as Record<string, string>[]) {
+          if (e['.tag'] === 'folder' && e.path_lower) folders.push({ name: String(e.name || ''), path: String(e.path_lower) });
+        }
+      };
+      let res = await dbx(token, 'files/list_folder', { path, limit: 1000 });
+      if (res.status >= 400) {
+        const sum = String(res.data?.error_summary || '');
+        if (/not_found/.test(sum)) return fail(404, 'That folder no longer exists in Dropbox', req);
+        return fail(502, `Could not open that folder (${res.status})`, req, sum);
+      }
+      collect(res.data?.entries);
+      // Paging is bounded: a folder with tens of thousands of children must
+      // not spin the function. Truncation is REPORTED, never silent.
+      let guard = 0;
+      while (res.data?.has_more && guard++ < 4) {
+        res = await dbx(token, 'files/list_folder/continue', { cursor: res.data.cursor });
+        if (res.status >= 400) break;
+        collect(res.data?.entries);
+      }
+      folders.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+      return json({ ok: true, path, folders, truncated: !!res.data?.has_more }, req);
+    }
+
     if (action === 'up_folders') {
       if (!(await callerRole(req))) return fail(401, 'Sign in to DailyOffice first', req);
       let token = '';
@@ -561,22 +604,26 @@ Deno.serve(async (req) => {
 
     if (action === 'up_link' || action === 'up_relay') {
       if (!(await callerRole(req))) return fail(401, 'Sign in to DailyOffice first', req);
-      const wantPath = String(body?.folderPath || '').trim().toLowerCase();
+      const wantPath = normPath(String(body?.folderPath ?? ''));
       const name = cleanSeg(String(body?.name || ''));
-      if (!wantPath) return fail(400, 'Pick a destination folder', req);
       if (!name) return fail(400, 'That file name cannot be used', req);
       let token = '';
       try { token = await getDropboxToken(); }
       catch (e) { if ((e as Error).message === 'dropbox_not_connected') return json({ ok: false, error: 'dropbox_not_connected' }, req, 409); return fail(500, 'Dropbox auth failed', req, (e as Error).message); }
-      // The destination must be one the admin configured - the client's path
-      // is matched against that list, never trusted.
-      const dests = await uploadDests(token);
-      const dest = dests.find(d => d.path.toLowerCase() === wantPath);
-      if (!dest) return fail(403, 'That folder is not one of the configured upload folders', req);
+      // Full Dropbox is in scope (owner's call), so the destination check is
+      // "is this a real folder", not "is it on a list". The write itself stays
+      // ADD-ONLY by construction: mode 'add' + autorename can create a new
+      // file but can never overwrite or delete an existing one, so broad reach
+      // still cannot destroy anything. ('' = the Dropbox root, which has no
+      // metadata to fetch.)
+      if (wantPath) {
+        const meta = await dbx(token, 'files/get_metadata', { path: wantPath });
+        if (meta.status >= 400 || meta.data?.['.tag'] !== 'folder') return fail(404, 'That folder is not in Dropbox any more - pick it again', req);
+      }
       // Optional subfolder ("DRS300", "invoices/august"): Dropbox creates
       // missing parents on upload. Depth-capped; empty and ".." segments drop.
       const sub = String(body?.subPath || '').split('/').map(cleanSeg).filter(Boolean).slice(0, 4);
-      const path = [dest.path, ...sub, name].join('/');
+      const path = [wantPath, ...sub, name].join('/');
 
       if (action === 'up_link') {
         const size = Number(body?.size || 0);
