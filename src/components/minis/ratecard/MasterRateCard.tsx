@@ -2,8 +2,9 @@
 // edge call (`ratecard_rows`, cached master read, zero AI) returns each SKU's
 // master row + detected garment category → the owner picks which columns go
 // on the card (SKU is locked on) → the same finalize pass as the other modes
-// runs the GST/stats/blocker logic. One card = one category: SKUs that read
-// as a different garment type error out here, before anything renders.
+// runs the GST/stats/blocker logic. SKUs spanning several garment categories
+// are allowed (owner's call): the card gains a CATEGORY column and the
+// designs are grouped by category instead of erroring out.
 import { useState } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
@@ -43,8 +44,10 @@ export default function MasterRateCard({ onSheet, addToast, shareToken, onCatalo
   const emptyCols = allPickable.filter(c => !hasData(c));
 
   const emit = (rows: MasterRow[], cols: string[], isMixed: boolean) => {
-    if (isMixed || !rows.length) { onSheet(null); return; }
-    const sheet = buildMasterSheet(rows, cols);
+    if (!rows.length) { onSheet(null); return; }
+    // Mixed categories no longer block (owner's call): the card gets a
+    // CATEGORY column and the designs are grouped by category instead.
+    const sheet = buildMasterSheet(rows, cols, isMixed);
     // A chosen column with master gaps still renders (as "—") — but say so
     // per SKU, so the owner fixes the master instead of wondering where the
     // data went. Price gaps already hit the all-or-nothing blocker.
@@ -126,17 +129,22 @@ export default function MasterRateCard({ onSheet, addToast, shareToken, onCatalo
         style={{ ...S.btnGhost, marginTop: 8, minHeight: 44, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>
         {busy ? 'Fetching…' : 'Fetch from Master'}
       </button>
-      {(missing.length > 0 || mixed) && (
+      {missing.length > 0 && (
         <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginTop: 8, lineHeight: 1.6 }}>
-          {missing.length > 0 && <div>• Not in the master sheet: <span style={{ fontFamily: T.mono }}>{missing.join(', ')}</span></div>}
-          {mixed && <div>• SKUs span different categories — {groups.map(g => `${g.label}: ${g.skus.join(', ')}`).join(' · ')}. A rate card covers one category.</div>}
+          • Not in the master sheet: <span style={{ fontFamily: T.mono }}>{missing.join(', ')}</span>
         </div>
       )}
-      {fetched && found.length > 0 && !mixed && (
+      {mixed && (
+        <div style={{ background: 'oklch(0.55 0.22 265 / .07)', border: '1px solid oklch(0.55 0.22 265 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.tx2, marginTop: 8, lineHeight: 1.6 }}>
+          {groups.length} categories on this card — {groups.map(g => `${g.label} (${g.skus.length})`).join(' · ')}. A <b style={{ color: T.ac2 }}>CATEGORY</b> column is added and designs are grouped by category.
+        </div>
+      )}
+      {fetched && found.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <div style={{ ...S.fLabel }}>Columns on the card{groups[0] ? ` — ${groups[0].label}` : ''}</div>
+          <div style={{ ...S.fLabel }}>Columns on the card{mixed ? ` — ${groups.length} categories` : groups[0] ? ` — ${groups[0].label}` : ''}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {chip('SKU', true, true)}
+            {mixed && chip('CATEGORY', true, true)}
             {pickable.map(c => chip(c, chosen.includes(c), false))}
             {emptyCols.length > 0 && !showEmpty && (
               <button onClick={() => setShowEmpty(true)}
