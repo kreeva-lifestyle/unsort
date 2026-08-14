@@ -9,6 +9,16 @@ const GST_BOUNDARY = 2500; // display formatting only - finalize re-checks the s
 
 export interface MasterRow { sku: string; found: boolean; category: string | null; categoryLabel: string | null; values: Record<string, string> }
 
+// The category shown on the card. The MASTER SHEET'S own category column wins
+// — the owner curates it, and the server's keyword detection reads the whole
+// row text, where a CO-ORDS set whose description mentions palazzo pants
+// detects as "Palazzo Set". Detection is only the fallback for rows whose
+// category cell is empty. (Server headers arrive uppercased.)
+export const displayCategory = (r: MasterRow): string | null => {
+  const k = Object.keys(r.values).find(h => /category/i.test(h));
+  return (k && r.values[k].trim()) || r.categoryLabel || null;
+};
+
 // Build the FinalizedSheet from fetched rows + chosen columns. Bare-number
 // prices are formatted to the card's standard "<n>/- +<slab>%(GST)" form;
 // cells already carrying GST text keep it (finalize autocorrects a wrong %).
@@ -16,22 +26,24 @@ export const buildMasterSheet = (rows: MasterRow[], chosenRaw: string[], withCat
   // A column with no value for ANY fetched SKU would render as a full column
   // of "—" and waste card width, so it never reaches the card. (Partly-filled
   // columns DO stay — those gaps are reported as smart-check notes instead.)
-  const chosen = chosenRaw.filter(c => rows.some(r => (r.values[c] || '').trim()));
-  const dropped = chosenRaw.filter(c => !chosen.includes(c));
+  let chosen = chosenRaw.filter(c => rows.some(r => (r.values[c] || '').trim()));
   // Mixed-category card (owner's call): instead of blocking, each design is
   // labelled with its category and the rows are grouped so one category's
-  // designs sit together — the typed order survives inside each group.
+  // designs sit together — the typed order survives inside each group. The
+  // auto column replaces a hand-picked master CATEGORY column (same data,
+  // never two columns saying CATEGORY).
   if (withCategory) {
-    const order = categoryGroups(rows).map(g => g.label);
-    rows = [...rows].sort((a, b) =>
-      (a.categoryLabel ? order.indexOf(a.categoryLabel) : order.length) -
-      (b.categoryLabel ? order.indexOf(b.categoryLabel) : order.length));
+    chosen = chosen.filter(c => c !== 'CATEGORY');
+    const order = categoryGroups(rows).map(g => g.label.toUpperCase());
+    const pos = (r: MasterRow) => { const l = displayCategory(r); return l ? order.indexOf(l.toUpperCase()) : order.length; };
+    rows = [...rows].sort((a, b) => pos(a) - pos(b));
   }
+  const dropped = chosenRaw.filter(c => !chosen.includes(c) && !(withCategory && c === 'CATEGORY'));
   const columns = withCategory ? ['SKU', 'CATEGORY', ...chosen] : ['SKU', ...chosen];
   const priceCol = chosen.find(c => isPriceHeader(c)) || null;
   const objRows = rows.map(r => {
     const row: Record<string, string> = withCategory
-      ? { SKU: r.sku, CATEGORY: r.categoryLabel || '—' }
+      ? { SKU: r.sku, CATEGORY: displayCategory(r) || '—' }
       : { SKU: r.sku };
     for (const c of chosen) {
       let v = r.values[c] || '';
@@ -51,16 +63,19 @@ export const buildMasterSheet = (rows: MasterRow[], chosenRaw: string[], withCat
   return sheet;
 };
 
-// Detected categories present on the card, biggest first (undetected rows are
-// counted nowhere — only positive evidence groups). More than one group turns
-// on the CATEGORY column + grouping above.
+// Categories present on the card, biggest first, keyed by the same label the
+// card shows (master column first, detection as fallback — a row with no
+// category anywhere is counted nowhere). More than one group turns on the
+// CATEGORY column + grouping above.
 export const categoryGroups = (rows: MasterRow[]): { label: string; skus: string[] }[] => {
   const by = new Map<string, { label: string; skus: string[] }>();
   for (const r of rows) {
-    if (!r.category) continue;
-    const g = by.get(r.category) || { label: r.categoryLabel || r.category, skus: [] };
+    const label = displayCategory(r);
+    if (!label) continue;
+    const key = label.toUpperCase();
+    const g = by.get(key) || { label, skus: [] };
     g.skus.push(r.sku);
-    by.set(r.category, g);
+    by.set(key, g);
   }
   return [...by.values()].sort((a, b) => b.skus.length - a.skus.length);
 };

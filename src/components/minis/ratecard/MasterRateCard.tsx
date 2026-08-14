@@ -145,7 +145,8 @@ export default function MasterRateCard({ onSheet, addToast, shareToken, onCatalo
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {chip('SKU', true, true)}
             {mixed && chip('CATEGORY', true, true)}
-            {pickable.map(c => chip(c, chosen.includes(c), false))}
+            {/* on a mixed card the master CATEGORY column IS the locked chip */}
+            {pickable.filter(c => !(mixed && c === 'CATEGORY')).map(c => chip(c, chosen.includes(c), false))}
             {emptyCols.length > 0 && !showEmpty && (
               <button onClick={() => setShowEmpty(true)}
                 title={`No data in the master for these SKUs: ${emptyCols.join(', ')}`}
