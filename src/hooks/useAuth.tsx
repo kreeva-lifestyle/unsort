@@ -53,15 +53,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (session?.user) {
         const { data: refreshed } = await supabase.auth.refreshSession();
         if (!mounted) return;
-        if (refreshed?.session?.user) {
-          setUser(refreshed.session.user);
-          const { data: prof, error: profErr } = await supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at, module_access').eq('id', refreshed.session.user.id).maybeSingle();
-          if (profErr) console.error('Profile load failed:', profErr.message);
-          if (!enforceActive(prof)) { if (mounted) { setUser(null); setProfile(null); } }
-          else if (mounted) setProfile(prof);
-        } else {
-          setUser(null); setProfile(null);
-        }
+        // Refresh can fail TRANSIENTLY (cold PWA start on a flaky mobile
+        // connection). Nulling the user here silently discarded a perfectly
+        // good on-device session and left Face ID dead until a full email
+        // login. Keep the stored session's user instead: supabase-js retries
+        // the refresh on the next API call, and the Face ID unlock path
+        // re-validates server-side anyway (fail closed), so a genuinely
+        // revoked session cannot sneak back in through this.
+        const sessUser = refreshed?.session?.user ?? session.user;
+        setUser(sessUser);
+        const { data: prof, error: profErr } = await supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at, module_access').eq('id', sessUser.id).maybeSingle();
+        if (profErr) console.error('Profile load failed:', profErr.message);
+        if (!enforceActive(prof)) { if (mounted) { setUser(null); setProfile(null); } }
+        else if (mounted) setProfile(prof);
       } else {
         setUser(null); setProfile(null);
       }
@@ -123,9 +127,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // expired, or an account DEACTIVATED while the app sat locked, must fail
   // closed to email login rather than unlock back into live data.
   const unlockWithFaceId = async (): Promise<{ error?: string }> => {
-    if (!user || !isFaceIdEnrolledFor(user.id)) {
-      return { error: 'Session ended — sign in with email once to re-enable Face ID.' };
-    }
+    // Gate on the ENROLLMENT, not on `user`: at a cold start the kept session
+    // is still being restored in the background, so `user` is null for the
+    // first seconds — the old check raced that restore and answered "Session
+    // ended, sign in with email" to a tap that should have shown the Face ID
+    // prompt. The biometric needs no session; the session is validated (and
+    // matched to the enrolled account) right after it passes.
+    const enr = getFaceIdEnrollment();
+    if (!enr) return { error: 'Face ID is not set up on this device.' };
     const res = await verifyFaceId();
     if (!res.ok) return { error: res.error };
     // Re-validate the kept session server-side.
@@ -139,10 +148,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (refErr || !refreshed?.session?.user) {
       return failClosed('session_expired', 'Your session has expired — sign in with email to continue.');
     }
+    if (refreshed.session.user.id !== enr.userId) {
+      return failClosed('session_expired', 'This device is set up for a different account — sign in with email.');
+    }
     const { data: prof } = await supabase.from('profiles').select('is_active').eq('id', refreshed.session.user.id).maybeSingle();
     if (prof && prof.is_active === false) {
       return failClosed('deactivated', 'This account has been deactivated.');
     }
+    setUser(refreshed.session.user);
     unlockApp(); setLocked(false);
     return {};
   };
