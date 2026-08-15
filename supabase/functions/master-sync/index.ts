@@ -1,12 +1,17 @@
 // master-sync — pulls the Google master sheet into master_sheet_rows.
 //
-// One-way: the sheet is the only place data is edited; this never writes back
-// (hence the READONLY Google scopes below).
+// One-way for DATA: the sheet is the only place data is edited; the sync never
+// writes business values back. The single, owner-requested exception is
+// `spellfix`: a weekly pass that corrects dictionary-verified garment/fabric
+// misspellings IN the sheet (see the spellfix section for why that is safe),
+// logs every cell it touches, and notifies the admins.
 //
 // Called by pg_cron, never by a browser:
-//   POST { mode: 'auto'   } -> sync only if Drive says the file changed
-//   POST { mode: 'full'   } -> sync unconditionally (hourly reconcile)
-//   POST { mode: 'verify' } -> diff sheet against DB, write NOTHING
+//   POST { mode: 'auto'         } -> sync only if Drive says the file changed
+//   POST { mode: 'full'         } -> sync unconditionally (hourly reconcile)
+//   POST { mode: 'verify'       } -> diff sheet against DB, write NOTHING
+//   POST { mode: 'spellfix'     } -> auto-correct misspellings in the sheet (weekly)
+//   POST { mode: 'spellfix_dry' } -> report what spellfix WOULD change, write nothing
 // Auth is the x-sync-secret header vs app_secrets.master_sync_secret.
 //
 // The three things that keep this cheap:
@@ -70,16 +75,21 @@ const SCOPES = [
   'https://www.googleapis.com/auth/drive.metadata.readonly',
 ].join(' ');
 
-let tokenCache: { token: string; expiresAt: number } | null = null;
-async function googleToken(): Promise<string> {
-  if (tokenCache && tokenCache.expiresAt > Date.now() + 60_000) return tokenCache.token;
+// Write scope exists ONLY for spellfix. Every other caller stays read-only,
+// so a bug elsewhere in this file still cannot touch the sheet.
+const WRITE_SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+
+const tokenCaches = new Map<string, { token: string; expiresAt: number }>();
+async function googleToken(scopes: string = SCOPES): Promise<string> {
+  const cached = tokenCaches.get(scopes);
+  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
   const email = Deno.env.get('GOOGLE_CLIENT_EMAIL');
   const pkRaw = Deno.env.get('GOOGLE_PRIVATE_KEY');
   if (!email || !pkRaw) throw new Error('Missing GOOGLE_CLIENT_EMAIL / GOOGLE_PRIVATE_KEY');
   const key = await crypto.subtle.importKey('pkcs8', pemToDer(pkRaw), { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
   const now = Math.floor(Date.now() / 1000);
   const unsigned = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' })) + '.' +
-    b64url(JSON.stringify({ iss: email, scope: SCOPES, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }));
+    b64url(JSON.stringify({ iss: email, scope: scopes, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }));
   const sig = await crypto.subtle.sign({ name: 'RSASSA-PKCS1-v1_5' }, key, new TextEncoder().encode(unsigned));
   const resp = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -87,8 +97,8 @@ async function googleToken(): Promise<string> {
   });
   const data = await resp.json();
   if (!resp.ok) throw new Error(`Google OAuth ${resp.status}: ${data.error_description || data.error || 'unknown'}`);
-  tokenCache = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
-  return tokenCache.token;
+  tokenCaches.set(scopes, { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 });
+  return data.access_token;
 }
 
 const sheetId = () => {
@@ -359,6 +369,158 @@ async function verifyTab(tab: string): Promise<Record<string, unknown>> {
 }
 
 // ---- entry ------------------------------------------------------------------
+
+// ── Weekly spelling autofix ──────────────────────────────────────────────────
+// The one sanctioned write-back. Safe because corrections only ever move
+// TOWARD a fixed dictionary of garment/fabric words — the same matcher the
+// Master Assistant's report uses (5+ letters, same first letter, edit
+// distance 1, or 2 when both words have 7+; identifier/link/price/catalog
+// columns never scanned; real words like "formal"/"living" never flag). A
+// trade name has no dictionary neighbour, so it cannot be "corrected".
+// Guard rails: at most SPELLFIX_CAP cells per run, every change logged to
+// master_spellfix_log with before/after, admins notified in-app, and the fix
+// is computed from a LIVE read in the same invocation (never the mirror), so
+// it cannot clobber an edit made minutes ago.
+const SPELLFIX_CAP = 200;
+const SPELL_SKIP_COL = /image|link|url|price|mrp|\bgst\b|hsn|qty|quantity|amount|date|\bsku\b|catalog|status|stock|\bno\b/i;
+const SPELL_VOCAB = [
+  'lehenga', 'choli', 'dupatta', 'chunni', 'kurta', 'kurti', 'saree', 'anarkali', 'sharara',
+  'gharara', 'palazzo', 'blouse', 'salwar', 'kameez', 'churidar', 'gowns', 'dress',
+  'cotton', 'georgette', 'chiffon', 'organza', 'velvet', 'rayon', 'viscose', 'crepe',
+  'brocade', 'jacquard', 'banarasi', 'chanderi', 'taffeta', 'satin', 'fabric',
+  'embroidery', 'embroidered', 'embellished', 'sequins', 'sequin', 'zardozi', 'mirror',
+  'thread', 'stitched', 'unstitched', 'bandhani', 'phulkari',
+  'chikankari', 'sleeve', 'sleeves', 'sleeveless', 'neckline', 'drawstring', 'lining',
+].filter(w => w.length >= 5);
+const spellVocabSet = new Set(SPELL_VOCAB);
+const SPELL_SAFE = new Set(['living']);
+
+function editDist(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (cur[j] < rowMin) rowMin = cur[j];
+    }
+    if (rowMin > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+function spellSuggest(word: string): string | null {
+  if (word.length < 5 || spellVocabSet.has(word) || SPELL_SAFE.has(word)) return null;
+  const stem = word.endsWith('s') ? word.slice(0, -1) : '';
+  if (stem && spellVocabSet.has(stem)) return null;
+  let best: string | null = null, bestD = 3;
+  for (const v of SPELL_VOCAB) {
+    if (v[0] !== word[0]) continue;
+    const max = word.length >= 7 && v.length >= 7 ? 2 : 1;
+    const d = editDist(word, v, max);
+    if (d <= max && d < bestD) { bestD = d; best = v; }
+  }
+  return best;
+}
+
+// Correct every misspelled token in one cell, keeping the writer's casing
+// (GORGETTE -> GEORGETTE, Gorgette -> Georgette) and a trailing plural s.
+function fixCellText(text: string): { fixed: string; words: string[] } | null {
+  const words: string[] = [];
+  const fixed = text.replace(/[A-Za-z]{5,}/g, (tok) => {
+    const lower = tok.toLowerCase();
+    const sug = spellSuggest(lower);
+    if (!sug) return tok;
+    let out = sug;
+    if (lower.endsWith('s') && !sug.endsWith('s')) out += 's';
+    if (tok === tok.toUpperCase()) out = out.toUpperCase();
+    else if (tok[0] === tok[0].toUpperCase()) out = out[0].toUpperCase() + out.slice(1);
+    words.push(`${tok}\u2192${out}`);
+    return out;
+  });
+  return words.length ? { fixed, words } : null;
+}
+
+const colA1 = (i: number): string => {
+  let n = i + 1, out = '';
+  while (n > 0) { const r = (n - 1) % 26; out = String.fromCharCode(65 + r) + out; n = Math.floor((n - 1) / 26); }
+  return out;
+};
+
+interface SpellFixPlan { range: string; tab: string; column: string; sku: string; before: string; after: string; words: string[] }
+
+async function spellfixRun(dry: boolean): Promise<Record<string, unknown>> {
+  const disc = await discoverDataTabs();
+  const plans: SpellFixPlan[] = [];
+  let scannedCells = 0, capped = false;
+  for (const tab of disc.dataTabs) {
+    const rows = await readSheetRaw(tab);
+    if (rows.length < 2) continue;
+    const headers = rows[0].map(h => String(h || '').trim());
+    const skuIdx = headers.findIndex(h => /\bsku\b/i.test(h));
+    const scanCols = headers.map((h, i) => ({ h, i })).filter(c => c.h && !SPELL_SKIP_COL.test(c.h));
+    for (let r = 1; r < rows.length; r++) {
+      for (const { h, i } of scanCols) {
+        const text = String(rows[r][i] ?? '');
+        if (!text) continue;
+        scannedCells++;
+        const fix = fixCellText(text);
+        if (!fix) continue;
+        if (plans.length >= SPELLFIX_CAP) { capped = true; break; }
+        plans.push({
+          range: `'${tab.replace(/'/g, "''")}'!${colA1(i)}${r + 1}`,
+          tab, column: h,
+          sku: String(rows[r][skuIdx] ?? '').trim() || `row ${r + 1}`,
+          before: text, after: fix.fixed, words: fix.words,
+        });
+      }
+      if (capped) break;
+    }
+    if (capped) break;
+  }
+
+  if (dry || plans.length === 0) {
+    return { ok: true, mode: dry ? 'spellfix_dry' : 'spellfix', scannedCells, cellsToFix: plans.length, capped, changes: plans, wrote: false };
+  }
+
+  // One batch write for all fixes. RAW so the corrected text lands verbatim.
+  const token = await googleToken(WRITE_SCOPES);
+  const w = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId()}/values:batchUpdate`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ valueInputOption: 'RAW', data: plans.map(p => ({ range: p.range, values: [[p.after]] })) }),
+  });
+  if (!w.ok) {
+    const err = await w.json().catch(() => ({}));
+    const sa = Deno.env.get('GOOGLE_CLIENT_EMAIL') || 'the service account';
+    const hint = w.status === 403 ? ` — share the master sheet with ${sa} as Editor to allow the weekly autofix` : '';
+    throw new Error(`Sheets write ${w.status}: ${err.error?.message || 'unknown'}${hint}`);
+  }
+
+  // Audit trail + admin notification. Log failures must not undo the fix —
+  // the write already happened — so they surface as a warning, not a throw.
+  const warnings: string[] = [];
+  const { error: logErr } = await db.from('master_spellfix_log').insert(plans.map(p => ({
+    tab: p.tab, cell: p.range, column_name: p.column, sku: p.sku,
+    before_text: p.before, after_text: p.after, words: p.words.join(', '),
+  })));
+  if (logErr) warnings.push(`log insert failed: ${logErr.message}`);
+  const { data: admins } = await db.from('profiles').select('id').eq('role', 'admin').eq('is_active', true);
+  const wordCount = plans.reduce((n, p) => n + p.words.length, 0);
+  const sample = plans.slice(0, 3).map(p => p.words[0]).join(', ');
+  if (admins?.length) {
+    const { error: notifErr } = await db.from('notifications').insert(admins.map((a: { id: string }) => ({
+      user_id: a.id, type: 'info',
+      title: 'Master sheet spelling autofix',
+      message: `Corrected ${wordCount} word${wordCount === 1 ? '' : 's'} in ${plans.length} cell${plans.length === 1 ? '' : 's'} of the Google master sheet (e.g. ${sample}).${capped ? ' More remain — the next weekly run continues.' : ''} The app picks the changes up within minutes.`,
+    })));
+    if (notifErr) warnings.push(`notification insert failed: ${notifErr.message}`);
+  }
+  return { ok: true, mode: 'spellfix', scannedCells, cellsFixed: plans.length, wordsFixed: wordCount, capped, changes: plans, wrote: true, warnings: warnings.length ? warnings : undefined };
+}
+
 // Constant-time-ish compare so the secret can't be probed byte by byte.
 function secretOk(given: string, expected: string): boolean {
   if (!given || !expected || given.length !== expected.length) return false;
@@ -379,9 +541,12 @@ Deno.serve(async (req) => {
   if (!secretOk(req.headers.get('x-sync-secret') || '', expected)) return json({ ok: false, error: 'forbidden' }, 403);
 
   const body = await req.json().catch(() => ({}));
-  const mode = ['auto', 'full', 'verify'].includes(body?.mode) ? body.mode : 'auto';
+  const mode = ['auto', 'full', 'verify', 'spellfix', 'spellfix_dry'].includes(body?.mode) ? body.mode : 'auto';
 
   try {
+    if (mode === 'spellfix' || mode === 'spellfix_dry') {
+      return json(await spellfixRun(mode === 'spellfix_dry'));
+    }
     if (mode === 'verify') {
       const disc = await discoverDataTabs();
       const results = [];
