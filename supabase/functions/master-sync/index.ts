@@ -388,10 +388,10 @@ const SPELL_VOCAB = [
   'gharara', 'palazzo', 'blouse', 'salwar', 'kameez', 'churidar', 'gowns', 'dress',
   'cotton', 'georgette', 'chiffon', 'organza', 'velvet', 'rayon', 'viscose', 'crepe',
   'brocade', 'jacquard', 'banarasi', 'chanderi', 'taffeta', 'satin', 'fabric',
-  // 'sequined' and 'sleeved' are REAL words the first production dry-run
-  // tried to "correct" (sequined blouse, full sleeved) - in the vocabulary
-  // they are recognised instead of altered.
-  'embroidery', 'embroidered', 'embellished', 'sequins', 'sequin', 'sequined', 'zardozi', 'mirror',
+  // 'sequined'/'sequinned' (both accepted spellings) and 'sleeved' are REAL
+  // words the production dry-runs
+  // tried to "correct" - in the vocabulary they are recognised, not altered.
+  'embroidery', 'embroidered', 'embellished', 'sequins', 'sequin', 'sequined', 'sequinned', 'zardozi', 'mirror',
   'thread', 'stitched', 'unstitched', 'bandhani', 'phulkari',
   'chikankari', 'sleeve', 'sleeves', 'sleeved', 'sleeveless', 'neckline', 'drawstring', 'lining',
 ].filter(w => w.length >= 5);
