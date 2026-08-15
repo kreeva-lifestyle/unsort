@@ -1,9 +1,5 @@
-// Client Finder - two ways in, chosen by the selector at the top:
-//   Find via Photo  - upload a product photo (or pick a SKU) and get the
-//                     websites that have posted that image (all state below).
-//   Find via Google - the downloadable Maps lead-generation tool (GoogleLeads).
-//   Find via Social Ads - Meta Ad Library keyword search: the brands actively
-//                     advertising a product per country (SocialAds).
+// Client Finder - upload a product photo (or pick a SKU) and get the
+// websites that have posted that image.
 //
 // The engine is Google Cloud Vision WEB_DETECTION, not a language model: no LLM
 // can reverse image search, because none has an image index behind it. The UI
@@ -17,10 +13,7 @@ import PhotoPicker from './PhotoPicker';
 import { call, explain, fileToB64, type Hit, type FolderCandidate } from './api';
 import { exportHitsXlsx } from './exportHits';
 import HitList from './HitList';
-import GoogleLeads from './GoogleLeads';
-import SocialAds from './SocialAds';
 
-type Finder = 'photo' | 'google' | 'ads';
 type Mode = 'upload' | 'sku';
 
 /** A picked photo plus the blob URL showing it. Kept as one object so the two
@@ -31,10 +24,6 @@ interface Shot { file: File; url: string }
 const shotKey = (f: File) => `${f.name}|${f.size}|${f.lastModified}`;
 
 export default function ClientFinder({ addToast }: { addToast: (m: string, t?: string) => void }) {
-  // Two very different ways to find clients: reverse image search (server-side
-  // Vision calls) vs the downloadable Google Maps lead tool. Photo state below
-  // is left untouched on a switch, so flipping over and back loses nothing.
-  const [finder, setFinder] = useState<Finder>('photo');
   const [mode, setMode] = useState<Mode>('upload');
   // File and its preview URL travel together so removing one can never leave
   // the two lists misaligned — and so the object URL is always revocable.
@@ -225,23 +214,6 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
   return (
     <div style={{ fontFamily: T.sans, color: T.tx }}>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-          {(['photo', 'google', 'ads'] as Finder[]).map(f => (
-            <button
-              key={f}
-              onClick={() => setFinder(f)}
-              style={{ ...(finder === f ? S.btnPrimary : S.btnGhost), flex: 1, minHeight: 44 }}
-            >
-              {f === 'photo' ? 'Find via Photo' : f === 'google' ? 'Find via Google' : 'Find via Social Ads'}
-            </button>
-          ))}
-        </div>
-
-        {finder === 'google' && <GoogleLeads />}
-
-        {finder === 'ads' && <SocialAds addToast={addToast} />}
-
-        {finder === 'photo' && (<>
         <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.6, marginBottom: 12 }}>
           Searches Google&rsquo;s image index for pages showing this product. It only finds
           what Google has indexed &mdash; private catalogues and wholesale portals stay invisible,
@@ -409,10 +381,9 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
             ))}
           </div>
         )}
-        </>)}
       </div>
 
-      {finder === 'photo' && hits && (
+      {hits && (
         <>
           {bestGuess && (
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 8 }}>

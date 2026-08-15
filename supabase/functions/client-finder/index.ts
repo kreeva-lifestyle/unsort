@@ -1,6 +1,4 @@
-// Client Finder - reverse image search over Google Cloud Vision WEB_DETECTION,
-// plus the Social Ads finder (Meta Ad Library: ads_status / ads_set_token /
-// ads_search - free API, token in app_secrets, brands aggregated by page).
+// Client Finder - reverse image search over Google Cloud Vision WEB_DETECTION.
 //
 // "Which websites have posted this product?" No language model can answer that;
 // there is no image index behind one. Vision's WEB_DETECTION does exactly this
@@ -531,98 +529,6 @@ Deno.serve(async (req) => {
   if (!who) return fail(401, 'Sign in to DailyOffice first', req);
 
   try {
-    // ── Social Ads finder (Meta Ad Library) ────────────────────────────────
-    // "Which brands are running ads for <keyword> in <countries>?" — free API,
-    // token stored server-side (app_secrets), never in the browser. Coverage
-    // honesty: Meta's API guarantees ALL commercial ads only for EU/DSA
-    // countries; US/UK/India may return thin non-political results — the UI
-    // says so and the Graph error text is surfaced verbatim when Meta refuses.
-    if (action === 'ads_status') {
-      const t = await fetch(`${SB_URL}/rest/v1/app_secrets?key=eq.meta_ads_token&select=value`, { headers: svcHeaders });
-      const v = String((await t.json().catch(() => []))?.[0]?.value || '');
-      return json({ ok: true, hasToken: v.length > 0 }, req);
-    }
-
-    if (action === 'ads_set_token') {
-      if (who.role !== 'admin') return fail(403, 'Only an admin can set the Meta token', req);
-      const token = String(body?.token || '').trim();
-      if (!token) {
-        await fetch(`${SB_URL}/rest/v1/app_secrets`, { method: 'POST', headers: { ...svcHeaders, prefer: 'resolution=merge-duplicates' }, body: JSON.stringify([{ key: 'meta_ads_token', value: '', updated_at: new Date().toISOString() }]) });
-        return json({ ok: true, cleared: true }, req);
-      }
-      // Free validation call before storing — a dead token should fail HERE,
-      // not on the owner's first real search.
-      const probe = await fetch(`https://graph.facebook.com/v21.0/ads_archive?search_terms=test&ad_reached_countries=${encodeURIComponent("['DE']")}&ad_type=ALL&limit=1&access_token=${encodeURIComponent(token)}`);
-      const pd = await probe.json().catch(() => ({}));
-      if (pd?.error) return fail(400, `Meta rejected this token: ${pd.error.message || pd.error.type || 'unknown error'}`, req);
-      const st = await fetch(`${SB_URL}/rest/v1/app_secrets`, { method: 'POST', headers: { ...svcHeaders, prefer: 'resolution=merge-duplicates' }, body: JSON.stringify([{ key: 'meta_ads_token', value: token, updated_at: new Date().toISOString() }]) });
-      if (!st.ok) return fail(500, 'Could not store the token', req);
-      return json({ ok: true }, req);
-    }
-
-    if (action === 'ads_search') {
-      const q = String(body?.q || '').trim().slice(0, 100);
-      const countries = (Array.isArray(body?.countries) ? body.countries : [])
-        .map((c: unknown) => String(c || '').trim().toUpperCase()).filter((c: string) => /^[A-Z]{2}$/.test(c)).slice(0, 10);
-      if (!q) return fail(400, 'Type a keyword to search (e.g. lehenga)', req);
-      if (countries.length === 0) return fail(400, 'Pick at least one country', req);
-      const activeOnly = body?.activeOnly !== false;
-      const t = await fetch(`${SB_URL}/rest/v1/app_secrets?key=eq.meta_ads_token&select=value`, { headers: svcHeaders });
-      const token = String((await t.json().catch(() => []))?.[0]?.value || '');
-      if (!token) return json({ ok: false, error: 'no_token' }, req, 409);
-
-      const fields = 'id,page_id,page_name,ad_creative_bodies,ad_creative_link_titles,ad_delivery_start_time,ad_delivery_stop_time,publisher_platforms,ad_snapshot_url';
-      let url = 'https://graph.facebook.com/v21.0/ads_archive'
-        + `?search_terms=${encodeURIComponent(q)}`
-        + `&ad_reached_countries=${encodeURIComponent('[' + countries.map(c => `'${c}'`).join(',') + ']')}`
-        + '&ad_type=ALL'
-        + `&ad_active_status=${activeOnly ? 'ACTIVE' : 'ALL'}`
-        + '&search_type=KEYWORD_UNORDERED'
-        + `&fields=${fields}`
-        + '&limit=100'
-        + `&access_token=${encodeURIComponent(token)}`;
-      // Up to 3 pages (300 ads) per search — plenty to rank brands, bounded so
-      // one broad keyword cannot spin the function for minutes.
-      const ads: any[] = [];
-      const warnings: string[] = [];
-      for (let page = 0; page < 3 && url; page++) {
-        const r = await fetch(url);
-        const data = await r.json().catch(() => ({}));
-        if (data?.error) {
-          const msg = String(data.error.message || data.error.type || 'Meta API error');
-          if (data.error.code === 190) return json({ ok: false, error: 'The Meta token has expired or was invalidated — paste a fresh one in the Social Ads settings.' }, req);
-          if (page === 0) return json({ ok: false, error: `Meta refused this search: ${msg}` }, req);
-          warnings.push(`Meta stopped paging early: ${msg}`);
-          break;
-        }
-        ads.push(...(Array.isArray(data?.data) ? data.data : []));
-        url = String(data?.paging?.next || '');
-      }
-      if (url && ads.length >= 300) warnings.push('More ads exist than the 300 scanned — narrow the keyword or countries for a fuller ranking.');
-
-      // Aggregate by PAGE — the deliverable is brands, not individual ads.
-      interface Brand { pageId: string; pageName: string; adCount: number; firstSeen: string; lastSeen: string; anyActive: boolean; platforms: string[]; samples: string[]; snapshot: string }
-      const byPage = new Map<string, Brand>();
-      for (const ad of ads) {
-        const id = String(ad.page_id || '');
-        if (!id) continue;
-        const b = byPage.get(id) || { pageId: id, pageName: String(ad.page_name || id), adCount: 0, firstSeen: '', lastSeen: '', anyActive: false, platforms: [], samples: [], snapshot: '' };
-        b.adCount++;
-        const start = String(ad.ad_delivery_start_time || '');
-        if (start && (!b.firstSeen || start < b.firstSeen)) b.firstSeen = start;
-        if (start && (!b.lastSeen || start > b.lastSeen)) b.lastSeen = start;
-        if (!ad.ad_delivery_stop_time) b.anyActive = true;
-        for (const pf of (ad.publisher_platforms || [])) if (!b.platforms.includes(pf)) b.platforms.push(pf);
-        const text = String((ad.ad_creative_bodies || [])[0] || (ad.ad_creative_link_titles || [])[0] || '').slice(0, 140);
-        if (text && b.samples.length < 2 && !b.samples.includes(text)) b.samples.push(text);
-        if (!b.snapshot && ad.ad_snapshot_url) b.snapshot = String(ad.ad_snapshot_url);
-        byPage.set(id, b);
-      }
-      const brands = [...byPage.values()].sort((a, b) => b.adCount - a.adCount).slice(0, 100)
-        .map(b => ({ ...b, libraryUrl: `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&view_all_page_id=${b.pageId}&country=${countries[0]}`, pageUrl: `https://www.facebook.com/${b.pageId}` }));
-      return json({ ok: true, q, countries, totalAds: ads.length, brands, warnings: warnings.length ? warnings : undefined }, req);
-    }
-
     if (action !== 'search') return fail(400, 'Unknown action', req);
 
     // Rate limit BEFORE any paid work.
