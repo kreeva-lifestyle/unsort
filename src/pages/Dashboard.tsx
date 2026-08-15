@@ -10,11 +10,6 @@ import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 import CountUp from '../components/ui/CountUp';
 import Skeleton from '../components/ui/Skeleton';
 
-type ChallanRow = { total: number | string; amount_paid: number | string | null; status: string; is_return: boolean; customer_name: string; created_at: string; payment_date: string | null };
-type InventoryRow = { status: string; status_changed_at: string | null };
-type ExpenseRow = { amount: number | string };
-type HandoverRow = { handover_number: number; amount: number | string; status: string; date: string; from_user_name: string; created_at: string };
-type BalanceRow = { opening_balance: number | string };
 type OverdueAlert = { name: string; amount: number; days: number };
 type DryCleanAlert = { days: number };
 type TaskRow = { id: string; title: string; is_done: boolean; created_at: string };
@@ -40,83 +35,42 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
   const { ask, modalProps } = useConfirm();
 
   const fetchAll = useCallback(async () => {
-    const today = new Date(); today.setHours(0,0,0,0);
+    // ONE round trip: the dashboard_summary RPC computes every number in the
+    // database (SECURITY INVOKER, so RLS applies exactly as the old direct
+    // reads did). The phone used to download every challan and every
+    // inventory item just to count them — the payload now stays ~constant no
+    // matter how much history the business accumulates. The math server-side
+    // is a verified 1:1 port of what used to run here (payment_date-keyed
+    // month, UTC trend buckets, voided excluded).
+    const today = new Date(); today.setHours(0, 0, 0, 0);
     const y = today.getFullYear(), mo = String(today.getMonth() + 1).padStart(2, '0');
-    const monthStartStr = `${y}-${mo}-01`;
-    const todayISO = today.toISOString();
-    const weekAgoISO = new Date(Date.now() - 7 * 86400000).toISOString();
-    let scansRes, challansRes, itemsRes, expensesRes, handoversRes, balancesRes, scanTrendRes;
-    try {
-      // All reads run in one parallel batch (single round-trip) so the dashboard
-      // can render as soon as it resolves — no second sequential hop gating `loaded`.
-      [scansRes, challansRes, itemsRes, expensesRes, handoversRes, balancesRes, scanTrendRes] = await Promise.all([
-        supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).gte('scanned_at', todayISO),
-        supabase.from('cash_challans').select('total, amount_paid, status, is_return, customer_name, created_at, payment_date').neq('status', 'voided'),
-        supabase.from('inventory_items').select('status, status_changed_at'),
-        supabase.from('cash_expenses').select('amount').gte('date', monthStartStr),
-        supabase.from('cash_handovers').select('handover_number, amount, status, date, from_user_name, created_at'),
-        supabase.from('cash_book_balances').select('opening_balance').eq('date', monthStartStr).maybeSingle(),
-        supabase.from('packtime_scans').select('scanned_at').gte('scanned_at', weekAgoISO),
-      ]);
-    } catch (e: any) {
-      addToast('Failed to load dashboard data', 'error');
-      return;
-    }
-    const challans = (challansRes.data ?? []) as ChallanRow[];
-    const items = (itemsRes.data ?? []) as InventoryRow[];
-    const expenses = (expensesRes.data ?? []) as ExpenseRow[];
-    const handovers = (handoversRes.data ?? []) as HandoverRow[];
-    const balances = balancesRes.data as BalanceRow | null;
-    const scanCount = scansRes.count ?? 0;
-
-    // Pulse — monthly metrics (matches Cash Book logic: payment_date, paid/partial only)
-    const paidInMonth = challans.filter(c => (c.status === 'paid' || c.status === 'partial') && c.payment_date && c.payment_date >= monthStartStr);
-    const monthRev = paidInMonth.reduce((s, c) => s + (c.is_return ? -1 : 1) * Number(c.total || 0), 0);
-    const unsortedCount = items.filter(i => i.status === 'unsorted').length;
-    const opening = Number(balances?.opening_balance || 0);
-    const cashSales = paidInMonth.filter(c => !c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
-    const cashReturns = paidInMonth.filter(c => c.is_return).reduce((s, c) => s + Number(c.amount_paid || 0), 0);
-    const totalExp = expenses.reduce((s, e) => s + Number(e.amount), 0);
-    const confirmedHand = handovers.filter(h => h.status === 'confirmed' && h.date >= monthStartStr).reduce((s, h) => s + Number(h.amount), 0);
-    const handoverTotal = handovers.filter(h => h.status === 'confirmed').reduce((s, h) => s + Number(h.amount), 0);
-    setPulse({ scans: scanCount, revenue: Math.round(monthRev), unsorted: unsortedCount, cashInHand: Math.round(opening + cashSales - cashReturns - totalExp - confirmedHand), handoverTotal: Math.round(handoverTotal) });
-
-    // Alerts
-    const sevenDaysAgo = Date.now() - 7 * 86400000;
-    const overdue: OverdueAlert[] = challans.filter(c => !c.is_return && (c.status === 'unpaid' || c.status === 'partial') && new Date(c.created_at).getTime() < sevenDaysAgo)
-      .map(c => ({ name: c.customer_name, amount: Number(c.total) - Number(c.amount_paid || 0), days: Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) }));
-    const dryClean: DryCleanAlert[] = items.filter(i => i.status === 'dry_clean').map(i => ({ days: Math.floor((Date.now() - new Date(i.status_changed_at || Date.now()).getTime()) / 86400000) }));
-    const pendHand: PendingHandover[] = handovers.filter(h => h.status === 'pending').map(h => ({
-      number: h.handover_number, from: h.from_user_name, amount: Number(h.amount),
-      ageDays: Math.floor((Date.now() - new Date(h.created_at || Date.now()).getTime()) / 86400000),
-    }));
-    const disputedCount = handovers.filter(h => h.status === 'disputed').length;
-    setAlerts({ overdue, dryClean, pendingHandovers: pendHand, disputedCount });
-
-    // Inventory breakdown
-    const breakdown: Record<string, number> = {};
-    items.forEach(i => { breakdown[i.status] = (breakdown[i.status] || 0) + 1; });
-    setInvBreakdown(breakdown);
-
-    // Top 5 customers
-    const custMap: Record<string, number> = {};
-    challans.filter(c => !c.is_return && (c.status === 'unpaid' || c.status === 'partial')).forEach(c => {
-      custMap[c.customer_name] = (custMap[c.customer_name] || 0) + (Number(c.total) - Number(c.amount_paid || 0));
+    const { data, error } = await supabase.rpc('dashboard_summary', {
+      p_month_start: `${y}-${mo}-01`,
+      p_today: today.toISOString(),
+      p_week_ago: new Date(Date.now() - 7 * 86400000).toISOString(),
     });
-    setTopCustomers(Object.entries(custMap).map(([name, outstanding]) => ({ name, outstanding })).sort((a, b) => b.outstanding - a.outstanding).slice(0, 5));
-
-    // Scan trend (7 days) — from the parallel batch above (no extra round-trip)
-    const scanData = scanTrendRes.data;
-    const scanByDay: Record<string, number> = {};
-    for (let d = 6; d >= 0; d--) { const dt = new Date(Date.now() - d * 86400000); scanByDay[dt.toISOString().slice(0,10)] = 0; }
-    ((scanData ?? []) as { scanned_at: string }[]).forEach(s => { const d = new Date(s.scanned_at).toISOString().slice(0,10); if (scanByDay[d] !== undefined) scanByDay[d]++; });
-    setScanTrend(Object.entries(scanByDay).map(([date, count]) => ({ date, count })));
-
-    // Revenue trend (30 days)
-    const revByDay: Record<string, number> = {};
-    for (let d = 29; d >= 0; d--) { const dt = new Date(Date.now() - d * 86400000); revByDay[dt.toISOString().slice(0,10)] = 0; }
-    challans.forEach(c => { if (!c.payment_date || (c.status !== 'paid' && c.status !== 'partial')) return; const d = c.payment_date.slice(0, 10); if (revByDay[d] !== undefined) revByDay[d] += (c.is_return ? -1 : 1) * Number(c.amount_paid || 0); });
-    setRevTrend(Object.entries(revByDay).map(([date, amount]) => ({ date, amount: Math.round(amount) })));
+    if (error || !data) { addToast('Failed to load dashboard data', 'error'); return; }
+    const s = data as {
+      scans: number; monthRev: number; unsorted: number; opening: number | string;
+      cashSales: number | string; cashReturns: number | string; totalExp: number | string;
+      confirmedHandMonth: number | string; handoverTotal: number;
+      invBreakdown: Record<string, number>;
+      overdue: OverdueAlert[]; dryClean: DryCleanAlert[];
+      pendingHandovers: PendingHandover[]; disputedCount: number;
+      topCustomers: { name: string; outstanding: number }[];
+      scanTrend: { date: string; count: number }[];
+      revTrend: { date: string; amount: number }[];
+    };
+    setPulse({
+      scans: s.scans, revenue: s.monthRev, unsorted: s.unsorted,
+      cashInHand: Math.round(Number(s.opening) + Number(s.cashSales) - Number(s.cashReturns) - Number(s.totalExp) - Number(s.confirmedHandMonth)),
+      handoverTotal: s.handoverTotal,
+    });
+    setAlerts({ overdue: s.overdue, dryClean: s.dryClean, pendingHandovers: s.pendingHandovers, disputedCount: s.disputedCount });
+    setInvBreakdown(s.invBreakdown);
+    setTopCustomers(s.topCustomers);
+    setScanTrend(s.scanTrend);
+    setRevTrend(s.revTrend);
     setLoaded(true);
   }, []);
 

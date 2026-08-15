@@ -1,0 +1,12 @@
+-- WHY: the Dashboard downloaded EVERY challan and EVERY inventory item on
+-- every open (7 parallel REST calls) just to count them client-side - cost
+-- grows with history forever. dashboard_summary() computes the same numbers
+-- in the database and returns one JSON payload: one round trip, ~constant
+-- size regardless of history. SECURITY INVOKER so RLS applies exactly as the
+-- old direct reads did. Semantics are a verified 1:1 port of the old
+-- Dashboard.tsx fetchAll() - all ten aggregates cross-checked equal against
+-- independent queries on live data before the client switched over.
+-- Applied 2026-08-15 via MCP as dashboard_summary_rpc +
+-- dashboard_summary_trend_date_format (trend keys as bare YYYY-MM-DD).
+-- Full body in the applied migration history; granted to authenticated,
+-- revoked from anon.
