@@ -132,7 +132,11 @@ async function flushQueue() {
       const retries = batchRetries + 1;
       if (retries <= 3) {
         writeQueue.unshift({ rows: batch, sheetName, retries });
-        await new Promise(r => setTimeout(r, 2000));
+        // Escalating gaps (2s → 8s → 20s, ~30s total) instead of 3×2s: the
+        // old ~6s window was shorter than a typical iOS network stall during
+        // an active phone call, so real scans dropped to the manual-Retry
+        // banner for blips that would have healed themselves seconds later.
+        await new Promise(r => setTimeout(r, [2000, 8000, 20000][retries - 1] || 2000));
       }
       if (retries > 3) {
         droppedBatches.push({ rows: batch, sheetName, ts: Date.now() });
