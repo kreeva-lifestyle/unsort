@@ -418,6 +418,59 @@ const detectCategory = (text: string): string | null => {
   return null;
 };
 const catLabel = (id: string | null) => CATEGORIES.find(c => c.id === id)?.label ?? null;
+
+// ── Master Assistant price filter ───────────────────────────────────────────
+// "products under 2000 that are active" is answered by CODE, not the model:
+// the question is parsed for a price condition, the filter runs over the
+// PRICE EXC GST column (owner's rule - the incl-GST column is NEVER used),
+// and the model narrates the finished, exact list. Pure helpers, harness-
+// testable. A number followed by a count noun ("less than 100 designs") is
+// a quantity, not a price - the guard skips those.
+const PRICE_COUNT_NOUN = /^(designs?|skus?|products?|items?|rows?|pieces?|styles?|codes?)\b/;
+interface PriceAsk { min: number | null; max: number | null; minInc: boolean; maxInc: boolean }
+const parsePriceAsk = (q: string): PriceAsk | null => {
+  const t = q.toLowerCase().replace(/[\u20b9,]/g, ' ').replace(/\s+/g, ' ').trim();
+  const num = (s: string) => parseFloat(s) * (/k$/.test(s) ? 1000 : 1);
+  const N = '(\\d+(?:\\.\\d+)?k?)';
+  const tail = (m: RegExpMatchArray) => t.slice((m.index || 0) + m[0].length).trimStart();
+  let m = t.match(new RegExp(`between ${N} (?:and|to) ${N}`)) || t.match(new RegExp(`${N} ?(?:to|-) ?${N}`));
+  if (m && !PRICE_COUNT_NOUN.test(tail(m))) {
+    const a = num(m[1]), b = num(m[2]);
+    return { min: Math.min(a, b), max: Math.max(a, b), minInc: true, maxInc: true };
+  }
+  // inclusive ceilings ("upto 2000" includes 2000) vs exclusive ("under 2000")
+  m = t.match(new RegExp(`(?:upto|up to|within|max(?:imum)?|<=) ?${N}`));
+  if (m && !PRICE_COUNT_NOUN.test(tail(m))) return { min: null, max: num(m[1]), minInc: true, maxInc: true };
+  m = t.match(new RegExp(`(?:under|below|less than|cheaper than|<) ?${N}`));
+  if (m && !PRICE_COUNT_NOUN.test(tail(m))) return { min: null, max: num(m[1]), minInc: true, maxInc: false };
+  m = t.match(new RegExp(`(?:min(?:imum)?|>=) ?${N}`));
+  if (m && !PRICE_COUNT_NOUN.test(tail(m))) return { min: num(m[1]), max: null, minInc: true, maxInc: true };
+  m = t.match(new RegExp(`(?:above|over|more than|greater than|costlier than|>) ?${N}`));
+  if (m && !PRICE_COUNT_NOUN.test(tail(m))) return { min: num(m[1]), max: null, minInc: false, maxInc: true };
+  return null;
+};
+const priceAskDesc = (f: PriceAsk): string =>
+  f.min !== null && f.max !== null ? `\u20b9${f.min} to \u20b9${f.max}` :
+  f.max !== null ? `${f.maxInc ? 'up to' : 'under'} \u20b9${f.max}` : `${f.minInc ? 'from' : 'above'} \u20b9${f.min}`;
+const statusAsk = (q: string): 'active' | 'inactive' | null => {
+  if (/\b(?:inactive|in-active|not active|deactivated)\b/i.test(q)) return 'inactive';
+  if (/\b(?:active|live)\b/i.test(q)) return 'active';
+  return null;
+};
+const inPriceAsk = (p: number, f: PriceAsk): boolean => {
+  if (f.max !== null && (f.maxInc ? p > f.max : p >= f.max)) return false;
+  if (f.min !== null && (f.minInc ? p < f.min : p <= f.min)) return false;
+  return true;
+};
+// First number in the cell ("2,150" or "2150/-" -> 2150); null means NO
+// readable price - such a SKU is excluded and counted, never treated as 0.
+const firstNumber = (s: string): number | null => {
+  const m = String(s || '').replace(/,/g, '').match(/\d+(?:\.\d+)?/);
+  if (!m) return null;
+  const n = parseFloat(m[0]);
+  return Number.isFinite(n) ? n : null;
+};
+
 const catCompatible = (tplCat: string, detected: string) =>
   tplCat === detected || (CAT_COMPAT[tplCat] || []).includes(detected);
 
@@ -1852,6 +1905,53 @@ Deno.serve(async (req) => {
         for (const k of masterSkus) { const c = catLabel(detectCategory(rowTextOf(index[k]))) || 'Undetected'; catCounts.set(c, (catCounts.get(c) || 0) + 1); }
         packLines.push(`Category spread (detected from row text): ${[...catCounts.entries()].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c}=${n}`).join(', ')}`);
         packLines.push('No seller sheet was attached to this question.');
+      }
+
+
+      // ---- price-filter ask: exact list computed HERE, model only narrates --
+      const priceAsk = parsePriceAsk(question);
+      if (priceAsk) {
+        const wantStatus = statusAsk(question);
+        const normH = (h: unknown) => String(h || '').toUpperCase().replace(/[^A-Z]/g, '');
+        const tabCols = new Map<string, { price: number; status: number; catalog: number }>();
+        for (const t of tabs) {
+          let price = -1, status = -1, catalog = -1;
+          t.headers.forEach((h, i) => {
+            const n = normH(h);
+            if (price < 0 && (n === 'PRICEEXCGST' || n === 'PRICEEXCLGST' || n === 'PRICEEXCLUDINGGST')) price = i;
+            if (status < 0 && n.includes('STATUS')) status = i;
+            if (catalog < 0 && n === 'CATALOG') catalog = i;
+          });
+          tabCols.set(t.tab, { price, status, catalog });
+        }
+        const missing = [...tabCols.entries()].filter(([, c]) => c.price < 0).map(([tab]) => tab);
+        if (missing.length === tabs.length) {
+          packLines.push('PRICE FILTER: the question asks about price but NO tab has a PRICE EXC GST column - tell the owner that exact column is required for price questions.');
+        } else {
+          if (missing.length) packLines.push(`PRICE FILTER WARNING: tab(s) ${missing.join(', ')} have no PRICE EXC GST column and are not covered - say so.`);
+          const matchRows: { sku: string; tab: string; catalog: string; price: number; status: string }[] = [];
+          let priced = 0, noPrice = 0;
+          const statusOfMatches = new Map<string, number>();
+          for (const k of masterSkus) {
+            const m = index[k];
+            const c = tabCols.get(m.tab)!;
+            if (c.price < 0) continue;
+            const p = firstNumber(String(m.row[c.price] ?? ''));
+            if (p === null) { noPrice++; continue; }
+            priced++;
+            if (!inPriceAsk(p, priceAsk)) continue;
+            const sv = String(c.status >= 0 ? (m.row[c.status] ?? '') : '').trim().toLowerCase() || '(blank)';
+            if (wantStatus && sv !== wantStatus) continue;
+            statusOfMatches.set(sv, (statusOfMatches.get(sv) || 0) + 1);
+            matchRows.push({ sku: k, tab: m.tab, catalog: String(c.catalog >= 0 ? (m.row[c.catalog] ?? '') : '').trim(), price: p, status: sv });
+          }
+          matchRows.sort((a, b) => a.price - b.price);
+          const desc = `${priceAskDesc(priceAsk)}${wantStatus ? `, ${wantStatus}` : ''}`;
+          const title = `Price filter - ${desc} (${matchRows.length})`;
+          tables.push({ title, columns: ['SKU', 'BRAND TAB', 'CATALOG', 'PRICE EXC GST', 'STATUS'], rows: matchRows.slice(0, TABLE_CAP).map(r => [r.sku, r.tab, r.catalog, String(r.price), r.status]) });
+          if (matchRows.length > TABLE_CAP) warnings.push(`"${title}" table truncated to ${TABLE_CAP.toLocaleString()} of ${matchRows.length.toLocaleString()} rows.`);
+          packLines.push(`PRICE FILTER (computed in code from the PRICE EXC GST column ONLY - the incl-GST column is never used): condition ${desc} -> ${matchRows.length} SKUs match out of ${priced} priced SKUs.${noPrice ? ` ${noPrice} SKUs have NO readable PRICE EXC GST and are EXCLUDED from this filter - state that.` : ''} Status of matches: ${[...statusOfMatches.entries()].map(([v, n]) => `${v}=${n}`).join(', ') || '(none)'}. Per brand: ${[...matchRows.reduce((mp, r) => mp.set(r.tab, (mp.get(r.tab) || 0) + 1), new Map<string, number>()).entries()].map(([t, n]) => `${t}=${n}`).join(', ') || '(none)'}. The complete list is in the "${title}" table (CSV exportable) - reference it by name. Sample: ${matchRows.slice(0, 20).map(r => `${r.sku}=\u20b9${r.price}`).join(', ') || '(none)'}`);
+        }
       }
 
       const model = await getModel();
