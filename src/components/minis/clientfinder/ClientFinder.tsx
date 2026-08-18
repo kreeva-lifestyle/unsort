@@ -230,7 +230,10 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
                 flex: 1, minHeight: 44,
               }}
             >
-              {m === 'upload' ? 'Upload a photo' : 'Pick a SKU'}
+              {/* Mode labels read as a CHOICE ("By photo"), not an action —
+                  "Upload a photo" next to the real "Choose or take photos"
+                  button looked like two upload buttons (owner's report). */}
+              {m === 'upload' ? 'By photo' : 'By SKU'}
             </button>
           ))}
         </div>
