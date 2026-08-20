@@ -9,9 +9,10 @@ import { T, S } from '../../../lib/theme';
 import { numericKeyDown } from '../../../lib/numericInput';
 import { CostingSupplier, blankSupplier, num } from './costingModel';
 
-export default function SupplierModal({ subName, suppliers, onDone, onClose }: {
+export default function SupplierModal({ subName, suppliers, suggest, onDone, onClose }: {
   subName: string;
   suppliers: CostingSupplier[];
+  suggest: string[];
   onDone: (next: CostingSupplier[]) => void;
   onClose: () => void;
 }) {
@@ -61,15 +62,21 @@ export default function SupplierModal({ subName, suppliers, onDone, onClose }: {
               <input type="radio" name="sel-supplier" checked={!!r.selected} onChange={() => select(i)}
                 aria-label="Use this supplier's rate" style={{ width: 18, height: 18, flexShrink: 0 }} />
               <input value={r.name} onChange={e => patch(i, { name: e.target.value })} placeholder="Supplier"
-                style={{ ...S.fInput, flex: 2, minWidth: 0 }} />
+                list="costing-supplier-suggest" style={{ ...S.fInput, flex: 2, minWidth: 0 }} />
               <input value={r.materialCode} onChange={e => patch(i, { materialCode: e.target.value })} placeholder="Material code"
                 style={{ ...S.fInput, flex: 2, minWidth: 0, fontFamily: T.mono }} />
               <input value={r.rate} onChange={e => patch(i, { rate: e.target.value })} onKeyDown={e => numericKeyDown(e)}
-                type="number" inputMode="decimal" placeholder="Rate" style={{ ...S.fInput, flex: 1, minWidth: 64 }} />
+                type="number" min="0" inputMode="decimal" placeholder="Rate"
+                style={{ ...S.fInput, flex: 1, minWidth: 64, ...(num(r.rate) > 0 ? {} : { border: '1px solid rgba(239,68,68,.55)' }) }} />
               <span onClick={() => remove(i)} aria-label="Remove supplier"
                 style={{ cursor: 'pointer', color: T.re, fontSize: 16, lineHeight: 1, padding: '4px 2px' }}>&#215;</span>
             </div>
           ))}
+          {/* Existing supplier names from every costing sheet — one spelling
+              per supplier keeps the purchase plan grouped correctly. */}
+          <datalist id="costing-supplier-suggest">
+            {suggest.map(n => <option key={n} value={n} />)}
+          </datalist>
           <button onClick={() => setRows(prev => [...prev, { ...blankSupplier(), selected: false }])}
             style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>+ Add supplier</button>
           {error && (
