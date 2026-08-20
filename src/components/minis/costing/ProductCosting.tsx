@@ -18,7 +18,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
 
   const load = () => {
     supabase.from('costing_products')
-      .select('id, sku, image_url, maintenance_pct, components, updated_at')
+      .select('id, sku, image_url, maintenance_pct, components, notes, updated_at')
       .order('updated_at', { ascending: false }).limit(500)
       .then(({ data, error }) => {
         if (error) { addToast(friendlyError(error), 'error'); setList([]); return; }
@@ -29,7 +29,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
 
   const newSheet = () => setEditing({
     id: crypto.randomUUID(), sku: '', image_url: null,
-    maintenance_pct: 0, components: [blankComponent()],
+    maintenance_pct: 0, components: [blankComponent()], notes: '',
   });
 
   const remove = async (p: CostingProduct) => {
@@ -41,8 +41,12 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
   };
 
   if (editing) {
+    // Supplier names already used on ANY sheet — offered as suggestions so
+    // one supplier keeps one spelling and the purchase plan groups correctly.
+    const supplierSuggest = [...new Set((list ?? []).flatMap(pr =>
+      pr.components.flatMap(c => c.subs.flatMap(su => su.suppliers.map(x => x.name.trim())))).filter(Boolean))].sort();
     return (
-      <CostingEditor product={editing} addToast={addToast}
+      <CostingEditor product={editing} supplierSuggest={supplierSuggest} addToast={addToast}
         onBack={() => { setEditing(null); load(); }}
         onSaved={() => { setEditing(null); load(); }} />
     );

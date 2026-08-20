@@ -11,10 +11,12 @@ import {
   CostingProduct, blankComponent, sheetCost, totalCost, money, validateSheet, num,
 } from './costingModel';
 import ComponentCard from './ComponentCard';
+import { optimizeImage } from './imageResize';
 import PlanPreview from './PlanPreview';
 
-export default function CostingEditor({ product, onSaved, onBack, addToast }: {
+export default function CostingEditor({ product, supplierSuggest, onSaved, onBack, addToast }: {
   product: CostingProduct;
+  supplierSuggest: string[];
   onSaved: (p: CostingProduct) => void;
   onBack: () => void;
   addToast: (m: string, t?: string) => void;
@@ -24,15 +26,20 @@ export default function CostingEditor({ product, onSaved, onBack, addToast }: {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
+  // Owner's flow: enter how many pcs to make -> totals auto-calculate for
+  // that quantity -> the purchase plan generates from the same number.
+  const [pieces, setPieces] = useState('');
   const imgRef = useRef<HTMLInputElement>(null);
 
   const uploadImage = async (file: File | undefined) => {
     if (!file || uploading) return;
     setUploading(true);
     try {
-      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
-      const path = `${p.id}.${ext}`;
-      const { error } = await supabase.storage.from('costing-images').upload(path, file, { contentType: file.type, upsert: true });
+      // Phone photos are 3-8 MB; the sheet needs ~200 KB. Resize + re-encode
+      // BEFORE upload so storage stays small and lists load fast.
+      const { blob, type } = await optimizeImage(file);
+      const path = `${p.id}.jpg`;
+      const { error } = await supabase.storage.from('costing-images').upload(path, blob, { contentType: type, upsert: true });
       if (error) throw error;
       const { data } = supabase.storage.from('costing-images').getPublicUrl(path);
       // Cache-buster: upsert keeps the same URL, so without it the old photo
@@ -55,7 +62,7 @@ export default function CostingEditor({ product, onSaved, onBack, addToast }: {
       const row = {
         id: p.id, sku: p.sku.trim().toUpperCase(), image_url: p.image_url,
         maintenance_pct: num(p.maintenance_pct), components: p.components,
-        created_by: user?.id, updated_at: new Date().toISOString(),
+        notes: p.notes, created_by: user?.id, updated_at: new Date().toISOString(),
       };
       const { error } = await supabase.from('costing_products').upsert(row);
       if (error) throw error;
@@ -89,7 +96,7 @@ export default function CostingEditor({ product, onSaved, onBack, addToast }: {
       </div>
 
       {p.components.map((c, i) => (
-        <ComponentCard key={i} comp={c}
+        <ComponentCard key={i} comp={c} supplierSuggest={supplierSuggest}
           onChange={next => patchComp(i, next)}
           onRemove={() => setP(prev => ({ ...prev, components: prev.components.filter((_, j) => j !== i) }))} />
       ))}
@@ -110,6 +117,25 @@ export default function CostingEditor({ product, onSaved, onBack, addToast }: {
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: T.tx, padding: '6px 0 0', borderTop: `1px solid ${T.bd}`, marginTop: 4 }}>
           <span>Total cost / pc</span><span style={{ fontFamily: T.mono, color: T.ac2 }}>{money(totalCost(p.components, p.maintenance_pct))}</span>
         </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: T.tx2, padding: '8px 0 0', borderTop: `1px solid ${T.bd}`, marginTop: 8 }}>
+          <span>Pieces to make</span>
+          <input value={pieces} onChange={e => setPieces(e.target.value)} onKeyDown={e => numericKeyDown(e)}
+            type="number" min="1" inputMode="numeric" placeholder="e.g. 48"
+            style={{ ...S.fInput, width: 84, textAlign: 'right' }} />
+        </div>
+        {num(pieces) > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: T.tx, padding: '6px 0 0' }}>
+            <span>Total for {Math.floor(num(pieces))} pcs</span>
+            <span style={{ fontFamily: T.mono, color: T.gr }}>{money(totalCost(p.components, p.maintenance_pct) * Math.floor(num(pieces)))}</span>
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <label style={S.fLabel}>Notes</label>
+        <textarea value={p.notes} onChange={e => setP(prev => ({ ...prev, notes: e.target.value }))}
+          placeholder="Anything to remember about costing this product — wastage, minimums, vendor terms…"
+          rows={3} style={{ ...S.fInput, width: '100%', height: 'auto', minHeight: 64, resize: 'vertical', lineHeight: 1.5 }} />
       </div>
 
       {errors.length > 0 && (
@@ -121,7 +147,13 @@ export default function CostingEditor({ product, onSaved, onBack, addToast }: {
 
       <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
         <button onClick={onBack} style={{ ...S.btnGhost, minHeight: 44 }}>Back</button>
-        <button onClick={() => setPlanOpen(true)} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Purchase plan (PDF)</button>
+        <button onClick={() => {
+          const n = Math.floor(num(pieces));
+          if (!(n > 0)) { addToast('Enter "Pieces to make" first — the plan is calculated from it', 'error'); return; }
+          const errs = validateSheet(p.sku, p.components);
+          if (errs.length) { setErrors(errs); addToast('Fix the highlighted fields first', 'error'); return; }
+          setErrors([]); setPlanOpen(true);
+        }} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Purchase plan (PDF)</button>
         <button onClick={save} disabled={saving}
           style={{ ...S.btnPrimary, flex: 1, minWidth: 140, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
           {saving ? 'Saving…' : 'Save costing sheet'}
@@ -129,7 +161,7 @@ export default function CostingEditor({ product, onSaved, onBack, addToast }: {
       </div>
 
       {planOpen && (
-        <PlanPreview product={p} addToast={addToast} onClose={() => setPlanOpen(false)} />
+        <PlanPreview product={p} pieces={Math.floor(num(pieces))} onClose={() => setPlanOpen(false)} />
       )}
     </div>
   );

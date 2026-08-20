@@ -13,6 +13,7 @@ export interface CostingComponent { name: string; subs: CostingSub[] }
 export interface CostingProduct {
   id: string; sku: string; image_url: string | null;
   maintenance_pct: number | string; components: CostingComponent[];
+  notes: string;
   updated_at?: string;
 }
 
@@ -43,6 +44,20 @@ export const sheetCost = (components: CostingComponent[]): number =>
 
 export const totalCost = (components: CostingComponent[], maintenancePct: number | string): number =>
   sheetCost(components) * (1 + num(maintenancePct) / 100);
+
+/** Live per-field validity for one sub-component — drives the red borders in
+ *  the editor so a zero rate or missing unit is visible while typing, not
+ *  only at save. Same rules as validateSheet, per cell. */
+export const subProblems = (s: CostingSub) => {
+  const sel = selectedSupplier(s);
+  return {
+    name: !s.name.trim(),
+    qty: !(num(s.qty) > 0),
+    unit: !s.unit.trim(),
+    supplier: !sel || !sel.name.trim(),
+    rate: !(num(sel?.rate) > 0),
+  };
+};
 
 export const blankSupplier = (): CostingSupplier => ({ name: '', materialCode: '', rate: '', selected: true });
 export const blankSub = (): CostingSub => ({ name: '', qty: '', unit: '', suppliers: [blankSupplier()] });
