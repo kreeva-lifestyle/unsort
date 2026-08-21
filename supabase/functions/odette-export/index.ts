@@ -751,11 +751,26 @@ Deno.serve(async (req) => {
           const uniq = found.filter((f: any) => { const k = f.path_lower; if (seen.has(k)) return false; seen.add(k); return true; });
           const exact = uniq.filter((f: any) => normSku(f.name) === sku);
           const cands = exact.length ? exact : uniq.filter((f: any) => nameMatchesSku(f.name, sku) && normSku(f.name).length >= sku.length);
-          if (cands.length !== 1) { misses.push({ sku, reason: cands.length === 0 ? 'no folder' : 'found in several places' }); continue; }
-          const ls = await dbx(token, 'files/list_folder', { path: cands[0].path_lower, limit: 200 });
-          if (ls.status >= 400) { misses.push({ sku, reason: 'folder unreadable' }); continue; }
-          const files = (ls.data.entries || []).filter((e: any) => e['.tag'] === 'file' && isImage(e.name))
-            .map((e: any) => ({ name: String(e.name), path: String(e.path_lower) }));
+          if (cands.length === 0) { misses.push({ sku, reason: 'no folder' }); continue; }
+          // A SKU folder often exists under SEVERAL roots (e-commerce AND the
+          // offline catalog) - for the Link Generator that ambiguity matters,
+          // but any folder's photo shows the same garment, so here the images
+          // are MERGED (first three folders), deduped by filename so the same
+          // shot from two copies is offered once. This is what made the first
+          // release answer "no photos" for every catalog SKU.
+          const files: { name: string; path: string }[] = [];
+          const seenNames = new Set<string>();
+          for (const cand of cands.slice(0, 3)) {
+            const ls = await dbx(token, 'files/list_folder', { path: cand.path_lower, limit: 200 });
+            if (ls.status >= 400) continue;
+            for (const e of (ls.data.entries || [])) {
+              if (e['.tag'] !== 'file' || !isImage(e.name)) continue;
+              const k = String(e.name).toLowerCase();
+              if (seenNames.has(k)) continue;
+              seenNames.add(k);
+              files.push({ name: String(e.name), path: String(e.path_lower) });
+            }
+          }
           if (files.length === 0) { misses.push({ sku, reason: 'no images' }); continue; }
           lists.push({ sku, files });
         }
