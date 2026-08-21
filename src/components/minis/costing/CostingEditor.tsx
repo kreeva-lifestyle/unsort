@@ -13,9 +13,11 @@ import {
 import ComponentCard from './ComponentCard';
 import { optimizeImage } from './imageResize';
 import PlanPreview from './PlanPreview';
+import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 
-export default function CostingEditor({ product, library, onSaved, onBack, addToast }: {
+export default function CostingEditor({ product, saved, library, onSaved, onBack, addToast }: {
   product: CostingProduct;
+  saved: boolean;
   library: CostingLibrary;
   onSaved: (p: CostingProduct) => void;
   onBack: () => void;
@@ -30,6 +32,17 @@ export default function CostingEditor({ product, library, onSaved, onBack, addTo
   // that quantity -> the purchase plan generates from the same number.
   const [pieces, setPieces] = useState('');
   const imgRef = useRef<HTMLInputElement>(null);
+  const { ask, modalProps } = useConfirm();
+
+  // Delete lives INSIDE the open costing (owner's call) - the list cards
+  // stay clean. Only offered for a costing that exists in the DB.
+  const deleteCosting = async () => {
+    if (!await ask({ title: `Delete product costing ${p.sku || product.sku}?`, confirmLabel: 'Delete', danger: true })) return;
+    const { error } = await supabase.from('costing_products').delete().eq('id', p.id);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    addToast(`${p.sku || product.sku} deleted`, 'success');
+    onSaved(p);
+  };
 
   const uploadImage = async (file: File | undefined) => {
     if (!file || uploading) return;
@@ -156,6 +169,7 @@ export default function CostingEditor({ product, library, onSaved, onBack, addTo
 
       <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
         <button onClick={onBack} style={{ ...S.btnGhost, minHeight: 44 }}>Back</button>
+        {saved && <button onClick={deleteCosting} style={{ ...S.btnDanger, minHeight: 44 }}>Delete</button>}
         <button onClick={() => {
           const n = Math.floor(num(pieces));
           if (!(n > 0)) { addToast('Enter "Pieces to make" first — the plan is calculated from it', 'error'); return; }
@@ -172,6 +186,7 @@ export default function CostingEditor({ product, library, onSaved, onBack, addTo
       {planOpen && (
         <PlanPreview product={p} pieces={Math.floor(num(pieces))} onClose={() => setPlanOpen(false)} />
       )}
+      <ConfirmModal {...modalProps} />
     </div>
   );
 }
