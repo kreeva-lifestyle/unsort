@@ -68,7 +68,7 @@ export default function CostingEditor({ product, library, onSaved, onBack, addTo
       // Same SKU on another sheet: the unique index refuses it (this is what
       // makes Duplicate safe) - say so in plain words, not a DB error.
       if (error) throw (error.code === '23505'
-        ? new Error(`A costing sheet for ${row.sku} already exists - change the SKU (duplicates must get a new code)`)
+        ? new Error(`A product costing for ${row.sku} already exists - change the SKU (duplicates must get a new code)`)
         : error);
       addToast(`${row.sku} saved`, 'success');
       onSaved({ ...p, sku: row.sku });

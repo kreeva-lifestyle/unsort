@@ -82,7 +82,7 @@ export function purchasePlanHtml(
       <tr><td>Maintenance</td><td class="r">${esc(String(num(maintenancePct)))}%</td></tr>
       <tr><td>Total cost (${esc(String(pieces))} pcs, incl. maintenance)</td><td class="r">${esc(inr(total))}</td></tr>
     </table>
-    <div class="note">Buy quantities are rounded up. Rates are the selected supplier's rate on the costing sheet; alternates are not shown here.</div>
+    <div class="note">Buy quantities are rounded up. Rates are the selected supplier's rate on the product costing; alternates are not shown here.</div>
   </body></html>`;
 }
 

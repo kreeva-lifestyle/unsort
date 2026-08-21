@@ -33,7 +33,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
   });
 
   const remove = async (p: CostingProduct) => {
-    if (!await ask({ title: `Delete costing sheet ${p.sku}?`, confirmLabel: 'Delete', danger: true })) return;
+    if (!await ask({ title: `Delete product costing ${p.sku}?`, confirmLabel: 'Delete', danger: true })) return;
     const { error } = await supabase.from('costing_products').delete().eq('id', p.id);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     addToast(`${p.sku} deleted`, 'success');
@@ -59,13 +59,13 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SKU…"
           style={{ ...S.fInput, flex: 1, minWidth: 160 }} />
-        <button onClick={newSheet} style={{ ...S.btnPrimary, minHeight: 36 }}>+ New costing sheet</button>
+        <button onClick={newSheet} style={{ ...S.btnPrimary, minHeight: 36 }}>+ New product costing</button>
       </div>
 
       {list === null && <div style={{ padding: 30, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading…</div>}
       {list !== null && shown.length === 0 && (
         <div style={{ padding: 36, textAlign: 'center', color: T.tx3, fontSize: 12, lineHeight: 1.7 }}>
-          {q ? 'No costing sheet matches that SKU.' : 'No costing sheets yet — tap "+ New costing sheet" to cost your first product: photo, components, suppliers with material codes, and a purchase plan for any quantity.'}
+          {q ? 'No product costing matches that SKU.' : 'Nothing costed yet — tap "+ New product costing" to cost your first product: photo, components, suppliers with material codes, and a purchase plan for any quantity.'}
         </div>
       )}
 
@@ -87,7 +87,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
             {/* Duplicate: same components/photo, BLANK SKU - the unique
                 index refuses a same-SKU save, so a fresh code is forced. */}
             <span onClick={e => { e.stopPropagation(); setEditing({ ...p, id: crypto.randomUUID(), sku: '' }); }}
-              title="Duplicate this costing sheet" aria-label={`Duplicate ${p.sku}`}
+              title="Duplicate this product costing" aria-label={`Duplicate ${p.sku}`}
               style={{ cursor: 'pointer', color: T.ac2, fontSize: 13, padding: 6 }}>⧉</span>
             <span onClick={e => { e.stopPropagation(); remove(p); }} aria-label={`Delete ${p.sku}`}
               style={{ cursor: 'pointer', color: T.tx3, fontSize: 16, padding: 6 }}>&#215;</span>
