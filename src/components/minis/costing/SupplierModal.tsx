@@ -65,7 +65,7 @@ export default function SupplierModal({ subName, suppliers, known, onDone, onClo
         </div>
         <div style={{ padding: '14px 18px', overflowY: 'auto' }}>
           <div style={{ fontSize: 10.5, color: T.tx3, marginBottom: 10, lineHeight: 1.5 }}>
-            The ticked supplier&rsquo;s rate prices the sheet; the others are alternates, each with its own material code.
+            The ticked supplier&rsquo;s rate prices the product costing; the others are alternates, each with its own material code.
           </div>
           {rows.map((r, i) => (
             <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
