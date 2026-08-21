@@ -8,15 +8,15 @@ import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { numericKeyDown } from '../../../lib/numericInput';
 import {
-  CostingProduct, blankComponent, sheetCost, totalCost, money, validateSheet, num,
+  CostingProduct, CostingLibrary, blankComponent, sheetCost, totalCost, money, validateSheet, num,
 } from './costingModel';
 import ComponentCard from './ComponentCard';
 import { optimizeImage } from './imageResize';
 import PlanPreview from './PlanPreview';
 
-export default function CostingEditor({ product, supplierSuggest, onSaved, onBack, addToast }: {
+export default function CostingEditor({ product, library, onSaved, onBack, addToast }: {
   product: CostingProduct;
-  supplierSuggest: string[];
+  library: CostingLibrary;
   onSaved: (p: CostingProduct) => void;
   onBack: () => void;
   addToast: (m: string, t?: string) => void;
@@ -65,7 +65,11 @@ export default function CostingEditor({ product, supplierSuggest, onSaved, onBac
         notes: p.notes, created_by: user?.id, updated_at: new Date().toISOString(),
       };
       const { error } = await supabase.from('costing_products').upsert(row);
-      if (error) throw error;
+      // Same SKU on another sheet: the unique index refuses it (this is what
+      // makes Duplicate safe) - say so in plain words, not a DB error.
+      if (error) throw (error.code === '23505'
+        ? new Error(`A costing sheet for ${row.sku} already exists - change the SKU (duplicates must get a new code)`)
+        : error);
       addToast(`${row.sku} saved`, 'success');
       onSaved({ ...p, sku: row.sku });
     } catch (e) { addToast(friendlyError(e), 'error'); }
@@ -95,8 +99,13 @@ export default function CostingEditor({ product, supplierSuggest, onSaved, onBac
         </div>
       </div>
 
+      {/* One datalist each, referenced by every row input below - the
+          "auto-saved" names from all sheets, offered as you type. */}
+      <datalist id="costing-main-suggest">{library.mains.map(n => <option key={n} value={n} />)}</datalist>
+      <datalist id="costing-sub-suggest">{library.subs.map(n => <option key={n} value={n} />)}</datalist>
+
       {p.components.map((c, i) => (
-        <ComponentCard key={i} comp={c} supplierSuggest={supplierSuggest}
+        <ComponentCard key={i} comp={c} library={library}
           onChange={next => patchComp(i, next)}
           onRemove={() => setP(prev => ({ ...prev, components: prev.components.filter((_, j) => j !== i) }))} />
       ))}
@@ -156,7 +165,7 @@ export default function CostingEditor({ product, supplierSuggest, onSaved, onBac
         }} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Purchase plan (PDF)</button>
         <button onClick={save} disabled={saving}
           style={{ ...S.btnPrimary, flex: 1, minWidth: 140, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
-          {saving ? 'Saving…' : 'Save costing sheet'}
+          {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
 

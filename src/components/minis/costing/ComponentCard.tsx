@@ -10,16 +10,16 @@ import { useState } from 'react';
 import { T, S } from '../../../lib/theme';
 import { numericKeyDown } from '../../../lib/numericInput';
 import {
-  CostingComponent, CostingSub, CostingSupplier,
+  CostingComponent, CostingSub, CostingSupplier, CostingLibrary,
   UNITS, blankSub, selectedSupplier, subCost, componentCost, money, subProblems,
 } from './costingModel';
 import SupplierModal from './SupplierModal';
 
 const BAD = '1px solid rgba(239,68,68,.55)';
 
-export default function ComponentCard({ comp, supplierSuggest, onChange, onRemove }: {
+export default function ComponentCard({ comp, library, onChange, onRemove }: {
   comp: CostingComponent;
-  supplierSuggest: string[];
+  library: CostingLibrary;
   onChange: (next: CostingComponent) => void;
   onRemove: () => void;
 }) {
@@ -35,6 +35,14 @@ export default function ComponentCard({ comp, supplierSuggest, onChange, onRemov
       : [{ name: '', materialCode: '', rate, selected: true }];
     patchSub(i, { suppliers });
   };
+  const patchCode = (i: number, materialCode: string) => {
+    const s = comp.subs[i];
+    const sel = selectedSupplier(s);
+    const suppliers: CostingSupplier[] = sel
+      ? s.suppliers.map(x => (x === sel ? { ...x, materialCode } : x))
+      : [{ name: '', materialCode, rate: '', selected: true }];
+    patchSub(i, { suppliers });
+  };
   const removeSub = (i: number) => onChange({ ...comp, subs: comp.subs.filter((_, j) => j !== i) });
   const addSub = () => onChange({ ...comp, subs: [...comp.subs, blankSub()] });
 
@@ -48,11 +56,10 @@ export default function ComponentCard({ comp, supplierSuggest, onChange, onRemov
     const extra = s.suppliers.filter(x => x.name.trim()).length - 1;
     return (
       <button onClick={() => setSupFor(i)}
-        style={{ ...S.btnGhost, width: '100%', minHeight: 36, padding: '4px 10px', justifyContent: 'flex-start', textAlign: 'left', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, ...(bad ? { border: BAD } : {}) }}>
+        style={{ ...S.btnGhost, width: '100%', minHeight: 36, padding: '4px 10px', justifyContent: 'flex-start', textAlign: 'left', ...(bad ? { border: BAD } : {}) }}>
         <span style={{ fontSize: 12, color: sel?.name ? T.tx : T.tx3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
           {sel?.name || 'Select supplier *'}{extra > 0 ? ` +${extra}` : ''}
         </span>
-        {sel?.materialCode ? <span style={{ fontSize: 9.5, color: T.tx3, fontFamily: T.mono }}>{sel.materialCode}</span> : null}
       </button>
     );
   };
@@ -62,7 +69,7 @@ export default function ComponentCard({ comp, supplierSuggest, onChange, onRemov
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 170 }}>
           <label style={S.fLabel}>Main component <span style={{ color: T.re }}>*</span></label>
-          <input value={comp.name} onChange={e => onChange({ ...comp, name: e.target.value })}
+          <input value={comp.name} onChange={e => onChange({ ...comp, name: e.target.value })} list="costing-main-suggest"
             placeholder="e.g. Fabric / Stitching / Packing" style={cellIn(!comp.name.trim())} />
         </div>
         <button onClick={onRemove} style={{ ...S.btnDanger, ...S.btnSm, minHeight: 36 }}>Remove</button>
@@ -72,8 +79,9 @@ export default function ComponentCard({ comp, supplierSuggest, onChange, onRemov
       <div className="desktop-only" style={{ overflowX: 'auto', borderRadius: 8, border: `1px solid ${T.bd}` }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
           <thead><tr>
-            <th style={{ ...th, minWidth: 150 }}>Sub component</th>
-            <th style={{ ...th, minWidth: 150 }}>Supplier</th>
+            <th style={{ ...th, minWidth: 140 }}>Sub component</th>
+            <th style={{ ...th, minWidth: 140 }}>Supplier</th>
+            <th style={{ ...th, minWidth: 110 }}>Material code</th>
             <th style={{ ...th, width: 76 }}>QTY</th>
             <th style={{ ...th, width: 96 }}>Unit</th>
             <th style={{ ...th, width: 90 }}>Rate</th>
@@ -86,8 +94,9 @@ export default function ComponentCard({ comp, supplierSuggest, onChange, onRemov
               const sel = selectedSupplier(s);
               return (
                 <tr key={i}>
-                  <td style={td}><input value={s.name} onChange={e => patchSub(i, { name: e.target.value })} placeholder="e.g. Georgette 60&quot;" style={cellIn(bad.name)} /></td>
+                  <td style={td}><input value={s.name} onChange={e => patchSub(i, { name: e.target.value })} list="costing-sub-suggest" placeholder="e.g. Georgette 60&quot;" style={cellIn(bad.name)} /></td>
                   <td style={td}>{supplierBtn(s, i, bad.supplier)}</td>
+                  <td style={td}><input value={sel?.materialCode ?? ''} onChange={e => patchCode(i, e.target.value)} placeholder="Code" style={{ ...cellIn(false), fontFamily: T.mono }} /></td>
                   <td style={td}><input value={s.qty} onChange={e => patchSub(i, { qty: e.target.value })} onKeyDown={e => numericKeyDown(e)} type="number" min="0" inputMode="decimal" placeholder="0" style={cellIn(bad.qty)} /></td>
                   <td style={td}>
                     <select value={s.unit} onChange={e => patchSub(i, { unit: e.target.value })} style={cellIn(bad.unit)}>
@@ -104,7 +113,7 @@ export default function ComponentCard({ comp, supplierSuggest, onChange, onRemov
               );
             })}
             <tr>
-              <td colSpan={5} style={{ ...td, borderTop: `1px solid ${T.bd2}` }}>
+              <td colSpan={6} style={{ ...td, borderTop: `1px solid ${T.bd2}` }}>
                 <button onClick={addSub} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>+ Add sub component</button>
               </td>
               <td style={{ ...td, borderTop: `1px solid ${T.bd2}`, textAlign: 'right', fontFamily: T.mono, fontWeight: 700, color: T.ac2, whiteSpace: 'nowrap' }}>{money(componentCost(comp))}</td>
@@ -122,10 +131,13 @@ export default function ComponentCard({ comp, supplierSuggest, onChange, onRemov
           return (
             <div key={i} style={{ border: `1px solid ${T.bd}`, borderRadius: 8, padding: 10, background: 'rgba(255,255,255,0.015)' }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
-                <input value={s.name} onChange={e => patchSub(i, { name: e.target.value })} placeholder="Sub component *" style={{ ...cellIn(bad.name), flex: 1 }} />
+                <input value={s.name} onChange={e => patchSub(i, { name: e.target.value })} list="costing-sub-suggest" placeholder="Sub component *" style={{ ...cellIn(bad.name), flex: 1 }} />
                 <span onClick={() => removeSub(i)} aria-label="Remove sub component" style={{ cursor: 'pointer', color: T.re, fontSize: 18, lineHeight: 1, padding: '6px 4px' }}>&#215;</span>
               </div>
-              <div style={{ marginBottom: 8 }}>{supplierBtn(s, i, bad.supplier)}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+                {supplierBtn(s, i, bad.supplier)}
+                <input value={sel?.materialCode ?? ''} onChange={e => patchCode(i, e.target.value)} placeholder="Material code" style={{ ...cellIn(false), fontFamily: T.mono }} />
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                 <input value={s.qty} onChange={e => patchSub(i, { qty: e.target.value })} onKeyDown={e => numericKeyDown(e)} type="number" min="0" inputMode="decimal" placeholder="QTY *" style={cellIn(bad.qty)} />
                 <select value={s.unit} onChange={e => patchSub(i, { unit: e.target.value })} style={cellIn(bad.unit)}>
@@ -148,7 +160,7 @@ export default function ComponentCard({ comp, supplierSuggest, onChange, onRemov
         <SupplierModal
           subName={comp.subs[supFor]?.name || ''}
           suppliers={comp.subs[supFor]?.suppliers || []}
-          suggest={supplierSuggest}
+          known={library.suppliers}
           onClose={() => setSupFor(null)}
           onDone={next => { patchSub(supFor, { suppliers: next }); setSupFor(null); }}
         />
