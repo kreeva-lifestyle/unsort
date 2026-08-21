@@ -142,23 +142,17 @@ export default function RateCardGenerator({ addToast, lockedMode, shareToken }: 
             {modeBtn('master', 'From Master')}
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: mode === 'import' ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 10 }}>
-          {pickBox('Catalog Photo', heroName, () => heroRef.current?.click())}
-          {mode === 'import' && pickBox('Rate Excel', excelName ? `${excelName} · ${parsed?.rows.length ?? 0} designs` : '', () => xlsRef.current?.click())}
-        </div>
+        {mode === 'import' && (
+          <div style={{ marginBottom: 10 }}>
+            {pickBox('Rate Excel', excelName ? `${excelName} · ${parsed?.rows.length ?? 0} designs` : '', () => xlsRef.current?.click())}
+          </div>
+        )}
         <input ref={heroRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickHero(f); e.target.value = ''; }} />
         <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickExcel(f); e.target.value = ''; }} />
         {mode === 'manual' && <ManualRateEditor onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} />}
         {mode === 'master' && !lockedMode && <MasterFreshness />}
         {mode === 'master' && !lockedMode && <SellerLinkBar addToast={addToast} />}
         {mode === 'master' && <MasterRateCard onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} shareToken={shareToken} onCatalogName={n => { setCatalogName(n); setResult(null); }} />}
-        {/* Supplier-requested: the sheet's own product photos as one-tap
-            hero candidates - the same pickHero path an upload takes. */}
-        {effective && effective.rows.length > 0 && (
-          <HeroFromSkus skus={effective.rows.map(r => String(r[effective.skuCol] || '').trim()).filter(Boolean)}
-            shareToken={shareToken} onPick={pickHero} addToast={addToast} />
-        )}
-        {heroUrl && <img src={heroUrl} alt="Catalog" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: `1px solid ${T.bd}`, marginBottom: 10 }} />}
         {effective && effective.stats && (
           <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10, fontFamily: T.mono }}>
             {effective.stats.designs} designs{effective.stats.total > 0 ? ` · avg RS.${effective.stats.avg.toLocaleString('en-IN')} · total RS.${effective.stats.total.toLocaleString('en-IN')}` : ''}
@@ -188,6 +182,17 @@ export default function RateCardGenerator({ addToast, lockedMode, shareToken }: 
           <label style={S.fLabel}>Bottom Note</label>
           <input value={disclaimer} onChange={e => { setDisclaimer(e.target.value); setResult(null); }} style={{ ...S.fInput, width: '100%' }} />
         </div>
+        {/* Catalog photo LAST before Generate (owner's order): candidates
+            auto-load from the fetched SKUs' own folders; upload stays as the
+            alternative. */}
+        {effective && effective.rows.length > 0 && (
+          <HeroFromSkus skus={effective.rows.map(r => String(r[effective.skuCol] || '').trim()).filter(Boolean)}
+            shareToken={shareToken} onPick={pickHero} addToast={addToast} />
+        )}
+        <div style={{ marginBottom: 10 }}>
+          {pickBox(heroUrl ? 'Catalog Photo — tap to replace with an upload' : 'Catalog Photo — upload', heroName, () => heroRef.current?.click())}
+        </div>
+        {heroUrl && <img src={heroUrl} alt="Catalog" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: `1px solid ${T.bd}`, marginBottom: 10 }} />}
         <button onClick={generate} disabled={busy || !ready} style={{ ...S.btnPrimary, width: '100%', justifyContent: 'center', pointerEvents: busy ? 'none' : 'auto', opacity: busy || !ready ? 0.5 : 1 }}>
           {busy ? 'Generating…' : 'Generate Rate Card'}
         </button>

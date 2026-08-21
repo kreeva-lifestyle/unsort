@@ -1,10 +1,12 @@
-// Catalog photo WITHOUT uploading (supplier-requested): once the rate sheet
-// has SKUs, offer ~8 of their own Dropbox product photos — one per SKU when
-// there are many — and let the user tap one as the hero. The tapped photo is
-// fetched through the edge fn as bytes, then fed into the SAME pickHero path
-// an upload uses, so the canvas export stays untainted. Works on the seller
-// link too: the share token authorises the two photo actions server-side.
-import { useState } from 'react';
+// Catalog photo WITHOUT uploading (supplier-requested): the moment the rate
+// sheet's SKUs arrive (fetch from master / catalog pick), ~8 of their own
+// Dropbox product photos load AUTOMATICALLY — one per SKU when there are
+// many — and tapping one makes it the hero (owner's call: no extra button,
+// load directly on fetch). The tapped photo is fetched through the edge fn
+// as bytes, then fed into the SAME pickHero path an upload uses, so the
+// canvas export stays untainted. Works on the seller link too: the share
+// token authorises the two photo actions server-side.
+import { useState, useEffect, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { call, explainGen } from '../dropboxlinks/api';
 
@@ -20,9 +22,11 @@ export default function HeroFromSkus({ skus, shareToken, onPick, addToast }: {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState('');
   const [note, setNote] = useState('');
+  const loadingRef = useRef(false);
 
   const load = async () => {
-    if (loading) return;
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true); setNote('');
     try {
       const { status, data } = await call({ action: 'ratecard_photos', skus, ...(shareToken ? { shareToken } : {}) });
@@ -32,8 +36,15 @@ export default function HeroFromSkus({ skus, shareToken, onPick, addToast }: {
       if (missed.length) setNote(`No photo for ${missed.map(m => m.sku).join(', ')}`);
     } catch {
       setCands([]); setNote('Could not load product photos — check the connection and try again');
-    } finally { setLoading(false); }
+    } finally { loadingRef.current = false; setLoading(false); }
   };
+
+  // Auto-load whenever the SKU set changes — fetching designs IS the trigger.
+  const skuKey = skus.join(',');
+  useEffect(() => {
+    if (skus.length > 0) { setCands(null); load(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skuKey]);
 
   const choose = async (c: Candidate) => {
     if (fetching) return;
@@ -55,13 +66,13 @@ export default function HeroFromSkus({ skus, shareToken, onPick, addToast }: {
 
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button onClick={cands ? () => { setCands(null); setNote(''); } : load}
-          style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, opacity: loading ? 0.5 : 1, pointerEvents: loading ? 'none' : 'auto' }}>
-          {loading ? 'Finding photos…' : cands ? 'Hide product photos' : 'Or pick from product photos'}
-        </button>
-        {cands !== null && cands.length > 0 && (
-          <button onClick={load} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>Show different photos</button>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ ...S.fLabel }}>Catalog photo — tap one{loading ? '' : ', or use Upload below'}</span>
+        {loading && <span style={{ fontSize: 10, color: T.tx3 }}>Finding product photos…</span>}
+        {!loading && (
+          <button onClick={load} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 28 }}>
+            {cands !== null && cands.length > 0 ? 'Show different photos' : 'Load product photos'}
+          </button>
         )}
       </div>
       {note && <div style={{ fontSize: 10, color: T.yl, marginTop: 6, lineHeight: 1.5 }}>{note}</div>}
