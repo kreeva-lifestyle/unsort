@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
-import { CostingProduct, blankComponent, totalCost, money } from './costingModel';
+import { CostingProduct, blankComponent, totalCost, money, buildLibrary } from './costingModel';
 import CostingEditor from './CostingEditor';
 import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 
@@ -41,12 +41,11 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
   };
 
   if (editing) {
-    // Supplier names already used on ANY sheet — offered as suggestions so
-    // one supplier keeps one spelling and the purchase plan groups correctly.
-    const supplierSuggest = [...new Set((list ?? []).flatMap(pr =>
-      pr.components.flatMap(c => c.subs.flatMap(su => su.suppliers.map(x => x.name.trim())))).filter(Boolean))].sort();
+    // Everything typed on ANY sheet, offered back as dropdown suggestions —
+    // one spelling per supplier keeps the purchase plan grouped correctly.
+    const library = buildLibrary(list ?? []);
     return (
-      <CostingEditor product={editing} supplierSuggest={supplierSuggest} addToast={addToast}
+      <CostingEditor product={editing} library={library} addToast={addToast}
         onBack={() => { setEditing(null); load(); }}
         onSaved={() => { setEditing(null); load(); }} />
     );
@@ -85,6 +84,11 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
                 {p.components.length} component{p.components.length === 1 ? '' : 's'} · <span style={{ color: T.ac2, fontFamily: T.mono }}>{money(totalCost(p.components, p.maintenance_pct))}</span>/pc
               </div>
             </div>
+            {/* Duplicate: same components/photo, BLANK SKU - the unique
+                index refuses a same-SKU save, so a fresh code is forced. */}
+            <span onClick={e => { e.stopPropagation(); setEditing({ ...p, id: crypto.randomUUID(), sku: '' }); }}
+              title="Duplicate this costing sheet" aria-label={`Duplicate ${p.sku}`}
+              style={{ cursor: 'pointer', color: T.ac2, fontSize: 13, padding: 6 }}>⧉</span>
             <span onClick={e => { e.stopPropagation(); remove(p); }} aria-label={`Delete ${p.sku}`}
               style={{ cursor: 'pointer', color: T.tx3, fontSize: 16, padding: 6 }}>&#215;</span>
           </div>

@@ -91,6 +91,45 @@ export function validateSheet(sku: string, components: CostingComponent[]): stri
   return errs;
 }
 
+
+/** Everything ever typed on any sheet, deduped for suggestions — mains, sub
+ *  names, and suppliers with the most recently used material code + rate per
+ *  supplier name. "Auto save" costs nothing: sheets already store these; the
+ *  library just harvests them so dropdowns can offer what exists. */
+export interface CostingLibrary {
+  mains: string[];
+  subs: string[];
+  suppliers: { name: string; materialCode: string; rate: number | string }[];
+}
+
+export function buildLibrary(products: CostingProduct[]): CostingLibrary {
+  const mains = new Set<string>();
+  const subs = new Set<string>();
+  const byName = new Map<string, { name: string; materialCode: string; rate: number | string }>();
+  // Newest sheet first (caller orders by updated_at desc), so the FIRST code/
+  // rate seen per supplier is the most recent one — that's what autofills.
+  for (const p of products) {
+    for (const c of p.components) {
+      if (c.name.trim()) mains.add(c.name.trim());
+      for (const su of c.subs) {
+        if (su.name.trim()) subs.add(su.name.trim());
+        for (const x of su.suppliers) {
+          const n = x.name.trim();
+          if (!n) continue;
+          const key = n.toUpperCase();
+          if (!byName.has(key)) byName.set(key, { name: n, materialCode: x.materialCode.trim(), rate: x.rate });
+        }
+      }
+    }
+  }
+  const coll = (a: string, b: string) => a.localeCompare(b);
+  return {
+    mains: [...mains].sort(coll),
+    subs: [...subs].sort(coll),
+    suppliers: [...byName.values()].sort((a, b) => coll(a.name, b.name)),
+  };
+}
+
 export interface PlanLine {
   supplier: string; materialCode: string; component: string; sub: string;
   unit: string; perPc: number; totalQty: number; rate: number; cost: number;

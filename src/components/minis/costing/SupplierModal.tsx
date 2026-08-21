@@ -9,10 +9,10 @@ import { T, S } from '../../../lib/theme';
 import { numericKeyDown } from '../../../lib/numericInput';
 import { CostingSupplier, blankSupplier, num } from './costingModel';
 
-export default function SupplierModal({ subName, suppliers, suggest, onDone, onClose }: {
+export default function SupplierModal({ subName, suppliers, known, onDone, onClose }: {
   subName: string;
   suppliers: CostingSupplier[];
-  suggest: string[];
+  known: { name: string; materialCode: string; rate: number | string }[];
   onDone: (next: CostingSupplier[]) => void;
   onClose: () => void;
 }) {
@@ -27,6 +27,16 @@ export default function SupplierModal({ subName, suppliers, suggest, onDone, onC
 
   const patch = (i: number, p: Partial<CostingSupplier>) =>
     setRows(prev => prev.map((r, j) => (j === i ? { ...r, ...p } : r)));
+  // Picking a KNOWN supplier autofills its last-used material code and rate
+  // into still-empty fields - typed values are never overwritten.
+  const patchName = (i: number, name: string) => {
+    const k = known.find(x => x.name.toUpperCase() === name.trim().toUpperCase());
+    setRows(prev => prev.map((r, j) => (j === i ? {
+      ...r, name,
+      materialCode: r.materialCode.trim() ? r.materialCode : (k?.materialCode ?? r.materialCode),
+      rate: String(r.rate).trim() ? r.rate : (k?.rate ?? r.rate),
+    } : r)));
+  };
   const select = (i: number) =>
     setRows(prev => prev.map((r, j) => ({ ...r, selected: j === i })));
   const remove = (i: number) =>
@@ -61,7 +71,7 @@ export default function SupplierModal({ subName, suppliers, suggest, onDone, onC
             <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
               <input type="radio" name="sel-supplier" checked={!!r.selected} onChange={() => select(i)}
                 aria-label="Use this supplier's rate" style={{ width: 18, height: 18, flexShrink: 0 }} />
-              <input value={r.name} onChange={e => patch(i, { name: e.target.value })} placeholder="Supplier"
+              <input value={r.name} onChange={e => patchName(i, e.target.value)} placeholder="Supplier"
                 list="costing-supplier-suggest" style={{ ...S.fInput, flex: 2, minWidth: 0 }} />
               <input value={r.materialCode} onChange={e => patch(i, { materialCode: e.target.value })} placeholder="Material code"
                 style={{ ...S.fInput, flex: 2, minWidth: 0, fontFamily: T.mono }} />
@@ -75,7 +85,7 @@ export default function SupplierModal({ subName, suppliers, suggest, onDone, onC
           {/* Existing supplier names from every costing sheet — one spelling
               per supplier keeps the purchase plan grouped correctly. */}
           <datalist id="costing-supplier-suggest">
-            {suggest.map(n => <option key={n} value={n} />)}
+            {known.map(k => <option key={k.name} value={k.name} />)}
           </datalist>
           <button onClick={() => setRows(prev => [...prev, { ...blankSupplier(), selected: false }])}
             style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>+ Add supplier</button>
