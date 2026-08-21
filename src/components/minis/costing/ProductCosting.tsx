@@ -8,13 +8,14 @@ import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { CostingProduct, blankComponent, totalCost, money, buildLibrary } from './costingModel';
 import CostingEditor from './CostingEditor';
-import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 
 export default function ProductCosting({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const [list, setList] = useState<CostingProduct[] | null>(null);
   const [editing, setEditing] = useState<CostingProduct | null>(null);
   const [search, setSearch] = useState('');
-  const { ask, modalProps } = useConfirm();
+  // Whether the open costing already exists in the DB - a new or duplicated
+  // one has nothing to delete, so the editor hides its Delete button.
+  const [editingSaved, setEditingSaved] = useState(false);
 
   const load = () => {
     supabase.from('costing_products')
@@ -27,17 +28,12 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
   };
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const newSheet = () => setEditing({
-    id: crypto.randomUUID(), sku: '', image_url: null,
-    maintenance_pct: 0, components: [blankComponent()], notes: '',
-  });
-
-  const remove = async (p: CostingProduct) => {
-    if (!await ask({ title: `Delete product costing ${p.sku}?`, confirmLabel: 'Delete', danger: true })) return;
-    const { error } = await supabase.from('costing_products').delete().eq('id', p.id);
-    if (error) { addToast(friendlyError(error), 'error'); return; }
-    addToast(`${p.sku} deleted`, 'success');
-    load();
+  const newSheet = () => {
+    setEditingSaved(false);
+    setEditing({
+      id: crypto.randomUUID(), sku: '', image_url: null,
+      maintenance_pct: 0, components: [blankComponent()], notes: '',
+    });
   };
 
   if (editing) {
@@ -45,7 +41,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
     // one spelling per supplier keeps the purchase plan grouped correctly.
     const library = buildLibrary(list ?? []);
     return (
-      <CostingEditor product={editing} library={library} addToast={addToast}
+      <CostingEditor product={editing} saved={editingSaved} library={library} addToast={addToast}
         onBack={() => { setEditing(null); load(); }}
         onSaved={() => { setEditing(null); load(); }} />
     );
@@ -71,7 +67,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
         {shown.map(p => (
-          <div key={p.id} onClick={() => setEditing(p)}
+          <div key={p.id} onClick={() => { setEditingSaved(true); setEditing(p); }}
             style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer' }}>
             <div style={{ width: 56, height: 56, borderRadius: 8, overflow: 'hidden', background: T.s2, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {p.image_url
@@ -86,15 +82,12 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
             </div>
             {/* Duplicate: same components/photo, BLANK SKU - the unique
                 index refuses a same-SKU save, so a fresh code is forced. */}
-            <span onClick={e => { e.stopPropagation(); setEditing({ ...p, id: crypto.randomUUID(), sku: '' }); }}
+            <span onClick={e => { e.stopPropagation(); setEditingSaved(false); setEditing({ ...p, id: crypto.randomUUID(), sku: '' }); }}
               title="Duplicate this product costing" aria-label={`Duplicate ${p.sku}`}
               style={{ cursor: 'pointer', color: T.ac2, fontSize: 13, padding: 6 }}>⧉</span>
-            <span onClick={e => { e.stopPropagation(); remove(p); }} aria-label={`Delete ${p.sku}`}
-              style={{ cursor: 'pointer', color: T.tx3, fontSize: 16, padding: 6 }}>&#215;</span>
           </div>
         ))}
       </div>
-      <ConfirmModal {...modalProps} />
     </div>
   );
 }
