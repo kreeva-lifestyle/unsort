@@ -1,7 +1,9 @@
 // odette-export Edge Function — Odette sheet push/reconcile + master-sheet
 // image LINK CHECK / AUTO-FIX + Dropbox LINK GENERATOR + FORWARD→DROPBOX.
 //
-// Actions (caller role validated against profiles.role via callerRole):
+// Actions (caller role validated against profiles.role via callerRole;
+// ratecard_photos / ratecard_photo_fetch alternatively accept a valid
+// ratecard share token so sellers on the public link can pick a photo):
 //   dropbox_status / dropbox_whoami / dropbox_exchange(admin) — connection
 //   linkcheck / linkfix / linkgen_roots / linkgen — master-sheet + link tools
 //   fwd_folder { op:'list'|'save' } — signed-in. The single shared Dropbox
@@ -178,6 +180,55 @@ async function callerRole(req: Request): Promise<string | null> {
   const prof = rows?.[0];
   if (!prof || prof.is_active === false) return null;
   return prof.role ?? null;
+}
+
+// ── Rate card photo candidates: shared helpers ──────────────────────────────
+// A valid, active ratecard share token authorises ONLY the two photo actions
+// below - sellers on a public rate-card link can pick a catalog photo from
+// the SKUs' folders without an account. Same source of truth as listing-ai's
+// ratecard_rows (ratecard_share.is_active), read with the service role.
+async function ratecardShareOk(token: string): Promise<boolean> {
+  if (!token || token.length < 8) return false;
+  const r = await fetch(`${SB_URL}/rest/v1/ratecard_share?token=eq.${encodeURIComponent(token)}&is_active=is.true&select=id`,
+    { headers: { apikey: SB_SVC, authorization: `Bearer ${SB_SVC}` } });
+  const rows = await r.json().catch(() => []);
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+// Owner's rule: "not too many, maybe 7-8" candidates, and with many SKUs one
+// image from EACH. Round-robin over the SKUs, a random not-yet-used image per
+// visit, until the cap - 10 SKUs give 8 one-each; 2 SKUs give 4 each. Pure,
+// rng injected, so a harness can drive it.
+function samplePhotoCandidates<T>(lists: { sku: string; files: T[] }[], cap: number, rand: () => number): { sku: string; file: T }[] {
+  const pools = lists.filter(l => l.files.length > 0).map(l => ({ sku: l.sku, files: [...l.files] }));
+  const out: { sku: string; file: T }[] = [];
+  while (out.length < cap && pools.some(pl => pl.files.length > 0)) {
+    for (const pl of pools) {
+      if (out.length >= cap) break;
+      if (pl.files.length === 0) continue;
+      out.push({ sku: pl.sku, file: pl.files.splice(Math.floor(rand() * pl.files.length), 1)[0] });
+    }
+  }
+  return out;
+}
+
+// Resolve the enabled linkgen roots to Dropbox paths (shared by the photo
+// actions; same cache and TTL the linkgen action uses).
+async function resolveGenRootPaths(token: string): Promise<string[]> {
+  const roots = (await loadGenRoots()).filter(r => r.enabled !== false && r.url);
+  const out: string[] = [];
+  for (const r of roots) {
+    const hit = genRootCache[r.url];
+    let rootPath = hit && Date.now() - hit.at < ROOT_TTL_MS ? hit.p : '';
+    if (!rootPath) {
+      const meta = await dbx(token, 'sharing/get_shared_link_metadata', { url: r.url });
+      rootPath = meta.data?.path_lower || '';
+      if (meta.status >= 400 || !rootPath) { delete genRootCache[r.url]; continue; }
+      genRootCache[r.url] = { p: rootPath, at: Date.now() };
+    }
+    out.push(rootPath);
+  }
+  return out;
 }
 
 // Cache is keyed by the refresh token it was minted from: when an admin
@@ -658,6 +709,98 @@ Deno.serve(async (req) => {
       }
       const ud = await up.json().catch(() => ({} as any));
       return json({ ok: true, name: ud?.name || name, path: ud?.path_display || path }, req);
+    }
+
+
+    // ── Rate card: catalog-photo candidates from the SKUs' own folders ──────
+    // Supplier-requested: after choosing a catalog / typing SKUs, show ~8
+    // product photos (one per SKU when there are many) so the catalog hero
+    // can be PICKED instead of uploaded. Auth: signed-in staff OR a valid
+    // ratecard share token (sellers on the public link). Candidates use
+    // files/get_temporary_link (4h direct URLs) - no permanent share links
+    // are minted for photos nobody picks.
+    if (action === 'ratecard_photos') {
+      if (!(await callerRole(req)) && !(await ratecardShareOk(String(body?.shareToken || '')))) {
+        return fail(401, 'Sign in to DailyOffice first', req);
+      }
+      const skusIn: string[] = [...new Set((Array.isArray(body?.skus) ? body.skus : []).map((x: unknown) => normSku(x)).filter(Boolean))] as string[];
+      if (skusIn.length === 0) return fail(400, 'No SKUs to look up', req);
+      // With more than 8 SKUs, 8 are sampled at random - one image each.
+      const skus = skusIn.length > 8 ? [...skusIn].sort(() => Math.random() - 0.5).slice(0, 8) : skusIn;
+      let token = '';
+      try { token = await getDropboxToken(); }
+      catch { return json({ ok: false, error: 'dropbox_not_connected' }, req, 409); }
+      const rootPaths = await resolveGenRootPaths(token);
+      if (rootPaths.length === 0) return json({ ok: false, error: 'No search folders are configured or reachable' }, req);
+      // Per-SKU: unique folder (exact name first), then its image files.
+      const lists: { sku: string; files: { name: string; path: string }[] }[] = [];
+      const misses: { sku: string; reason: string }[] = [];
+      const isImage = (n: string) => /\.(jpe?g|png|webp|gif|bmp)$/i.test(n);
+      let cursor = 0;
+      const skuWorker = async () => {
+        while (cursor < skus.length) {
+          const sku = skus[cursor++];
+          const searches = await Promise.all(rootPaths.map(rp =>
+            dbx(token, 'files/search_v2', { query: sku, options: { path: rp, max_results: 25, filename_only: true } })));
+          const found: any[] = [];
+          for (const sr of searches) {
+            if (sr.status >= 400) continue;
+            for (const m of (sr.data.matches || [])) { const md = m.metadata?.metadata; if (md && md['.tag'] === 'folder') found.push(md); }
+          }
+          const seen = new Set<string>();
+          const uniq = found.filter((f: any) => { const k = f.path_lower; if (seen.has(k)) return false; seen.add(k); return true; });
+          const exact = uniq.filter((f: any) => normSku(f.name) === sku);
+          const cands = exact.length ? exact : uniq.filter((f: any) => nameMatchesSku(f.name, sku) && normSku(f.name).length >= sku.length);
+          if (cands.length !== 1) { misses.push({ sku, reason: cands.length === 0 ? 'no folder' : 'found in several places' }); continue; }
+          const ls = await dbx(token, 'files/list_folder', { path: cands[0].path_lower, limit: 200 });
+          if (ls.status >= 400) { misses.push({ sku, reason: 'folder unreadable' }); continue; }
+          const files = (ls.data.entries || []).filter((e: any) => e['.tag'] === 'file' && isImage(e.name))
+            .map((e: any) => ({ name: String(e.name), path: String(e.path_lower) }));
+          if (files.length === 0) { misses.push({ sku, reason: 'no images' }); continue; }
+          lists.push({ sku, files });
+        }
+      };
+      await Promise.all(Array.from({ length: 4 }, () => skuWorker()));
+      const picks = samplePhotoCandidates(lists, 8, Math.random);
+      const candidates = (await Promise.all(picks.map(async pk => {
+        const tl = await dbx(token, 'files/get_temporary_link', { path: pk.file.path });
+        return tl.status < 400 && tl.data?.link ? { sku: pk.sku, name: pk.file.name, path: pk.file.path, url: String(tl.data.link) } : null;
+      }))).filter(Boolean);
+      return json({ ok: candidates.length > 0, candidates, misses: misses.length ? misses : undefined,
+        error: candidates.length === 0 ? 'No product photos found for these SKUs' : undefined }, req);
+    }
+
+    // The chosen candidate, fetched server-side and returned as bytes so the
+    // rate-card canvas stays untainted (a cross-origin <img> would poison
+    // toBlob and break the JPG export). Path must sit INSIDE a configured
+    // search folder - a share token cannot reach the rest of the Dropbox.
+    if (action === 'ratecard_photo_fetch') {
+      if (!(await callerRole(req)) && !(await ratecardShareOk(String(body?.shareToken || '')))) {
+        return fail(401, 'Sign in to DailyOffice first', req);
+      }
+      const path = String(body?.path || '').trim().toLowerCase();
+      if (!path.startsWith('/')) return fail(400, 'Bad photo path', req);
+      let token = '';
+      try { token = await getDropboxToken(); }
+      catch { return json({ ok: false, error: 'dropbox_not_connected' }, req, 409); }
+      const rootPaths = await resolveGenRootPaths(token);
+      if (!rootPaths.some(rp => path === rp || path.startsWith(rp + '/'))) {
+        return fail(403, 'That photo is outside the configured folders', req);
+      }
+      const meta = await dbx(token, 'files/get_metadata', { path });
+      if (meta.status >= 400 || meta.data?.['.tag'] !== 'file') return fail(404, 'That photo no longer exists', req);
+      if (Number(meta.data.size || 0) > 8 * 1024 * 1024) return fail(413, 'That photo is too large (over 8 MB) - pick another or upload one', req);
+      const dl = await fetch('https://content.dropboxapi.com/2/files/download', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'Dropbox-API-Arg': asciiArg({ path }) },
+      });
+      if (!dl.ok) { try { await dl.body?.cancel(); } catch { /* noop */ } return fail(502, `Dropbox returned ${dl.status} for that photo`, req); }
+      const buf = new Uint8Array(await dl.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+      const ext = (meta.data.name.split('.').pop() || 'jpg').toLowerCase();
+      const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'gif' ? 'image/gif' : 'image/jpeg';
+      return json({ ok: true, name: String(meta.data.name), mime, b64: btoa(bin) }, req);
     }
 
     if (action === 'linkgen_roots') {

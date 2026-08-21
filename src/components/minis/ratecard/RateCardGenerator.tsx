@@ -12,6 +12,7 @@ import { parseRateSheet, ParsedRateSheet } from './parseRateSheet';
 import { renderRateCard } from './renderRateCard';
 import ManualRateEditor from './ManualRateEditor';
 import MasterRateCard from './MasterRateCard';
+import HeroFromSkus from './HeroFromSkus';
 import SellerLinkBar from './SellerLinkBar';
 import MasterFreshness from '../../ui/MasterFreshness';
 import MarkupRow from './MarkupRow';
@@ -151,6 +152,12 @@ export default function RateCardGenerator({ addToast, lockedMode, shareToken }: 
         {mode === 'master' && !lockedMode && <MasterFreshness />}
         {mode === 'master' && !lockedMode && <SellerLinkBar addToast={addToast} />}
         {mode === 'master' && <MasterRateCard onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} shareToken={shareToken} onCatalogName={n => { setCatalogName(n); setResult(null); }} />}
+        {/* Supplier-requested: the sheet's own product photos as one-tap
+            hero candidates - the same pickHero path an upload takes. */}
+        {effective && effective.rows.length > 0 && (
+          <HeroFromSkus skus={effective.rows.map(r => String(r[effective.skuCol] || '').trim()).filter(Boolean)}
+            shareToken={shareToken} onPick={pickHero} addToast={addToast} />
+        )}
         {heroUrl && <img src={heroUrl} alt="Catalog" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: `1px solid ${T.bd}`, marginBottom: 10 }} />}
         {effective && effective.stats && (
           <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10, fontFamily: T.mono }}>
