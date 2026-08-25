@@ -8,10 +8,17 @@ import {
   CostingProduct, CostingSupplier, selectedSupplier, subCost, totalCost, sheetCost, num,
 } from './costingModel';
 
-export interface ItemHit {
-  sku: string; component: string; sub: string;
-  qty: number; unit: string; cost: number;
+export interface ItemUse { sku: string; component: string; qty: number; unit: string; cost: number }
+export interface ItemGroup {
+  name: string;
+  // The material's suppliers ONCE for the whole group, deduped by
+  // name+code+rate - one supplier at one rate used on seven products is ONE
+  // row (owner's report: seven near-identical cards were noise). A supplier
+  // appearing at TWO rates shows as two rows, which is exactly when the
+  // detail matters.
   suppliers: { name: string; materialCode: string; rate: number; selected: boolean }[];
+  uses: ItemUse[];
+  totalCost: number;
 }
 export interface SupplierHit {
   sku: string; component: string; sub: string;
@@ -20,7 +27,7 @@ export interface SupplierHit {
 export interface ProductHit { sku: string; perPc: number; total: number; components: { name: string; cost: number }[] }
 
 export type AskAnswer =
-  | { kind: 'item'; term: string; hits: ItemHit[] }
+  | { kind: 'item'; term: string; groups: ItemGroup[]; approx: boolean }
   | { kind: 'supplier'; name: string; hits: SupplierHit[] }
   | { kind: 'product'; hit: ProductHit }
   | { kind: 'none'; hint: string };
@@ -88,7 +95,8 @@ export function askCosting(question: string, products: CostingProduct[]): AskAns
   const termTok = qTok.filter(t => !FILLER.has(t));
   const term = termTok.join(' ');
   if (!term) return { kind: 'none', hint: 'Name the material, supplier or SKU you are asking about — e.g. "cost of fabric salsa", "what do we buy from Arvachin", "DRS210 cost"' };
-  const scored: { score: number; hit: ItemHit }[] = [];
+  interface Raw { score: number; sub: string; use: ItemUse; suppliers: ReturnType<typeof supRow>[] }
+  const scored: Raw[] = [];
   for (const p of products) for (const c of p.components) for (const s of c.subs) {
     const subN = norm(s.name);
     const bothTok = new Set([...tokens(s.name), ...tokens(c.name)]);
@@ -99,11 +107,9 @@ export function askCosting(question: string, products: CostingProduct[]): AskAns
     else if (termTok.some(t => bothTok.has(t) && !tokens(c.name).includes(t))) score = 1;
     if (score === 0) continue;
     const sel = selectedSupplier(s);
-    scored.push({ score, hit: {
-      sku: p.sku, component: c.name.trim(), sub: s.name.trim(),
-      qty: num(s.qty), unit: s.unit, cost: subCost(s),
-      suppliers: s.suppliers.filter(x => x.name.trim()).map(x => supRow(x, x === sel)),
-    } });
+    scored.push({ score, sub: s.name.trim(),
+      use: { sku: p.sku, component: c.name.trim(), qty: num(s.qty), unit: s.unit, cost: subCost(s) },
+      suppliers: s.suppliers.filter(x => x.name.trim()).map(x => supRow(x, x === sel)) });
   }
   if (scored.length === 0) {
     return { kind: 'none', hint: `Nothing called "${term}" on any product costing — check the spelling, or ask by supplier or SKU` };
@@ -112,6 +118,21 @@ export function askCosting(question: string, products: CostingProduct[]): AskAns
   // present) - "Salsa" and "Salsa 60\"" must both answer "fabric salsa".
   // Weak single-word overlaps (score 1) only surface when nothing solid did.
   const solid = scored.filter(x => x.score >= 2);
-  const pool = (solid.length ? solid : scored).sort((a, b) => b.score - a.score);
-  return { kind: 'item', term, hits: pool.map(x => x.hit).slice(0, 12) };
+  const approx = solid.length === 0;
+  const pool = (solid.length ? solid : scored).sort((a, b) => b.score - a.score).slice(0, 24);
+  // ONE group per material name: suppliers stated once, usages listed under.
+  const groups = new Map<string, ItemGroup>();
+  for (const r of pool) {
+    const key = norm(r.sub);
+    const g = groups.get(key) ?? { name: r.sub || '(unnamed)', suppliers: [], uses: [], totalCost: 0 };
+    for (const x of r.suppliers) {
+      const dup = g.suppliers.find(y => norm(y.name) === norm(x.name) && y.rate === x.rate && y.materialCode === x.materialCode);
+      if (dup) dup.selected = dup.selected || x.selected;
+      else g.suppliers.push({ ...x });
+    }
+    g.uses.push(r.use);
+    g.totalCost += r.use.cost;
+    groups.set(key, g);
+  }
+  return { kind: 'item', term, groups: [...groups.values()].slice(0, 6), approx };
 }
