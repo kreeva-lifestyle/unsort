@@ -10,7 +10,10 @@
 //   lets its holder inject OTP rows)
 // Push auth: the shared secret from app_secrets.otp_push_secret - the
 // Shortcut cannot do JWTs. Constant-time compare; wrong secret gets 403.
-// Retention is the DB's job (purge cron); this function only ingests.
+// Retention is the DB's job (purge cron); this function only ingests —
+// except courier delivery-sheet links, which delivery.ts files into
+// Dropbox in the background after the row is stored.
+import { processDeliverySheet } from './delivery.ts';
 
 const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SB_SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -92,9 +95,18 @@ Deno.serve(async (req) => {
   if (!text) return json({ ok: false, error: 'Empty message' }, 400);
   const code = extractOtp(text);
   const r = await fetch(`${SB_URL}/rest/v1/otp_inbox`, {
-    method: 'POST', headers: svcHeaders,
+    method: 'POST', headers: { ...svcHeaders, prefer: 'return=representation' },
     body: JSON.stringify({ message: text, code: code || null, device: String(body.device || '').slice(0, 60) || null }),
   });
   if (!r.ok) return json({ ok: false, error: `store failed (${r.status})` }, 502);
+  const rowId = (await r.json().catch(() => []))?.[0]?.id;
+  if (rowId) {
+    // Courier delivery-sheet links (e.g. Shadowfax) get fetched and filed
+    // into Dropbox AFTER responding — the Shortcut isn't kept waiting, and
+    // the outcome lands on the row via realtime. Never throws.
+    const bg = processDeliverySheet(String(rowId), text);
+    const er = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+    if (er?.waitUntil) er.waitUntil(bg); else await bg;
+  }
   return json({ ok: true, code });
 });
