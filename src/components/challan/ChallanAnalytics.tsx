@@ -118,7 +118,7 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
         let angle = 0;
         const slices = top.map((c, i) => {
           const sweep = (c.value / topTotal) * 360;
-          const d = slicePath(70, 70, 38, 62, angle, angle + sweep);
+          const d = slicePath(90, 90, 48, 82, angle, angle + sweep);
           angle += sweep;
           return { ...c, d, color: PIE[i] };
         });
@@ -131,14 +131,19 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
               </span>
             </div>
             <div style={{ display: 'flex', gap: 14, padding: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              <svg viewBox="0 0 140 140" style={{ width: 140, height: 140, flexShrink: 0 }} role="img" aria-label={`Top ${top.length} customers by sales value`}>
+              {/* margin auto: centred when the legend wraps below on the
+                  phone (owner's video showed it hugging the left with dead
+                  space beside); on desktop the legend's flex:1 absorbs the
+                  row so the donut stays put. Bigger radius keeps the small
+                  slices legible next to a dominant one. */}
+              <svg viewBox="0 0 180 180" style={{ width: 180, height: 180, flexShrink: 0, margin: '0 auto' }} role="img" aria-label={`Top ${top.length} customers by sales value`}>
                 {slices.map((c, i) => (
                   <path key={i} d={c.d} fill={c.color} stroke={T.bg} strokeWidth={2}>
                     <title>{`${c.name} — ₹${Math.round(c.value).toLocaleString('en-IN')} (${Math.round((c.value / topTotal) * 100)}%)`}</title>
                   </path>
                 ))}
-                <text x="70" y="66" textAnchor="middle" style={{ fill: T.tx3, fontSize: 8.5, fontFamily: T.sans as string }}>TOP {top.length}</text>
-                <text x="70" y="80" textAnchor="middle" style={{ fill: T.tx, fontSize: 11, fontWeight: 700, fontFamily: T.mono as string }}>₹{topTotal >= 100000 ? `${(topTotal / 100000).toFixed(1)}L` : Math.round(topTotal).toLocaleString('en-IN')}</text>
+                <text x="90" y="85" textAnchor="middle" style={{ fill: T.tx3, fontSize: 10, fontFamily: T.sans as string }}>TOP {top.length}</text>
+                <text x="90" y="102" textAnchor="middle" style={{ fill: T.tx, fontSize: 14, fontWeight: 700, fontFamily: T.mono as string }}>₹{topTotal >= 100000 ? `${(topTotal / 100000).toFixed(1)}L` : Math.round(topTotal).toLocaleString('en-IN')}</text>
               </svg>
               <div style={{ flex: 1, minWidth: 220 }}>
                 {slices.map((c, i) => (
