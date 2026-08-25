@@ -39,18 +39,32 @@ export default function AskBox({ products }: { products: CostingProduct[] }) {
       {ans?.kind === 'item' && (
         <div style={{ marginTop: 8 }}>
           <div style={{ fontSize: 11, color: T.tx3 }}>
-            &ldquo;{ans.term}&rdquo; — {ans.hits.length} match{ans.hits.length === 1 ? '' : 'es'} across your costings, every supplier shown:
+            {ans.approx ? <>Nothing matches &ldquo;{ans.term}&rdquo; exactly — closest match:</> : <>&ldquo;{ans.term}&rdquo;:</>}
           </div>
-          {ans.hits.map((h, i) => (
+          {ans.groups.map((g, i) => (
             <div key={i} style={card}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: T.tx }}>{h.sub || '(unnamed)'}</span>
-                <span style={{ fontSize: 10, color: T.tx3 }}>{h.component}</span>
-                <span style={{ fontSize: 10, fontFamily: T.mono, color: T.ac2 }}>{h.sku}</span>
-                <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: T.mono, color: T.tx }}>{h.qty} {h.unit} → {money(h.cost)}</span>
+              {/* The material ONCE: its supplier(s) and rate stated a single
+                  time, then a compact line per product that uses it. */}
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.tx }}>{g.name}</div>
+              <div style={{ marginTop: 2 }}>
+                {g.suppliers.length ? g.suppliers.map(supLine) : <span style={{ fontSize: 10, color: T.tx3 }}>No supplier entered</span>}
               </div>
-              <div style={{ marginTop: 4, borderTop: `1px solid ${T.bd}`, paddingTop: 4 }}>
-                {h.suppliers.length ? h.suppliers.map(supLine) : <span style={{ fontSize: 10, color: T.tx3 }}>No supplier entered</span>}
+              <div style={{ marginTop: 6, borderTop: `1px solid ${T.bd}`, paddingTop: 6 }}>
+                <div style={{ fontSize: 9.5, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
+                  Used on {g.uses.length} line{g.uses.length === 1 ? '' : 's'}
+                </div>
+                {g.uses.map((u, j) => (
+                  <div key={j} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 11, color: T.tx2, padding: '2px 0', flexWrap: 'wrap' }}>
+                    <span style={{ fontFamily: T.mono, color: T.ac2 }}>{u.sku}</span>
+                    <span style={{ fontSize: 10, color: T.tx3 }}>{u.component}</span>
+                    <span style={{ marginLeft: 'auto', fontFamily: T.mono }}>{u.qty} {u.unit} → {money(u.cost)}</span>
+                  </div>
+                ))}
+                {g.uses.length > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: T.tx, borderTop: `1px solid ${T.bd}`, paddingTop: 4, marginTop: 2 }}>
+                    <span>Total across products</span><span style={{ fontFamily: T.mono, color: T.ac2 }}>{money(g.totalCost)}</span>
+                  </div>
+                )}
               </div>
             </div>
           ))}
