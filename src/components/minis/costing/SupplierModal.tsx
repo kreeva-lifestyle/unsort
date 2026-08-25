@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../../lib/theme';
 import { numericKeyDown } from '../../../lib/numericInput';
-import { CostingSupplier, blankSupplier, num } from './costingModel';
+import { CostingSupplier, blankSupplier, num, cheaperAlt, money } from './costingModel';
 
 export default function SupplierModal({ subName, suppliers, known, onDone, onClose }: {
   subName: string;
@@ -65,9 +65,13 @@ export default function SupplierModal({ subName, suppliers, known, onDone, onClo
         </div>
         <div style={{ padding: '14px 18px', overflowY: 'auto' }}>
           <div style={{ fontSize: 10.5, color: T.tx3, marginBottom: 10, lineHeight: 1.5 }}>
-            The ticked supplier&rsquo;s rate prices the product costing; the others are alternates, each with its own material code.
+            The ticked supplier is the <b style={{ color: T.tx2 }}>PRIMARY</b> — its rate prices the product costing. The others are alternates, each with its own material code.
           </div>
-          {rows.map((r, i) => (
+          {rows.map((r, i) => {
+            const rates = rows.map(x => ({ x, r: num(x.rate) })).filter(v => v.r > 0 && v.x.name.trim());
+            const minRate = rates.length ? Math.min(...rates.map(v => v.r)) : 0;
+            const isCheapest = num(r.rate) > 0 && num(r.rate) === minRate && rates.length > 1 && !!r.name.trim();
+            return (
             <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
               <input type="radio" name="sel-supplier" checked={!!r.selected} onChange={() => select(i)}
                 aria-label="Use this supplier's rate" style={{ width: 18, height: 18, flexShrink: 0 }} />
@@ -78,10 +82,12 @@ export default function SupplierModal({ subName, suppliers, known, onDone, onClo
               <input value={r.rate} onChange={e => patch(i, { rate: e.target.value })} onKeyDown={e => numericKeyDown(e)}
                 type="number" min="0" inputMode="decimal" placeholder="Rate"
                 style={{ ...S.fInput, flex: 1, minWidth: 64, ...(num(r.rate) > 0 ? {} : { border: '1px solid rgba(239,68,68,.55)' }) }} />
+              {isCheapest && <span style={{ fontSize: 8.5, fontWeight: 700, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .3)', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>CHEAPEST</span>}
               <span onClick={() => remove(i)} aria-label="Remove supplier"
                 style={{ cursor: 'pointer', color: T.re, fontSize: 16, lineHeight: 1, padding: '4px 2px' }}>&#215;</span>
             </div>
-          ))}
+            );
+          })}
           {/* Existing supplier names from every costing sheet — one spelling
               per supplier keeps the purchase plan grouped correctly. */}
           <datalist id="costing-supplier-suggest">
@@ -89,6 +95,17 @@ export default function SupplierModal({ subName, suppliers, known, onDone, onClo
           </datalist>
           <button onClick={() => setRows(prev => [...prev, { ...blankSupplier(), selected: false }])}
             style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>+ Add supplier</button>
+          {(() => {
+            // Recommend, never decide: if the primary is not the cheapest,
+            // say exactly who is and by how much - switching stays one tap
+            // on the radio, the owner's call (quality and terms matter too).
+            const alt = cheaperAlt({ name: '', qty: '1', unit: '', suppliers: rows });
+            return alt ? (
+              <div style={{ background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl, marginTop: 10, lineHeight: 1.5 }}>
+                💡 {alt.name} offers this at {money(alt.rate)} — {money(alt.saving)} cheaper than your primary. Tick them to switch, or keep your primary if their quality or terms are better.
+              </div>
+            ) : null;
+          })()}
           {error && (
             <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginTop: 10 }}>{error}</div>
           )}
