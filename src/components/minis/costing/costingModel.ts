@@ -59,6 +59,23 @@ export const subProblems = (s: CostingSub) => {
   };
 };
 
+/** The cheapest usable alternate to the primary supplier, when it genuinely
+ *  beats the primary's rate. Powers the "cheaper supplier available"
+ *  recommendation (owner's ask) - a nudge only, never an auto-switch: rate
+ *  is not the whole story (quality, credit terms, availability). */
+export const cheaperAlt = (s: CostingSub): { name: string; rate: number; saving: number } | null => {
+  const sel = selectedSupplier(s);
+  const selRate = num(sel?.rate);
+  if (!sel || !(selRate > 0)) return null;
+  let best: { name: string; rate: number } | null = null;
+  for (const x of s.suppliers) {
+    if (x === sel || !x.name.trim()) continue;
+    const r = num(x.rate);
+    if (r > 0 && r < selRate && (!best || r < best.rate)) best = { name: x.name.trim(), rate: r };
+  }
+  return best ? { ...best, saving: selRate - best.rate } : null;
+};
+
 export const blankSupplier = (): CostingSupplier => ({ name: '', materialCode: '', rate: '', selected: true });
 export const blankSub = (): CostingSub => ({ name: '', qty: '', unit: '', suppliers: [blankSupplier()] });
 export const blankComponent = (): CostingComponent => ({ name: '', subs: [blankSub()] });

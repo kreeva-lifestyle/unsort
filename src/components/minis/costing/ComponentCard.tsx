@@ -11,7 +11,7 @@ import { T, S } from '../../../lib/theme';
 import { numericKeyDown } from '../../../lib/numericInput';
 import {
   CostingComponent, CostingSub, CostingSupplier, CostingLibrary,
-  UNITS, blankSub, selectedSupplier, subCost, componentCost, money, subProblems,
+  UNITS, blankSub, selectedSupplier, subCost, componentCost, money, subProblems, cheaperAlt,
 } from './costingModel';
 import SupplierModal from './SupplierModal';
 
@@ -54,12 +54,16 @@ export default function ComponentCard({ comp, library, onChange, onRemove }: {
   const supplierBtn = (s: CostingSub, i: number, bad: boolean) => {
     const sel = selectedSupplier(s);
     const extra = s.suppliers.filter(x => x.name.trim()).length - 1;
+    // Owner's ask: RECOMMEND when an alternate beats the primary's rate - an
+    // amber line naming the saving, never an automatic switch.
+    const alt = cheaperAlt(s);
     return (
-      <button onClick={() => setSupFor(i)}
-        style={{ ...S.btnGhost, width: '100%', minHeight: 36, padding: '4px 10px', justifyContent: 'flex-start', textAlign: 'left', ...(bad ? { border: BAD } : {}) }}>
+      <button onClick={() => setSupFor(i)} title={alt ? `${alt.name} offers ${money(alt.rate)} — ${money(alt.saving)} cheaper per ${s.unit || 'unit'}` : undefined}
+        style={{ ...S.btnGhost, width: '100%', minHeight: 36, padding: '4px 10px', justifyContent: 'flex-start', textAlign: 'left', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, ...(bad ? { border: BAD } : alt ? { border: '1px solid oklch(0.78 0.18 75 / .4)' } : {}) }}>
         <span style={{ fontSize: 12, color: sel?.name ? T.tx : T.tx3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
           {sel?.name || 'Select supplier *'}{extra > 0 ? ` +${extra}` : ''}
         </span>
+        {alt && <span style={{ fontSize: 9, color: T.yl, whiteSpace: 'nowrap' }}>▼ {alt.name} {money(alt.saving)} cheaper</span>}
       </button>
     );
   };
