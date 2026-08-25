@@ -141,7 +141,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [paymentQrUrl, setPaymentQrUrl] = useState<string | null>(null);
   const [paymentUpiId, setPaymentUpiId] = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number>; returnsCount?: number; voidedCount?: number; prevRevenue?: number; prevCount?: number }>({ totalRevenue: 0, count: 0, byMode: {} });
+  const [analytics, setAnalytics] = useState<{ totalRevenue: number; count: number; byMode: Record<string, number>; returnsCount?: number; voidedCount?: number; prevRevenue?: number; prevCount?: number; topCustomers?: { name: string; value: number }[]; customerCount?: number }>({ totalRevenue: 0, count: 0, byMode: {} });
   const [analyticsFrom, setAnalyticsFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; });
   const [analyticsTo, setAnalyticsTo] = useState(() => localToday());
 
@@ -434,7 +434,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // Previous comparable period (audit P2: "This period vs Previous")
     const prevToDt = new Date(fromDt.getTime() - 1);
     const prevFromDt = new Date(prevToDt.getTime() - rangeMs);
-    type AnalyticsRow = Pick<CashChallan, 'total' | 'payment_mode' | 'status' | 'is_return'>;
+    type AnalyticsRow = Pick<CashChallan, 'total' | 'payment_mode' | 'status' | 'is_return' | 'customer_name'>;
     const fromIso = fromDt.toISOString(); const toIso = toDt.toISOString();
     const fromDate = analyticsFrom; const toDate = analyticsTo;
     // Explicit high row cap — without .limit() PostgREST silently truncates
@@ -442,7 +442,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // with no warning. At the cap we flag `truncated` for the UI.
     const CAP = 10000;
     const [{ data }, { count: voidedCount }, { data: prevData }, { data: paymentsInPeriod, error: payErr }] = await Promise.all([
-      supabase.from('cash_challans').select('total, payment_mode, status, is_return').gte('created_at', fromIso).lte('created_at', toIso).neq('status', 'voided').limit(CAP),
+      supabase.from('cash_challans').select('total, payment_mode, status, is_return, customer_name').gte('created_at', fromIso).lte('created_at', toIso).neq('status', 'voided').limit(CAP),
       supabase.from('cash_challans').select('id', { count: 'estimated', head: true }).gte('created_at', fromIso).lte('created_at', toIso).eq('status', 'voided'),
       supabase.from('cash_challans').select('total, is_return').gte('created_at', prevFromDt.toISOString()).lte('created_at', prevToDt.toISOString()).neq('status', 'voided').limit(CAP),
       // Mode breakup from the payments ledger, not challan totals — a partial
@@ -458,6 +458,15 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     ]);
     const rows = (data as AnalyticsRow[] | null) || [];
     const totalRevenue = rows.reduce((s, r) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
+    // Top customers by NET sales value (returns subtract - same sign rule as
+    // Net Revenue above); customers netting <= 0 in the range never chart.
+    const byCustomer = new Map<string, number>();
+    for (const r of rows) {
+      const n = (r.customer_name || '').trim() || '(no name)';
+      byCustomer.set(n, (byCustomer.get(n) || 0) + (r.is_return ? -1 : 1) * Number(r.total));
+    }
+    const positive = [...byCustomer.entries()].filter(([, v]) => v > 0);
+    const topCustomers = positive.sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, value]) => ({ name, value }));
     // Never let the breakup fail quietly: an empty byMode is indistinguishable
     // from "no payments this period" once it reaches the panel.
     if (payErr) addToast(friendlyError(payErr), 'error');
@@ -476,7 +485,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (rows.length >= CAP || prevRows.length >= CAP || ((paymentsInPeriod as unknown[] | null) || []).length >= CAP) {
       addToast(`Analytics computed from the first ${CAP.toLocaleString('en-IN')} rows — narrow the date range for exact figures`, 'error');
     }
-    setAnalytics({ totalRevenue, count: salesCount, byMode, returnsCount, voidedCount: voidedCount || 0, prevRevenue, prevCount } as typeof analytics);
+    setAnalytics({ totalRevenue, count: salesCount, byMode, returnsCount, voidedCount: voidedCount || 0, prevRevenue, prevCount, topCustomers, customerCount: positive.length } as typeof analytics);
   }, [analyticsFrom, analyticsTo, addToast]);
 
   // ── Fetch ledger (recent 10 customers) ──────────────────────────────────────
