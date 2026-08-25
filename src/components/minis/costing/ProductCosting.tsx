@@ -8,6 +8,7 @@ import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { CostingProduct, blankComponent, totalCost, money, buildLibrary } from './costingModel';
 import CostingEditor from './CostingEditor';
+import AskBox from './AskBox';
 
 export default function ProductCosting({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const [list, setList] = useState<CostingProduct[] | null>(null);
@@ -57,6 +58,10 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
           style={{ ...S.fInput, flex: 1, minWidth: 160 }} />
         <button onClick={newSheet} style={{ ...S.btnPrimary, minHeight: 36 }}>+ New product costing</button>
       </div>
+
+      {/* Natural ask engine (owner's spec): answers computed from the loaded
+          costings, all suppliers shown - deterministic, nothing estimated. */}
+      {list !== null && list.length > 0 && <AskBox products={list} />}
 
       {list === null && <div style={{ padding: 30, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading…</div>}
       {list !== null && shown.length === 0 && (
