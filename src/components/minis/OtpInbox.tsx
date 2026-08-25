@@ -7,7 +7,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
-import { useAuth } from '../../hooks/useAuth';
 
 interface OtpRow { id: string; message: string; code: string | null; device: string | null; received_at: string }
 
@@ -16,7 +15,6 @@ const FRESH_MS = 10 * 60 * 1000;
 const FN_URL = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/otp-inbox';
 
 export default function OtpInbox({ addToast }: { addToast: (m: string, t?: string) => void }) {
-  const { profile } = useAuth();
   const [rows, setRows] = useState<OtpRow[] | null>(null);
   const [now, setNow] = useState(Date.now());
   const [guideOpen, setGuideOpen] = useState(false);
@@ -102,9 +100,7 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
           <span style={{ paddingLeft: 14, display: 'inline-block' }}>• Expand it → Method: <b style={{ color: T.tx }}>POST</b> → Request Body: <b style={{ color: T.tx }}>JSON</b>, then add 3 fields:</span><br />
           <span style={{ paddingLeft: 28, display: 'inline-block' }}>– <span style={{ fontFamily: T.mono }}>secret</span> (Text): {setupKey
             ? <span onClick={() => copyText('Key', setupKey)} style={{ fontFamily: T.mono, fontSize: 10, color: T.ac2, cursor: 'pointer', wordBreak: 'break-all' }}>{setupKey} (tap to copy)</span>
-            : profile?.role === 'admin'
-              ? <button onClick={loadKey} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 26, marginLeft: 4 }}>Show key</button>
-              : <span style={{ color: T.yl }}>ask the admin for the key</span>}</span><br />
+            : <button onClick={loadKey} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 26, marginLeft: 4 }}>Show key</button>}</span><br />
           <span style={{ paddingLeft: 28, display: 'inline-block' }}>– <span style={{ fontFamily: T.mono }}>text</span> (Text): tap the field and pick the blue <b style={{ color: T.tx }}>Shortcut Input</b> variable</span><br />
           <span style={{ paddingLeft: 28, display: 'inline-block' }}>– <span style={{ fontFamily: T.mono }}>device</span> (Text): a name like &ldquo;Owner iPhone&rdquo;</span><br />
           4. Done. Send yourself a test SMS containing &ldquo;OTP 123456&rdquo; from another phone — it should appear above within seconds.<br />
