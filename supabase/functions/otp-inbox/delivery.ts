@@ -106,13 +106,16 @@ export async function processDeliverySheet(rowId: string, text: string): Promise
     const ctype = res.headers.get('content-type') || '';
     const raw = new Uint8Array(await res.arrayBuffer());
     if (raw.byteLength > 4_000_000) { await report({ sheet_status: 'Sheet too large to save' }); return; }
+    // Trust the bytes, not the server's label: Delhivery serves a real PDF
+    // but without a pdf content-type, which made this save as ".html".
+    const magicPdf = raw.length > 4 && raw[0] === 0x25 && raw[1] === 0x50 && raw[2] === 0x44 && raw[3] === 0x46 && raw[4] === 0x2d; // %PDF-
     // IST date for the file name — the phone receiving the SMS lives in IST.
     const ist = new Date(Date.now() + 5.5 * 3600 * 1000);
     const dateStr = `${String(ist.getUTCDate()).padStart(2, '0')}-${String(ist.getUTCMonth() + 1).padStart(2, '0')}-${ist.getUTCFullYear()}`;
     const base = `${dateStr} - ${courier}`;
     const dest = folder.startsWith('/') ? folder : `/${folder}`;
     let saved: string;
-    if (/pdf/i.test(ctype)) {
+    if (magicPdf || /pdf/i.test(ctype)) {
       saved = await uploadToDropbox(dest, base, '.pdf', raw);
     } else {
       const html = new TextDecoder().decode(raw);
