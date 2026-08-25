@@ -1,8 +1,9 @@
 // OTP Inbox — OTP SMS from the owner's iPhone, forwarded by an iOS Shortcut
 // automation the moment they arrive (iOS lets no app read SMS; the Shortcut
 // is the sanctioned bridge). Staff open this and tap a code to copy it.
-// Codes older than 10 minutes grey out — an OTP that old is dead anyway;
-// everything purges after 24 hours server-side.
+// Codes stay fully readable for their whole life (owner's call — delivery
+// codes are used days later); a green highlight marks the fresh ones.
+// Everything purges after 30 days server-side (purge-otp-inbox cron).
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
@@ -10,6 +11,7 @@ import { friendlyError } from '../../lib/friendlyError';
 
 interface OtpRow { id: string; message: string; code: string | null; device: string | null; received_at: string }
 
+// "Fresh" only adds the green just-arrived highlight — nothing fades after.
 const FRESH_MS = 10 * 60 * 1000;
 
 const FN_URL = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/otp-inbox';
@@ -58,7 +60,7 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
         setRows(prev => [payload.new as OtpRow, ...(prev ?? [])]);
       })
       .subscribe();
-    // Re-render every 30s so the age labels and fresh/expired styling track.
+    // Re-render every 30s so the age labels and the fresh highlight track.
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => { supabase.removeChannel(ch); clearInterval(t); };
   }, [load]);
@@ -84,7 +86,7 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
   return (
     <div style={{ fontFamily: T.sans, color: T.tx }}>
       <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.6, marginBottom: 12 }}>
-        OTPs from the owner&rsquo;s phone appear here the moment they arrive — tap a code to copy it. Codes fade after 10 minutes and clear out after a day.
+        OTPs from the owner&rsquo;s phone appear here the moment they arrive — tap a code to copy it. Codes stay here for 30 days, then clear automatically.
       </div>
 
       <button onClick={() => setGuideOpen(o => !o)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, marginBottom: 10 }}>
@@ -120,17 +122,17 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
         {(rows ?? []).map(r => {
           const fresh = now - new Date(r.received_at).getTime() < FRESH_MS;
           return (
-            <div key={r.id} style={{ border: `1px solid ${fresh ? 'oklch(0.72 0.19 145 / .3)' : T.bd}`, background: fresh ? 'oklch(0.72 0.19 145 / .04)' : 'rgba(255,255,255,0.015)', borderRadius: 10, padding: '10px 12px', opacity: fresh ? 1 : 0.55 }}>
+            <div key={r.id} style={{ border: `1px solid ${fresh ? 'oklch(0.72 0.19 145 / .3)' : T.bd}`, background: fresh ? 'oklch(0.72 0.19 145 / .04)' : 'rgba(255,255,255,0.015)', borderRadius: 10, padding: '10px 12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 {r.code ? (
                   <button onClick={() => copy(r.code!)} title="Tap to copy"
-                    style={{ fontFamily: T.mono, fontSize: 22, fontWeight: 800, letterSpacing: 2, color: fresh ? T.gr : T.tx3, background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 2px', minHeight: 44 }}>
+                    style={{ fontFamily: T.mono, fontSize: 22, fontWeight: 800, letterSpacing: 2, color: fresh ? T.gr : T.tx, background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 2px', minHeight: 44 }}>
                     {r.code}
                   </button>
                 ) : (
                   <span style={{ fontSize: 11, color: T.yl }}>No code detected — read the message</span>
                 )}
-                <span style={{ fontSize: 10, color: T.tx3, marginLeft: 'auto' }}>{fresh ? '' : 'expired · '}{age(r.received_at)}{r.device ? ` · ${r.device}` : ''}</span>
+                <span style={{ fontSize: 10, color: T.tx3, marginLeft: 'auto' }}>{age(r.received_at)}{r.device ? ` · ${r.device}` : ''}</span>
                 <span onClick={() => remove(r.id)} aria-label="Delete OTP" style={{ cursor: 'pointer', color: T.tx3, fontSize: 15, padding: 4 }}>&#215;</span>
               </div>
               <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5, marginTop: 4, wordBreak: 'break-word' }}>{r.message}</div>
