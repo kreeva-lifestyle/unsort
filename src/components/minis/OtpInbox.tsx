@@ -9,7 +9,10 @@ import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 
-interface OtpRow { id: string; message: string; code: string | null; device: string | null; received_at: string }
+interface OtpRow {
+  id: string; message: string; code: string | null; device: string | null; received_at: string;
+  sheet_status: string | null; sheet_file: string | null;
+}
 
 // "Fresh" only adds the green just-arrived highlight — nothing fades after.
 const FRESH_MS = 10 * 60 * 1000;
@@ -21,6 +24,30 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
   const [now, setNow] = useState(Date.now());
   const [guideOpen, setGuideOpen] = useState(false);
   const [setupKey, setSetupKey] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [folder, setFolder] = useState('');
+  const [savingFolder, setSavingFolder] = useState(false);
+
+  // Where courier delivery-sheet PDFs get filed — a GLOBAL app setting.
+  const openSettings = async () => {
+    setSettingsOpen(o => !o);
+    if (settingsOpen) return;
+    const { data } = await supabase.from('app_settings').select('value').eq('key', 'otp_delivery_sheet_folder').maybeSingle();
+    if (typeof data?.value === 'string') setFolder(data.value);
+  };
+  const saveFolder = async () => {
+    if (savingFolder) return;
+    const v = folder.trim().replace(/\/+$/, '');
+    const path = v ? (v.startsWith('/') ? v : `/${v}`) : '';
+    if (!path) { addToast('Type the Dropbox folder first — e.g. /Delivery Sheets', 'error'); return; }
+    setSavingFolder(true);
+    const { error } = await supabase.from('app_settings')
+      .upsert({ key: 'otp_delivery_sheet_folder', value: path, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    setSavingFolder(false);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    setFolder(path);
+    addToast(`Delivery sheets will save to ${path}`, 'success');
+  };
 
   // The shared key the Shortcut needs - fetched live, ADMIN-only, enforced
   // server-side. It is never baked into the app bundle.
@@ -44,7 +71,7 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
   };
 
   const load = useCallback(() => {
-    supabase.from('otp_inbox').select('id, message, code, device, received_at')
+    supabase.from('otp_inbox').select('id, message, code, device, received_at, sheet_status, sheet_file')
       .order('received_at', { ascending: false }).limit(100)
       .then(({ data, error }) => {
         if (error) { addToast(friendlyError(error), 'error'); setRows([]); return; }
@@ -59,6 +86,12 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'otp_inbox' }, payload => {
         setRows(prev => [payload.new as OtpRow, ...(prev ?? [])]);
       })
+      // The delivery-sheet result (saved to Dropbox / any problem) lands on
+      // the row seconds after the insert — merge it in live.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'otp_inbox' }, payload => {
+        const next = payload.new as OtpRow;
+        setRows(prev => (prev ?? []).map(r => (r.id === next.id ? { ...r, ...next } : r)));
+      })
       .subscribe();
     // Re-render every 30s so the age labels and the fresh highlight track.
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -68,12 +101,6 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
   const copy = async (code: string) => {
     try { await navigator.clipboard.writeText(code); addToast(`${code} copied`, 'success'); }
     catch { addToast('Could not copy — long-press the code instead', 'error'); }
-  };
-
-  const remove = async (id: string) => {
-    const { error } = await supabase.from('otp_inbox').delete().eq('id', id);
-    if (error) { addToast(friendlyError(error), 'error'); return; }
-    setRows(prev => (prev ?? []).filter(r => r.id !== id));
   };
 
   const age = (iso: string): string => {
@@ -89,9 +116,31 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
         OTPs from the owner&rsquo;s phone appear here the moment they arrive — tap a code to copy it. Codes stay here for 30 days, then clear automatically.
       </div>
 
-      <button onClick={() => setGuideOpen(o => !o)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, marginBottom: 10 }}>
-        {guideOpen ? 'Hide setup guide' : 'How to set up (one-time, on the phone receiving OTPs)'}
-      </button>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+        <button onClick={() => setGuideOpen(o => !o)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>
+          {guideOpen ? 'Hide setup guide' : 'How to set up (one-time, on the phone receiving OTPs)'}
+        </button>
+        <button onClick={openSettings} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>
+          {settingsOpen ? 'Hide settings' : 'Settings'}
+        </button>
+      </div>
+      {settingsOpen && (
+        <div style={{ border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+          <label style={S.fLabel}>Dropbox folder for courier delivery sheets</label>
+          <div style={{ fontSize: 10.5, color: T.tx3, lineHeight: 1.6, margin: '2px 0 8px' }}>
+            When a courier SMS (Shadowfax etc.) carries a delivery-sheet link, the sheet is saved here automatically as a PDF named by date and courier — e.g. 26-08-2026 - Shadow Fax.pdf. Couriers are recognised from the names saved in PackStation settings.
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input value={folder} onChange={e => setFolder(e.target.value)} placeholder="/Delivery Sheets"
+              onKeyDown={e => { if (e.key === 'Enter') saveFolder(); }}
+              style={{ ...S.fInput, flex: 1, minWidth: 180, fontFamily: T.mono }} />
+            <button onClick={saveFolder} disabled={savingFolder}
+              style={{ ...S.btnPrimary, minHeight: 36, pointerEvents: savingFolder ? 'none' : 'auto', opacity: savingFolder ? 0.5 : 1 }}>
+              {savingFolder ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
       {guideOpen && (
         <div style={{ border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px', marginBottom: 12, fontSize: 12, color: T.tx2, lineHeight: 1.9 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>iPhone Shortcut — about 3 minutes</div>
@@ -133,9 +182,14 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
                   <span style={{ fontSize: 11, color: T.yl }}>No code detected — read the message</span>
                 )}
                 <span style={{ fontSize: 10, color: T.tx3, marginLeft: 'auto' }}>{age(r.received_at)}{r.device ? ` · ${r.device}` : ''}</span>
-                <span onClick={() => remove(r.id)} aria-label="Delete OTP" style={{ cursor: 'pointer', color: T.tx3, fontSize: 15, padding: 4 }}>&#215;</span>
               </div>
               <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5, marginTop: 4, wordBreak: 'break-word' }}>{r.message}</div>
+              {r.sheet_file && (
+                <div style={{ fontSize: 10.5, color: T.gr, marginTop: 6 }}>✓ Delivery sheet saved to Dropbox: {r.sheet_file}</div>
+              )}
+              {!r.sheet_file && r.sheet_status && (
+                <div style={{ fontSize: 10.5, color: T.yl, marginTop: 6, lineHeight: 1.5 }}>{r.sheet_status}</div>
+              )}
             </div>
           );
         })}
