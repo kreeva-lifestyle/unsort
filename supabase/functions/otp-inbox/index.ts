@@ -4,8 +4,10 @@
 // message with the extracted code so staff see it live in the OTP Inbox Mini.
 //
 // POST { secret, text, device? } -> { ok, code }   (the Shortcut's push)
-// POST { action: 'setup' } + user JWT -> { ok, url, secret }   (ADMIN only:
-//   powers the in-app setup guide so the owner never hunts for the key)
+// POST { action: 'setup' } + user JWT -> { ok, url, secret }   (any
+//   signed-in staff member - owner's call: the guide is not sensitive
+//   in-house; only anonymous internet callers are refused, since the key
+//   lets its holder inject OTP rows)
 // Push auth: the shared secret from app_secrets.otp_push_secret - the
 // Shortcut cannot do JWTs. Constant-time compare; wrong secret gets 403.
 // Retention is the DB's job (purge cron); this function only ingests.
@@ -55,7 +57,7 @@ export function extractOtp(text: string): string {
   return best ? best.code : cands[0].code;
 }
 
-async function isAdmin(req: Request): Promise<boolean> {
+async function isSignedIn(req: Request): Promise<boolean> {
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
   if (!token) return false;
   const u = await fetch(`${SB_URL}/auth/v1/user`, { headers: { authorization: `Bearer ${token}`, apikey: SB_SVC } });
@@ -64,7 +66,7 @@ async function isAdmin(req: Request): Promise<boolean> {
   if (!user?.id) return false;
   const p = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=role,is_active`, { headers: svcHeaders });
   const prof = (await p.json().catch(() => []))?.[0];
-  return !!prof && prof.is_active !== false && prof.role === 'admin';
+  return !!prof && prof.is_active !== false;
 }
 
 Deno.serve(async (req) => {
@@ -80,7 +82,7 @@ Deno.serve(async (req) => {
   // In-app setup guide (owner's ask): ADMINS read the URL + secret here so
   // the guide in the Mini is complete without the key ever entering the repo.
   if (body.action === 'setup') {
-    if (!(await isAdmin(req))) return json({ ok: false, error: 'Only an admin can view the setup key' }, 403);
+    if (!(await isSignedIn(req))) return json({ ok: false, error: 'Sign in to DailyOffice first' }, 403);
     return json({ ok: true, url: `${SB_URL}/functions/v1/otp-inbox`, secret: expected });
   }
 
