@@ -3,9 +3,11 @@
 // "Message contains OTP -> POST here" is the sanctioned bridge). Stores the
 // message with the extracted code so staff see it live in the OTP Inbox Mini.
 //
-// POST { secret, text, device? } -> { ok, code }
-// Auth: the shared secret from app_secrets.otp_push_secret - the Shortcut
-// cannot do JWTs. Constant-time compare; wrong secret gets a plain 403.
+// POST { secret, text, device? } -> { ok, code }   (the Shortcut's push)
+// POST { action: 'setup' } + user JWT -> { ok, url, secret }   (ADMIN only:
+//   powers the in-app setup guide so the owner never hunts for the key)
+// Push auth: the shared secret from app_secrets.otp_push_secret - the
+// Shortcut cannot do JWTs. Constant-time compare; wrong secret gets 403.
 // Retention is the DB's job (purge cron); this function only ingests.
 
 const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -53,15 +55,35 @@ export function extractOtp(text: string): string {
   return best ? best.code : cands[0].code;
 }
 
+async function isAdmin(req: Request): Promise<boolean> {
+  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return false;
+  const u = await fetch(`${SB_URL}/auth/v1/user`, { headers: { authorization: `Bearer ${token}`, apikey: SB_SVC } });
+  if (!u.ok) return false;
+  const user = await u.json().catch(() => null);
+  if (!user?.id) return false;
+  const p = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=role,is_active`, { headers: svcHeaders });
+  const prof = (await p.json().catch(() => []))?.[0];
+  return !!prof && prof.is_active !== false && prof.role === 'admin';
+}
+
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' } });
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' } });
   if (req.method !== 'POST') return json({ ok: false, error: 'POST only' }, 405);
-  let body: { secret?: string; text?: string; device?: string };
+  let body: { secret?: string; text?: string; device?: string; action?: string };
   try { body = await req.json(); } catch { return json({ ok: false, error: 'Invalid JSON' }, 400); }
 
   const sec = await fetch(`${SB_URL}/rest/v1/app_secrets?key=eq.otp_push_secret&select=value`, { headers: svcHeaders });
   const expected = (await sec.json().catch(() => []))?.[0]?.value ?? '';
   if (!expected) return json({ ok: false, error: 'otp_push_secret is not configured' }, 503);
+
+  // In-app setup guide (owner's ask): ADMINS read the URL + secret here so
+  // the guide in the Mini is complete without the key ever entering the repo.
+  if (body.action === 'setup') {
+    if (!(await isAdmin(req))) return json({ ok: false, error: 'Only an admin can view the setup key' }, 403);
+    return json({ ok: true, url: `${SB_URL}/functions/v1/otp-inbox`, secret: expected });
+  }
+
   if (!secretOk(String(body.secret || ''), expected)) return json({ ok: false, error: 'forbidden' }, 403);
 
   const text = String(body.text || '').slice(0, 1000).trim();
