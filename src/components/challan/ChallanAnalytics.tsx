@@ -58,7 +58,12 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
   const revChange = pctChange(analytics.totalRevenue, analytics.prevRevenue);
   const salesChange = pctChange(analytics.count, analytics.prevCount);
   return (
-    <div style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+    // page-pad (owner's video): the bottom nav is position:fixed OVER the
+    // scroller, so every view must reserve nav clearance itself - Ledger and
+    // Cash Book do; Analytics was the one sub-view missing the class, so at
+    // full scroll the last card jammed under the nav and a fling overscrolled
+    // into a big void.
+    <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div className="challan-analytics-dates" style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12 }}>
         <DateInput value={from} onChange={e => onFromChange(e.target.value)} />
         <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
