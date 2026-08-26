@@ -14,6 +14,7 @@ import {
   UNITS, blankSub, selectedSupplier, subCost, componentCost, money, subProblems, cheaperAlt,
 } from './costingModel';
 import SupplierModal from './SupplierModal';
+import SuggestInput from '../../ui/SuggestInput';
 
 const BAD = '1px solid rgba(239,68,68,.55)';
 
@@ -73,7 +74,7 @@ export default function ComponentCard({ comp, library, onChange, onRemove }: {
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 170 }}>
           <label style={S.fLabel}>Main component <span style={{ color: T.re }}>*</span></label>
-          <input value={comp.name} onChange={e => onChange({ ...comp, name: e.target.value })} list="costing-main-suggest"
+          <SuggestInput value={comp.name} onChange={v => onChange({ ...comp, name: v })} options={library.mains}
             placeholder="e.g. Fabric / Stitching / Packing" style={cellIn(!comp.name.trim())} />
         </div>
         <button onClick={onRemove} style={{ ...S.btnDanger, ...S.btnSm, minHeight: 36 }}>Remove</button>
@@ -98,7 +99,7 @@ export default function ComponentCard({ comp, library, onChange, onRemove }: {
               const sel = selectedSupplier(s);
               return (
                 <tr key={i}>
-                  <td style={td}><input value={s.name} onChange={e => patchSub(i, { name: e.target.value })} list="costing-sub-suggest" placeholder="e.g. Georgette 60&quot;" style={cellIn(bad.name)} /></td>
+                  <td style={td}><SuggestInput value={s.name} onChange={v => patchSub(i, { name: v })} options={library.subs} placeholder='e.g. Georgette 60"' style={cellIn(bad.name)} /></td>
                   <td style={td}>{supplierBtn(s, i, bad.supplier)}</td>
                   <td style={td}><input value={sel?.materialCode ?? ''} onChange={e => patchCode(i, e.target.value)} placeholder="Code" style={{ ...cellIn(false), fontFamily: T.mono }} /></td>
                   <td style={td}><input value={s.qty} onChange={e => patchSub(i, { qty: e.target.value })} onKeyDown={e => numericKeyDown(e)} type="number" min="0" inputMode="decimal" placeholder="0" style={cellIn(bad.qty)} /></td>
@@ -135,7 +136,7 @@ export default function ComponentCard({ comp, library, onChange, onRemove }: {
           return (
             <div key={i} style={{ border: `1px solid ${T.bd}`, borderRadius: 8, padding: 10, background: 'rgba(255,255,255,0.015)' }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
-                <input value={s.name} onChange={e => patchSub(i, { name: e.target.value })} list="costing-sub-suggest" placeholder="Sub component *" style={{ ...cellIn(bad.name), flex: 1 }} />
+                <SuggestInput value={s.name} onChange={v => patchSub(i, { name: v })} options={library.subs} placeholder="Sub component *" style={{ ...cellIn(bad.name), flex: 1 }} />
                 <span onClick={() => removeSub(i)} aria-label="Remove sub component" style={{ cursor: 'pointer', color: T.re, fontSize: 18, lineHeight: 1, padding: '12px 8px' }}>&#215;</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>

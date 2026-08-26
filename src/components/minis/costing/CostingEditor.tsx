@@ -11,6 +11,7 @@ import {
   CostingProduct, CostingLibrary, blankComponent, sheetCost, totalCost, money, validateSheet, num,
 } from './costingModel';
 import ComponentCard from './ComponentCard';
+import QuickAddChips from './QuickAddChips';
 import { optimizeImage } from './imageResize';
 import PrintPreview from './PrintPreview';
 import { purchasePlanHtml } from './purchasePlan';
@@ -120,18 +121,13 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
         </div>
       </div>
 
-      {/* One datalist each, referenced by every row input below - the
-          "auto-saved" names from all sheets, offered as you type. */}
-      <datalist id="costing-main-suggest">{library.mains.map(n => <option key={n} value={n} />)}</datalist>
-      <datalist id="costing-sub-suggest">{library.subs.map(n => <option key={n} value={n} />)}</datalist>
-
       {p.components.map((c, i) => (
         <ComponentCard key={i} comp={c} library={library}
           onChange={next => patchComp(i, next)}
           onRemove={() => setP(prev => ({ ...prev, components: prev.components.filter((_, j) => j !== i) }))} />
       ))}
-      <button onClick={() => setP(prev => ({ ...prev, components: [...prev.components, blankComponent()] }))}
-        style={{ ...S.btnPrimary, minHeight: 40 }}>+ Add main component</button>
+      <QuickAddChips existing={p.components.map(c => c.name)} known={library.mains}
+        onAdd={name => setP(prev => ({ ...prev, components: [...prev.components, { ...blankComponent(), name }] }))} />
 
       {/* Totals card, right-aligned like the reference */}
       <div style={{ maxWidth: 340, marginLeft: 'auto', marginTop: 14, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 14 }}>
