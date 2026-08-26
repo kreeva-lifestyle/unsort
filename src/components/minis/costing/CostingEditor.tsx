@@ -11,6 +11,7 @@ import {
   validateSheetDetailed, pruneBlank, num,
 } from './costingModel';
 import ComponentCard from './ComponentCard';
+import { canonicalizeNames } from './costingNames';
 import { SubPreset } from './SubChips';
 import TotalsCard from './TotalsCard';
 import SheetProblems from './SheetProblems';
@@ -69,9 +70,9 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
 
   const save = async () => {
     if (saving) return;
-    // Untouched leftover lines (the keyboard flow adds a fresh one after each
-    // completed line) are dropped, never a save blocker.
-    const comps = pruneBlank(p.components);
+    // Untouched leftover lines are dropped (never a save blocker) and names
+    // snap to their one existing spelling ("cups" == "CUPS" == "Cups").
+    const comps = canonicalizeNames(pruneBlank(p.components), library);
     setP(prev => ({ ...prev, components: comps }));
     const errs = validateSheetDetailed(p.sku, comps);
     setErrors(errs);
@@ -102,7 +103,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
   // Both PDFs need a valid sheet; the purchase plan additionally needs pieces.
   const openPdf = (which: 'sheet' | 'plan') => {
     if (which === 'plan' && !(Math.floor(num(pieces)) > 0)) { addToast('Enter "Pieces to make" first — the plan is calculated from it', 'error'); return; }
-    const comps = pruneBlank(p.components);
+    const comps = canonicalizeNames(pruneBlank(p.components), library);
     setP(prev => ({ ...prev, components: comps }));
     const errs = validateSheetDetailed(p.sku, comps);
     if (errs.length) { setErrors(errs); addToast('Fix the highlighted fields first', 'error'); return; }
