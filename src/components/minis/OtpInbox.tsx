@@ -4,11 +4,12 @@
 // Codes stay fully readable for their whole life (owner's call — delivery
 // codes are used days later); a green highlight marks the fresh ones.
 // Everything purges after 30 days server-side (purge-otp-inbox cron).
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import OtpSetupGuide from './OtpSetupGuide';
+import OtpFolderSetting from './OtpFolderSetting';
 
 interface OtpRow {
   id: string; message: string; code: string | null; device: string | null; received_at: string;
@@ -23,48 +24,32 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
   const [now, setNow] = useState(Date.now());
   const [guideOpen, setGuideOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [folder, setFolder] = useState('');
-  const [savingFolder, setSavingFolder] = useState(false);
-
-  // Where courier delivery-sheet PDFs get filed — a GLOBAL app setting.
-  const openSettings = async () => {
-    setSettingsOpen(o => !o);
-    if (settingsOpen) return;
-    const { data } = await supabase.from('app_settings').select('value').eq('key', 'otp_delivery_sheet_folder').maybeSingle();
-    if (typeof data?.value === 'string') setFolder(data.value);
-  };
-  const saveFolder = async () => {
-    if (savingFolder) return;
-    const v = folder.trim().replace(/\/+$/, '');
-    const path = v ? (v.startsWith('/') ? v : `/${v}`) : '';
-    if (!path) { addToast('Type the Dropbox folder first — e.g. /Delivery Sheets', 'error'); return; }
-    setSavingFolder(true);
-    const { error } = await supabase.from('app_settings')
-      .upsert({ key: 'otp_delivery_sheet_folder', value: path, updated_at: new Date().toISOString() }, { onConflict: 'key' });
-    setSavingFolder(false);
-    if (error) { addToast(friendlyError(error), 'error'); return; }
-    setFolder(path);
-    addToast(`Delivery sheets will save to ${path}`, 'success');
-  };
+  const [page, setPage] = useState(0);
+  const [perPage, setPerPage] = useState(25);
+  const [count, setCount] = useState(0);
 
   const load = useCallback(() => {
-    supabase.from('otp_inbox').select('id, message, code, device, received_at, sheet_status, sheet_file')
-      .order('received_at', { ascending: false }).limit(100)
-      .then(({ data, error }) => {
+    supabase.from('otp_inbox').select('id, message, code, device, received_at, sheet_status, sheet_file', { count: 'exact' })
+      .order('received_at', { ascending: false }).range(page * perPage, page * perPage + perPage - 1)
+      .then(({ data, error, count: total }) => {
         if (error) { addToast(friendlyError(error), 'error'); setRows([]); return; }
         setRows((data ?? []) as OtpRow[]);
+        setCount(total ?? 0);
+        // The nightly purge can strand a page past the end — snap back.
+        if ((data ?? []).length === 0 && (total ?? 0) > 0 && page > 0) setPage(0);
       });
-  }, [addToast]);
+  }, [addToast, page, perPage]);
+
+  // The realtime/foreground handlers below are mounted ONCE but must always
+  // refetch the CURRENT page — the ref keeps them pointed at the latest load.
+  const loadRef = useRef(load);
+  useEffect(() => { loadRef.current = load; load(); }, [load]);
 
   useEffect(() => {
-    load();
-    // New OTPs appear the moment the phone forwards them.
+    // New OTPs appear the moment the phone forwards them: refetch the page
+    // (keeps the count and page contents exact, wherever the user is).
     const ch = supabase.channel('otp-inbox')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'otp_inbox' }, payload => {
-        const next = payload.new as OtpRow;
-        // A foreground reload can race the realtime event — never show a row twice.
-        setRows(prev => ((prev ?? []).some(r => r.id === next.id) ? prev : [next, ...(prev ?? [])]));
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'otp_inbox' }, () => loadRef.current())
       // The delivery-sheet result (saved to Dropbox / any problem) lands on
       // the row seconds after the insert — merge it in live.
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'otp_inbox' }, payload => {
@@ -74,10 +59,10 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
       // Reload whenever the channel (re)connects: iOS suspends the socket
       // while the PWA is backgrounded, and anything that arrived meanwhile
       // would otherwise be missed until a manual refresh.
-      .subscribe(status => { if (status === 'SUBSCRIBED') load(); });
+      .subscribe(status => { if (status === 'SUBSCRIBED') loadRef.current(); });
     // Same story when the app returns to the foreground or regains focus —
     // no refresh button needed, the list refetches itself.
-    const onVisible = () => { if (document.visibilityState === 'visible') load(); };
+    const onVisible = () => { if (document.visibilityState === 'visible') loadRef.current(); };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
     // Re-render every 30s so the age labels and the fresh highlight track.
@@ -87,7 +72,7 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [load]);
+  }, []);
 
   const copy = async (code: string) => {
     try { await navigator.clipboard.writeText(code); addToast(`${code} copied`, 'success'); }
@@ -111,27 +96,11 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
         <button onClick={() => setGuideOpen(o => !o)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>
           {guideOpen ? 'Hide Setup Guide' : 'Setup Guide'}
         </button>
-        <button onClick={openSettings} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>
+        <button onClick={() => setSettingsOpen(o => !o)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>
           {settingsOpen ? 'Hide settings' : 'Settings'}
         </button>
       </div>
-      {settingsOpen && (
-        <div style={{ border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
-          <label style={S.fLabel}>Dropbox folder for courier delivery sheets</label>
-          <div style={{ fontSize: 10.5, color: T.tx3, lineHeight: 1.6, margin: '2px 0 8px' }}>
-            When a courier SMS (Shadowfax etc.) carries a delivery-sheet link, the sheet is saved here automatically as a PDF named by date and courier — e.g. 26-08-2026 - Shadow Fax.pdf. Couriers are recognised from the names saved in PackStation settings.
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <input value={folder} onChange={e => setFolder(e.target.value)} placeholder="/Delivery Sheets"
-              onKeyDown={e => { if (e.key === 'Enter') saveFolder(); }}
-              style={{ ...S.fInput, flex: 1, minWidth: 180, fontFamily: T.mono }} />
-            <button onClick={saveFolder} disabled={savingFolder}
-              style={{ ...S.btnPrimary, minHeight: 36, pointerEvents: savingFolder ? 'none' : 'auto', opacity: savingFolder ? 0.5 : 1 }}>
-              {savingFolder ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        </div>
-      )}
+      {settingsOpen && <OtpFolderSetting addToast={addToast} />}
       {guideOpen && <OtpSetupGuide addToast={addToast} />}
 
       {rows === null && <div style={{ padding: 30, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading…</div>}
@@ -169,6 +138,28 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
           );
         })}
       </div>
+
+      {count > 0 && (() => {
+        const totalPages = Math.max(1, Math.ceil(count / perPage));
+        return (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}
+                style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1 }} aria-label="Previous page">Prev</button>
+              <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
+              <button onClick={() => setPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1}
+                style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1 }} aria-label="Next page">Next</button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 10, color: T.tx3 }}>{count} OTPs</span>
+              <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setPage(0); }}
+                style={{ ...S.fInput, width: 'auto', padding: '4px 8px', fontSize: 11, height: 28, cursor: 'pointer' }}>
+                <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
+              </select>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
