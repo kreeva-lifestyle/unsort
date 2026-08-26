@@ -142,29 +142,29 @@ export interface CostingLibrary {
 }
 
 export function buildLibrary(products: CostingProduct[]): CostingLibrary {
-  const mains = new Set<string>();
-  const subs = new Set<string>();
+  // Everything dedupes CASE-INSENSITIVELY (owner: "cups" / "CUPS" / "Cups"
+  // are the same thing). Newest sheet first (caller orders by updated_at
+  // desc), so the first spelling / code / rate seen is the most recent one.
+  const mains = new Map<string, string>();
+  const subs = new Map<string, string>();
   const byName = new Map<string, { name: string; materialCode: string; rate: number | string }>();
-  // Newest sheet first (caller orders by updated_at desc), so the FIRST code/
-  // rate seen per supplier is the most recent one — that's what autofills.
+  const add = (m: Map<string, string>, raw: string) => { const n = raw.trim(); if (n && !m.has(n.toUpperCase())) m.set(n.toUpperCase(), n); };
   for (const p of products) {
     for (const c of p.components) {
-      if (c.name.trim()) mains.add(c.name.trim());
+      add(mains, c.name);
       for (const su of c.subs) {
-        if (su.name.trim()) subs.add(su.name.trim());
+        add(subs, su.name);
         for (const x of su.suppliers) {
           const n = x.name.trim();
-          if (!n) continue;
-          const key = n.toUpperCase();
-          if (!byName.has(key)) byName.set(key, { name: n, materialCode: x.materialCode.trim(), rate: x.rate });
+          if (n && !byName.has(n.toUpperCase())) byName.set(n.toUpperCase(), { name: n, materialCode: x.materialCode.trim(), rate: x.rate });
         }
       }
     }
   }
   const coll = (a: string, b: string) => a.localeCompare(b);
   return {
-    mains: [...mains].sort(coll),
-    subs: [...subs].sort(coll),
+    mains: [...mains.values()].sort(coll),
+    subs: [...subs.values()].sort(coll),
     suppliers: [...byName.values()].sort((a, b) => coll(a.name, b.name)),
   };
 }
