@@ -80,32 +80,54 @@ export const blankSupplier = (): CostingSupplier => ({ name: '', materialCode: '
 export const blankSub = (): CostingSub => ({ name: '', qty: '', unit: '', suppliers: [blankSupplier()] });
 export const blankComponent = (): CostingComponent => ({ name: '', subs: [blankSub()] });
 
+/** One validation problem with the DOM anchor it belongs to — the editor's
+ *  error list is tappable and scrolls to `target` (data-fx / element id). */
+export interface SheetProblem { msg: string; target: string }
+
 /** Owner's rule: main component, sub component, supplier, qty, unit and rate
  *  are compulsory. Returns human-readable problems, empty when saveable. */
-export function validateSheet(sku: string, components: CostingComponent[]): string[] {
-  const errs: string[] = [];
-  if (!sku.trim()) errs.push('SKU is required');
-  if (components.length === 0) errs.push('Add at least one main component');
+export function validateSheetDetailed(sku: string, components: CostingComponent[]): SheetProblem[] {
+  const errs: SheetProblem[] = [];
+  const push = (msg: string, target: string) => errs.push({ msg, target });
+  if (!sku.trim()) push('SKU is required', 'cost-f-sku');
+  if (components.length === 0) push('Add at least one main component', 'cost-f-sku');
   components.forEach((c, ci) => {
     const cn = c.name.trim() || `Main component ${ci + 1}`;
-    if (!c.name.trim()) errs.push(`Main component ${ci + 1}: name is required`);
-    if (c.subs.length === 0) errs.push(`${cn}: add at least one sub component`);
+    const ct = `cost-f-${ci}`;
+    if (!c.name.trim()) push(`Main component ${ci + 1}: name is required`, ct);
+    if (c.subs.length === 0) push(`${cn}: add at least one sub component`, ct);
     c.subs.forEach((s, si) => {
       const sn = s.name.trim() || `sub ${si + 1}`;
-      if (!s.name.trim()) errs.push(`${cn}: sub component ${si + 1} needs a name`);
-      if (!(num(s.qty) > 0)) errs.push(`${cn} → ${sn}: QTY must be more than 0`);
-      if (!s.unit.trim()) errs.push(`${cn} → ${sn}: pick a unit`);
+      const st = `cost-f-${ci}-${si}`;
+      if (!s.name.trim()) push(`${cn}: sub component ${si + 1} needs a name`, st);
+      if (!(num(s.qty) > 0)) push(`${cn} → ${sn}: QTY must be more than 0`, st);
+      if (!s.unit.trim()) push(`${cn} → ${sn}: pick a unit`, st);
       const sel = selectedSupplier(s);
-      if (!sel || !sel.name.trim()) errs.push(`${cn} → ${sn}: supplier is required`);
-      if (!(num(sel?.rate) > 0)) errs.push(`${cn} → ${sn}: rate must be more than 0`);
+      if (!sel || !sel.name.trim()) push(`${cn} → ${sn}: supplier is required`, st);
+      if (!(num(sel?.rate) > 0)) push(`${cn} → ${sn}: rate must be more than 0`, st);
       s.suppliers.forEach((sup, pi) => {
         if (sup !== sel && sup.name.trim() && !(num(sup.rate) > 0)) {
-          errs.push(`${cn} → ${sn}: alternate supplier ${pi + 1} (${sup.name.trim()}) needs a rate`);
+          push(`${cn} → ${sn}: alternate supplier ${pi + 1} (${sup.name.trim()}) needs a rate`, st);
         }
       });
     });
   });
   return errs;
+}
+
+export const validateSheet = (sku: string, components: CostingComponent[]): string[] =>
+  validateSheetDetailed(sku, components).map(e => e.msg);
+
+/** Drop fully-blank sub-component lines (the keyboard flow auto-adds a fresh
+ *  line after each completed one — an untouched leftover must not block save)
+ *  and blank-named components left with no subs. */
+export function pruneBlank(components: CostingComponent[]): CostingComponent[] {
+  const blankSubRow = (s: CostingSub) =>
+    !s.name.trim() && !String(s.qty).trim() &&
+    s.suppliers.every(x => !x.name.trim() && !x.materialCode.trim() && !String(x.rate).trim());
+  return components
+    .map(c => ({ ...c, subs: c.subs.filter(s => !blankSubRow(s)) }))
+    .filter(c => c.name.trim() || c.subs.length > 0);
 }
 
 
