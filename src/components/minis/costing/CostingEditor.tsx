@@ -11,7 +11,7 @@ import {
   validateSheetDetailed, pruneBlank, num,
 } from './costingModel';
 import ComponentCard from './ComponentCard';
-import QuickAddChips from './QuickAddChips';
+import { SubPreset } from './SubChips';
 import TotalsCard from './TotalsCard';
 import SheetProblems from './SheetProblems';
 import { optimizeImage } from './imageResize';
@@ -20,10 +20,11 @@ import { purchasePlanHtml } from './purchasePlan';
 import { costingSheetHtml } from './costingSheet';
 import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 
-export default function CostingEditor({ product, saved, library, onSaved, onBack, addToast }: {
+export default function CostingEditor({ product, saved, library, topSubs, onSaved, onBack, addToast }: {
   product: CostingProduct;
   saved: boolean;
   library: CostingLibrary;
+  topSubs: SubPreset[];
   onSaved: (p: CostingProduct) => void;
   onBack: () => void;
   addToast: (m: string, t?: string) => void;
@@ -130,12 +131,12 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
       </div>
 
       {p.components.map((c, i) => (
-        <ComponentCard key={i} comp={c} idx={i} library={library}
+        <ComponentCard key={i} comp={c} idx={i} library={library} topSubs={topSubs}
           onChange={next => patchComp(i, next)}
           onRemove={() => setP(prev => ({ ...prev, components: prev.components.filter((_, j) => j !== i) }))} />
       ))}
-      <QuickAddChips existing={p.components.map(c => c.name)} known={library.mains}
-        onAdd={name => setP(prev => ({ ...prev, components: [...prev.components, { ...blankComponent(), name }] }))} />
+      <button onClick={() => setP(prev => ({ ...prev, components: [...prev.components, blankComponent()] }))}
+        style={{ ...S.btnPrimary, minHeight: 40 }}>+ Add main component</button>
 
       <TotalsCard components={p.components} maintenancePct={p.maintenance_pct}
         onMaintenance={v => setP(prev => ({ ...prev, maintenance_pct: v }))}

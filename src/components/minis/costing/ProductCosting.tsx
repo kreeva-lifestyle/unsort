@@ -8,12 +8,16 @@ import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { CostingProduct, blankComponent, totalCost, money, buildLibrary } from './costingModel';
 import CostingEditor from './CostingEditor';
+import { SubPreset } from './SubChips';
 import AskBox from './AskBox';
 
 export default function ProductCosting({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const [list, setList] = useState<CostingProduct[] | null>(null);
   const [editing, setEditing] = useState<CostingProduct | null>(null);
   const [search, setSearch] = useState('');
+  // Cron-ranked most-repeated sub names (app_settings.costing_top_subs,
+  // recounted every 4 days) — the editor shows them as one-tap chips.
+  const [topSubs, setTopSubs] = useState<string[]>([]);
   // Whether the open costing already exists in the DB - a new or duplicated
   // one has nothing to delete, so the editor hides its Delete button.
   const [editingSaved, setEditingSaved] = useState(false);
@@ -26,8 +30,25 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
         if (error) { addToast(friendlyError(error), 'error'); setList([]); return; }
         setList((data ?? []) as CostingProduct[]);
       });
+    supabase.from('app_settings').select('value').eq('key', 'costing_top_subs').maybeSingle()
+      .then(({ data }) => {
+        if (Array.isArray(data?.value)) setTopSubs((data.value as unknown[]).map(String));
+      });
   };
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A chip carries more than the name: the newest sheet using that sub
+  // donates its unit and suppliers (with material codes). Rates stay blank —
+  // the house rule since the supplier-autofill change.
+  const presets: SubPreset[] = topSubs.map(n => {
+    for (const p of list ?? []) for (const c of p.components) for (const s of c.subs) {
+      if (s.name.trim().toUpperCase() === n.toUpperCase()) {
+        return { name: s.name.trim(), unit: s.unit,
+          suppliers: s.suppliers.filter(x => x.name.trim()).map(x => ({ name: x.name.trim(), materialCode: x.materialCode.trim() })) };
+      }
+    }
+    return { name: n, unit: '', suppliers: [] };
+  });
 
   const newSheet = () => {
     setEditingSaved(false);
@@ -42,7 +63,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
     // one spelling per supplier keeps the purchase plan grouped correctly.
     const library = buildLibrary(list ?? []);
     return (
-      <CostingEditor product={editing} saved={editingSaved} library={library} addToast={addToast}
+      <CostingEditor product={editing} saved={editingSaved} library={library} topSubs={presets} addToast={addToast}
         onBack={() => { setEditing(null); load(); }}
         onSaved={() => { setEditing(null); load(); }} />
     );
