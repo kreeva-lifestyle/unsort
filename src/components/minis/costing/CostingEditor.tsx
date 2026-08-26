@@ -2,7 +2,7 @@
 // the owner's reference screenshot. Everything is editable; the compulsory
 // fields (main/sub/supplier/qty/unit/rate) are enforced at SAVE, with the
 // problems listed — a half-filled sheet is never silently stored.
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
@@ -12,7 +12,9 @@ import {
 } from './costingModel';
 import ComponentCard from './ComponentCard';
 import { optimizeImage } from './imageResize';
-import PlanPreview from './PlanPreview';
+import PrintPreview from './PrintPreview';
+import { purchasePlanHtml } from './purchasePlan';
+import { costingSheetHtml } from './costingSheet';
 import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 
 export default function CostingEditor({ product, saved, library, onSaved, onBack, addToast }: {
@@ -28,10 +30,9 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
-  // Owner's flow: enter how many pcs to make -> totals auto-calculate for
-  // that quantity -> the purchase plan generates from the same number.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // Owner's flow: pieces to make -> totals and purchase plan use the same number.
   const [pieces, setPieces] = useState('');
-  const imgRef = useRef<HTMLInputElement>(null);
   const { ask, modalProps } = useConfirm();
 
   // Delete lives INSIDE the open costing (owner's call) - the list cards
@@ -48,15 +49,13 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
     if (!file || uploading) return;
     setUploading(true);
     try {
-      // Phone photos are 3-8 MB; the sheet needs ~200 KB. Resize + re-encode
-      // BEFORE upload so storage stays small and lists load fast.
+      // Phone photos are 3-8 MB; resize + re-encode BEFORE upload (~200 KB).
       const { blob, type } = await optimizeImage(file);
       const path = `${p.id}.jpg`;
       const { error } = await supabase.storage.from('costing-images').upload(path, blob, { contentType: type, upsert: true });
       if (error) throw error;
       const { data } = supabase.storage.from('costing-images').getPublicUrl(path);
-      // Cache-buster: upsert keeps the same URL, so without it the old photo
-      // sticks until a hard refresh.
+      // Cache-buster: upsert keeps the URL, else the old photo sticks around.
       const url = `${data.publicUrl}?v=${Date.now()}`;
       setP(prev => ({ ...prev, image_url: url }));
       addToast('Photo uploaded — remember to Save', 'success');
@@ -92,12 +91,21 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
   const patchComp = (i: number, next: ReturnType<typeof blankComponent>) =>
     setP(prev => ({ ...prev, components: prev.components.map((c, j) => (j === i ? next : c)) }));
 
+  // Both PDFs need a valid sheet; the purchase plan additionally needs pieces.
+  const openPdf = (which: 'sheet' | 'plan') => {
+    if (which === 'plan' && !(Math.floor(num(pieces)) > 0)) { addToast('Enter "Pieces to make" first — the plan is calculated from it', 'error'); return; }
+    const errs = validateSheet(p.sku, p.components);
+    if (errs.length) { setErrors(errs); addToast('Fix the highlighted fields first', 'error'); return; }
+    setErrors([]);
+    (which === 'plan' ? setPlanOpen : setSheetOpen)(true);
+  };
+
   return (
     <div style={{ fontFamily: T.sans, color: T.tx }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 12 }}>
         {/* Photo + SKU strip */}
         <label style={{ width: 92, height: 92, borderRadius: 10, border: `1.5px dashed ${T.bd2}`, background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
-          <input ref={imgRef} type="file" accept="image/*"
+          <input type="file" accept="image/*"
             style={{ position: 'absolute', width: 0, height: 0, opacity: 0 }}
             onChange={e => { uploadImage(e.target.files?.[0]); e.target.value = ''; }} />
           {p.image_url
@@ -170,13 +178,8 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
       <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
         <button onClick={onBack} style={{ ...S.btnGhost, minHeight: 44 }}>Back</button>
         {saved && <button onClick={deleteCosting} style={{ ...S.btnDanger, minHeight: 44 }}>Delete</button>}
-        <button onClick={() => {
-          const n = Math.floor(num(pieces));
-          if (!(n > 0)) { addToast('Enter "Pieces to make" first — the plan is calculated from it', 'error'); return; }
-          const errs = validateSheet(p.sku, p.components);
-          if (errs.length) { setErrors(errs); addToast('Fix the highlighted fields first', 'error'); return; }
-          setErrors([]); setPlanOpen(true);
-        }} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Purchase plan (PDF)</button>
+        <button onClick={() => openPdf('sheet')} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Costing PDF</button>
+        <button onClick={() => openPdf('plan')} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Purchase plan (PDF)</button>
         <button onClick={save} disabled={saving}
           style={{ ...S.btnPrimary, flex: 1, minWidth: 140, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
           {saving ? 'Saving…' : 'Save'}
@@ -184,7 +187,12 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
       </div>
 
       {planOpen && (
-        <PlanPreview product={p} pieces={Math.floor(num(pieces))} onClose={() => setPlanOpen(false)} />
+        <PrintPreview title={`Purchase plan — ${p.sku} × ${Math.floor(num(pieces))} pcs`}
+          html={purchasePlanHtml(p.sku, p.image_url, p.components, Math.floor(num(pieces)), p.maintenance_pct)}
+          onClose={() => setPlanOpen(false)} />
+      )}
+      {sheetOpen && (
+        <PrintPreview title={`Product costing — ${p.sku}`} html={costingSheetHtml(p)} onClose={() => setSheetOpen(false)} />
       )}
       <ConfirmModal {...modalProps} />
     </div>
