@@ -1,16 +1,17 @@
-// One costing sheet: SKU + photo + main components + totals card, mirroring
-// the owner's reference screenshot. Everything is editable; the compulsory
-// fields (main/sub/supplier/qty/unit/rate) are enforced at SAVE, with the
-// problems listed — a half-filled sheet is never silently stored.
+// One costing sheet, owner-approved redesign: hero (photo · SKU · cost/pc)
+// with a selling-price + margin strip, collapsible component cards whose
+// rows open the LineSheet, and Save in the sticky total bar. Compulsory
+// fields still enforced at SAVE — a half-filled sheet is never stored.
 import { useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import {
   CostingProduct, CostingLibrary, SheetProblem, blankComponent, totalCost, money,
-  validateSheetDetailed, pruneBlank, num,
+  validateSheetDetailed, pruneBlank, subProblems, num,
 } from './costingModel';
 import ComponentCard from './ComponentCard';
+import CostingHero from './CostingHero';
 import { canonicalizeNames } from './costingNames';
 import { SubPreset } from './SubChips';
 import TotalsCard from './TotalsCard';
@@ -39,6 +40,11 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
   // Owner's flow: pieces to make -> totals and purchase plan use the same number.
   const [pieces, setPieces] = useState('');
   const { ask, modalProps } = useConfirm();
+  // A saved, complete component starts folded (compact overview); anything
+  // new or with problems starts open. Computed once at mount.
+  const [openDefaults] = useState<boolean[]>(() => product.components.map(c =>
+    !saved || !c.name.trim() || c.subs.length === 0 ||
+    c.subs.some(s => Object.values(subProblems(s)).some(Boolean))));
 
   // Delete lives INSIDE the open costing (owner's call) - the list cards
   // stay clean. Only offered for a costing that exists in the DB.
@@ -84,6 +90,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
         id: p.id, sku: p.sku.trim().toUpperCase(), image_url: p.image_url,
         maintenance_pct: num(p.maintenance_pct), components: comps,
         notes: p.notes, created_by: user?.id, updated_at: new Date().toISOString(),
+        selling_price: String(p.selling_price ?? '').trim() ? num(p.selling_price ?? '') : null,
       };
       const { error } = await supabase.from('costing_products').upsert(row);
       // Same SKU on another sheet: the unique index refuses it (this is what
@@ -111,28 +118,17 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
     (which === 'plan' ? setPlanOpen : setSheetOpen)(true);
   };
 
+  const total = totalCost(p.components, p.maintenance_pct);
   return (
     <div style={{ fontFamily: T.sans, color: T.tx }}>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 12 }}>
-        {/* Photo + SKU strip */}
-        <label style={{ width: 92, height: 92, borderRadius: 10, border: `1.5px dashed ${T.bd2}`, background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
-          <input type="file" accept="image/*"
-            style={{ position: 'absolute', width: 0, height: 0, opacity: 0 }}
-            onChange={e => { uploadImage(e.target.files?.[0]); e.target.value = ''; }} />
-          {p.image_url
-            ? <img src={p.image_url} alt={p.sku || 'product'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={{ fontSize: 10, color: T.tx3, textAlign: 'center', lineHeight: 1.4 }}>{uploading ? 'Uploading…' : '+ Add\nimage'}</span>}
-        </label>
-        <div style={{ flex: 1, minWidth: 200 }}>
-          <label style={S.fLabel}>SKU <span style={{ color: T.re }}>*</span></label>
-          <input id="cost-f-sku" value={p.sku} onChange={e => setP(prev => ({ ...prev, sku: e.target.value }))}
-            placeholder="e.g. DRS210" style={{ ...S.fInput, width: '100%', textTransform: 'uppercase', fontFamily: T.mono }} />
-          <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>Tap the square to add or replace the product photo.</div>
-        </div>
-      </div>
+      <CostingHero p={p} total={total} uploading={uploading}
+        onSku={v => setP(prev => ({ ...prev, sku: v }))}
+        onSelling={v => setP(prev => ({ ...prev, selling_price: v }))}
+        onFile={uploadImage} />
 
       {p.components.map((c, i) => (
         <ComponentCard key={i} comp={c} idx={i} library={library} topSubs={topSubs}
+          defaultOpen={openDefaults[i] ?? true}
           onChange={next => patchComp(i, next)}
           onRemove={() => setP(prev => ({ ...prev, components: prev.components.filter((_, j) => j !== i) }))} />
       ))}
@@ -157,17 +153,23 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
         {saved && <button onClick={deleteCosting} style={{ ...S.btnDanger, minHeight: 44 }}>Delete</button>}
         <button onClick={() => openPdf('sheet')} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Costing PDF</button>
         <button onClick={() => openPdf('plan')} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Purchase plan (PDF)</button>
-        <button onClick={save} disabled={saving}
+        <button className="desktop-only" onClick={save} disabled={saving}
           style={{ ...S.btnPrimary, flex: 1, minWidth: 140, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
           {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
 
-      {/* Mobile: the total tracks every keystroke without scrolling down. */}
-      <div className="mobile-only" style={{ height: 48 }} />
-      <div className="mobile-only" style={{ position: 'fixed', left: 12, right: 12, bottom: 'calc(var(--nav-h, 0px) + 10px)', zIndex: 50, alignItems: 'center', justifyContent: 'space-between', background: 'rgba(15,20,32,0.92)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '9px 14px' }}>
-        <span style={{ fontSize: 11, color: T.tx3 }}>Total cost / pc</span>
-        <span style={{ fontFamily: T.mono, fontSize: 15, fontWeight: 700, color: T.ac2 }}>{money(totalCost(p.components, p.maintenance_pct))}</span>
+      {/* Mobile: live total + Save pinned above the bottom nav. */}
+      <div className="mobile-only" style={{ height: 62 }} />
+      <div className="mobile-only" style={{ position: 'fixed', left: 12, right: 12, bottom: 'calc(var(--nav-h, 0px) + 10px)', zIndex: 50, alignItems: 'center', gap: 10, background: 'rgba(15,20,32,0.94)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.bd2}`, borderRadius: 12, padding: '9px 12px', boxShadow: '0 10px 30px rgba(0,0,0,.5)' }}>
+        <div>
+          <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Total / pc</div>
+          <div style={{ fontFamily: T.mono, fontSize: 16, fontWeight: 800, color: T.ac2 }}>{money(total)}</div>
+        </div>
+        <button onClick={save} disabled={saving}
+          style={{ ...S.btnPrimary, marginLeft: 'auto', minHeight: 44, padding: '10px 26px', pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
       </div>
 
       {planOpen && (

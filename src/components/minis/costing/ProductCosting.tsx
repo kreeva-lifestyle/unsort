@@ -24,7 +24,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
 
   const load = () => {
     supabase.from('costing_products')
-      .select('id, sku, image_url, maintenance_pct, components, notes, updated_at')
+      .select('id, sku, image_url, maintenance_pct, components, notes, selling_price, updated_at')
       .order('updated_at', { ascending: false }).limit(500)
       .then(({ data, error }) => {
         if (error) { addToast(friendlyError(error), 'error'); setList([]); return; }
@@ -55,7 +55,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
     setEditingSaved(false);
     setEditing({
       id: crypto.randomUUID(), sku: '', image_url: null,
-      maintenance_pct: 0, components: [blankComponent()], notes: '',
+      maintenance_pct: 0, components: [blankComponent()], notes: '', selling_price: null,
     });
   };
 
