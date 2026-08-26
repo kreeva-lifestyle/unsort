@@ -84,6 +84,19 @@ button:focus-visible, [role="button"]:focus-visible, [onclick]:focus-visible { o
 
 select:focus, select:focus-visible { border-color: rgba(99,102,241,0.5) !important; box-shadow: 0 0 0 2px rgba(99,102,241,0.08); outline: none; }
 select option { background: #0B0F19; color: #E8EEF7; padding: 8px 10px; }
+/* The native select arrow renders dark-on-dark and disappears — draw our own
+   chevron (T.tx2 stroke) and make room for it. color-scheme keeps the opened
+   native picker dark too. */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  /* !important: inline background shorthands (S.fInput) reset background-image */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238896B0' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 8px center !important;
+  padding-right: 26px !important;
+  color-scheme: dark;
+}
 input::placeholder, textarea::placeholder { color: #6B7890; opacity: 1; }
 
 /* Date/time picker calendar icon — tinted to match accent on dark theme */

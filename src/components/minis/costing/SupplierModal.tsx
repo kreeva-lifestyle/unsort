@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom';
 import { T, S } from '../../../lib/theme';
 import { numericKeyDown } from '../../../lib/numericInput';
 import { CostingSupplier, blankSupplier, num, cheaperAlt, money } from './costingModel';
+import SuggestInput from '../../ui/SuggestInput';
 
 export default function SupplierModal({ subName, suppliers, known, onDone, onClose }: {
   subName: string;
@@ -27,14 +28,14 @@ export default function SupplierModal({ subName, suppliers, known, onDone, onClo
 
   const patch = (i: number, p: Partial<CostingSupplier>) =>
     setRows(prev => prev.map((r, j) => (j === i ? { ...r, ...p } : r)));
-  // Picking a KNOWN supplier autofills its last-used material code and rate
-  // into still-empty fields - typed values are never overwritten.
-  const patchName = (i: number, name: string) => {
+  // TAPPING a known supplier from the suggestions autofills its last-used
+  // material code into a still-empty field. The rate is NEVER pre-filled
+  // (owner's call: rates change, a stale one silently priced the sheet).
+  const pickName = (i: number, name: string) => {
     const k = known.find(x => x.name.toUpperCase() === name.trim().toUpperCase());
     setRows(prev => prev.map((r, j) => (j === i ? {
       ...r, name,
       materialCode: r.materialCode.trim() ? r.materialCode : (k?.materialCode ?? r.materialCode),
-      rate: String(r.rate).trim() ? r.rate : (k?.rate ?? r.rate),
     } : r)));
   };
   const select = (i: number) =>
@@ -79,8 +80,8 @@ export default function SupplierModal({ subName, suppliers, known, onDone, onClo
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
                 <input type="radio" name="sel-supplier" checked={!!r.selected} onChange={() => select(i)}
                   aria-label="Use this supplier's rate" style={{ width: 18, height: 18, flexShrink: 0 }} />
-                <input value={r.name} onChange={e => patchName(i, e.target.value)} placeholder="Supplier"
-                  list="costing-supplier-suggest" style={{ ...S.fInput, flex: 1, minWidth: 0 }} />
+                <SuggestInput value={r.name} onChange={v => patch(i, { name: v })} onPick={v => pickName(i, v)}
+                  options={known.map(k => k.name)} placeholder="Supplier" style={{ ...S.fInput, flex: 1, minWidth: 0 }} />
                 <span onClick={() => remove(i)} aria-label="Remove supplier"
                   style={{ cursor: 'pointer', color: T.re, fontSize: 16, lineHeight: 1, padding: '10px 8px' }}>&#215;</span>
               </div>
@@ -95,11 +96,6 @@ export default function SupplierModal({ subName, suppliers, known, onDone, onClo
             </div>
             );
           })}
-          {/* Existing supplier names from every costing sheet — one spelling
-              per supplier keeps the purchase plan grouped correctly. */}
-          <datalist id="costing-supplier-suggest">
-            {known.map(k => <option key={k.name} value={k.name} />)}
-          </datalist>
           <button onClick={() => setRows(prev => [...prev, { ...blankSupplier(), selected: false }])}
             style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>+ Add supplier</button>
           {(() => {
