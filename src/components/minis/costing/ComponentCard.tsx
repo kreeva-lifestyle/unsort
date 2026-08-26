@@ -1,11 +1,8 @@
-// One MAIN COMPONENT of a costing sheet: its name plus sub-components.
-// Desktop shows the reference-screenshot table (Sub · Supplier · QTY · Unit ·
-// Rate · Cost); the phone gets stacked cards instead of a sideways-scrolling
-// table (owner: "optimize the best for mobile"). Rate lives on the supplier
-// (each supplier has its own), so the rate cell edits the SELECTED supplier's
-// rate; the supplier cell opens the multi-supplier editor. Compulsory fields
-// show a red border LIVE — a zero rate is visible while typing, not only at
-// save (owner: "rate cannot be zero").
+// One MAIN COMPONENT of a costing sheet: name plus sub-components. Desktop
+// shows the reference table; the phone gets stacked cards (owner: "optimize
+// the best for mobile"). The rate cell edits the SELECTED supplier's rate;
+// the supplier cell opens the multi-supplier editor. Compulsory fields show
+// a red border LIVE, not only at save (owner: "rate cannot be zero").
 import { useState, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { numericKeyDown } from '../../../lib/numericInput';
@@ -14,14 +11,16 @@ import {
   UNITS, blankSub, selectedSupplier, subCost, componentCost, money, subProblems, cheaperAlt,
 } from './costingModel';
 import SupplierModal from './SupplierModal';
+import SubChips, { SubPreset } from './SubChips';
 import SuggestInput from '../../ui/SuggestInput';
 
 const BAD = '1px solid rgba(239,68,68,.55)';
 
-export default function ComponentCard({ comp, idx, library, onChange, onRemove }: {
+export default function ComponentCard({ comp, idx, library, topSubs, onChange, onRemove }: {
   comp: CostingComponent;
   idx: number;
   library: CostingLibrary;
+  topSubs: SubPreset[];
   onChange: (next: CostingComponent) => void;
   onRemove: () => void;
 }) {
@@ -36,12 +35,11 @@ export default function ComponentCard({ comp, idx, library, onChange, onRemove }
       .find(e => e.offsetParent !== null);
     el?.focus();
   };
-  const onEnter = (e: React.KeyboardEvent, next: () => void) => { if (e.key === 'Enter') { e.preventDefault(); next(); } };
+  const onEnter = (e: React.KeyboardEvent, n: () => void) => { if (e.key === 'Enter') { e.preventDefault(); n(); } };
   const afterRate = (i: number) => {
-    if (i < comp.subs.length - 1) { focusK(`${i + 1}-name`); return; }
+    if (i < comp.subs.length - 1) return focusK(`${i + 1}-name`);
     const nextIdx = comp.subs.length;
-    addSub();
-    setTimeout(() => focusK(`${nextIdx}-name`), 60);
+    addSub(); setTimeout(() => focusK(`${nextIdx}-name`), 60);
   };
 
   const patchSub = (i: number, p: Partial<CostingSub>) =>
@@ -184,6 +182,9 @@ export default function ComponentCard({ comp, idx, library, onChange, onRemove }
           <span style={{ fontFamily: T.mono, fontWeight: 700, color: T.ac2, fontSize: 12 }}>{money(componentCost(comp))}</span>
         </div>
       </div>
+
+      {/* One-tap chips of the most-repeated subs (cron-ranked), both layouts. */}
+      <SubChips presets={topSubs} comp={comp} onAdd={s => onChange({ ...comp, subs: [...comp.subs, s] })} />
 
       {supFor !== null && (
         <SupplierModal
