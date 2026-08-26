@@ -7,7 +7,7 @@ import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import {
-  CostingProduct, CostingLibrary, SheetProblem, blankComponent, totalCost, money,
+  CostingProduct, CostingLibrary, SheetProblem, blankComponent, totalCost,
   validateSheetDetailed, pruneBlank, subProblems, num,
 } from './costingModel';
 import ComponentCard from './ComponentCard';
@@ -153,21 +153,8 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
         {saved && <button onClick={deleteCosting} style={{ ...S.btnDanger, minHeight: 44 }}>Delete</button>}
         <button onClick={() => openPdf('sheet')} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Costing PDF</button>
         <button onClick={() => openPdf('plan')} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Purchase plan (PDF)</button>
-        <button className="desktop-only" onClick={save} disabled={saving}
-          style={{ ...S.btnPrimary, flex: 1, minWidth: 140, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-      </div>
-
-      {/* Mobile: live total + Save pinned above the bottom nav. */}
-      <div className="mobile-only" style={{ height: 62 }} />
-      <div className="mobile-only" style={{ position: 'fixed', left: 12, right: 12, bottom: 'calc(var(--nav-h, 0px) + 10px)', zIndex: 50, alignItems: 'center', gap: 10, background: 'rgba(15,20,32,0.94)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.bd2}`, borderRadius: 12, padding: '9px 12px', boxShadow: '0 10px 30px rgba(0,0,0,.5)' }}>
-        <div>
-          <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Total / pc</div>
-          <div style={{ fontFamily: T.mono, fontSize: 16, fontWeight: 800, color: T.ac2 }}>{money(total)}</div>
-        </div>
         <button onClick={save} disabled={saving}
-          style={{ ...S.btnPrimary, marginLeft: 'auto', minHeight: 44, padding: '10px 26px', pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
+          style={{ ...S.btnPrimary, flex: 1, minWidth: 140, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
           {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
