@@ -136,7 +136,7 @@ export default function ComponentCard({ comp, library, onChange, onRemove }: {
             <div key={i} style={{ border: `1px solid ${T.bd}`, borderRadius: 8, padding: 10, background: 'rgba(255,255,255,0.015)' }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
                 <input value={s.name} onChange={e => patchSub(i, { name: e.target.value })} list="costing-sub-suggest" placeholder="Sub component *" style={{ ...cellIn(bad.name), flex: 1 }} />
-                <span onClick={() => removeSub(i)} aria-label="Remove sub component" style={{ cursor: 'pointer', color: T.re, fontSize: 18, lineHeight: 1, padding: '6px 4px' }}>&#215;</span>
+                <span onClick={() => removeSub(i)} aria-label="Remove sub component" style={{ cursor: 'pointer', color: T.re, fontSize: 18, lineHeight: 1, padding: '12px 8px' }}>&#215;</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
                 {supplierBtn(s, i, bad.supplier)}

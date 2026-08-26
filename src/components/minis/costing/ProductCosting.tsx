@@ -89,7 +89,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
                 index refuses a same-SKU save, so a fresh code is forced. */}
             <span onClick={e => { e.stopPropagation(); setEditingSaved(false); setEditing({ ...p, id: crypto.randomUUID(), sku: '' }); }}
               title="Duplicate this product costing" aria-label={`Duplicate ${p.sku}`}
-              style={{ cursor: 'pointer', color: T.ac2, fontSize: 13, padding: 6 }}>⧉</span>
+              style={{ cursor: 'pointer', color: T.ac2, fontSize: 14, width: 40, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>⧉</span>
           </div>
         ))}
       </div>
