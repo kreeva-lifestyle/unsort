@@ -6,12 +6,14 @@ import { useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
-import { numericKeyDown } from '../../../lib/numericInput';
 import {
-  CostingProduct, CostingLibrary, blankComponent, sheetCost, totalCost, money, validateSheet, num,
+  CostingProduct, CostingLibrary, SheetProblem, blankComponent, totalCost, money,
+  validateSheetDetailed, pruneBlank, num,
 } from './costingModel';
 import ComponentCard from './ComponentCard';
 import QuickAddChips from './QuickAddChips';
+import TotalsCard from './TotalsCard';
+import SheetProblems from './SheetProblems';
 import { optimizeImage } from './imageResize';
 import PrintPreview from './PrintPreview';
 import { purchasePlanHtml } from './purchasePlan';
@@ -27,7 +29,7 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
   addToast: (m: string, t?: string) => void;
 }) {
   const [p, setP] = useState<CostingProduct>(product);
-  const [errors, setErrors] = useState<string[]>([]);
+  const [errors, setErrors] = useState<SheetProblem[]>([]);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
@@ -66,7 +68,11 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
 
   const save = async () => {
     if (saving) return;
-    const errs = validateSheet(p.sku, p.components);
+    // Untouched leftover lines (the keyboard flow adds a fresh one after each
+    // completed line) are dropped, never a save blocker.
+    const comps = pruneBlank(p.components);
+    setP(prev => ({ ...prev, components: comps }));
+    const errs = validateSheetDetailed(p.sku, comps);
     setErrors(errs);
     if (errs.length) return;
     setSaving(true);
@@ -74,7 +80,7 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
       const { data: { user } } = await supabase.auth.getUser();
       const row = {
         id: p.id, sku: p.sku.trim().toUpperCase(), image_url: p.image_url,
-        maintenance_pct: num(p.maintenance_pct), components: p.components,
+        maintenance_pct: num(p.maintenance_pct), components: comps,
         notes: p.notes, created_by: user?.id, updated_at: new Date().toISOString(),
       };
       const { error } = await supabase.from('costing_products').upsert(row);
@@ -84,7 +90,7 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
         ? new Error(`A product costing for ${row.sku} already exists - change the SKU (duplicates must get a new code)`)
         : error);
       addToast(`${row.sku} saved`, 'success');
-      onSaved({ ...p, sku: row.sku });
+      onSaved({ ...p, sku: row.sku, components: comps });
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setSaving(false);
   };
@@ -95,7 +101,9 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
   // Both PDFs need a valid sheet; the purchase plan additionally needs pieces.
   const openPdf = (which: 'sheet' | 'plan') => {
     if (which === 'plan' && !(Math.floor(num(pieces)) > 0)) { addToast('Enter "Pieces to make" first — the plan is calculated from it', 'error'); return; }
-    const errs = validateSheet(p.sku, p.components);
+    const comps = pruneBlank(p.components);
+    setP(prev => ({ ...prev, components: comps }));
+    const errs = validateSheetDetailed(p.sku, comps);
     if (errs.length) { setErrors(errs); addToast('Fix the highlighted fields first', 'error'); return; }
     setErrors([]);
     (which === 'plan' ? setPlanOpen : setSheetOpen)(true);
@@ -115,47 +123,23 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
         </label>
         <div style={{ flex: 1, minWidth: 200 }}>
           <label style={S.fLabel}>SKU <span style={{ color: T.re }}>*</span></label>
-          <input value={p.sku} onChange={e => setP(prev => ({ ...prev, sku: e.target.value }))}
+          <input id="cost-f-sku" value={p.sku} onChange={e => setP(prev => ({ ...prev, sku: e.target.value }))}
             placeholder="e.g. DRS210" style={{ ...S.fInput, width: '100%', textTransform: 'uppercase', fontFamily: T.mono }} />
           <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>Tap the square to add or replace the product photo.</div>
         </div>
       </div>
 
       {p.components.map((c, i) => (
-        <ComponentCard key={i} comp={c} library={library}
+        <ComponentCard key={i} comp={c} idx={i} library={library}
           onChange={next => patchComp(i, next)}
           onRemove={() => setP(prev => ({ ...prev, components: prev.components.filter((_, j) => j !== i) }))} />
       ))}
       <QuickAddChips existing={p.components.map(c => c.name)} known={library.mains}
         onAdd={name => setP(prev => ({ ...prev, components: [...prev.components, { ...blankComponent(), name }] }))} />
 
-      {/* Totals card, right-aligned like the reference */}
-      <div style={{ maxWidth: 340, marginLeft: 'auto', marginTop: 14, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, padding: '4px 0' }}>
-          <span>Cost</span><span style={{ fontFamily: T.mono }}>{money(sheetCost(p.components))}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: T.tx2, padding: '4px 0' }}>
-          <span>Maintenance (%)</span>
-          <input value={p.maintenance_pct} onChange={e => setP(prev => ({ ...prev, maintenance_pct: e.target.value }))}
-            onKeyDown={e => numericKeyDown(e)} type="number" inputMode="decimal"
-            style={{ ...S.fInput, width: 84, textAlign: 'right' }} />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: T.tx, padding: '6px 0 0', borderTop: `1px solid ${T.bd}`, marginTop: 4 }}>
-          <span>Total cost / pc</span><span style={{ fontFamily: T.mono, color: T.ac2 }}>{money(totalCost(p.components, p.maintenance_pct))}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: T.tx2, padding: '8px 0 0', borderTop: `1px solid ${T.bd}`, marginTop: 8 }}>
-          <span>Pieces to make</span>
-          <input value={pieces} onChange={e => setPieces(e.target.value)} onKeyDown={e => numericKeyDown(e)}
-            type="number" min="1" inputMode="numeric" placeholder="e.g. 48"
-            style={{ ...S.fInput, width: 84, textAlign: 'right' }} />
-        </div>
-        {num(pieces) > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: T.tx, padding: '6px 0 0' }}>
-            <span>Total for {Math.floor(num(pieces))} pcs</span>
-            <span style={{ fontFamily: T.mono, color: T.gr }}>{money(totalCost(p.components, p.maintenance_pct) * Math.floor(num(pieces)))}</span>
-          </div>
-        )}
-      </div>
+      <TotalsCard components={p.components} maintenancePct={p.maintenance_pct}
+        onMaintenance={v => setP(prev => ({ ...prev, maintenance_pct: v }))}
+        pieces={pieces} onPieces={setPieces} />
 
       <div style={{ marginTop: 12 }}>
         <label style={S.fLabel}>Notes</label>
@@ -164,12 +148,7 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
           rows={3} style={{ ...S.fInput, width: '100%', height: 'auto', minHeight: 64, resize: 'vertical', lineHeight: 1.5 }} />
       </div>
 
-      {errors.length > 0 && (
-        <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginTop: 12, lineHeight: 1.7 }}>
-          {errors.slice(0, 8).map((e, i) => <div key={i}>• {e}</div>)}
-          {errors.length > 8 && <div>…and {errors.length - 8} more</div>}
-        </div>
-      )}
+      <SheetProblems problems={errors} />
 
       <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
         <button onClick={onBack} style={{ ...S.btnGhost, minHeight: 44 }}>Back</button>
@@ -180,6 +159,13 @@ export default function CostingEditor({ product, saved, library, onSaved, onBack
           style={{ ...S.btnPrimary, flex: 1, minWidth: 140, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
           {saving ? 'Saving…' : 'Save'}
         </button>
+      </div>
+
+      {/* Mobile: the total tracks every keystroke without scrolling down. */}
+      <div className="mobile-only" style={{ height: 48 }} />
+      <div className="mobile-only" style={{ position: 'fixed', left: 12, right: 12, bottom: 'calc(var(--nav-h, 0px) + 10px)', zIndex: 50, alignItems: 'center', justifyContent: 'space-between', background: 'rgba(15,20,32,0.92)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '9px 14px' }}>
+        <span style={{ fontSize: 11, color: T.tx3 }}>Total cost / pc</span>
+        <span style={{ fontFamily: T.mono, fontSize: 15, fontWeight: 700, color: T.ac2 }}>{money(totalCost(p.components, p.maintenance_pct))}</span>
       </div>
 
       {planOpen && (

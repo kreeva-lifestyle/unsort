@@ -7,13 +7,16 @@
 import { useState } from 'react';
 import { T } from '../../lib/theme';
 
-export default function SuggestInput({ value, onChange, onPick, options, placeholder, style }: {
+export default function SuggestInput({ value, onChange, onPick, options, placeholder, style, inputProps }: {
   value: string;
   onChange: (v: string) => void;
   onPick?: (v: string) => void;
   options: string[];
   placeholder?: string;
   style?: React.CSSProperties;
+  /** Extra attrs for the inner <input> — enterKeyHint, data-* markers,
+   *  onKeyDown for the keyboard next-field flow. */
+  inputProps?: React.InputHTMLAttributes<HTMLInputElement>;
 }) {
   const [open, setOpen] = useState(false);
   const q = value.trim().toLowerCase();
@@ -23,7 +26,7 @@ export default function SuggestInput({ value, onChange, onPick, options, placeho
   return (
     // The wrapper takes over the input's layout sizing; the input fills it.
     <div style={{ position: 'relative', flex: style?.flex, minWidth: style?.minWidth ?? 0, width: style?.width }}>
-      <input value={value} onChange={e => { onChange(e.target.value); setOpen(true); }}
+      <input {...inputProps} value={value} onChange={e => { onChange(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 120)}
         placeholder={placeholder} style={{ ...style, flex: undefined, minWidth: 0, width: '100%' }} />
       {open && matches.length > 0 && (

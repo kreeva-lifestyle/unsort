@@ -6,7 +6,7 @@
 // rate; the supplier cell opens the multi-supplier editor. Compulsory fields
 // show a red border LIVE — a zero rate is visible while typing, not only at
 // save (owner: "rate cannot be zero").
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { numericKeyDown } from '../../../lib/numericInput';
 import {
@@ -18,13 +18,31 @@ import SuggestInput from '../../ui/SuggestInput';
 
 const BAD = '1px solid rgba(239,68,68,.55)';
 
-export default function ComponentCard({ comp, library, onChange, onRemove }: {
+export default function ComponentCard({ comp, idx, library, onChange, onRemove }: {
   comp: CostingComponent;
+  idx: number;
   library: CostingLibrary;
   onChange: (next: CostingComponent) => void;
   onRemove: () => void;
 }) {
   const [supFor, setSupFor] = useState<number | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Keyboard flow: Enter walks name → qty → rate; Enter on the LAST rate adds
+  // a fresh line (Excel style). data-k exists twice (desktop + mobile copies
+  // of each field) — focus whichever the current layout shows.
+  const focusK = (k: string) => {
+    const el = [...(rootRef.current?.querySelectorAll<HTMLInputElement>(`[data-k="${k}"]`) ?? [])]
+      .find(e => e.offsetParent !== null);
+    el?.focus();
+  };
+  const onEnter = (e: React.KeyboardEvent, next: () => void) => { if (e.key === 'Enter') { e.preventDefault(); next(); } };
+  const afterRate = (i: number) => {
+    if (i < comp.subs.length - 1) { focusK(`${i + 1}-name`); return; }
+    const nextIdx = comp.subs.length;
+    addSub();
+    setTimeout(() => focusK(`${nextIdx}-name`), 60);
+  };
 
   const patchSub = (i: number, p: Partial<CostingSub>) =>
     onChange({ ...comp, subs: comp.subs.map((s, j) => (j === i ? { ...s, ...p } : s)) });
@@ -70,7 +88,7 @@ export default function ComponentCard({ comp, library, onChange, onRemove }: {
   };
 
   return (
-    <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
+    <div ref={rootRef} data-fx={`cost-f-${idx}`} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 170 }}>
           <label style={S.fLabel}>Main component <span style={{ color: T.re }}>*</span></label>
@@ -98,18 +116,21 @@ export default function ComponentCard({ comp, library, onChange, onRemove }: {
               const bad = subProblems(s);
               const sel = selectedSupplier(s);
               return (
-                <tr key={i}>
-                  <td style={td}><SuggestInput value={s.name} onChange={v => patchSub(i, { name: v })} options={library.subs} placeholder='e.g. Georgette 60"' style={cellIn(bad.name)} /></td>
+                <tr key={i} data-fx={`cost-f-${idx}-${i}`}>
+                  <td style={td}><SuggestInput value={s.name} onChange={v => patchSub(i, { name: v })} options={library.subs} placeholder='e.g. Georgette 60"' style={cellIn(bad.name)}
+                    inputProps={{ enterKeyHint: 'next', 'data-k': `${i}-name`, onKeyDown: e => onEnter(e, () => focusK(`${i}-qty`)) } as React.InputHTMLAttributes<HTMLInputElement>} /></td>
                   <td style={td}>{supplierBtn(s, i, bad.supplier)}</td>
                   <td style={td}><input value={sel?.materialCode ?? ''} onChange={e => patchCode(i, e.target.value)} placeholder="Code" style={{ ...cellIn(false), fontFamily: T.mono }} /></td>
-                  <td style={td}><input value={s.qty} onChange={e => patchSub(i, { qty: e.target.value })} onKeyDown={e => numericKeyDown(e)} type="number" min="0" inputMode="decimal" placeholder="0" style={cellIn(bad.qty)} /></td>
+                  <td style={td}><input value={s.qty} onChange={e => patchSub(i, { qty: e.target.value })} data-k={`${i}-qty`} enterKeyHint="next"
+                    onKeyDown={e => { numericKeyDown(e); onEnter(e, () => focusK(`${i}-rate`)); }} type="number" min="0" placeholder="0" style={cellIn(bad.qty)} /></td>
                   <td style={td}>
                     <select value={s.unit} onChange={e => patchSub(i, { unit: e.target.value })} style={cellIn(bad.unit)}>
                       <option value="">Unit…</option>
                       {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                     </select>
                   </td>
-                  <td style={td}><input value={sel?.rate ?? ''} onChange={e => patchRate(i, e.target.value)} onKeyDown={e => numericKeyDown(e)} type="number" min="0" inputMode="decimal" placeholder="0" style={cellIn(bad.rate)} /></td>
+                  <td style={td}><input value={sel?.rate ?? ''} onChange={e => patchRate(i, e.target.value)} data-k={`${i}-rate`} enterKeyHint={i === comp.subs.length - 1 ? 'done' : 'next'}
+                    onKeyDown={e => { numericKeyDown(e); onEnter(e, () => afterRate(i)); }} type="number" min="0" placeholder="0" style={cellIn(bad.rate)} /></td>
                   <td style={{ ...td, textAlign: 'right', fontFamily: T.mono, fontSize: 12, color: T.tx, whiteSpace: 'nowrap' }}>{money(subCost(s))}</td>
                   <td style={{ ...td, textAlign: 'center' }}>
                     <span onClick={() => removeSub(i)} aria-label="Remove sub component" style={{ cursor: 'pointer', color: T.re, fontSize: 16, lineHeight: 1, padding: 4 }}>&#215;</span>
@@ -134,9 +155,10 @@ export default function ComponentCard({ comp, library, onChange, onRemove }: {
           const bad = subProblems(s);
           const sel = selectedSupplier(s);
           return (
-            <div key={i} style={{ border: `1px solid ${T.bd}`, borderRadius: 8, padding: 10, background: 'rgba(255,255,255,0.015)' }}>
+            <div key={i} data-fx={`cost-f-${idx}-${i}`} style={{ border: `1px solid ${T.bd}`, borderRadius: 8, padding: 10, background: 'rgba(255,255,255,0.015)' }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
-                <SuggestInput value={s.name} onChange={v => patchSub(i, { name: v })} options={library.subs} placeholder="Sub component *" style={{ ...cellIn(bad.name), flex: 1 }} />
+                <SuggestInput value={s.name} onChange={v => patchSub(i, { name: v })} options={library.subs} placeholder="Sub component *" style={{ ...cellIn(bad.name), flex: 1 }}
+                  inputProps={{ enterKeyHint: 'next', 'data-k': `${i}-name`, onKeyDown: e => onEnter(e, () => focusK(`${i}-qty`)) } as React.InputHTMLAttributes<HTMLInputElement>} />
                 <span onClick={() => removeSub(i)} aria-label="Remove sub component" style={{ cursor: 'pointer', color: T.re, fontSize: 18, lineHeight: 1, padding: '12px 8px' }}>&#215;</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
@@ -144,12 +166,14 @@ export default function ComponentCard({ comp, library, onChange, onRemove }: {
                 <input value={sel?.materialCode ?? ''} onChange={e => patchCode(i, e.target.value)} placeholder="Material code" style={{ ...cellIn(false), fontFamily: T.mono }} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                <input value={s.qty} onChange={e => patchSub(i, { qty: e.target.value })} onKeyDown={e => numericKeyDown(e)} type="number" min="0" inputMode="decimal" placeholder="QTY *" style={cellIn(bad.qty)} />
+                <input value={s.qty} onChange={e => patchSub(i, { qty: e.target.value })} data-k={`${i}-qty`} enterKeyHint="next"
+                  onKeyDown={e => { numericKeyDown(e); onEnter(e, () => focusK(`${i}-rate`)); }} type="number" min="0" placeholder="QTY *" style={cellIn(bad.qty)} />
                 <select value={s.unit} onChange={e => patchSub(i, { unit: e.target.value })} style={cellIn(bad.unit)}>
                   <option value="">Unit *</option>
                   {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
-                <input value={sel?.rate ?? ''} onChange={e => patchRate(i, e.target.value)} onKeyDown={e => numericKeyDown(e)} type="number" min="0" inputMode="decimal" placeholder="Rate *" style={cellIn(bad.rate)} />
+                <input value={sel?.rate ?? ''} onChange={e => patchRate(i, e.target.value)} data-k={`${i}-rate`} enterKeyHint={i === comp.subs.length - 1 ? 'done' : 'next'}
+                  onKeyDown={e => { numericKeyDown(e); onEnter(e, () => afterRate(i)); }} type="number" min="0" placeholder="Rate *" style={cellIn(bad.rate)} />
               </div>
               <div style={{ textAlign: 'right', fontFamily: T.mono, fontSize: 12, color: T.tx, marginTop: 6 }}>Cost {money(subCost(s))}</div>
             </div>
