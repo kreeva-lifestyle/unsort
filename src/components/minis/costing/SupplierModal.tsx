@@ -71,20 +71,27 @@ export default function SupplierModal({ subName, suppliers, known, onDone, onClo
             const rates = rows.map(x => ({ x, r: num(x.rate) })).filter(v => v.r > 0 && v.x.name.trim());
             const minRate = rates.length ? Math.min(...rates.map(v => v.r)) : 0;
             const isCheapest = num(r.rate) > 0 && num(r.rate) === minRate && rates.length > 1 && !!r.name.trim();
+            // Two lines per supplier, not one: a single row squeezed 6 cells
+            // into a phone-width modal and cut names to "Arvachin…". Line 1 is
+            // the radio + FULL name + remove; line 2 code + rate + chip.
             return (
-            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
-              <input type="radio" name="sel-supplier" checked={!!r.selected} onChange={() => select(i)}
-                aria-label="Use this supplier's rate" style={{ width: 18, height: 18, flexShrink: 0 }} />
-              <input value={r.name} onChange={e => patchName(i, e.target.value)} placeholder="Supplier"
-                list="costing-supplier-suggest" style={{ ...S.fInput, flex: 2, minWidth: 0 }} />
-              <input value={r.materialCode} onChange={e => patch(i, { materialCode: e.target.value })} placeholder="Material code"
-                style={{ ...S.fInput, flex: 2, minWidth: 0, fontFamily: T.mono }} />
-              <input value={r.rate} onChange={e => patch(i, { rate: e.target.value })} onKeyDown={e => numericKeyDown(e)}
-                type="number" min="0" inputMode="decimal" placeholder="Rate"
-                style={{ ...S.fInput, flex: 1, minWidth: 64, ...(num(r.rate) > 0 ? {} : { border: '1px solid rgba(239,68,68,.55)' }) }} />
-              {isCheapest && <span style={{ fontSize: 8.5, fontWeight: 700, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .3)', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>CHEAPEST</span>}
-              <span onClick={() => remove(i)} aria-label="Remove supplier"
-                style={{ cursor: 'pointer', color: T.re, fontSize: 16, lineHeight: 1, padding: '4px 2px' }}>&#215;</span>
+            <div key={i} style={{ border: `1px solid ${T.bd}`, borderRadius: 8, padding: 8, marginBottom: 8, background: 'rgba(255,255,255,0.015)' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                <input type="radio" name="sel-supplier" checked={!!r.selected} onChange={() => select(i)}
+                  aria-label="Use this supplier's rate" style={{ width: 18, height: 18, flexShrink: 0 }} />
+                <input value={r.name} onChange={e => patchName(i, e.target.value)} placeholder="Supplier"
+                  list="costing-supplier-suggest" style={{ ...S.fInput, flex: 1, minWidth: 0 }} />
+                <span onClick={() => remove(i)} aria-label="Remove supplier"
+                  style={{ cursor: 'pointer', color: T.re, fontSize: 16, lineHeight: 1, padding: '10px 8px' }}>&#215;</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', paddingLeft: 26 }}>
+                <input value={r.materialCode} onChange={e => patch(i, { materialCode: e.target.value })} placeholder="Material code"
+                  style={{ ...S.fInput, flex: 1.4, minWidth: 0, fontFamily: T.mono }} />
+                <input value={r.rate} onChange={e => patch(i, { rate: e.target.value })} onKeyDown={e => numericKeyDown(e)}
+                  type="number" min="0" inputMode="decimal" placeholder="Rate"
+                  style={{ ...S.fInput, flex: 1, minWidth: 64, ...(num(r.rate) > 0 ? {} : { border: '1px solid rgba(239,68,68,.55)' }) }} />
+                {isCheapest && <span style={{ fontSize: 8.5, fontWeight: 700, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .3)', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>CHEAPEST</span>}
+              </div>
             </div>
             );
           })}
