@@ -1,14 +1,17 @@
 // One-tap chips of the MOST-REPEATED sub-components across all costings
 // (owner's call: mains don't need chips, subs do). The ranking is computed
 // by a pg_cron job every 4 days into app_settings.costing_top_subs — the
-// app only displays it. Tapping adds the sub pre-filled with its usual unit
-// and suppliers (with material codes); rates stay BLANK on purpose — house
-// rule: a stale rate never silently prices a sheet. Chips already present
-// in this component hide.
+// app only displays it. Tapping adds the sub FULLY pre-filled: usual unit
+// and suppliers with material codes AND rates (owner's explicit call —
+// chips are the ONE place that fills the rate; typing and supplier-pick
+// still leave it blank). Chips already on this component hide.
 import { S } from '../../../lib/theme';
 import { CostingComponent, CostingSub, blankSupplier } from './costingModel';
 
-export interface SubPreset { name: string; unit: string; suppliers: { name: string; materialCode: string }[] }
+export interface SubPreset {
+  name: string; unit: string;
+  suppliers: { name: string; materialCode: string; rate: number | string; selected: boolean }[];
+}
 
 export default function SubChips({ presets, comp, onAdd }: {
   presets: SubPreset[];
@@ -20,9 +23,7 @@ export default function SubChips({ presets, comp, onAdd }: {
   if (chips.length === 0) return null;
   const toSub = (p: SubPreset): CostingSub => ({
     name: p.name, qty: '', unit: p.unit,
-    suppliers: p.suppliers.length
-      ? p.suppliers.map((x, i) => ({ name: x.name, materialCode: x.materialCode, rate: '', selected: i === 0 }))
-      : [blankSupplier()],
+    suppliers: p.suppliers.length ? p.suppliers.map(x => ({ ...x })) : [blankSupplier()],
   });
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
