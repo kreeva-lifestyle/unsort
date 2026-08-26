@@ -14,6 +14,7 @@ export interface CostingProduct {
   id: string; sku: string; image_url: string | null;
   maintenance_pct: number | string; components: CostingComponent[];
   notes: string;
+  selling_price?: number | string | null;
   updated_at?: string;
 }
 
