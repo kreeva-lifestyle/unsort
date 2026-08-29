@@ -241,7 +241,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Fetch challans ─────────────────────────────────────────────────────────
   const fetchChallans = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    let query = supabase.from('cash_challans').select('*, cash_challan_items(sku, quantity, price, discount_amount, total), handover:cash_handovers!handover_id(handover_number)', { count: 'estimated' });
+    let query = supabase.from('cash_challans').select('*, cash_challan_items(sku, quantity, price, discount_type, discount_value, discount_amount, total), handover:cash_handovers!handover_id(handover_number)', { count: 'estimated' });
     if (debouncedSearch) {
       const s = debouncedSearch.replace(/[%_,().]/g, '');
       const num = parseInt(s);
@@ -1028,7 +1028,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── Print ──────────────────────────────────────────────────────────────────
   const printChallan = async (c: Challan) => {
-    const { data: citems, error: itemsErr } = await supabase.from('cash_challan_items').select('sku, quantity, price, total, discount_amount').eq('challan_id', c.id).order('sort_order');
+    const { data: citems, error: itemsErr } = await supabase.from('cash_challan_items').select('sku, quantity, price, total, discount_type, discount_value, discount_amount').eq('challan_id', c.id).order('sort_order');
     if (itemsErr) { addToast(friendlyError(itemsErr), 'error'); return; }
     // Build one copy's inner HTML. We render it twice — top half = Office copy
     // (signed by customer, kept on file), bottom half = Customer copy. A
@@ -1041,7 +1041,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
     const itemRows = (citems || []).map((it, i) => {
       const da = Number(it.discount_amount || 0);
-      return `<tr><td>${i + 1}</td><td>${escHtml(it.sku || '-')}</td><td class="right">${Number(it.quantity)}</td><td class="right">${Number(it.price).toFixed(2)}</td><td class="right">${da > 0 ? '-' + da.toFixed(2) : '-'}</td><td class="right">${Number(it.total).toFixed(2)}</td></tr>`;
+      // Owner's ask: a %-given discount shows its percentage on the challan.
+      const pct = it.discount_type === 'percentage' && Number(it.discount_value) > 0 ? ` (${Number(it.discount_value)}%)` : '';
+      return `<tr><td>${i + 1}</td><td>${escHtml(it.sku || '-')}</td><td class="right">${Number(it.quantity)}</td><td class="right">${Number(it.price).toFixed(2)}</td><td class="right">${da > 0 ? '-' + da.toFixed(2) + pct : '-'}</td><td class="right">${Number(it.total).toFixed(2)}</td></tr>`;
     }).join('');
 
     let paymentLine = '';
@@ -1064,7 +1066,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         </table>
         <div class="totals">
           <p>Subtotal: <strong>${Number(c.subtotal).toFixed(2)}</strong></p>
-          ${Number(c.discount_amount) > 0 ? `<p>Discount: -${Number(c.discount_amount).toFixed(2)}</p>` : ''}
+          ${Number(c.discount_amount) > 0 ? `<p>Discount: -${Number(c.discount_amount).toFixed(2)}${Number(c.subtotal) > 0 ? ` (${(Number(c.discount_amount) / Number(c.subtotal) * 100).toFixed(1).replace(/\.0$/, '')}%)` : ''}</p>` : ''}
           ${Number(c.shipping_charges) > 0 ? `<p>Shipping/Porter: +${Number(c.shipping_charges).toFixed(2)}</p>` : ''}
           ${Number(c.round_off) !== 0 ? `<p>Round Off: ${Number(c.round_off).toFixed(2)}</p>` : ''}
           <p class="grand">Total: ₹${Number(c.total).toFixed(2)}</p>
