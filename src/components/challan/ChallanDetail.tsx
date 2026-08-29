@@ -275,6 +275,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
 
           {/* ── Totals card ── */}
           <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx2, marginBottom: 4 }}><span>Total Quantity</span><span style={{ fontFamily: T.mono, fontWeight: 700, color: T.tx }}>{(c.cash_challan_items || []).reduce((t, it) => t + (Number(it.quantity) || 0), 0)} pcs</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx2, marginBottom: 4 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{Number(c.subtotal).toLocaleString('en-IN')}</span></div>
             {Number(c.discount_amount) > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.re, marginBottom: 4 }}><span>Item Discounts</span><span style={{ fontFamily: T.mono }}>-₹{Number(c.discount_amount).toLocaleString('en-IN')}{Number(c.subtotal) > 0 ? ` (${(Number(c.discount_amount) / Number(c.subtotal) * 100).toFixed(1).replace(/\.0$/, '')}%)` : ''}</span></div>}
             {Number(c.shipping_charges) > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.bl, marginBottom: 4 }}><span>Shipping/Porter</span><span style={{ fontFamily: T.mono }}>+₹{Number(c.shipping_charges).toLocaleString('en-IN')}</span></div>}
