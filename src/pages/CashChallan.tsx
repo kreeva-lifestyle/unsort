@@ -1065,6 +1065,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           <tbody>${itemRows}</tbody>
         </table>
         <div class="totals">
+          <p>Total Qty: <strong>${(citems || []).reduce((t, it) => t + (Number(it.quantity) || 0), 0)} pcs</strong></p>
           <p>Subtotal: <strong>${Number(c.subtotal).toFixed(2)}</strong></p>
           ${Number(c.discount_amount) > 0 ? `<p>Discount: -${Number(c.discount_amount).toFixed(2)}${Number(c.subtotal) > 0 ? ` (${(Number(c.discount_amount) / Number(c.subtotal) * 100).toFixed(1).replace(/\.0$/, '')}%)` : ''}</p>` : ''}
           ${Number(c.shipping_charges) > 0 ? `<p>Shipping/Porter: +${Number(c.shipping_charges).toFixed(2)}</p>` : ''}

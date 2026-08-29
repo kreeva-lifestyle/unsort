@@ -423,6 +423,9 @@ export default function ChallanForm(p: ChallanFormProps) {
         {/* Totals card — honest math. Totals go red when negative so the
             user sees the problem and fixes it (save is also blocked). */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${p.grandTotal < 0 ? 'oklch(0.63 0.22 25 / .35)' : T.bd}`, borderRadius: 10, padding: '12px 16px', marginBottom: 12 }}>
+          {/* Total quantity while entering (owner's ask) — the running count
+              of pieces across all item lines. */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, marginBottom: 4 }}><span>Total Quantity</span><span style={{ fontFamily: T.mono, fontWeight: 700, color: T.tx }}>{p.items.reduce((t, it) => t + (Number(it.quantity) || 0), 0)} pcs</span></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, marginBottom: 4 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{p.subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>
           {p.totalDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Item Discounts{p.totalDiscount > p.subtotal ? ' ⚠' : ''}</span><span style={{ fontFamily: T.mono }}>-₹{p.totalDiscount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}{p.subtotal > 0 ? ` (${(p.totalDiscount / p.subtotal * 100).toFixed(1).replace(/\.0$/, '')}%)` : ''}</span></div>}
           {!p.isReturn && p.shippingCharges > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.bl, marginBottom: 4 }}><span>Shipping/Porter</span><span style={{ fontFamily: T.mono }}>+₹{p.shippingCharges.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>}
