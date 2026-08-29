@@ -34,6 +34,7 @@ export default function SkuInput({
   style,
   disabled,
   onKeyDown,
+  sizes = true,
   ...rest
 }: {
   value: string;
@@ -45,6 +46,10 @@ export default function SkuInput({
   style?: React.CSSProperties;
   disabled?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  /** Folder-based callers (Client Finder, Dropbox Link Generator) pass false:
+   *  Dropbox folders are named by the PARENT design, a size is meaningless
+   *  there — no size chips, onPick fires on the parent straight away. */
+  sizes?: boolean;
 } & Record<string, unknown>) {
   const listId = useId();
   const { index } = useProductCatalog();
@@ -52,19 +57,19 @@ export default function SkuInput({
   const hit = resolveSku(index, value);
   const product = hit?.product ?? null;
   const chosenSize = hit?.size ?? null;
-  const showSizes = !!product && needsSize(product) && !chosenSize;
+  const showSizes = sizes && !!product && needsSize(product) && !chosenSize;
 
   // Fire onPick once per resolved code, not on every keystroke that happens to
   // still resolve — otherwise a challan row would re-fill its price constantly.
   const lastFired = useRef<string>('');
   useEffect(() => {
     if (!onPick || !product) { lastFired.current = ''; return; }
-    if (needsSize(product) && !chosenSize) return;   // wait for the size choice
+    if (sizes && needsSize(product) && !chosenSize) return;   // wait for the size choice
     const full = chosenSize ? variantSku(product, chosenSize) : product.sku;
     if (lastFired.current === full) return;
     lastFired.current = full;
     onPick(product, chosenSize, full);
-  }, [product, chosenSize, onPick]);
+  }, [product, chosenSize, onPick, sizes]);
 
   // Built from `value` itself, NOT a delayed copy of it. The previous version
   // debounced the search by 120ms while the browser filtered the resulting

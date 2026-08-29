@@ -304,6 +304,7 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
             <SkuInput
               value={sku}
               onChange={setSku}
+              sizes={false}
               onKeyDown={e => { if (e.key === 'Enter') search(); }}
               placeholder="e.g. 7101"
               style={{ ...S.fInput, width: '100%', textTransform: 'uppercase' }}

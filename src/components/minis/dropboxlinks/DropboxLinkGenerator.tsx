@@ -119,7 +119,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
           that block the moment a SKU resolves. Centring would instead drop them
           below the input they sit next to. */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <SkuInput value={sku} onChange={setSku} onKeyDown={e => { if (e.key === 'Enter') requestGenOne(); }} placeholder="Enter SKU e.g. 15003" style={{ ...S.fInput, width: 200, fontFamily: T.mono }} />
+        <SkuInput value={sku} onChange={setSku} sizes={false} onKeyDown={e => { if (e.key === 'Enter') requestGenOne(); }} placeholder="Enter SKU e.g. 15003" style={{ ...S.fInput, width: 200, fontFamily: T.mono }} />
         {/* minHeight 36 matches S.fInput's height — the btn recipes set none and
             land at ~32px. Same as modeBtn above. */}
         <button onClick={requestGenOne} disabled={busy || !sku.trim()} style={{ ...S.btnPrimary, minHeight: 36, pointerEvents: busy ? 'none' : 'auto', opacity: busy || !sku.trim() ? 0.5 : 1 }}>{busy ? 'Generating…' : 'Generate Link'}</button>
