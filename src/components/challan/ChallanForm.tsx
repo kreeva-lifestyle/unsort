@@ -219,7 +219,7 @@ export default function ChallanForm(p: ChallanFormProps) {
 
           {/* Line Items */}
           <div className="challan-item-grid-wrap" data-items style={{ background: 'rgba(0,0,0,.15)', border: `1px solid ${T.bd}`, borderRadius: 10, marginBottom: 12, overflow: 'hidden' }}>
-            <div className="challan-items-head" style={{ display: 'grid', gridTemplateColumns: '1fr 56px 80px 100px 28px', gap: 6, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, background: T.glass1 }}>
+            <div className="challan-items-head" style={{ display: 'grid', gridTemplateColumns: '1fr 92px 80px 100px 28px', gap: 6, padding: '9px 12px', borderBottom: `1px solid ${T.bd}`, background: T.glass1 }}>
               <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600 }}>SKU</span>
               <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600, textAlign: 'center' as const }}>Qty</span>
               <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase' as const, letterSpacing: '0.12em', fontWeight: 600, textAlign: 'right' as const }}>Price</span>
@@ -244,7 +244,7 @@ export default function ChallanForm(p: ChallanFormProps) {
               const okBorder = `1px solid ${T.bd}`;
               return (
               <div key={i}>
-                <div className="challan-item-row" style={{ display: 'grid', gridTemplateColumns: '1fr 56px 80px 100px 28px', gap: 6, padding: '7px 12px', borderBottom: err ? 'none' : `1px solid ${T.bd}`, alignItems: 'center' }}>
+                <div className="challan-item-row" style={{ display: 'grid', gridTemplateColumns: '1fr 92px 80px 100px 28px', gap: 6, padding: '7px 12px', borderBottom: err ? 'none' : `1px solid ${T.bd}`, alignItems: 'center' }}>
                   <SkuInput
                     data-sku
                     value={it.sku}
@@ -271,7 +271,16 @@ export default function ChallanForm(p: ChallanFormProps) {
                     disabled={!!(p.isReturn && p.returnSource)}
                     style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1, width: '100%' }}
                   />
-                  <input type="number" min="1" step="1" value={it.quantity || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].quantity = Math.max(0, Math.round(Number(e.target.value))); p.setItems(n); }} placeholder="Qty" style={{ background: 'rgba(255,255,255,0.04)', border: qtyBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'center' as const }} />
+                  {/* Qty as a stepper (owner's ask): the number stays visible
+                      between − and + so every tap's result is seen at once. */}
+                  <div className="challan-qty-col" style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.04)', border: qtyBad ? errBorder : okBorder, borderRadius: 4 }}>
+                    <button onClick={() => { const n = [...p.items]; n[i].quantity = Math.max(1, q - 1); p.setItems(n); }} aria-label="Decrease quantity"
+                      style={{ border: 'none', background: 'none', color: T.ac2, fontSize: 15, width: 26, minHeight: 30, cursor: 'pointer', padding: 0, flexShrink: 0 }}>−</button>
+                    <input type="number" min="1" step="1" value={it.quantity || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].quantity = Math.max(0, Math.round(Number(e.target.value))); p.setItems(n); }} placeholder="Qty"
+                      style={{ background: 'none', border: 'none', color: T.tx, fontSize: 12, fontWeight: 700, padding: '6px 0', outline: 'none', textAlign: 'center' as const, width: '100%', minWidth: 0 }} />
+                    <button onClick={() => { const n = [...p.items]; n[i].quantity = q + 1; p.setItems(n); }} aria-label="Increase quantity"
+                      style={{ border: 'none', background: 'none', color: T.ac2, fontSize: 15, width: 26, minHeight: 30, cursor: 'pointer', padding: 0, flexShrink: 0 }}>+</button>
+                  </div>
                   <input type="number" min="0" step="0.01" value={it.price || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].price = Math.max(0, Number(e.target.value)); delete autoFilled.current[i]; p.setItems(n); }} placeholder="Price" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: priceBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
                   <div className="challan-disc-col" style={{ display: 'flex', gap: 2, alignItems: 'center', opacity: p.isReturn && p.returnSource ? 0.6 : 1 }}>
                     <select value={it.discount_type || 'flat'} onChange={e => { const n = [...p.items]; n[i].discount_type = e.target.value; n[i].discount_value = 0; p.setItems(n); }} disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: okBorder, borderRadius: 4, color: T.tx3, fontSize: 11, padding: '4px 6px', outline: 'none', width: 32 }}>
@@ -306,6 +315,7 @@ export default function ChallanForm(p: ChallanFormProps) {
                   {q > 0 && pr > 0 && (
                     <div className="challan-line-total" style={{ width: '100%', justifyContent: 'flex-end', fontFamily: T.mono, fontSize: 11, color: T.tx2 }}>
                       = ₹{(q * pr - (it.discount_type === 'percentage' ? q * pr * d / 100 : Math.min(d, q * pr))).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                      {it.discount_type === 'percentage' && d > 0 ? ` · ${d}% off` : ''}
                     </div>
                   )}
                 </div>
@@ -414,7 +424,7 @@ export default function ChallanForm(p: ChallanFormProps) {
             user sees the problem and fixes it (save is also blocked). */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${p.grandTotal < 0 ? 'oklch(0.63 0.22 25 / .35)' : T.bd}`, borderRadius: 10, padding: '12px 16px', marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, marginBottom: 4 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{p.subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>
-          {p.totalDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Item Discounts{p.totalDiscount > p.subtotal ? ' ⚠' : ''}</span><span style={{ fontFamily: T.mono }}>-₹{p.totalDiscount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>}
+          {p.totalDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Item Discounts{p.totalDiscount > p.subtotal ? ' ⚠' : ''}</span><span style={{ fontFamily: T.mono }}>-₹{p.totalDiscount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}{p.subtotal > 0 ? ` (${(p.totalDiscount / p.subtotal * 100).toFixed(1).replace(/\.0$/, '')}%)` : ''}</span></div>}
           {!p.isReturn && p.shippingCharges > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.bl, marginBottom: 4 }}><span>Shipping/Porter</span><span style={{ fontFamily: T.mono }}>+₹{p.shippingCharges.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>}
           {p.roundOff !== 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx3, marginBottom: 4 }}><span>Round Off</span><span style={{ fontFamily: T.mono }}>{p.roundOff > 0 ? '+' : ''}₹{p.roundOff.toFixed(2)}</span></div>}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: p.grandTotal < 0 ? T.re : T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}><span>Total</span><span>{p.grandTotal < 0 ? '−' : ''}₹{Math.abs(p.grandTotal).toLocaleString('en-IN')}</span></div>

@@ -352,6 +352,7 @@ body.modal-open .fab { display: none !important; }
   .challan-item-row input[data-sku] { width: 100% !important; flex: none !important; }
   .challan-item-row input:not([data-sku]) { flex: 1 !important; min-width: 60px !important; }
   .challan-item-row .challan-disc-col { display: flex !important; flex: 1.5 !important; min-width: 90px !important; gap: 4px !important; }
+  .challan-item-row .challan-qty-col { flex: 1.2 !important; min-width: 108px !important; }
   .challan-form .challan-item-row input { font-size: 14px !important; padding: 8px 6px !important; }
   .challan-form .challan-item-row select { font-size: 14px !important; padding: 6px !important; width: auto !important; }
   .challan-form-grid-2 { grid-template-columns: 1fr !important; }
