@@ -103,14 +103,26 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   useEffect(() => { fetchPos(); }, [fetchPos]);
 
   // Filtered realtime — any PO / item / receipt change refetches the list.
+  // (The three tables joined the supabase_realtime publication on 2026-08-31;
+  // before that this channel existed but the DB never broadcast to it.)
   useEffect(() => {
     const imm = () => fetchPos(true);
     const ch = supabase.channel('purchase_orders_rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, imm)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_order_items' }, imm)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_order_receipts' }, imm)
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+      // Refetch on (re)connect: iOS suspends the socket while the PWA is
+      // backgrounded — whatever arrived meanwhile would be missed silently.
+      .subscribe(status => { if (status === 'SUBSCRIBED') imm(); });
+    // Same story on returning to the foreground / regaining focus.
+    const onVisible = () => { if (document.visibilityState === 'visible') imm(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      supabase.removeChannel(ch);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, [fetchPos]);
 
   useEffect(() => { document.body.classList.toggle('modal-open', !!printData); return () => { document.body.classList.remove('modal-open'); }; }, [printData]);
