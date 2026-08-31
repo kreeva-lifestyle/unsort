@@ -73,18 +73,28 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     if (!silent) setLoading(true);
     let q = supabase.from('purchase_orders').select(`${COLS}, purchase_order_items(quantity, received_qty)`, { count: 'estimated' });
     if (debouncedSearch) {
-      const s = debouncedSearch.replace(/[%_,().]/g, '').trim();
+      // Vendor name always matches; a pure number also matches the PO #; and
+      // ANY term (numeric SKUs like "15003" included) also matches line-item
+      // SKUs via search_po_ids. The RPC gets the RAW term (parameterized, so
+      // safe) — stripping dots/underscores made "DRS_178" unfindable; only
+      // the or-filter string needs the PostgREST-syntax characters removed.
+      const raw = debouncedSearch.trim();
+      const s = raw.replace(/[%_,().]/g, '').trim();
+      const ors: string[] = [];
       if (s) {
-        // Vendor name always matches; a pure number also matches the PO #; and
-        // ANY term (numeric SKUs like "15003" included) also matches line-item
-        // SKUs via search_po_ids.
-        const ors = [`vendor_name.ilike.%${s}%`];
-        if (/^\d+$/.test(s)) ors.push(`po_number.eq.${parseInt(s)}`);
-        const { data: idRows } = await supabase.rpc('search_po_ids', { q: s });
-        const ids = (idRows as string[] | null) || [];
-        if (ids.length > 0) ors.push(`id.in.(${ids.join(',')})`);
-        q = q.or(ors.join(','));
+        ors.push(`vendor_name.ilike.%${s}%`);
+        // <=9 digits only: a 13-digit barcode overflows int4 and 400s the query.
+        if (/^\d{1,9}$/.test(s)) ors.push(`po_number.eq.${parseInt(s)}`);
       }
+      if (raw) {
+        const { data: idRows, error: rpcErr } = await supabase.rpc('search_po_ids', { q: raw });
+        // A swallowed error here made SKU search silently degrade to
+        // vendor-only — surface it so a break is visible, not mysterious.
+        if (rpcErr) addToast(`SKU search failed — ${friendlyError(rpcErr)}`, 'error');
+        const ids = (idRows as string[] | null) || [];
+        if (ids.length > 0) ors.push(`id.in.(${ids.slice(0, 200).join(',')})`);
+      }
+      if (ors.length > 0) q = q.or(ors.join(','));
     }
     if (statusFilter) q = q.eq('status', statusFilter);
     if (typeFilter) q = q.eq('po_type', typeFilter);
