@@ -155,7 +155,9 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
               const amt = num(it.quantity) * num(it.rate);
               return (
                 <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <SkuInput value={it.sku} onChange={v => setItem(i, { sku: v })} placeholder={poType === 'fabric' || poType === 'material' ? 'SKU *' : 'SKU'} style={{ ...S.fInput, flex: '1 1 90px', minWidth: 72, fontFamily: T.mono }} />
+                  {/* sizes off (owner's call): POs order fabric/job work at the
+                      parent-design level — a size chip makes no sense here. */}
+                  <SkuInput value={it.sku} onChange={v => setItem(i, { sku: v })} sizes={false} placeholder={poType === 'fabric' || poType === 'material' ? 'SKU *' : 'SKU'} style={{ ...S.fInput, flex: '1 1 90px', minWidth: 72, fontFamily: T.mono }} />
                   <input value={it.item_name} onChange={e => setItem(i, { item_name: e.target.value })} placeholder="Item name *" style={{ ...S.fInput, flex: '2 1 140px', minWidth: 110 }} />
                   <input value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Qty" style={{ ...S.fInput, flex: '1 1 60px', minWidth: 56, fontFamily: T.mono }} />
                   <select value={it.unit} onChange={e => setItem(i, { unit: e.target.value })} style={{ ...S.fInput, flex: '1 1 74px', minWidth: 66, color: it.unit ? T.tx : T.tx3 }}>
