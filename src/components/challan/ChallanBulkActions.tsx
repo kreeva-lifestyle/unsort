@@ -1,6 +1,6 @@
 // Bulk-mode toolbar + Bulk Pay / Bulk Unpay modals + last-batch undo banner.
 // Extracted from CashChallan.tsx — parent owns the data + RPC calls.
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
@@ -36,6 +36,8 @@ interface Props {
   setBulkPayMode: (v: string) => void;
   bulkReceivedAmount: string;
   setBulkReceivedAmount: (v: string) => void;
+  bulkPayDate: string;
+  setBulkPayDate: (v: string) => void;
   onConfirmBulkPay: () => void;
   // Bulk unpay modal
   showBulkUnpay: boolean;
@@ -45,10 +47,21 @@ interface Props {
 }
 
 export default function ChallanBulkActions(p: Props) {
+  // Short-payment acknowledgement: marking everything FULLY paid while the
+  // customer paid less writes the gap off silently — that needs an explicit
+  // tick, not just a hint. Reset each time the modal opens.
+  const [shortAck, setShortAck] = useState(false);
   useEffect(() => {
     document.body.classList.toggle('modal-open', p.showBulkPay || p.showBulkUnpay);
+    if (p.showBulkPay) setShortAck(false);
     return () => { document.body.classList.remove('modal-open'); };
   }, [p.showBulkPay, p.showBulkUnpay]);
+
+  const d = new Date();
+  const todayISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const recvStr = String(p.bulkReceivedAmount).trim();
+  const shortBy = recvStr !== '' && p.netTotal > 0 ? Math.abs(p.netTotal) - (Number(recvStr) || 0) : 0;
+  const isShort = shortBy > 0.009;
 
   return (
     <>
@@ -84,15 +97,27 @@ export default function ChallanBulkActions(p: Props) {
               <input type="number" min="0" value={p.bulkReceivedAmount} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setBulkReceivedAmount(e.target.value)} placeholder={String(Math.abs(p.netTotal))} style={{ ...S.fInput, width: '100%', fontFamily: T.mono, fontSize: 14 }} />
               {(() => { const recv = Number(p.bulkReceivedAmount) || 0; const expected = Math.abs(p.netTotal); const diff = recv - expected; if (!p.bulkReceivedAmount || diff === 0) return null; return <div style={{ marginTop: 4, fontSize: 10, color: T.yl, fontWeight: 600 }}>₹{Math.abs(diff).toLocaleString('en-IN')} {diff > 0 ? 'more than expected' : 'less than expected'}</div>; })()}
             </div>
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>{p.netTotal < 0 ? 'Refund Mode' : 'Payment Mode'}</label>
-              <select value={p.bulkPayMode} onChange={e => p.setBulkPayMode(e.target.value)} style={{ ...S.fInput, width: '100%', cursor: 'pointer' }}>
-                <option value="">Select...</option>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>{p.netTotal < 0 ? 'Refund Mode' : 'Payment Mode'}</label>
+                <select value={p.bulkPayMode} onChange={e => p.setBulkPayMode(e.target.value)} style={{ ...S.fInput, width: '100%', cursor: 'pointer' }}>
+                  <option value="">Select...</option>{PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>{p.netTotal < 0 ? 'Refund Date' : 'Payment Date'}</label>
+                <input type="date" value={p.bulkPayDate} max={todayISO} onChange={e => p.setBulkPayDate(e.target.value)} style={{ ...S.fInput, width: '100%' }} />
+              </div>
             </div>
+            {isShort && (
+              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 6, padding: '8px 10px', fontSize: 10.5, color: T.yl, marginBottom: 12, lineHeight: 1.5, cursor: 'pointer' }}>
+                <input type="checkbox" checked={shortAck} onChange={e => setShortAck(e.target.checked)} style={{ width: 16, height: 16, marginTop: 1, flexShrink: 0 }} />
+                <span>Customer paid <b>₹{shortBy.toLocaleString('en-IN')} less</b> than the outstanding. Mark all challans FULLY paid anyway — the gap is only written in the payment note, it will NOT show as due anywhere.</span>
+              </label>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={p.onCloseBulkPay} style={{ ...S.btnGhost, flex: 1 }}>Cancel</button>
-              <button onClick={p.onConfirmBulkPay} disabled={!p.bulkPayMode || p.payable.length === 0 || p.bulkBusy} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: p.bulkPayMode ? `linear-gradient(135deg, ${p.netTotal < 0 ? T.re : T.gr}, ${p.netTotal < 0 ? T.reCC : T.grCC})` : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: p.bulkPayMode && !p.bulkBusy ? 'pointer' : 'default', opacity: p.bulkPayMode && !p.bulkBusy ? 1 : 0.4 }}>{p.bulkBusy ? 'Processing…' : p.netTotal < 0 ? 'Settle & Refund' : 'Confirm Pay'}</button>
+              <button onClick={p.onConfirmBulkPay} disabled={!p.bulkPayMode || p.payable.length === 0 || p.bulkBusy || (isShort && !shortAck)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: p.bulkPayMode ? `linear-gradient(135deg, ${p.netTotal < 0 ? T.re : T.gr}, ${p.netTotal < 0 ? T.reCC : T.grCC})` : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: p.bulkPayMode && !p.bulkBusy && !(isShort && !shortAck) ? 'pointer' : 'default', opacity: p.bulkPayMode && !p.bulkBusy && !(isShort && !shortAck) ? 1 : 0.4 }}>{p.bulkBusy ? 'Processing…' : p.netTotal < 0 ? 'Settle & Refund' : 'Confirm Pay'}</button>
             </div>
           </div>
         </div>,
