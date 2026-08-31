@@ -314,8 +314,19 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cash_challan_items' }, imm)
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cash_challan_items' }, imm)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cash_challan_items' }, debouncedFetchChallans)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      // Refetch on (re)connect: iOS suspends the socket while the PWA is
+      // backgrounded, and realtime never replays missed events — without this
+      // a challan created elsewhere stays invisible until a manual reload.
+      .subscribe(status => { if (status === 'SUBSCRIBED') imm(); });
+    // Same story on returning to the foreground / regaining focus.
+    const onVisible = () => { if (document.visibilityState === 'visible') imm(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      supabase.removeChannel(channel);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, [fetchChallans, debouncedFetchChallans]);
   useEffect(() => {
     (async () => {
