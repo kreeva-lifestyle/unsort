@@ -94,10 +94,14 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     q = q.order('po_number', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
     const { data, count, error } = await q;
     if (seq !== fetchSeq.current) return; // a newer fetch superseded this one
-    if (error) { addToast(friendlyError(error), 'error'); if (!silent) setLoading(false); return; }
+    // We ARE the latest fetch, so ALWAYS clear loading — even on the silent
+    // path. A silent refetch (channel connect / foreground) can supersede the
+    // mount fetch, and the superseded one returns above without clearing;
+    // gating this on !silent left the skeletons up forever.
+    if (error) { addToast(friendlyError(error), 'error'); setLoading(false); return; }
     setPos((data as PORow[] | null) || []);
     setTotalCount(count || 0);
-    if (!silent) setLoading(false);
+    setLoading(false);
   }, [debouncedSearch, statusFilter, typeFilter, creatorFilter, dateFrom, dateTo, page, pageSize, addToast]);
 
   useEffect(() => { fetchPos(); }, [fetchPos]);
