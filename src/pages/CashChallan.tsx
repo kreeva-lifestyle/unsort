@@ -92,6 +92,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkPayMode, setBulkPayMode] = useState('');
   const [bulkReceivedAmount, setBulkReceivedAmount] = useState('');
+  const [bulkPayDate, setBulkPayDate] = useState('');
   const [lastBatch, setLastBatch] = useState<{ id: string; count: number; mode: string; settled: number } | null>(null);
   const [undoingBatch, setUndoingBatch] = useState(false);
 
@@ -1169,15 +1170,20 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   const executeBulkPay = async () => {
     if (!bulkPayMode || bulkBusy) return;
-    setBulkBusy(true);
+    // Payment date is choosable (owner's ask) — defaults to today, never future.
     const today = localToday();
+    const payDate = bulkPayDate || today;
+    if (payDate > today) { addToast('Payment date cannot be in the future', 'error'); return; }
+    setBulkBusy(true);
     const { data: { user } } = await supabase.auth.getUser();
     const ids = bulkPayable.map(c => c.id);
     const settleableReturns = bulkReturns.filter(c => Number(c.total) - Number(c.amount_paid || 0) > 0.009);
     if (ids.length === 0 && settleableReturns.length === 0) { setShowBulkPay(false); setBulkBusy(false); return; }
     const batchId = `BP-${Date.now().toString(36).toUpperCase()}`;
     const isRefund = bulkNetTotal < 0;
-    const received = Number(bulkReceivedAmount) || Math.abs(bulkNetTotal);
+    // A typed 0 must stay 0 in the note (the old `|| default` silently turned
+    // it into the full amount); only an EMPTY box means "the expected amount".
+    const received = String(bulkReceivedAmount).trim() !== '' ? Math.max(0, Number(bulkReceivedAmount) || 0) : Math.abs(bulkNetTotal);
     const receiptNote = isRefund
       ? `Batch ${batchId} — settled ₹${bulkSalesOutstanding.toLocaleString('en-IN')} outstanding against ₹${bulkReturnsTotal.toLocaleString('en-IN')} returns. Refunded ₹${received.toLocaleString('en-IN')} to customer via ${bulkPayMode}`
       : `Batch ${batchId} — received ₹${received.toLocaleString('en-IN')} against ₹${bulkNetTotal.toLocaleString('en-IN')} outstanding${Math.abs(received - bulkNetTotal) > 0.009 ? ` (${received > bulkNetTotal ? 'excess' : 'short'} ₹${Math.abs(received - bulkNetTotal).toLocaleString('en-IN')})` : ''}`;
@@ -1189,15 +1195,24 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       const outstanding = Number(c.total) - Number(c.amount_paid || 0);
       const { data: updated, error: upErr } = await supabase.from('cash_challans').update({
         status: 'paid', amount_paid: Number(c.total), payment_mode: bulkPayMode,
-        payment_date: today, modified_by: user?.id, updated_at: new Date().toISOString(),
+        payment_date: payDate, modified_by: user?.id, updated_at: new Date().toISOString(),
       }).eq('id', c.id).in('status', ['unpaid', 'partial']).select('id');
       if (upErr || !updated || updated.length === 0) { failCount++; continue; }
       if (outstanding > 0) {
         const { error: payErr } = await supabase.from('cash_challan_payments').insert({
           challan_id: c.id, amount: outstanding, payment_mode: bulkPayMode,
-          payment_date: today, paid_by: user?.id, notes: receiptNote, batch_id: batchId, is_reversal: false,
+          payment_date: payDate, paid_by: user?.id, notes: receiptNote, batch_id: batchId, is_reversal: false,
         });
-        if (payErr) { failCount++; }
+        if (payErr) {
+          // The challan was already marked paid but its payment row failed to
+          // write — undo the mark, so the books never show a paid challan with
+          // no payment record, and count it as a FAILURE, not a success.
+          await supabase.from('cash_challans').update({
+            status: c.status, amount_paid: c.amount_paid, payment_mode: c.payment_mode,
+            payment_date: c.payment_date, updated_at: new Date().toISOString(),
+          }).eq('id', c.id);
+          failCount++; continue;
+        }
       }
       paidOk.push(c);
     }
@@ -1218,7 +1233,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       await ccAuditLog('RETURN_SETTLED', c.id, `Return credit ₹${remaining.toLocaleString('en-IN')} consumed in batch ${batchId} via ${bulkPayMode}`, { amount_paid: { from: c.amount_paid, to: c.total } });
     }
     setLastBatch({ id: batchId, count: ids.length, mode: bulkPayMode, settled: settledCount });
-    setShowBulkPay(false); setBulkPayMode(''); setBulkReceivedAmount(''); exitBulkMode(); fetchChallans();
+    setShowBulkPay(false); setBulkPayMode(''); setBulkReceivedAmount(''); setBulkPayDate(''); exitBulkMode(); fetchChallans();
     if (failCount > 0 || settleFail > 0) {
       const parts = [];
       if (ids.length > 0) parts.push(`${paidOk.length} of ${ids.length} challans paid${failCount > 0 ? ` (${failCount} failed)` : ''}`);
@@ -1235,8 +1250,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         const nums = paidOk.map(c => `#${c.challan_number}`);
         const numsStr = nums.length > 6 ? `${nums.slice(0, 6).join(', ')} +${nums.length - 6} more` : nums.join(', ');
         const lead = isRefund
-          ? `Settlement recorded — ₹${received.toLocaleString('en-IN')} refunded via ${bulkPayMode} on ${receiptDate(today)}`
-          : `Payment received — thank you!\n₹${received.toLocaleString('en-IN')} via ${bulkPayMode} on ${receiptDate(today)}`;
+          ? `Settlement recorded — ₹${received.toLocaleString('en-IN')} refunded via ${bulkPayMode} on ${receiptDate(payDate)}`
+          : `Payment received — thank you!\n₹${received.toLocaleString('en-IN')} via ${bulkPayMode} on ${receiptDate(payDate)}`;
         const msg = await buildReceiptMsg({
           name: paidOk[0].customer_name, customerId: paidOk[0].customer_id,
           lead, lines: [`Challan${paidOk.length > 1 ? 's' : ''} ${numsStr} — fully settled`],
@@ -1489,8 +1504,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         onUndoBatch={async () => { if (!lastBatch) return; setUndoingBatch(true); await undoBatch(lastBatch.id); setUndoingBatch(false); }}
         onDismissBatch={() => setLastBatch(null)}
         showBulkPay={showBulkPay}
-        onOpenBulkPay={() => { setBulkPayMode(''); setBulkReceivedAmount(''); setShowBulkPay(true); }}
+        onOpenBulkPay={() => { setBulkPayMode(''); setBulkReceivedAmount(''); setBulkPayDate(localToday()); setShowBulkPay(true); }}
         onCloseBulkPay={() => setShowBulkPay(false)}
+        bulkPayDate={bulkPayDate}
+        setBulkPayDate={setBulkPayDate}
         bulkPayMode={bulkPayMode}
         setBulkPayMode={setBulkPayMode}
         bulkReceivedAmount={bulkReceivedAmount}
