@@ -11,6 +11,7 @@ import { friendlyError } from '../../lib/friendlyError';
 import { numericKeyDown } from '../../lib/numericInput';
 import { poAuditLog } from './poAudit';
 import VendorPicker from './VendorPicker';
+import TopVendorChips from './TopVendorChips';
 import SkuInput from '../ui/SkuInput';
 import DateInput from '../ui/DateInput';
 import { PO_TYPES, PO_TYPE_LABELS } from '../../types/database';
@@ -127,6 +128,7 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={S.fLabel}>Vendor *</label>
               <VendorPicker value={vendor.name} phone={vendor.phone} onPick={setVendor} addToast={addToast} />
+              {!editing && !vendor.name.trim() && <TopVendorChips onPick={setVendor} />}
             </div>
             <div>
               <label style={S.fLabel}>Type *</label>
