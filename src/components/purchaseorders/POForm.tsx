@@ -178,29 +178,38 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
           </div>
 
           <label style={S.fLabel}>Items *</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+          {/* One CARD per item (the costing-editor pattern the owner approved):
+              a fixed structure that never free-wraps — the old six-boxes-in-a-
+              flex-row layout broke into ragged lines at phone width. */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
             {items.map((it, i) => {
               const amt = num(it.quantity) * num(it.rate);
               return (
-                <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                  {/* sizes off (owner's call): POs order fabric/job work at the
-                      parent-design level — a size chip makes no sense here. */}
-                  <SkuInput value={it.sku} onChange={v => setItem(i, { sku: v })} sizes={false} placeholder={poType === 'fabric' || poType === 'material' ? 'SKU *' : 'SKU'} style={{ ...S.fInput, flex: '1 1 90px', minWidth: 72, fontFamily: T.mono }} />
-                  <input value={it.item_name} onChange={e => setItem(i, { item_name: e.target.value })} placeholder="Item name *" style={{ ...S.fInput, flex: '2 1 140px', minWidth: 110 }} />
-                  <input value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Qty" style={{ ...S.fInput, flex: '1 1 60px', minWidth: 56, fontFamily: T.mono }} />
-                  <select value={it.unit} onChange={e => setItem(i, { unit: e.target.value })} style={{ ...S.fInput, flex: '1 1 74px', minWidth: 66, color: it.unit ? T.tx : T.tx3 }}>
-                    <option value="">Unit</option>
-                    {it.unit && !UNIT_OPTIONS.includes(it.unit) && <option value={it.unit}>{it.unit}</option>}
-                    {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                  <input value={it.rate} onChange={e => setItem(i, { rate: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Rate" style={{ ...S.fInput, flex: '1 1 70px', minWidth: 60, fontFamily: T.mono }} />
-                  <span style={{ flex: '1 1 70px', minWidth: 60, textAlign: 'right', fontSize: 12, fontFamily: T.mono, color: amt > 0 ? T.tx2 : T.tx3 }}>{amt > 0 ? `₹${amt.toLocaleString('en-IN')}` : '—'}</span>
-                  <button onClick={() => removeRow(i)} disabled={items.length === 1} style={{ border: 'none', background: 'none', cursor: items.length === 1 ? 'not-allowed' : 'pointer', color: T.re, opacity: items.length === 1 ? 0.25 : 0.7, fontSize: 18, padding: '0 4px', lineHeight: 1 }} aria-label="Remove item">&times;</button>
+                <div key={i} style={{ border: `1px solid ${T.bd}`, borderRadius: 8, padding: 10, background: 'rgba(255,255,255,0.015)' }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+                    {/* sizes off (owner's call): POs order fabric/job work at
+                        the parent-design level. */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <SkuInput value={it.sku} onChange={v => setItem(i, { sku: v })} sizes={false} placeholder={poType === 'fabric' || poType === 'material' ? 'SKU *' : 'SKU'} style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
+                    </div>
+                    <button onClick={() => removeRow(i)} disabled={items.length === 1} style={{ border: 'none', background: 'none', cursor: items.length === 1 ? 'not-allowed' : 'pointer', color: T.re, opacity: items.length === 1 ? 0.25 : 0.7, fontSize: 18, padding: '8px 10px', lineHeight: 1, flexShrink: 0 }} aria-label="Remove item">&times;</button>
+                  </div>
+                  <input value={it.item_name} onChange={e => setItem(i, { item_name: e.target.value })} placeholder="Item name *" style={{ ...S.fInput, width: '100%', marginBottom: 8 }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                    <input value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Qty" style={{ ...S.fInput, width: '100%', minWidth: 0, fontFamily: T.mono }} />
+                    <select value={it.unit} onChange={e => setItem(i, { unit: e.target.value })} style={{ ...S.fInput, width: '100%', minWidth: 0, color: it.unit ? T.tx : T.tx3 }}>
+                      <option value="">Unit</option>
+                      {it.unit && !UNIT_OPTIONS.includes(it.unit) && <option value={it.unit}>{it.unit}</option>}
+                      {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                    <input value={it.rate} onChange={e => setItem(i, { rate: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Rate" style={{ ...S.fInput, width: '100%', minWidth: 0, fontFamily: T.mono }} />
+                  </div>
+                  {amt > 0 && <div style={{ textAlign: 'right', fontSize: 12, fontFamily: T.mono, color: T.tx2, marginTop: 6 }}>= ₹{amt.toLocaleString('en-IN')}</div>}
                 </div>
               );
             })}
           </div>
-          <button onClick={addRow} style={{ ...S.btnGhost, ...S.btnSm, marginTop: 8 }}>+ Add item</button>
+          <button onClick={addRow} style={{ ...S.btnGhost, ...S.btnSm, marginTop: 8, borderStyle: 'dashed', minHeight: 36 }}>+ Add item</button>
 
           <div style={{ marginTop: 14, borderTop: `1px solid ${T.bd}`, paddingTop: 12 }}>
             <button onClick={() => setShowCharges(s => !s)} style={{ border: 'none', background: 'none', color: T.tx3, fontSize: 11, cursor: 'pointer', padding: 0 }}>{showCharges ? '− Hide' : '+ Add'} discount / tax / charges</button>
