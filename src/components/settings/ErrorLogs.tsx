@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
-import { T, S } from '../../lib/theme';
+import { T, S, alpha } from '../../lib/theme';
 import Empty from '../ui/Empty';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import { SkeletonRows } from '../ui/Skeleton';
@@ -75,7 +75,7 @@ export default function ErrorLogs({ addToast }: { addToast: (msg: string, type?:
             return (
               <div key={log.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer' }} onClick={() => setExpanded(isOpen ? null : log.id)}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: '2px 7px', borderRadius: 4, background: `${SOURCE_COLORS[log.source] || T.tx3}22`, color: SOURCE_COLORS[log.source] || T.tx3 }}>{log.source}</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: '2px 7px', borderRadius: 4, background: alpha(SOURCE_COLORS[log.source] || T.tx3, 0.13), color: SOURCE_COLORS[log.source] || T.tx3 }}>{log.source}</span>
                   <span style={{ fontSize: 12, color: T.tx, fontWeight: 500, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: isOpen ? 'normal' : 'nowrap' }}>{log.message}</span>
                   <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, flexShrink: 0 }}>{new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
@@ -92,10 +92,10 @@ export default function ErrorLogs({ addToast }: { addToast: (msg: string, type?:
       )}
 
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 14 }}>
-          <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }}>Prev</span>
+        <div className="pager" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 14 }}>
+          <button type="button" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }}>Prev</button>
           <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages} · {total} total</span>
-          <span onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }}>Next</span>
+          <button type="button" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }}>Next</button>
         </div>
       )}
 

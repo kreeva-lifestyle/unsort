@@ -155,7 +155,7 @@ export default function TaughtMappingsPage({ onBack, onBulk, fields, addToast }:
             ))}
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+        <div className="pager" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
           <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1 }}>Prev</button>
           <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {pages}</span>
           <button onClick={() => setPage(p => Math.min(pages - 1, p + 1))} disabled={page >= pages - 1} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= pages - 1 ? 0.3 : 1 }}>Next</button>

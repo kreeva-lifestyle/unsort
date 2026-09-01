@@ -2,7 +2,7 @@
 // Parent owns all state and the submit logic; this component is just render + event routing.
 // Wide prop surface is intentional — keeps state in one place without introducing a context.
 import { useRef, useState, useEffect } from 'react';
-import { T, S } from '../../lib/theme';
+import { T, S, alpha } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import DateInput from '../ui/DateInput';
 import AuditTrailModal from './AuditTrailModal';
@@ -142,7 +142,7 @@ export default function ChallanForm(p: ChallanFormProps) {
         {/* Sale / Return Toggle */}
         <div style={{ display: 'flex', gap: 3, marginBottom: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: 2, width: 'fit-content', border: `1px solid ${T.bd}` }}>
           {([{ v: false, label: 'Sale', color: T.gr }, { v: true, label: 'Return', color: T.re }] as const).map(opt => (
-            <div key={String(opt.v)} onClick={() => !p.editing && p.setIsReturn(opt.v)} style={{ padding: '5px 14px', borderRadius: 4, fontSize: 10, fontWeight: p.isReturn === opt.v ? 600 : 400, cursor: p.editing ? 'not-allowed' : 'pointer', opacity: p.editing ? 0.6 : 1, background: p.isReturn === opt.v ? opt.color + '33' : 'transparent', color: p.isReturn === opt.v ? opt.color : T.tx3, border: p.isReturn === opt.v ? `1px solid ${opt.color}44` : 'none' }}>{opt.label}</div>
+            <div key={String(opt.v)} onClick={() => !p.editing && p.setIsReturn(opt.v)} style={{ padding: '5px 14px', borderRadius: 4, fontSize: 10, fontWeight: p.isReturn === opt.v ? 600 : 400, cursor: p.editing ? 'not-allowed' : 'pointer', opacity: p.editing ? 0.6 : 1, background: p.isReturn === opt.v ? alpha(opt.color, 0.2) : 'transparent', color: p.isReturn === opt.v ? opt.color : T.tx3, border: p.isReturn === opt.v ? `1px solid ${alpha(opt.color, 0.27)}` : 'none' }}>{opt.label}</div>
           ))}
         </div>
 

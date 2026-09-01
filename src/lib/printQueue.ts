@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { friendlyError } from './friendlyError';
 import type { PrintSlot, PrintJobInsert } from '../types/database';
 import type { PageSize } from './qzPrint';
 
@@ -183,7 +184,7 @@ export async function printOrQueue(
   if (getPrintMode() === 'cloud') {
     const { error, jobId } = await submitPrintJob(slot, html, pageSize, title, copies);
     if (addToast) {
-      if (error) addToast(error.message, 'error');
+      if (error) addToast(friendlyError(error), 'error');
       else {
         addToast('Print job sent', 'success');
         if (jobId) watchPrintJob(jobId, addToast);

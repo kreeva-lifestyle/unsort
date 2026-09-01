@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { T, S } from '../lib/theme';
+import { T, S, alpha } from '../lib/theme';
 import { supabase } from '../lib/supabase';
 import { connect, isConnected, getSlotPrinter, printHtml, SLOT_LABELS, friendlyPrintError } from '../lib/qzPrint';
 import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
@@ -290,7 +290,7 @@ export default function PrintStation({ active }: { active?: boolean } = {}) {
               </div>
               {j.error_message && <div style={{ fontSize: 10, color: T.re, marginTop: 2 }}>{j.error_message}</div>}
             </div>
-            <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: `${statusColor(j.status)}22`, color: statusColor(j.status), fontWeight: 700, textTransform: 'uppercase' }}>{j.status}</span>
+            <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: alpha(statusColor(j.status), 0.13), color: statusColor(j.status), fontWeight: 700, textTransform: 'uppercase' }}>{j.status}</span>
             {(j.status === 'pending' || j.status === 'failed') && (
               <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                 {j.status === 'failed' && <button onClick={() => retryJob(j.id)} style={{ ...S.btnGhost, ...S.btnSm }}>Retry</button>}

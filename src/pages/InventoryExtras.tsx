@@ -552,7 +552,7 @@ export default function InventoryExtras() {
             </div>
             {error && <div style={{ color: T.re, fontSize: 11, marginBottom: 8 }}>{error}</div>}
             <div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
-              <button onClick={() => { setShowAdd(false); setError(''); }} style={btnGhost}>Cancel</button>
+              <button type="button" onClick={() => { setShowAdd(false); setError(''); }} style={btnGhost}>Cancel</button>
               <button type="submit" style={{ ...btn, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving...' : 'Add'}</button>
             </div>
           </form>

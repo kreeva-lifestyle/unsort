@@ -3,14 +3,18 @@
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import type { AuditLog } from '../../types/database';
+import { useModalLock } from '../../hooks/useModalLock';
+import { useBackClose } from '../../hooks/useBackClose';
 
 export default function AuditTrailModal({ trail, onClose }: { trail: AuditLog[]; onClose: () => void }) {
+  useModalLock();
+  useBackClose(true, onClose);
   return createPortal(
-    <div style={S.modalOverlay}>
-      <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', padding: '18px 16px' }}>
+    <div style={S.modalOverlay} onClick={onClose}>
+      <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', padding: '18px 16px' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Audit Trail</span>
-          <button onClick={onClose} style={{ ...S.btnGhost, ...S.btnSm }}>Close</button>
+          <button type="button" onClick={onClose} aria-label="Close" style={S.modalClose}>&#215;</button>
         </div>
         {trail.length === 0 && <div style={{ padding: 16, textAlign: 'center' as const, color: T.tx3, fontSize: 11 }}>No history for this challan.</div>}
         {trail.map(a => (

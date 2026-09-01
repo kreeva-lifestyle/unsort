@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { useBackClose } from '../../hooks/useBackClose';
 import Toggle from '../ui/Toggle';
-import { T, S } from '../../lib/theme';
+import { T, S, alpha } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { MODULE_LABELS, ALL_MODULE_KEYS } from '../../lib/tabs';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
@@ -192,7 +192,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
             <div key={u.id} className="user-card" style={{ background: T.glass2, border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 16, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', transition: 'border-color .15s' }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = 'oklch(0.55 0.22 265 / .28)')} onMouseLeave={e => (e.currentTarget.style.borderColor = T.bd2)}>
               <div className="user-card-head" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff', flexShrink: 0, boxShadow: `0 0 0 2px ${T.bg}, 0 0 0 3.5px ${ring}66` }}>{(u.full_name || u.email || '?')[0].toUpperCase()}</div>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: `linear-gradient(135deg, ${T.ac}, ${T.ac2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff', flexShrink: 0, boxShadow: `0 0 0 2px ${T.bg}, 0 0 0 3.5px ${alpha(ring, 0.4)}` }}>{(u.full_name || u.email || '?')[0].toUpperCase()}</div>
                 <div style={{ flex: 1, minWidth: 150 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 700, fontSize: 14, color: T.tx, fontFamily: T.sora }}>{u.full_name || 'Unnamed'}</span>

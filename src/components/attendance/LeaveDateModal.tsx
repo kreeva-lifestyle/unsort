@@ -9,6 +9,7 @@ import { T, S } from '../../lib/theme';
 import DateInput from '../ui/DateInput';
 import { AttEmployee } from '../../lib/attendance';
 import { useBackClose } from '../../hooks/useBackClose';
+import { useModalLock } from '../../hooks/useModalLock';
 
 const todayISO = () => {
   const d = new Date();
@@ -24,6 +25,7 @@ export default function LeaveDateModal({ emp, busy, onCancel, onConfirm }: {
   const [err, setErr] = useState('');
 
   useBackClose(true, () => { if (!busy) onCancel(); });
+  useModalLock();
 
   const confirm = () => {
     if (busy) return;
@@ -36,7 +38,7 @@ export default function LeaveDateModal({ emp, busy, onCancel, onConfirm }: {
       <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380 }} onClick={ev => ev.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>Deactivate {emp.name}</div>
-          <span onClick={busy ? undefined : onCancel} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+          <button type="button" onClick={busy ? undefined : onCancel} aria-label="Close" style={S.modalClose}>&#215;</button>
         </div>
         <div style={{ padding: 16 }}>
           <div style={{ marginBottom: 12 }}>
