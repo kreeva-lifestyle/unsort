@@ -22,6 +22,8 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [forgotMsg, setForgotMsg] = useState('');
+  const [forgotSending, setForgotSending] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   const [info, setInfo] = useState('');
   // Two-option entry: when Face ID is enrolled on this device the user picks
   // how to sign in; otherwise straight to the email form.
@@ -56,9 +58,12 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
   };
 
   const handleForgotPassword = async () => {
+    if (forgotSending) return;
     setError(''); setForgotMsg('');
     if (!email.trim()) { setError('Enter your email above first, then tap "Forgot password".'); return; }
+    setForgotSending(true);
     const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin });
+    setForgotSending(false);
     if (resetErr) { setError(friendlyAuthError(resetErr.message)); return; }
     setForgotMsg(`Password reset link sent to ${email.trim()}. Check your email.`);
   };
@@ -143,7 +148,11 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
             </div>
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: 'block', fontSize: 12, color: T.tx2, fontWeight: 500, marginBottom: 6 }}>Password</label>
-              <input type="password" autoComplete="current-password" placeholder="Enter password" value={password} onChange={e => setPassword(e.target.value)} required style={inp} />
+              <div style={{ position: 'relative' }}>
+                <input type={showPw ? 'text' : 'password'} autoComplete="current-password" placeholder="Enter password" value={password} onChange={e => setPassword(e.target.value)} required style={{ ...inp, paddingRight: 64 }} />
+                <button type="button" onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide password' : 'Show password'} aria-pressed={showPw}
+                  style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', minHeight: 40, padding: '0 12px', background: 'transparent', border: 'none', color: T.tx3, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: T.sans }}>{showPw ? 'Hide' : 'Show'}</button>
+              </div>
             </div>
             <button type="submit" disabled={loading} style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', cursor: loading ? 'default' : 'pointer', fontSize: 15, fontWeight: 600, fontFamily: T.sora, color: '#fff', background: `linear-gradient(135deg, ${T.ac}, ${T.bl})`, boxShadow: `0 8px 24px ${T.ac44}`, transition: 'all .2s', filter: loading ? 'brightness(0.7)' : 'none', letterSpacing: 0.3 }}>
               {loading ? 'Signing in...' : 'Sign In'}
@@ -152,7 +161,7 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
               {faceIdOffered && (
                 <button type="button" onClick={() => { setError(''); setMode('choose'); }} style={{ background: 'transparent', border: 'none', color: T.tx3, fontSize: 12, cursor: 'pointer', padding: '6px 10px', fontFamily: T.sans, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.color = T.tx2)} onMouseLeave={e => (e.currentTarget.style.color = T.tx3)}>← Face ID</button>
               )}
-              <button type="button" onClick={handleForgotPassword} style={{ background: 'transparent', border: 'none', color: T.tx3, fontSize: 12, cursor: 'pointer', padding: '6px 10px', fontFamily: T.sans, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.color = T.tx2)} onMouseLeave={e => (e.currentTarget.style.color = T.tx3)}>Forgot password?</button>
+              <button type="button" onClick={handleForgotPassword} disabled={forgotSending} style={{ background: 'transparent', border: 'none', color: T.tx3, fontSize: 12, cursor: 'pointer', padding: '6px 10px', opacity: forgotSending ? 0.5 : 1, pointerEvents: forgotSending ? 'none' : 'auto', fontFamily: T.sans, transition: T.transition }} onMouseEnter={e => (e.currentTarget.style.color = T.tx2)} onMouseLeave={e => (e.currentTarget.style.color = T.tx3)}>{forgotSending ? 'Sending…' : 'Forgot password?'}</button>
             </div>
           </form>
         </div>

@@ -1,4 +1,4 @@
-import { T } from '../../lib/theme';
+import { T, S } from '../../lib/theme';
 
 interface Props { label: string; id: string; onUndo: () => void; onDismiss: () => void }
 
@@ -8,7 +8,7 @@ export default function UndoBar({ label, id, onUndo, onDismiss }: Props) {
       <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ fontSize: 12, color: T.tx, flex: 1 }}>{label}</span>
         <span onClick={onUndo} style={{ padding: '4px 12px', borderRadius: 6, border: `1px solid ${T.ac3}`, cursor: 'pointer', fontSize: 11, fontWeight: 600, background: T.ac3, color: T.ac2 }}>Undo</span>
-        <span onClick={onDismiss} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }} aria-label="Dismiss">✕</span>
+        <button type="button" onClick={onDismiss} style={{ ...S.modalClose, margin: '-8px -8px -8px 0' }} aria-label="Dismiss">&#215;</button>
       </div>
       <div className="undo-bar" key={id} />
     </div>

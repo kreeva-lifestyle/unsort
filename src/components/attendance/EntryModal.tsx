@@ -99,7 +99,7 @@ export default function AttendanceEntryModal({ employees, month, editing, preset
       <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 460 }} onClick={ev => ev.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>{editing ? 'Edit attendance' : 'Add attendance'}</div>
-          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+          <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: 16, overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>

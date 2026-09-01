@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import QRCodeLib from 'qrcode';
 import { T } from '../../lib/theme';
 import { printOrQueue } from '../../lib/printQueue';
+import { friendlyError } from '../../lib/friendlyError';
+import { useNotifications } from '../../hooks/useNotifications';
 import { fetchProgramById, fetchMatchings, fetchPriceWithParts, generateShareToken } from './lib/supabase-rpc';
 import { toDirectImageUrl } from './lib/image-url-converters';
 import { getShareUrl } from './lib/share-token';
@@ -17,6 +19,7 @@ interface Props {
 
 export default function PDFExport({ programId, onClose, t }: Props) {
   const [loading, setLoading] = useState(true);
+  const { addToast } = useNotifications();
 
   useEffect(() => {
     (async () => {
@@ -27,9 +30,9 @@ export default function PDFExport({ programId, onClose, t }: Props) {
           fetchProgramById(programId), fetchMatchings(programId), fetchPriceWithParts(programId),
         ]);
         program = r1.data; matchings = r2.data; parts = r3.parts;
-      } catch { setLoading(false); onClose(); return; }
+      } catch (e) { setLoading(false); addToast(friendlyError(e), 'error'); onClose(); return; }
       setLoading(false);
-      if (!program) { onClose(); return; }
+      if (!program) { addToast('This program could not be found — it may have been deleted', 'error'); onClose(); return; }
       let qrDataUrl = '';
       if (program.voice_note_path) {
         let token = program.share_token;
@@ -49,16 +52,17 @@ export default function PDFExport({ programId, onClose, t }: Props) {
         grandFabricTotal: t('grandFabricTotal'), poweredBy: t('poweredBy'),
         meter: t('meter'), piece: t('piece'), voiceNote: t('voiceNote'),
       };
-      openPrintWindow(program, matchings, parts, L, qrDataUrl);
+      try { await openPrintWindow(program, matchings, parts, L, qrDataUrl, addToast); }
+      catch (e) { addToast(friendlyError(e), 'error'); }
       onClose();
     })();
-  }, [programId, onClose, t]);
+  }, [programId, onClose, t, addToast]);
 
   if (loading) return <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.5)', color: T.tx }}>{t('loading')}</div>;
   return null;
 }
 
-async function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: ProgramPricePart[], L: Record<string, string>, qrDataUrl?: string) {
+async function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: ProgramPricePart[], L: Record<string, string>, qrDataUrl: string, addToast: (m: string, t?: string) => void) {
   const esc = (s: string | null) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const imageUrl = p.dropbox_gdrive_link ? toDirectImageUrl(p.dropbox_gdrive_link) : '';
   let html = '';
@@ -126,5 +130,5 @@ async function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: 
     html +=`<div style="margin:16px 0;text-align:center;border-top:1px solid #eee;padding-top:12px"><p style="font-size:9px;color:#888;margin:0 0 6px;text-transform:uppercase;letter-spacing:1px">${esc(L.voiceNote)} — Scan QR</p><img src="${qrDataUrl}" style="width:120px;height:120px" /></div>`;
   }
   html +=`<div class="footer">${esc(L.poweredBy)}</div></body></html>`;
-  await printOrQueue('document', html, 'A4', `Program ${p.program_uid}`);
+  await printOrQueue('document', html, 'A4', `Program ${p.program_uid}`, undefined, addToast);
 }

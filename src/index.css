@@ -263,6 +263,10 @@ body.modal-open .fab { display: none !important; }
   .mobile-drawer { display: block !important; }
   .desktop-only { display: none !important; }
   .mobile-only { display: flex !important; }
+  /* Text FABs (Salary "Pay"): the generic .fab rule forces the indigo
+     gradient and a 24px/300 glyph face, which turned "Pay" into a thin
+     unreadable word. */
+  .fab.fab-pay { background: linear-gradient(135deg, oklch(0.60 0.17 145), oklch(0.72 0.19 145)) !important; font-size: 13px !important; font-weight: 700 !important; box-shadow: 0 6px 24px oklch(0.72 0.19 145 / .4) !important; }
   .fab { display: flex !important; position: fixed !important; bottom: calc(var(--nav-h) + 12px) !important; right: 16px !important; width: 52px !important; height: 52px !important; border-radius: 50% !important; background: linear-gradient(135deg, oklch(0.55 0.22 265), oklch(0.65 0.18 270)) !important; color: #fff !important; align-items: center !important; justify-content: center !important; font-size: 24px !important; font-weight: 300 !important; box-shadow: 0 6px 24px rgba(99,102,241,.45) !important; z-index: 103 !important; cursor: pointer !important; border: none !important; animation: fi .2s ease !important; }
   .challan-row-actions { display: none !important; }
   .bt-actions-col { display: none !important; }

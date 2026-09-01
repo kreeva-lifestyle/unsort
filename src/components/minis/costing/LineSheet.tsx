@@ -56,7 +56,7 @@ export default function LineSheet({ sub, compName, library, onChange, onRemove, 
             <span style={{ ...S.modalTitle, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub.name.trim() || 'New line'}</span>
             <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>{compName.trim() || 'component'}</span>
           </div>
-          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+          <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: '14px 18px', overflowY: 'auto' }}>
           <label style={S.fLabel}>Sub component <span style={{ color: T.re }}>*</span></label>

@@ -323,7 +323,7 @@ const InstallPrompt = () => {
     <div style={{ position: 'fixed', bottom: 'calc(var(--nav-h, 60px) + 10px)', right: 16, zIndex: 200, background: 'rgba(14,18,30,.96)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: `1px solid ${T.ac3}`, borderRadius: 10, padding: '8px 10px 8px 12px', boxShadow: '0 8px 24px rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', gap: 8, animation: 'slideUp .3s cubic-bezier(.2,.9,.3,1)' }}>
       <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Install app</span>
       <button onClick={() => { deferredPrompt.prompt(); setDeferredPrompt(null); }} style={{ ...S.btnPrimary, padding: '5px 12px', fontSize: 10, flexShrink: 0 }}>Install</button>
-      <span onClick={() => { setDismissed(true); sessionStorage.setItem('pwa-dismiss', '1'); }} style={{ color: T.tx3, cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 4 }} aria-label="Close">&times;</span>
+      <button type="button" onClick={() => { setDismissed(true); sessionStorage.setItem('pwa-dismiss', '1'); }} style={{ ...S.modalClose, margin: '-8px -8px -8px 0' }} aria-label="Close">&#215;</button>
     </div>
   );
 };

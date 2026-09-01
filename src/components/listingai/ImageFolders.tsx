@@ -66,7 +66,7 @@ export default function ImageFolders({ open, onClose, addToast }: {
       <div className="modal-inner" style={{ ...S.modalBox, width: 560 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>Image Folders</div>
-          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+          <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: 16, overflowY: 'auto' }}>
           <div style={{ fontSize: 11, color: T.tx3, marginBottom: 10, lineHeight: 1.5 }}>

@@ -130,7 +130,7 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 400 }} onClick={ev => ev.stopPropagation()}>
             <div style={S.modalHead}>
               <div style={S.modalTitle}>{editing ? `Edit ${editing.name}` : 'Add Employee'}</div>
-              <span onClick={close} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+              <button type="button" onClick={close} style={S.modalClose} aria-label="Close">&#215;</button>
             </div>
             <div style={{ padding: 16 }}>
               <div style={{ marginBottom: 10 }}>

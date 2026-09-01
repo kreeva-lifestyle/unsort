@@ -147,7 +147,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
       <div className="modal-inner" style={{ ...S.modalBox, width: 560 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>{editing ? (editing.id ? 'Edit Template' : 'New Template') : 'Manage Templates'}</div>
-          <span onClick={editing ? requestLeave : onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+          <button type="button" onClick={editing ? requestLeave : onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: 16, overflowY: 'auto' }}>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={onFile} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />

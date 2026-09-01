@@ -197,7 +197,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
         <div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
           <div style={S.modalHead}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Create Short Link</span>
-            <span onClick={closeModal} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }} aria-label="Close">&#215;</span>
+            <button type="button" onClick={closeModal} style={S.modalClose} aria-label="Close">&#215;</button>
           </div>
           <form onSubmit={e => { e.preventDefault(); handleSave(); }} style={{ padding: 16 }}>
             <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Destination URL *</label><input value={form.long_url} onChange={e => setForm({ ...form, long_url: e.target.value })} placeholder="https://example.com/long-page" style={S.fInput} /></div>

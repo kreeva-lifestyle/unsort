@@ -52,7 +52,7 @@ export default function AdjustModal({ emp, kind, month, monthLabel, onClose, onS
       <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 380 }} onClick={ev => ev.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>{isPen ? 'Penalty' : 'Advance'} — {emp.name}</div>
-          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+          <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: 16 }}>
           <div style={{ fontSize: 11, color: T.tx3, marginBottom: 10 }}>

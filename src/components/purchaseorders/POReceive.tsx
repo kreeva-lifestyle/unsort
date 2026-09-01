@@ -82,7 +82,7 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
       <div className="modal-inner" style={{ ...S.modalBox, width: 560 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>Receive — PO #{po.po_number}</span>
-          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&times;</span>
+          <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: '16px 18px', overflowY: 'auto', maxHeight: 'calc(90vh - 130px)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

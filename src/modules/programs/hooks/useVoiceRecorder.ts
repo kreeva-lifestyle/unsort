@@ -46,7 +46,11 @@ export function useVoiceRecorder() {
         });
       }, 1000);
     } catch (e: any) {
-      setError(e?.message || 'Microphone access denied');
+      const name = e?.name;
+      setError(name === 'NotAllowedError' || name === 'SecurityError'
+        ? 'Microphone access was blocked — allow the mic for this site in your phone settings and try again'
+        : name === 'NotFoundError' ? 'No microphone found on this device'
+        : 'Could not start recording — try again');
     }
   }, []);
 
