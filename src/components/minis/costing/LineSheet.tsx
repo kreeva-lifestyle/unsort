@@ -108,7 +108,7 @@ export default function LineSheet({ sub, compName, library, onChange, onRemove, 
           </button>
           {alt && (
             <div style={{ background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 10, padding: '9px 11px', fontSize: 11, color: T.yl, marginTop: 10, lineHeight: 1.5 }}>
-              💡 {alt.name} is {money(alt.saving)}/{sub.unit || 'unit'} cheaper — {money(alt.saving * num(sub.qty))} saved per piece. Tick to switch, or keep your primary if quality/terms are better.
+              Tip: {alt.name} is {money(alt.saving)}/{sub.unit || 'unit'} cheaper — {money(alt.saving * num(sub.qty))} saved per piece. Tick to switch, or keep your primary if quality/terms are better.
             </div>
           )}
 

@@ -1,6 +1,7 @@
 // Excel export for Client Finder results. Same shape as the Dropbox Link
 // Generator's export (bulk.ts:55) so downloads across the app stay consistent.
 import * as XLSX from 'xlsx';
+import { saveWorkbook } from '../../../lib/xlsxDownload';
 import { exportName, fileDate } from '../../../lib/exportName';
 import { kindLabel, type Hit } from './api';
 
@@ -26,5 +27,5 @@ export function exportHitsXlsx(hits: Hit[], subject: string, bestGuess?: string 
   // unreadable without manual resizing on the other end.
   ws['!cols'] = [{ wch: 28 }, { wch: 18 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 60 }, { wch: 70 }, { wch: 70 }];
   XLSX.utils.book_append_sheet(wb, ws, 'Client Finder');
-  XLSX.writeFile(wb, exportName('Client-Finder', [subject, bestGuess || '', fileDate()], 'xlsx'));
+  saveWorkbook(wb, exportName('Client-Finder', [subject, bestGuess || '', fileDate()], 'xlsx'));
 }

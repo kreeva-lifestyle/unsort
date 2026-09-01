@@ -100,7 +100,7 @@ export default function AttendanceTimesheet({ employees, entries, month, onChang
                 </tr>
               );
             })}
-            {rows.length === 0 && <tr><td colSpan={10} style={{ ...S.tdStyle, textAlign: 'center', color: T.tx3, padding: 30 }}>{(empFilter || statusFilter || q) ? <>No entries match the current filters. <span onClick={() => { setEmpFilter(''); setStatusFilter(''); setQ(''); }} style={{ color: T.ac2, cursor: 'pointer', textDecoration: 'underline' }}>Clear filters</span></> : <>No entries for {monthLabel}. Use Import Excel, or “+ Add Entry”, to add the timesheet.</>}</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={10} style={{ ...S.tdStyle, textAlign: 'center', color: T.tx3, padding: 30 }}>{(empFilter || statusFilter || q) ? <>No entries match the current filters. <button type="button" className="touch44" onClick={() => { setEmpFilter(''); setStatusFilter(''); setQ(''); }} style={{ background: 'none', border: 'none', padding: '4px 6px', font: 'inherit', color: T.ac2, cursor: 'pointer', textDecoration: 'underline' }}>Clear filters</button></> : <>No entries for {monthLabel}. Use Import Excel, or “+ Add Entry”, to add the timesheet.</>}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -132,7 +132,7 @@ export default function AttendanceTimesheet({ employees, entries, month, onChang
             </div>
           );
         })}
-        {rows.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{(empFilter || statusFilter || q) ? <>No entries match the filters. <span onClick={() => { setEmpFilter(''); setStatusFilter(''); setQ(''); }} style={{ color: T.ac2, textDecoration: 'underline' }}>Clear filters</span></> : <>No entries for {monthLabel}. Tap + to add one.</>}</div>}
+        {rows.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: T.tx3, fontSize: 12 }}>{(empFilter || statusFilter || q) ? <>No entries match the filters. <button type="button" className="touch44" onClick={() => { setEmpFilter(''); setStatusFilter(''); setQ(''); }} style={{ background: 'none', border: 'none', padding: '4px 6px', font: 'inherit', color: T.ac2, cursor: 'pointer', textDecoration: 'underline' }}>Clear filters</button></> : <>No entries for {monthLabel}. Tap + to add one.</>}</div>}
       </div>
 
       {/* Mobile add FAB */}

@@ -826,7 +826,7 @@ export default function CashBook() {
                 <span style={{ fontSize: 13, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(h.amount).toLocaleString('en-IN')}</span>
               </div>
               {h.notes && <div style={{ fontSize: 10, color: T.tx3, marginBottom: 4 }}>{h.notes}</div>}
-              {h.reason && <div style={{ fontSize: 10, color: T.yl, marginBottom: 4 }}>⚠ {h.reason}</div>}
+              {h.reason && <div style={{ fontSize: 10, color: T.yl, marginBottom: 4 }}>{h.reason}</div>}
               {h.status === 'disputed' && h.reject_reason && <div style={{ fontSize: 10, color: T.re, marginBottom: 4 }}>✕ Rejected: {h.reject_reason}</div>}
               {h.status === 'confirmed' && h.confirmed_at && <div style={{ fontSize: 9, color: T.gr, fontFamily: T.mono, marginBottom: 4 }}>Signed at {new Date(h.confirmed_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
               {h.status === 'disputed' && h.rejected_at && <div style={{ fontSize: 9, color: T.re, fontFamily: T.mono, marginBottom: 4 }}>Rejected at {new Date(h.rejected_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
@@ -877,7 +877,7 @@ export default function CashBook() {
                 <div style={{ fontSize: 9, color: T.ac2, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Cash Flow Summary</div>
                 {!handBreakdown.openingIsSet && (
                   <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .2)', borderRadius: 4, padding: '6px 8px', marginBottom: 6, fontSize: 9, color: T.yl }}>
-                    ⚠ No opening balance set for {handPeriodFrom}. Using ₹0. Set it in Cash Book before initiating if that's wrong.
+                    No opening balance set for {handPeriodFrom}. Using ₹0. Set it in Cash Book before initiating if that's wrong.
                   </div>
                 )}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4, fontFamily: T.mono }}>
@@ -949,7 +949,7 @@ export default function CashBook() {
             {handBreakdown && Math.abs(Number(handAmount) - handBreakdown.available) > 0.01 && (
               <div style={{ marginBottom: 10 }}>
                 <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .2)', borderRadius: 6, padding: '6px 10px', fontSize: 10, color: T.yl, marginBottom: 6 }}>
-                  ⚠ Amount differs from available (₹{handBreakdown.available.toLocaleString('en-IN', { maximumFractionDigits: 2 })}). Reason required:
+                  Amount differs from available (₹{handBreakdown.available.toLocaleString('en-IN', { maximumFractionDigits: 2 })}). Reason required:
                 </div>
                 <input type="text" value={handReason} onChange={e => setHandReason(e.target.value)} placeholder="e.g., Keeping ₹200 as petty cash" style={{ ...S.fInput, width: '100%' }} />
               </div>

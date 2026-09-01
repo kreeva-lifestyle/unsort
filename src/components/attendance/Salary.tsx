@@ -2,7 +2,7 @@
 // owner add penalties and advances (both deduct from this month's net; the
 // modal lives in AdjustModal.tsx), stores the month's results, and exports
 // in-depth PDF payslips (single or combined; HTML builders in payslip.ts).
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S, Pill } from '../../lib/theme';
@@ -14,6 +14,7 @@ import SalaryPaymentFlow from './SalaryPaymentFlow';
 import AdjustModal from './AdjustModal';
 import { useBackClose } from '../../hooks/useBackClose';
 import { docTitle } from '../../lib/exportName';
+import { printOrQueue } from '../../lib/printQueue';
 
 const leftLabel = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
 
@@ -25,6 +26,7 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
   const { profile } = useAuth();
   const canPay = ['admin', 'manager', 'operator'].includes(profile?.role);
   const [pdfHtml, setPdfHtml] = useState<string | null>(null);
+  const pdfFrameRef = useRef<HTMLIFrameElement>(null);
   const [adjFor, setAdjFor] = useState<{ emp: AttEmployee; kind: 'penalty' | 'advance' } | null>(null);
   const [saving, setSaving] = useState(false);
   const [payFlow, setPayFlow] = useState(false);
@@ -275,11 +277,11 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
           <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Salary PDF</span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setPdfHtml(null)} style={{ ...S.btnGhost, flex: 1, maxWidth: 120 }}>Close</button>
-              <button onClick={() => { const f = document.getElementById('att-pdf-frame') as HTMLIFrameElement | null; f?.contentWindow?.focus(); f?.contentWindow?.print(); }} style={{ ...S.btnPrimary, flex: 1, maxWidth: 160 }}>Print / Save</button>
+              <button type="button" onClick={() => setPdfHtml(null)} style={{ ...S.btnGhost, flex: 1, maxWidth: 120 }}>Close</button>
+              <button type="button" onClick={() => printOrQueue('document', pdfHtml, 'A4', 'Salary PDF', undefined, addToast, pdfFrameRef.current)} style={{ ...S.btnPrimary, flex: 1, maxWidth: 160 }}>Print / Save</button>
             </div>
           </div>
-          <iframe id="att-pdf-frame" title="Salary PDF" srcDoc={pdfHtml} style={{ flex: 1, border: 'none', background: '#fff' }} />
+          <iframe ref={pdfFrameRef} title="Salary PDF" srcDoc={pdfHtml} style={{ flex: 1, border: 'none', background: '#fff' }} />
         </div>
       ), document.body)}
 

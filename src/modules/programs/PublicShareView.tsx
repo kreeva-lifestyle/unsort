@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { T } from '../../lib/theme';
+import { T, Icon } from '../../lib/theme';
 import { toDirectImageUrl } from './lib/image-url-converters';
 import { getVoiceNoteUrl } from './lib/supabase-rpc';
 import { en } from './i18n/en';
@@ -45,7 +45,7 @@ export default function PublicShareView({ shareToken }: Props) {
   }, [data]);
 
   if (loading) return <div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.tx3 }}><div className="spinner" style={{ marginRight: 8 }} /> {t('loading')}</div>;
-  if (error || !data) return <div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10, color: T.tx3 }}><div style={{ fontSize: 28 }}>🔗</div><div style={{ fontSize: 13 }}>{error || t('notFound')}</div></div>;
+  if (error || !data) return <div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10, color: T.tx3 }}><div style={{ display: 'flex', opacity: 0.6 }}><Icon name="link" size={28} /></div><div style={{ fontSize: 13 }}>{error || t('notFound')}</div></div>;
 
   const program = data.program;
   const matchings = data.matchings || [];

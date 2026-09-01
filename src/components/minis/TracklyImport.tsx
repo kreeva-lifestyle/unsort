@@ -101,7 +101,7 @@ export default function TracklyImport({ onBack }: { onBack: () => void }) {
           }}>
             {loading ? msg || 'Processing…' : 'Upload .xlsx or .csv'}
           </button>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.txt" onChange={handleFile} style={{ display: 'none' }} />
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain" onChange={handleFile} style={{ display: 'none' }} />
 
           <div style={{ marginTop: 22, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>The CSV will mark each SKU as</div>

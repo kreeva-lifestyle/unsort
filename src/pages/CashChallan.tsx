@@ -852,7 +852,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       }
       await ccAuditLog('VOID', id, `Return #${before.challan_number} (${before.customer_name}) voided — refund ₹${before.total} reversed`, { status: { from: before.status, to: 'voided' } });
       addToast(`Return #${before.challan_number} voided`, 'success');
-      if (before.inventory_deducted) addToast(`⚠ Inventory was updated for this return — please reverse the inventory transaction manually`, 'error');
+      if (before.inventory_deducted) addToast(`Inventory was updated for this return — please reverse the inventory transaction manually`, 'error');
       fetchChallans();
       return;
     }
@@ -865,7 +865,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (!updated || updated.length === 0) { addToast('Challan changed since you opened it (voided or paid elsewhere) — refresh and retry', 'error'); fetchChallans(); return; }
     await ccAuditLog('VOID', id, `Challan #${before.challan_number} (${before.customer_name}) voided — was ₹${before.total}`, { status: { from: before.status, to: 'voided' } });
     addToast(`Challan #${before.challan_number} voided`, 'success');
-    if (before.inventory_deducted) addToast(`⚠ Inventory was deducted for this challan — please reverse the inventory transaction manually`, 'error');
+    if (before.inventory_deducted) addToast(`Inventory was deducted for this challan — please reverse the inventory transaction manually`, 'error');
     fetchChallans();
   };
 

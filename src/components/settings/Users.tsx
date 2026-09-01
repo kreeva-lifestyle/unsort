@@ -208,7 +208,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 20, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', ...(u.is_active ? { background: 'rgba(45,212,160,.10)', color: T.gr } : { background: 'rgba(245,87,92,.10)', color: T.re }) }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', boxShadow: '0 0 6px currentColor' }} />{u.is_active ? 'Active' : 'Inactive'}
                   </span>
-                  {!isYou && <button onClick={() => resetPassword(u)} style={{ ...S.btnGhost, ...S.btnSm, fontSize: 10 }}>Reset Pwd</button>}
+                  {!isYou && <button type="button" className="touch44" onClick={() => resetPassword(u)} style={{ ...S.btnGhost, ...S.btnSm }}>Reset password</button>}
                   {!isYou && <Toggle on={u.is_active} onToggle={() => toggleActive(u.id, u.is_active)} size="sm" />}
                 </div>
               </div>

@@ -8,6 +8,7 @@
 // is done with what it DOES write: column widths (!cols), merged banner rows
 // (!merges) and autofilter. That is enough to make the file readable on open.
 import * as XLSX from 'xlsx';
+import { saveWorkbook } from '../../../lib/xlsxDownload';
 import { exportName, fileDate } from '../../../lib/exportName';
 import type { ComparisonReport } from './buildReport';
 
@@ -79,7 +80,7 @@ export function downloadComparisonWorkbook(rep: ComparisonReport): void {
       : []),
     // Warnings get their own heading instead of trailing off the bottom as
     // loose rows — they change how every count above should be read.
-    ...(rep.warnings.length ? [[], ['⚠ NOTES — read these before acting on the counts above'], ...rep.warnings.map(w => [w])] : []),
+    ...(rep.warnings.length ? [[], ['NOTES — read these before acting on the counts above'], ...rep.warnings.map(w => [w])] : []),
   ];
   // Banner across the width of the sheet table below it.
   sheet(wb, '1 Summary', summary, { merges: [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }] });
@@ -102,5 +103,5 @@ export function downloadComparisonWorkbook(rep: ComparisonReport): void {
   action(SHEETS.notUp, ['SKU', 'CATEGORY', 'MASTER STATUS'], rep.notUploaded,
     'Nothing to do here — the seller has uploaded every product in your master sheet.');
 
-  XLSX.writeFile(wb, exportName('Seller-Comparison', [rep.seller.replace(/\.[^.]+$/, ''), fileDate()], 'xlsx'));
+  saveWorkbook(wb, exportName('Seller-Comparison', [rep.seller.replace(/\.[^.]+$/, ''), fileDate()], 'xlsx'));
 }

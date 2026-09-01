@@ -6,7 +6,7 @@
 // says so plainly rather than implying magic, because the failure mode that
 // matters here is a user reading "no websites found" as "nobody copied this".
 import { useState, useRef, useEffect } from 'react';
-import { T, S } from '../../../lib/theme';
+import { T, S, Icon } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import SkuInput from '../../ui/SkuInput';
 import PhotoPicker from './PhotoPicker';
@@ -380,7 +380,7 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
                   pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1,
                 }}
               >
-                📁 {c.display}
+                <span style={{ display: 'inline-flex', verticalAlign: '-2px', marginRight: 4 }}><Icon name="folder" size={12} /></span>{c.display}
               </button>
             ))}
           </div>

@@ -236,7 +236,7 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
           {err && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>{err}</div>}
           {!result && (
             <label style={{ display: 'block', border: `1px dashed ${T.bd2}`, borderRadius: 10, padding: 24, textAlign: 'center', cursor: busy ? 'default' : 'pointer', background: 'rgba(255,255,255,0.02)' }}>
-              <input type="file" accept=".xlsx,.xls,.csv" disabled={busy} style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+              <input type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" disabled={busy} style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
               <div style={{ fontSize: 13, color: busy ? T.tx3 : T.ac2, fontWeight: 600 }}>{busy ? `Reading ${fileName}…` : 'Choose Excel file'}</div>
               <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>.xlsx · .xls · .csv</div>
             </label>
@@ -250,7 +250,7 @@ export default function ImportExcel({ employees, onClose, onImported, addToast }
               </div>
               {result.warnings.length > 0 && (
                 <div style={{ background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .2)', borderRadius: 8, padding: 10, marginBottom: 10 }}>
-                  {result.warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: T.yl, marginBottom: 3 }}>⚠ {w}</div>)}
+                  {result.warnings.map((w, i) => <div key={i} style={{ fontSize: 11, color: T.yl, marginBottom: 3 }}>{w}</div>)}
                 </div>
               )}
               {result.skipped.length > 0 && (

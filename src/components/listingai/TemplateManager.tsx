@@ -150,7 +150,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
           <button type="button" onClick={editing ? requestLeave : onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: 16, overflowY: 'auto' }}>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={onFile} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" onChange={onFile} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
           {!editing && <>
             <button onClick={() => fileRef.current?.click()} style={{ ...S.btnPrimary, marginBottom: 12 }}>Upload Listing Template sheet</button>
             {templates.length === 0 && (

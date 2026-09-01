@@ -120,12 +120,13 @@ export default function TracklyLanding({ longUrl, onImport }: Props) {
       const data = await res.json();
       if (!data.ok || !Array.isArray(data.sheets)) throw new Error(data.error || 'Could not fetch the sheet');
       const XLSX = await import('xlsx');
+      const { saveWorkbook } = await import('../../lib/xlsxDownload');
       const wb = XLSX.utils.book_new();
       for (const s of data.sheets) {
         if (s.values?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.values), String(s.tab).slice(0, 31));
       }
       if (wb.SheetNames.length === 0) throw new Error('Sheet is empty');
-      XLSX.writeFile(wb, exportName('Stock-Sheet', [fileDate()], 'xlsx'));
+      await saveWorkbook(wb, exportName('Stock-Sheet', [fileDate()], 'xlsx'));
     } catch {
       setDownloadError('Download failed — please try again, or use Self Import.');
     }

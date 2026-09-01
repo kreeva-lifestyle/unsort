@@ -3,7 +3,7 @@
 // operator — a one-tap "Save to master sheet" that writes the folder link into
 // the SKU's IMAGE column. Split out of DropboxLinkGenerator to stay within the
 // file budget.
-import { T, S } from '../../../lib/theme';
+import { T, S, Icon } from '../../../lib/theme';
 import { thumbUrl, GenResult } from './api';
 
 const IMG_RE = /\.(jpe?g|png|webp|heic|heif|gif|bmp|tiff?)$/i;
@@ -36,7 +36,7 @@ export default function LinkResult({ result, saveUrl, canSave, saving, busy, onP
       {(result.candidates || []).map((c, i) => (
         <button key={i} onClick={() => onPickCandidate(c.path)} disabled={busy}
           style={{ ...S.btnGhost, display: 'block', width: '100%', textAlign: 'left', marginTop: 8, padding: '9px 12px', fontSize: 11, fontFamily: T.mono, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>
-          📁 {c.display}
+          <span style={{ display: 'inline-flex', verticalAlign: '-2px', marginRight: 4 }}><Icon name="folder" size={12} /></span>{c.display}
         </button>
       ))}
       {links.map((l, i) => (

@@ -105,7 +105,7 @@ export default function SupplierModal({ subName, suppliers, known, onDone, onClo
             const alt = cheaperAlt({ name: '', qty: '1', unit: '', suppliers: rows });
             return alt ? (
               <div style={{ background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl, marginTop: 10, lineHeight: 1.5 }}>
-                💡 {alt.name} offers this at {money(alt.rate)} — {money(alt.saving)} cheaper than your primary. Tick them to switch, or keep your primary if their quality or terms are better.
+                Tip: {alt.name} offers this at {money(alt.rate)} — {money(alt.saving)} cheaper than your primary. Tick them to switch, or keep your primary if their quality or terms are better.
               </div>
             ) : null;
           })()}

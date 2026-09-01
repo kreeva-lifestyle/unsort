@@ -27,6 +27,7 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
   const [changingPwd, setChangingPwd] = useState(false);
   const [pwd, setPwd] = useState('');
   const [pwdConfirm, setPwdConfirm] = useState('');
+  const [showPwd, setShowPwd] = useState(false);
   const [pwdError, setPwdError] = useState('');
   const [pwdSaving, setPwdSaving] = useState(false);
 
@@ -220,9 +221,10 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
         ) : (
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }} className="two-col">
-              <div><label style={{ ...S.fLabel, marginBottom: 3 }}>New Password</label><input type="password" value={pwd} onChange={e => { setPwd(e.target.value); setPwdError(''); }} placeholder="Min 8 characters" autoFocus style={S.fInput} /></div>
-              <div><label style={{ ...S.fLabel, marginBottom: 3 }}>Confirm</label><input type="password" value={pwdConfirm} onChange={e => { setPwdConfirm(e.target.value); setPwdError(''); }} placeholder="Re-enter" style={S.fInput} /></div>
+              <div><label style={{ ...S.fLabel, marginBottom: 3 }}>New Password</label><input type={showPwd ? 'text' : 'password'} autoComplete="new-password" value={pwd} onChange={e => { setPwd(e.target.value); setPwdError(''); }} placeholder="Min 8 characters" autoFocus style={S.fInput} /></div>
+              <div><label style={{ ...S.fLabel, marginBottom: 3 }}>Confirm</label><input type={showPwd ? 'text' : 'password'} autoComplete="new-password" value={pwdConfirm} onChange={e => { setPwdConfirm(e.target.value); setPwdError(''); }} placeholder="Re-enter" style={S.fInput} /></div>
             </div>
+            <div style={{ marginBottom: 6 }}><button type="button" className="touch44" onClick={() => setShowPwd(v => !v)} aria-pressed={showPwd} style={{ background: 'none', border: 'none', padding: '4px 0', fontSize: 11, color: T.ac2, cursor: 'pointer', fontFamily: T.sans }}>{showPwd ? 'Hide passwords' : 'Show passwords'}</button></div>
             {pwdError && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '5px 10px', fontSize: 10, color: T.re, marginBottom: 8 }}>{pwdError}</div>}
             <div style={{ display: 'flex', gap: 6 }}>
               <button onClick={async () => {

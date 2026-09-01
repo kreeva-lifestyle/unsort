@@ -124,7 +124,7 @@ export default function DropboxLinkGenerator({ addToast }: { addToast: (m: strin
             land at ~32px. Same as modeBtn above. */}
         <button onClick={requestGenOne} disabled={busy || !sku.trim()} style={{ ...S.btnPrimary, minHeight: 36, pointerEvents: busy ? 'none' : 'auto', opacity: busy || !sku.trim() ? 0.5 : 1 }}>{busy ? 'Generating…' : 'Generate Link'}</button>
         <button onClick={() => setShowPaste(p => !p)} style={{ ...S.btnGhost, minHeight: 36, color: T.ac2, border: '1px solid oklch(0.55 0.22 265 / .2)' }}>{showPaste ? 'Hide paste' : 'Paste SKUs'}</button>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) importFile(f); e.target.value = ''; }} />
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) importFile(f); e.target.value = ''; }} />
         <button onClick={() => fileRef.current?.click()} disabled={bulkBusy} style={{ ...S.btnGhost, minHeight: 36, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)', pointerEvents: bulkBusy ? 'none' : 'auto', opacity: bulkBusy ? 0.5 : 1 }}>{bulkBusy ? `Bulk… ${progress.done}/${progress.total}` : 'Bulk from Excel'}</button>
         {bulk && bulk.length > 0 && !bulkBusy && <button onClick={() => exportBulkXlsx(bulk)} style={{ ...S.btnGhost, minHeight: 36, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export {bulk.length}</button>}
       </div>

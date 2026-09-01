@@ -131,7 +131,7 @@ export default function MasterAssistant({ onBack, addToast, openListingAI }: {
 
       {/* attached-sheet chip */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }}
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style={{ display: 'none' }}
           onChange={e => { const f = e.target.files?.[0]; if (f) pickFile(f); e.target.value = ''; }} />
         {sheet ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: 'oklch(0.72 0.19 145 / .08)', border: '1px solid oklch(0.72 0.19 145 / .25)', fontSize: 11, color: T.gr }}>

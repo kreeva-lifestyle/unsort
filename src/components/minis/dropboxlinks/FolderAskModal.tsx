@@ -4,7 +4,7 @@
 // Generate / bulk run asks again.
 import { createPortal } from 'react-dom';
 import { useEffect } from 'react';
-import { T, S } from '../../../lib/theme';
+import { T, S, Icon } from '../../../lib/theme';
 import { useBackClose } from '../../../hooks/useBackClose';
 import { GenRoot } from './api';
 
@@ -33,7 +33,7 @@ export default function FolderAskModal({ roots, onPick, onClose }: {
           {roots.map(r => (
             <button key={r.url} onClick={() => onPick(r.url)}
               style={{ ...S.btnGhost, display: 'block', width: '100%', textAlign: 'left', marginBottom: 8, padding: '11px 12px', minHeight: 44, fontSize: 12, fontWeight: 600 }}>
-              📁 {r.label || r.url.slice(-24)}
+              <span style={{ display: 'inline-flex', verticalAlign: '-2px', marginRight: 4 }}><Icon name="folder" size={12} /></span>{r.label || r.url.slice(-24)}
             </button>
           ))}
           <button onClick={() => onPick('')}

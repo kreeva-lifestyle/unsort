@@ -3,10 +3,12 @@ import { createPortal } from 'react-dom';
 import { numericKeyDown } from '../lib/numericInput';
 import { printOrQueue } from '../lib/printQueue';
 import * as XLSX from 'xlsx';
+import { saveWorkbook } from '../lib/xlsxDownload';
 import { supabase } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
 import BrandTagModalNew from '../components/ui/BrandTagModal';
 import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
+import ActionSheet from '../components/ui/ActionSheet';
 import { friendlyError } from '../lib/friendlyError';
 import type { BrandTag, BrandTagInsert } from '../types/database';
 // Bundle JsBarcode instead of loading it from a CDN inside the print iframe. A
@@ -20,7 +22,7 @@ const JSBARCODE_INLINE = jsBarcodeSrc.replace(/<\/script/gi, '<\\/script');
 
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
-import { T, S } from '../lib/theme';
+import { T, S, Icon } from '../lib/theme';
 import { useBackClose } from '../hooks/useBackClose';
 import { exportName, fileDate, docTitle } from '../lib/exportName';
 
@@ -267,6 +269,9 @@ export default function BrandTagPrinter() {
   const [orderPage, setOrderPage] = useState(0);
   const [orderPerPage, setOrderPerPage] = useState(10);
   const [confirmDel, setConfirmDel] = useState<{ id: string; sku: string } | null>(null);
+  // Phones hide the Actions column (.bt-actions-col); a row tap opens this
+  // sheet instead so Edit / Print / Delete stay reachable.
+  const [sheetRow, setSheetRow] = useState<BrandTagRow | null>(null);
   const [btPage, setBtPage] = useState(0);
   const [btPerPage, setBtPerPage] = useState(10);
 
@@ -392,7 +397,7 @@ export default function BrandTagPrinter() {
           const ws = XLSX.utils.json_to_sheet(errorRows as any[]);
           const wb = XLSX.utils.book_new();
           XLSX.utils.book_append_sheet(wb, ws, 'Import Errors');
-          XLSX.writeFile(wb, exportName('Brand-Tags-Import-Errors', [fileDate()], 'xlsx'));
+          saveWorkbook(wb, exportName('Brand-Tags-Import-Errors', [fileDate()], 'xlsx'));
           addToast(`Import rejected — ${errors.length} row(s) missing data. Error report downloaded.`, 'error');
           return;
         }
@@ -442,7 +447,7 @@ export default function BrandTagPrinter() {
   }, [addToast]);
 
   // ── Export Excel ──
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     if (rows.length === 0) { addToast('Nothing to export — add or import SKUs first', 'error'); return; }
     const data = rows.map(r => ({
       'BRAND NAME': r.brand,
@@ -460,8 +465,7 @@ export default function BrandTagPrinter() {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Brand Tags');
-    XLSX.writeFile(wb, exportName('Brand-Tags', [fileDate()], 'xlsx'));
-    addToast(`Exported ${rows.length} brand tag${rows.length !== 1 ? 's' : ''}`, 'success');
+    if (await saveWorkbook(wb, exportName('Brand-Tags', [fileDate()], 'xlsx'))) addToast(`Exported ${rows.length} brand tag${rows.length !== 1 ? 's' : ''}`, 'success');
   }, [rows, addToast]);
 
   // ── Row Mutations ──
@@ -580,10 +584,10 @@ export default function BrandTagPrinter() {
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {orderLoading && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: T.yl }}><span style={{ width: 10, height: 10, border: '1.5px solid oklch(0.78 0.18 75 / .2)', borderTopColor: T.yl, borderRadius: '50%', animation: 'btnSpin .6s linear infinite', flexShrink: 0 }} />{orderLoadMsg}</span>}
-          <input ref={orderFileRef} type="file" accept=".xlsx,.xls" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} onChange={handleOrderImport} />
-          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} onChange={handleImport} />
-          <div style={{ position: 'relative' }} className="desktop-only">
-            <button style={S.btnGhost} onClick={() => setMoreMenuOpen(o => !o)}>
+          <input ref={orderFileRef} type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} onChange={handleOrderImport} />
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} onChange={handleImport} />
+          <div style={{ position: 'relative' }}>
+            <button type="button" style={S.btnGhost} onClick={() => setMoreMenuOpen(o => !o)}>
               <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
               Import / Export
             </button>
@@ -597,7 +601,7 @@ export default function BrandTagPrinter() {
                     { label: 'Export to Excel', action: handleExport },
                     { label: 'Test print', action: printTestLabel },
                   ].map((opt, i) => (
-                    <div key={i} onClick={() => { setMoreMenuOpen(false); opt.action(); }} style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, color: T.tx2, borderRadius: 5, transition: 'all .12s' }} onMouseEnter={e => { e.currentTarget.style.background = 'oklch(0.55 0.22 265 / .08)'; e.currentTarget.style.color = T.tx; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx2; }}>{opt.label}</div>
+                    <div key={i} className="touch44" onClick={() => { setMoreMenuOpen(false); opt.action(); }} style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 12, color: T.tx2, borderRadius: 5, transition: 'all .12s', whiteSpace: 'nowrap' }} onMouseEnter={e => { e.currentTarget.style.background = 'oklch(0.55 0.22 265 / .08)'; e.currentTarget.style.color = T.tx; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx2; }}>{opt.label}</div>
                   ))}
                 </div>
               </>
@@ -627,6 +631,7 @@ export default function BrandTagPrinter() {
       </div>
 
       {/* Table */}
+      <div className="mobile-only" style={{ display: 'none', fontSize: 10, color: T.tx3, marginBottom: 6 }}>Tap a row to edit, print or delete it</div>
       <div style={{ overflowX: 'auto', border: `1px solid ${T.bd}`, borderRadius: 8, background: 'rgba(255,255,255,0.015)', marginBottom: 8 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead><tr>
@@ -637,7 +642,7 @@ export default function BrandTagPrinter() {
           <tbody>
             {rows.length === 0 && !loading && <tr><td colSpan={8} style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No rows. Import Excel or add SKUs.</td></tr>}
             {rows.map(row => (
-              <tr key={row.id} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.015)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+              <tr key={row.id} className="bt-row" onClick={() => { if (window.innerWidth <= 768) setSheetRow(row); }} style={{ transition: 'background .1s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.015)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
                 <td style={tdS}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: 'oklch(0.55 0.22 265 / .10)', color: T.ac2 }}>{row.brand.replace(/^BRAND NAME:\s*/i, '')}</span></td>
                 <td style={tdS}><div style={{ fontFamily: T.mono, fontSize: 11, color: T.tx3 }}>{row.sku}</div><div style={{ fontWeight: 500, color: T.tx, marginTop: 1 }}>{row.product.replace(/^PRODUCT DESC:\s*/i, '')}</div></td>
                 <td style={tdS}>{row.size}</td>
@@ -645,10 +650,10 @@ export default function BrandTagPrinter() {
                 <td style={{ ...tdS, fontFamily: T.mono, fontSize: 12, whiteSpace: 'nowrap', fontWeight: 600 }}>{fmtMrp(row.mrp)}</td>
                 <td style={{ ...tdS, fontFamily: T.mono, fontSize: 11, color: T.tx3 }}>{row.jioCode}</td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-                    <button onClick={() => { const old = row.copies || 0; const v = Math.max(0, old - 1); setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Decrease copies" className="step44">−</button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 0 }} onClick={e => e.stopPropagation()}>
+                    <button type="button" onClick={() => { const old = row.copies || 0; const v = Math.max(0, old - 1); setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '6px 0 0 6px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Decrease copies" className="step44">−</button>
                     <span className="step44-val" style={{ width: 32, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${T.bd}`, borderBottom: `1px solid ${T.bd}`, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: row.copies > 0 ? T.ac2 : T.tx3, background: row.copies > 0 ? 'oklch(0.55 0.22 265 / .06)' : 'transparent' }}>{row.copies || 0}</span>
-                    <button onClick={() => { const old = row.copies || 0; const v = old + 1; setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Increase copies" className="step44">+</button>
+                    <button type="button" onClick={() => { const old = row.copies || 0; const v = old + 1; setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: v } : r)); supabase.from('brand_tags').update({ copies: v }).eq('id', row.id).then(({ error }) => { if (error) { setRows(prev => prev.map(r => r.id === row.id ? { ...r, copies: old } : r)); addToast(friendlyError(error), 'error'); } }); }} style={{ width: 36, height: 36, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', borderRadius: '0 6px 6px 0', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Increase copies" className="step44">+</button>
                   </div>
                 </td>
                 <td style={{ ...tdS, whiteSpace: 'nowrap' }} className="bt-actions-col">
@@ -709,13 +714,13 @@ export default function BrandTagPrinter() {
                   const ws = XLSX.utils.json_to_sheet(exportData);
                   const wb = XLSX.utils.book_new();
                   XLSX.utils.book_append_sheet(wb, ws, 'Order Preview');
-                  XLSX.writeFile(wb, exportName('Brand-Tags-Order', [orderRows?.[0]?.marketplace, fileDate()], 'xlsx'));
+                  saveWorkbook(wb, exportName('Brand-Tags-Order', [orderRows?.[0]?.marketplace, fileDate()], 'xlsx'));
                 }}>Export</button>
                 <button onClick={() => setOrderRows(null)} style={S.btnIcon} aria-label="Close">✕</button>
               </div>
             </div>
             {missing.length > 0 && <div style={{ padding: '8px 14px', background: 'rgba(248,113,113,.05)', borderBottom: `1px solid rgba(248,113,113,.12)`, display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 10, color: T.re, lineHeight: 1.5 }}>
-              <span style={{ fontSize: 12, flexShrink: 0 }}>⚠</span>
+              <span style={{ display: 'inline-flex', flexShrink: 0, marginTop: 1 }}><Icon name="alert" size={13} /></span>
               <div><strong>{missing.length} SKU{missing.length > 1 ? 's' : ''} not found in master data.</strong> Printing is blocked until all SKUs are resolved. Go to the Brand Tags table, add the missing SKU{missing.length > 1 ? 's' : ''} ({missing.map(m => m.sku).join(', ')}), then re-import this order sheet.</div>
             </div>}
             <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
@@ -804,6 +809,17 @@ export default function BrandTagPrinter() {
       )}
       </>}
       <ConfirmModal {...confirmModalProps} />
+      <ActionSheet
+        open={!!sheetRow}
+        title={sheetRow?.sku || ''}
+        subtitle={sheetRow ? sheetRow.product.replace(/^PRODUCT DESC:\s*/i, '') : undefined}
+        onClose={() => setSheetRow(null)}
+        actions={sheetRow ? [
+          { label: 'Edit tag', onClick: () => openEdit(sheetRow) },
+          { label: 'Print this label', color: T.bl, onClick: () => printSingle(sheetRow) },
+          { label: 'Delete', danger: true, onClick: () => deleteRow(sheetRow.id, sheetRow.sku) },
+        ] : []}
+      />
     </div>
   );
 }
