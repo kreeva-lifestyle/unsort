@@ -144,12 +144,16 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
 
   return createPortal(
     <div style={S.modalOverlay} onClick={onClose}>
-      <div className="modal-inner" style={{ ...S.modalBox, width: 640 }} onClick={e => e.stopPropagation()}>
+      {/* Flex column: head fixed, ONE scrolling body, footer always visible.
+          The old inner scroller was sized with desktop maths (90vh - 130px),
+          taller than the mobile bottom sheet (85dvh) - the footer got pushed
+          off-screen and two scroll areas fought over the touch. */}
+      <div className="modal-inner" style={{ ...S.modalBox, width: 640, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>{editing ? `Edit PO #${editing.po_number}` : duplicateFrom ? 'Duplicate Purchase Order' : 'New Purchase Order'}</span>
           <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&times;</span>
         </div>
-        <div style={{ padding: '16px 18px', overflowY: 'auto', maxHeight: 'calc(90vh - 130px)' }}>
+        <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 12 }}>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={S.fLabel}>Vendor *</label>
@@ -243,9 +247,9 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
 
           {error && <div style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}
         </div>
-        <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={S.btnGhost}>Cancel</button>
-          <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Save draft'}</button>
+        <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end', flexShrink: 0 }}>
+          <button onClick={onClose} style={{ ...S.btnGhost, minHeight: 44 }}>Cancel</button>
+          <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Save draft'}</button>
         </div>
       </div>
     </div>,
