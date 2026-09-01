@@ -8,7 +8,7 @@ import { SkeletonRows } from '../ui/Skeleton';
 import { PO_TYPE_LABELS, PO_STATUS_LABELS, PO_STATUSES } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 
-export type PORow = PurchaseOrder & { purchase_order_items?: Array<Pick<PurchaseOrderItem, 'quantity' | 'received_qty'>> };
+export type PORow = PurchaseOrder & { purchase_order_items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'quantity' | 'received_qty'>> };
 
 interface Props {
   pos: PORow[];
@@ -49,6 +49,18 @@ const StatusPill = ({ status, sc }: { status: string; sc: { bg: string; color: s
     {PO_STATUS_LABELS[status as keyof typeof PO_STATUS_LABELS] || status}
   </span>
 );
+
+// "What's on this PO" at a glance (owner's ask): first line-item's SKU and
+// name, then how many more — the full list stays one tap away in the detail.
+const itemsLabel = (po: PORow) => {
+  const its = po.purchase_order_items || [];
+  if (its.length === 0) return { head: '—', sub: '' };
+  const f = its[0];
+  const sku = (f.sku || '').trim();
+  const name = (f.item_name || '').trim();
+  const sub = [sku && name ? name : '', its.length > 1 ? `+${its.length - 1} more` : ''].filter(Boolean).join(' · ');
+  return { head: sku || name || 'item', sub };
+};
 
 const progress = (po: PORow) => {
   const its = po.purchase_order_items || [];
@@ -109,7 +121,7 @@ export default function POList(p: Props) {
       {!p.loading && p.pos.length > 0 && <div className="desktop-only" style={{ border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860, tableLayout: 'fixed' }}>
-            <colgroup><col style={{ width: '9%' }} /><col style={{ width: '22%' }} /><col style={{ width: '11%' }} /><col style={{ width: '10%' }} /><col style={{ width: '12%' }} /><col style={{ width: '13%' }} /><col style={{ width: '13%' }} /><col style={{ width: 44 }} /></colgroup>
+            <colgroup><col style={{ width: '9%' }} /><col style={{ width: '18%' }} /><col style={{ width: '10%' }} /><col style={{ width: '17%' }} /><col style={{ width: '11%' }} /><col style={{ width: '12%' }} /><col style={{ width: '13%' }} /><col style={{ width: 44 }} /></colgroup>
             <thead><tr style={{ borderBottom: `1px solid ${T.bd}` }}>
               <th style={S.thStyle}>PO #</th><th style={S.thStyle}>Vendor</th><th style={S.thStyle}>Type</th><th style={S.thStyle}>Items</th><th style={{ ...S.thStyle, textAlign: 'right' }}>Total</th><th style={S.thStyle}>Received</th><th style={{ ...S.thStyle, textAlign: 'center' }}>Status</th><th style={S.thStyle} />
             </tr></thead>
@@ -122,7 +134,10 @@ export default function POList(p: Props) {
                     <td style={S.tdStyle}><span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.ac2 }}>#{po.po_number}</span><div style={{ fontSize: 9, color: T.tx3, marginTop: 1 }}>{po.po_date ? new Date(po.po_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}</div></td>
                     <td style={S.tdStyle}><div style={{ fontWeight: 600, fontSize: 13, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{po.vendor_name}</div>{po.vendor_phone && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{po.vendor_phone}</div>}</td>
                     <td style={S.tdStyle}><span style={{ fontSize: 12, color: T.tx2 }}>{PO_TYPE_LABELS[po.po_type] || po.po_type}</span></td>
-                    <td style={S.tdStyle}><span style={{ fontSize: 12, color: T.tx2 }}>{pr.count} item{pr.count === 1 ? '' : 's'}</span></td>
+                    <td style={S.tdStyle}>{(() => { const il = itemsLabel(po); return (<>
+                      <div style={{ fontSize: 12, fontFamily: T.mono, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{il.head}</div>
+                      {il.sub && <div style={{ fontSize: 9, color: T.tx3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{il.sub}</div>}
+                    </>); })()}</td>
                     <td style={{ ...S.tdStyle, textAlign: 'right' }}><span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(po.grand_total || 0).toLocaleString('en-IN')}</span></td>
                     <td style={S.tdStyle}>
                       {(po.status === 'partially_received' || po.status === 'completed') ? (
@@ -166,7 +181,7 @@ export default function POList(p: Props) {
                 </div>
                 <div style={{ fontSize: 11, color: T.tx3, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span>{PO_TYPE_LABELS[po.po_type] || po.po_type}</span><span>·</span>
-                  <span>{pr.count} item{pr.count === 1 ? '' : 's'}</span>
+                  {(() => { const il = itemsLabel(po); return <span style={{ color: T.tx2 }}>{il.head}{il.sub ? ` · ${il.sub}` : ''}</span>; })()}
                   {po.po_date && <><span>·</span><span>{new Date(po.po_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span></>}
                   {(po.status === 'partially_received' || po.status === 'completed') && <><span>·</span><span style={{ color: pr.pct >= 100 ? T.gr : T.yl }}>{pr.pct}% received</span></>}
                 </div>
