@@ -71,7 +71,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const fetchPos = useCallback(async (silent = false) => {
     const seq = ++fetchSeq.current;
     if (!silent) setLoading(true);
-    let q = supabase.from('purchase_orders').select(`${COLS}, purchase_order_items(quantity, received_qty)`, { count: 'estimated' });
+    let q = supabase.from('purchase_orders').select(`${COLS}, purchase_order_items(sku, item_name, quantity, received_qty)`, { count: 'estimated' });
     if (debouncedSearch) {
       // Vendor name always matches; a pure number also matches the PO #; and
       // ANY term (numeric SKUs like "15003" included) also matches line-item
