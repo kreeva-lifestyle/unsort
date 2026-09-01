@@ -15,7 +15,7 @@ interface BrandTagRow {
 interface Props {
   mode: 'add' | 'edit';
   initial: BrandTagRow;
-  onSave: (row: BrandTagRow) => void;
+  onSave: (row: BrandTagRow) => void | boolean | Promise<void | boolean>; // false = keep the form open
   onClose: () => void;
   brandOptions: string[];
   productOptions: string[];
@@ -58,7 +58,9 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
     const bad = validateRow(form);
     if (bad) { setError(`"${bad}" is required.`); return; }
     setSaving(true);
-    onSave(form);
+    // A parent that resolves false failed to write — keep the form open so
+    // the edits are not lost. Unmount-after-success makes the reset a no-op.
+    Promise.resolve(onSave(form)).then(ok => { if (ok === false) setSaving(false); });
   };
 
   React.useEffect(() => {

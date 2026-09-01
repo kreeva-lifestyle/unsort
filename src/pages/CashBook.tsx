@@ -28,6 +28,7 @@ import type {
   Profile,
 } from '../types/database';
 import { exportName, docTitle, fileRange } from '../lib/exportName';
+import { downloadFile } from '../lib/downloadFile';
 
 const CATEGORIES = ['Office Supplies', 'Rent', 'Salaries', 'Travel', 'Utilities', 'Food', 'Transport', 'Misc', 'Others'];
 
@@ -76,6 +77,9 @@ export default function CashBook() {
   const [formError, setFormError] = useState('');
   const [expSaving, setExpSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  // WhatsApp link for a just-created handover — offered as a tap, never a
+  // navigation, so the PWA is not dumped into the browser (see createHandover).
+  const [waLink, setWaLink] = useState<string | null>(null);
   // Admin-only correction of a LOCKED expense (inside a signed handover
   // period): the original stays untouched — a counter-entry dated today fixes
   // the running cash math without altering the signed record.
@@ -405,11 +409,10 @@ export default function CashBook() {
     // WhatsApp notification to recipient
     if (recipient.phone) {
       const msg = encodeURIComponent(`Hi ${recipient.full_name},\n${prof?.full_name || 'Sender'} has initiated cash handover ${hoNo} of ₹${amt.toLocaleString('en-IN')} for you (period ${handPeriodFrom} to ${handPeriodTo}).\nPlease open DailyOffice → Cash Book → Handovers and sign with your PIN to confirm receipt, or reject with a reason.\n— Arya Designs`);
-      // Open WhatsApp WITHOUT navigating the app away — the handover is already
-      // saved, and location.href here used to dump desktop users out of the PWA.
-      const waUrl = `https://wa.me/${waPhone(recipient.phone)}?text=${msg}`;
-      const w = window.open(waUrl, '_blank', 'noopener');
-      if (!w) window.location.href = waUrl; // popup blocked — fall back to same-tab
+      // Never navigate the app away — the handover is already saved, and a
+      // location.href here used to dump users out of the PWA. A real <a>
+      // tapped by the user is the only reliable way to open WhatsApp.
+      setWaLink(`https://wa.me/${waPhone(recipient.phone)}?text=${msg}`);
     }
     setHandSaving(false); setHandAmount(''); setHandToId(''); setHandNotes(''); setHandReason(''); setHandBreakdown(null); setShowHandover(false);
     fetchData();
@@ -655,7 +658,7 @@ export default function CashBook() {
   const filteredSales = sq ? sales.filter(s => (s.customer_name || '').toLowerCase().includes(sq) || String(s.challan_number || '').includes(sq)) : sales;
   const filteredHandovers = sq ? handovers.filter(h => (h.from_user_name || '').toLowerCase().includes(sq) || (h.to_user_name || '').toLowerCase().includes(sq) || (h.notes || '').toLowerCase().includes(sq)) : handovers;
 
-  const exportCSV = () => {
+  const exportCSV = async () => {
     // Export what's on screen: the filtered arrays, so an active search and
     // the file agree (previously exported the unfiltered range).
     const rowsForTab = tab === 'expenses' ? filteredExpenses : tab === 'sales' ? filteredSales : filteredHandovers;
@@ -674,10 +677,9 @@ export default function CashBook() {
       label = 'Handovers';
       csv = 'Handover#,Date,From,To,Amount,Status\n' + filteredHandovers.map(h => `${h.handover_number},${h.date},${esc(h.from_user_name)},${esc(h.to_user_name)},${h.amount},${h.status}`).join('\n');
     }
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = exportName('CashBook', [label, fileRange(fromDate, toDate)], 'csv'); a.click(); URL.revokeObjectURL(url);
-    addToast(`Exported ${rowsForTab.length} ${label.toLowerCase()}`, 'success');
+    try {
+      if (await downloadFile(new Blob([csv], { type: 'text/csv' }), exportName('CashBook', [label, fileRange(fromDate, toDate)], 'csv'))) addToast(`Exported ${rowsForTab.length} ${label.toLowerCase()}`, 'success');
+    } catch (e) { addToast(friendlyError(e), 'error'); }
   };
 
   return (
@@ -688,7 +690,7 @@ export default function CashBook() {
           <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
           <DateInput value={toDate} onChange={e => setToDate(e.target.value)} />
           {(search || fromDate !== today || toDate !== today) && <button onClick={() => { setSearch(''); setFromDate(today); setToDate(today); }} style={{ ...S.btnGhost, ...S.btnSm }}>Clear</button>}
-          <button className="desktop-only" onClick={exportCSV} style={{ ...S.btnGhost, height: 36 }}>Export</button>
+          <button type="button" onClick={exportCSV} style={{ ...S.btnGhost, height: 36 }}>Export</button>
         </div>
         <div style={{ position: 'relative', maxWidth: 200 }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, strokeLinecap: 'round' as const, opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
@@ -841,6 +843,15 @@ export default function CashBook() {
         </div>
       </>}
 
+      {/* WhatsApp notify bar for a just-created handover */}
+      {waLink && createPortal(
+        <div style={{ position: 'fixed', bottom: 'calc(var(--nav-h, 70px) + 10px)', left: '50%', transform: 'translateX(-50%)', zIndex: 300, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '10px 14px', boxShadow: '0 8px 30px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 12, animation: 'su .2s ease', minWidth: 280, maxWidth: 'calc(100vw - 24px)' }}>
+          <span style={{ flex: 1, fontSize: 12, color: T.tx }}>Notify the recipient on WhatsApp?</span>
+          <a href={waLink} target="_blank" rel="noopener noreferrer" onClick={() => setWaLink(null)} style={{ ...S.btnPrimary, background: '#25D366', boxShadow: 'none', fontSize: 11, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>Send</a>
+          <button type="button" onClick={() => setWaLink(null)} style={S.modalClose} aria-label="Dismiss">&#215;</button>
+        </div>,
+        document.body)}
+
       {/* Initiate Handover Modal */}
       {showHandover && createPortal(
         <div style={{ ...S.modalOverlay }}>
@@ -967,7 +978,7 @@ export default function CashBook() {
                 <span style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora }}>Handover Details</span>
                 <div style={{ fontSize: 11, fontFamily: T.mono, color: T.ac2, fontWeight: 600, marginTop: 2 }}>{formatHandoverNo(viewingHandover.handover_number)}</div>
               </div>
-              <button onClick={() => setViewingHandover(null)} style={{ padding: '3px 10px', borderRadius: 5, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, cursor: 'pointer' }}>Close</button>
+              <button type="button" onClick={() => setViewingHandover(null)} style={S.modalClose} aria-label="Close">&#215;</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12, fontSize: 11 }}>
               <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>From</div><div style={{ color: T.tx, fontWeight: 600 }}>{viewingHandover.from_user_name}</div></div>

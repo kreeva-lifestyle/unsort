@@ -490,15 +490,19 @@ export default function BrandTagPrinter() {
     setModalRow({ ...row });
   }, []);
 
-  const handleModalSave = useCallback((updated: BrandTagRow) => {
+  // Resolves only after the write lands, so the modal's "Saving…" state is
+  // real and a failed save keeps the form open instead of losing the edits.
+  const handleModalSave = useCallback(async (updated: BrandTagRow): Promise<boolean> => {
     const dbRow: BrandTagInsert = { brand: updated.brand, ean: updated.ean, sku: updated.sku, qty: updated.qty, mrp: updated.mrp, size: updated.size, product: updated.product, color: updated.color, mktd: updated.mktd, jio_code: updated.jioCode, copies: updated.copies };
-    if (modalMode === 'add') {
-      supabase.from('brand_tags').insert(dbRow).then(({ error }) => { if (error) addToast('Save failed — ' + friendlyError(error), 'error'); else { addToast(`SKU ${updated.sku} added`, 'success'); fetchPage(); } });
-    } else {
-      supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id).then(({ error }) => { if (error) addToast('Update failed — ' + friendlyError(error), 'error'); else { addToast(`SKU ${updated.sku} updated`, 'success'); fetchPage(); } });
-    }
+    const { error } = modalMode === 'add'
+      ? await supabase.from('brand_tags').insert(dbRow)
+      : await supabase.from('brand_tags').update({ ...dbRow, updated_at: new Date().toISOString() }).eq('id', updated.id);
+    if (error) { addToast((modalMode === 'add' ? 'Save failed — ' : 'Update failed — ') + friendlyError(error), 'error'); return false; }
+    addToast(`SKU ${updated.sku} ${modalMode === 'add' ? 'added' : 'updated'}`, 'success');
+    fetchPage();
     setModalRow(null);
-  }, [modalMode, fetchPage]);
+    return true;
+  }, [modalMode, fetchPage, addToast]);
 
   // ── Print Handlers ──
   const printSingle = useCallback((row: BrandTagRow) => {
@@ -782,7 +786,7 @@ export default function BrandTagPrinter() {
 
       {/* ── Label Print Preview (iframe-based; no popup required) ── */}
       {printHtml && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', overscrollBehavior: 'contain' }}>
           <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
             <div>
               <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: "'Sora',sans-serif" }}>Label Print Preview</span>

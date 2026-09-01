@@ -271,7 +271,7 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
 
       {/* PDF preview overlay */}
       {pdfHtml && createPortal((
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', overscrollBehavior: 'contain', paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Salary PDF</span>
             <div style={{ display: 'flex', gap: 8 }}>

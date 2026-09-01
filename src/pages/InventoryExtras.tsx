@@ -172,9 +172,11 @@ export default function InventoryExtras() {
       .eq('status', 'unsorted').eq('serial_number', ex.sku).eq('product_id', ex.product_id);
     if (ex.size && ex.size !== 'N/A') q = q.eq('size', ex.size);
     const { data: candidates, error: cErr } = await q;
-    if (cErr) { setError('Failed to load matches: ' + friendlyError(cErr)); setMatches([]); return; }
+    // The matches sheet only opens on success, so an inline error would never
+    // be seen — toast it.
+    if (cErr) { addToast(friendlyError(cErr), 'error'); setMatches([]); return; }
     const { data: comps, error: compErr } = await supabase.from('item_components').select('inventory_item_id, component_id, status').in('inventory_item_id', (candidates || []).map(c => c.id));
-    if (compErr) { setError('Failed to load matches: ' + friendlyError(compErr)); setMatches([]); return; }
+    if (compErr) { addToast(friendlyError(compErr), 'error'); setMatches([]); return; }
     type ItemCompsRow = Pick<ItemComponent, 'inventory_item_id' | 'component_id' | 'status'>;
     const hasMissing = new Set((comps as ItemCompsRow[] | null || []).filter((c) => (c.status === 'missing' || c.status === 'damaged') && c.component_id === ex.component_id).map((c) => c.inventory_item_id));
     setMatches(((candidates as InventoryItemMatch[] | null) || []).filter(c => hasMissing.has(c.id)));
@@ -375,7 +377,7 @@ export default function InventoryExtras() {
             }} style={{ padding: '12px 14px', fontSize: 12, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, background: 'transparent', border: 'none', width: '100%', fontFamily: T.sans }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>CSV Download</button>
             <button onClick={() => {
               setShowExportMenu(false);
-            if (filtered.length === 0) return;
+            if (filtered.length === 0) { addToast('Nothing to export — the list is empty', 'error'); return; }
             const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
             const rows = filtered.map(ex => `<tr><td>${esc(ex.sku)}</td><td>${esc(ex.product_name)}</td><td>${esc(ex.component_name)}</td><td>${esc(ex.size)}</td><td>${esc(ex.location)}</td><td style="text-align:right;font-weight:600">${ex.quantity}</td></tr>`).join('');
             setExportHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${docTitle('Spare-Parts', fileDate())}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#060810;color:#E2E8F0;padding:16px;padding-bottom:80px;-webkit-text-size-adjust:100%}.header{margin-bottom:16px}.brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}.logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#6366F1,#38BDF8);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff}.title{font-size:15px;font-weight:700;letter-spacing:-0.3px}.sub{font-size:10px;color:#6B7890;letter-spacing:0.5px}.meta{display:flex;gap:12px;font-size:10px;color:#8896B0;margin-top:8px}.meta span{padding:3px 8px;border-radius:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}table{width:100%;border-collapse:collapse;margin-top:4px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.06)}th{background:rgba(255,255,255,.03);font-size:9px;font-weight:600;color:#6B7890;text-transform:uppercase;letter-spacing:0.8px;padding:10px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)}td{padding:9px 10px;font-size:11px;color:#8896B0;border-bottom:1px solid rgba(255,255,255,.04)}tr:nth-child(even) td{background:rgba(255,255,255,.015)}.footer{text-align:center;font-size:8px;color:#4A5568;margin-top:16px;letter-spacing:1px;text-transform:uppercase}.no-print{display:none}@page{size:A4;margin:8mm}@media print{body{background:#fff;color:#222;padding:8mm}th{background:#f5f5f5;color:#333}td{color:#444;border-color:#eee}.footer{color:#999}}</style></head><body><div class="header"><div class="brand"><div class="logo">D</div><div><div class="title">Spare Parts Report</div><div class="sub">Arya Designs</div></div></div><div class="meta"><span>${filtered.length} items</span><span>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div></div><table><thead><tr><th>SKU</th><th>Category</th><th>Component</th><th>Size</th><th>Location</th><th style="text-align:right">Qty</th></tr></thead><tbody>${rows}</tbody></table><div class="footer">Powered by DailyOffice</div></body></html>`);
@@ -664,7 +666,7 @@ export default function InventoryExtras() {
       </div>, document.body)}
 
       {exportHtml && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', overscrollBehavior: 'contain' }}>
           <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Export Preview</span>
             <button onClick={() => setExportHtml(null)} style={S.btnIcon} title="Close" aria-label="Close">&times;</button>

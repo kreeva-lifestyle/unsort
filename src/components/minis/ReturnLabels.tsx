@@ -448,7 +448,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
 
       {/* Print Preview */}
       {printHtml && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', overscrollBehavior: 'contain' }}>
           <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd}`, background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
             <div>
               <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>QC Label Preview</span>
