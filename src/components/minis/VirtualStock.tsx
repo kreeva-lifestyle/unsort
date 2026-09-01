@@ -4,6 +4,7 @@ import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import { exportName, fileDate } from '../../lib/exportName';
+import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
 const STOCK_LIMIT = 1000;
 
@@ -17,6 +18,7 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
+  const { ask, modalProps: confirmProps } = useConfirm();
   const [editSku, setEditSku] = useState('');
   const [editQty, setEditQty] = useState('');
   const [expanded, setExpanded] = useState(false);
@@ -70,6 +72,8 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
   };
 
   const remove = async (id: string) => {
+    const r = rows.find(x => x.id === id);
+    if (!await ask({ title: 'Remove virtual stock?', message: r ? `${r.sku} (+${r.quantity})` : undefined, confirmLabel: 'Remove', danger: true })) return;
     const { error } = await supabase.from('virtual_stock').delete().eq('id', id);
     if (error) { addToast('Delete failed — ' + friendlyError(error), 'error'); return; }
     addToast('Virtual stock entry removed', 'success'); setPage(0); fetch();
@@ -94,6 +98,7 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
 
   return (
     <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 14, marginBottom: 16 }}>
+      <ConfirmModal {...confirmProps} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => setExpanded(e => !e)}>
         <div>
           <div style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>Virtual Stock Override {rows.length > 0 && <span style={{ fontSize: 10, color: T.tx3, fontWeight: 400 }}>({rows.length} SKU{rows.length !== 1 ? 's' : ''})</span>}</div>
@@ -137,8 +142,8 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
                   <div style={{ flex: 1, fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.tx }}>{r.sku}</div>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                     <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 700, color: T.gr, minWidth: 30, textAlign: 'right' }}>+{r.quantity}</span>
-                    <span onClick={() => { setEditId(r.id); setEditSku(r.sku); setEditQty(String(r.quantity)); }} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer' }}>Edit</span>
-                    <span onClick={() => remove(r.id)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer' }}>Del</span>
+                    <button type="button" className="touch44" onClick={() => { setEditId(r.id); setEditSku(r.sku); setEditQty(String(r.quantity)); }} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer' }}>Edit</button>
+                    <button type="button" className="touch44" onClick={() => remove(r.id)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer' }}>Del</button>
                   </div>
                 </>)}
               </div>

@@ -7,6 +7,7 @@
 // refresh never loses typed rows.
 import { useState, useEffect, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
+import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 import { finalizeRateRows, FinalizedSheet, MAX_CARD_ROWS } from './finalizeRateRows';
 import { isPriceHeader } from './parseRateSheet';
 
@@ -33,6 +34,7 @@ export default function ManualRateEditor({ onSheet, addToast }: {
   const [newCol, setNewCol] = useState('');
   const [confirmClear, setConfirmClear] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
+  const { ask, modalProps: confirmProps } = useConfirm();
   const { columns, rows } = draft;
 
   // Persist + re-finalize on every change. Rows with an empty SKU are kept in
@@ -62,8 +64,10 @@ export default function ManualRateEditor({ onSheet, addToast }: {
     setDraft(d => ({ columns: [...d.columns, label], rows: d.rows.map(r => [...r, '']) }));
     setNewCol('');
   };
-  const delColumn = (ci: number) => {
+  const delColumn = async (ci: number) => {
     if (ci === 0) return; // SKU is fixed
+    // A column with typed values is real work — ask before wiping it.
+    if (rows.some(r => (r[ci] || '').trim()) && !await ask({ title: `Remove the ${columns[ci]} column?`, message: 'Every value typed in it is erased.', confirmLabel: 'Remove', danger: true })) return;
     setDraft(d => ({ columns: d.columns.filter((_, i) => i !== ci), rows: d.rows.map(r => r.filter((_, i) => i !== ci)) }));
   };
   const clearAll = () => {
@@ -75,14 +79,15 @@ export default function ManualRateEditor({ onSheet, addToast }: {
   const cell: React.CSSProperties = { ...S.fInput, width: '100%', minWidth: 0, borderRadius: 6 };
   return (
     <div style={{ marginBottom: 10 }}>
+      <ConfirmModal {...confirmProps} />
       <div ref={gridRef} style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', border: `1px solid ${T.bd}`, borderRadius: 8, padding: 8 }}>
         <div style={{ minWidth: columns.length * 118 + 40 }}>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns.length}, minmax(110px, 1fr)) 32px`, gap: 6, marginBottom: 6 }}>
             {columns.map((c, ci) => (
               <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ ...S.fLabel, marginBottom: 0 }}>{c}</span>
-                {ci > 0 && <button onClick={() => delColumn(ci)} title={`Remove the ${c} column`} aria-label={`Remove the ${c} column`}
-                  style={{ background: 'none', border: 'none', color: T.tx3, cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: '2px 4px' }}>&#215;</button>}
+                {ci > 0 && <button type="button" onClick={() => delColumn(ci)} title={`Remove the ${c} column`} aria-label={`Remove the ${c} column`}
+                  style={{ background: 'none', border: 'none', color: T.tx3, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '6px 8px', minWidth: 32, minHeight: 32 }}>&#215;</button>}
               </div>
             ))}
             <span />
@@ -95,7 +100,7 @@ export default function ManualRateEditor({ onSheet, addToast }: {
                   onKeyDown={e => { if (e.key === 'Enter' && ri === rows.length - 1 && ci === columns.length - 1) { e.preventDefault(); addRow(); } }}
                   style={{ ...cell, fontFamily: ci === 0 ? T.mono : T.sans }} />
               ))}
-              <button onClick={() => delRow(ri)} title="Remove row" aria-label={`Remove row ${ri + 1}`}
+              <button type="button" onClick={() => delRow(ri)} title="Remove row" aria-label={`Remove row ${ri + 1}`}
                 style={{ background: 'none', border: `1px solid ${T.bd}`, borderRadius: 6, color: T.tx3, cursor: 'pointer', fontSize: 13, minHeight: 36 }}>&#215;</button>
             </div>
           ))}

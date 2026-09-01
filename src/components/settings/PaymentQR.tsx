@@ -15,9 +15,12 @@ export default function PaymentQR({ addToast }: { addToast: (msg: string, type: 
       supabase.from('app_settings').select('value').eq('key', 'payment_qr_url').maybeSingle(),
       supabase.from('app_settings').select('value').eq('key', 'payment_upi_id').maybeSingle(),
     ]).then(([qr, upi]) => {
+      const err = qr.error || upi.error;
+      if (err) { addToast(friendlyError(err), 'error'); return; }
       if (qr.data?.value) setQrUrl(qr.data.value as string);
       if (upi.data?.value) setUpiId(upi.data.value as string);
-    }).catch(() => {});
+    }).catch(e => addToast(friendlyError(e), 'error'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const uploadQr = async (file: File) => {

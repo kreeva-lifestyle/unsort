@@ -278,12 +278,13 @@ export default function BrandTagPrinter() {
     if (brandFilter) query = query.ilike('brand', `%${brandFilter.replace(/[%_]/g, '\\$&')}%`);
     if (sizeFilter) query = query.eq('size', sizeFilter);
     const from = btPage * btPerPage;
-    const { data, count } = await query.order('created_at', { ascending: false }).range(from, from + btPerPage - 1);
+    const { data, count, error } = await query.order('created_at', { ascending: false }).range(from, from + btPerPage - 1);
+    if (error) { addToast(friendlyError(error), 'error'); setLoading(false); return; }
     type BrandTagFetchRow = Pick<BrandTag, 'id' | 'brand' | 'ean' | 'sku' | 'qty' | 'mrp' | 'size' | 'product' | 'color' | 'mktd' | 'jio_code' | 'copies'>;
     if (data) setRows((data as BrandTagFetchRow[]).map((d): BrandTagRow => ({ id: d.id, brand: d.brand, ean: d.ean, sku: d.sku, qty: d.qty, mrp: Number(d.mrp), size: d.size, product: d.product, color: d.color, mktd: d.mktd, jioCode: d.jio_code, copies: d.copies })));
     if (count !== null) setTotalCount(count);
     setLoading(false);
-  }, [btPage, btPerPage, search, brandFilter, sizeFilter]);
+  }, [btPage, btPerPage, search, brandFilter, sizeFilter, addToast]);
 
   useEffect(() => { fetchPage(); }, [fetchPage]);
 

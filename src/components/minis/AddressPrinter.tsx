@@ -7,6 +7,7 @@ import { useBackClose } from '../../hooks/useBackClose';
 import { printOrQueue } from '../../lib/printQueue';
 import SwipeRow from '../ui/SwipeRow';
 import { docTitle, fileDate } from '../../lib/exportName';
+import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
 const LABEL_LIMIT = 500;
 const FROM = { name: 'Arya Designs', city: 'Surat', phone: '+91 63544 82868' };
@@ -31,6 +32,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const { ask, modalProps: confirmProps } = useConfirm();
 
   useEffect(() => {
     document.body.classList.toggle('modal-open', showAdd);
@@ -78,6 +80,8 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   };
 
   const deleteLabel = async (id: string) => {
+    const l = labels.find(x => x.id === id);
+    if (!await ask({ title: 'Delete address?', message: l ? `${l.name} — ${l.city}` : undefined, confirmLabel: 'Delete', danger: true })) return;
     const { error } = await supabase.from('address_labels').delete().eq('id', id);
     if (error) { addToast('Delete failed — ' + friendlyError(error), 'error'); return; }
     addToast('Address deleted', 'success'); setSelected(prev => { const n = new Set(prev); n.delete(id); return n; }); setPage(0); fetchLabels();
@@ -98,6 +102,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
 
   return (
     <div>
+      <ConfirmModal {...confirmProps} />
       {/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -141,7 +146,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
               <div className="desktop-only" style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                 <span onClick={() => { const expanded = Array(getCopies(l.id)).fill(l); setPrintHtml(buildLabelHtml(expanded)); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx2, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,.03)', borderRadius: 5, padding: '6px 12px', fontSize: 11 }}>Print</span>
                 <span onClick={() => openEdit(l)} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', padding: '6px 12px', fontSize: 11 }}>Edit</span>
-                <span onClick={() => deleteLabel(l.id)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', padding: '6px 12px', fontSize: 11 }}>Del</span>
+                <button type="button" className="touch44" onClick={() => deleteLabel(l.id)} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', padding: '6px 12px', fontSize: 11 }}>Del</button>
               </div>
             </div>
           </SwipeRow>

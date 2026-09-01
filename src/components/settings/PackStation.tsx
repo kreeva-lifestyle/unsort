@@ -17,8 +17,9 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
   const { ask, modalProps } = useConfirm();
 
   const fetchData = useCallback(() => {
-    supabase.from('packtime_couriers').select('id, name, sheet_name, is_active').order('name').then(({ data }) => setCouriers(data || []));
-    supabase.from('packtime_cameras').select('id, number, is_active').order('number').then(({ data }) => setCameras(data || []));
+    supabase.from('packtime_couriers').select('id, name, sheet_name, is_active').order('name').then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); else setCouriers(data || []); });
+    supabase.from('packtime_cameras').select('id, number, is_active').order('number').then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); else setCameras(data || []); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Table is passed per delete call — a shared state variable here used to be
   // read one render late, sending the first camera delete to the couriers table.

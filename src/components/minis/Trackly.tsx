@@ -8,6 +8,7 @@ import type { ShortLink } from '../../types/database';
 import TracklyAnalytics from './TracklyAnalytics';
 import SwipeRow from '../ui/SwipeRow';
 import { useBackClose } from '../../hooks/useBackClose';
+import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
 const LINK_LIMIT = 500;
 const COLS = 'id, short_code, long_url, title, clicks, created_by, created_at, updated_at';
@@ -47,6 +48,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
   const [page, setPage] = useState(0);
   const [perPage, setPerPage] = useState(25);
   const [analyticsLink, setAnalyticsLink] = useState<ShortLink | null>(null);
+  const { ask, modalProps: confirmProps } = useConfirm();
 
   useEffect(() => {
     document.body.classList.toggle('modal-open', showAdd);
@@ -88,6 +90,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
       addToast('This link is protected and cannot be deleted', 'error');
       return;
     }
+    if (!await ask({ title: 'Delete short link?', message: `${displayShortUrl(link?.short_code || '')} will stop working for anyone who has it.`, confirmLabel: 'Delete', danger: true })) return;
     const { error } = await supabase.from('short_links').delete().eq('id', id);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     addToast('Link deleted', 'success'); setPage(0); fetchLinks();
@@ -111,6 +114,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
   // ── List View ─────────────────────────────────────────────────────────────
   return (
     <div>
+      <ConfirmModal {...confirmProps} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 6 }}>
         {onBack ? (
           <span onClick={onBack} style={{ ...S.btnGhost, padding: '8px 12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', minHeight: 36 }} aria-label="Back">
@@ -130,7 +134,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {paged.map((l, i) => (
           <SwipeRow key={l.id} actions={[
-            { label: 'Print', color: '#6366F1', onClick: () => copyLink(l.short_code) },
+            { label: 'Copy', color: '#6366F1', onClick: () => copyLink(l.short_code) },
             { label: 'View', color: '#22C55E', onClick: () => { setAnalyticsLink(l); } },
             ...(l.short_code === PROTECTED_CODE ? [] : [{ label: 'Del', color: '#EF4444', onClick: () => deleteLink(l.id) }]),
           ]} hint={i === 0} hintKey="trackly">
