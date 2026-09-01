@@ -69,6 +69,25 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
     setPoType(t);
     if (t === 'fabric') setItems(list => list.map(it => (it.unit ? it : { ...it, unit: 'Meter' })));
   };
+
+  // Smart defaults from the vendor's LATEST PO (owner's ask): picking a
+  // vendor loads that PO's type and its items' unit — filling ONLY what is
+  // still empty, never overwriting a choice already made. One single-row
+  // indexed lookup per pick; nothing runs on form open.
+  const pickVendor = async (v: { id: string | null; name: string; phone: string }) => {
+    setVendor(v);
+    if (!v.name.trim()) return;
+    let q = supabase.from('purchase_orders').select('po_type, purchase_order_items(unit)')
+      .order('created_at', { ascending: false }).limit(1);
+    q = v.id ? q.eq('vendor_id', v.id) : q.ilike('vendor_name', v.name.trim());
+    const { data } = await q;
+    const last = data?.[0] as { po_type: PurchaseOrderType; purchase_order_items?: { unit: string | null }[] } | undefined;
+    if (!last) return;
+    setPoType(prev => prev || last.po_type);
+    const lastUnit = (last.purchase_order_items || []).map(x => (x.unit || '').trim()).find(Boolean)
+      || (last.po_type === 'fabric' ? 'Meter' : '');
+    if (lastUnit) setItems(list => list.map(it => (it.unit ? it : { ...it, unit: lastUnit })));
+  };
   const removeRow = (i: number) => setItems(list => list.length > 1 ? list.filter((_, idx) => idx !== i) : list);
 
   const save = async () => {
@@ -134,8 +153,8 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 12 }}>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={S.fLabel}>Vendor *</label>
-              <VendorPicker value={vendor.name} phone={vendor.phone} onPick={setVendor} addToast={addToast} />
-              {!editing && !vendor.name.trim() && <TopVendorChips onPick={setVendor} />}
+              <VendorPicker value={vendor.name} phone={vendor.phone} onPick={pickVendor} addToast={addToast} />
+              {!editing && !vendor.name.trim() && <TopVendorChips onPick={pickVendor} />}
             </div>
             <div>
               <label style={S.fLabel}>Type *</label>
