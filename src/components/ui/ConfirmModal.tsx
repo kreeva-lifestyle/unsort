@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import { useBackClose } from '../../hooks/useBackClose';
+import { useModalLock } from '../../hooks/useModalLock';
 
 export interface ConfirmOptions {
   title: string;
@@ -33,21 +34,21 @@ export default function ConfirmModal({
   onCancel,
 }: ConfirmModalProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   // Device Back answers the confirm the safe way — cancel, never confirm.
   useBackClose(open, () => onCancel());
 
+  useModalLock(open);
   useEffect(() => {
     if (!open) return;
-    document.body.classList.add('modal-open');
-    const h = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-      else if (e.key === 'Enter') onConfirm();
-    };
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
     window.addEventListener('keydown', h);
-    confirmRef.current?.focus();
-    return () => { window.removeEventListener('keydown', h); document.body.classList.remove('modal-open'); };
-  }, [open, onCancel, onConfirm]);
+    // Focus lands on the SAFE button: Enter confirms a plain question but
+    // cancels a destructive one, so a stray keypress never deletes anything.
+    (danger ? cancelRef : confirmRef).current?.focus();
+    return () => window.removeEventListener('keydown', h);
+  }, [open, onCancel, danger]);
 
   if (!open) return null;
 
@@ -61,7 +62,7 @@ export default function ConfirmModal({
           )}
         </div>
         <div style={{ padding: '12px 20px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button onClick={onCancel} style={S.btnGhost}>{cancelLabel}</button>
+          <button ref={cancelRef} onClick={onCancel} style={S.btnGhost}>{cancelLabel}</button>
           <button
             ref={confirmRef}
             onClick={onConfirm}

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { T, S } from '../../lib/theme';
+import { T, S, alpha } from '../../lib/theme';
 import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { exportName, fileDate } from '../../lib/exportName';
@@ -222,7 +222,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
             { key: 'not_found' as const, label: 'Not Found', count: results.filter(r => r.flag === 'not_found').length, color: T.tx3 },
             { key: 'blocked' as const, label: 'Blocked', count: results.filter(r => r.flag === 'blocked').length, color: '#F97316' },
           ]).map(s => (
-            <div key={s.key} onClick={() => setFilter(filter === s.key ? 'all' : s.key)} style={{ padding: '8px 14px', background: filter === s.key ? `${s.color}12` : 'rgba(255,255,255,0.02)', border: `1px solid ${filter === s.key ? `${s.color}44` : T.bd}`, borderRadius: 8, textAlign: 'center', cursor: 'pointer', transition: 'all .15s' }}>
+            <div key={s.key} onClick={() => setFilter(filter === s.key ? 'all' : s.key)} style={{ padding: '8px 14px', background: filter === s.key ? alpha(s.color, 0.07) : 'rgba(255,255,255,0.02)', border: `1px solid ${filter === s.key ? alpha(s.color, 0.27) : T.bd}`, borderRadius: 8, textAlign: 'center', cursor: 'pointer', transition: 'all .15s' }}>
               <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.mono, color: s.color }}>{s.count}</div>
               <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
             </div>
@@ -254,7 +254,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 700, color: r.flag === 'blocked' ? '#F97316' : r.total < 0 ? T.re : flagColor(r.flag) }}>{r.flag === 'not_found' ? '--' : r.flag === 'oos' ? 'Out of Stock' : r.total}</td>
                   <td style={{ ...S.tdStyle, fontSize: 10, color: T.tx3 }}>{r.vendorCount}/{vendorFiles.length}{r.naCount > 0 ? ` (${r.naCount} N/A)` : ''}</td>
-                  <td style={S.tdStyle}>{flagLabel(r.flag) && <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: flagColor(r.flag), background: `${flagColor(r.flag)}18` }}>{flagLabel(r.flag)}</span>}</td>
+                  <td style={S.tdStyle}>{flagLabel(r.flag) && <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: flagColor(r.flag), background: alpha(flagColor(r.flag), 0.09) }}>{flagLabel(r.flag)}</span>}</td>
                 </tr>
               ))}
             </tbody>

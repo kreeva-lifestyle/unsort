@@ -317,7 +317,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
           </div>
 
           {/* Pagination */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, flexWrap: 'wrap', gap: 8 }}>
+          <div className="pager" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, flexWrap: 'wrap', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1, pointerEvents: page === 0 ? 'none' : 'auto' }}>Prev</button>
               <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {Math.max(1, totalPages)}</span>

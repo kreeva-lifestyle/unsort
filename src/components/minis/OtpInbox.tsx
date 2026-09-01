@@ -142,7 +142,7 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
       {count > 0 && (() => {
         const totalPages = Math.max(1, Math.ceil(count / perPage));
         return (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+          <div className="pager" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}
                 style={{ ...S.btnGhost, ...S.btnSm, opacity: page === 0 ? 0.3 : 1 }} aria-label="Previous page">Prev</button>

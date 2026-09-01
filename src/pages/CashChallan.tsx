@@ -1329,49 +1329,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     <div>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { setShowCashBook(false); }} style={S.btnGhost}>← Back</button></div><CashBook /></div>
   );
 
-  // ── Analytics Screen ───────────────────────────────────────────────────────
-  if (showAnalytics) return (
-    <>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { setShowAnalytics(false); }} style={S.btnGhost}>← Back</button></div><ChallanAnalytics
-      analytics={analytics}
-      from={analyticsFrom}
-      to={analyticsTo}
-      onFromChange={setAnalyticsFrom}
-      onToChange={setAnalyticsTo}
-      onApply={fetchAnalytics}
-    /></>
-  );
-
-  // ── Ledger (list + detail) — extracted to components/challan/ChallanLedger.tsx ──
-  if (showLedger) return (
-    <>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { if (ledgerDetail) { setLedgerDetail(null); return; } setShowLedger(false); setLedgerSearch(''); }} style={S.btnGhost}>← Back</button></div><ChallanLedger
-      detailName={ledgerDetail?.name ?? null}
-      detailId={ledgerDetail?.id ?? null}
-      customers={ledgerCustomers}
-      detailChallans={ledgerChallans as any}
-      search={ledgerSearch}
-      onSearchChange={setLedgerSearch}
-      onSearchSubmit={searchLedgerCustomer}
-      onOpenCustomer={fetchLedgerDetail}
-      onOpenChallan={openEdit}
-      onExportPdf={exportLedgerPDF}
-      onLoadMore={() => { const newLimit = ledgerFetchLimit + 500; setLedgerFetchLimit(newLimit); fetchLedger(newLimit); }}
-      truncated={ledgerTruncated}
-      statusColors={STATUS_COLORS}
-      dateFrom={ledgerFrom}
-      dateTo={ledgerTo}
-      onDateFromChange={(v) => { setLedgerFrom(v); }}
-      onDateToChange={(v) => { setLedgerTo(v); }}
-      onDateApply={(from?: string, to?: string) => {
-        const f = from ?? ledgerFrom;
-        const t = to ?? ledgerTo;
-        if (from !== undefined) setLedgerFrom(from);
-        if (to !== undefined) setLedgerTo(to);
-        if (ledgerDetail) fetchLedgerDetailWithRange(ledgerDetail, f, t);
-      }}
-    /></>
-  );
-
   // ── Create/Edit Modal — extracted to components/challan/ChallanForm.tsx ──
+  // Must come BEFORE the Ledger/Analytics returns: openEdit from inside the
+  // Ledger sets showModal, and the ledger return used to win — dead tap.
   if (showModal) return (<>
     {draftRestored && !editing && (
       <div style={{ margin: '0 16px 8px', padding: '8px 12px', borderRadius: 6, background: 'oklch(0.72 0.19 145 / .06)', border: '1px solid oklch(0.72 0.19 145 / .15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1429,6 +1389,48 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       formError={formError}
     />
   </>);
+
+  // ── Analytics Screen ───────────────────────────────────────────────────────
+  if (showAnalytics) return (
+    <>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { setShowAnalytics(false); }} style={S.btnGhost}>← Back</button></div><ChallanAnalytics
+      analytics={analytics}
+      from={analyticsFrom}
+      to={analyticsTo}
+      onFromChange={setAnalyticsFrom}
+      onToChange={setAnalyticsTo}
+      onApply={fetchAnalytics}
+    /></>
+  );
+
+  // ── Ledger (list + detail) — extracted to components/challan/ChallanLedger.tsx ──
+  if (showLedger) return (
+    <>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { if (ledgerDetail) { setLedgerDetail(null); return; } setShowLedger(false); setLedgerSearch(''); }} style={S.btnGhost}>← Back</button></div><ChallanLedger
+      detailName={ledgerDetail?.name ?? null}
+      detailId={ledgerDetail?.id ?? null}
+      customers={ledgerCustomers}
+      detailChallans={ledgerChallans as any}
+      search={ledgerSearch}
+      onSearchChange={setLedgerSearch}
+      onSearchSubmit={searchLedgerCustomer}
+      onOpenCustomer={fetchLedgerDetail}
+      onOpenChallan={openEdit}
+      onExportPdf={exportLedgerPDF}
+      onLoadMore={() => { const newLimit = ledgerFetchLimit + 500; setLedgerFetchLimit(newLimit); fetchLedger(newLimit); }}
+      truncated={ledgerTruncated}
+      statusColors={STATUS_COLORS}
+      dateFrom={ledgerFrom}
+      dateTo={ledgerTo}
+      onDateFromChange={(v) => { setLedgerFrom(v); }}
+      onDateToChange={(v) => { setLedgerTo(v); }}
+      onDateApply={(from?: string, to?: string) => {
+        const f = from ?? ledgerFrom;
+        const t = to ?? ledgerTo;
+        if (from !== undefined) setLedgerFrom(from);
+        if (to !== undefined) setLedgerTo(to);
+        if (ledgerDetail) fetchLedgerDetailWithRange(ledgerDetail, f, t);
+      }}
+    /></>
+  );
 
   // ── List View ──────────────────────────────────────────────────────────────
   return (

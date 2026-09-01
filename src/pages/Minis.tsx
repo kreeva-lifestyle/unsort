@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { T, S } from '../lib/theme';
+import { T, S, alpha } from '../lib/theme';
 import { SUPABASE_ANON_KEY, supabase } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
 import { friendlyError } from '../lib/friendlyError';
@@ -434,7 +434,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
             { key: 'duplicate' as CompareFilter, label: 'Duplicate', count: counts.duplicate, color: '#A78BFA' },
             { key: 'ignored' as CompareFilter, label: 'Ignored', count: ignoredSkus.size, color: T.tx3 },
           ]).map(s => (
-            <div key={s.key} onClick={() => { setCompareFilter(compareFilter === s.key ? 'all' : s.key); setCompareLimit(50); }} style={{ padding: '8px 14px', background: compareFilter === s.key ? `${s.color}12` : 'rgba(255,255,255,0.02)', border: `1px solid ${compareFilter === s.key ? `${s.color}44` : T.bd}`, borderRadius: 8, textAlign: 'center', cursor: 'pointer', transition: 'all .15s' }}>
+            <div key={s.key} onClick={() => { setCompareFilter(compareFilter === s.key ? 'all' : s.key); setCompareLimit(50); }} style={{ padding: '8px 14px', background: compareFilter === s.key ? alpha(s.color, 0.07) : 'rgba(255,255,255,0.02)', border: `1px solid ${compareFilter === s.key ? alpha(s.color, 0.27) : T.bd}`, borderRadius: 8, textAlign: 'center', cursor: 'pointer', transition: 'all .15s' }}>
               <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.mono, color: s.color }}>{s.count}</div>
               <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
             </div>
@@ -460,7 +460,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
                 return (
                   <tr key={`${r.sku}-${r.category}-${i}`}>
                     <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600 }}>{r.sku}{r.extra ? <span style={{ fontSize: 9, color: T.tx3, fontWeight: 400, marginLeft: 6 }}>{r.extra}</span> : null}</td>
-                    <td style={S.tdStyle}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: catColor, background: `${catColor}18` }}>{catLabel}</span></td>
+                    <td style={S.tdStyle}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: catColor, background: alpha(catColor, 0.09) }}>{catLabel}</span></td>
                     <td style={{ ...S.tdStyle, textAlign: 'right' as const }}>
                       {compareFilter === 'ignored'
                         ? <span onClick={() => unignoreSku(r._key, r.sku)} style={{ cursor: 'pointer', color: T.re, fontSize: 10, fontWeight: 600, border: '1px solid oklch(0.63 0.22 25 / .2)', background: 'oklch(0.63 0.22 25 / .06)', borderRadius: 5, padding: '3px 9px' }}>Delete</span>

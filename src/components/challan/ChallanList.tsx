@@ -255,7 +255,7 @@ export default function ChallanList(p: Props) {
           ];
           return (
             <SwipeRow key={c.id} actions={swipeActions} hint={i === 0} hintKey="challan">
-              <div onClick={() => { if (p.bulkMode) { if (canSelect) p.onToggleSelect(c.id); } else p.onOpenDetail(c); }} style={{ background: isSelected ? 'oklch(0.55 0.22 265 / .08)' : 'rgba(255,255,255,0.025)', border: `1px solid ${isSelected ? T.ac + '44' : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', width: '100%', boxSizing: 'border-box' as const }}>
+              <div onClick={() => { if (p.bulkMode) { if (canSelect) p.onToggleSelect(c.id); } else p.onOpenDetail(c); }} style={{ background: isSelected ? 'oklch(0.55 0.22 265 / .08)' : 'rgba(255,255,255,0.025)', border: `1px solid ${isSelected ? T.ac44 : T.bd2}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', width: '100%', boxSizing: 'border-box' as const }}>
                 {/* Top: number + name left, total + status right */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>

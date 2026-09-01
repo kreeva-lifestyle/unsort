@@ -194,7 +194,7 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
         </div>
         {clicks.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No clicks in this date range.</div>}
         {clicks.length > 0 && (
-          <div className="trackly-pagination" style={{ padding: '8px 14px', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="pager trackly-pagination" style={{ padding: '8px 14px', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={safePage === 0} style={{ ...S.btnGhost, ...S.btnSm, opacity: safePage === 0 ? 0.3 : 1, cursor: safePage === 0 ? 'default' : 'pointer' }}>Prev</button>
               <span style={{ fontSize: 10, color: T.tx3 }}>{safePage + 1} / {totalPages}</span>

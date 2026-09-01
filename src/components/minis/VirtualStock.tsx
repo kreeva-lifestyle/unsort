@@ -147,9 +147,9 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
           {rows.length === STOCK_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {STOCK_LIMIT} items. Use search to find more.</div>}
           {filtered.length > pageSize && <div className="vs-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, padding: '4px 0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span onClick={() => setPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }} aria-label="Previous page">Prev</span>
+              <button type="button" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }} aria-label="Previous page">Prev</button>
               <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
-              <span onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }} aria-label="Next page">Next</span>
+              <button type="button" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} style={{ ...S.btnGhost, ...S.btnSm, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }} aria-label="Next page">Next</button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 10, color: T.tx3 }}>{filtered.length} items</span>

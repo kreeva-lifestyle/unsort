@@ -23,6 +23,17 @@ import React from 'react';
 // Generates alpha-transparent tints from oklch base values.
 export const oklchTint = (l: number, c: number, h: number, a: number) => `oklch(${l} ${c} ${h} / ${a})`;
 
+// Alpha for ANY color string — tokens (oklch) or literal hex. Appending a
+// hex suffix to an oklch token (`T.ac + '44'`) yields invalid CSS and the
+// browser silently drops the whole declaration (no border, no fill), so any
+// runtime-picked color must go through this instead.
+export const alpha = (color: string, a: number): string => {
+  const m = color.match(/^oklch\(\s*([^/)]+?)\s*(?:\/\s*[^)]+)?\)$/);
+  if (m) return `oklch(${m[1]} / ${a})`;
+  if (/^#[0-9a-f]{6}$/i.test(color)) return color + Math.round(a * 255).toString(16).padStart(2, '0');
+  return color;
+};
+
 // ─── Design tokens (OKLCH color space) ──────────────────────────────────
 export const T = {
   // Surfaces (perceptually uniform dark scale, hue 265 = deep blue)
@@ -313,8 +324,13 @@ export const S = {
     marginBottom: 10,
   } as React.CSSProperties,
 
+  // Modal × — a real 40×40 tap target (the glyph alone was ~18px on phones).
+  // Negative margin keeps the glyph optically where the 18px span used to sit.
   modalClose: {
-    cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1,
+    cursor: 'pointer', color: T.tx3, fontSize: 20, lineHeight: 1,
+    width: 40, height: 40, margin: '-10px -12px -10px 0', flexShrink: 0,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    background: 'none', border: 'none', borderRadius: 8, padding: 0,
   } as React.CSSProperties,
 
   // ─── Empty state ──────────────────────────────────────────

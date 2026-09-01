@@ -924,9 +924,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="scan-pagination" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 10 }}>
-          <span onClick={() => setHistoryPage(p => Math.max(0, p - 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage === 0 ? 0.3 : 1, pointerEvents: historyPage === 0 ? 'none' : 'auto' }} aria-label="Previous page">Prev</span>
+          <button type="button" onClick={() => setHistoryPage(p => Math.max(0, p - 1))} disabled={historyPage === 0} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage === 0 ? 0.3 : 1, pointerEvents: historyPage === 0 ? 'none' : 'auto' }} aria-label="Previous page">Prev</button>
           <span style={{ fontSize: 10, color: T.tx3 }}>{historyPage + 1} / {totalPages}</span>
-          <span onClick={() => setHistoryPage(p => Math.min(totalPages - 1, p + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: historyPage >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">Next</span>
+          <button type="button" onClick={() => setHistoryPage(p => Math.min(totalPages - 1, p + 1))} disabled={historyPage >= totalPages - 1} style={{ ...S.btnGhost, ...S.btnSm, opacity: historyPage >= totalPages - 1 ? 0.3 : 1, pointerEvents: historyPage >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">Next</button>
         </div>
       )}
     </div>
@@ -1152,7 +1152,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               <div style={{ fontSize: 20, fontWeight: 800, fontFamily: T.sora, color: T.ac2 }}>{sessionCount}</div>
               <div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 600 }}>Scanned</div>
             </div>
-            <div onClick={() => setSearchOpen(p => !p)} style={{ width: 44, height: 44, borderRadius: 8, border: `1px solid ${searchOpen ? T.ac + '33' : T.bd}`, background: searchOpen ? 'oklch(0.55 0.22 265 / .10)' : 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: searchOpen ? T.ac2 : T.tx3 }}>
+            <div onClick={() => setSearchOpen(p => !p)} style={{ width: 44, height: 44, borderRadius: 8, border: `1px solid ${searchOpen ? T.ac33 : T.bd}`, background: searchOpen ? 'oklch(0.55 0.22 265 / .10)' : 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: searchOpen ? T.ac2 : T.tx3 }}>
               <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
             </div>
             <div onClick={() => {
@@ -1269,7 +1269,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <input ref={inputRef} type="text" inputMode="text" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
             value={awbInput} onChange={e => setAwbInput(e.target.value)} onKeyDown={handleKeyDown}
             placeholder="Type or scan AWB..."
-            style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `2px solid ${flash === 'success' ? T.gr : flash === 'error' ? T.re : T.ac + '44'}`, borderRadius: 12, color: T.tx, fontFamily: T.mono, fontSize: 16, padding: '14px 50px 14px 16px', outline: 'none', transition: 'border-color .15s', boxSizing: 'border-box', boxShadow: `0 0 12px ${flash === 'success' ? 'oklch(0.72 0.19 145 / .12)' : flash === 'error' ? 'oklch(0.63 0.22 25 / .12)' : 'oklch(0.55 0.22 265 / .04)'}` }} />
+            style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `2px solid ${flash === 'success' ? T.gr : flash === 'error' ? T.re : T.ac44}`, borderRadius: 12, color: T.tx, fontFamily: T.mono, fontSize: 16, padding: '14px 50px 14px 16px', outline: 'none', transition: 'border-color .15s', boxSizing: 'border-box', boxShadow: `0 0 12px ${flash === 'success' ? 'oklch(0.72 0.19 145 / .12)' : flash === 'error' ? 'oklch(0.63 0.22 25 / .12)' : 'oklch(0.55 0.22 265 / .04)'}` }} />
           {/* Camera trigger inside input (audit P3: shave a click on the heavy-use path) */}
           {!cameraOpen && <button type="button" onClick={() => setCameraOpen(true)} title="Scan barcode with camera" style={{ position: 'absolute', right: 48, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: 8, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8 }}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" /></svg>

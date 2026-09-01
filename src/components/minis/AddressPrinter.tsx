@@ -149,11 +149,11 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
       </div>}
 
       {/* Pagination */}
-      {totalPages > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
+      {totalPages > 1 && <div className="pager" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span onClick={() => setPage(Math.max(0, page - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }} aria-label="Previous page">Prev</span>
+          <button type="button" onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }} aria-label="Previous page">Prev</button>
           <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
-          <span onClick={() => setPage(Math.min(totalPages - 1, page + 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }} aria-label="Next page">Next</span>
+          <button type="button" onClick={() => setPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1} style={{ ...S.btnGhost, ...S.btnSm, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }} aria-label="Next page">Next</button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 10, color: T.tx3 }}>{filtered.length} addresses</span>

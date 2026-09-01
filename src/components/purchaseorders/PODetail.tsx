@@ -9,6 +9,7 @@ import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { poAuditLog } from './poAudit';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
+import { useModalLock } from '../../hooks/useModalLock';
 import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../../types/database';
 
@@ -31,6 +32,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
   addToast: (m: string, t?: string) => void;
 }) {
   const { ask, modalProps } = useConfirm();
+  useModalLock();
   const [busy, setBusy] = useState('');
   const sc = statusColors[po.status] || statusColors.draft;
 

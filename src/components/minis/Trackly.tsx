@@ -173,12 +173,12 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
 
       {links.length === LINK_LIMIT && <div style={{ fontSize: 11, color: T.yl, padding: '8px 14px', background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .15)', borderRadius: 6, marginTop: 8, textAlign: 'center' }}>Showing first {LINK_LIMIT} links. Use search to find older ones.</div>}
 
-      {filtered.length > 0 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
+      {filtered.length > 0 && <div className="pager" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', marginTop: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {totalPages > 1 && <>
-            <span onClick={() => setPage(Math.max(0, page - 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }}>Prev</span>
+            <button type="button" onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} style={{ ...S.btnGhost, ...S.btnSm, cursor: page === 0 ? 'default' : 'pointer', opacity: page === 0 ? 0.3 : 1 }}>Prev</button>
             <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {totalPages}</span>
-            <span onClick={() => setPage(Math.min(totalPages - 1, page + 1))} style={{ ...S.btnGhost, ...S.btnSm, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }}>Next</span>
+            <button type="button" onClick={() => setPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1} style={{ ...S.btnGhost, ...S.btnSm, cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.3 : 1 }}>Next</button>
           </>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
