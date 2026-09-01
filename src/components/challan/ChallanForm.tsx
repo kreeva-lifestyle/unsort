@@ -274,11 +274,11 @@ export default function ChallanForm(p: ChallanFormProps) {
                   {/* Qty as a stepper (owner's ask): the number stays visible
                       between − and + so every tap's result is seen at once. */}
                   <div className="challan-qty-col" style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.04)', border: qtyBad ? errBorder : okBorder, borderRadius: 4 }}>
-                    <button onClick={() => { const n = [...p.items]; n[i].quantity = Math.max(1, q - 1); p.setItems(n); }} aria-label="Decrease quantity"
+                    <button type="button" className="step44" onClick={() => { const n = [...p.items]; n[i].quantity = Math.max(1, q - 1); p.setItems(n); }} aria-label="Decrease quantity"
                       style={{ border: 'none', background: 'none', color: T.ac2, fontSize: 15, width: 26, minHeight: 30, cursor: 'pointer', padding: 0, flexShrink: 0 }}>−</button>
                     <input type="number" min="1" step="1" value={it.quantity || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].quantity = Math.max(0, Math.round(Number(e.target.value))); p.setItems(n); }} placeholder="Qty"
                       style={{ background: 'none', border: 'none', color: T.tx, fontSize: 12, fontWeight: 700, padding: '6px 0', outline: 'none', textAlign: 'center' as const, width: '100%', minWidth: 0 }} />
-                    <button onClick={() => { const n = [...p.items]; n[i].quantity = q + 1; p.setItems(n); }} aria-label="Increase quantity"
+                    <button type="button" className="step44" onClick={() => { const n = [...p.items]; n[i].quantity = q + 1; p.setItems(n); }} aria-label="Increase quantity"
                       style={{ border: 'none', background: 'none', color: T.ac2, fontSize: 15, width: 26, minHeight: 30, cursor: 'pointer', padding: 0, flexShrink: 0 }}>+</button>
                   </div>
                   <input type="number" min="0" step="0.01" value={it.price || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => { const n = [...p.items]; n[i].price = Math.max(0, Number(e.target.value)); delete autoFilled.current[i]; p.setItems(n); }} placeholder="Price" disabled={!!(p.isReturn && p.returnSource)} style={{ background: 'rgba(255,255,255,0.04)', border: priceBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, opacity: p.isReturn && p.returnSource ? 0.6 : 1 }} />
@@ -309,7 +309,7 @@ export default function ChallanForm(p: ChallanFormProps) {
                       style={{ background: 'rgba(255,255,255,0.04)', border: discBad ? errBorder : okBorder, borderRadius: 4, color: T.tx, fontSize: 12, padding: '6px', outline: 'none', textAlign: 'right' as const, fontFamily: T.mono, flex: 1, minWidth: 0 }}
                     />
                   </div>
-                  <button onClick={() => { if (p.items.length > 1) p.setItems(p.items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 14, padding: 0, opacity: 0.6 }} aria-label="Remove item">×</button>
+                  <button type="button" onClick={() => { if (p.items.length > 1) p.setItems(p.items.filter((_, j) => j !== i)); }} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 18, padding: '4px 8px', minWidth: 36, minHeight: 36, opacity: 0.7 }} aria-label="Remove item">&#215;</button>
                   {/* Mobile-only line net: on the stacked card layout the eye
                       has no row to sum — confirm each line as it is typed. */}
                   {q > 0 && pr > 0 && (

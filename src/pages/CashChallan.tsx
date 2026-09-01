@@ -184,9 +184,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       supabase.from('app_settings').select('value').eq('key', 'payment_qr_url').maybeSingle(),
       supabase.from('app_settings').select('value').eq('key', 'payment_upi_id').maybeSingle(),
     ]).then(([qr, upi]) => {
+      const err = qr.error || upi.error;
+      if (err) { addToast(friendlyError(err), 'error'); return; }
       setPaymentQrUrl((qr.data?.value as string) ?? null);
       setPaymentUpiId((upi.data?.value as string) ?? null);
-    }).catch(() => {});
+    }).catch(e => addToast(friendlyError(e), 'error'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { loadPaymentSettings(); }, [loadPaymentSettings]);
   useEffect(() => { if (viewingChallan) loadPaymentSettings(); }, [viewingChallan?.id, loadPaymentSettings]);
@@ -392,8 +395,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     let query = supabase.from('cash_challans').select('*, cash_challan_items(sku, description, quantity, price, total, discount_type, discount_value, discount_amount)').eq('is_return', false).neq('status', 'voided');
     if (num && !isNaN(num)) query = query.eq('challan_number', num);
     else query = query.ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
-    const { data } = await query.order('created_at', { ascending: false }).limit(10);
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(10);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
     setReturnResults((data as Challan[] | null) || []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectReturnSource = (challan: Challan) => {
@@ -1132,7 +1137,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (dateFrom) q = q.gte('created_at', new Date(dateFrom + 'T00:00:00').toISOString());
     if (dateTo) q = q.lte('created_at', new Date(dateTo + 'T23:59:59').toISOString());
     q = q.order('created_at', { ascending: false }).limit(5000);
-    const { data } = await q;
+    const { data, error } = await q;
+    if (error) { addToast(friendlyError(error), 'error'); return; }
     if (!data || data.length === 0) { addToast('No challans to export', 'error'); return; }
     if (data.length >= 5000) addToast('Export capped at the most recent 5,000 challans — narrow the date range for a complete file', 'error');
     // Prefix ' on leading =+-@ so Excel/Sheets never treat customer-typed
@@ -1307,7 +1313,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // Ledger PDF modal — must be ABOVE all early returns so it renders
   // when showLedger is true. It's position:fixed so it overlays any view.
   const pdfModal = ledgerPdfHtml ? createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', overscrollBehavior: 'contain' }}>
       <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
         <div>
           <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: "'Sora',sans-serif" }}>Ledger — {ledgerPdfTitle}</span>
@@ -1581,14 +1587,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       ), document.body)}
 
       {/* WhatsApp Share Bar */}
-      {whatsAppShare && (
+      {whatsAppShare && createPortal(
         <div style={{ position: 'fixed', bottom: 'calc(var(--nav-h, 70px) + 10px)', left: '50%', transform: 'translateX(-50%)', zIndex: 300, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 10, padding: '10px 14px', boxShadow: '0 8px 30px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 12, animation: 'su .2s ease', minWidth: 280 }}>
           <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: 'none', stroke: T.ac2, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', flexShrink: 0 }}><rect x="5" y="2" width="14" height="20" rx="3" /><path d="M5 6h14M5 18h14" /><circle cx="12" cy="20" r=".5" fill={T.ac2} /></svg>
           <span style={{ flex: 1, fontSize: 12, color: T.tx }}>Share on WhatsApp?</span>
           <button onClick={() => { window.location.href = whatsAppShare.url; setWhatsAppShare(null); }} style={{ ...S.btnPrimary, background: '#25D366', boxShadow: 'none', gap: 4, fontSize: 11 }}>Send</button>
-          <span onClick={() => setWhatsAppShare(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }} aria-label="Dismiss">✕</span>
-        </div>
-      )}
+          <button type="button" onClick={() => setWhatsAppShare(null)} style={S.modalClose} aria-label="Dismiss">&#215;</button>
+        </div>,
+        document.body)}
 
       {/* ERP Reminder Modal */}
       {showErpReminder && createPortal((
@@ -1627,7 +1633,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
 
       {printHtml && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', overscrollBehavior: 'contain' }}>
           <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: "'Sora',sans-serif" }}>Print Preview</span>
             <button onClick={() => setPrintHtml(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: T.tx2, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Close">&times;</button>

@@ -22,6 +22,7 @@ import type {
   PackTimeShortcut,
 } from '../types/database';
 import { exportName, fileRange, fileDate } from '../lib/exportName';
+import { downloadFile } from '../lib/downloadFile';
 
 // In-memory view model for the recent-scans strip. Not a DB row.
 interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; }
@@ -663,8 +664,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     focusInput();
     // Background delete from Google Sheet + Supabase DB
     getAuthHeaders().then(headers => fetch(EDGE_FN, { method: 'POST', headers, body: JSON.stringify({ action: 'delete', awb, sheetName: courierSheet }) })
-      .then(r => r.json()).then(() => {})).catch(e => console.warn('Sheet delete failed:', e));
-    supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current).then(({ error: e }) => { if (e) console.error('Scan undo failed:', e); });
+      .then(r => r.json()).then(() => {})).catch(() => addToast(`Undo could not remove ${awb} from the sheet — delete that row by hand`, 'error'));
+    supabase.from('packtime_scans').delete().eq('awb', awb).eq('session_id', sessionIdRef.current).then(({ error: e }) => { if (e) addToast(`Undo failed for ${awb} — ${friendlyError(e)}`, 'error'); });
   }, [lastScanned, courierSheet, focusInput, addToast]);
 
 
@@ -740,6 +741,15 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     fetchHistory();
   };
 
+  // Current session's successful scans as CSV — share sheet on phones.
+  const exportSession = async () => {
+    if (successScans.length === 0) { addToast('No successful scans to export', 'error'); return; }
+    const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => [s.awb, courier, camera, courierBrand, s.time].map(csvCell).join(',')).join('\n');
+    try {
+      if (await downloadFile(new Blob([csv], { type: 'text/csv' }), exportName('PackStation-Session', [courier, `CAM${camera}`, fileDate()], 'csv'))) addToast(`Exported ${successScans.length} scan${successScans.length !== 1 ? 's' : ''}`, 'success');
+    } catch (e) { addToast(friendlyError(e), 'error'); }
+  };
+
   const exportHistory = async () => {
     if (!historyDateFrom || !historyDateTo) { addToast('Select a date range first', 'error'); return; }
     const allData: PackTimeScan[] = [];
@@ -764,9 +774,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       return [r.awb, r.courier, r.camera, r.brand || '', when, r.session_id].map(csvCell).join(',');
     }).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = exportName('PackStation-History', [fileRange(historyDateFrom, historyDateTo)], 'csv'); a.click(); URL.revokeObjectURL(url);
-    addToast(`Exported ${allData.length} scan${allData.length !== 1 ? 's' : ''}`, 'success');
+    try {
+      if (await downloadFile(blob, exportName('PackStation-History', [fileRange(historyDateFrom, historyDateTo)], 'csv'))) addToast(`Exported ${allData.length} scan${allData.length !== 1 ? 's' : ''}`, 'success');
+    } catch (e) { addToast(friendlyError(e), 'error'); }
   };
 
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
@@ -782,7 +792,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button onClick={() => { setShowHistory(false); }} style={{ ...S.btnGhost, minHeight: 44 }}>← Back</button>
-          <button className="desktop-only" onClick={() => { setExporting(true); exportHistory().finally(() => setExporting(false)); }} disabled={exporting || !historyDateFrom || !historyDateTo} title={!historyDateFrom || !historyDateTo ? 'Select a date range first' : 'Export filtered records to CSV'} style={{ ...S.btnGhost, minHeight: 44, opacity: exporting || !historyDateFrom || !historyDateTo ? 0.4 : 1, cursor: exporting || !historyDateFrom || !historyDateTo ? 'not-allowed' : 'pointer', pointerEvents: exporting || !historyDateFrom || !historyDateTo ? 'none' : 'auto' }}>{exporting ? 'Exporting...' : 'Export'}</button>
+          <button onClick={() => { setExporting(true); exportHistory().finally(() => setExporting(false)); }} disabled={exporting || !historyDateFrom || !historyDateTo} title={!historyDateFrom || !historyDateTo ? 'Select a date range first' : 'Export filtered records to CSV'} style={{ ...S.btnGhost, minHeight: 44, opacity: exporting || !historyDateFrom || !historyDateTo ? 0.4 : 1, cursor: exporting || !historyDateFrom || !historyDateTo ? 'not-allowed' : 'pointer', pointerEvents: exporting || !historyDateFrom || !historyDateTo ? 'none' : 'auto' }}>{exporting ? 'Exporting...' : 'Export'}</button>
         </div>
       </div>
 
@@ -1087,7 +1097,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, minHeight: '100%', position: 'relative' }} onClick={focusInput}>
 
       {/* Scan counter badge */}
-      {recentScans.length > 0 && <div style={{ position: 'fixed', top: 52, right: 16, zIndex: 200, background: T.gr, color: '#fff', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, boxShadow: '0 2px 10px oklch(0.72 0.19 145 / .4)' }}>{successScans.length} scanned</div>}
+      {recentScans.length > 0 && <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top) + 60px)', right: 16, zIndex: 200, background: T.gr, color: '#fff', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, boxShadow: '0 2px 10px oklch(0.72 0.19 145 / .4)' }}>{successScans.length} scanned</div>}
 
       {/* Flash */}
       {flash && <div style={{ position: 'fixed', inset: 0, zIndex: 300, pointerEvents: 'none', background: flash === 'success' ? 'oklch(0.72 0.19 145 / .08)' : 'oklch(0.63 0.22 25 / .10)', animation: 'fi .15s ease' }} />}
@@ -1228,7 +1238,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             <div style={{ fontSize: 8, color: T.gr, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 2 }}>Last Scanned</div>
             <div style={{ fontSize: 14, fontFamily: T.mono, color: T.tx, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lastScanned}</div>
           </div>
-          <button type="button" onClick={(e) => { e.stopPropagation(); undoLast(); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid oklch(0.63 0.22 25 / .2)', background: 'oklch(0.63 0.22 25 / .08)', color: '#FCA5A5', fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: T.sans }}>Undo</button>
+          <button type="button" className="touch44" onClick={(e) => { e.stopPropagation(); undoLast(); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid oklch(0.63 0.22 25 / .2)', background: 'oklch(0.63 0.22 25 / .08)', color: '#FCA5A5', fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: T.sans }}>Undo</button>
         </div>
       )}
 
@@ -1287,7 +1297,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
           <span style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' }}>Recent Scans</span>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 9, color: T.tx3 }}>{recentScans.length} this session</span>
-            {successScans.length > 0 && <button className="desktop-only" onClick={e => { e.stopPropagation(); const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => [s.awb, courier, camera, courierBrand, s.time].map(csvCell).join(',')).join('\n'); const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = exportName('PackStation-Session', [courier, `CAM${camera}`, fileDate()], 'csv'); a.click(); URL.revokeObjectURL(url); }} style={{ padding: '4px 10px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Export</button>}
+            {successScans.length > 0 && <button type="button" className="touch44" onClick={e => { e.stopPropagation(); exportSession(); }} style={{ padding: '4px 10px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Export</button>}
           </div>
         </div>
         {sessionListOpen && <div style={{ maxHeight: 280, overflowY: 'auto' }}>
@@ -1306,7 +1316,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                   {s.success && s.pending && <span style={{ color: T.yl, fontWeight: 600, marginLeft: 6 }}>· syncing</span>}
                 </div>
               </div>
-              {s.success && !s.pending && i === 0 && <button type="button" onClick={(e) => { e.stopPropagation(); undoLast(); }} style={{ ...S.btnGhost, ...S.btnSm, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>↩ Undo</button>}
+              {s.success && !s.pending && i === 0 && <button type="button" className="touch44" onClick={(e) => { e.stopPropagation(); undoLast(); }} style={{ ...S.btnGhost, ...S.btnSm, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>↩ Undo</button>}
             </div>
           ))}
         </div>}
@@ -1336,15 +1346,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                 <div><div style={{ fontSize: 9, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 2 }}>Duplicates</div><div style={{ fontSize: 20, fontWeight: 800, color: dupCount > 0 ? T.re : T.tx3, fontFamily: T.sora }}>{dupCount}</div></div>
               </div>
             </div>
-            <button onClick={() => {
-              if (successScans.length === 0) { addToast('No successful scans to export', 'error'); return; }
-              const csv = 'AWB,Courier,Camera,Brand,Scanned At\n' + successScans.map(s => [s.awb, courier, camera, courierBrand, s.time].map(csvCell).join(',')).join('\n');
-              const blob = new Blob([csv], { type: 'text/csv' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url; a.download = exportName('PackStation-Session', [courier, `CAM${camera}`, fileDate()], 'csv');
-              a.click(); URL.revokeObjectURL(url);
-            }} className="desktop-only" style={{ width: '100%', padding: '7px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 10, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx2, cursor: 'pointer', marginBottom: 10, fontFamily: T.sans }}>Export Session CSV</button>
+            <button type="button" onClick={exportSession} style={{ width: '100%', minHeight: 44, padding: '7px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 10, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx2, cursor: 'pointer', marginBottom: 10, fontFamily: T.sans }}>Export Session CSV</button>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setShowComplete(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: `1px solid ${T.bd2}`, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', color: T.tx3, cursor: 'pointer' }}>Continue</button>
               <button onClick={() => { endSession(); }} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, background: `linear-gradient(135deg, ${T.grCC}, ${T.gr88})`, color: '#fff', cursor: 'pointer' }}>End Session</button>

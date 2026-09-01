@@ -74,7 +74,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
 
   const sendQrWhatsApp = () => {
     const phone = qrPhone.trim();
-    if (!phone || phone.replace(/\D/g, '').length < 10) { return; }
+    if (!phone || phone.replace(/\D/g, '').length < 10) { addToast('Enter a 10-digit mobile number first', 'error'); return; }
     const due = Math.max(0, Number(c.total) - Number(c.amount_paid || 0));
     const amt = due > 0 ? due : Number(c.total);
     let msg = `Payment for Challan #${c.challan_number} — ₹${amt.toLocaleString('en-IN')}\n\n`;
@@ -230,7 +230,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
           <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.bd}`, borderRadius: 6, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1, flexShrink: 0 }} title="Close" aria-label="Close">&times;</button>
         </div>
 
-        <div style={{ padding: mobile ? '12px 16px' : '16px 20px', paddingBottom: mobile ? 20 : 16 }}>
+        <div style={{ padding: mobile ? '12px 16px' : '16px 20px', paddingBottom: mobile ? 'calc(env(safe-area-inset-bottom) + 20px)' : 16 }}>
 
           {/* ── Items table ── */}
           {items.length > 0 && (

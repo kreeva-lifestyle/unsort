@@ -3,6 +3,8 @@ import { T, S, alpha } from '../lib/theme';
 import { supabase } from '../lib/supabase';
 import { connect, isConnected, getSlotPrinter, printHtml, SLOT_LABELS, friendlyPrintError } from '../lib/qzPrint';
 import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
+import { useNotifications } from '../hooks/useNotifications';
+import { friendlyError } from '../lib/friendlyError';
 import type { PrintJob, PrintSlot } from '../types/database';
 import type { PageSize } from '../lib/qzPrint';
 
@@ -32,6 +34,7 @@ export default function PrintStation({ active }: { active?: boolean } = {}) {
   const [stats, setStats] = useState({ printed: 0, failed: 0 });
   const processingRef = useRef(false);
   const { ask, modalProps } = useConfirm();
+  const { addToast } = useNotifications();
 
   const mySlots = SLOTS.filter(s => getSlotPrinter(s));
   const activeCount = jobs.filter(j => j.status === 'pending' || j.status === 'printing').length;
@@ -186,8 +189,8 @@ export default function PrintStation({ active }: { active?: boolean } = {}) {
 
   const cancelJob = async (id: string) => {
     const { error } = await supabase.from('print_queue').delete().eq('id', id);
-    if (!error) setJobs(j => j.filter(x => x.id !== id));
-    else { console.warn('Cancel failed:', error); fetchJobs(); }
+    if (!error) { setJobs(j => j.filter(x => x.id !== id)); addToast('Print job cancelled', 'success'); }
+    else { addToast(friendlyError(error), 'error'); fetchJobs(); }
   };
 
   // Emergency stop — purge every queued/in-progress job so nothing more prints.
@@ -201,12 +204,13 @@ export default function PrintStation({ active }: { active?: boolean } = {}) {
     });
     if (!ok) return;
     const { error } = await supabase.from('print_queue').delete().in('status', ['pending', 'printing']);
-    if (!error) setJobs(j => j.filter(x => x.status !== 'pending' && x.status !== 'printing'));
+    if (!error) { setJobs(j => j.filter(x => x.status !== 'pending' && x.status !== 'printing')); addToast('All queued printing stopped', 'success'); }
+    else addToast(friendlyError(error), 'error');
   };
 
   const retryJob = async (id: string) => {
     const { error } = await supabase.from('print_queue').update({ status: 'pending', error_message: null, printed_at: null, printed_by_station: null }).eq('id', id);
-    if (error) console.warn('Retry failed:', error);
+    if (error) addToast(friendlyError(error), 'error'); else addToast('Job queued again', 'success');
     fetchJobs();
   };
 
@@ -293,8 +297,8 @@ export default function PrintStation({ active }: { active?: boolean } = {}) {
             <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: alpha(statusColor(j.status), 0.13), color: statusColor(j.status), fontWeight: 700, textTransform: 'uppercase' }}>{j.status}</span>
             {(j.status === 'pending' || j.status === 'failed') && (
               <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                {j.status === 'failed' && <button onClick={() => retryJob(j.id)} style={{ ...S.btnGhost, ...S.btnSm }}>Retry</button>}
-                <button onClick={() => cancelJob(j.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Cancel</button>
+                {j.status === 'failed' && <button type="button" className="touch44" onClick={() => retryJob(j.id)} style={{ ...S.btnGhost, ...S.btnSm }}>Retry</button>}
+                <button type="button" className="touch44" onClick={() => cancelJob(j.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Cancel</button>
               </div>
             )}
           </div>

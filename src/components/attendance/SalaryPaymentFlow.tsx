@@ -77,7 +77,7 @@ export default function SalaryPaymentFlow({ employees, salaries, payments, month
   const btnBusy = { pointerEvents: busy ? 'none' as const : 'auto' as const, opacity: busy ? 0.5 : 1 };
 
   return createPortal((
-    <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', touchAction: 'none', fontFamily: T.sans, color: T.tx }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', overscrollBehavior: 'contain', fontFamily: T.sans, color: T.tx }}>
       {/* Header */}
       <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.bd2}`, background: 'rgba(8,11,20,.95)' }}>
         <div>
