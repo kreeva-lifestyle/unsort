@@ -2,6 +2,7 @@
 // paste box. Kept out of the component so the generator stays under the file
 // budget. Runs the same server `linkgen` action with 3 concurrent workers.
 import * as XLSX from 'xlsx';
+import { saveWorkbook } from '../../../lib/xlsxDownload';
 import { call, explainGen, GenLink } from './api';
 import { friendlyError } from '../../../lib/friendlyError';
 import { exportName, fileDate } from '../../../lib/exportName';
@@ -59,5 +60,5 @@ export function exportBulkXlsx(bulk: BulkRow[]): void {
   const rows = bulk.map(r => [r.sku, r.status === 'ok' ? 'OK' : (r.message || 'Failed'), ...r.links.map(l => l.url)]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...rows]), 'Dropbox Links');
-  XLSX.writeFile(wb, exportName('Dropbox-Links', [fileDate()], 'xlsx'));
+  saveWorkbook(wb, exportName('Dropbox-Links', [fileDate()], 'xlsx'));
 }

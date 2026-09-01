@@ -319,7 +319,7 @@ export default function ChallanForm(p: ChallanFormProps) {
                     </div>
                   )}
                 </div>
-                {err && <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.re, borderBottom: `1px solid ${T.bd}`, background: 'oklch(0.63 0.22 25 / .04)', display: 'flex', alignItems: 'center', gap: 5 }}>⚠ {err}</div>}
+                {err && <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.re, borderBottom: `1px solid ${T.bd}`, background: 'oklch(0.63 0.22 25 / .04)', display: 'flex', alignItems: 'center', gap: 5 }}>{err}</div>}
                 {!err && d > 0 && q > 0 && pr > 0 && (() => { const pct = it.discount_type === 'percentage' ? d : (d / (q * pr)) * 100; return pct > 10 ? <div style={{ padding: '4px 10px 6px', fontSize: 10, color: T.yl, borderBottom: `1px solid ${T.bd}`, background: 'oklch(0.78 0.18 75 / .04)', display: 'flex', alignItems: 'center', gap: 5 }}>High discount: {Math.round(pct)}% off this item</div> : null; })()}
               </div>
               );
@@ -341,7 +341,7 @@ export default function ChallanForm(p: ChallanFormProps) {
             {!p.isReturn && <div>
               <label style={lbl}>Shipping/Porter</label>
               <input type="number" min="0" value={p.shippingCharges || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setShippingCharges(Math.max(0, Number(e.target.value)))} placeholder="Amount" style={{ ...inp, fontFamily: T.mono, fontSize: 11, border: p.shippingCharges < 0 ? `1px solid ${T.reAA}` : `1px solid ${T.bd}` }} />
-              {p.shippingCharges < 0 && <div style={{ fontSize: 10, color: T.re, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>⚠ Cannot be negative</div>}
+              {p.shippingCharges < 0 && <div style={{ fontSize: 10, color: T.re, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>Cannot be negative</div>}
             </div>}
             <div>
               <label style={lbl}>Tags <span style={{ fontWeight: 400, textTransform: 'none' as const, letterSpacing: 0, fontSize: 7 }}>comma separated</span></label>
@@ -381,7 +381,7 @@ export default function ChallanForm(p: ChallanFormProps) {
                   Paid so far <b style={{ fontFamily: T.mono }}>₹{prev.toLocaleString('en-IN')}</b>{p.editing.payment_mode ? ` (${p.editing.payment_mode})` : ''} · Left to pay <b style={{ fontFamily: T.mono, color: left > 0 ? T.re : T.gr }}>₹{left.toLocaleString('en-IN')}</b>
                   <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>"Amount Paid" below is the running total — not just today's payment.</div>
                   {diff > 0 && <div style={{ fontSize: 10, color: T.gr, marginTop: 2 }}>Saving records a new payment of ₹{diff.toLocaleString('en-IN')}{p.paymentMode && p.paymentMode !== 'Return Credit' ? ` via ${p.paymentMode}` : ' — pick the payment mode below'}.</div>}
-                  {diff < 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 2 }}>⚠ This LOWERS the recorded payment by ₹{Math.abs(diff).toLocaleString('en-IN')} — a reversal entry will be written.</div>}
+                  {diff < 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 2 }}>This LOWERS the recorded payment by ₹{Math.abs(diff).toLocaleString('en-IN')} — a reversal entry will be written.</div>}
                   {left > 0 && (
                     <button onClick={() => { p.setAmountPaid(p.grandTotal); p.setChallanStatus('paid'); p.setPaymentDate(today); if (p.paymentMode === 'Return Credit') p.setPaymentMode(''); }}
                       style={{ ...S.btnGhost, ...S.btnSm, marginTop: 6, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .3)', background: 'oklch(0.72 0.19 145 / .06)' }}>
@@ -427,11 +427,11 @@ export default function ChallanForm(p: ChallanFormProps) {
               of pieces across all item lines. */}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, marginBottom: 4 }}><span>Total Quantity</span><span style={{ fontFamily: T.mono, fontWeight: 700, color: T.tx }}>{p.items.reduce((t, it) => t + (Number(it.quantity) || 0), 0)} pcs</span></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, marginBottom: 4 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{p.subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>
-          {p.totalDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Item Discounts{p.totalDiscount > p.subtotal ? ' ⚠' : ''}</span><span style={{ fontFamily: T.mono }}>-₹{p.totalDiscount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}{p.subtotal > 0 ? ` (${(p.totalDiscount / p.subtotal * 100).toFixed(1).replace(/\.0$/, '')}%)` : ''}</span></div>}
+          {p.totalDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Item Discounts{p.totalDiscount > p.subtotal ? ' (over subtotal)' : ''}</span><span style={{ fontFamily: T.mono }}>-₹{p.totalDiscount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}{p.subtotal > 0 ? ` (${(p.totalDiscount / p.subtotal * 100).toFixed(1).replace(/\.0$/, '')}%)` : ''}</span></div>}
           {!p.isReturn && p.shippingCharges > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.bl, marginBottom: 4 }}><span>Shipping/Porter</span><span style={{ fontFamily: T.mono }}>+₹{p.shippingCharges.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>}
           {p.roundOff !== 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx3, marginBottom: 4 }}><span>Round Off</span><span style={{ fontFamily: T.mono }}>{p.roundOff > 0 ? '+' : ''}₹{p.roundOff.toFixed(2)}</span></div>}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: p.grandTotal < 0 ? T.re : T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}><span>Total</span><span>{p.grandTotal < 0 ? '−' : ''}₹{Math.abs(p.grandTotal).toLocaleString('en-IN')}</span></div>
-          {p.grandTotal < 0 && <div style={{ marginTop: 6, fontSize: 10, color: T.re, display: 'flex', alignItems: 'center', gap: 4 }}>⚠ Total is negative — reduce discount or add items before saving.</div>}
+          {p.grandTotal < 0 && <div style={{ marginTop: 6, fontSize: 10, color: T.re, display: 'flex', alignItems: 'center', gap: 4 }}>Total is negative — reduce discount or add items before saving.</div>}
         </div>
 
         {p.formError && <div style={{ background: 'oklch(0.63 0.22 25 / .15)', borderLeft: `4px solid ${T.re}`, borderRadius: 6, padding: '10px 14px', fontSize: 11, color: T.tx, marginBottom: 8 }}>{p.formError}</div>}

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
+import { saveWorkbook } from '../lib/xlsxDownload';
 import { T, S, alpha } from '../lib/theme';
 import { SUPABASE_ANON_KEY, supabase } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
@@ -134,7 +135,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Utsav Export');
-    XLSX.writeFile(wb, exportName('Utsav-Upload', [fileDate()], 'xls'));
+    saveWorkbook(wb, exportName('Utsav-Upload', [fileDate()], 'xls'));
   };
 
   const EDGE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
@@ -256,7 +257,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
       const wb = XLSX.utils.book_new();
       const label = cat === 'stock_out' ? 'StockOut' : cat === 'not_uploaded' ? 'NotUploaded' : 'Export';
       XLSX.utils.book_append_sheet(wb, ws, label);
-      XLSX.writeFile(wb, exportName('Utsav', [label, today], 'xlsx'));
+      saveWorkbook(wb, exportName('Utsav', [label, today], 'xlsx'));
     } else {
       const seen = new Set<string>();
       const squeezed: string[][] = [];
@@ -270,7 +271,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
       const wb = XLSX.utils.book_new();
       const label = cat === 'na' ? 'NA' : cat === 'zero_stock' ? 'InStockBut0' : cat === 'vs_missing' ? 'VirtualStockMissing' : cat === 'duplicate' ? 'Duplicates' : 'Export';
       XLSX.utils.book_append_sheet(wb, ws, label);
-      XLSX.writeFile(wb, exportName('Utsav', [label, today], 'xlsx'));
+      saveWorkbook(wb, exportName('Utsav', [label, today], 'xlsx'));
     }
   };
 
@@ -391,7 +392,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
           {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); setCompareRows([]); setCompareHeaders([]); setCompareFilter('all'); setCompareSearch(''); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid oklch(0.63 0.22 25 / .2)', background: 'oklch(0.63 0.22 25 / .06)' }}>Close</div>}
         </div>
       </div>
-      <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
+      <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" onChange={handleImport} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
       <VirtualStock stock={virtualStock} setStock={setVirtualStock} addToast={addToast} />
       {fileName && <div style={{ fontSize: 10, color: T.tx3, marginBottom: 8 }}>File: {fileName} -- {rows.length} rows</div>}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: rows.length > 0 ? 12 : 0 }}>

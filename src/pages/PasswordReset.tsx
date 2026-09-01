@@ -6,6 +6,7 @@ import { T, S } from '../lib/theme';
 export default function PasswordReset() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -48,11 +49,12 @@ export default function PasswordReset() {
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: 12 }}>
               <label style={S.fLabel}>New Password</label>
-              <input type="password" value={password} onChange={e => { setPassword(e.target.value); setError(''); }} placeholder="Minimum 8 characters" autoFocus style={S.fInput} />
+              <input type={showPw ? 'text' : 'password'} autoComplete="new-password" value={password} onChange={e => { setPassword(e.target.value); setError(''); }} placeholder="Minimum 8 characters" autoFocus style={S.fInput} />
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={S.fLabel}>Confirm Password</label>
-              <input type="password" value={confirm} onChange={e => { setConfirm(e.target.value); setError(''); }} placeholder="Re-enter password" style={S.fInput} />
+              <input type={showPw ? 'text' : 'password'} autoComplete="new-password" value={confirm} onChange={e => { setConfirm(e.target.value); setError(''); }} placeholder="Re-enter password" style={S.fInput} />
+              <button type="button" className="touch44" onClick={() => setShowPw(v => !v)} aria-pressed={showPw} style={{ background: 'none', border: 'none', padding: '4px 0', fontSize: 11, color: T.ac2, cursor: 'pointer', fontFamily: T.sans }}>{showPw ? 'Hide passwords' : 'Show passwords'}</button>
             </div>
             {error && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 12 }}>{error}</div>}
             <button type="submit" disabled={saving} style={{ ...S.btnPrimary, width: '100%', justifyContent: 'center', pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>

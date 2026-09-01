@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
+import { saveWorkbook } from '../../lib/xlsxDownload';
 import { T, S } from '../../lib/theme';
 import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
@@ -63,7 +64,7 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
     const ws = XLSX.utils.json_to_sheet(result.missing, { header: result.columns });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Missing from Odette');
-    XLSX.writeFile(wb, exportName('Odette-Missing-Sizes', [fileDate()], 'xls'));
+    saveWorkbook(wb, exportName('Odette-Missing-Sizes', [fileDate()], 'xls'));
   };
 
   const q = search.toLowerCase();
@@ -94,7 +95,7 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
         </div>
 
         {result.missing.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: T.gr, fontSize: 12 }}>All active SKUs are on Odette 🎉</div>
+          <div style={{ padding: 40, textAlign: 'center', color: T.gr, fontSize: 12 }}>All active SKUs are on Odette</div>
         ) : <>
           <div style={{ position: 'relative', marginBottom: 10, maxWidth: 280 }}>
             <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, strokeLinecap: 'round' as const, opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>

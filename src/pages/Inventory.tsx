@@ -17,6 +17,7 @@ import InventoryExtras from './InventoryExtras';
 import Empty from '../components/ui/Empty';
 import { SkeletonRows } from '../components/ui/Skeleton';
 import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
+import ActionSheet from '../components/ui/ActionSheet';
 
 // Status indicator — dot + plain label. Previous pills-with-bg were noisy in the
 // list view per audit P2; reserve pill treatment for modals.
@@ -106,6 +107,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const [showMoreFields, setShowMoreFields] = useState(false);
   const [quickStatusItem, setQuickStatusItem] = useState<string | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
+  const longPressed = useRef(false); // swallow the click that follows a long-press
   const [intelResults, setIntelResults] = useState<any[]>([]);
   const [showExtras, setShowExtras] = useState(false);
   const [exportPdfHtml, setExportPdfHtml] = useState<string | null>(null);
@@ -968,28 +970,11 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             ];
             return (
               <SwipeRow key={item.id} actions={swipeActions} hint={idx === 0} hintKey="inventory">
-              <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}`, borderLeft: `3px solid ${STATUS_DOT_COLOR[item.status] || T.yl}`, display: 'flex', flexDirection: 'column', gap: 6, position: 'relative', WebkitUserSelect: 'none', userSelect: 'none' }}
-                onTouchStart={() => { if (!canEdit || item.status === 'completed') return; longPressTimer.current = setTimeout(() => { try { navigator.vibrate?.(15); } catch {} setQuickStatusItem(item.id); }, 500); }}
+              <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.bd}`, borderLeft: `3px solid ${STATUS_DOT_COLOR[item.status] || T.yl}`, display: 'flex', flexDirection: 'column', gap: 6, position: 'relative', WebkitUserSelect: 'none', userSelect: 'none', cursor: 'pointer' }}
+                onClick={() => { if (longPressed.current) { longPressed.current = false; return; } openComps(item); }}
+                onTouchStart={() => { longPressed.current = false; if (!canEdit || item.status === 'completed') return; longPressTimer.current = setTimeout(() => { try { navigator.vibrate?.(15); } catch {} longPressed.current = true; setQuickStatusItem(item.id); }, 500); }}
                 onTouchEnd={() => clearTimeout(longPressTimer.current)}
                 onTouchMove={() => clearTimeout(longPressTimer.current)}>
-                {quickStatusItem === item.id && (<>
-                  <div onClick={e => { e.stopPropagation(); setQuickStatusItem(null); }} style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,.5)' }} />
-                  <div style={{ position: 'fixed', left: '50%', top: '40%', transform: 'translate(-50%, -50%)', zIndex: 1000, background: T.s, border: `1px solid ${T.bd2}`, borderRadius: 14, boxShadow: '0 16px 40px rgba(0,0,0,.6)', overflow: 'hidden', animation: 'fi .15s ease', minWidth: 240 }}>
-                    <div style={{ padding: '14px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ ...statusTag(item.status), margin: 0 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} /><span style={{ textTransform: 'capitalize', fontSize: 9 }}>{item.status === 'dry_clean' ? 'Dry Clean' : item.status}</span></span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.products?.name || '—'}</div>
-                        <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{item.serial_number || '—'} · {item.size || '—'}</div>
-                      </div>
-                    </div>
-                    <div style={{ padding: '6px 0' }}>
-                    {['unsorted', 'damaged', 'dry_clean', 'completed'].filter(s => s !== item.status).map(s => (
-                      <button key={s} onClick={e => { e.stopPropagation(); quickStatusChange(item.id, s); }} style={{ padding: '12px 18px', fontSize: 14, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', width: '100%', fontFamily: T.sans }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: s === 'completed' ? T.gr : s === 'damaged' ? T.re : s === 'dry_clean' ? T.bl : T.yl }} />{s === 'dry_clean' ? 'Dry Clean' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
-                    ))}
-                    </div>
-                    <button onClick={e => { e.stopPropagation(); setQuickStatusItem(null); }} style={{ padding: '12px 18px', fontSize: 13, color: T.tx3, cursor: 'pointer', textAlign: 'center', borderTop: `1px solid ${T.bd}`, background: 'none', border: 'none', width: '100%', fontFamily: T.sans }}>Cancel</button>
-                  </div>
-                </>)}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: T.mono, fontSize: 11, color: T.ac2, fontWeight: 600 }}>{item.serial_number || '—'}</div>
@@ -1004,6 +989,21 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
             );
           })}
         </div>
+        {/* Long-press quick status. Rendered OUTSIDE the SwipeRow (its transform
+            + overflow:hidden would clip a position:fixed menu inside a card). */}
+        {(() => { const qi = quickStatusItem ? paged.find(i => i.id === quickStatusItem) : null; return (
+          <ActionSheet
+            open={!!qi}
+            title={qi?.products?.name || '—'}
+            subtitle={qi ? `${qi.serial_number || '—'} · ${qi.size || '—'} · now ${qi.status === 'dry_clean' ? 'Dry Clean' : qi.status}` : undefined}
+            onClose={() => setQuickStatusItem(null)}
+            actions={qi ? ['unsorted', 'damaged', 'dry_clean', 'completed'].filter(st => st !== qi.status).map(st => ({
+              label: `Mark ${st === 'dry_clean' ? 'Dry Clean' : st.charAt(0).toUpperCase() + st.slice(1)}`,
+              color: st === 'completed' ? T.gr : st === 'damaged' ? T.re : st === 'dry_clean' ? T.bl : T.yl,
+              onClick: () => quickStatusChange(qi.id, st),
+            })) : []}
+          />
+        ); })()}
         {filtered.length === 0 && <div style={{ padding: 14 }}>{hasActiveFilters
           ? <Empty icon="search" title="No items match your filters" message="Try adjusting the filters, or click Clear filters to reset." cta="Clear filters" onCta={clearFilters} />
           : <Empty icon="box" title="No items yet" message="Register your first inventory item to start tracking components and pair matches." cta={canEdit ? '+ Add Item' : undefined} onCta={canEdit ? () => setShowModal(true) : undefined} />

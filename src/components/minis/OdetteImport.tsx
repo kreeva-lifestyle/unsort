@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
+import { saveWorkbook } from '../../lib/xlsxDownload';
 import { T, S, alpha } from '../../lib/theme';
 import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
@@ -175,7 +176,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Odette Export');
-    XLSX.writeFile(wb, exportName('Odette-Stock', [fileDate()], 'xls'));
+    saveWorkbook(wb, exportName('Odette-Stock', [fileDate()], 'xls'));
   };
 
   const filtered = results.filter(r => {
@@ -199,9 +200,9 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         {computed && results.length > 0 && <div onClick={pushToSheet} style={{ ...S.btnPrimary, background: T.gr, color: '#fff', fontWeight: 700, opacity: pushing ? 0.5 : 1, pointerEvents: pushing ? 'none' : 'auto' }}>{pushing ? 'Pushing...' : 'Push to Sheet'}</div>}
         {(masterSkus.length > 0 || vendorFiles.length > 0 || blockedFile) && <div onClick={() => { setMasterSkus([]); setMasterFile(''); setVendorFiles([]); setBlockedFile(''); setBlockedMap({}); setResults([]); setComputed(false); }} style={{ ...S.btnDanger, cursor: 'pointer' }}>Reset</div>}
       </div>
-      <input ref={masterRef} type="file" accept=".xlsx,.xls,.csv" onChange={importMaster} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
-      <input ref={vendorRef} type="file" accept=".xlsx,.xls,.csv" multiple onChange={importVendor} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
-      <input ref={blockedRef} type="file" accept=".xlsx,.xls,.csv" onChange={importBlocked} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
+      <input ref={masterRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" onChange={importMaster} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
+      <input ref={vendorRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" multiple onChange={importVendor} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
+      <input ref={blockedRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" onChange={importBlocked} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />
 
       {/* Status chips */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -238,7 +239,7 @@ export default function OdetteImport({ addToast, virtualStock }: { addToast: (ms
         {/* Filter export */}
         {filter !== 'all' && <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
           <span style={{ fontSize: 11, color: T.tx2 }}>Showing: <b style={{ color: flagColor(filter) }}>{flagLabel(filter) || 'In Stock'}</b> ({filtered.length})</span>
-          <div onClick={() => { if (filtered.length === 0) { addToast('Nothing to export in this filter', 'error'); return; } const data = filtered.map(r => ({ SKU: r.sku, Quantity: r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? 'Not Found' : r.total })); const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Filtered'); XLSX.writeFile(wb, exportName('Odette', [flagLabel(filter), fileDate()], 'xls')); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Export {filtered.length}</div>
+          <div onClick={() => { if (filtered.length === 0) { addToast('Nothing to export in this filter', 'error'); return; } const data = filtered.map(r => ({ SKU: r.sku, Quantity: r.flag === 'oos' ? 'Out of Stock' : r.flag === 'not_found' ? 'Not Found' : r.total })); const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Filtered'); saveWorkbook(wb, exportName('Odette', [flagLabel(filter), fileDate()], 'xls')); }} style={{ ...S.btnSm, cursor: 'pointer', color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)', borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Export {filtered.length}</div>
           <div onClick={() => setFilter('all')} style={{ ...S.btnSm, cursor: 'pointer', color: T.tx3, border: `1px solid ${T.bd}`, borderRadius: 5, padding: '4px 10px', fontSize: 10 }}>Clear</div>
         </div>}
 

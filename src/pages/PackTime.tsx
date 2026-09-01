@@ -1114,7 +1114,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       {droppedCount > 0 && started && (
         <div style={{ margin: '0 14px 8px', padding: '10px 14px', borderRadius: 6, background: 'oklch(0.63 0.22 25 / .1)', border: '1px solid oklch(0.63 0.22 25 / .3)', color: T.re, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.re, animation: 'subtlePulse 1.5s ease-in-out infinite' }} />
-          <span style={{ flex: 1 }}>⚠ {droppedCount} scan(s) failed to sync to Google Sheets after retries — they ARE saved in the app, just missing from the sheet. Check connection, then tap Retry.</span>
+          <span style={{ flex: 1 }}>{droppedCount} scan(s) failed to sync to Google Sheets after retries — they ARE saved in the app, just missing from the sheet. Check connection, then tap Retry.</span>
           <button onClick={() => { const batches = getDroppedBatches().slice(); clearDroppedBatches(); for (const b of batches) enqueueWrite(b.rows, b.sheetName); }} style={{ ...S.btnDanger, ...S.btnSm, fontWeight: 700 }}>Retry sync</button>
           <button onClick={() => { clearDroppedBatches(); setDroppedCount(0); }} style={{ ...S.btnGhost, ...S.btnSm, color: T.re, borderColor: 'oklch(0.63 0.22 25 / .3)' }}>Dismiss</button>
         </div>
@@ -1183,7 +1183,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
               style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd}`, borderRadius: 8, color: T.tx, fontFamily: T.mono, fontSize: 12, padding: '8px 12px', outline: 'none', boxSizing: 'border-box', height: 36 }} />
             {searchQuery.trim() && (
               <div style={{ marginTop: 4, fontSize: 11, fontFamily: T.mono, color: awbSetRef.current.has(searchQuery.trim().toUpperCase()) ? T.re : T.gr }}>
-                {awbSetRef.current.has(searchQuery.trim().toUpperCase()) ? '⚠ Already scanned (last 7 days)' : '✓ Not found — safe to scan'}
+                {awbSetRef.current.has(searchQuery.trim().toUpperCase()) ? 'Already scanned (last 7 days)' : '✓ Not found — safe to scan'}
               </div>
             )}
           </div>

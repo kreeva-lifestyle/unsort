@@ -4,7 +4,7 @@
 // <body> so it escapes the page scroll container.
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { T, S } from '../../../lib/theme';
+import { T, S, Icon } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { useAuth } from '../../../hooks/useAuth';
 import { call } from '../dropboxlinks/api';
@@ -221,7 +221,7 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
           </div>
           <div onClick={nextDay} style={{ width: 36, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 17, cursor: atToday ? 'default' : 'pointer', opacity: atToday ? 0.3 : 1 }}>›</div>
         </div>
-        <div onClick={() => setShowSettings(true)} style={ic} aria-label="Settings">⚙</div>
+        <div onClick={() => setShowSettings(true)} style={ic} aria-label="Settings"><Icon name="settings" size={16} /></div>
       </div>
 
       {/* recent uploads strip */}

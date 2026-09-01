@@ -171,7 +171,7 @@ export default function SalaryPaymentFlow({ employees, salaries, payments, month
               )}
             </div>
           )}
-          {index > 0 && <button onClick={back} disabled={busy} style={{ background: 'none', border: 'none', color: T.tx3, fontSize: 11, cursor: 'pointer', padding: 2, ...btnBusy }}>← Previous</button>}
+          {index > 0 && <button type="button" className="touch44" onClick={back} disabled={busy} style={{ background: 'none', border: 'none', color: T.tx3, fontSize: 12, cursor: 'pointer', padding: '8px 4px', ...btnBusy }}>← Previous</button>}
         </div>
       )}
     </div>

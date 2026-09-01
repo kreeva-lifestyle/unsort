@@ -11,7 +11,7 @@
 // Several photos can be selected. Each one searched is a separate Vision call,
 // so the count is surfaced on the button in ClientFinder rather than hidden.
 import { useState, useEffect, useRef } from 'react';
-import { T, S } from '../../../lib/theme';
+import { T, S, Icon } from '../../../lib/theme';
 import { useProductCatalog, resolveSku } from '../../../hooks/useProductCatalog';
 import { call as dbxCall, thumbUrl, explainGen, type GenLink, type GenCandidate } from '../dropboxlinks/api';
 
@@ -86,7 +86,7 @@ export default function PhotoPicker({
           {candidates.map((c, i) => (
             <button key={i} onClick={() => load(sku.trim().toUpperCase(), c.path)} disabled={busy}
               style={{ ...S.btnGhost, display: 'block', width: '100%', textAlign: 'left', marginTop: i === 0 ? 0 : 6, padding: '10px 12px', minHeight: 44, fontSize: 11, fontFamily: T.mono }}>
-              📁 {c.display}
+              <span style={{ display: 'inline-flex', verticalAlign: '-2px', marginRight: 4 }}><Icon name="folder" size={12} /></span>{c.display}
             </button>
           ))}
         </div>

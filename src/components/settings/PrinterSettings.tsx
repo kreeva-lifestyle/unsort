@@ -14,6 +14,7 @@ export default function PrinterSettings({ addToast }: { addToast: (msg: string, 
   const [connected, setConnected] = useState(false);
   const [printers, setPrinters] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState<PrintSlot | null>(null);
   const [slots, setSlots] = useState<Record<PrintSlot, string | null>>({
     label_small: getSlotPrinter('label_small'),
     label_large: getSlotPrinter('label_large'),
@@ -49,8 +50,8 @@ export default function PrinterSettings({ addToast }: { addToast: (msg: string, 
       .then(({ error }) => { if (error) console.warn('Print-log cleanup failed:', error); });
     supabase.from('print_queue').select('id, printer_slot, title, status, error_message, created_at, printed_at')
       .order('created_at', { ascending: false }).limit(10)
-      .then(({ data }) => { if (data) setRecentJobs(data as PrintJob[]); });
-  }, [mode]);
+      .then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); else if (data) setRecentJobs(data as PrintJob[]); });
+  }, [mode, addToast]);
 
   const handleModeChange = async (m: 'cloud' | 'default') => {
     if (m === mode) return;
@@ -77,11 +78,15 @@ export default function PrinterSettings({ addToast }: { addToast: (msg: string, 
   const testPrint = async (slot: PrintSlot) => {
     const printer = slots[slot];
     if (!printer) { addToast('Select a printer first', 'error'); return; }
+    if (testing) return;
+    setTesting(slot);
     try {
       await printHtml(printer, `<html><body style="font-family:Arial;text-align:center;padding:20px"><h2>Test Print</h2><p>Slot: ${SLOT_LABELS[slot]}</p><p>Printer: ${printer}</p><p>${new Date().toLocaleString()}</p></body></html>`, slot === 'document' ? 'A4' : slot === 'label_large' ? { width: 4, height: 6 } : { width: 1.97, height: 2.97 });
       addToast('Test page sent to printer', 'success');
     } catch (e: any) {
       addToast(friendlyPrintError(e?.message), 'error');
+    } finally {
+      setTesting(null);
     }
   };
 
@@ -145,7 +150,7 @@ export default function PrinterSettings({ addToast }: { addToast: (msg: string, 
                     <option value="">None (not assigned)</option>
                     {printers.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
-                  <button onClick={() => testPrint(slot)} disabled={!slots[slot]} style={{ ...S.btnGhost, ...S.btnSm, opacity: slots[slot] ? 1 : 0.3 }}>Test</button>
+                  <button type="button" onClick={() => testPrint(slot)} disabled={!slots[slot] || !!testing} className="touch44" style={{ ...S.btnGhost, opacity: !slots[slot] || (testing && testing !== slot) ? 0.3 : testing === slot ? 0.5 : 1, whiteSpace: 'nowrap', pointerEvents: testing ? 'none' : 'auto' }}>{testing === slot ? 'Sending…' : 'Test'}</button>
                 </div>
               </div>
             ))}
@@ -157,15 +162,15 @@ export default function PrinterSettings({ addToast }: { addToast: (msg: string, 
               <label style={{ ...S.fLabel, marginBottom: 8, display: 'block' }}>Recent Print Jobs</label>
               <div style={{ background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
                 {recentJobs.map(j => (
-                  <div key={j.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, fontSize: 11 }}>
+                  <div key={j.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, fontSize: 11, flexWrap: 'wrap' }}>
                     {statusDot(j.status)}
                     <span style={{ color: T.tx, fontWeight: 600, flex: 1 }}>{j.title || j.printer_slot}</span>
                     <span style={{ color: T.tx3, fontSize: 10 }}>{j.status}</span>
                     {j.error_message && <span style={{ color: T.re, fontSize: 10 }}>{j.error_message}</span>}
                     {(j.status === 'pending' || j.status === 'failed') && (
                       <div style={{ display: 'flex', gap: 4 }}>
-                        {j.status === 'failed' && <button onClick={() => retryJob(j.id)} style={{ ...S.btnGhost, ...S.btnSm, fontSize: 9, padding: '2px 6px' }}>Retry</button>}
-                        <button onClick={() => cancelJob(j.id)} style={{ ...S.btnDanger, ...S.btnSm, fontSize: 9, padding: '2px 6px' }}>Cancel</button>
+                        {j.status === 'failed' && <button type="button" onClick={() => retryJob(j.id)} className="touch44" style={{ ...S.btnGhost, ...S.btnSm }}>Retry</button>}
+                        <button type="button" onClick={() => cancelJob(j.id)} className="touch44" style={{ ...S.btnDanger, ...S.btnSm }}>Cancel</button>
                       </div>
                     )}
                   </div>

@@ -6,6 +6,7 @@
 // ambiguous (catalog-aware matching). Creds live in the server vault.
 import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import { saveWorkbook } from '../../lib/xlsxDownload';
 import { T, S } from '../../lib/theme';
 import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
@@ -68,7 +69,7 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
         if (data.nextOffset == null) break;
         offset = data.nextOffset;
       }
-      addToast(acc.length === 0 ? 'All image links are healthy 🎉' : `${acc.length} problem link${acc.length === 1 ? '' : 's'} found — press "Find Correct Links" to see the fixes`, acc.length === 0 ? 'success' : 'error');
+      addToast(acc.length === 0 ? 'All image links are healthy' : `${acc.length} problem link${acc.length === 1 ? '' : 's'} found — press "Find Correct Links" to see the fixes`, acc.length === 0 ? 'success' : 'error');
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setScanning(false);
   };
@@ -126,7 +127,7 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
     const rows = problems.map(p => ({ SKU: p.sku, 'Source Tab': p.tab, 'Sheet Row': p.row, Status: p.problem, 'Matched Folder': p.folder || '', Link: p.url || '' }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Broken Links');
-    XLSX.writeFile(wb, exportName('Broken-Image-Links', [fileDate()], 'xls'));
+    saveWorkbook(wb, exportName('Broken-Image-Links', [fileDate()], 'xls'));
   };
 
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
@@ -167,7 +168,7 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
       )}
 
       {problems && problems.length === 0 && !scanning && (
-        <div style={{ padding: 30, textAlign: 'center', color: T.gr, fontSize: 12 }}>All image links are healthy 🎉</div>
+        <div style={{ padding: 30, textAlign: 'center', color: T.gr, fontSize: 12 }}>All image links are healthy</div>
       )}
 
       {problems && problems.length > 0 && (
@@ -181,7 +182,7 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
                   <td style={S.tdStyle}>{p.tab}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono }}>{p.row}</td>
                   <td style={{ ...S.tdStyle, color: statusColor(p), fontWeight: 600 }}>
-                    {p.fixed ? '✅ ' : p.willUse ? '🟢 ' : ''}{p.problem}
+                    {p.fixed ? '✓ ' : p.willUse ? '• ' : ''}{p.problem}
                     {canFix && p.url && !p.fixed && /^WRONG LINK/.test(p.problem) && !p.approved && (
                       <button onClick={() => markCorrect(p, false)} title="This link IS correct for this SKU — stop flagging it" style={{ ...S.btnGhost, display: 'block', marginTop: 5, padding: '3px 9px', fontSize: 10, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .3)', background: 'oklch(0.72 0.19 145 / .06)' }}>Correct ✓ — don't show again</button>
                     )}

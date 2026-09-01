@@ -233,7 +233,7 @@ export default function Dashboard({ navigateTo, active }: { navigateTo?: (tab: s
           </div>
           <div style={{ flex: 1 }}>
             {alerts.pendingHandovers.slice(0, 2).map(h => (
-              <p key={h.number} style={{ fontSize: 9, color: T.tx2, margin: '0 0 2px' }}>HO-{String(h.number).padStart(4, '0')} from {h.from} — ₹{h.amount.toLocaleString('en-IN')}{h.ageDays > 0 ? `, ${h.ageDays}d ago` : ''}{h.ageDays >= 1 ? ' ⚠' : ''}</p>
+              <p key={h.number} style={{ fontSize: 9, color: T.tx2, margin: '0 0 2px' }}>HO-{String(h.number).padStart(4, '0')} from {h.from} — ₹{h.amount.toLocaleString('en-IN')}{h.ageDays > 0 ? `, ${h.ageDays}d ago` : ''}{h.ageDays >= 1 ? ' · overdue' : ''}</p>
             ))}
             {alerts.pendingHandovers.length === 0 && <p style={{ fontSize: 10, color: T.tx3, margin: 0 }}>None awaiting</p>}
             {alerts.disputedCount > 0 && <p style={{ fontSize: 9, color: T.re, margin: '4px 0 0', fontWeight: 600 }}>{alerts.disputedCount} rejected — needs attention</p>}

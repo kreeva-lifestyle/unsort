@@ -5,6 +5,7 @@
 // all of that on write, which is why we only READ with it, never writeFile.)
 // Falls back to a plain sheet for old templates saved before the file was kept.
 import * as XLSX from 'xlsx';
+import { saveWorkbook } from '../../lib/xlsxDownload';
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { supabase } from '../../lib/supabase';
 import { injectCells, resolveSheetPart, type CellWrite } from './xlsxInject';
@@ -100,6 +101,6 @@ export async function exportFilledXlsx(headers: string[], rows: GenRow[], tpl: T
   }
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...values]), 'Listings');
-  XLSX.writeFile(wb, exportName('Listings', [tpl.name, fileDate()], 'xlsx'));
+  saveWorkbook(wb, exportName('Listings', [tpl.name, fileDate()], 'xlsx'));
   return { formatted: false, matched: 0, total: headers.length, hadTemplate };
 }

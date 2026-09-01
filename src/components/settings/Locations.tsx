@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
-import { T, S } from '../../lib/theme';
+import { T, S, Icon } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { useUndoDelete } from '../../hooks/useUndoDelete';
 import UndoBar from '../ui/UndoBar';
@@ -58,18 +58,18 @@ export default function Locations({ addToast, canEdit }: { addToast: (msg: strin
             {editId === loc.id ? (
               <div style={{ display: 'flex', gap: 6, flex: 1 }}>
                 <input value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') updateLocation(loc.id); if (e.key === 'Escape') setEditId(null); }} style={{ ...S.fInput, flex: 1 }} autoFocus />
-                <span onClick={() => updateLocation(loc.id)} style={S.btnPrimary}>Save</span>
-                <span onClick={() => setEditId(null)} style={S.btnGhost}>Cancel</span>
+                <button type="button" className="touch44" onClick={() => updateLocation(loc.id)} style={S.btnPrimary}>Save</button>
+                <button type="button" className="touch44" onClick={() => setEditId(null)} style={S.btnGhost}>Cancel</button>
               </div>
             ) : (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13 }}>📍</span>
+                  <span style={{ color: T.tx3, display: 'inline-flex' }}><Icon name="pin" size={14} /></span>
                   <span style={{ fontSize: 12, color: T.tx, fontWeight: 500 }}>{loc.name}</span>
                 </div>
                 {canEdit && <div style={{ display: 'flex', gap: 4 }}>
-                  <span onClick={() => { setEditId(loc.id); setEditName(loc.name); }} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</span>
-                  <span className="touch44" onClick={() => deleteLocation(loc.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</span>
+                  <button type="button" className="touch44" onClick={() => { setEditId(loc.id); setEditName(loc.name); }} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</button>
+                  <button type="button" className="touch44" onClick={() => deleteLocation(loc.id)} style={{ ...S.btnDanger, ...S.btnSm }}>Delete</button>
                 </div>}
               </>
             )}

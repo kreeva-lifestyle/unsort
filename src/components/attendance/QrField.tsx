@@ -35,7 +35,7 @@ export default function QrField({ value, savedUrl, onChange, addToast }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pick(f); e.target.value = ''; }} />
           <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} style={{ ...S.btnGhost, padding: '6px 12px', fontSize: 11, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy ? 'Uploading…' : value ? 'Change QR' : 'Upload QR'}</button>
-          {value && !busy && <button type="button" onClick={() => onChange('')} style={{ background: 'none', border: 'none', color: T.re, fontSize: 10, cursor: 'pointer', padding: 0, textAlign: 'left' }}>Remove</button>}
+          {value && !busy && <button type="button" onClick={() => onChange('')} className="touch44" style={{ background: 'none', border: 'none', color: T.re, fontSize: 11, cursor: 'pointer', padding: '6px 0', textAlign: 'left' }}>Remove</button>}
         </div>
       </div>
 
