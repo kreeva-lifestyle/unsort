@@ -1,5 +1,5 @@
 // Auth state hook + provider
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { supabase } from '../lib/supabase';
 import { isFaceIdEnrolledFor, isAppLocked, lockApp, unlockApp, verifyFaceId, getFaceIdEnrollment, disableFaceId } from '../lib/faceId';
 
@@ -26,6 +26,10 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  // Mirror for the auth-state listener: lets it skip refetching a profile the
+  // startup load already holds (INITIAL_SESSION dedupe) without re-binding.
+  const profileRef = useRef<any>(null);
+  profileRef.current = profile;
   const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(false);
   // Face ID lock: the session survives on-device; the UI gates on `locked`
@@ -76,6 +80,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (!mounted) return;
       if (session?.user) {
         setUser(session.user);
+        // Startup fires INITIAL_SESSION right after the load above fetched
+        // this exact profile — don't fetch it a second time on every app
+        // open. Only the fetch is skipped; every other path (login, Face ID,
+        // sign-out, a different user) behaves exactly as before.
+        if (profileRef.current?.id === session.user.id) { setLoading(false); setReady(true); return; }
         supabase.from('profiles').select('id, email, full_name, role, is_active, phone, created_at, updated_at, module_access').eq('id', session.user.id).maybeSingle().then(({ data, error }) => {
           if (error) console.error('Profile load failed:', error.message);
           if (!mounted) return;

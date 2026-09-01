@@ -687,7 +687,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const fetchHistory = useCallback(async () => {
     if (!historyDateFrom || !historyDateTo) return;
     setHistoryLoading(true);
-    let query = supabase.from('packtime_scans').select('*', { count: 'exact' })
+    // 'estimated' like every other pager — 'exact' forced a full count scan
+    // of the app's largest table on every history view.
+    let query = supabase.from('packtime_scans').select('*', { count: 'estimated' })
       .gte('scanned_at', new Date(historyDateFrom + 'T00:00:00').toISOString())
       .lte('scanned_at', new Date(historyDateTo + 'T23:59:59.999').toISOString());
     if (historySearch) query = query.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);

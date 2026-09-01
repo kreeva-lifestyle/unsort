@@ -12,6 +12,7 @@ import { useBackClose } from '../hooks/useBackClose';
 import { useNotifications } from '../hooks/useNotifications';
 import { printOrQueue } from '../lib/printQueue';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
+import { useActiveRefetch } from '../hooks/useActiveRefetch';
 import InventoryExtras from './InventoryExtras';
 import Empty from '../components/ui/Empty';
 import { SkeletonRows } from '../components/ui/Skeleton';
@@ -144,11 +145,16 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
 
   const fetchData = () => {
     setLoading(true);
-    const p1 = supabase.from('inventory_items').select('id, batch_number, serial_number, product_id, size, status, location, manufacturer, notes, order_id, marketplace, ticket_id, link, status_changed_at, created_at, updated_at, products(name, sku, total_components)').order('created_at', { ascending: false }).limit(invLimit).then(({ data, error }) => { if (error) addToast('Failed to load inventory — ' + friendlyError(error), 'error'); setItems(data || []); setInvTruncated((data || []).length >= invLimit); });
-    supabase.from('products').select('id, name, sku, total_components, category').eq('is_active', true).then(({ data, error }) => { if (error) addToast('Failed to load categories — ' + friendlyError(error), 'error'); setProducts(data || []); });
-    supabase.from('locations').select('id, name').order('name').then(({ data, error }) => { if (error) addToast('Failed to load locations — ' + friendlyError(error), 'error'); setLocations(data || []); });
-    supabase.from('tags').select('id, name, color').order('name').then(({ data, error }) => { if (error) addToast('Failed to load tags — ' + friendlyError(error), 'error'); setTags(data || []); });
-    supabase.from('inventory_items').select('manufacturer').gt('manufacturer', '').limit(5000).then(({ data, error }) => { if (error) { addToast('Failed to load manufacturers — ' + friendlyError(error), 'error'); return; } const unique = [...new Set((data || []).map(d => d.manufacturer).filter(Boolean))].sort(); setManufacturers(unique); });
+    const p1 = supabase.from('inventory_items').select('id, batch_number, serial_number, product_id, size, status, location, manufacturer, notes, order_id, marketplace, ticket_id, link, status_changed_at, created_at, updated_at, products(name, sku, total_components)').order('created_at', { ascending: false }).limit(invLimit).then(({ data, error }) => {
+      if (error) addToast('Failed to load inventory — ' + friendlyError(error), 'error');
+      setItems(data || []); setInvTruncated((data || []).length >= invLimit);
+      // Manufacturer filter options derive from the SAME rows — the previous
+      // separate 5000-row scan fetched an identical set a second time.
+      setManufacturers([...new Set((data || []).map(d => d.manufacturer).filter(Boolean))].sort() as string[]);
+    });
+    supabase.from('products').select('id, name, sku, total_components, category').eq('is_active', true).limit(500).then(({ data, error }) => { if (error) addToast('Failed to load categories — ' + friendlyError(error), 'error'); setProducts(data || []); });
+    supabase.from('locations').select('id, name').order('name').limit(500).then(({ data, error }) => { if (error) addToast('Failed to load locations — ' + friendlyError(error), 'error'); setLocations(data || []); });
+    supabase.from('tags').select('id, name, color').order('name').limit(500).then(({ data, error }) => { if (error) addToast('Failed to load tags — ' + friendlyError(error), 'error'); setTags(data || []); });
     supabase.from('item_tags').select('inventory_item_id, tag_id, tags(id, name, color)').limit(5000).then(({ data, error }) => {
       if (error) { addToast('Failed to load tags — ' + friendlyError(error), 'error'); return; }
       const map: Record<string, { id: string; name: string; color: string }[]> = {};
@@ -221,24 +227,22 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     if ('requestIdleCallback' in window) requestIdleCallback(compute);
     else setTimeout(compute, 100);
   }, [items, itemMissing, itemPresent, itemDamagedIds]);
+  // Refetching is gated on the page being the VISIBLE tab (App.tsx keeps
+  // hidden tabs mounted forever — this 7-query fetch used to re-run on every
+  // event even while the user was elsewhere). Hidden events mark the page
+  // stale; one refetch fires on switching back. The hook throttles bursts.
+  const notify = useActiveRefetch(active ?? true, fetchData);
   useEffect(() => {
     fetchData();
-    let debounceTimer: ReturnType<typeof setTimeout>;
-    const debouncedFetch = () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(fetchData, 500); };
-    const immFetch = () => fetchData();
     const ch = supabase.channel('inv-sync-' + instanceId.replace(/:/g, ''))
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inventory_items' }, immFetch)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'inventory_items' }, immFetch)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inventory_items' }, debouncedFetch)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'item_components' }, immFetch)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'item_components' }, immFetch)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'item_components' }, debouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'item_tags' }, debouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, debouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, debouncedFetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tags' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, notify)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'item_components' }, notify)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'item_tags' }, notify)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, notify)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, notify)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tags' }, notify)
       .subscribe();
-    return () => { clearTimeout(debounceTimer); supabase.removeChannel(ch); };
+    return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

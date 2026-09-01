@@ -278,7 +278,7 @@ const MainApp = () => {
       <HeaderComponent title={titles[tab]} onNotifClick={handleNotifClick} notifications={notifications} markAsRead={markAsRead} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(o => !o)} />
       <main ref={mainRef} style={{ flex: 1, overflow: 'auto' }}>
         <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}><div className="spinner" /></div>}>
-        {mounted.has('dashboard') && checkTab('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard navigateTo={setTab} /></div>}
+        {mounted.has('dashboard') && checkTab('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard navigateTo={setTab} active={tab === 'dashboard'} /></div>}
         {mounted.has('inventory') && checkTab('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
         {mounted.has('brandtag') && checkTab('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
         {mounted.has('packtime') && checkTab('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime active={tab === 'packtime'} /></div>}
@@ -288,7 +288,7 @@ const MainApp = () => {
         {mounted.has('attendance') && checkTab('attendance') && <div style={{ display: tab === 'attendance' ? 'block' : 'none' }}><Attendance active={tab === 'attendance'} /></div>}
         {mounted.has('programs') && checkTab('programs') && <div style={{ display: tab === 'programs' ? 'block' : 'none' }}><ProgramsModule active={tab === 'programs'} /></div>}
         {mounted.has('minis') && checkTab('minis') && <div style={{ display: tab === 'minis' ? 'block' : 'none' }}><Minis navigateTo={setTab} active={tab === 'minis'} /></div>}
-        {mounted.has('printstation') && checkTab('printstation') && <div style={{ display: tab === 'printstation' ? 'block' : 'none' }}><PrintStation /></div>}
+        {mounted.has('printstation') && checkTab('printstation') && <div style={{ display: tab === 'printstation' ? 'block' : 'none' }}><PrintStation active={tab === 'printstation'} /></div>}
         {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage profile={profile} addToast={addToast} active={tab === 'settings'} /></div>}
         {/* The content area used to render literally nothing when the tab was
             gated and `profile` never loaded — a permanent blank screen with no
