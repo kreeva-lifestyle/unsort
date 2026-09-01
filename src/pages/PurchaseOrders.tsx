@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { printOrQueue } from '../lib/printQueue';
 import { useAuth } from '../hooks/useAuth';
+import { useActiveRefetch } from '../hooks/useActiveRefetch';
 import { useNotifications } from '../hooks/useNotifications';
 import { T, S, PO_STATUS_COLORS } from '../lib/theme';
 import { useBackClose } from '../hooks/useBackClose';
@@ -51,7 +52,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
 
   // Active users for the "Created By" filter dropdown (pattern from CashBook).
   useEffect(() => {
-    supabase.from('profiles').select('id, full_name').eq('is_active', true).order('full_name')
+    supabase.from('profiles').select('id, full_name').eq('is_active', true).order('full_name').limit(200)
       .then(({ data }) => setUsers((data as { id: string; full_name: string }[] | null) || []));
   }, []);
 
@@ -116,28 +117,20 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
 
   useEffect(() => { fetchPos(); }, [fetchPos]);
 
-  // Filtered realtime — any PO / item / receipt change refetches the list.
-  // (The three tables joined the supabase_realtime publication on 2026-08-31;
-  // before that this channel existed but the DB never broadcast to it.)
+  // Realtime, gated on the page being the VISIBLE tab (hidden tabs stay
+  // mounted forever — refetching them was invisible server load). Hidden
+  // events mark the page stale; one refetch fires on switching back / app
+  // resume. The hook throttles bursts and owns the foreground listeners.
+  const notifyPos = useActiveRefetch(active ?? true, () => fetchPos(true));
   useEffect(() => {
-    const imm = () => fetchPos(true);
     const ch = supabase.channel('purchase_orders_rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, imm)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_order_items' }, imm)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_order_receipts' }, imm)
-      // Refetch on (re)connect: iOS suspends the socket while the PWA is
-      // backgrounded — whatever arrived meanwhile would be missed silently.
-      .subscribe(status => { if (status === 'SUBSCRIBED') imm(); });
-    // Same story on returning to the foreground / regaining focus.
-    const onVisible = () => { if (document.visibilityState === 'visible') imm(); };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', onVisible);
-    return () => {
-      supabase.removeChannel(ch);
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', onVisible);
-    };
-  }, [fetchPos]);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, notifyPos)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_order_items' }, notifyPos)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_order_receipts' }, notifyPos)
+      // Reconnect catch-up: realtime never replays missed events.
+      .subscribe(status => { if (status === 'SUBSCRIBED') notifyPos(); });
+    return () => { supabase.removeChannel(ch); };
+  }, [notifyPos]);
 
   useEffect(() => { document.body.classList.toggle('modal-open', !!printData); return () => { document.body.classList.remove('modal-open'); }; }, [printData]);
   useBackClose(!!detail, () => setDetail(null));

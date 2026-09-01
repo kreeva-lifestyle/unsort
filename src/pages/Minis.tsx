@@ -52,7 +52,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
   const cmpNorm = (s: string) => s.toUpperCase().replace(/[-\s.]/g, '');
   const [ignoredSkus, setIgnoredSkus] = useState<Map<string, { displaySku: string; category: string }>>(new Map());
   const fetchIgnored = useCallback(async () => {
-    const { data, error } = await supabase.from('utsav_ignored_skus').select('sku_key, display_sku, category');
+    const { data, error } = await supabase.from('utsav_ignored_skus').select('sku_key, display_sku, category').limit(2000);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     const m = new Map<string, { displaySku: string; category: string }>();
     for (const r of data || []) m.set(r.sku_key, { displaySku: r.display_sku, category: r.category || '' });

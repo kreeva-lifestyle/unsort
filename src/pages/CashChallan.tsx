@@ -15,7 +15,7 @@ import ChallanList from '../components/challan/ChallanList';
 import ChallanBulkActions from '../components/challan/ChallanBulkActions';
 import { friendlyError } from '../lib/friendlyError';
 import { fetchCustomerOutstanding } from '../lib/customerOutstanding';
-import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
+import { useActiveRefetch } from '../hooks/useActiveRefetch';
 import type {
   CashChallan,
   CashChallanItem as DbCashChallanItem,
@@ -242,7 +242,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Fetch challans ─────────────────────────────────────────────────────────
   const fetchChallans = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    let query = supabase.from('cash_challans').select('*, cash_challan_items(sku, quantity, price, discount_type, discount_value, discount_amount, total), handover:cash_handovers!handover_id(handover_number)', { count: 'estimated' });
+    // Explicit columns (house rule — no select-* on growable tables): same
+    // list the ledger fetch at ~:576 uses, so nothing the UI reads is missing.
+    let query = supabase.from('cash_challans').select('id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, handover_id, inventory_deducted, created_by, modified_by, voided_by, voided_at, created_at, updated_at, cash_challan_items(sku, quantity, price, discount_type, discount_value, discount_amount, total), handover:cash_handovers!handover_id(handover_number)', { count: 'estimated' });
     if (debouncedSearch) {
       const s = debouncedSearch.replace(/[%_,().]/g, '');
       const num = parseInt(s);
@@ -301,33 +303,21 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   useBackClose(!!ledgerPdfHtml, () => setLedgerPdfHtml(null));
   useBackClose(!!printHtml, () => setPrintHtml(null));
 
-  // ── Realtime sync — multi-user safety ──────────────────────────────────────
-  // INSERT/DELETE instant; UPDATE debounced 500ms to coalesce bulk operations.
+  // ── Realtime sync — multi-user safety, gated on the page being VISIBLE ────
+  // (App.tsx keeps hidden tabs mounted forever; refetching them was invisible
+  // server load.) Hidden events mark the page stale; one refetch fires on
+  // switching back / app resume. The hook throttles event bursts and owns the
+  // foreground listeners.
   const silentFetch = useCallback(() => fetchChallans(true), [fetchChallans]);
-  const { debounced: debouncedFetchChallans } = useDebouncedFetch(silentFetch, 500);
+  const notifyChallans = useActiveRefetch(active ?? true, silentFetch);
   useEffect(() => {
-    const imm = () => fetchChallans(true);
     const channel = supabase.channel('cash_challans_realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cash_challans' }, imm)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cash_challans' }, imm)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cash_challans' }, debouncedFetchChallans)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cash_challan_items' }, imm)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cash_challan_items' }, imm)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cash_challan_items' }, debouncedFetchChallans)
-      // Refetch on (re)connect: iOS suspends the socket while the PWA is
-      // backgrounded, and realtime never replays missed events — without this
-      // a challan created elsewhere stays invisible until a manual reload.
-      .subscribe(status => { if (status === 'SUBSCRIBED') imm(); });
-    // Same story on returning to the foreground / regaining focus.
-    const onVisible = () => { if (document.visibilityState === 'visible') imm(); };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', onVisible);
-    return () => {
-      supabase.removeChannel(channel);
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', onVisible);
-    };
-  }, [fetchChallans, debouncedFetchChallans]);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, notifyChallans)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challan_items' }, notifyChallans)
+      // Reconnect catch-up: realtime never replays missed events.
+      .subscribe(status => { if (status === 'SUBSCRIBED') notifyChallans(); });
+    return () => { supabase.removeChannel(channel); };
+  }, [notifyChallans]);
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();

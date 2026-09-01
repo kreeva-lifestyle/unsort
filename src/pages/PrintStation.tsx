@@ -14,8 +14,12 @@ const PRINT_TIMEOUT_MS = 60_000;
 const MAX_PENDING_AGE_MS = 30 * 60_000;
 const HEARTBEAT_MS = 45_000;
 
-export default function PrintStation() {
+export default function PrintStation({ active }: { active?: boolean } = {}) {
   const [connected, setConnected] = useState(false);
+  // Ref so the long-lived poll interval always sees the current tab state.
+  const activeRef = useRef(active ?? true);
+  useEffect(() => { activeRef.current = active ?? true; if (active) fetchJobsRef.current?.(); }, [active]);
+  const fetchJobsRef = useRef<(() => void) | null>(null);
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [stationName] = useState(() => {
     const stored = localStorage.getItem('print_station_name');
@@ -59,7 +63,7 @@ export default function PrintStation() {
     if (data) setJobs(data as PrintJob[]);
   }, []);
 
-  useEffect(() => { fetchJobs(); }, [fetchJobs]);
+  useEffect(() => { fetchJobs(); fetchJobsRef.current = fetchJobs; }, [fetchJobs]);
 
   // On (re)mount, recover this station's own jobs left mid-print by a previous
   // tab close/refresh. Only reset ones claimed >90s ago — a sibling tab's print
@@ -82,7 +86,14 @@ export default function PrintStation() {
     const chan = supabase.channel('print-queue-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'print_queue' }, () => { fetchJobs(); })
       .subscribe();
-    const poll = setInterval(fetchJobs, 5000);
+    // The 5s safety poll runs only where it can matter: on the PC that can
+    // actually PRINT (QZ Tray connected — regardless of which tab its user is
+    // browsing), or while this tab is the one being looked at. Every other
+    // device (a phone that once peeked at this tab, days ago) stops polling —
+    // realtime plus the visibility catch-up below keep its list current.
+    const poll = setInterval(() => {
+      if (isConnected() || (activeRef.current && document.visibilityState === 'visible')) fetchJobs();
+    }, 5000);
     // Background tabs get throttled timers and may drop the websocket during
     // sleep — catch up the moment the tab is visible again.
     const onVisible = () => { if (document.visibilityState === 'visible') { fetchJobs(); tryConnect(); } };

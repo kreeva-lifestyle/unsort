@@ -29,7 +29,7 @@ export default function Attendance() {
 
   const fetchEmployees = useCallback(async () => {
     const { data, error } = await supabase.from('attendance_employees')
-      .select('id, employee_code, name, salary, fix_time_minutes, is_active, qr_image_url, left_on').order('name');
+      .select('id, employee_code, name, salary, fix_time_minutes, is_active, qr_image_url, left_on').order('name').limit(300);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     setEmployees((data as AttEmployee[]) || []);
   }, [addToast]);

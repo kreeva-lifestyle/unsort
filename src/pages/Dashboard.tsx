@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { T, S, Pill } from '../lib/theme';
 import { useAuth } from '../hooks/useAuth';
-import { useDebouncedFetch } from '../hooks/useDebouncedFetch';
+import { useActiveRefetch } from '../hooks/useActiveRefetch';
 import { useNotifications } from '../hooks/useNotifications';
 import { friendlyError } from '../lib/friendlyError';
 import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
@@ -15,7 +15,7 @@ type DryCleanAlert = { days: number };
 type TaskRow = { id: string; title: string; is_done: boolean; created_at: string };
 const TASK_LIMIT = 100;
 
-export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) => void } = {}) {
+export default function Dashboard({ navigateTo, active }: { navigateTo?: (tab: string) => void; active?: boolean } = {}) {
   const { profile } = useAuth();
   const { addToast } = useNotifications();
   const hour = new Date().getHours();
@@ -79,22 +79,22 @@ export default function Dashboard({ navigateTo }: { navigateTo?: (tab: string) =
   const [refreshing, setRefreshing] = useState(false);
   const manualRefresh = useCallback(async () => { setRefreshing(true); await fetchAll(); fetchTasks(); setRefreshing(false); addToast('Dashboard refreshed', 'success'); }, [fetchAll, addToast]);
 
-  // Dashboard shows aggregate counts — a 2s lag is imperceptible.
-  const { debounced: debouncedFetchAll } = useDebouncedFetch(fetchAll, 2000);
-  const { debounced: debouncedFetchTasks } = useDebouncedFetch(fetchTasks, 2000);
+  // Refetching is gated on the dashboard being the VISIBLE tab — it stays
+  // mounted forever, and every inventory/challan write anywhere used to
+  // re-run the summary RPC on every device even while nobody looked at it.
+  // Hidden events mark it stale; one refresh fires on switching back.
+  const notifyDash = useActiveRefetch(active ?? true, () => { fetchAll(); fetchTasks(); });
   useEffect(() => {
     fetchAll(); fetchTasks();
     // NB: deliberately NOT subscribing to packtime_scans — during active
     // packing it fires continuously and would re-run the whole dashboard on
     // every scan. Today's-scan count refreshes on tab focus / manual refresh.
     const ch = supabase.channel('dash-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, debouncedFetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, debouncedFetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, debouncedFetchTasks)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, notifyDash)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_challans' }, notifyDash)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, notifyDash)
       .subscribe();
-    const onVisible = () => { if (document.visibilityState === 'visible') { fetchAll(); fetchTasks(); } };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => { supabase.removeChannel(ch); document.removeEventListener('visibilitychange', onVisible); };
+    return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
