@@ -11,18 +11,23 @@ export default function RootSettings({ addToast, onChanged }: { addToast: (m: st
   const [roots, setRoots] = useState<GenRoot[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Save sends the full list, so a list that never loaded must not be saved —
+  // it would silently replace every stored folder with nothing.
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     call({ action: 'linkgen_roots', op: 'list' })
-      .then(({ data }) => { if (data.ok) setRoots(data.roots || []); })
-      .catch(() => {})
+      .then(({ data }) => { if (data.ok) setRoots(data.roots || []); else { setLoadFailed(true); addToast(friendlyError(data.details || data.error || 'Could not load the folders'), 'error'); } })
+      .catch(e => { setLoadFailed(true); addToast(friendlyError(e), 'error'); })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const patch = (i: number, p: Partial<GenRoot>) => setRoots(rs => rs.map((r, j) => j === i ? { ...r, ...p, resolved: undefined, error: undefined } : r));
 
   const save = async () => {
     if (saving) return;
+    if (loadFailed) { addToast('The saved folders could not be loaded — reopen this page before saving', 'error'); return; }
     const cleaned = roots.filter(r => r.url.trim());
     setSaving(true);
     try {
@@ -50,16 +55,16 @@ export default function RootSettings({ addToast, onChanged }: { addToast: (m: st
             </button>
             <input value={r.label} onChange={e => patch(i, { label: e.target.value })} placeholder="Name (e.g. ARYA)" style={{ ...S.fInput, width: 110 }} />
             <input value={r.url} onChange={e => patch(i, { url: e.target.value })} placeholder="https://www.dropbox.com/scl/fo/…" style={{ ...S.fInput, flex: 1, minWidth: 160, fontFamily: T.mono, fontSize: 11 }} />
-            <button onClick={() => setRoots(rs => rs.filter((_, j) => j !== i))} title="Remove" style={{ background: 'none', border: 'none', color: T.re, fontSize: 16, cursor: 'pointer', lineHeight: 1, padding: '4px 6px' }}>&#215;</button>
+            <button type="button" onClick={() => setRoots(rs => rs.filter((_, j) => j !== i))} title="Remove" aria-label="Remove folder" style={{ background: 'none', border: 'none', color: T.re, fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: '6px 8px', minWidth: 36, minHeight: 36 }}>&#215;</button>
           </div>
           {r.resolved === true && <div style={{ fontSize: 10, color: T.gr, marginTop: 4 }}>✓ Verified{r.path ? ` — ${r.path}` : ''}</div>}
           {r.resolved === false && <div style={{ fontSize: 10, color: T.re, marginTop: 4 }}>✗ Dropbox cannot open this link{r.error ? ` (${r.error})` : ''} — check it and Save again</div>}
         </div>
       ))}
-      {!loading && roots.length === 0 && <div style={{ fontSize: 11, color: T.tx3, padding: '6px 0 10px' }}>No search folders yet — add the first one below.</div>}
+      {!loading && roots.length === 0 && <div style={{ fontSize: 11, color: loadFailed ? T.re : T.tx3, padding: '6px 0 10px' }}>{loadFailed ? 'Could not load the saved folders — reopen this page to try again.' : 'No search folders yet — add the first one below.'}</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
         <button onClick={() => setRoots(rs => [...rs, { label: '', url: '', enabled: true }])} style={S.btnGhost}>+ Add Folder</button>
-        <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save'}</button>
+        <button onClick={save} disabled={saving || loadFailed} style={{ ...S.btnPrimary, pointerEvents: saving ? 'none' : 'auto', opacity: saving || loadFailed ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save'}</button>
       </div>
     </div>
   );

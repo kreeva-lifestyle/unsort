@@ -105,6 +105,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
   };
 
   const deleteComp = async (id: string) => {
+    if (!await ask({ title: 'Delete component?', message: 'It is removed from this category. Items already using it block the delete.', confirmLabel: 'Delete', danger: true })) return;
     if (await checkCategoryInUse(selected.id)) { addToast('Cannot delete component — inventory items use this category. Delink items first.', 'error'); return; }
     const { count: compCount } = await supabase.from('components').select('id', { count: 'exact', head: true }).eq('product_id', selected.id);
     if ((compCount || 0) <= 1) { addToast('Cannot delete — category must have at least 1 component', 'error'); return; }

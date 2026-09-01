@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { call } from '../dropboxlinks/api';
+import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 
 interface SavedFolder { url: string; path?: string; display?: string; resolved?: boolean }
 
@@ -12,13 +13,20 @@ export default function FwdSettings({ addToast, onChanged }: { addToast: (m: str
   const [saved, setSaved] = useState<SavedFolder | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { ask, modalProps: confirmProps } = useConfirm();
 
   useEffect(() => {
     call({ action: 'fwd_folder', op: 'list' })
       .then(({ data }) => { if (data.ok && data.folder) { setSaved(data.folder); setUrl(data.folder.url || ''); } })
-      .catch(() => {})
+      .catch(e => addToast(friendlyError(e), 'error'))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const clear = async () => {
+    if (!await ask({ title: 'Clear the upload folder?', message: 'Document photos have nowhere to upload until a folder is set again.', confirmLabel: 'Clear', danger: true })) return;
+    save('');
+  };
 
   // saveUrl === '' clears the folder (the Save button requires a non-empty URL,
   // so clearing gets its own button — without it a set folder could only ever
@@ -40,6 +48,7 @@ export default function FwdSettings({ addToast, onChanged }: { addToast: (m: str
 
   return (
     <div style={{ maxWidth: 520 }}>
+      <ConfirmModal {...confirmProps} />
       <div style={{ marginBottom: 10 }}>
         <label style={S.fLabel}>Dropbox folder link</label>
         <input value={url} onChange={e => { setUrl(e.target.value); setSaved(null); }} placeholder="https://www.dropbox.com/scl/fo/…" style={{ ...S.fInput, width: '100%', fontFamily: T.mono, fontSize: 11 }} />
@@ -47,7 +56,7 @@ export default function FwdSettings({ addToast, onChanged }: { addToast: (m: str
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={() => save()} disabled={saving || !url.trim()} style={{ ...S.btnPrimary, pointerEvents: saving ? 'none' : 'auto', opacity: saving || !url.trim() ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save folder'}</button>
-        {(saved || url.trim()) && <button onClick={() => save('')} disabled={saving} style={{ ...S.btnDanger, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>Clear</button>}
+        {(saved || url.trim()) && <button type="button" onClick={clear} disabled={saving} style={{ ...S.btnDanger, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>Clear</button>}
       </div>
       <div style={{ fontSize: 11, color: T.tx3, marginTop: 10, lineHeight: 1.5 }}>
         Photos from every user upload into this one folder. <b style={{ color: T.tx2 }}>Any signed-in user can set it.</b>
