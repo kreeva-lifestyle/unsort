@@ -61,7 +61,14 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
   const grand = Math.round((afterDisc + taxAmt + num(otherCharges)) * 100) / 100;
 
   const setItem = (i: number, patch: Partial<FormItem>) => setItems(list => list.map((it, idx) => idx === i ? { ...it, ...patch } : it));
-  const addRow = () => setItems(list => [...list, blankItem()]);
+  // Fabric is bought by the meter (owner's rule): new rows on a fabric PO
+  // start with unit Meter, and switching the type to fabric fills it into
+  // any row whose unit is still empty — a typed unit is never overwritten.
+  const addRow = () => setItems(list => [...list, { ...blankItem(), ...(poType === 'fabric' ? { unit: 'Meter' } : {}) }]);
+  const changeType = (t: PurchaseOrderType | '') => {
+    setPoType(t);
+    if (t === 'fabric') setItems(list => list.map(it => (it.unit ? it : { ...it, unit: 'Meter' })));
+  };
   const removeRow = (i: number) => setItems(list => list.length > 1 ? list.filter((_, idx) => idx !== i) : list);
 
   const save = async () => {
@@ -132,7 +139,7 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
             </div>
             <div>
               <label style={S.fLabel}>Type *</label>
-              <select value={poType} onChange={e => setPoType(e.target.value as PurchaseOrderType | '')} style={{ ...S.fInput, color: poType ? T.tx : T.tx3 }}>
+              <select value={poType} onChange={e => changeType(e.target.value as PurchaseOrderType | '')} style={{ ...S.fInput, color: poType ? T.tx : T.tx3 }}>
                 <option value="" disabled>Select type…</option>
                 {PO_TYPES.map(t => <option key={t} value={t}>{PO_TYPE_LABELS[t]}</option>)}
               </select>
