@@ -372,7 +372,7 @@ export default function Dashboard({ navigateTo, active }: { navigateTo?: (tab: s
               ) : (
                 <span onClick={() => { setEditingTaskId(t.id); setEditingTaskTitle(t.title); }} style={{ flex: 1, fontSize: 11, color: T.tx, textDecoration: t.is_done ? 'line-through' : 'none', cursor: 'text' }}>{t.title}</span>
               )}
-              <span onClick={() => deleteTask(t.id)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14, padding: '6px 8px', opacity: 0.4 }}>×</span>
+              <button type="button" onClick={() => deleteTask(t.id)} aria-label="Delete note" style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1, padding: '8px 10px', minWidth: 36, minHeight: 36, opacity: 0.5 }}>&#215;</button>
             </div>
           ))}
           {tasks.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: T.tx3, fontSize: 10 }}>No notes yet</div>}

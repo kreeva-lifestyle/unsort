@@ -430,7 +430,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
       <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 360, padding: '20px 18px' }} onClick={e => e.stopPropagation()}>
         <div style={{ ...S.modalHead, borderBottom: 'none', padding: '0 0 12px' }}>
           <div style={S.modalTitle}>Share Payment QR</div>
-          <span onClick={() => setShowQrShare(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18 }}>&times;</span>
+          <button type="button" onClick={() => setShowQrShare(false)} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ textAlign: 'center', marginBottom: 14 }}>
           <img src={qrUrl} alt="Payment QR" style={{ width: '100%', maxWidth: 220, borderRadius: 10, margin: '0 auto' }} />

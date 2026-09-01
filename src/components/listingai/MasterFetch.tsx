@@ -77,7 +77,7 @@ export default function MasterFetch({ busy, hasSkus, onPick, addToast }: {
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 420 }} onClick={ev => ev.stopPropagation()}>
             <div style={S.modalHead}>
               <div style={S.modalTitle}>Fetch from Master</div>
-              <span onClick={() => setOpen(false)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+              <button type="button" onClick={() => setOpen(false)} style={S.modalClose} aria-label="Close">&#215;</button>
             </div>
             <div style={{ padding: 16 }}>
               {!meta && !err && <div style={{ padding: 24, display: 'flex', justifyContent: 'center' }}><div className="spinner" /></div>}

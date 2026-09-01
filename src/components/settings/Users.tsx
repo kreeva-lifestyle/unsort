@@ -8,6 +8,7 @@ import { useBackClose } from '../../hooks/useBackClose';
 import Toggle from '../ui/Toggle';
 import { T, S, alpha } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
+import { copyToClipboard } from '../../lib/clipboard';
 import { MODULE_LABELS, ALL_MODULE_KEYS } from '../../lib/tabs';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import Empty from '../ui/Empty';
@@ -160,8 +161,10 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
         await supabase.from('profiles').update({ role: inviteForm.role }).eq('id', data.user.id);
       }
     }
+    // The password is shown exactly once — it must stay on screen until the
+    // admin explicitly taps Done (a timer or a stray backdrop tap used to
+    // wipe it mid-copy, leaving no way to recover it).
     setInviteResult({ email: inviteForm.email, password });
-    setTimeout(() => setInviteResult(null), 15000);
     addToast(`User ${inviteForm.full_name} invited!`, 'success');
     setInviting(false);
     fetchUsers();
@@ -215,8 +218,8 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
         })}
       </div>
 
-      {showInvite && createPortal(<div style={S.modalOverlay} onClick={() => { setShowInvite(false); setInviteResult(null); }}><div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
-        <div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Invite New User</span><span onClick={() => { setShowInvite(false); setInviteResult(null); }} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>✕</span></div>
+      {showInvite && createPortal(<div style={S.modalOverlay} onClick={() => { if (!inviteResult) setShowInvite(false); }}><div className="modal-inner" style={S.modalBox} onClick={e => e.stopPropagation()}>
+        <div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Invite New User</span>{!inviteResult && <button type="button" onClick={() => setShowInvite(false)} aria-label="Close" style={S.modalClose}>&#215;</button>}</div>
         {inviteResult ? (
           <div style={{ padding: 16 }}>
             <div style={{ background: 'rgba(45,212,160,.06)', border: '1px solid rgba(45,212,160,.18)', borderRadius: T.r, padding: 12, marginBottom: 12 }}>
@@ -233,9 +236,10 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
                 <p style={{ fontSize: 12, fontFamily: T.mono, color: T.ac, margin: 0, userSelect: 'all' as const }}>{inviteResult.password}</p>
               </div>
             </div>
+            <button type="button" onClick={async () => { const ok = await copyToClipboard(`Email: ${inviteResult.email}\nPassword: ${inviteResult.password}`); addToast(ok ? 'Credentials copied' : 'Could not copy — long-press the text to select it', ok ? 'success' : 'error'); }} style={{ ...S.btnGhost, width: '100%', marginTop: 10, minHeight: 44 }}>Copy email + password</button>
             <p style={{ fontSize: 10, color: T.tx3, marginTop: 10, textAlign: 'center' as const }}>The user should change their password after first login</p>
             <div style={{ padding: '12px 0 0', display: 'flex', justifyContent: 'flex-end' }}>
-              <div onClick={closeInvite} style={S.btnPrimary}>Done</div>
+              <button type="button" onClick={closeInvite} style={{ ...S.btnPrimary, minHeight: 44 }}>Done</button>
             </div>
           </div>
         ) : (

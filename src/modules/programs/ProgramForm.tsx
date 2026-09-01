@@ -100,7 +100,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
       <div className="prg-form-modal modal-inner" style={{ background: 'rgba(14,18,30,.96)', border: `1px solid ${T.bd2}`, borderRadius: 14, padding: 0, maxWidth: 900, width: '100%', margin: '20px 0' }} onClick={e => e.stopPropagation()}>
         <div className="prg-form-head" style={{ ...S.modalHead, position: 'sticky', top: 0, zIndex: 2, background: 'rgba(14,18,30,.98)', borderRadius: '14px 14px 0 0' }}>
           <span style={S.modalTitle}>{editing ? t('editTitle') : t('addTitle')}</span>
-          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18 }} aria-label="Close">&times;</span>
+          <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div className="prg-form-body" style={{ padding: '0 20px 20px' }}>
           <SectionTitle color={T.ac2}>{t('programInfo')}</SectionTitle>

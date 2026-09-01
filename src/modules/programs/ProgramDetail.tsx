@@ -3,6 +3,8 @@ import { T, S } from '../../lib/theme';
 import { fetchProgramById, fetchMatchings, fetchPriceWithParts } from './lib/supabase-rpc';
 import { toDirectImageUrl } from './lib/image-url-converters';
 import { safeHref } from '../../lib/safeHref';
+import { friendlyError } from '../../lib/friendlyError';
+import { useNotifications } from '../../hooks/useNotifications';
 import SectionTitle from './components/SectionTitle';
 import FabricBreakdown from './components/FabricBreakdown';
 import ProgramHistory from './ProgramHistory';
@@ -24,6 +26,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
   const [fabricParts, setFabricParts] = useState<ProgramPricePart[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFabricBreakdown, setShowFabricBreakdown] = useState(false);
+  const { addToast } = useNotifications();
 
   const load = async () => {
     setLoading(true);
@@ -35,6 +38,9 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       setProgram(p); setMatchings(m);
       setWorkParts(parts.filter(pt => (pt.section || 'work') === 'work'));
       setFabricParts(parts.filter(pt => pt.section === 'fabric'));
+    } catch (e) {
+      // Without this the spinner stayed up forever on a failed load.
+      addToast(friendlyError(e), 'error'); onClose();
     } finally { setLoading(false); }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps

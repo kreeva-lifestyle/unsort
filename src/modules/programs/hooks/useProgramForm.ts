@@ -1,6 +1,7 @@
 // Form state hook for add/edit program
 import { useState, useCallback } from 'react';
 import { upsertProgram, upsertProgramPrice } from '../lib/supabase-rpc';
+import { friendlyError } from '../../../lib/friendlyError';
 import type { ProgramFormData, Program, PricePartRow } from '../types';
 
 const EMPTY_FORM: ProgramFormData = {
@@ -41,7 +42,7 @@ export function useProgramForm(onSuccess: () => void) {
     const cleanForm = { ...form, matchings: form.matchings.filter(m => m.company_name.trim()) };
     setSaving(true);
     const { result, error: rpcErr } = await upsertProgram(cleanForm, editing?.id, editing?.updated_at);
-    if (rpcErr) { setSaving(false); setError(rpcErr.message || 'Network error'); return false; }
+    if (rpcErr) { setSaving(false); setError(friendlyError(rpcErr)); return false; }
     if (!result) { setSaving(false); setError('No response from server'); return false; }
     if (!result.ok) { setSaving(false); setError(result.error || 'Unknown error'); return false; }
 
@@ -52,7 +53,7 @@ export function useProgramForm(onSuccess: () => void) {
         ...(fabricParts || []).map((p, i) => ({ ...p, section: 'fabric' as const, sort_order: i + 1000 })),
       ];
       const { error: priceErr } = await upsertProgramPrice(result.id, allParts);
-      if (priceErr) { setSaving(false); setError('Program saved but prices failed: ' + priceErr.message); return false; }
+      if (priceErr) { setSaving(false); setError('Program saved but prices failed: ' + friendlyError(priceErr)); return false; }
     }
 
     setSaving(false);

@@ -19,6 +19,7 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
   const { recording, audioUrl, audioBlob, duration, error, start, stop, clear, ext } = useVoiceRecorder();
   const { addToast } = useNotifications();
   const [uploading, setUploading] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const { ask, modalProps } = useConfirm();
   const existingUrl = existingPath ? getVoiceNoteUrl(existingPath) : null;
 
@@ -60,14 +61,18 @@ export default function VoiceRecorder({ programId, existingPath, onUploaded, t }
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
           <audio controls src={existingUrl} style={{ flex: 1, height: 32 }} />
           <button onClick={async () => {
-            if (!await ask({ title: t('removeVoiceConfirm'), confirmLabel: t('remove'), danger: true })) return;
+            if (removing || !await ask({ title: t('removeVoiceConfirm'), confirmLabel: t('remove'), danger: true })) return;
+            setRemoving(true);
             if (existingPath) {
-              await supabase.storage.from('program-voice-notes').remove([existingPath]);
+              const { error: rmErr } = await supabase.storage.from('program-voice-notes').remove([existingPath]);
+              if (rmErr) { addToast(friendlyError(rmErr), 'error'); setRemoving(false); return; }
             }
-            await supabase.from('programs').update({ voice_note_path: null, updated_at: new Date().toISOString() }).eq('id', programId);
+            const { error: upErr } = await supabase.from('programs').update({ voice_note_path: null, updated_at: new Date().toISOString() }).eq('id', programId);
+            setRemoving(false);
+            if (upErr) { addToast(friendlyError(upErr), 'error'); return; }
             onUploaded('');
             addToast(t('voiceRemoved'), 'success');
-          }} style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', flexShrink: 0 }}>{t('remove')}</button>
+          }} className="touch44" style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', flexShrink: 0, pointerEvents: removing ? 'none' : 'auto', opacity: removing ? 0.5 : 1 }}>{removing ? '…' : t('remove')}</button>
         </div>
       )}
 

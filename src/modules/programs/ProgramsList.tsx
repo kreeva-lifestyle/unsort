@@ -113,6 +113,7 @@ export default function ProgramsList({ onAdd, onEdit, onView, onPDF }: Props) {
               <SwipeRow key={p.id} hint={idx === 0} hintKey="programs" actions={[
                 { label: 'Edit', color: '#3B82F6', onClick: () => handleEdit(p) },
                 { label: 'PDF', color: '#6366F1', onClick: () => onPDF(p) },
+                { label: 'Link', color: '#0EA5E9', onClick: () => handleCopyLink(p) },
                 { label: 'Del', color: '#EF4444', onClick: () => handleDelete(p) },
               ]}>
               <div onClick={() => onView(p)} style={{ padding: '14px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer' }}>

@@ -91,7 +91,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
             <span style={S.modalTitle}>PO #{po.po_number}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: sc.color }} />{PO_STATUS_LABELS[po.status]}</span>
           </div>
-          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&times;</span>
+          <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
 
         <div style={{ padding: '16px 18px', overflowY: 'auto', maxHeight: 'calc(90vh - 190px)' }}>

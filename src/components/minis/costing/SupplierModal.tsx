@@ -62,7 +62,7 @@ export default function SupplierModal({ subName, suppliers, known, onDone, onClo
       <div className="modal-inner" style={{ ...S.modalBox, width: 560 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>Suppliers — {subName || 'sub component'}</div>
-          <span onClick={onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+          <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: '14px 18px', overflowY: 'auto' }}>
           <div style={{ fontSize: 10.5, color: T.tx3, marginBottom: 10, lineHeight: 1.5 }}>

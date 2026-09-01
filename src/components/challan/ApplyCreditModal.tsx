@@ -91,7 +91,7 @@ export default function ApplyCreditModal({ challan: c, onClose, onDone, addToast
       <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 440 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={S.modalTitle}>{fromReturn ? 'Apply credit to a challan' : 'Use return credit'}</div>
-          <span onClick={saving ? undefined : onClose} style={{ cursor: 'pointer', color: T.tx3, fontSize: 18, lineHeight: 1 }}>&#215;</span>
+          <button type="button" onClick={saving ? undefined : onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: '14px 18px' }}>
           <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5, marginBottom: 10 }}>

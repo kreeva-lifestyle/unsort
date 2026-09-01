@@ -285,8 +285,7 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
 
       {/* Mobile "Pay" FAB */}
       {canPay && salaries.length > 0 && (
-        <button className="fab mobile-only" onClick={() => setPayFlow(true)} aria-label="Pay salaries"
-          style={{ background: 'linear-gradient(135deg, #16A34A, #22C55E)', fontSize: 12, fontWeight: 700, fontFamily: T.sans }}>Pay</button>
+        <button className="fab fab-pay mobile-only" onClick={() => setPayFlow(true)} aria-label="Pay salaries" style={{ fontFamily: T.sans }}>Pay</button>
       )}
 
       {/* Salary payment kiosk */}

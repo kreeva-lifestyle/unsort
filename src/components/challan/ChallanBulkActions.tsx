@@ -83,7 +83,7 @@ export default function ChallanBulkActions(p: Props) {
             {p.lastBatch.settled > 0 && <span style={{ color: T.yl, fontWeight: 500 }}> — Undo restores the sales only; settled return credits stay consumed</span>}
           </span>
           <button disabled={p.undoingBatch} onClick={p.onUndoBatch} style={{ ...S.btnDanger, ...S.btnSm, pointerEvents: p.undoingBatch ? 'none' : 'auto', opacity: p.undoingBatch ? 0.5 : 1 }}>{p.undoingBatch ? 'Undoing…' : 'Undo Batch'}</button>
-          <span onClick={p.onDismissBatch} style={{ cursor: 'pointer', color: T.tx3, fontSize: 14 }} aria-label="Dismiss">&times;</span>
+          <button type="button" onClick={p.onDismissBatch} style={{ ...S.modalClose, margin: '-8px -8px -8px 0' }} aria-label="Dismiss">&#215;</button>
         </div>
       )}
 
