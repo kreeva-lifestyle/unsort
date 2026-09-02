@@ -86,6 +86,7 @@ import { closeAllLayers, closeTopLayer, useBackClose } from './hooks/useBackClos
 import { TAB_IDS, canAccessTab, getFirstAllowedTab } from './lib/tabs';
 import { initGlobalPrintMode } from './lib/printQueue';
 import { logError } from './lib/errorLogger';
+import { useViewportRestore } from './hooks/useViewportRestore';
 // Public routes (share links, password reset) render OUTSIDE .main-area, so
 // they don't get <main>'s scroll. #root is a fixed overflow:hidden frame -
 // without their own scroll container, tall public pages clip below the fold.
@@ -207,44 +208,10 @@ const MainApp = () => {
   });
   useEffect(() => { try { localStorage.setItem('sidebarOpen', sidebarOpen ? '1' : '0'); } catch { /* private mode */ } }, [sidebarOpen]);
 
-  // iOS standalone: after the keyboard closes, the fixed-position viewport can
-  // STAY SHRUNK — the whole shell (bottom nav included) floats above the
-  // screen edge with a dead strip below it until the app is relaunched (the
-  // owner photographed exactly this; the CSS itself measures correct). When
-  // the visual viewport reports full height again, nudge scroll and re-pin
-  // the #root fixed frame so iOS recomputes the fixed-position viewport.
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    let t: ReturnType<typeof setTimeout>;
-    const recover = () => {
-      clearTimeout(t);
-      t = setTimeout(() => {
-        if (Math.abs(vv.height + vv.offsetTop - window.innerHeight) < 2) {
-          window.scrollTo(0, 0);
-          const r = document.getElementById('root');
-          if (r) { r.style.bottom = '0.5px'; requestAnimationFrame(() => { r.style.bottom = '0'; }); }
-        }
-      }, 120);
-    };
-    vv.addEventListener('resize', recover);
-    window.addEventListener('focusout', recover, true);
-    // The in-call shrink (iOS reserves call-bar space from standalone PWAs,
-    // owner's screenshot: green call ring + bottom strip) sometimes announces
-    // its end via window resize / app foregrounding — recover on those too.
-    // While the call RUNS the space is iOS's, not ours; nothing to reclaim.
-    window.addEventListener('resize', recover);
-    window.addEventListener('pageshow', recover);
-    document.addEventListener('visibilitychange', recover);
-    return () => {
-      clearTimeout(t);
-      vv.removeEventListener('resize', recover);
-      window.removeEventListener('focusout', recover, true);
-      window.removeEventListener('resize', recover);
-      window.removeEventListener('pageshow', recover);
-      document.removeEventListener('visibilitychange', recover);
-    };
-  }, []);
+  // iOS standalone keyboard bug: the layout viewport shrinks by the status-bar
+  // height the first time the keyboard opens and never grows back on its own.
+  // See src/hooks/useViewportRestore.ts for the mechanism and the fix.
+  useViewportRestore();
 
   // height (NOT minHeight): a child's percentage height cannot resolve against
   // an auto-height parent per spec — WebKit enforces this, so with minHeight

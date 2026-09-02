@@ -5,6 +5,7 @@
 // where the fixed nav actually landed), so a surviving gap can be diagnosed
 // from a single screenshot instead of guesswork.
 import { useState, useEffect } from 'react';
+import { viewportRestoreStats } from '../../hooks/useViewportRestore';
 
 declare const __APP_BUILD__: string; // injected by vite define (build stamp)
 
@@ -37,6 +38,8 @@ export default function ViewportDebug() {
         'nav.h': nr ? nr.height.toFixed(1) : '-',
         'gap(inner-navBot)': nr ? (window.innerHeight - nr.bottom).toFixed(1) : '-',
         standalone: String(window.matchMedia('(display-mode: standalone)').matches),
+        maxH: String(viewportRestoreStats.maxH),
+        restores: `${viewportRestoreStats.restores}${viewportRestoreStats.lastReason ? ' (' + viewportRestoreStats.lastReason + ')' : ''}`,
         build: typeof __APP_BUILD__ === 'string' ? __APP_BUILD__ : 'dev',
       });
     };
