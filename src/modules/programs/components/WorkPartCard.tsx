@@ -1,5 +1,6 @@
 import { T } from '../../../lib/theme';
 import { numericKeyDown } from '../../../lib/numericInput';
+import SuggestInput from '../../../components/ui/SuggestInput';
 import type { PricePartRow } from '../types';
 import type { TranslationKey } from '../i18n/en';
 
@@ -13,15 +14,17 @@ interface Props {
   onUpdate: (i: number, field: keyof PricePartRow, value: string | number) => void;
   onDelete: (i: number) => void;
   t: (key: TranslationKey) => string;
+  partNames?: string[];
+  fabricNames?: string[];
 }
 
 const lbl: React.CSSProperties = { fontSize: 10, color: T.tx3, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3, fontWeight: 600 };
 
-export default function WorkPartCard({ p, i, canDelete, numIn, txtIn, selIn, onUpdate, onDelete, t }: Props) {
+export default function WorkPartCard({ p, i, canDelete, numIn, txtIn, selIn, onUpdate, onDelete, t, partNames = [], fabricNames = [] }: Props) {
   return (
     <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid rgba(255,255,255,0.05)`, borderRadius: 8, padding: 12, marginBottom: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <input list="dl-pn" value={p.part_name} onChange={e => onUpdate(i, 'part_name', e.target.value)} placeholder={t('partPlaceholder')} style={{ ...txtIn, flex: 1, fontWeight: 600, fontSize: 14 }} />
+        <SuggestInput value={p.part_name} onChange={v => onUpdate(i, 'part_name', v)} options={partNames} placeholder={t('partPlaceholder')} style={{ ...txtIn, flex: 1, fontWeight: 600, fontSize: 14 }} />
         {canDelete && <button onClick={() => onDelete(i)} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 18, marginLeft: 8, minWidth: 44, minHeight: 44 }} aria-label="Remove part">×</button>}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
@@ -39,7 +42,7 @@ export default function WorkPartCard({ p, i, canDelete, numIn, txtIn, selIn, onU
         <div><div style={lbl}>{t('total')}</div><div style={{ ...numIn, background: 'oklch(0.72 0.19 145 / .06)', color: T.gr, fontWeight: 700, fontFamily: "'Sora',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '6px' }}>{p.total ? '₹' + p.total.toFixed(0) : '—'}</div></div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        <div><div style={lbl}>{t('fabricName')}</div><input list="dl-fn" value={p.fabric_name} onChange={e => onUpdate(i, 'fabric_name', e.target.value)} placeholder={t('fabricPlaceholder')} style={txtIn} /></div>
+        <div><div style={lbl}>{t('fabricName')}</div><SuggestInput value={p.fabric_name} onChange={v => onUpdate(i, 'fabric_name', v)} options={fabricNames} placeholder={t('fabricPlaceholder')} style={txtIn} /></div>
         <div><div style={lbl}>{t('fabricMeter')}</div><input type="number" onKeyDown={numericKeyDown} min="0" step="0.01" value={p.fabric_meter || ''} onChange={e => onUpdate(i, 'fabric_meter', Math.max(0, Number(e.target.value)))} placeholder="0" style={numIn} /></div>
       </div>
     </div>

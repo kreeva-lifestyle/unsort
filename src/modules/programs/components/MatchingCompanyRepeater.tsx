@@ -1,4 +1,5 @@
 import { S } from '../../../lib/theme';
+import SuggestInput from '../../../components/ui/SuggestInput';
 import type { TranslationKey } from '../i18n/en';
 
 interface Row { company_name: string; matching_label: string }
@@ -26,14 +27,13 @@ export default function MatchingCompanyRepeater({ rows, onChange, t, brandOption
           <input value={r.company_name} onChange={e => update(i, 'company_name', e.target.value)}
             placeholder={t('brandName')}
             style={{ ...S.fInput, fontSize: 12 }} />
-          <input list="dl-brand" value={r.matching_label} onChange={e => update(i, 'matching_label', e.target.value)}
+          <SuggestInput value={r.matching_label} onChange={v => update(i, 'matching_label', v)} options={brandOptions}
             placeholder={t('brandLabel')}
             style={{ ...S.fInput, fontSize: 12 }} />
           <button type="button" onClick={() => remove(i)}
             style={{ ...S.btnDanger, ...S.btnSm, cursor: 'pointer', alignSelf: 'center' }} aria-label="Remove">×</button>
         </div>
       ))}
-      <datalist id="dl-brand">{brandOptions.map(n => <option key={n} value={n} />)}</datalist>
       <button type="button" onClick={add}
         style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer' }}>{t('addCompany')}</button>
     </div>

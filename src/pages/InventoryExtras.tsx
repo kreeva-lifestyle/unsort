@@ -13,6 +13,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import SwipeRow from '../components/ui/SwipeRow';
 import { SkeletonRows } from '../components/ui/Skeleton';
 import Empty from '../components/ui/Empty';
+import SuggestInput from '../components/ui/SuggestInput';
 import type {
   Product,
   ProductComponent,
@@ -52,6 +53,9 @@ export default function InventoryExtras() {
   const [editForm, setEditForm] = useState({ sku: '', size: '', location: '', manufacturer: '', notes: '' });
   // Add form
   const resetAddForm = () => { setFProductId(''); setFComponentId(''); setFSku(''); setFSize(''); setFLocation(''); setFManufacturer(''); setFQty('1'); setFNotes(''); };
+  // Every way out of the Add sheet (Cancel, backdrop, back gesture) clears
+  // the half-typed form so the next open starts clean.
+  const closeAdd = () => { setShowAdd(false); setError(''); resetAddForm(); };
   const [fProductId, setFProductId] = useState('');
   const [fComponentId, setFComponentId] = useState('');
   const [fSku, setFSku] = useState('');
@@ -81,7 +85,7 @@ export default function InventoryExtras() {
     document.body.classList.toggle('modal-open', hasModal);
     return () => { document.body.classList.remove('modal-open'); };
   }, [showAdd, adjustExtra, matchExtra, completeItem, editingExtra, exportHtml]);
-  useBackClose(showAdd, () => setShowAdd(false));
+  useBackClose(showAdd, closeAdd);
   useBackClose(!!editingExtra, () => setEditingExtra(null));
   useBackClose(!!adjustExtra, () => setAdjustExtra(null));
   useBackClose(!!matchExtra, () => setMatchExtra(null));
@@ -494,7 +498,7 @@ export default function InventoryExtras() {
       </div>}
 
       {/* Add Spare Part Modal */}
-      {showAdd && createPortal(<div style={overlay} onClick={() => { setShowAdd(false); setError(''); }}>
+      {showAdd && createPortal(<div style={overlay} onClick={closeAdd}>
         <div className="modal-inner" style={modal} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}` }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Add Spare Part</span>
@@ -539,8 +543,7 @@ export default function InventoryExtras() {
             </div>
             <div style={{ marginBottom: 10 }}>
               <label style={label}>Manufacturer *</label>
-              <input list="mfr-extras-list" value={fManufacturer} onChange={e => setFManufacturer(e.target.value)} placeholder="Type or select manufacturer..." style={input} />
-              <datalist id="mfr-extras-list">{mfrOptions.map(m => <option key={m} value={m} />)}</datalist>
+              <SuggestInput value={fManufacturer} onChange={setFManufacturer} options={mfrOptions} placeholder="Type or select manufacturer..." style={input} />
             </div>
             <div className="inv-extra-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div>
@@ -554,7 +557,7 @@ export default function InventoryExtras() {
             </div>
             {error && <div style={{ color: T.re, fontSize: 11, marginBottom: 8 }}>{error}</div>}
             <div style={{ padding: '14px 0 0', borderTop: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
-              <button type="button" onClick={() => { setShowAdd(false); setError(''); }} style={btnGhost}>Cancel</button>
+              <button type="button" onClick={closeAdd} style={btnGhost}>Cancel</button>
               <button type="submit" style={{ ...btn, opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : 'auto' }}>{saving ? 'Saving...' : 'Add'}</button>
             </div>
           </form>
@@ -566,7 +569,7 @@ export default function InventoryExtras() {
         <div className="modal-inner" style={{ ...modal, width: 380 }} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{adjustMode === 'add' ? 'Add' : 'Remove'} Quantity</span>
-            <button onClick={() => setAdjustExtra(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16, background: 'none', border: 'none' }} title="Close" aria-label="Close">&times;</button>
+            <button type="button" onClick={() => setAdjustExtra(null)} style={S.modalClose} title="Close" aria-label="Close">&times;</button>
           </div>
           <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ fontSize: 11, color: T.tx2 }}>
@@ -590,7 +593,7 @@ export default function InventoryExtras() {
         <div className="modal-inner" style={{ ...modal, width: 520 }} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Matching Unsorted Items</span>
-            <button onClick={() => setMatchExtra(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16, background: 'none', border: 'none' }} title="Close" aria-label="Close">&times;</button>
+            <button type="button" onClick={() => setMatchExtra(null)} style={S.modalClose} title="Close" aria-label="Close">&times;</button>
           </div>
           <div style={{ padding: 10, fontSize: 11, color: T.tx2, borderBottom: `1px solid ${T.bd}`, background: 'oklch(0.78 0.18 75 / .03)' }}>
             Extra: {matchExtra.component_name} | SKU: {matchExtra.sku} | Size: {matchExtra.size} | Qty available: <b style={{ color: T.gr }}>{matchExtra.quantity}</b>
@@ -645,7 +648,7 @@ export default function InventoryExtras() {
         <div className="modal-inner" style={modal} onClick={e => e.stopPropagation()}>
           <div style={{ padding: '13px 18px', borderBottom: `1px solid ${T.bd}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>Edit Spare Part</span>
-            <button onClick={() => setEditingExtra(null)} style={{ cursor: 'pointer', color: T.tx3, fontSize: 16, background: 'none', border: 'none' }} title="Close" aria-label="Close">&times;</button>
+            <button type="button" onClick={() => setEditingExtra(null)} style={S.modalClose} title="Close" aria-label="Close">&times;</button>
           </div>
           <div style={{ padding: 16 }}>
             {error && <div style={{ background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: T.re, marginBottom: 10 }}>{error}</div>}
@@ -655,7 +658,7 @@ export default function InventoryExtras() {
               <div><label style={label}>Size *</label><select value={editForm.size} onChange={e => setEditForm({ ...editForm, size: e.target.value })} style={input}><option value="">Select...</option>{SIZES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
             </div>
             <div style={{ marginBottom: 10 }}><label style={label}>Location *</label><select value={editForm.location} onChange={e => setEditForm({ ...editForm, location: e.target.value })} style={input}><option value="">Select...</option>{locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
-            <div style={{ marginBottom: 10 }}><label style={label}>Manufacturer *</label><input list="mfr-edit-list" value={editForm.manufacturer} onChange={e => setEditForm({ ...editForm, manufacturer: e.target.value })} style={input} /><datalist id="mfr-edit-list">{mfrOptions.map(m => <option key={m} value={m} />)}</datalist></div>
+            <div style={{ marginBottom: 10 }}><label style={label}>Manufacturer *</label><SuggestInput value={editForm.manufacturer} onChange={v => setEditForm({ ...editForm, manufacturer: v })} options={mfrOptions} style={input} /></div>
             <div style={{ marginBottom: 12 }}><label style={label}>Notes</label><input value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} placeholder="Optional" style={input} /></div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setEditingExtra(null)} style={btnGhost}>Cancel</button>
