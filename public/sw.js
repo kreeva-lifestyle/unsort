@@ -2,6 +2,10 @@
 const CACHE = 'dailyoffice-__BUILD_TS__';
 
 self.addEventListener('install', e => {
+  // Precache the shell so the navigate fallback below has something to
+  // serve when the app is launched offline. The cache name is build-stamped,
+  // so every deploy installs a fresh copy and activate drops the old one.
+  e.waitUntil(caches.open(CACHE).then(c => c.add('/index.html')).catch(() => {}));
   self.skipWaiting();
 });
 

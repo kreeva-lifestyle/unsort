@@ -23,6 +23,8 @@ import type {
 } from '../types/database';
 import { exportName, fileRange, fileDate } from '../lib/exportName';
 import { downloadFile } from '../lib/downloadFile';
+import { registerBeforeSignOut } from '../lib/beforeSignOut';
+import { logSwallowed } from '../lib/errorLogger';
 
 // In-memory view model for the recent-scans strip. Not a DB row.
 interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; }
@@ -148,6 +150,14 @@ async function flushQueue() {
   flushing = false;
 }
 
+// Sign-out drains the queue under the signing-out user's token (see
+// beforeSignOut.ts). Waits for an in-flight flush first, bounded by the
+// runner's cap, so a wifi stall cannot hold the sign-out button hostage.
+registerBeforeSignOut(async () => {
+  for (let i = 0; i < 30 && flushing; i++) await new Promise(r => setTimeout(r, 200));
+  await flushQueue();
+});
+
 function enqueueWrite(rows: unknown[][], sheetName: string) {
   writeQueue.push({ rows, sheetName, retries: 0 });
   flushQueue();
@@ -165,7 +175,7 @@ if (typeof window !== 'undefined') {
         // handlers can't await) — the edge verifies the caller now, so the
         // anon key alone would be rejected.
         const body = JSON.stringify({ action: 'batch', rows: item.rows, sheetName: item.sheetName });
-        fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${lastAccessToken || SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body, keepalive: true }).catch(e => console.warn('Sheet sync failed:', e));
+        fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${lastAccessToken || SUPABASE_ANON_KEY}`, 'apikey': SUPABASE_ANON_KEY }, body, keepalive: true }).catch(e => logSwallowed('Sheet sync on unload', e));
       }
       e.returnValue = '';
     }
@@ -690,7 +700,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setHistoryLoading(true);
     // 'estimated' like every other pager — 'exact' forced a full count scan
     // of the app's largest table on every history view.
-    let query = supabase.from('packtime_scans').select('*', { count: 'estimated' })
+    let query = supabase.from('packtime_scans').select('id, session_id, awb, courier, camera, sheet_name, scanned_at, user_id, brand', { count: 'estimated' })
       .gte('scanned_at', new Date(historyDateFrom + 'T00:00:00').toISOString())
       .lte('scanned_at', new Date(historyDateTo + 'T23:59:59.999').toISOString());
     if (historySearch) query = query.ilike('awb', `%${historySearch.replace(/[%_]/g, '\\$&')}%`);

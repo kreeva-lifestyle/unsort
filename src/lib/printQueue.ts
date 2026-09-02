@@ -15,10 +15,13 @@ export function getPrintMode(): PrintMode {
 }
 
 export async function setPrintMode(mode: PrintMode): Promise<{ error: Error | null }> {
-  localStorage.setItem('print_mode', mode);
+  // DB first: the cache used to be written before the upsert, so a failed
+  // save left THIS device printing in a mode no other device agreed with.
   const { error } = await supabase.from('app_settings')
     .upsert({ key: 'print_mode', value: mode, updated_at: new Date().toISOString() }, { onConflict: 'key' });
-  return { error: error ? new Error(error.message) : null };
+  if (error) return { error: new Error(error.message) };
+  localStorage.setItem('print_mode', mode);
+  return { error: null };
 }
 
 // Fetch the global mode into the localStorage cache + subscribe to live changes.

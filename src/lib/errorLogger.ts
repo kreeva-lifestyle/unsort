@@ -1,7 +1,8 @@
 // Self-contained error tracking — writes unhandled errors to Supabase.
-// Scope: ONLY unexpected/unhandled errors (render crashes, window.onerror,
-// unhandledrejection). Handled errors that go through addToast(friendlyError)
-// are deliberately NOT logged — they're expected and already surfaced.
+// Scope: unexpected/unhandled errors (render crashes, window.onerror,
+// unhandledrejection) plus best-effort background writes via logSwallowed.
+// Handled errors that go through addToast(friendlyError) are deliberately
+// NOT logged — they're expected and already surfaced.
 import { supabase } from './supabase';
 
 type ErrorSource = 'boundary' | 'window' | 'promise' | 'manual';
@@ -36,6 +37,13 @@ function messageOf(err: unknown): string {
 function stackOf(err: unknown): string | null {
   if (err instanceof Error && err.stack) return err.stack;
   return null;
+}
+
+// Best-effort background writes (audit trail, print-log housekeeping,
+// heartbeats) used to end in console.warn, which nobody reads on a phone.
+// They now land in Settings → Error Logs with a context prefix.
+export function logSwallowed(context: string, err: unknown): void {
+  void logError(new Error(`${context}: ${messageOf(err)}`), 'manual');
 }
 
 export async function logError(err: unknown, source: ErrorSource, extra?: { componentStack?: string }) {

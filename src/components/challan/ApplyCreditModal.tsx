@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
+import { logSwallowed } from '../../lib/errorLogger';
 import { friendlyError } from '../../lib/friendlyError';
 import { useAuth } from '../../hooks/useAuth';
 import { T, S } from '../../lib/theme';
@@ -80,7 +81,7 @@ export default function ApplyCreditModal({ challan: c, onClose, onDone, addToast
     const details = `Return credit ${inr(applied)} from #${retNumber} applied to challan #${saleNumber} (${d.batch || ''}) — pending now ${inr(Number(d.challan_pending || 0))}, credit left ${inr(Number(d.credit_remaining || 0))}`;
     // Audit both records — best-effort, the RPC already wrote the ledger.
     for (const rid of [args.p_challan_id, args.p_return_id]) {
-      await supabase.from('audit_log').insert({ module: 'cash_challan', record_id: rid, action: 'CREDIT_APPLIED', details, user_email: profile?.email }).then(({ error: ae }) => { if (ae) console.warn('Audit log failed:', ae.message); });
+      await supabase.from('audit_log').insert({ module: 'cash_challan', record_id: rid, action: 'CREDIT_APPLIED', details, user_email: profile?.email }).then(({ error: ae }) => { if (ae) { logSwallowed('Credit audit log', ae); addToast('Credit applied, but the audit log failed — ' + friendlyError(ae), 'error'); } });
     }
     addToast(`${inr(applied)} credit applied — challan #${saleNumber} pending is now ${inr(Number(d.challan_pending || 0))}`, 'success');
     onDone();

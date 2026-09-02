@@ -4,6 +4,8 @@ import CashBook from './CashBook';
 import { supabase } from '../lib/supabase';
 import { printOrQueue } from '../lib/printQueue';
 import { useAuth } from '../hooks/useAuth';
+import { canAccessModule } from '../lib/tabs';
+import { logSwallowed } from '../lib/errorLogger';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import { useBackClose } from '../hooks/useBackClose';
@@ -29,7 +31,7 @@ const ccAuditLog = async (action: string, recordId: string, details: string, cha
     let userName = user?.email || null;
     if (user) { const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(); userName = prof?.full_name || userName; }
     const { error } = await supabase.from('audit_log').insert({ action, module: 'cash_challan', record_id: recordId, details, user_id: user?.id ?? null, user_email: userName, changes: changes || null });
-    if (error) console.warn('Audit log failed:', error.message);
+    if (error) logSwallowed('Challan audit log', error);
   } catch { /* audit is best-effort — never block the main operation */ }
 };
 
@@ -1331,7 +1333,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   ) : null;
 
   // ── Cash Book Screen ───────────────────────────────────────────────────────
-  if (showCashBook && profile?.module_access?.cashbook !== false) return (
+  if (showCashBook && canAccessModule(profile?.role, 'cashbook', profile?.module_access)) return (
     <div>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { setShowCashBook(false); }} style={S.btnGhost}>← Back</button></div><CashBook /></div>
   );
 
@@ -1450,7 +1452,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         <div className="challan-nav-btns" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('analytics'); await fetchAnalytics(); setViewOpening(null); setShowAnalytics(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'analytics' ? 0.6 : 1 }}>{viewOpening === 'analytics' ? 'Opening…' : 'Analytics'}</button>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('ledger'); await fetchLedger(); setViewOpening(null); setShowLedger(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'ledger' ? 0.6 : 1 }}>{viewOpening === 'ledger' ? 'Opening…' : 'Ledger'}</button>
-          {profile?.module_access?.cashbook !== false && <button onClick={() => { setShowCashBook(true); }} style={{ ...S.btnGhost, color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .25)', background: 'oklch(0.72 0.19 145 / .06)' }}>Cash Book</button>}
+          {canAccessModule(profile?.role, 'cashbook', profile?.module_access) && <button onClick={() => { setShowCashBook(true); }} style={{ ...S.btnGhost, color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .25)', background: 'oklch(0.72 0.19 145 / .06)' }}>Cash Book</button>}
           <button onClick={() => { setShowModal(true); }} style={S.btnPrimary} className="desktop-only">+ New Challan</button>
         </div>
       </div>
