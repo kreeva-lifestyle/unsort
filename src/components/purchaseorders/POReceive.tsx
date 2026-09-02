@@ -5,7 +5,7 @@
 // Before writing we re-check the server's received totals: if another user
 // recorded a receipt while this modal was open, the pre-filled quantities are
 // stale and confirming would silently double the tally.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
@@ -38,6 +38,10 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { document.body.classList.add('modal-open'); return () => { document.body.classList.remove('modal-open'); }; }, []);
+  // The error box sits at the bottom of a long scrolling sheet; on a phone the
+  // user is usually scrolled up at the failing field, so bring it into view.
+  const errRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (error) errRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [error]);
   useBackClose(true, () => onClose());
 
   const submit = async () => {
@@ -116,7 +120,7 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
             <div><label style={S.fLabel}>Receipt date</label><DateInput value={date} onChange={e => setDate(e.target.value)} style={{ width: '100%' }} /></div>
             <div><label style={S.fLabel}>Remarks</label><input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Optional (e.g. courier, invoice #)" style={S.fInput} /></div>
           </div>
-          {error && <div style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}
+          {error && <div ref={errRef} style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}
         </div>
         <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={S.btnGhost}>Cancel</button>

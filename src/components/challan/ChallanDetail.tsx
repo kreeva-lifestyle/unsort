@@ -250,13 +250,13 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
                         {editSkuIdx === i ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                             <input autoFocus value={editSkuVal} onChange={e => setEditSkuVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveSkuEdit(it, it.sku || ''); if (e.key === 'Escape') setEditSkuIdx(null); }} style={{ ...S.fInput, fontFamily: T.mono, fontSize: 11, padding: '4px 8px', height: 28, width: 100 }} disabled={savingSku} />
-                            <button onClick={() => saveSkuEdit(it, it.sku || '')} disabled={savingSku} style={{ ...S.btnPrimary, padding: '4px 8px', fontSize: 10, borderRadius: 5, opacity: savingSku ? 0.5 : 1 }}>{savingSku ? '…' : '✓'}</button>
-                            <button onClick={() => setEditSkuIdx(null)} style={{ ...S.btnGhost, padding: '4px 8px', fontSize: 10, borderRadius: 5 }}>✕</button>
+                            <button type="button" className="touch44" onClick={() => saveSkuEdit(it, it.sku || '')} disabled={savingSku} aria-label="Save SKU" style={{ ...S.btnPrimary, ...S.btnSm, minHeight: 32, opacity: savingSku ? 0.5 : 1, pointerEvents: savingSku ? 'none' : 'auto' }}>{savingSku ? 'Saving…' : 'Save'}</button>
+                            <button type="button" className="touch44" onClick={() => setEditSkuIdx(null)} aria-label="Cancel SKU edit" style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>Cancel</button>
                           </div>
                         ) : (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                             {it.sku || '—'}
-                            {isAdmin && <button onClick={e => { e.stopPropagation(); setEditSkuIdx(i); setEditSkuVal(it.sku || ''); }} title="Edit SKU (admin)" aria-label="Edit SKU" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, opacity: 0.4, display: 'inline-flex' }}>
+                            {isAdmin && <button onClick={e => { e.stopPropagation(); setEditSkuIdx(i); setEditSkuVal(it.sku || ''); }} title="Edit SKU (admin)" aria-label="Edit SKU" className="touch44" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '6px 8px', margin: '-6px 0', opacity: 0.5, display: 'inline-flex' }}>
                               <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.ac2, strokeWidth: 2 }}><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                             </button>}
                           </span>

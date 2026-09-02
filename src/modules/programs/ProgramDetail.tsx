@@ -119,7 +119,7 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       {matchings.length > 0 && (
         <div style={{ marginBottom: 18 }}>
           <SectionTitle color={T.yl}>{t('brands')} <span style={{ fontFamily: T.mono, fontSize: 10, color: T.tx3, padding: '2px 7px', border: `1px solid ${T.bd}`, borderRadius: 10, marginLeft: 6 }}>{matchings.length}</span></SectionTitle>
-          <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th style={thS}>{t('brandName')}</th><th style={thS}>{t('brandLabel')}</th></tr></thead>
               <tbody>{matchings.map(m => (
@@ -166,8 +166,8 @@ export default function ProgramDetail({ programId, onClose, onEdit, t }: Props) 
       {fabricParts.length > 0 && (
         <div style={{ marginBottom: 18 }}>
           <SectionTitle color={T.bl}>{t('fabricProgram')} <span style={{ fontFamily: T.mono, fontSize: 10, color: T.tx3, padding: '2px 7px', border: `1px solid ${T.bd}`, borderRadius: 10, marginLeft: 6 }}>{fabricParts.length}</span></SectionTitle>
-          <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${T.bd}`, borderRadius: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 360 }}>
               <thead><tr><th style={{ ...thS, width: '45%' }}>{t('partName')}</th><th style={thS}>{t('fabricName')}</th><th style={thR}>{t('fabricMeter')}</th></tr></thead>
               <tbody>
                 {fabricParts.map(p => (
