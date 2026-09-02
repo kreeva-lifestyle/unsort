@@ -19,7 +19,7 @@
  * Do NOT redefine these types inline in feature files — import from here.
  */
 
-// ─── profiles (11 cols) ──────────────────────────────────────────────────
+// ─── profiles (12 cols) ──────────────────────────────────────────────────
 
 export interface Profile {
   id: string;
@@ -104,7 +104,7 @@ export type ProductComponentInsert = {
   created_at?: string | null;
 };
 
-// ─── inventory_items (20 cols) ───────────────────────────────────────────
+// ─── inventory_items (21 cols) ───────────────────────────────────────────
 
 export interface InventoryItem {
   id: string;
@@ -258,7 +258,7 @@ export type DamageReportInsert = {
   updated_at?: string | null;
 };
 
-// ─── inventory_extras (12 cols) ──────────────────────────────────────────
+// ─── inventory_extras (14 cols) ──────────────────────────────────────────
 
 export interface InventoryExtra {
   id: string;
@@ -356,7 +356,7 @@ export type CashExpenseInsert = {
   created_at?: string | null;
 };
 
-// ─── cash_handovers (20 cols) ────────────────────────────────────────────
+// ─── cash_handovers (21 cols) ────────────────────────────────────────────
 // Immutable once confirmed — no updated_at column (trigger
 // prevent_confirmed_handover_mutation enforces it).
 // 'disputed' is set by the recipient via Reject; 'cancelled' by the sender
@@ -411,7 +411,7 @@ export type CashHandoverInsert = {
   cancelled_by?: string | null;
 };
 
-// ─── cash_challans (25 cols) ─────────────────────────────────────────────
+// ─── cash_challans (28 cols) ─────────────────────────────────────────────
 
 export interface CashChallan {
   id: string;
@@ -671,7 +671,7 @@ export type PackTimeScanInsert = {
   brand?: string | null;
 };
 
-// ─── packtime_shortcuts (5 cols) ────────────────────────────────────────
+// ─── packtime_shortcuts (6 cols) ────────────────────────────────────────
 
 export interface PackTimeShortcut {
   id: string;
@@ -701,7 +701,7 @@ export type UserRole = NonNullable<Profile['role']>;
 export type CashChallanStatus = NonNullable<CashChallan['status']>;
 export type CashHandoverStatus = NonNullable<CashHandover['status']>;
 
-// ─── cash_challan_payments (9 cols) ─────────────────────────────────────
+// ─── cash_challan_payments (10 cols) ─────────────────────────────────────
 export interface CashChallanPayment {
   id: string;
   challan_id: string;
@@ -809,7 +809,7 @@ export type ShortLinkInsert = {
   updated_at?: string | null;
 };
 
-// ─── link_clicks (10 cols) ────────────────────────────────────────────
+// ─── link_clicks (11 cols) ────────────────────────────────────────────
 
 export interface LinkClick {
   id: string;
