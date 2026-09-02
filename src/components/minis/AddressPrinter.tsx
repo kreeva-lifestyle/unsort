@@ -8,13 +8,15 @@ import { printOrQueue } from '../../lib/printQueue';
 import SwipeRow from '../ui/SwipeRow';
 import { docTitle, fileDate } from '../../lib/exportName';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
+import { useModalLock } from '../../hooks/useModalLock';
+import { escHtml as escHtmlShared } from '../../lib/escape';
 
 const LABEL_LIMIT = 500;
 const FROM = { name: 'Arya Designs', city: 'Surat', phone: '+91 63544 82868' };
 
 interface Label { id: string; name: string; phone: string; address: string; city: string; state: string; pincode: string; created_at: string }
 
-const escHtml = (s: string) => s.replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
+const escHtml = escHtmlShared;
 
 const buildLabelHtml = (labels: Label[]) => {
   const cards = labels.map(l => `
@@ -34,10 +36,7 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
   const [formError, setFormError] = useState('');
   const { ask, modalProps: confirmProps } = useConfirm();
 
-  useEffect(() => {
-    document.body.classList.toggle('modal-open', showAdd);
-    return () => { document.body.classList.remove('modal-open'); };
-  }, [showAdd]);
+  useModalLock(showAdd);
   useBackClose(showAdd, () => setShowAdd(false));
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);

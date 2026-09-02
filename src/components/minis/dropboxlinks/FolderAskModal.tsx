@@ -3,10 +3,10 @@
 // rule is "ask each time, as simple as that". Nothing is remembered; every
 // Generate / bulk run asks again.
 import { createPortal } from 'react-dom';
-import { useEffect } from 'react';
 import { T, S, Icon } from '../../../lib/theme';
 import { useBackClose } from '../../../hooks/useBackClose';
 import { GenRoot } from './api';
+import { useModalLock } from '../../../hooks/useModalLock';
 
 export default function FolderAskModal({ roots, onPick, onClose }: {
   roots: GenRoot[];
@@ -14,10 +14,7 @@ export default function FolderAskModal({ roots, onPick, onClose }: {
   onClose: () => void;
 }) {
   useBackClose(true, onClose);
-  useEffect(() => {
-    document.body.classList.add('modal-open');
-    return () => document.body.classList.remove('modal-open');
-  }, []);
+  useModalLock();
 
   return createPortal((
     <div style={{ ...S.modalOverlay }} onClick={onClose}>

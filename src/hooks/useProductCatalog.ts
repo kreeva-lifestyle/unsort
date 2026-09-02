@@ -157,7 +157,6 @@ const load = async (): Promise<Index> => {
   return inflight;
 };
 
-export const invalidateProductCatalog = () => { cache = null; inflight = null; };
 
 export function useProductCatalog() {
   const [index, setIndex] = useState<Index | null>(cache);

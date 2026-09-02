@@ -2,7 +2,7 @@
 // without re-importing the whole sheet. Upserts on (employee_id, date) so it
 // also fixes a day that was already imported. Only in/out drive pay; status is
 // a label. Admin/manager/operator only (enforced by RLS).
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
@@ -10,6 +10,7 @@ import DateInput from '../ui/DateInput';
 import { friendlyError } from '../../lib/friendlyError';
 import { AttEmployee, AttEntry } from '../../lib/attendance';
 import { useBackClose } from '../../hooks/useBackClose';
+import { useModalLock } from '../../hooks/useModalLock';
 
 const STATUSES = [
   { v: 'P', label: 'P — Present' },
@@ -46,7 +47,7 @@ export default function AttendanceEntryModal({ employees, month, editing, preset
   const [deleting, setDeleting] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
 
-  useEffect(() => { document.body.classList.add('modal-open'); return () => document.body.classList.remove('modal-open'); }, []);
+  useModalLock();
   // Device Back closes this instead of leaving the page behind it.
   useBackClose(true, () => onClose());
 

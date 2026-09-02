@@ -7,9 +7,9 @@
 import {
   CostingProduct, CostingComponent, selectedSupplier, subCost, componentCost, sheetCost, totalCost, num,
 } from './costingModel';
+import { escHtml } from '../../../lib/escape';
 
-const esc = (s: unknown): string =>
-  String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const esc = escHtml;
 
 const inr = (n: number): string =>
   '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

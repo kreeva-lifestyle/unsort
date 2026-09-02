@@ -1,5 +1,4 @@
 export const TAB_IDS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'purchaseorders', 'listingai', 'attendance', 'programs', 'minis', 'printstation', 'settings'] as const;
-export type TabId = typeof TAB_IDS[number];
 
 const TAB_TO_MODULE: Record<string, string> = {
   dashboard: 'dashboard', inventory: 'inventory', brandtag: 'brandtag',

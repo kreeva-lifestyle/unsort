@@ -55,6 +55,8 @@ const canAlterSize = (a: string, b: string): boolean => {
 };
 import { isDupatta, isLehenga, isBottomType, mfrFromSku } from '../lib/garmentHelpers';
 import { exportName, docTitle, fileDate } from '../lib/exportName';
+import { useModalLock } from '../hooks/useModalLock';
+import { escHtml } from '../lib/escape';
 
 export default function Inventory({ openItemId, onItemOpened, active }: { openItemId?: string | null; onItemOpened?: () => void; active?: boolean }) {
   const [stage, setStage] = useState<'pending' | 'completed'>('pending');
@@ -126,11 +128,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
   const [invLimit, setInvLimit] = useState(5000);
   const [invTruncated, setInvTruncated] = useState(false);
 
-  useEffect(() => {
-    const hasModal = showModal || showCompModal || !!matchResult || !!showCompleteModal || showIntel || !!exportPdfHtml;
-    document.body.classList.toggle('modal-open', hasModal);
-    return () => { document.body.classList.remove('modal-open'); };
-  }, [showModal, showCompModal, matchResult, showCompleteModal, showIntel, exportPdfHtml]);
+  useModalLock(showModal || showCompModal || !!matchResult || !!showCompleteModal || showIntel || !!exportPdfHtml);
 
     // Every one of these is createPortal(..., document.body) — i.e. OUTSIDE the
   // display:none page wrapper — so leaving the tab must close them or they
@@ -496,7 +494,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
 
   const exportPdf = () => {
     if (filtered.length === 0) { addToast('Nothing to export — the list is empty', 'error'); return; }
-    const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
+    const esc = escHtml;
     const rows = filtered.map(i => { const m = (itemMissing[i.id] || []).join(', '); const d = (itemDamaged[i.id] || []).join(', '); const issues = [m ? `Missing: ${m}` : '', d ? `Damaged: ${d}` : ''].filter(Boolean).join(' | '); return `<tr><td>${esc(i.serial_number || '—')}</td><td>${esc(i.products?.name || '—')}</td><td>${esc(i.size || '—')}</td><td>${esc(i.location || '—')}</td><td>${esc(i.manufacturer || '—')}</td><td style="text-transform:capitalize">${esc(i.status === 'dry_clean' ? 'Dry Clean' : i.status)}</td><td style="font-size:9px;color:${m ? '#F59E0B' : d ? '#EF4444' : '#4A5568'}">${esc(issues || '—')}</td></tr>`; }).join('');
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${docTitle('Inventory', isCompletedView ? 'Completed' : 'Active', fileDate())}</title><style>
       *{margin:0;padding:0;box-sizing:border-box}

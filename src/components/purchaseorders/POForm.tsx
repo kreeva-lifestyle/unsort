@@ -16,6 +16,7 @@ import SkuInput from '../ui/SkuInput';
 import DateInput from '../ui/DateInput';
 import { PO_TYPES, PO_TYPE_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderType } from '../../types/database';
+import { useModalLock } from '../../hooks/useModalLock';
 
 type FormItem = { sku: string; item_name: string; quantity: string; unit: string; rate: string };
 export type EditingPO = PurchaseOrder & { items?: PurchaseOrderItem[] };
@@ -50,7 +51,7 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { document.body.classList.add('modal-open'); return () => { document.body.classList.remove('modal-open'); }; }, []);
+  useModalLock();
   // The error box sits at the bottom of a long scrolling sheet; on a phone the
   // user is usually scrolled up at the failing field, so bring it into view.
   const errRef = useRef<HTMLDivElement>(null);

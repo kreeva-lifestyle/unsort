@@ -15,6 +15,7 @@ import { useBackClose } from '../../hooks/useBackClose';
 import { numericKeyDown } from '../../lib/numericInput';
 import { SkeletonRows } from '../ui/Skeleton';
 import type { CashChallan } from '../../types/database';
+import { useModalLock } from '../../hooks/useModalLock';
 
 type Row = Pick<CashChallan, 'id' | 'challan_number' | 'customer_name' | 'total' | 'amount_paid' | 'status' | 'created_at' | 'is_return'>;
 
@@ -36,7 +37,7 @@ export default function ApplyCreditModal({ challan: c, onClose, onDone, addToast
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { document.body.classList.add('modal-open'); return () => document.body.classList.remove('modal-open'); }, []);
+  useModalLock();
   // Device Back closes the credit form, not the challan screen behind it.
   useBackClose(true, () => { if (!saving) onClose(); });
 

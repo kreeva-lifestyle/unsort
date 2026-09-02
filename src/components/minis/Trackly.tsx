@@ -9,6 +9,7 @@ import TracklyAnalytics from './TracklyAnalytics';
 import SwipeRow from '../ui/SwipeRow';
 import { useBackClose } from '../../hooks/useBackClose';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
+import { useModalLock } from '../../hooks/useModalLock';
 
 const LINK_LIMIT = 500;
 const COLS = 'id, short_code, long_url, title, clicks, created_by, created_at, updated_at';
@@ -50,10 +51,7 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
   const [analyticsLink, setAnalyticsLink] = useState<ShortLink | null>(null);
   const { ask, modalProps: confirmProps } = useConfirm();
 
-  useEffect(() => {
-    document.body.classList.toggle('modal-open', showAdd);
-    return () => { document.body.classList.remove('modal-open'); };
-  }, [showAdd]);
+  useModalLock(showAdd);
 
   // Device Back: analytics → list, add-form → list. Without an owned layer the
   // analytics view pushed an entry nobody popped, so Back jumped two levels.

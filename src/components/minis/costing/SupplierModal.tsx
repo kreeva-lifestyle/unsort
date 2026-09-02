@@ -3,12 +3,13 @@
 // others stay as alternates the purchase plan can fall back to by hand).
 // House modal contract: portal, modal-inner, body scroll lock, full reset on
 // close (state is a working copy — Cancel discards, Done commits).
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../../lib/theme';
 import { numericKeyDown } from '../../../lib/numericInput';
 import { CostingSupplier, blankSupplier, num, cheaperAlt, money } from './costingModel';
 import SuggestInput from '../../ui/SuggestInput';
+import { useModalLock } from '../../../hooks/useModalLock';
 
 export default function SupplierModal({ subName, suppliers, known, onDone, onClose }: {
   subName: string;
@@ -21,10 +22,7 @@ export default function SupplierModal({ subName, suppliers, known, onDone, onClo
     suppliers.length ? suppliers.map(s => ({ ...s })) : [blankSupplier()]);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    document.body.classList.add('modal-open');
-    return () => document.body.classList.remove('modal-open');
-  }, []);
+  useModalLock();
 
   const patch = (i: number, p: Partial<CostingSupplier>) =>
     setRows(prev => prev.map((r, j) => (j === i ? { ...r, ...p } : r)));

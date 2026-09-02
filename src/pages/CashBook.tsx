@@ -29,6 +29,8 @@ import type {
 } from '../types/database';
 import { exportName, docTitle, fileRange } from '../lib/exportName';
 import { downloadFile } from '../lib/downloadFile';
+import { useModalLock } from '../hooks/useModalLock';
+import { escHtml, csvCell } from '../lib/escape';
 
 const CATEGORIES = ['Office Supplies', 'Rent', 'Salaries', 'Travel', 'Utilities', 'Food', 'Transport', 'Misc', 'Others'];
 
@@ -159,11 +161,7 @@ export default function CashBook() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  useEffect(() => {
-    const open = showHandover || !!viewingHandover || !!confirmingHandover || !!rejectingHandover || !!cancellingHandover || showAdd || !!confirmDelete || !!correctingExpense;
-    document.body.classList.toggle('modal-open', open);
-    return () => { document.body.classList.remove('modal-open'); };
-  }, [showHandover, viewingHandover, confirmingHandover, rejectingHandover, cancellingHandover, showAdd, confirmDelete, correctingExpense]);
+  useModalLock(showHandover || !!viewingHandover || !!confirmingHandover || !!rejectingHandover || !!cancellingHandover || showAdd || !!confirmDelete || !!correctingExpense);
   useBackClose(showAdd, () => setShowAdd(false));
   useBackClose(showHandover, () => setShowHandover(false));
   useBackClose(!!viewingHandover, () => setViewingHandover(null));
@@ -419,7 +417,7 @@ export default function CashBook() {
   };
 
   // Print receipt for a handover
-  const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
+  const esc = escHtml;
   const printHandoverReceipt = async (h: Handover) => {
     const b = h.breakdown;
     let html = `<html><head><meta charset="utf-8"><title>${docTitle('Cash-Handover', formatHandoverNo(h.handover_number), h.date)}</title><style>
@@ -667,7 +665,7 @@ export default function CashBook() {
     if (rowsForTab.length === 0) { addToast('Nothing to export in this date range', 'error'); return; }
     // Prefix ' on leading =+-@ so Excel/Sheets never treat user-typed text as
     // a formula (CSV injection) — same guard as the challan export.
-    const esc = (v: string) => { const s = v || ''; const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s; return `"${safe.replace(/"/g, '""')}"`; };
+    const esc = csvCell;
     let csv = '', label = '';
     if (tab === 'expenses') {
       label = 'Expenses';

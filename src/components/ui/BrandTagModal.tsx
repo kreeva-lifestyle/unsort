@@ -6,6 +6,7 @@ import { useBackClose } from '../../hooks/useBackClose';
 import { numericKeyDown } from '../../lib/numericInput';
 import SkuInput from './SkuInput';
 import SuggestInput from './SuggestInput';
+import { useModalLock } from '../../hooks/useModalLock';
 
 interface BrandTagRow {
   id: string; brand: string; ean: string; sku: string; qty: string;
@@ -41,10 +42,7 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
   const product = form.product.replace(/^PRODUCT DESC:\s*/i, '').trim();
   const mrpStr = '₹' + (form.mrp || 0).toLocaleString('en-IN');
 
-  React.useEffect(() => {
-    document.body.classList.add('modal-open');
-    return () => document.body.classList.remove('modal-open');
-  }, []);
+  useModalLock();
   useBackClose(true, () => onClose());
 
   React.useEffect(() => {

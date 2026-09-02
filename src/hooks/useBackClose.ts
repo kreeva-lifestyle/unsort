@@ -53,10 +53,6 @@ export function closeAllLayers() {
   while (stack.length) stack.pop()!.close();
 }
 
-export function hasOpenLayers(): boolean {
-  return stack.length > 0;
-}
-
 // Closes the topmost layer, if any. Used by the global Escape handler. It goes
 // through the layer's own close(), so the unmount cleanup below owns the
 // history pop — exactly the same path as tapping ×.

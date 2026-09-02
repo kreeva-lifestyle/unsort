@@ -1,6 +1,6 @@
 // Employee master — name, monthly salary, fixed daily time (the three
 // columns of the owner's Employee sheet), plus code + active flag.
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
@@ -12,6 +12,7 @@ import { useBackClose } from '../../hooks/useBackClose';
 import DateInput from '../ui/DateInput';
 import LeaveDateModal from './LeaveDateModal';
 import QrField from './QrField';
+import { useModalLock } from '../../hooks/useModalLock';
 
 const prettyDate = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -29,7 +30,7 @@ export default function AttendanceEmployees({ employees, onChanged, addToast }: 
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { document.body.classList.toggle('modal-open', showModal); return () => document.body.classList.remove('modal-open'); }, [showModal]);
+  useModalLock(showModal);
   useBackClose(showModal, () => close());
 
   const openAdd = () => { setEditing(null); setName(''); setCode(''); setSalary(''); setFixTime('8:30'); setQrUrl(''); setLeftOn(''); setErr(''); setShowModal(true); };

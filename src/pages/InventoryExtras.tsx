@@ -26,6 +26,8 @@ const EXTRAS_LIMIT = 1000;
 const SIZES = ['N/A', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Semi-Stitched'];
 import { isDupatta, isLehenga, isBottomType, isBlouse, mfrFromSku } from '../lib/garmentHelpers';
 import { exportName, docTitle, fileDate } from '../lib/exportName';
+import { useModalLock } from '../hooks/useModalLock';
+import { escHtml } from '../lib/escape';
 
 // View model: narrowed inventory_items row for the matching UI.
 type InventoryItemMatch = Pick<InventoryItem, 'id' | 'batch_number' | 'serial_number' | 'size' | 'location' | 'status'>;
@@ -80,11 +82,7 @@ export default function InventoryExtras() {
   // Complete confirm
   const [completeItem, setCompleteItem] = useState<{ extra: InventoryExtra; item: InventoryItemMatch } | null>(null);
 
-  useEffect(() => {
-    const hasModal = showAdd || !!adjustExtra || !!matchExtra || !!completeItem || !!editingExtra || !!exportHtml;
-    document.body.classList.toggle('modal-open', hasModal);
-    return () => { document.body.classList.remove('modal-open'); };
-  }, [showAdd, adjustExtra, matchExtra, completeItem, editingExtra, exportHtml]);
+  useModalLock(showAdd || !!adjustExtra || !!matchExtra || !!completeItem || !!editingExtra || !!exportHtml);
   useBackClose(showAdd, closeAdd);
   useBackClose(!!editingExtra, () => setEditingExtra(null));
   useBackClose(!!adjustExtra, () => setAdjustExtra(null));
@@ -382,7 +380,7 @@ export default function InventoryExtras() {
             <button onClick={() => {
               setShowExportMenu(false);
             if (filtered.length === 0) { addToast('Nothing to export — the list is empty', 'error'); return; }
-            const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
+            const esc = escHtml;
             const rows = filtered.map(ex => `<tr><td>${esc(ex.sku)}</td><td>${esc(ex.product_name)}</td><td>${esc(ex.component_name)}</td><td>${esc(ex.size)}</td><td>${esc(ex.location)}</td><td style="text-align:right;font-weight:600">${ex.quantity}</td></tr>`).join('');
             setExportHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${docTitle('Spare-Parts', fileDate())}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#060810;color:#E2E8F0;padding:16px;padding-bottom:80px;-webkit-text-size-adjust:100%}.header{margin-bottom:16px}.brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}.logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#6366F1,#38BDF8);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff}.title{font-size:15px;font-weight:700;letter-spacing:-0.3px}.sub{font-size:10px;color:#6B7890;letter-spacing:0.5px}.meta{display:flex;gap:12px;font-size:10px;color:#8896B0;margin-top:8px}.meta span{padding:3px 8px;border-radius:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}table{width:100%;border-collapse:collapse;margin-top:4px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.06)}th{background:rgba(255,255,255,.03);font-size:9px;font-weight:600;color:#6B7890;text-transform:uppercase;letter-spacing:0.8px;padding:10px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)}td{padding:9px 10px;font-size:11px;color:#8896B0;border-bottom:1px solid rgba(255,255,255,.04)}tr:nth-child(even) td{background:rgba(255,255,255,.015)}.footer{text-align:center;font-size:8px;color:#4A5568;margin-top:16px;letter-spacing:1px;text-transform:uppercase}.no-print{display:none}@page{size:A4;margin:8mm}@media print{body{background:#fff;color:#222;padding:8mm}th{background:#f5f5f5;color:#333}td{color:#444;border-color:#eee}.footer{color:#999}}</style></head><body><div class="header"><div class="brand"><div class="logo">D</div><div><div class="title">Spare Parts Report</div><div class="sub">Arya Designs</div></div></div><div class="meta"><span>${filtered.length} items</span><span>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div></div><table><thead><tr><th>SKU</th><th>Category</th><th>Component</th><th>Size</th><th>Location</th><th style="text-align:right">Qty</th></tr></thead><tbody>${rows}</tbody></table><div class="footer">Powered by DailyOffice</div></body></html>`);
           }} style={{ padding: '12px 14px', fontSize: 12, color: T.tx, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, background: 'transparent', border: 'none', width: '100%', fontFamily: T.sans }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>Print / PDF</button>

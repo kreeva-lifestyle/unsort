@@ -25,6 +25,8 @@ const JSBARCODE_INLINE = jsBarcodeSrc.replace(/<\/script/gi, '<\\/script');
 import { T, S, Icon } from '../lib/theme';
 import { useBackClose } from '../hooks/useBackClose';
 import { exportName, fileDate, docTitle } from '../lib/exportName';
+import { useModalLock } from '../hooks/useModalLock';
+import { escHtml } from '../lib/escape';
 
 const btnGhost: React.CSSProperties = S.btnGhost;
 const btnSm: React.CSSProperties = { ...S.btnGhost, ...S.btnSm };
@@ -137,7 +139,7 @@ const parseOrderSheet = (data: any[], masterRows: BrandTagRow[]): OrderRow[] => 
 };
 
 // ── Build label print HTML (rendered inside an in-app iframe instead of a popup) ─
-const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
+const esc = escHtml;
 
 // Serialize data for embedding INSIDE an inline <script>. JSON.stringify alone
 // is unsafe there: it leaves `<` intact, so a value containing `</script>` closes
@@ -294,11 +296,7 @@ export default function BrandTagPrinter() {
   useEffect(() => { fetchPage(); }, [fetchPage]);
 
   // Lock body scroll when any modal/popup is open
-  useEffect(() => {
-    const hasModal = !!modalRow || !!orderRows || !!confirmDel;
-    document.body.classList.toggle('modal-open', hasModal);
-    return () => { document.body.classList.remove('modal-open'); };
-  }, [modalRow, orderRows, confirmDel]);
+  useModalLock(!!modalRow || !!orderRows || !!confirmDel);
   useBackClose(!!orderRows, () => setOrderRows(null));
   useBackClose(!!modalRow, () => setModalRow(null));
   useBackClose(!!confirmDel, () => setConfirmDel(null));

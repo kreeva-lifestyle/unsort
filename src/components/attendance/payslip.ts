@@ -5,8 +5,9 @@
 // carries the same alignment as its cells (In/Out/Worked/diff/St centred,
 // Day Pay right) so headers sit directly above their values.
 import { AttEmployee, AttPenalty, AttAdvance, MonthlySalary, minutesToHM, fmtDiffHM } from '../../lib/attendance';
+import { escHtml } from '../../lib/escape';
 
-export const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
+export const esc = escHtml;
 export const inr = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
 export const inr2 = (n: number) => '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

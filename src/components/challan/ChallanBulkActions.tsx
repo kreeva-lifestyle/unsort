@@ -6,6 +6,7 @@ import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import ChallanKPIs from './ChallanKPIs';
 import type { CashChallan } from '../../types/database';
+import { useModalLock } from '../../hooks/useModalLock';
 
 type Challan = Omit<CashChallan, 'created_at' | 'updated_at'> & { created_at: string; updated_at: string };
 
@@ -51,11 +52,8 @@ export default function ChallanBulkActions(p: Props) {
   // customer paid less writes the gap off silently — that needs an explicit
   // tick, not just a hint. Reset each time the modal opens.
   const [shortAck, setShortAck] = useState(false);
-  useEffect(() => {
-    document.body.classList.toggle('modal-open', p.showBulkPay || p.showBulkUnpay);
-    if (p.showBulkPay) setShortAck(false);
-    return () => { document.body.classList.remove('modal-open'); };
-  }, [p.showBulkPay, p.showBulkUnpay]);
+  useModalLock(p.showBulkPay || p.showBulkUnpay);
+  useEffect(() => { if (p.showBulkPay) setShortAck(false); }, [p.showBulkPay]);
 
   const d = new Date();
   const todayISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

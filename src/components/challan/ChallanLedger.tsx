@@ -5,6 +5,7 @@ import { T, S, Icon } from '../../lib/theme';
 import DateInput from '../ui/DateInput';
 import type { CashChallan } from '../../types/database';
 import { exportName, fileDate } from '../../lib/exportName';
+import { csvCell } from '../../lib/escape';
 
 type Challan = Omit<CashChallan, 'created_at' | 'updated_at'> & { created_at: string; updated_at: string };
 
@@ -160,7 +161,7 @@ export default function ChallanLedger({
             // Same guard as every other export: prefix ' on leading =+-@ so a
             // customer name never executes as a spreadsheet formula, and
             // double quotes so names with " can't break the columns.
-            const esc = (v: string) => { const s = v || ''; const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s; return `"${safe.replace(/"/g, '""')}"`; };
+            const esc = csvCell;
             const csv = 'Customer,Billed,Paid,Outstanding,Challans\n' + due.map(c => `${esc(c.name)},${c.total},${c.paid},${c.outstanding},${c.count}`).join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = exportName('Outstanding-Customers', [fileDate()], 'csv'); a.click(); URL.revokeObjectURL(a.href);

@@ -11,6 +11,7 @@ import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { call } from './api';
 import { useBackClose } from '../../hooks/useBackClose';
+import { useModalLock } from '../../hooks/useModalLock';
 
 interface PickerCategory { id: string; label: string; counts: Record<string, number> }
 
@@ -28,7 +29,7 @@ export default function MasterFetch({ busy, hasSkus, onPick, addToast }: {
   const [loading, setLoading] = useState(false);
 
   useBackClose(open, () => setOpen(false));
-  useEffect(() => { document.body.classList.toggle('modal-open', open); return () => document.body.classList.remove('modal-open'); }, [open]);
+  useModalLock(open);
   // Full state reset on close (modal contract) + counts fetched fresh per
   // open, so a master-sync that ran in between is reflected.
   useEffect(() => {

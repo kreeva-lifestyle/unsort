@@ -19,6 +19,7 @@ import EditorMeta from './EditorMeta';
 import RulesEditor from './RulesEditor';
 import TemplateListRow from './TemplateListRow';
 import type { ListingTemplate, ListingTemplateField, ListingTemplateRule } from '../../types/database';
+import { useModalLock } from '../../hooks/useModalLock';
 
 type Editing = {
   id: string | null; name: string; marketplace: string; category: string; fields: ListingTemplateField[];
@@ -41,7 +42,7 @@ export default function TemplateManager({ open, onClose, templates, refresh, add
   const [confirmClose, setConfirmClose] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { document.body.classList.toggle('modal-open', open); return () => document.body.classList.remove('modal-open'); }, [open]);
+  useModalLock(open);
   // Back runs the same guard as ×: an unsaved template asks before leaving.
   // The layer stands down while the confirm is up and re-arms if the user
   // keeps editing, so Back never falls through to the page underneath.

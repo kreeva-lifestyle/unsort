@@ -3,13 +3,14 @@
 // and that month's net amount; "Mark Paid" records the employee-month as paid
 // (attendance_salary_payments) and auto-advances to the next person. Paying is
 // independent of "Save Month" — the amount comes from the live salary engine.
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S, Icon, Pill } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { AttEmployee, AttPenalty, AttAdvance, MonthlySalary, AttSalaryPayment, monthFirstDay, minutesToHM } from '../../lib/attendance';
 import { useBackClose } from '../../hooks/useBackClose';
+import { useModalLock } from '../../hooks/useModalLock';
 
 const inr = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
 
@@ -31,7 +32,7 @@ export default function SalaryPaymentFlow({ employees, salaries, payments, month
   // button, which would advance twice and silently skip an employee.
   const busyRef = useRef(false);
 
-  useEffect(() => { document.body.classList.add('modal-open'); return () => document.body.classList.remove('modal-open'); }, []);
+  useModalLock();
   // Device Back closes this instead of leaving the page behind it.
   useBackClose(true, () => onClose());
 

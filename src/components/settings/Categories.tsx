@@ -7,6 +7,7 @@ import { useBackClose } from '../../hooks/useBackClose';
 import { friendlyError } from '../../lib/friendlyError';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import { SkeletonRows } from '../ui/Skeleton';
+import { useModalLock } from '../../hooks/useModalLock';
 
 export default function Categories({ addToast, profile }: { addToast: (msg: string, type?: string) => void; profile: any }) {
   const [categories, setCategories] = useState<any[]>([]);
@@ -17,10 +18,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
   const [comps, setComps] = useState<any[]>([]);
   const [form, setForm] = useState({ sku: '', name: '', description: '', category: '' });
 
-  useEffect(() => {
-    document.body.classList.toggle('modal-open', showModal || showCompModal);
-    return () => { document.body.classList.remove('modal-open'); };
-  }, [showModal, showCompModal]);
+  useModalLock(showModal || showCompModal);
   useBackClose(showModal, () => setShowModal(false));
   useBackClose(showCompModal, () => setShowCompModal(false));
   const [newComps, setNewComps] = useState<string[]>(['']);

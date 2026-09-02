@@ -3,7 +3,7 @@
 // must know what the deduction is for); an advance's note is optional (it is
 // its own explanation — money already handed over). Both deduct from the SAME
 // month's net salary.
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
@@ -12,6 +12,7 @@ import { numericKeyDown } from '../../lib/numericInput';
 import { AttEmployee, monthFirstDay } from '../../lib/attendance';
 import { useBackClose } from '../../hooks/useBackClose';
 import { inr } from './payslip';
+import { useModalLock } from '../../hooks/useModalLock';
 
 export default function AdjustModal({ emp, kind, month, monthLabel, onClose, onSaved, addToast }: {
   emp: AttEmployee; kind: 'penalty' | 'advance'; month: string; monthLabel: string;
@@ -23,7 +24,7 @@ export default function AdjustModal({ emp, kind, month, monthLabel, onClose, onS
   const [saving, setSaving] = useState(false);
   const isPen = kind === 'penalty';
 
-  useEffect(() => { document.body.classList.add('modal-open'); return () => document.body.classList.remove('modal-open'); }, []);
+  useModalLock();
   // Device Back closes this instead of leaving the page behind it.
   useBackClose(true, () => onClose());
 
