@@ -7,10 +7,24 @@ body {
   font-family: 'Inter', -apple-system, sans-serif;
   background-color: oklch(0.08 0.02 265);
   color: oklch(0.93 0.01 250);
-  height: 100%;
+  /* body is the app frame AND the containing block for every position:fixed
+     element (bottom nav, FAB, bottom sheets portaled here, savebar, undo bars,
+     print overlays). It is sized with dvh, NOT inset:0 / height:100%: on iOS
+     standalone the fixed-position viewport can stay SHORTER than the screen
+     (after the keyboard closes, after the in-call bar, sometimes until
+     relaunch) while dvh still reports the real visible height. Anything
+     anchored to that stuck viewport ends above the screen edge with a bare
+     strip below the nav (owner's phone). transform: translateZ(0) makes this
+     box the anchor for fixed descendants, so bottom:0 means the true bottom. */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  transform: translateZ(0);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: contain;
-  width: 100%;
   overflow: hidden;
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
@@ -19,12 +33,11 @@ body {
   line-height: 1.55;
 }
 
-/* #root is a FIXED frame filling the visual viewport. position:fixed + inset:0
-   puts the app shell in the SAME coordinate system as fixed children (bottom
-   nav, FAB) by construction — on iOS standalone PWAs the dvh unit and the
-   fixed-position viewport can disagree, which floated the bottom nav above
-   the screen edge with a dead strip below it. A fixed frame cannot drift. */
-#root { position: fixed; inset: 0; overflow: hidden; }
+/* #root fills the body frame above. It used to be position:fixed; inset:0 —
+   that sized the whole shell from the iOS fixed-position viewport, so when
+   that viewport was stuck short the shell (nav included) stopped above the
+   screen edge. Now body owns the size (dvh) and fixed children anchor to it. */
+#root { position: absolute; inset: 0; overflow: hidden; }
 .main-area { height: 100% !important; }
 
 ::selection { background: oklch(0.55 0.22 265 / 0.25); color: oklch(0.93 0.01 250); }
