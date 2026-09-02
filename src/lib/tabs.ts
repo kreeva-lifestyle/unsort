@@ -21,6 +21,15 @@ export const getFirstAllowedTab = (role: string | null | undefined, moduleAccess
   return 'settings';
 };
 
+// Sub-module keys that are NOT tabs — `extras` (Spare Parts inside Inventory)
+// and `cashbook` (Cash Book inside Cash Challan) — never reach canAccessTab.
+// Pages used to test `module_access?.x !== false` inline; this is the one
+// auditable place for that rule. Admins always pass, as with tabs.
+export const canAccessModule = (role: string | null | undefined, key: string, moduleAccess?: Record<string, boolean> | null): boolean => {
+  if (role === 'admin') return true;
+  return !(moduleAccess && moduleAccess[key] === false);
+};
+
 export const canAccessTab = (role: string | null | undefined, tab: string, moduleAccess?: Record<string, boolean> | null): boolean => {
   if (!role) return tab === 'dashboard';
   if (tab === 'settings') return true;

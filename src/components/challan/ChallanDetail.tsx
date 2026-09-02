@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
+import { logSwallowed } from '../../lib/errorLogger';
 import { friendlyError } from '../../lib/friendlyError';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useAuth } from '../../hooks/useAuth';
@@ -93,7 +94,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
     try {
       const { error } = await supabase.from('cash_challans').update({ notes: newNotes }).eq('id', c.id);
       if (error) { addToast(friendlyError(error), 'error'); setSavingNotes(false); return; }
-      await supabase.from('audit_log').insert({ module: 'cash_challan', record_id: c.id, action: 'NOTES_EDIT', details: `Notes ${newNotes ? 'updated' : 'removed'} on challan #${c.challan_number}`, user_email: profile?.email, changes: { notes: { from: oldNotes, to: newNotes } } }).then(({ error: ae }) => { if (ae) console.warn('Audit log failed:', ae.message); });
+      await supabase.from('audit_log').insert({ module: 'cash_challan', record_id: c.id, action: 'NOTES_EDIT', details: `Notes ${newNotes ? 'updated' : 'removed'} on challan #${c.challan_number}`, user_email: profile?.email, changes: { notes: { from: oldNotes, to: newNotes } } }).then(({ error: ae }) => { if (ae) { logSwallowed('Challan audit log', ae); addToast('Saved, but the audit log failed — ' + friendlyError(ae), 'error'); } });
       (c as any).notes = newNotes;
       addToast('Notes updated', 'success');
     } catch (e: any) { addToast(friendlyError(e), 'error'); }
@@ -108,7 +109,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
     try {
       const { error } = await supabase.from('cash_challan_items').update({ sku: newSku }).eq('id', item.id);
       if (error) { addToast(friendlyError(error), 'error'); setSavingSku(false); return; }
-      await supabase.from('audit_log').insert({ module: 'cash_challan', record_id: c.id, action: 'SKU_EDIT', details: `SKU changed: ${oldSku} → ${newSku} (challan #${c.challan_number})`, user_email: profile?.email, changes: { sku: { from: oldSku, to: newSku } } }).then(({ error: ae }) => { if (ae) console.warn('Audit log failed:', ae.message); });
+      await supabase.from('audit_log').insert({ module: 'cash_challan', record_id: c.id, action: 'SKU_EDIT', details: `SKU changed: ${oldSku} → ${newSku} (challan #${c.challan_number})`, user_email: profile?.email, changes: { sku: { from: oldSku, to: newSku } } }).then(({ error: ae }) => { if (ae) { logSwallowed('Challan audit log', ae); addToast('Saved, but the audit log failed — ' + friendlyError(ae), 'error'); } });
       (item as any).sku = newSku;
       addToast(`SKU updated: ${oldSku} → ${newSku}`, 'success');
     } catch (e: any) { addToast(friendlyError(e), 'error'); }

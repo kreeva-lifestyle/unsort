@@ -3,9 +3,9 @@ import { SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { T } from '../../lib/theme';
 import TracklyLanding from './TracklyLanding';
 import TracklyImport from './TracklyImport';
+import { HTTP_SCHEMES } from '../../lib/safeHref';
 
 const EDGE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
-const ALLOWED_SCHEMES = ['http:', 'https:'];
 const LANDING_CODE = 'RW5Un';
 
 // Fire the resolve fetch at module load time — before React's useEffect cycle starts.
@@ -64,7 +64,7 @@ export default function TracklyRedirect({ shortCode }: { shortCode: string }) {
         if (data.ok && typeof data.longUrl === 'string') {
           let target: URL;
           try { target = new URL(data.longUrl); } catch { setStatus('notfound'); return; }
-          if (!ALLOWED_SCHEMES.includes(target.protocol)) { setStatus('notfound'); return; }
+          if (!HTTP_SCHEMES.includes(target.protocol)) { setStatus('notfound'); return; }
           if (shortCode !== LANDING_CODE) {
             // A short link may point back into this app (e.g. the seller
             // rate-card page). That target differs only by hash, and a

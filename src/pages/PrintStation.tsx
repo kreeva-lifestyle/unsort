@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { T, S, alpha } from '../lib/theme';
 import { supabase } from '../lib/supabase';
+import { logSwallowed } from '../lib/errorLogger';
 import { connect, isConnected, getSlotPrinter, printHtml, SLOT_LABELS, friendlyPrintError } from '../lib/qzPrint';
 import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 import { useNotifications } from '../hooks/useNotifications';
@@ -77,12 +78,12 @@ export default function PrintStation({ active }: { active?: boolean } = {}) {
     supabase.from('print_queue')
       .update({ status: 'pending', printed_by_station: null, printed_at: null })
       .eq('status', 'printing').eq('printed_by_station', stationName).lt('printed_at', cutoff)
-      .then(({ error }) => { if (error) console.warn('Recovery update failed:', error); fetchJobs(); });
+      .then(({ error }) => { if (error) logSwallowed('Print job recovery', error); fetchJobs(); });
     // Housekeeping: print logs are kept for 7 days only (owner policy) —
     // anything finished (done OR failed) older than that is purged.
     const logCutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
     supabase.from('print_queue').delete().in('status', ['done', 'failed']).lt('created_at', logCutoff)
-      .then(({ error }) => { if (error) console.warn('Print-log cleanup failed:', error); });
+      .then(({ error }) => { if (error) logSwallowed('Print-log cleanup', error); });
   }, [stationName, fetchJobs]);
 
   useEffect(() => {
@@ -118,7 +119,7 @@ export default function PrintStation({ active }: { active?: boolean } = {}) {
       const { error: expireErr } = await supabase.from('print_queue')
         .update({ status: 'failed', error_message: 'Expired — queued too long without a print station. Print again if still needed.' })
         .eq('id', job.id).eq('status', 'pending');
-      if (expireErr) console.warn('Expire update failed:', expireErr);
+      if (expireErr) logSwallowed('Print job expiry', expireErr);
       processingRef.current = false;
       setProcessing(null);
       return;
@@ -164,7 +165,7 @@ export default function PrintStation({ active }: { active?: boolean } = {}) {
     const beat = () => {
       supabase.from('app_settings')
         .upsert({ key: 'print_station_heartbeat', value: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: 'key' })
-        .then(({ error }) => { if (error) console.warn('Heartbeat failed:', error); });
+        .then(({ error }) => { if (error) logSwallowed('Print station heartbeat', error); });
     };
     beat();
     const iv = setInterval(beat, HEARTBEAT_MS);
@@ -180,7 +181,7 @@ export default function PrintStation({ active }: { active?: boolean } = {}) {
           // .then() is required — supabase-js queries are lazy and never
           // execute without it (this sweep was silently a no-op before).
           supabase.from('print_queue').update({ status: 'failed', error_message: friendlyPrintError('Print timed out — station may have crashed'), printed_by_station: null }).eq('id', j.id).eq('status', 'printing')
-            .then(({ error }) => { if (error) console.warn('Stale job reset failed:', error); });
+            .then(({ error }) => { if (error) logSwallowed('Stale print job reset', error); });
         }
       });
     }, 30_000);

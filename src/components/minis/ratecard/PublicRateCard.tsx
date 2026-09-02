@@ -39,7 +39,7 @@ export default function PublicRateCard({ token }: { token: string }) {
 
       {/* Inline toasts - public pages are outside the app's ToastContainer. */}
       {toasts.length > 0 && (
-        <div style={{ position: 'fixed', left: 12, right: 12, top: 'max(12px, env(safe-area-inset-top))', zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', left: 12, right: 12, top: 'max(12px, env(safe-area-inset-top))', zIndex: 20000, display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'none' }}>
           {toasts.map(t => (
             <div key={t.id} style={{
               padding: '9px 12px', borderRadius: 8, fontSize: 12, maxWidth: 520, margin: '0 auto', width: '100%',

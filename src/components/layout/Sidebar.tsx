@@ -2,6 +2,7 @@ import { supabase } from '../../lib/supabase';
 import { T, Icon } from '../../lib/theme';
 import { canAccessTab } from '../../lib/tabs';
 import { isFaceIdEnrolledFor, lockApp } from '../../lib/faceId';
+import { runBeforeSignOut } from '../../lib/beforeSignOut';
 
 export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }: { activeTab: string; setActiveTab: (t: string) => void; profile: any; collapsed?: boolean }) {
   const tabs = [
@@ -21,6 +22,8 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
 
   const handleSignOut = async () => {
     try { localStorage.removeItem('ccDraft'); } catch {}
+    // Let module-level queues (PackTime sheet sync) flush under THIS user first.
+    await runBeforeSignOut();
     // Face ID enrolled: LOCK instead of signing out — the session stays on
     // this device so unlock is one biometric prompt with zero network.
     if (profile?.id && isFaceIdEnrolledFor(profile.id)) { lockApp(); window.location.reload(); return; }

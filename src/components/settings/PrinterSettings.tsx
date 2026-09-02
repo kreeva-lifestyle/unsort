@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { T, S } from '../../lib/theme';
 import { supabase } from '../../lib/supabase';
+import { logSwallowed } from '../../lib/errorLogger';
 import { friendlyError } from '../../lib/friendlyError';
 import { connect, listPrinters, getSlotPrinter, setSlotPrinter, SLOT_LABELS, printHtml, friendlyPrintError } from '../../lib/qzPrint';
 import { getPrintMode, setPrintMode } from '../../lib/printQueue';
@@ -47,7 +48,7 @@ export default function PrinterSettings({ addToast }: { addToast: (msg: string, 
     // expire even if no Print Station tab ever opens to do the housekeeping.
     const logCutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
     supabase.from('print_queue').delete().in('status', ['done', 'failed']).lt('created_at', logCutoff)
-      .then(({ error }) => { if (error) console.warn('Print-log cleanup failed:', error); });
+      .then(({ error }) => { if (error) logSwallowed('Print-log cleanup', error); });
     supabase.from('print_queue').select('id, printer_slot, title, status, error_message, created_at, printed_at')
       .order('created_at', { ascending: false }).limit(10)
       .then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); else if (data) setRecentJobs(data as PrintJob[]); });

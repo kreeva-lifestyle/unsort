@@ -8,6 +8,8 @@ import SwipeRow from '../components/ui/SwipeRow';
 import { friendlyError } from '../lib/friendlyError';
 import { safeHref } from '../lib/safeHref';
 import { useAuth } from '../hooks/useAuth';
+import { canAccessModule } from '../lib/tabs';
+import { fetchPaged } from '../lib/fetchPaged';
 import { useBackClose } from '../hooks/useBackClose';
 import { useNotifications } from '../hooks/useNotifications';
 import { printOrQueue } from '../lib/printQueue';
@@ -146,11 +148,11 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     return () => setBreadcrumb(null);
   }, [showExtras, setBreadcrumb]);
 
-  const fetchData = () => {
+  const fetchData = (limit = invLimit) => {
     setLoading(true);
-    const p1 = supabase.from('inventory_items').select('id, batch_number, serial_number, product_id, size, status, location, manufacturer, notes, order_id, marketplace, ticket_id, link, status_changed_at, created_at, updated_at, products(name, sku, total_components)').order('created_at', { ascending: false }).limit(invLimit).then(({ data, error }) => {
+    const p1 = fetchPaged((from, to) => supabase.from('inventory_items').select('id, batch_number, serial_number, product_id, size, status, location, manufacturer, notes, order_id, marketplace, ticket_id, link, status_changed_at, created_at, updated_at, products(name, sku, total_components)').order('created_at', { ascending: false }).order('id').range(from, to), limit).then(({ data, error }) => {
       if (error) addToast('Failed to load inventory — ' + friendlyError(error), 'error');
-      setItems(data || []); setInvTruncated((data || []).length >= invLimit);
+      setItems(data as any); setInvTruncated(data.length >= limit);
       // Manufacturer filter options derive from the SAME rows — the previous
       // separate 5000-row scan fetched an identical set a second time.
       setManufacturers([...new Set((data || []).map(d => d.manufacturer).filter(Boolean))].sort() as string[]);
@@ -158,13 +160,13 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
     supabase.from('products').select('id, name, sku, total_components, category').eq('is_active', true).limit(500).then(({ data, error }) => { if (error) addToast('Failed to load categories — ' + friendlyError(error), 'error'); setProducts(data || []); });
     supabase.from('locations').select('id, name').order('name').limit(500).then(({ data, error }) => { if (error) addToast('Failed to load locations — ' + friendlyError(error), 'error'); setLocations(data || []); });
     supabase.from('tags').select('id, name, color').order('name').limit(500).then(({ data, error }) => { if (error) addToast('Failed to load tags — ' + friendlyError(error), 'error'); setTags(data || []); });
-    supabase.from('item_tags').select('inventory_item_id, tag_id, tags(id, name, color)').limit(5000).then(({ data, error }) => {
+    fetchPaged((from, to) => supabase.from('item_tags').select('inventory_item_id, tag_id, tags(id, name, color)').order('inventory_item_id').range(from, to), limit * 4).then(({ data, error }) => {
       if (error) { addToast('Failed to load tags — ' + friendlyError(error), 'error'); return; }
       const map: Record<string, { id: string; name: string; color: string }[]> = {};
       (data || []).forEach((it) => { if (!map[it.inventory_item_id]) map[it.inventory_item_id] = []; map[it.inventory_item_id].push(it.tags as unknown as { id: string; name: string; color: string }); });
       setItemTags(map);
     });
-    const p2 = supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').limit(5000).then(({ data, error }) => {
+    const p2 = fetchPaged((from, to) => supabase.from('item_components').select('inventory_item_id, component_id, status, components(name)').order('inventory_item_id').range(from, to), limit * 4).then(({ data, error }) => {
       if (error) { addToast('Failed to load components — ' + friendlyError(error), 'error'); return; }
       const missingMap: Record<string, string[]> = {};
       const damagedMap: Record<string, string[]> = {};
@@ -783,12 +785,12 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
               </button>
             </div></>}
           </div>}
-          {!showExtras && (!isCompletedView || profile?.module_access?.extras !== false) && <div style={{ position: 'relative' }}>
+          {!showExtras && (!isCompletedView || canAccessModule(profile?.role, 'extras', profile?.module_access)) && <div style={{ position: 'relative' }}>
             <button onClick={() => setShowMore(v => !v)} style={S.btnGhost} title="More actions" aria-label="More actions">More &#8943;</button>
             {showMore && <><div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setShowMore(false)} />
             <div className="inv-more-dropdown" style={{ position: 'absolute', right: 0, top: '100%', zIndex: 10, background: T.s2, border: `1px solid ${T.bd}`, borderRadius: 8, padding: 6, display: 'flex', flexDirection: 'column' as const, gap: 4, minWidth: 160 }}>
               {!isCompletedView && <button onClick={() => { setShowMore(false); computeIntel(); }} style={{ ...S.btnGhost, width: '100%', justifyContent: 'flex-start', border: 'none', background: 'oklch(0.78 0.18 75 / .05)', color: T.yl, fontWeight: 600 }} title="Find cross-size completion possibilities">Find Pairs</button>}
-              {profile?.module_access?.extras !== false && <button onClick={() => { setShowMore(false); setShowExtras(true); }} style={{ ...S.btnGhost, width: '100%', justifyContent: 'flex-start', border: 'none', background: 'linear-gradient(135deg, oklch(0.55 0.22 265 / .08), oklch(0.77 0.14 230 / .06))', color: T.ac2, fontWeight: 600, gap: 6 }} title="Manage spare parts">
+              {canAccessModule(profile?.role, 'extras', profile?.module_access) && <button onClick={() => { setShowMore(false); setShowExtras(true); }} style={{ ...S.btnGhost, width: '100%', justifyContent: 'flex-start', border: 'none', background: 'linear-gradient(135deg, oklch(0.55 0.22 265 / .08), oklch(0.77 0.14 230 / .06))', color: T.ac2, fontWeight: 600, gap: 6 }} title="Manage spare parts">
                 <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, flexShrink: 0 }}><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" /></svg>
                 Spare Parts
               </button>}
@@ -796,7 +798,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           </div>}
         </div>
       </div>
-      {showExtras && profile?.module_access?.extras !== false ? <><div style={{ marginBottom: 10 }}><button onClick={() => { setShowExtras(false); }} style={S.btnGhost}>← Back to Inventory</button></div><InventoryExtras /></> : <>
+      {showExtras && canAccessModule(profile?.role, 'extras', profile?.module_access) ? <><div style={{ marginBottom: 10 }}><button onClick={() => { setShowExtras(false); }} style={S.btnGhost}>← Back to Inventory</button></div><InventoryExtras /></> : <>
       {/* Preset chips + search + Filters popover — Brand Tags glass-card aesthetic */}
       <div className="filter-bar" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: activeFilterCount > 0 ? 10 : 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {/* Search */}
@@ -1018,7 +1020,7 @@ export default function Inventory({ openItemId, onItemOpened, active }: { openIt
           <span style={{ color: T.tx3 }}>{page + 1} / {totalPages}</span>
           <button onClick={() => setPage(Math.min(totalPages - 1, page + 1))} style={{ ...S.btnGhost, ...S.btnSm, opacity: page >= totalPages - 1 ? 0.3 : 1, pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' }} aria-label="Next page">Next</button>
         </>}
-        {invTruncated && <button onClick={() => { setInvLimit(p => p + 5000); fetchData(); }} style={{ ...S.btnGhost, fontSize: 10, color: T.yl, borderColor: 'oklch(0.78 0.18 75 / .2)', background: 'oklch(0.78 0.18 75 / .06)' }}>Load More Items ({invLimit} loaded)</button>}
+        {invTruncated && <button onClick={() => { const next = invLimit + 5000; setInvLimit(next); fetchData(next); }} style={{ ...S.btnGhost, fontSize: 10, color: T.yl, borderColor: 'oklch(0.78 0.18 75 / .2)', background: 'oklch(0.78 0.18 75 / .06)' }}>Load More Items ({invLimit} loaded)</button>}
       </div>
 
       {/* Bulk-actions dock — appears when rows are selected (audit P1) */}
