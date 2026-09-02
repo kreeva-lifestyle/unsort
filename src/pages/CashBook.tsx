@@ -641,7 +641,9 @@ export default function CashBook() {
     const p = pendingExpDelRef.current;
     if (p) {
       clearTimeout(p.timer);
-      supabase.from('cash_expenses').delete().eq('id', p.id).then(() => {});
+      // The toast container outlives this page, so a failed commit still
+      // gets reported instead of vanishing with the unmount.
+      supabase.from('cash_expenses').delete().eq('id', p.id).then(({ error }) => { if (error) addToast('Expense delete did not go through — ' + friendlyError(error), 'error'); });
     }
   }, []);
   const dismissExpDel = async () => {

@@ -9,6 +9,7 @@ import MatchingCompanyRepeater from './components/MatchingCompanyRepeater';
 import { fetchLookup, addLookup } from './lib/supabase-rpc';
 import { useTableNav } from './hooks/useTableNav';
 import WorkPartCard from './components/WorkPartCard';
+import SuggestInput from '../../components/ui/SuggestInput';
 import type { ProgramFormData, Program, PricePartRow } from './types';
 import { EMPTY_WORK_PART, EMPTY_FABRIC_PART } from './types';
 import type { TranslationKey } from './i18n/en';
@@ -124,7 +125,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
               <tbody>
                 {workParts.map((p, i) => (
                   <tr key={i}>
-                    <td style={td}><input list="dl-pn" value={p.part_name} onChange={e => updateWork(i, 'part_name', e.target.value)} placeholder={t('partPlaceholder')} style={txtIn} data-row={i} data-col={0} onKeyDown={workNav} /></td>
+                    <td style={td}><SuggestInput value={p.part_name} onChange={v => updateWork(i, 'part_name', v)} options={partNames} placeholder={t('partPlaceholder')} style={txtIn} inputProps={{ 'data-row': i, 'data-col': 0, onKeyDown: workNav } as React.InputHTMLAttributes<HTMLInputElement>} /></td>
                     <td style={td}><input type="number" min="0" value={p.stitch || ''} onChange={e => updateWork(i, 'stitch', Math.max(0, Number(e.target.value)))} style={numIn} data-row={i} data-col={1} onKeyDown={e => { numericKeyDown(e); workNav(e); }} /></td>
                     <td style={td}><select value={p.stitch_type || 'meter'} onChange={e => updateWork(i, 'stitch_type', e.target.value)} style={{ ...selIn, color: T.tx }} data-row={i} data-col={2} onKeyDown={workNav}><option value="meter">{t('meter')}</option><option value="piece">{t('piece')}</option></select></td>
                     <td style={td}><input type="number" min="0" step="0.01" value={p.one_rs || ''} onChange={e => updateWork(i, 'one_rs', Math.max(0, Number(e.target.value)))} style={numIn} data-row={i} data-col={3} onKeyDown={e => { numericKeyDown(e); workNav(e); }} /></td>
@@ -133,7 +134,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                     <td style={td}><input type="number" min="0" step="0.01" value={p.meter_per_pcs || ''} onChange={e => updateWork(i, 'meter_per_pcs', Math.max(0, Number(e.target.value)))} style={numIn} data-row={i} data-col={6} onKeyDown={e => { numericKeyDown(e); workNav(e); }} /></td>
                     <td style={td}><input type="number" min="0" step="0.01" value={p.rate || ''} onChange={e => updateWork(i, 'rate', Math.max(0, Number(e.target.value)))} style={numIn} data-row={i} data-col={7} onKeyDown={e => { numericKeyDown(e); workNav(e); }} /></td>
                     <td style={{ ...calcCell, color: T.gr }}>{p.total ? '₹' + p.total.toFixed(0) : '—'}</td>
-                    <td style={td}><input list="dl-fn" value={p.fabric_name} onChange={e => updateWork(i, 'fabric_name', e.target.value)} placeholder={t('fabricPlaceholder')} style={txtIn} data-row={i} data-col={9} onKeyDown={workNav} /></td>
+                    <td style={td}><SuggestInput value={p.fabric_name} onChange={v => updateWork(i, 'fabric_name', v)} options={fabricNames} placeholder={t('fabricPlaceholder')} style={txtIn} inputProps={{ 'data-row': i, 'data-col': 9, onKeyDown: workNav } as React.InputHTMLAttributes<HTMLInputElement>} /></td>
                     <td style={td}><input type="number" min="0" step="0.01" value={p.fabric_meter || ''} onChange={e => updateWork(i, 'fabric_meter', Math.max(0, Number(e.target.value)))} style={numIn} data-row={i} data-col={10} onKeyDown={e => { numericKeyDown(e); workNav(e); }} /></td>
                     <td style={td}>{workParts.length > 1 && <button onClick={() => setWorkParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 16, minWidth: 44, minHeight: 44 }} aria-label="Remove row">×</button>}</td>
                   </tr>
@@ -145,15 +146,11 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
                 </tr>
               </tbody>
             </table>
-            <datalist id="dl-pn">{partNames.map(n => <option key={n} value={n} />)}</datalist>
-            <datalist id="dl-fn">{fabricNames.map(n => <option key={n} value={n} />)}</datalist>
           </div>
           {/* Mobile card view for work parts */}
           <div className="prg-work-mobile" style={{ display: 'none' }}>
-            {workParts.map((p, i) => <WorkPartCard key={i} p={p} i={i} canDelete={workParts.length > 1} numIn={numIn} txtIn={txtIn} selIn={selIn} onUpdate={updateWork} onDelete={j => setWorkParts(prev => prev.filter((_, k) => k !== j))} t={t} />)}
+            {workParts.map((p, i) => <WorkPartCard key={i} p={p} i={i} canDelete={workParts.length > 1} numIn={numIn} txtIn={txtIn} selIn={selIn} onUpdate={updateWork} onDelete={j => setWorkParts(prev => prev.filter((_, k) => k !== j))} t={t} partNames={partNames} fabricNames={fabricNames} />)}
             {workGT > 0 && <div style={{ padding: '8px 12px', background: 'rgba(52,211,153,.08)', borderRadius: 8, display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><span style={{ fontSize: 11, fontWeight: 600, color: T.tx }}>{t('grandTotal')}</span><span style={{ fontFamily: T.sora, fontSize: 14, fontWeight: 700, color: T.gr }}>₹{workGT.toLocaleString('en-IN')}</span></div>}
-            <datalist id="dl-pn">{partNames.map(n => <option key={n} value={n} />)}</datalist>
-            <datalist id="dl-fn">{fabricNames.map(n => <option key={n} value={n} />)}</datalist>
           </div>
           <button onClick={() => setWorkParts(p => [...p, { ...EMPTY_WORK_PART, sort_order: p.length }])} style={{ ...S.btnGhost, ...S.btnSm, cursor: 'pointer', marginBottom: 4 }}>{t('addPart')}</button>
 
@@ -164,7 +161,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
               <tbody>
                 {fabricParts.map((p, i) => (
                   <tr key={i}>
-                    <td style={td}><input list="dl-pn" value={p.part_name} onChange={e => updateFabric(i, 'part_name', e.target.value)} placeholder={t('partPlaceholder')} style={txtIn} data-row={i} data-col={0} onKeyDown={fabricNav} /></td>
+                    <td style={td}><SuggestInput value={p.part_name} onChange={v => updateFabric(i, 'part_name', v)} options={partNames} placeholder={t('partPlaceholder')} style={txtIn} inputProps={{ 'data-row': i, 'data-col': 0, onKeyDown: fabricNav } as React.InputHTMLAttributes<HTMLInputElement>} /></td>
                     <td style={td}><input type="number" min="0" step="0.01" value={p.fabric_meter || ''} onChange={e => updateFabric(i, 'fabric_meter', Math.max(0, Number(e.target.value)))} style={numIn} data-row={i} data-col={1} onKeyDown={fabricNav} /></td>
                     <td style={td}>{fabricParts.length > 1 && <button onClick={() => setFabricParts(p => p.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', color: T.re, cursor: 'pointer', fontSize: 16, minWidth: 44, minHeight: 44 }} aria-label="Remove row">×</button>}</td>
                   </tr>

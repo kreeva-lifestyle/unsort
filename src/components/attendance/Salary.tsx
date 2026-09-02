@@ -172,10 +172,10 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
     const isArmed = armed === `${kind}:${id}`;
     const c = kind === 'penalty' ? '0.63 0.22 25' : '0.62 0.17 245';
     return (
-      <span key={`${kind}:${id}`} onClick={() => removeAdjust(kind, id)} title={isArmed ? 'Tap again to remove' : 'Tap to remove'}
-        style={{ fontSize: 10, padding: '4px 9px', borderRadius: 5, background: `oklch(${c} / ${isArmed ? '.22' : '.08'})`, border: `1px solid oklch(${c} / ${isArmed ? '.55' : '.2'})`, color: kind === 'penalty' ? T.re : T.bl, cursor: 'pointer', fontFamily: T.mono, fontWeight: isArmed ? 700 : 400 }}>
-        {isArmed ? `Remove −${inr(amount)}? tap again` : <>−{inr(amount)}{kind === 'advance' ? ' adv' : ''}{note ? ` · ${note}` : ''} ✕</>}
-      </span>
+      <button type="button" className="touch44" key={`${kind}:${id}`} onClick={() => removeAdjust(kind, id)} title={isArmed ? 'Tap again to remove' : 'Tap to remove'} aria-pressed={isArmed}
+        style={{ fontSize: 11, padding: '6px 10px', minHeight: 32, borderRadius: 6, background: `oklch(${c} / ${isArmed ? '.22' : '.08'})`, border: `1px solid oklch(${c} / ${isArmed ? '.55' : '.2'})`, color: kind === 'penalty' ? T.re : T.bl, cursor: 'pointer', fontFamily: T.mono, fontWeight: isArmed ? 700 : 400 }}>
+        {isArmed ? `Remove −${inr(amount)}? tap again` : <>−{inr(amount)}{kind === 'advance' ? ' adv' : ''}{note ? ` · ${note}` : ''} &#215;</>}
+      </button>
     );
   };
 

@@ -1,7 +1,7 @@
 // One SKU box, used everywhere a SKU is typed: Cash Challan, Purchase Orders,
 // Brand Tags, Dropbox Link Generator, Client Finder.
 //
-// Two-step by design. The datalist suggests the PARENT design (DRS141); if that
+// Two-step by design. The dropdown suggests the PARENT design (DRS141); if that
 // design comes in sizes, a row of size chips appears and picking one writes
 // DRS141-S. Suggesting every variant up front would turn ~300 designs into
 // ~1,800 dropdown entries and bury the design you actually wanted.
@@ -11,8 +11,9 @@
 //
 // It ALWAYS accepts free text — a challan can legitimately bill something the
 // master sheet never had, so this suggests but never constrains.
-import { useId, useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { T } from '../../lib/theme';
+import AnchoredList from './AnchoredList';
 import {
   useProductCatalog, searchProducts, resolveSku, needsSize, variantSku, type Product,
 } from '../../hooks/useProductCatalog';
@@ -51,8 +52,15 @@ export default function SkuInput({
    *  there — no size chips, onPick fires on the parent straight away. */
   sizes?: boolean;
 } & Record<string, unknown>) {
-  const listId = useId();
   const { index } = useProductCatalog();
+  // The list is our own (portaled) dropdown, not a <datalist>: iOS Safari
+  // never shows datalist suggestions, so on the owner's phone typing a SKU
+  // silently offered nothing. Keyboard flow mirrors a datalist on desktop —
+  // arrows move the highlight, Enter picks only when something is highlighted,
+  // so callers' own Enter handlers (next row, generate) still fire otherwise.
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(-1);
+  const [anchor, setAnchor] = useState<HTMLInputElement | null>(null);
 
   const hit = resolveSku(index, value);
   const product = hit?.product ?? null;
@@ -86,32 +94,65 @@ export default function SkuInput({
     () => (q.length >= MIN_CHARS ? searchProducts(index, q, 25) : []),
     [index, q],
   );
+  // Like a browser datalist, never offer the exact text already in the box.
+  const listOpts = useMemo(() => { const k = q.toUpperCase(); return opts.filter(p => p.sku_norm !== k); }, [opts, q]);
+  const showList = open && listOpts.length > 0;
+
+  const pick = (p: Product) => { onChange(p.sku); setOpen(false); setHi(-1); };
+
+  const keyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (showList) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setHi(h => (h + 1) % listOpts.length); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setHi(h => (h <= 0 ? listOpts.length - 1 : h - 1)); return; }
+      if (e.key === 'Enter' && hi >= 0 && listOpts[hi]) { e.preventDefault(); pick(listOpts[hi]); return; }
+      if (e.key === 'Escape') { e.preventDefault(); setOpen(false); setHi(-1); return; }
+    }
+    onKeyDown?.(e);
+  };
 
   return (
     <div style={{ minWidth: 0 }}>
       <input
         {...rest}
-        list={listId}
+        ref={setAnchor}
         value={value}
         disabled={disabled}
-        onKeyDown={onKeyDown}
-        onChange={e => onChange(e.target.value)}
+        onKeyDown={keyDown}
+        onChange={e => { onChange(e.target.value); setOpen(true); setHi(-1); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => { setOpen(false); setHi(-1); }, 150)}
         placeholder={placeholder}
         autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+        role="combobox"
+        aria-expanded={showList}
         style={{ width: '100%', ...style }}
       />
-      <datalist id={listId}>
-        {opts.map(p => (
-          <option key={p.sku_norm} value={p.sku}>
-            {[
-              p.title,
-              p.price_exc_gst != null ? `₹${Number(p.price_exc_gst).toLocaleString('en-IN')}` : null,
-              needsSize(p) ? `${p.sizes.length} sizes` : null,
-              p.is_active ? null : 'Discontinued',
-            ].filter(Boolean).join(' · ')}
-          </option>
+      <AnchoredList anchor={anchor} open={showList}>
+        {listOpts.map((p, i) => (
+          // onMouseDown + preventDefault fires before the input's blur, so the
+          // tap lands even though the list closes on blur.
+          <div
+            key={p.sku_norm}
+            role="option"
+            aria-selected={i === hi}
+            onMouseDown={e => { e.preventDefault(); pick(p); }}
+            onMouseEnter={() => setHi(i)}
+            style={{ padding: '8px 12px', minHeight: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1, cursor: 'pointer', background: i === hi ? T.ac3 : 'transparent', borderBottom: `1px solid ${T.bd}` }}
+          >
+            <span style={{ fontSize: 12, fontFamily: T.mono, color: T.tx, fontWeight: 600 }}>{p.sku}</span>
+            <span style={{ fontSize: 10, color: p.is_active ? T.tx3 : T.yl, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {[
+                p.title,
+                p.price_exc_gst != null ? `₹${Number(p.price_exc_gst).toLocaleString('en-IN')}` : null,
+                needsSize(p) ? `${p.sizes.length} sizes` : null,
+                p.is_active ? null : 'Discontinued',
+              ].filter(Boolean).join(' · ')}
+            </span>
+          </div>
         ))}
-      </datalist>
+      </AnchoredList>
 
       {showSizes && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4, alignItems: 'center' }}>
@@ -120,9 +161,10 @@ export default function SkuInput({
             <button
               key={s}
               type="button"
+              className="touch44"
               onClick={() => onChange(variantSku(product!, s))}
               style={{
-                padding: '3px 9px', minHeight: 26, fontSize: 11, fontWeight: 600,
+                padding: '4px 12px', minHeight: 30, fontSize: 11, fontWeight: 600,
                 borderRadius: 5, cursor: 'pointer', fontFamily: T.mono,
                 background: T.ac3, color: T.ac2, border: `1px solid ${T.bd2}`,
               }}

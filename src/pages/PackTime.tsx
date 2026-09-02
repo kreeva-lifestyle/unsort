@@ -1014,7 +1014,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: T.tx2, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 7 }}>Camera Number</label>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(cameras.length, 4)}, 1fr)`, gap: 10 }}>
               {cameras.map(c => (
-                <div key={c.id} onClick={() => setCamera(c.number)} style={{ padding: '14px 0', borderRadius: 10, textAlign: 'center', fontSize: 18, fontWeight: 700, fontFamily: T.mono, cursor: 'pointer', transition: 'all .2s', background: camera === c.number ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.04)', color: camera === c.number ? '#fff' : T.tx2, border: `1px solid ${camera === c.number ? T.ac + '55' : T.bd2}`, boxShadow: camera === c.number ? `0 6px 20px ${T.ac44}` : 'none' }}>{c.number}</div>
+                <div key={c.id} onClick={() => setCamera(c.number)} style={{ padding: '14px 0', borderRadius: 10, textAlign: 'center', fontSize: 18, fontWeight: 700, fontFamily: T.mono, cursor: 'pointer', transition: 'all .2s', background: camera === c.number ? `linear-gradient(135deg, ${T.ac}, ${T.ac2})` : 'rgba(255,255,255,0.04)', color: camera === c.number ? '#fff' : T.tx2, border: `1px solid ${camera === c.number ? T.ac55 : T.bd2}`, boxShadow: camera === c.number ? `0 6px 20px ${T.ac44}` : 'none' }}>{c.number}</div>
               ))}
             </div>
             {cameras.length === 0 && <div style={{ fontSize: 11, color: T.yl, marginTop: 6 }}>No cameras configured. Add in Settings → PackStation.</div>}

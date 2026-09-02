@@ -5,6 +5,7 @@ import { T, S } from '../../lib/theme';
 import { useBackClose } from '../../hooks/useBackClose';
 import { numericKeyDown } from '../../lib/numericInput';
 import SkuInput from './SkuInput';
+import SuggestInput from './SuggestInput';
 
 interface BrandTagRow {
   id: string; brand: string; ean: string; sku: string; qty: string;
@@ -92,17 +93,17 @@ export default function BrandTagModal({ mode, initial, onSave, onClose, brandOpt
               <div><label style={fLabel}>Brand *</label><select value={form.brand} onChange={e => set('brand', e.target.value)} style={fSelect}><option value="">Select brand</option>{brandOptions.map(o => <option key={o} value={o}>{o.replace(/^BRAND NAME:\s*/i, '')}</option>)}</select></div>
               <div><label style={fLabel}>SKU *</label><SkuInput value={form.sku} onChange={v => set('sku', v)} style={fInput} placeholder="e.g. TNDRS177-M" /></div>
             </div>
-            <div><label style={fLabel}>Product *</label><input value={product} onChange={e => set('product', e.target.value ? 'PRODUCT DESC: ' + e.target.value : '')} list="dl-prod" style={fInput} placeholder="e.g. Co-ord Set" /><datalist id="dl-prod">{productOptions.map(o => <option key={o} value={o.replace(/^PRODUCT DESC:\s*/i, '')} />)}</datalist></div>
+            <div><label style={fLabel}>Product *</label><SuggestInput value={product} onChange={v => set('product', v ? 'PRODUCT DESC: ' + v : '')} options={productOptions.map(o => o.replace(/^PRODUCT DESC:\s*/i, ''))} style={fInput} placeholder="e.g. Co-ord Set" /></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div><label style={fLabel}>Size</label><select value={form.size} onChange={e => set('size', e.target.value)} style={fSelect}><option value="">Select size</option>{sizeOptions.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
-              <div><label style={fLabel}>Color</label><input value={form.color} onChange={e => set('color', e.target.value)} list="dl-color" style={fInput} placeholder="e.g. Maroon" /><datalist id="dl-color">{colorOptions.map(c => <option key={c} value={c} />)}</datalist></div>
+              <div><label style={fLabel}>Color</label><SuggestInput value={form.color} onChange={v => set('color', v)} options={colorOptions} style={fInput} placeholder="e.g. Maroon" /></div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div><label style={fLabel}>EAN-13 *</label><input value={form.ean} onChange={e => set('ean', e.target.value)} style={{ ...fInput, fontFamily: T.mono }} placeholder="8905738880431" /></div>
               <div><label style={fLabel}>Jio Tag</label><input value={form.jioCode} onChange={e => set('jioCode', e.target.value)} style={{ ...fInput, fontFamily: T.mono }} placeholder="JIO-A41" /></div>
             </div>
             <div><label style={fLabel}>MRP (₹) *</label><input type="number" min="0" value={form.mrp || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => set('mrp', Math.max(0, Number(e.target.value)))} style={{ ...fInput, fontFamily: T.mono }} placeholder="6800" /></div>
-            <div><label style={fLabel}>Includes</label><input value={form.qty.replace(/^INCLUDES:\s*/i, '')} onChange={e => set('qty', e.target.value ? 'INCLUDES: ' + e.target.value : '')} list="dl-qty" style={fInput} placeholder="1 U Top, 1 U Bottom, 1 U Dupatta" /><datalist id="dl-qty">{qtyOptions.map(o => <option key={o} value={o.replace(/^INCLUDES:\s*/i, '')} />)}</datalist></div>
+            <div><label style={fLabel}>Includes</label><SuggestInput value={form.qty.replace(/^INCLUDES:\s*/i, '')} onChange={v => set('qty', v ? 'INCLUDES: ' + v : '')} options={qtyOptions.map(o => o.replace(/^INCLUDES:\s*/i, ''))} style={fInput} placeholder="1 U Top, 1 U Bottom, 1 U Dupatta" /></div>
             <div><label style={fLabel}>Mktd &amp; Dist. By</label><textarea value={form.mktd} onChange={e => set('mktd', e.target.value)} rows={2} style={{ ...fInput, height: 'auto', resize: 'vertical' }} /></div>
           </div>
 
