@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { T, S } from '../../lib/theme';
 import { exportName, fileDate } from '../../lib/exportName';
+import { csvCell } from '../../lib/escape';
 
 const CBAZAAR_SIZE_MAP: Record<string, string> = {
   'XS (Extra small)': 'XS', 'S (Small)': 'S', 'M (Medium)': 'M',
@@ -63,7 +64,7 @@ export default function CbazaarImport({ addToast }: { addToast: (msg: string, ty
 
   const exportCsv = () => {
     if (rows.length === 0) return;
-    const esc = (s: string) => s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+    const esc = csvCell;
     const header = 'Catalogue,Design No,Size,Product Category,Product Name,ReadyToShipQty,LeadTime,SupplierCost,ARYA SKU';
     const csvRows = rows.map(r => `${esc(r.catalogue)},${esc(r.designNo)},${esc(r.sizeRaw)},${esc(r.productCategory)},${esc(r.productName)},${r.readyToShipQty},${r.leadTime},${r.supplierCost},${esc(r.aryaSku)}`);
     const blob = new Blob([header + '\n' + csvRows.join('\n')], { type: 'text/csv' });

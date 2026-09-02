@@ -6,7 +6,7 @@
 // full supplier add/edit flow stays in SupplierModal, opened from here.
 // House modal contract: portal + modal-inner (bottom sheet on mobile) +
 // body scroll lock.
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../../lib/theme';
 import { numericKeyDown } from '../../../lib/numericInput';
@@ -16,6 +16,7 @@ import {
 } from './costingModel';
 import SupplierModal from './SupplierModal';
 import SuggestInput from '../../ui/SuggestInput';
+import { useModalLock } from '../../../hooks/useModalLock';
 
 const BAD = '1px solid rgba(239,68,68,.55)';
 
@@ -28,11 +29,9 @@ export default function LineSheet({ sub, compName, library, onChange, onRemove, 
   onClose: () => void;
 }) {
   const [supOpen, setSupOpen] = useState(false);
-  // SupplierModal removes modal-open when it closes — re-add while we're up.
-  useEffect(() => {
-    if (!supOpen) document.body.classList.add('modal-open');
-    return () => { if (!supOpen) document.body.classList.remove('modal-open'); };
-  }, [supOpen]);
+  // useModalLock only drops the class when no other .modal-inner is mounted,
+  // so SupplierModal closing on top no longer unlocks the page behind us.
+  useModalLock();
 
   const sel = selectedSupplier(sub);
   const bad = subProblems(sub);

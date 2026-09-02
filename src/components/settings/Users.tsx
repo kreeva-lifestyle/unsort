@@ -13,6 +13,7 @@ import { MODULE_LABELS, ALL_MODULE_KEYS } from '../../lib/tabs';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import Empty from '../ui/Empty';
 import { SkeletonRows } from '../ui/Skeleton';
+import { useModalLock } from '../../hooks/useModalLock';
 
 export default function Users({ addToast, profile }: { addToast: (msg: string, type?: string) => void; profile: any }) {
   const [users, setUsers] = useState<any[]>([]);
@@ -24,10 +25,7 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
   const [resetResult, setResetResult] = useState<{ name: string; password: string } | null>(null);
   const { ask, modalProps } = useConfirm();
 
-  useEffect(() => {
-    document.body.classList.toggle('modal-open', showInvite);
-    return () => { document.body.classList.remove('modal-open'); };
-  }, [showInvite]);
+  useModalLock(showInvite);
   useBackClose(showInvite, () => setShowInvite(false));
   useBackClose(!!resetResult, () => setResetResult(null));
 

@@ -4,8 +4,9 @@
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
 import { docTitle } from '../../lib/exportName';
+import { escHtml as escHtmlShared } from '../../lib/escape';
 
-const escHtml = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
+const escHtml = escHtmlShared;
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = (d: string | null | undefined) => d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 

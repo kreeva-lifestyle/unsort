@@ -10,6 +10,7 @@ import { getShareUrl } from './lib/share-token';
 import type { Program, ProgramMatching, ProgramPricePart } from './types';
 import type { TranslationKey } from './i18n/en';
 import { docTitle } from '../../lib/exportName';
+import { escHtml } from '../../lib/escape';
 
 interface Props {
   programId: string;
@@ -63,7 +64,7 @@ export default function PDFExport({ programId, onClose, t }: Props) {
 }
 
 async function openPrintWindow(p: Program, matchings: ProgramMatching[], parts: ProgramPricePart[], L: Record<string, string>, qrDataUrl: string, addToast: (m: string, t?: string) => void) {
-  const esc = (s: string | null) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const esc = escHtml;
   const imageUrl = p.dropbox_gdrive_link ? toDirectImageUrl(p.dropbox_gdrive_link) : '';
   let html = '';
   const typeLabel = (v: string) => v === 'piece' ? L.piece : L.meter;

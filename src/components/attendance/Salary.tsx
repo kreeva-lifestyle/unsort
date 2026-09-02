@@ -15,6 +15,7 @@ import AdjustModal from './AdjustModal';
 import { useBackClose } from '../../hooks/useBackClose';
 import { docTitle } from '../../lib/exportName';
 import { printOrQueue } from '../../lib/printQueue';
+import { useModalLock } from '../../hooks/useModalLock';
 
 const leftLabel = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
 
@@ -97,7 +98,7 @@ export default function AttendanceSalary({ employees, entries, penalties, advanc
   const totalPenalty = shown.reduce((s, x) => s + x.penaltyTotal, 0);
   const totalAdvance = shown.reduce((s, x) => s + x.advanceTotal, 0);
 
-  useEffect(() => { document.body.classList.toggle('modal-open', !!pdfHtml || payFlow); return () => document.body.classList.remove('modal-open'); }, [pdfHtml, payFlow]);
+  useModalLock(!!pdfHtml || payFlow);
   // Back dismisses this overlay instead of leaving the page (or closing the PWA).
   useBackClose(!!pdfHtml, () => { setPdfHtml(null); });
 

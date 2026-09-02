@@ -7,6 +7,8 @@ import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import Empty from '../ui/Empty';
 import { docTitle, fileDate } from '../../lib/exportName';
+import { useModalLock } from '../../hooks/useModalLock';
+import { escHtml } from '../../lib/escape';
 
 interface Label { id: string; label_text: string; label_type: string; qc_person: string | null; created_at: string }
 
@@ -15,7 +17,7 @@ const QC_PEOPLE = ['Bhavika', 'Parul', 'Aarti', 'Rekha', 'Sarla', 'Jayshree'];
 const CONTACT = '9537656191';
 const CONTACT_LINE = `Contact Owner: ${CONTACT} for any type of quality issue, quickest action will be taken.`;
 
-const esc = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
+const esc = escHtml;
 
 const buildReturnLabel = (text: string, date: string, time: string) => `<div class="label">
   <div class="inner">
@@ -134,10 +136,7 @@ export default function ReturnLabels({ addToast }: { addToast: (msg: string, typ
 
   useEffect(() => { fetchLabels(); }, [fetchLabels]);
 
-  useEffect(() => {
-    document.body.classList.toggle('modal-open', showModal || !!printHtml || !!confirmDelete);
-    return () => { document.body.classList.remove('modal-open'); };
-  }, [showModal, printHtml, confirmDelete]);
+  useModalLock(showModal || !!printHtml || !!confirmDelete);
   useBackClose(showModal, () => setShowModal(false));
   useBackClose(!!printHtml, () => setPrintHtml(null));
   useBackClose(!!confirmDelete, () => setConfirmDelete(null));

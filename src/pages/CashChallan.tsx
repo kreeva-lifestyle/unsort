@@ -37,6 +37,8 @@ const ccAuditLog = async (action: string, recordId: string, details: string, cha
 
 import { T, S, CHALLAN_STATUS_COLORS as STATUS_COLORS } from '../lib/theme';
 import { exportName, docTitle, fileRange } from '../lib/exportName';
+import { useModalLock } from '../hooks/useModalLock';
+import { escHtml as escHtmlShared, csvCell } from '../lib/escape';
 
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
 // Strip the country code only when it IS a country code (>10 digits) — a
@@ -163,11 +165,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [ledgerFrom, setLedgerFrom] = useState('');
   const [ledgerTo, setLedgerTo] = useState('');
 
-  useEffect(() => {
-    const hasModal = showModal || !!viewingChallan || !!printHtml || !!confirmAction || showBulkPay || showBulkUnpay || !!ledgerPdfHtml || showErpReminder || !!reminderChallan || !!auditTrail;
-    document.body.classList.toggle('modal-open', hasModal);
-    return () => { document.body.classList.remove('modal-open'); };
-  }, [showModal, viewingChallan, printHtml, confirmAction, showBulkPay, showBulkUnpay, ledgerPdfHtml, showErpReminder, reminderChallan, auditTrail]);
+  useModalLock(showModal || !!viewingChallan || !!printHtml || !!confirmAction || showBulkPay || showBulkUnpay || !!ledgerPdfHtml || showErpReminder || !!reminderChallan || !!auditTrail);
 
   const { set: setBreadcrumb } = useBreadcrumb();
   useEffect(() => {
@@ -933,7 +931,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   // ── Export customer ledger PDF ─────────────────────────────────────────────
-  const escHtml = (s: unknown) => String(s ?? '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] || c));
+  const escHtml = escHtmlShared;
   const exportLedgerPDF = (customerName: string) => {
     if (ledgerChallans.length === 0) return;
     const safeName = escHtml(customerName);
@@ -1145,7 +1143,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (data.length >= 5000) addToast('Export capped at the most recent 5,000 challans — narrow the date range for a complete file', 'error');
     // Prefix ' on leading =+-@ so Excel/Sheets never treat customer-typed
     // text as a formula (CSV injection) — same guard as TracklyImport.
-    const esc = (v: string) => { const s = v || ''; const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s; return `"${safe.replace(/"/g, '""')}"`; };
+    const esc = csvCell;
     const header = 'Challan #,Date,Customer,Type,Status,SKU,Description,Qty,Price,Disc Type,Disc Value,Disc Amount,Item Total,Subtotal,Total Discount,Shipping,Round Off,Grand Total,Amount Paid,Payment Mode,Payment Date,Notes,Tags';
     const rows: string[] = [];
     for (const c of data as any[]) {

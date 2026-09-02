@@ -8,6 +8,7 @@ import { T, S } from '../../lib/theme';
 import { useBackClose } from '../../hooks/useBackClose';
 import { friendlyError } from '../../lib/friendlyError';
 import type { ListingFolder } from '../../types/database';
+import { useModalLock } from '../../hooks/useModalLock';
 
 export default function ImageFolders({ open, onClose, addToast }: {
   open: boolean;
@@ -26,10 +27,7 @@ export default function ImageFolders({ open, onClose, addToast }: {
     setRows((data as ListingFolder[] | null) || []);
   }, [addToast]);
 
-  useEffect(() => {
-    document.body.classList.toggle('modal-open', open);
-    return () => document.body.classList.remove('modal-open');
-  }, [open]);
+  useModalLock(open);
   useBackClose(open, () => onClose());
   useEffect(() => { if (open) load(); else { setLink(''); setSaving(false); setConfirmDel(''); } }, [open, load]);
 

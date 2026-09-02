@@ -5,9 +5,9 @@
 // there. Every interpolated value goes through esc() — sheet text is user
 // input.
 import { CostingComponent, purchasePlan, totalCost, sheetCost, num, PlanLine } from './costingModel';
+import { escHtml } from '../../../lib/escape';
 
-const esc = (s: unknown): string =>
-  String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const esc = escHtml;
 
 const inr = (n: number): string =>
   '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

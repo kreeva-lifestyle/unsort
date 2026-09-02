@@ -185,9 +185,9 @@ After every merge to main, you MUST:
 - Empty states: use `<Empty>` from `src/components/ui/Empty.tsx` with
   icon + title + message + optional CTA.
 - Destructive ops: use an in-app confirm modal, not `window.confirm()`.
-- HTML print/PDF: interpolated values must go through an `escHtml`
-  helper (present in `CashChallan.tsx`, `CashBook.tsx`, `BrandTags.tsx`;
-  CSV cells need the separate formula-prefix guard, not `escHtml`).
+- HTML print/PDF: interpolated values go through `escHtml` from
+  `src/lib/escape.ts`; CSV cells go through `csvCell` from the same file
+  (quoting + formula-prefix guard). Do not write local copies.
 
 ## Engineering ethics
 - **Do no harm.** Before any destructive action (delete, drop, force-push,

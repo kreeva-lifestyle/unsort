@@ -19,6 +19,7 @@ import POReceive from '../components/purchaseorders/POReceive';
 import { buildPoPdf } from '../components/purchaseorders/poPdf';
 import { sharePoImage } from '../components/purchaseorders/poImage';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../types/database';
+import { useModalLock } from '../hooks/useModalLock';
 
 const COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, created_by, modified_by, created_at, updated_at';
 
@@ -132,7 +133,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     return () => { supabase.removeChannel(ch); };
   }, [notifyPos]);
 
-  useEffect(() => { document.body.classList.toggle('modal-open', !!printData); return () => { document.body.classList.remove('modal-open'); }; }, [printData]);
+  useModalLock(!!printData);
   useBackClose(!!detail, () => setDetail(null));
   useBackClose(!!printData, () => setPrintData(null));
 

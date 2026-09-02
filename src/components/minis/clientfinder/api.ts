@@ -71,7 +71,6 @@ export const kindLabel: Record<MatchKind, string> = {
 
 /** Similar-looking designs are NOT evidence anyone used your photo, so they are
  *  separated everywhere rather than ranked alongside real matches. */
-export const isSimilar = (k: MatchKind) => k === 'similar';
 
 export const call = async (body: object): Promise<{ status: number; data: SearchResult }> => {
   const { data: { session } } = await supabase.auth.getSession();

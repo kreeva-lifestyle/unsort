@@ -15,6 +15,7 @@ import { numericKeyDown } from '../../lib/numericInput';
 import DateInput from '../ui/DateInput';
 import { poAuditLog } from './poAudit';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
+import { useModalLock } from '../../hooks/useModalLock';
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
@@ -37,7 +38,7 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { document.body.classList.add('modal-open'); return () => { document.body.classList.remove('modal-open'); }; }, []);
+  useModalLock();
   // The error box sits at the bottom of a long scrolling sheet; on a phone the
   // user is usually scrolled up at the failing field, so bring it into view.
   const errRef = useRef<HTMLDivElement>(null);

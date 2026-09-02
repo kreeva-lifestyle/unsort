@@ -13,6 +13,7 @@ import SuggestInput from '../../components/ui/SuggestInput';
 import type { ProgramFormData, Program, PricePartRow } from './types';
 import { EMPTY_WORK_PART, EMPTY_FABRIC_PART } from './types';
 import type { TranslationKey } from './i18n/en';
+import { useModalLock } from '../../hooks/useModalLock';
 
 interface Props {
   form: ProgramFormData;
@@ -28,10 +29,7 @@ interface Props {
 }
 
 export default function ProgramForm({ form, setField, editing, error, saving, onSave, onClose, t, initialWorkParts, initialFabricParts }: Props) {
-  useEffect(() => {
-    document.body.classList.add('modal-open');
-    return () => { document.body.classList.remove('modal-open'); };
-  }, []);
+  useModalLock();
   useBackClose(true, () => onClose());
   const isSkuError = error === 'skuRequired';
   const [workParts, setWorkParts] = useState<PricePartRow[]>(initialWorkParts?.length ? initialWorkParts : [{ ...EMPTY_WORK_PART }]);

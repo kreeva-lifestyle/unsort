@@ -13,6 +13,7 @@ import type { CashChallan, CashChallanItem } from '../../types/database';
 type Challan = CashChallan & { cash_challan_items?: Partial<CashChallanItem>[] };
 
 import { CHALLAN_STATUS_COLORS as STATUS_COLORS } from '../../lib/theme';
+import { useModalLock } from '../../hooks/useModalLock';
 
 interface Props {
   challan: Challan;
@@ -122,10 +123,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [c.id]);
 
-  useEffect(() => {
-    document.body.classList.add('modal-open');
-    return () => document.body.classList.remove('modal-open');
-  }, []);
+  useModalLock();
 
   useEffect(() => {
     const el = scrollRef.current;

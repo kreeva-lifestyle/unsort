@@ -25,6 +25,7 @@ import { exportName, fileRange, fileDate } from '../lib/exportName';
 import { downloadFile } from '../lib/downloadFile';
 import { registerBeforeSignOut } from '../lib/beforeSignOut';
 import { logSwallowed } from '../lib/errorLogger';
+import { useModalLock } from '../hooks/useModalLock';
 
 // In-memory view model for the recent-scans strip. Not a DB row.
 interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; }
@@ -286,11 +287,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const [exporting, setExporting] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  useEffect(() => {
-    const open = !!confirmDeleteId || todaySummaryOpen || showComplete || confirmChangeSetup;
-    document.body.classList.toggle('modal-open', open);
-    return () => { document.body.classList.remove('modal-open'); };
-  }, [confirmDeleteId, todaySummaryOpen, showComplete, confirmChangeSetup]);
+  useModalLock(!!confirmDeleteId || todaySummaryOpen || showComplete || confirmChangeSetup);
 
   // Local duplicate tracking
   const awbSetRef = useRef<Set<string>>(new Set());
