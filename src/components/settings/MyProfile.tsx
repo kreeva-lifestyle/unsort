@@ -238,7 +238,7 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
                 addToast('Password updated', 'success');
                 setChangingPwd(false); setPwd(''); setPwdConfirm('');
               }} disabled={pwdSaving} style={{ ...S.btnPrimary, opacity: pwdSaving ? 0.6 : 1 }}>{pwdSaving ? 'Saving…' : 'Update Password'}</button>
-              <button onClick={() => { setChangingPwd(false); setPwd(''); setPwdConfirm(''); setPwdError(''); }} style={S.btnGhost}>Cancel</button>
+              <button type="button" onClick={() => { setChangingPwd(false); setPwd(''); setPwdConfirm(''); setPwdError(''); setShowPwd(false); }} style={S.btnGhost}>Cancel</button>
             </div>
           </div>
         )}

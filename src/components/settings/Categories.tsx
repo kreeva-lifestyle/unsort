@@ -6,9 +6,11 @@ import { T, S } from '../../lib/theme';
 import { useBackClose } from '../../hooks/useBackClose';
 import { friendlyError } from '../../lib/friendlyError';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
+import { SkeletonRows } from '../ui/Skeleton';
 
 export default function Categories({ addToast, profile }: { addToast: (msg: string, type?: string) => void; profile: any }) {
   const [categories, setCategories] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showCompModal, setShowCompModal] = useState(false);
   const [selected, setSelected] = useState<any>(null);
@@ -28,7 +30,7 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
   const closeModal = () => { setShowModal(false); setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); };
   const { ask, modalProps } = useConfirm();
 
-  const fetchCategories = () => { supabase.from('products').select('id, name, sku, description, category, total_components').eq('is_active', true).order('created_at', { ascending: false }).then(({ data, error }) => { if (error) addToast('Failed to load categories — ' + friendlyError(error), 'error'); setCategories(data || []); }); };
+  const fetchCategories = () => { supabase.from('products').select('id, name, sku, description, category, total_components').eq('is_active', true).order('created_at', { ascending: false }).then(({ data, error }) => { if (error) addToast('Failed to load categories — ' + friendlyError(error), 'error'); setCategories(data || []); setLoaded(true); }); };
   useEffect(() => {
     fetchCategories();
     const ch = supabase.channel('cat-sync')
@@ -145,7 +147,8 @@ export default function Categories({ addToast, profile }: { addToast: (msg: stri
           <span style={{ fontSize: 10, color: T.tx3 }}>{p.total_components} component{p.total_components !== 1 ? 's' : ''}</span>
         </div>
       </div>))}</div>
-      {categories.length === 0 && <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 36, textAlign: 'center' }}><p style={{ color: T.tx3, fontSize: 12, marginBottom: 6 }}>No categories yet</p><p style={{ color: T.tx3, fontSize: 10 }}>Add a category like "Lehenga Choli" with components like Lehenga, Blouse, Dupatta</p>{canEdit && <button type="button" className="touch44" onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={{ ...S.btnPrimary, marginTop: 12, display: 'inline-flex' }}>+ Add First Category</button>}</div>}
+      {!loaded && categories.length === 0 && <SkeletonRows rows={3} />}
+      {loaded && categories.length === 0 && <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.r, padding: 36, textAlign: 'center' }}><p style={{ color: T.tx3, fontSize: 12, marginBottom: 6 }}>No categories yet</p><p style={{ color: T.tx3, fontSize: 10 }}>Add a category like "Lehenga Choli" with components like Lehenga, Blouse, Dupatta</p>{canEdit && <button type="button" className="touch44" onClick={() => { setSelected(null); setForm({ sku: '', name: '', description: '', category: '' }); setNewComps(['']); setShowModal(true); }} style={{ ...S.btnPrimary, marginTop: 12, display: 'inline-flex' }}>+ Add First Category</button>}</div>}
 
       {showModal && createPortal(<div style={S.modalOverlay} onClick={closeModal}><div className="modal-inner" style={{ ...S.modalBox, width: 480 }} onClick={e => e.stopPropagation()}><div style={S.modalHead}><span style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{selected ? 'Edit' : 'Add'} Category</span><button type="button" onClick={closeModal} style={S.modalClose} aria-label="Close">&#215;</button></div><form onSubmit={handleSubmit} style={{ padding: 16 }}>
         <div style={{ marginBottom: 10 }}><label style={S.fLabel}>Category name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Lehenga Choli" style={S.fInput} /></div>
