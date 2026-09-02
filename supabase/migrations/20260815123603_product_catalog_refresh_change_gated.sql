@@ -1,3 +1,7 @@
+-- NOTE: this file is a bookmark, not the full migration. The rewritten
+-- refresh_product_catalog() body was applied through the Supabase MCP and
+-- exists only in the project's migration history; replaying this folder
+-- from scratch will NOT recreate that function body.
 -- WHY: refresh_product_catalog() was the single heaviest statement on the
 -- database: ~1.57 s of CPU every 2 minutes (pg_cron job 'product-catalog-
 -- refresh'), rebuilding the catalog even when the master-sheet mirror had not

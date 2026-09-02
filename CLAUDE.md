@@ -12,24 +12,27 @@ This applies to all code changes. No confirmation needed.
 
 ## Post-deploy verification — MANDATORY
 After every merge to main, you MUST:
-1. **Wait 30 seconds**, then check if the GitHub Pages deploy succeeded
-   (`mcp__github__get_commit` on the merge SHA → check CI status, or
-   ask the user to confirm the site updated)
+1. **Wait for the Pages run** — build + deploy takes 1–4 minutes. Poll
+   `mcp__github__actions_list` (list_workflow_runs, branch main) until the
+   run for the merge SHA reports `conclusion: success`
 2. **Never declare work "done"** until deployment is confirmed
 3. If the deploy was cancelled or failed, investigate and fix — push a
    follow-up commit to re-trigger the workflow if needed
-4. Think before acting: rapid-fire merges cancel in-flight builds.
-   Batch related changes into one PR when possible instead of
-   merging 3 PRs in 2 minutes.
+4. Think before acting: deploys queue (`cancel-in-progress: false`), so
+   several quick merges wait on each other. Batch related changes into
+   one PR when possible instead of merging 3 PRs in 2 minutes.
 
 ## File layout
 - Modular structure — DO NOT put new code in App.tsx
 - New components: `src/components/[feature]/`
 - New pages: `src/pages/`
-- Shared UI helpers: `src/components/ui/` (e.g. `Empty`, `BarcodeScanner`)
+- Shared UI helpers: `src/components/ui/` (e.g. `Empty`, `ConfirmModal`, `ActionSheet`, `SuggestInput`, `AnchoredList`)
 - Cash Challan sub-views: `src/components/challan/` (`ChallanAnalytics`, `ChallanLedger`, `ChallanForm` — main `CashChallan.tsx` owns data + list view only)
 - Settings sub-pages: `src/components/settings/`
 - Layout chrome: `src/components/layout/` (`Sidebar`, `Header`, `ToastContainer`)
+- Programs module: `src/modules/programs/` (self-contained: own `hooks/`, `lib/`, `i18n/` with Gujarati)
+- Hooks: `src/hooks/` (`useModalLock`, `useBackClose`, `useConfirm` via ConfirmModal, `useActiveRefetch`, `useViewportRestore`…)
+- The only stylesheet: `src/index.css` — media queries, pseudo-classes, animations, safe-area and the `--nav-h` bottom-nav geometry. Everything else is inline from theme recipes, which is why mobile overrides there need `!important`
 - Types: `src/types/database.ts`
 - Theme constants + recipes: `src/lib/theme.tsx` (exports `T`, `S`, `Icon`)
 - Supabase client: `src/lib/supabase.ts`
@@ -37,22 +40,22 @@ After every merge to main, you MUST:
 
 ## Reading conventions
 - Read only the specific file you need — never read all of App.tsx
-- Keep every file under 200 lines (CashChallan.tsx is grandfathered — split further when touching it)
-- Schema reference: UNSORT-CLAUDE-CODE-CONTEXT.md (read this instead of App.tsx for DB info)
+- Keep new files under 200 lines. Grandfathered above the limit — do not grow them, split when a change lands there: PackTime.tsx, Inventory.tsx, CashBook.tsx, types/database.ts, BrandTags.tsx, InventoryExtras.tsx, Minis.tsx. CashChallan.tsx stays as it is by owner decision
+- Schema reference: `src/types/database.ts` (one interface per table) plus `supabase/migrations/` (timestamp-prefixed, replay in order). UNSORT-CLAUDE-CODE-CONTEXT.md is the project overview, not the schema
 
 ## UI/UX Design Rules — MANDATORY
 **Before changing ANY visual element, read `src/lib/theme.tsx` first.**
 
 ### Design Tokens (`T.*`)
-- Surfaces: `T.bg` (#060810), `T.s` (#0B0F19), `T.s2` (#0F1420), `T.s3` (#141B2B)
+- Surfaces: `T.bg`, `T.s`, `T.s2`, `T.s3` (OKLCH strings, darkest to lightest)
 - Glass: `T.glass1` (rgba 0.02), `T.glass2` (rgba 0.04)
 - Borders: `T.bd` (rgba 0.05), `T.bd2` (rgba 0.08)
-- Text: `T.tx` (#E2E8F0 primary), `T.tx2` (#8896B0 secondary), `T.tx3` (#6B7890 muted)
-- Accent: `T.ac` (#6366F1), `T.ac2` (#818CF8), `T.ac3` (rgba 0.12)
+- Text: `T.tx` (primary), `T.tx2` (secondary), `T.tx3` (muted)
+- Accent: `T.ac`, `T.ac2` (lighter), `T.ac3` (12% tint). Alpha tints exist as tokens (`T.ac22/33/44/55/AA`, `T.reAA`, `T.gr*`, `T.yl*`) plus `alpha(token, a)`
 - Semantic: `T.gr` (green), `T.re` (red), `T.yl` (yellow), `T.bl` (blue)
 - Radii: `T.r` (8), `T.rSm` (6), `T.rLg` (10), `T.rXl` (14)
 - Fonts: `T.mono` (JetBrains Mono), `T.sans` (Inter), `T.sora` (Sora)
-- Never hardcode hex colors — use tokens. SwipeRow actions are the only exception.
+- Never hardcode hex colors — use tokens. Every token is an OKLCH string: NEVER append a hex alpha suffix (`T.ac + '44'`) — the browser silently drops the whole declaration; use the tint tokens or `alpha()`. Only print/PDF HTML templates and SwipeRow action colours may carry literals.
 
 ### Inputs & Form Fields
 - All text inputs/selects/textareas: use `S.fInput` (height 36px, fontSize 13, padding 8px 12px, borderRadius 8)
@@ -61,7 +64,7 @@ After every merge to main, you MUST:
 - Search icon: 14x14px SVG, stroke T.tx3, strokeWidth 1.8, opacity 0.5, positioned absolute left:10 top:50% translateY(-50%)
 - Per-page selects: padding 4px 8px, fontSize 11, height 28, borderRadius 6
 - Number inputs: always add `onKeyDown={e => numericKeyDown(e)}` from `src/lib/numericInput.ts` to block alphabets (e/E/+)
-- Never use fontSize below 12 for inputs (iOS zooms on < 16px — CSS fix at index.css:38 forces 16px on mobile)
+- Never use fontSize below 12 for inputs (iOS zooms on < 16px — the mobile media query in index.css forces 16px on inputs)
 - Labels: use `S.fLabel` (fontSize 11, fontWeight 600, color T.tx3, uppercase, letterSpacing 0.06em)
 
 ### Buttons
@@ -90,7 +93,7 @@ After every merge to main, you MUST:
 - Must toggle `document.body.classList.toggle('modal-open', isOpen)` in useEffect for scroll lock
 - Must reset ALL form state on close (form fields, error state, editing ID)
 - Error display: inline red box above buttons (`background: rgba(239,68,68,.08)`, `border: 1px solid rgba(239,68,68,.2)`, `borderRadius: 6`, `padding: 8px 10px`, `fontSize: 11`, `color: T.re`)
-- On mobile (index.css:187): modals become bottom sheets (position:fixed, bottom:0, slideUp animation)
+- On mobile (the `.modal-inner` rule in index.css): modals become bottom sheets (position:fixed, bottom:0, slideUp animation)
 
 ### Print / Export Previews
 - Full-screen overlay: position fixed, inset 0, z-index 10000, background #060810
@@ -115,7 +118,7 @@ After every merge to main, you MUST:
 
 ### Status Indicators
 - Dot + label pattern (not pills): 8px circle + fontSize 11 text
-- Colors: completed=#22C55E, damaged=#EF4444, unsorted=#F59E0B, dry_clean=#38BDF8
+- Colors: completed=`T.gr`, damaged=`T.re`, unsorted=`T.yl`, dry_clean=`T.bl`
 - Status badges: padding 2px 8px, borderRadius 4, fontSize 9, fontWeight 600
 
 ### Pagination
@@ -123,7 +126,7 @@ After every merge to main, you MUST:
 - Prev/Next: `S.btnGhost` + `S.btnSm`, opacity 0.3 when disabled
 - Page display: fontSize 10, color T.tx3
 - Per-page select: padding 4px 8px, fontSize 11, height 28, borderRadius 6
-- Options: [10, 25, 50, 100], default 25
+- Options: [10, 25, 50, 100], default 25 (Inventory and Brand Tags default to 10 and omit 100 — keep what the page already does)
 - Reset page to 0 on search/filter change
 - Reset page to 0 on delete
 
@@ -135,20 +138,20 @@ After every merge to main, you MUST:
 ### Notifications / Toasts
 - Success: `addToast('message', 'success')`
 - Error: `addToast(friendlyError(err), 'error')` — always wrap with friendlyError
-- Never use `window.alert()` or `console.error` for user-facing messages
+- Never use `window.alert()` or `console.error` for user-facing messages. Best-effort background writes (audit trail, housekeeping) report through `logSwallowed()` in `src/lib/errorLogger.ts`, never `console.warn`
 - Toasts appear at top on mobile (CSS override in index.css)
 
 ### Mobile (max-width: 768px)
 - Desktop-only: `className="desktop-only"` (display:none on mobile)
 - Mobile-only: `className="mobile-only"` (display:none on desktop, flex on mobile)
 - FAB: `className="fab"` (display:none desktop, fixed bottom-right on mobile, 52px circle)
-- Bottom nav height: ~68px + safe-area-inset-bottom — all page content needs 70px bottom padding
-- Page wrapper: `className="page-pad"` applies `padding: 14px 12px 70px 12px` on mobile with safe-area insets
+- Bottom nav geometry lives in ONE CSS variable, `--nav-h` (index.css, includes the safe-area inset) — never hardcode 68/70px
+- Page wrapper: `className="page-pad"` reserves `calc(var(--nav-h) + 14px)` bottom clearance on mobile plus safe-area side insets
 - Grids 3+ columns: must have CSS media query fallback to 1-2 columns
-- No `window.open()` — use iframe print preview
+- No `window.open()` — use iframe print preview (one documented exception: the desktop-only WhatsApp fallback in `RateCardActions.tsx`)
 - Modals become bottom sheets (position:fixed, bottom:0, slideUp animation)
 - SwipeRow: hint on first item, actions array for swipe-to-reveal buttons
-- iOS input zoom fix: index.css:38 forces fontSize 16px on all inputs at mobile breakpoint
+- iOS input zoom fix: the mobile media query in index.css forces fontSize 16px on all inputs
 
 ### Consistency Checklist (before committing UI changes)
 1. Does the element use theme recipes (S.*) instead of inline styles?
@@ -175,15 +178,16 @@ After every merge to main, you MUST:
   (`delete_inventory_item_cascade`, `complete_inventory_pair`,
   `revert_inventory_pair`, `complete_item_with_extra`). Don't replace
   them with multiple chained `.then()` calls.
-- Own-user cash PIN read: `supabase.rpc('get_own_pin')` only.
-  Column-level SELECT on `profiles.cash_pin` is revoked for
-  `authenticated` and `anon`.
+- Cash PIN: never read `profiles.cash_pin` — column-level SELECT is
+  revoked for `authenticated` and `anon`. Go through the RPCs:
+  `check_pin_exists`, `set_own_pin`, `verify_own_pin` (SECURITY DEFINER
+  with lockout columns), `get_profiles_pin_status`, `confirm_handover`.
 - Empty states: use `<Empty>` from `src/components/ui/Empty.tsx` with
   icon + title + message + optional CTA.
 - Destructive ops: use an in-app confirm modal, not `window.confirm()`.
-- HTML print/PDF: interpolated values must go through `escHtml` /
-  `esc` helpers already present in `CashChallan.tsx`, `CashBook.tsx`,
-  `BrandTagPrinter.tsx`.
+- HTML print/PDF: interpolated values must go through an `escHtml`
+  helper (present in `CashChallan.tsx`, `CashBook.tsx`, `BrandTags.tsx`;
+  CSV cells need the separate formula-prefix guard, not `escHtml`).
 
 ## Engineering ethics
 - **Do no harm.** Before any destructive action (delete, drop, force-push,
@@ -207,9 +211,9 @@ After every merge to main, you MUST:
   `apply_migration` with a descriptive `name`. Document why in the SQL
   comment header, not just what.
 - **Tests don't exist — be extra careful.** This codebase has no test
-  suite. Compensate by reading before writing, type-checking with
-  `npx tsc --noEmit`, building with `npx vite build`, and cross-
-  verifying claims against actual code before declaring work done.
+  suite. Compensate by reading before writing, running `npm run build`
+  (eslint + tsc + vite — the same gate the deploy workflow runs), and
+  cross-verifying claims against actual code before declaring work done.
 
 ## Database sustainability (scaling past "it works on my laptop")
 - **Never `select('*')` on anything that can grow.** Spell out the

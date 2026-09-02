@@ -1,21 +1,8 @@
-// ============================================================
-// DailyOffice — shared theme tokens + style recipes + Icon
-//
-// Single source of truth. Replaces the duplicated `const T = {...}`
-// blocks at the top of App.tsx, BrandTagPrinter.tsx, CashBook.tsx,
-// CashChallan.tsx, InventoryExtras.tsx, PackTime.tsx.
-//
-// Drop this file into `src/theme.ts` and in each of the 6 files:
-//
-//   - DELETE the local `const T = {...}` block
-//   - DELETE the local `const S = {...}` block (App.tsx only)
-//   - DELETE the local `const Icon` component (App.tsx only)
-//   - Add at the top, next to the other imports:
-//         import { T, S, Icon } from './theme';
-//
-// Every call-site reads `T.bg`, `T.ac`, `S.fInput`, `<Icon name="…" />`
-// exactly as before — no call-site changes required.
-// ============================================================
+// DailyOffice — shared theme tokens (T), style recipes (S) and the Icon
+// component. Single source of truth for every colour, radius, font and
+// control recipe in the app; pages import `{ T, S, Icon }` from here and
+// style inline. Responsive overrides that inline styles cannot express
+// (media queries, pseudo-classes, animations) live in src/index.css.
 
 import React from 'react';
 

@@ -16,6 +16,7 @@ Follow these steps in order for every schema change. Do not skip steps.
 
 ## 2. Write migration SQL
 - Apply via MCP `apply_migration` with a descriptive `name` (e.g. `add_manufacturer_to_inventory_items`)
+- Save the same SQL to `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql` in the same commit (the folder is the only replayable history; files without a timestamp prefix sort alphabetically and replay in the wrong order)
 - Start with a SQL comment explaining WHY the change is needed
 - New tables must include in the same migration:
   - `id uuid DEFAULT gen_random_uuid() PRIMARY KEY`
@@ -23,7 +24,7 @@ Follow these steps in order for every schema change. Do not skip steps.
   - `updated_at timestamptz DEFAULT now()` (omit only for intentionally immutable tables)
   - `ALTER TABLE new_table ENABLE ROW LEVEL SECURITY`
   - At least one `CREATE POLICY` (empty RLS locks out everyone)
-- Functions/RPCs for multi-table writes: use `SECURITY INVOKER` (not DEFINER)
+- Functions/RPCs: `SECURITY INVOKER` by default so RLS still applies. Use `SECURITY DEFINER` only when the function must deliberately bypass RLS (edge-function-only RPCs, PIN checks, catalog refresh) and then always `SET search_path = public` and validate the caller inside the body
 - RPC parameter names: `p_` prefix (e.g. `p_item_id`, `p_reason`)
 - Add btree indexes on any column the UI will filter or sort on
 
@@ -56,8 +57,7 @@ Follow these steps in order for every schema change. Do not skip steps.
 - If realtime needed: `ALTER PUBLICATION supabase_realtime ADD TABLE new_table` in migration, add `supabase.channel().on('postgres_changes', ...)` with filter clause when possible, unsubscribe on unmount
 
 ## 8. Build check
-- `npx tsc --noEmit` -- zero errors
-- `npx vite build` -- successful build
+- `npm run build` -- runs eslint, tsc and vite exactly as the deploy workflow does
 
 ---
 
