@@ -78,13 +78,21 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
     addToast('Password reset successfully', 'success');
   };
 
+  // One in-flight toggle per chip: a double tap used to fire two read-modify-
+  // write rounds that could land in either order.
+  const [togglingMod, setTogglingMod] = useState<string | null>(null);
   const toggleModule = async (userId: string, modKey: string) => {
+    const key = `${userId}:${modKey}`;
+    if (togglingMod) return;
+    setTogglingMod(key);
+    try {
     const { data: fresh } = await supabase.from('profiles').select('module_access').eq('id', userId).maybeSingle();
     const access = { ...( fresh?.module_access || Object.fromEntries(ALL_MODULE_KEYS.map(k => [k, true])) ) };
     access[modKey] = !access[modKey];
     const { error } = await supabase.from('profiles').update({ module_access: access }).eq('id', userId);
     if (error) addToast('Failed to update access — ' + friendlyError(error), 'error');
-    else { addToast(`${MODULE_LABELS[modKey]} ${access[modKey] ? 'enabled' : 'disabled'}`, 'success'); fetchUsers(); }
+    else { addToast(`${MODULE_LABELS[modKey]} ${access[modKey] ? 'enabled' : 'disabled'}`, 'success'); await fetchUsers(); }
+    } finally { setTogglingMod(null); }
   };
 
   const ROLE_COLORS: Record<string, string> = { admin: T.yl, manager: T.ac2, operator: T.bl, viewer: T.tx3 };
@@ -110,8 +118,8 @@ export default function Users({ addToast, profile }: { addToast: (msg: string, t
           {ALL_MODULE_KEYS.map(k => {
             const on = access[k] !== false;
             return (
-              <button key={k} className="touch44" onClick={() => toggleModule(u.id, k)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, fontSize: 10.5, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', userSelect: 'none', minHeight: 30,
+              <button key={k} type="button" className="touch44" onClick={() => toggleModule(u.id, k)} disabled={!!togglingMod} aria-pressed={on}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7, fontSize: 10.5, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', userSelect: 'none', minHeight: 30, opacity: togglingMod === `${u.id}:${k}` ? 0.5 : 1,
                   background: on ? 'oklch(0.72 0.19 145 / .10)' : 'rgba(255,255,255,.02)',
                   border: `1px solid ${on ? 'oklch(0.72 0.19 145 / .28)' : T.bd}`,
                   color: on ? T.gr : T.tx3 }}>

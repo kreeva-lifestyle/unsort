@@ -6,12 +6,16 @@ import { useUndoDelete } from '../../hooks/useUndoDelete';
 import Toggle from '../ui/Toggle';
 import UndoBar from '../ui/UndoBar';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
+import { SkeletonRows } from '../ui/Skeleton';
 
 export default function Brands({ addToast }: { addToast: (msg: string, type?: string) => void }) {
   const [brands, setBrands] = useState<any[]>([]);
   const [newBrand, setNewBrand] = useState('');
+  // Empty state waits for the first response; otherwise every open flashes
+  // "No brands" for a beat before the list lands.
+  const [loaded, setLoaded] = useState(false);
   const { ask, modalProps } = useConfirm();
-  const fetchBrands = useCallback(() => { supabase.from('brands').select('id, name, is_active').order('name').then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); setBrands(data || []); }); }, [addToast]);
+  const fetchBrands = useCallback(() => { supabase.from('brands').select('id, name, is_active').order('name').then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); setBrands(data || []); setLoaded(true); }); }, [addToast]);
   const { pendingDel, scheduleDelete, undo, dismiss } = useUndoDelete('brands', fetchBrands);
   useEffect(() => { fetchBrands(); }, [fetchBrands]);
 
@@ -47,11 +51,12 @@ export default function Brands({ addToast }: { addToast: (msg: string, type?: st
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <Toggle on={b.is_active} onToggle={() => toggleBrand(b.id, b.is_active)} size="sm" />
-            <span className="touch44" onClick={() => deleteBrand(b.id)} style={{ ...S.btnDanger, cursor: 'pointer' }}>Delete</span>
+            <button type="button" className="touch44" onClick={() => deleteBrand(b.id)} style={{ ...S.btnDanger, cursor: 'pointer' }}>Delete</button>
           </div>
         </div>
       ))}
-      {brands.length === 0 && <div style={{ fontSize: 11, color: T.tx3, padding: 10 }}>No brands. Add one above.</div>}
+      {!loaded && brands.length === 0 && <SkeletonRows rows={3} />}
+      {loaded && brands.length === 0 && <div style={{ fontSize: 11, color: T.tx3, padding: 10 }}>No brands. Add one above.</div>}
       {pendingDel && <UndoBar label={pendingDel.label} id={pendingDel.id} onUndo={undo} onDismiss={dismiss} />}
       <ConfirmModal {...modalProps} />
     </div>

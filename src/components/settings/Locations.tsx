@@ -5,14 +5,16 @@ import { friendlyError } from '../../lib/friendlyError';
 import { useUndoDelete } from '../../hooks/useUndoDelete';
 import UndoBar from '../ui/UndoBar';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
+import { SkeletonRows } from '../ui/Skeleton';
 
 export default function Locations({ addToast, canEdit }: { addToast: (msg: string, type?: string) => void; canEdit: boolean }) {
   const [locations, setLocations] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [newLoc, setNewLoc] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const { ask, modalProps } = useConfirm();
-  const fetchLocations = useCallback(() => { supabase.from('locations').select('id, name').order('name').then(({ data, error }) => { if (error) addToast('Failed to load locations — ' + friendlyError(error), 'error'); setLocations(data || []); }); }, [addToast]);
+  const fetchLocations = useCallback(() => { supabase.from('locations').select('id, name').order('name').then(({ data, error }) => { if (error) addToast('Failed to load locations — ' + friendlyError(error), 'error'); setLocations(data || []); setLoaded(true); }); }, [addToast]);
   const { pendingDel, scheduleDelete, undo, dismiss } = useUndoDelete('locations', fetchLocations);
 
   useEffect(() => {
@@ -75,7 +77,8 @@ export default function Locations({ addToast, canEdit }: { addToast: (msg: strin
             )}
           </div>
         ))}
-        {locations.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No locations yet. Add your first location above.</div>}
+        {!loaded && locations.length === 0 && <div style={{ padding: 12 }}><SkeletonRows rows={3} /></div>}
+        {loaded && locations.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No locations yet. Add your first location above.</div>}
       </div>
       {pendingDel && <UndoBar label={pendingDel.label} id={pendingDel.id} onUndo={undo} onDismiss={dismiss} />}
       <ConfirmModal {...modalProps} />

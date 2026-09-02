@@ -600,7 +600,8 @@ export default function InventoryExtras() {
           </div>
           <div style={{ padding: 12, maxHeight: 400, overflowY: 'auto' }}>
             {matches.length === 0 && <Empty icon="search" title="No matching items" message="No inventory item is missing this component in this size right now." />}
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}>
               {matches.length > 0 && <thead><tr>
                 <th style={th}>Batch #</th><th style={th}>SKU</th><th style={th}>Size</th><th style={th}>Location</th><th style={th}>Action</th>
               </tr></thead>}
@@ -613,14 +614,15 @@ export default function InventoryExtras() {
                     <td style={td}>{m.location || '--'}</td>
                     <td style={td}>
                       {matchExtra.quantity > 0 ? (
-                        <button onClick={() => setCompleteItem({ extra: matchExtra, item: m })}
-                          style={{ ...btn, padding: '3px 10px', fontSize: 10, border: 'none' }} title="Use this spare part" aria-label="Use spare part">Use</button>
+                        <button type="button" className="touch44" onClick={() => setCompleteItem({ extra: matchExtra, item: m })}
+                          style={{ ...btn, ...S.btnSm, minHeight: 32, border: 'none' }} title="Use this spare part" aria-label="Use spare part">Use</button>
                       ) : <span style={{ fontSize: 10, color: T.re }}>No stock</span>}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       </div>, document.body)}

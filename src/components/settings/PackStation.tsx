@@ -6,10 +6,12 @@ import { useUndoDelete } from '../../hooks/useUndoDelete';
 import Toggle from '../ui/Toggle';
 import UndoBar from '../ui/UndoBar';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
+import { SkeletonRows } from '../ui/Skeleton';
 
 export default function PackStation({ addToast }: { addToast: (msg: string, type?: string) => void }) {
   const [couriers, setCouriers] = useState<any[]>([]);
   const [cameras, setCameras] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState({ couriers: false, cameras: false });
   const [newCourier, setNewCourier] = useState('');
   const [newSheet, setNewSheet] = useState('');
   const [newCamera, setNewCamera] = useState('');
@@ -17,8 +19,8 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
   const { ask, modalProps } = useConfirm();
 
   const fetchData = useCallback(() => {
-    supabase.from('packtime_couriers').select('id, name, sheet_name, is_active').order('name').then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); else setCouriers(data || []); });
-    supabase.from('packtime_cameras').select('id, number, is_active').order('number').then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); else setCameras(data || []); });
+    supabase.from('packtime_couriers').select('id, name, sheet_name, is_active').order('name').then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); else setCouriers(data || []); setLoaded(l => ({ ...l, couriers: true })); });
+    supabase.from('packtime_cameras').select('id, number, is_active').order('number').then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); else setCameras(data || []); setLoaded(l => ({ ...l, cameras: true })); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Table is passed per delete call — a shared state variable here used to be
@@ -104,7 +106,8 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
               </div>
             </div>
           ))}
-          {couriers.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No couriers configured</div>}
+          {!loaded.couriers && couriers.length === 0 && <div style={{ padding: 12 }}><SkeletonRows rows={2} /></div>}
+          {loaded.couriers && couriers.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No couriers configured</div>}
         </div>
       </div>
       <div>
@@ -127,7 +130,8 @@ export default function PackStation({ addToast }: { addToast: (msg: string, type
               </div>
             </div>
           ))}
-          {cameras.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No cameras configured</div>}
+          {!loaded.cameras && cameras.length === 0 && <div style={{ padding: 12 }}><SkeletonRows rows={2} /></div>}
+          {loaded.cameras && cameras.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No cameras configured</div>}
         </div>
       </div>
       {pendingDel && <UndoBar label={pendingDel.label} id={pendingDel.id} onUndo={undo} onDismiss={dismiss} />}

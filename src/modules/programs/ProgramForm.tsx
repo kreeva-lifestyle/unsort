@@ -80,13 +80,21 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
   }, [workParts, fabricParts]);
 
+  // The lookup upserts run before the parent's saving flag flips, so a
+  // second tap in that window used to start a second save. Guard locally.
+  const [prepping, setPrepping] = useState(false);
+  const busy = saving || prepping;
   const handleSave = async () => {
+    if (busy) return;
+    setPrepping(true);
+    try {
     for (const p of [...workParts, ...fabricParts]) {
       if (p.part_name && !partNames.includes(p.part_name)) await addLookup('program_lookup_part_names', p.part_name);
       if (p.fabric_name && !fabricNames.includes(p.fabric_name)) await addLookup('program_lookup_fabric_names', p.fabric_name);
     }
     for (const m of form.matchings) { if (m.matching_label && !brandNames.includes(m.matching_label)) await addLookup('program_lookup_brands', m.matching_label); }
     onSave(workParts, fabricParts);
+    } finally { setPrepping(false); }
   };
 
   const th: React.CSSProperties = { ...S.thStyle, padding: '8px 8px', fontSize: 10 };
@@ -187,7 +195,7 @@ export default function ProgramForm({ form, setField, editing, error, saving, on
           {error && !isSkuError && <div style={{ ...S.errorBox, marginTop: 12 }}>{error === 'conflictError' ? t('conflictError') : error}</div>}
           <div className="prg-actions-row" style={{ display: 'flex', gap: 8, marginTop: 16, borderTop: `1px solid ${T.bd}`, paddingTop: 16 }}>
             <button onClick={onClose} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center', cursor: 'pointer', height: 40 }}>{t('cancel')}</button>
-            <button onClick={handleSave} disabled={saving} style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.5 : 1, height: 40 }}>{saving ? t('saving') : t('save')}</button>
+            <button type="button" onClick={handleSave} disabled={busy} style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto', height: 40 }}>{busy ? t('saving') : t('save')}</button>
           </div>
         </div>
       </div>
