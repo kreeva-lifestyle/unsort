@@ -2,7 +2,7 @@
 // a live preview total (the server recomputes authoritatively on save), and
 // calls create_po_with_items / update_po_with_items. Only item name + qty are
 // mandatory (owner decision) — unit, rate and all header charges are optional.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
@@ -51,6 +51,10 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { document.body.classList.add('modal-open'); return () => { document.body.classList.remove('modal-open'); }; }, []);
+  // The error box sits at the bottom of a long scrolling sheet; on a phone the
+  // user is usually scrolled up at the failing field, so bring it into view.
+  const errRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (error) errRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [error]);
   useBackClose(true, () => onClose());
 
   // Live preview — the server is authoritative, this just mirrors its formula.
@@ -245,7 +249,7 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: T.tx, borderTop: `1px solid ${T.bd}`, paddingTop: 6, marginTop: 2 }}><span>Grand Total</span><span style={{ fontFamily: T.mono }}>₹{grand.toLocaleString('en-IN')}</span></div>
           </div>
 
-          {error && <div style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}
+          {error && <div ref={errRef} style={{ marginTop: 12, background: 'oklch(0.63 0.22 25 / .08)', border: '1px solid oklch(0.63 0.22 25 / .2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{error}</div>}
         </div>
         <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 8, justifyContent: 'flex-end', flexShrink: 0 }}>
           <button onClick={onClose} style={{ ...S.btnGhost, minHeight: 44 }}>Cancel</button>

@@ -109,7 +109,7 @@ export default function ApplyCreditModal({ challan: c, onClose, onDone, addToast
             <div style={{ border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden', marginBottom: 12, maxHeight: 220, overflowY: 'auto' }}>
               {rows.map(r => (
                 <div key={r.id} onClick={() => pick(r)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', cursor: 'pointer', borderBottom: `1px solid ${T.bd}`, background: picked?.id === r.id ? 'oklch(0.55 0.22 265 / .08)' : 'transparent', borderLeft: picked?.id === r.id ? `2px solid ${T.ac}` : '2px solid transparent' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', minHeight: 44, cursor: 'pointer', borderBottom: `1px solid ${T.bd}`, background: picked?.id === r.id ? 'oklch(0.55 0.22 265 / .08)' : 'transparent', borderLeft: picked?.id === r.id ? `2px solid ${T.ac}` : '2px solid transparent' }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.mono }}>#{r.challan_number}</span>
                   <span style={{ fontSize: 10, color: T.tx3, flex: 1 }}>{r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}</span>
                   <span style={{ fontSize: 11, fontFamily: T.mono, color: fromReturn ? T.re : T.yl, fontWeight: 600 }}>

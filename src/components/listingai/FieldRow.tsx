@@ -62,11 +62,11 @@ export default function FieldRow({ f, others, masterCols, onChange, addToast }: 
       <input type="checkbox" checked={f.mandatory} onChange={e => onChange({ mandatory: e.target.checked })} title="Mandatory" style={{ width: 15, height: 15, accentColor: T.ac, cursor: 'pointer', flexShrink: 0 }} />
       <span style={{ fontSize: 12, color: T.tx2, flex: 1, minWidth: 90, wordBreak: 'break-word' }}>{f.header}</span>
       {nAllowed > 0 && (
-        <span onClick={() => addToast(`${f.header}: ${f.allowed!.slice(0, 15).join(', ')}${nAllowed > 15 ? ` … +${nAllowed - 15} more` : ''}`, 'success')}
+        <button type="button" className="touch44" onClick={() => addToast(`${f.header}: ${f.allowed!.slice(0, 15).join(', ')}${nAllowed > 15 ? ` … +${nAllowed - 15} more` : ''}`, 'success')}
           title={f.allowed!.slice(0, 30).join(', ')}
-          style={{ padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600, background: 'oklch(0.72 0.19 145 / .1)', color: T.gr, cursor: 'pointer', flexShrink: 0 }}>
+          style={{ padding: '4px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: 'oklch(0.72 0.19 145 / .1)', color: T.gr, cursor: 'pointer', flexShrink: 0, border: 'none', fontFamily: 'inherit' }}>
           {nAllowed} options
-        </span>
+        </button>
       )}
       {nAllowed > 0 ? (<>
         <select value={f.fixed || ''} onChange={e => onChange({ fixed: e.target.value })}

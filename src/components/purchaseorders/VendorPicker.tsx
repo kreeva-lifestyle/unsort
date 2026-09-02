@@ -89,14 +89,14 @@ export default function VendorPicker({ value, onPick, addToast, disabled }: {
       {open && (suggestions.length > 0 || q.trim().length >= 1) && !disabled && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4, background: T.s2, border: `1px solid ${T.bd2}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.4)', overflow: 'hidden', maxHeight: 220, overflowY: 'auto' }}>
           {suggestions.map(v => (
-            <div key={v.id} onClick={() => pick(v)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: `1px solid ${T.bd}`, fontSize: 13, color: T.tx }}
+            <div key={v.id} role="option" aria-selected={false} onClick={() => pick(v)} style={{ padding: '8px 12px', minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', borderBottom: `1px solid ${T.bd}`, fontSize: 13, color: T.tx }}
               onMouseEnter={e => (e.currentTarget.style.background = T.glass2)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <span style={{ fontWeight: 600 }}>{v.name}</span>
               {v.phone && <span style={{ fontSize: 11, color: T.tx3, marginLeft: 8, fontFamily: T.mono }}>{v.phone}</span>}
             </div>
           ))}
           {!adding && (
-            <div onClick={() => { setAdding(true); setNewName(q); setNewPhone(''); }} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 12, color: T.ac2, fontWeight: 600 }}>
+            <div onClick={() => { setAdding(true); setNewName(q); setNewPhone(''); }} style={{ padding: '8px 12px', minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 12, color: T.ac2, fontWeight: 600 }}>
               + Add new vendor{q.trim() ? ` "${q.trim()}"` : ''}
             </div>
           )}

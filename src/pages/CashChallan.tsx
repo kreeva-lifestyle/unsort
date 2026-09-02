@@ -1576,11 +1576,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 12 }}>No phone saved for <strong style={{ color: T.tx }}>{reminderChallan.customer_name}</strong>. Enter a 10-digit mobile to send reminder:</div>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
               <span style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.bd2}`, borderRight: 'none', borderRadius: '6px 0 0 6px', fontSize: 14, color: T.tx3, fontFamily: T.mono }}>+91</span>
-              <input type="tel" value={reminderPhone} onChange={e => setReminderPhone(e.target.value)} placeholder="9876543210" autoFocus style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: '0 6px 6px 0', color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
+              <input type="tel" value={reminderPhone} onChange={e => setReminderPhone(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && reminderPhone.trim()) { e.preventDefault(); saveReminderPhone(); } }} enterKeyHint="send" placeholder="9876543210" autoFocus style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.bd2}`, borderRadius: '0 6px 6px 0', color: T.tx, fontFamily: T.mono, fontSize: 14, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }} />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setReminderChallan(null)} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${T.ac3}`, fontSize: 11, fontWeight: 500, background: T.ac3, color: T.ac2, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={saveReminderPhone} disabled={!reminderPhone.trim()} style={{ ...S.btnSuccessSolid, flex: 1, padding: '8px 0', fontSize: 11, opacity: reminderPhone.trim() ? 1 : 0.3, cursor: reminderPhone.trim() ? 'pointer' : 'not-allowed' }}>Send</button>
+              <button type="button" onClick={() => setReminderChallan(null)} style={{ flex: 1, padding: '8px 0', minHeight: 44, borderRadius: 6, border: `1px solid ${T.ac3}`, fontSize: 12, fontWeight: 500, background: T.ac3, color: T.ac2, cursor: 'pointer' }}>Cancel</button>
+              <button type="button" onClick={saveReminderPhone} disabled={!reminderPhone.trim()} style={{ ...S.btnSuccessSolid, flex: 1, padding: '8px 0', minHeight: 44, fontSize: 12, opacity: reminderPhone.trim() ? 1 : 0.3, cursor: reminderPhone.trim() ? 'pointer' : 'not-allowed' }}>Send</button>
             </div>
           </div>
         </div>
