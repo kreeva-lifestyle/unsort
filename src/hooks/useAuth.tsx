@@ -1,7 +1,19 @@
 // Auth state hook + provider
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { supabase } from '../lib/supabase';
-import { isFaceIdEnrolledFor, isAppLocked, lockApp, unlockApp, verifyFaceId, getFaceIdEnrollment, disableFaceId } from '../lib/faceId';
+import { isFaceIdEnrolledFor, isAppLocked, lockApp, unlockApp, verifyFaceId, getFaceIdEnrollment, disableFaceId, hasStoredSession, clearFaceIdFails } from '../lib/faceId';
+import { runBeforeSignOut } from '../lib/beforeSignOut';
+
+// A refresh that failed because the NETWORK failed, not because the session
+// was rejected. auth-js tags these as retryable; offline is the common case.
+const isTransientAuthError = (err: unknown): boolean => {
+  const e = err as { name?: string; status?: number; message?: string } | null;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  if (!e) return false;
+  if (e.name === 'AuthRetryableFetchError') return true;
+  if (e.status === 0 || e.status === 502 || e.status === 503 || e.status === 504) return true;
+  return /failed to fetch|load failed|network|timed? ?out|fetch/i.test(e.message || '');
+};
 
 interface AuthContextValue {
   user: any;
@@ -13,7 +25,7 @@ interface AuthContextValue {
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   lockNow: () => void;
-  unlockWithFaceId: () => Promise<{ error?: string }>;
+  unlockWithFaceId: () => Promise<{ error?: string; code?: string }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -34,7 +46,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [ready, setReady] = useState(false);
   // Face ID lock: the session survives on-device; the UI gates on `locked`
   // until the platform authenticator verifies the user (or email re-auth).
-  const [locked, setLocked] = useState(() => isAppLocked() && !!getFaceIdEnrollment());
+  // Locked only when there is something to unlock: an enrolment AND a kept
+  // session. A stale lock flag with no session used to show a Face ID button
+  // that could never succeed.
+  const [locked, setLocked] = useState(() => {
+    const l = isAppLocked() && !!getFaceIdEnrollment() && hasStoredSession();
+    if (!l && isAppLocked()) { unlockApp(); try { localStorage.setItem('signOutReason', 'session_expired'); } catch {} }
+    return l;
+  });
+  const lockedRef = useRef(locked);
+  lockedRef.current = locked;
 
   useEffect(() => {
     let mounted = true;
@@ -76,8 +97,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (mounted) { setLoading(false); setReady(true); clearTimeout(timeout); }
     }).catch(() => { if (mounted) { setLoading(false); setReady(true); clearTimeout(timeout); } });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
+      // The kept session died while the app sat locked (refresh token revoked
+      // or expired in the background): drop the lock and explain, instead of
+      // offering a Face ID prompt over nothing.
+      if (event === 'SIGNED_OUT' && lockedRef.current) {
+        unlockApp(); setLocked(false);
+        try { localStorage.setItem('signOutReason', 'session_expired'); } catch {}
+      }
       if (session?.user) {
         setUser(session.user);
         // Startup fires INITIAL_SESSION right after the load above fetched
@@ -101,17 +129,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     // A full email re-auth always clears the biometric lock.
     if (!error) {
-      unlockApp(); setLocked(false);
+      unlockApp(); setLocked(false); clearFaceIdFails();
+      try { localStorage.removeItem('signOutReason'); } catch {}
       // If a DIFFERENT user's Face ID enrollment is still on this device, drop
-      // it — otherwise the login screen keeps offering a stranger's Face ID.
-      try {
-        const { data: { user: u } } = await supabase.auth.getUser();
-        const enr = getFaceIdEnrollment();
-        if (u && enr && enr.userId !== u.id) disableFaceId();
-      } catch { /* non-fatal */ }
+      // it — otherwise the lock screen shows a stranger's email and offers
+      // their Face ID. The signed-in user comes straight from the sign-in
+      // response, so there is no second request that could fail silently.
+      const enr = getFaceIdEnrollment();
+      if (data?.user && enr && enr.userId !== data.user.id) disableFaceId();
     }
     return { error };
   };
@@ -124,8 +152,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // With Face ID enrolled for this user, "sign out" LOCKS the app (session
   // stays on-device so biometric unlock is instant). Disabling Face ID in
   // Profile settings restores the full sign-out behavior.
+  // The ONE sign-out. With Face ID enrolled for this user it locks (session
+  // kept, nothing to flush); otherwise module queues flush under this user
+  // first, then the session is destroyed.
   const signOut = async () => {
-    if (user && isFaceIdEnrolledFor(user.id)) { lockApp(); setLocked(true); return; }
+    if (user && isFaceIdEnrolledFor(user.id)) {
+      if (!lockApp()) { await supabase.auth.signOut(); return; }   // storage blocked: fall back to a real sign-out
+      setLocked(true);
+      return;
+    }
+    await runBeforeSignOut();
     await supabase.auth.signOut();
   };
 
@@ -135,7 +171,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // before lifting the lock. The biometric alone is not enough: a session that
   // expired, or an account DEACTIVATED while the app sat locked, must fail
   // closed to email login rather than unlock back into live data.
-  const unlockWithFaceId = async (): Promise<{ error?: string }> => {
+  const unlockWithFaceId = async (): Promise<{ error?: string; code?: string }> => {
     // Gate on the ENROLLMENT, not on `user`: at a cold start the kept session
     // is still being restored in the background, so `user` is null for the
     // first seconds — the old check raced that restore and answered "Session
@@ -145,27 +181,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const enr = getFaceIdEnrollment();
     if (!enr) return { error: 'Face ID is not set up on this device.' };
     const res = await verifyFaceId();
-    if (!res.ok) return { error: res.error };
+    if (!res.ok) return { error: res.error, code: res.code };
     // Re-validate the kept session server-side.
     const failClosed = async (reason: string, msg: string) => {
       try { localStorage.setItem('signOutReason', reason); } catch {}
       await supabase.auth.signOut();
       unlockApp(); setLocked(false);
-      return { error: msg };
+      return { error: msg, code: 'session' as const };
     };
     const { data: refreshed, error: refErr } = await supabase.auth.refreshSession();
+    if (refErr && isTransientAuthError(refErr)) {
+      // No network: keep the session and the lock; the user retries when online.
+      return { error: "No connection — try Face ID again when you're online.", code: 'offline' as const };
+    }
     if (refErr || !refreshed?.session?.user) {
       return failClosed('session_expired', 'Your session has expired — sign in with email to continue.');
     }
     if (refreshed.session.user.id !== enr.userId) {
       return failClosed('session_expired', 'This device is set up for a different account — sign in with email.');
     }
-    const { data: prof } = await supabase.from('profiles').select('is_active').eq('id', refreshed.session.user.id).maybeSingle();
+    const { data: prof, error: profErr } = await supabase.from('profiles').select('is_active').eq('id', refreshed.session.user.id).maybeSingle();
+    if (profErr) {
+      if (isTransientAuthError(profErr)) return { error: "No connection — try Face ID again when you're online.", code: 'offline' as const };
+      return failClosed('session_expired', 'Could not verify your account — sign in with email.');
+    }
     if (prof && prof.is_active === false) {
       return failClosed('deactivated', 'This account has been deactivated.');
     }
     setUser(refreshed.session.user);
-    unlockApp(); setLocked(false);
+    unlockApp(); setLocked(false); clearFaceIdFails();
+    try { localStorage.removeItem('signOutReason'); } catch {}
     return {};
   };
 
@@ -180,10 +225,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       supabase.auth.signOut();
     };
     const resetTimer = () => { clearTimeout(timer); timer = setTimeout(expire, 30 * 60 * 1000); };
-    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
-    events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }));
+    // Capture phase: `scroll` does not bubble and every list scrolls inside
+    // <main> or a sheet, so a listener on window only ever saw touch/mouse.
+    const events = ['mousedown', 'pointerdown', 'keydown', 'scroll', 'wheel', 'touchstart'];
+    events.forEach(e => window.addEventListener(e, resetTimer, { passive: true, capture: true }));
     resetTimer();
-    return () => { clearTimeout(timer); events.forEach(e => window.removeEventListener(e, resetTimer)); };
+    return () => { clearTimeout(timer); events.forEach(e => window.removeEventListener(e, resetTimer, { capture: true })); };
   }, [user, locked]);
 
   return <AuthContext.Provider value={{ user, profile, loading, ready, locked, signIn, signUp, signOut, lockNow, unlockWithFaceId }}>{children}</AuthContext.Provider>;
