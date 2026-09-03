@@ -317,7 +317,10 @@ const AppContent = () => {
 
   // Password recovery callback — Supabase redirects with #access_token=...&type=recovery
   const hash = window.location.hash;
-  if (hash.includes('type=recovery')) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><PubScroll><LazyPasswordReset /></PubScroll></Suspense>;
+  // A real recovery link carries a token; and a locked device must pass
+  // Face ID before it can reach a form that changes the kept session's password.
+  const isRecovery = hash.includes('type=recovery') && /(access_token=|code=)/.test(hash);
+  if (isRecovery && !auth?.locked) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><PubScroll><LazyPasswordReset /></PubScroll></Suspense>;
 
   // Public share route — no auth required, rendered before login gate
   const shareMatch = hash.match(/^#\/share\/program\/([a-f0-9]+)$/);

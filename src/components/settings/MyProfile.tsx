@@ -1,7 +1,7 @@
 // Personal settings (Phone + Cash PIN) — accessible to every authenticated user.
 // Extracted from Users.tsx so operators/viewers can set their own PIN without
 // needing admin privileges, which was blocking cash-handover confirmation.
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
@@ -21,9 +21,17 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneSaving, setPhoneSaving] = useState(false);
   const [faceSupported, setFaceSupported] = useState(false);
-  const [faceEnrolled, setFaceEnrolled] = useState(() => { const e = getFaceIdEnrollment(); return !!e && e.userId === profile?.id; });
-  const [faceEnrolledAt, setFaceEnrolledAt] = useState(() => getFaceIdEnrollment()?.enrolledAt || '');
+  const [faceEnrolled, setFaceEnrolled] = useState(false);
+  const [faceEnrolledAt, setFaceEnrolledAt] = useState('');
   const [faceBusy, setFaceBusy] = useState(false);
+  const faceInFlight = useRef(false);
+  // Derived from the loaded profile, not from a mount-time read that ran
+  // before the profile existed and showed "Off" for an enrolled user.
+  useEffect(() => {
+    const e = getFaceIdEnrollment();
+    const mine = !!e && !!profile?.id && e.userId === profile.id;
+    setFaceEnrolled(mine); setFaceEnrolledAt(mine ? e!.enrolledAt : '');
+  }, [profile?.id]);
   const [changingPwd, setChangingPwd] = useState(false);
   const [pwd, setPwd] = useState('');
   const [pwdConfirm, setPwdConfirm] = useState('');
@@ -43,19 +51,21 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
   useEffect(() => { faceIdSupported().then(setFaceSupported); }, []);
 
   const handleEnableFaceId = async () => {
-    if (faceBusy) return;
-    setFaceBusy(true);
-    const res = await enrollFaceId({ id: profile.id, email: profile.email, full_name: profile.full_name });
-    setFaceBusy(false);
-    if (!res.ok) { addToast(res.error || 'Face ID setup failed', 'error'); return; }
-    setFaceEnrolled(true);
-    setFaceEnrolledAt(getFaceIdEnrollment()?.enrolledAt || new Date().toISOString());
-    addToast('Face ID enabled — you can now unlock with Face ID on this device', 'success');
+    if (faceInFlight.current || !profile?.id) return;
+    faceInFlight.current = true; setFaceBusy(true);
+    try {
+      const res = await enrollFaceId({ id: profile.id, email: profile.email, full_name: profile.full_name });
+      if (!res.ok) { addToast(res.error || 'Face ID setup failed', 'error'); return; }
+      setFaceEnrolled(true);
+      setFaceEnrolledAt(getFaceIdEnrollment()?.enrolledAt || new Date().toISOString());
+      addToast('Face ID enabled — you can now unlock with Face ID on this device', 'success');
+    } catch (e) { addToast(friendlyError(e), 'error'); }
+    finally { faceInFlight.current = false; setFaceBusy(false); }
   };
 
   const handleDisableFaceId = async () => {
     if (!await ask({ title: 'Disable Face ID?', message: 'Signing out will fully log you out again, and the login page will only offer email sign-in on this device.', confirmLabel: 'Disable', danger: true })) return;
-    disableFaceId();
+    if (!disableFaceId()) { addToast('Could not remove the Face ID setup — storage is blocked on this device', 'error'); return; }
     setFaceEnrolled(false);
     addToast('Face ID disabled on this device', 'success');
   };
@@ -206,7 +216,7 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
             <button onClick={handleDisableFaceId} style={S.btnDanger}>Disable Face ID</button>
           </div>
         ) : faceSupported ? (
-          <button onClick={handleEnableFaceId} disabled={faceBusy} style={{ ...S.btnPrimary, opacity: faceBusy ? 0.6 : 1 }}>{faceBusy ? 'Waiting for Face ID…' : 'Enable Face ID'}</button>
+          <button type="button" onClick={handleEnableFaceId} disabled={faceBusy || !profile?.id} style={{ ...S.btnPrimary, opacity: faceBusy || !profile?.id ? 0.5 : 1, pointerEvents: faceBusy ? 'none' : 'auto' }}>{faceBusy ? 'Waiting for Face ID…' : 'Enable Face ID'}</button>
         ) : (
           <div style={{ fontSize: 11, color: T.tx3, fontStyle: 'italic' as const }}>Not available on this device or browser. Requires Face ID, Touch ID or Windows Hello.</div>
         )}

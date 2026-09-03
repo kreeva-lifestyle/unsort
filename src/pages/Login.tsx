@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { T, S } from '../lib/theme';
 import { supabase } from '../lib/supabase';
-import { getFaceIdEnrollment } from '../lib/faceId';
+import { getFaceIdEnrollment, faceIdOffered as faceIdOfferedNow } from '../lib/faceId';
 
 const friendlyAuthError = (raw: string): string => {
   const m = (raw || '').toLowerCase();
@@ -15,7 +15,7 @@ const friendlyAuthError = (raw: string): string => {
 export default function Login({ signIn, locked, unlockWithFaceId }: {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   locked?: boolean;
-  unlockWithFaceId?: () => Promise<{ error?: string }>;
+  unlockWithFaceId?: () => Promise<{ error?: string; code?: string }>;
 }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,29 +25,44 @@ export default function Login({ signIn, locked, unlockWithFaceId }: {
   const [forgotSending, setForgotSending] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [info, setInfo] = useState('');
-  // Two-option entry: when Face ID is enrolled on this device the user picks
-  // how to sign in; otherwise straight to the email form.
+  // Two-option entry: Face ID is offered only when it can work — an
+  // enrolment AND a kept session on this device. Re-read every render so the
+  // button disappears the moment the session is gone.
   const enrollment = getFaceIdEnrollment();
-  const faceIdOffered = !!enrollment && !!unlockWithFaceId;
+  const faceIdOffered = faceIdOfferedNow() && !!unlockWithFaceId;
   const [mode, setMode] = useState<'choose' | 'email'>(faceIdOffered ? 'choose' : 'email');
   const [faceBusy, setFaceBusy] = useState(false);
+  // Ref, not state: two taps in the same tick both read stale state and
+  // start two OS prompts (WebKit then aborts the first as "cancelled").
+  const inFlight = useRef(false);
+  useEffect(() => { if (!faceIdOffered) setMode('email'); }, [faceIdOffered]);
 
   const handleFaceId = async () => {
-    if (!unlockWithFaceId || faceBusy) return;
-    setError(''); setFaceBusy(true);
-    const res = await unlockWithFaceId();
-    // On success the app unlocks instantly (no navigation needed here).
-    if (res.error) setError(res.error);
-    setFaceBusy(false);
+    if (!unlockWithFaceId || inFlight.current) return;
+    inFlight.current = true;
+    setError(''); setInfo(''); setFaceBusy(true);
+    try {
+      const res = await unlockWithFaceId();
+      // On success the app unlocks instantly (no navigation needed here).
+      if (res.error) {
+        // Session problems are information (blue), prompt problems are errors (red).
+        if (res.code === 'session' || res.code === 'offline') setInfo(res.error);
+        else setError(res.error);
+        if (res.code === 'too_many' || res.code === 'session' || res.code === 'mismatch' || res.code === 'wrong_host') setMode('email');
+      }
+    } finally { setFaceBusy(false); inFlight.current = false; }
   };
 
+  // The reason banner is read at mount AND whenever the lock/offer state
+  // changes: the login stays mounted across "locked → session gone", so a
+  // mount-only read showed the message on a later visit instead of now.
   useEffect(() => {
     try {
       const reason = localStorage.getItem('signOutReason');
       if (reason === 'session_expired') { setInfo('Session expired — please sign in again.'); localStorage.removeItem('signOutReason'); }
       else if (reason === 'deactivated') { setInfo('Your access was revoked — contact your admin.'); localStorage.removeItem('signOutReason'); }
     } catch {}
-  }, []);
+  }, [locked, faceIdOffered]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

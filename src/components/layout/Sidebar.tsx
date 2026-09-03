@@ -1,8 +1,7 @@
-import { supabase } from '../../lib/supabase';
+import { useState } from 'react';
 import { T, Icon } from '../../lib/theme';
 import { canAccessTab } from '../../lib/tabs';
-import { isFaceIdEnrolledFor, lockApp } from '../../lib/faceId';
-import { runBeforeSignOut } from '../../lib/beforeSignOut';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }: { activeTab: string; setActiveTab: (t: string) => void; profile: any; collapsed?: boolean }) {
   const tabs = [
@@ -20,14 +19,16 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
     ...(profile ? [{ id: 'settings', icon: 'settings', label: 'Settings' }] : []),
   ].filter(t => canAccessTab(profile?.role, t.id, profile?.module_access));
 
+  const { signOut } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+  // useAuth.signOut is the one implementation: lock when Face ID is enrolled
+  // for the signed-in user (session kept), full sign-out otherwise (module
+  // queues flush first). The reload clears every page's in-memory state.
   const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
     try { localStorage.removeItem('ccDraft'); } catch {}
-    // Let module-level queues (PackTime sheet sync) flush under THIS user first.
-    await runBeforeSignOut();
-    // Face ID enrolled: LOCK instead of signing out — the session stays on
-    // this device so unlock is one biometric prompt with zero network.
-    if (profile?.id && isFaceIdEnrolledFor(profile.id)) { lockApp(); window.location.reload(); return; }
-    try { await supabase.auth.signOut(); } catch {}
+    try { await signOut(); } catch {}
     window.location.reload();
   };
 
@@ -60,11 +61,11 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
 
       {/* Sign out */}
       <div style={{ padding: '12px 10px 16px', borderTop: `1px solid ${T.bd}`, marginTop: 'auto' }}>
-        <div onClick={handleSignOut} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', borderRadius: 8, cursor: 'pointer', color: T.tx3, fontSize: 13, fontWeight: 400, transition: 'all .15s' }}
+        <div onClick={handleSignOut} role="button" aria-disabled={signingOut} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', borderRadius: 8, cursor: signingOut ? 'default' : 'pointer', color: T.tx3, fontSize: 13, fontWeight: 400, transition: 'all .15s', opacity: signingOut ? 0.5 : 1, pointerEvents: signingOut ? 'none' : 'auto' }}
           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = T.tx2; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx3; }}>
           <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }}><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" /></svg>
-          Logout
+          {signingOut ? 'Signing out…' : 'Logout'}
         </div>
         <p style={{ margin: '10px 0 0', fontSize: 8, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' as const, textAlign: 'center', opacity: 0.3 }}>DailyOffice</p>
       </div>
