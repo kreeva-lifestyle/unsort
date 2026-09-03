@@ -65,6 +65,8 @@ export type ChallanFormProps = {
   subtotal: number;
   totalDiscount: number;
   roundOff: number;
+  manualRoundOff: number | null;   // null = automatic (nearest rupee)
+  setManualRoundOff: (v: number | null) => void;
   grandTotal: number;
   // Audit trail
   auditTrail: AuditLog[] | null;
@@ -78,6 +80,14 @@ export type ChallanFormProps = {
 };
 
 export default function ChallanForm(p: ChallanFormProps) {
+  // Text mirror of the manual round-off so '-' and '2.' can be typed freely;
+  // the numeric value goes to the parent only once the text parses.
+  const [roundOffText, setRoundOffText] = useState('');
+  useEffect(() => {
+    if (p.manualRoundOff === null) { setRoundOffText(''); return; }
+    if (Number(roundOffText) !== p.manualRoundOff) setRoundOffText(String(p.manualRoundOff));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.manualRoundOff]);
   const { addToast } = useNotifications();
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
   // Last price THIS FORM auto-filled, per row. Lets a corrected SKU replace
@@ -429,7 +439,29 @@ export default function ChallanForm(p: ChallanFormProps) {
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.tx2, marginBottom: 4 }}><span>Subtotal</span><span style={{ fontFamily: T.mono }}>₹{p.subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>
           {p.totalDiscount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.re, marginBottom: 4 }}><span>Item Discounts{p.totalDiscount > p.subtotal ? ' (over subtotal)' : ''}</span><span style={{ fontFamily: T.mono }}>-₹{p.totalDiscount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}{p.subtotal > 0 ? ` (${(p.totalDiscount / p.subtotal * 100).toFixed(1).replace(/\.0$/, '')}%)` : ''}</span></div>}
           {!p.isReturn && p.shippingCharges > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.bl, marginBottom: 4 }}><span>Shipping/Porter</span><span style={{ fontFamily: T.mono }}>+₹{p.shippingCharges.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>}
-          {p.roundOff !== 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.tx3, marginBottom: 4 }}><span>Round Off</span><span style={{ fontFamily: T.mono }}>{p.roundOff > 0 ? '+' : ''}₹{p.roundOff.toFixed(2)}</span></div>}
+          {/* Round off: automatic to the nearest rupee, or typed by hand (owner's
+              ask — bring ₹2,043 to ₹2,040/₹2,050). Manual values persist
+              through edits; Auto returns to the computed figure. */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 11, color: T.tx3, marginBottom: 4 }}>
+            <span>Round Off{p.manualRoundOff !== null && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: T.yl, letterSpacing: '0.06em' }}>MANUAL</span>}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              {p.manualRoundOff === null ? (
+                <>
+                  <span style={{ fontFamily: T.mono }}>{p.roundOff > 0 ? '+' : ''}₹{p.roundOff.toFixed(2)}</span>
+                  <button type="button" className="touch44" onClick={() => { setRoundOffText(p.roundOff.toFixed(2)); p.setManualRoundOff(p.roundOff); }} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 28 }} aria-label="Edit round off">Edit</button>
+                </>
+              ) : (
+                <>
+                  <input type="number" step="0.01" inputMode="decimal" value={roundOffText} aria-label="Round off amount"
+                    onKeyDown={e => numericKeyDown(e, true)}
+                    onChange={e => { const v = e.target.value; setRoundOffText(v); const n = Number(v); if (v.trim() !== '' && Number.isFinite(n)) p.setManualRoundOff(Math.round(n * 100) / 100); }}
+                    onBlur={() => { if (roundOffText.trim() === '' || !Number.isFinite(Number(roundOffText))) { setRoundOffText('0'); p.setManualRoundOff(0); } }}
+                    style={{ ...S.fInput, width: 96, height: 32, padding: '4px 8px', fontFamily: T.mono, textAlign: 'right' as const, fontSize: 13 }} />
+                  <button type="button" className="touch44" onClick={() => p.setManualRoundOff(null)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 28 }} aria-label="Automatic round off">Auto</button>
+                </>
+              )}
+            </span>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: p.grandTotal < 0 ? T.re : T.gr, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8, marginTop: 4 }}><span>Total</span><span>{p.grandTotal < 0 ? '−' : ''}₹{Math.abs(p.grandTotal).toLocaleString('en-IN')}</span></div>
           {p.grandTotal < 0 && <div style={{ marginTop: 6, fontSize: 10, color: T.re, display: 'flex', alignItems: 'center', gap: 4 }}>Total is negative — reduce discount or add items before saving.</div>}
         </div>
