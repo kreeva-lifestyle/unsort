@@ -4,11 +4,13 @@ import { T, S } from '../../../lib/theme';
 import { numericKeyDown } from '../../../lib/numericInput';
 import { CostingProduct, money, num } from './costingModel';
 
-export default function CostingHero({ p, total, uploading, onSku, onSelling, onFile }: {
+export default function CostingHero({ p, total, uploading, categories, onSku, onCategory, onSelling, onFile }: {
   p: CostingProduct;
   total: number;
   uploading: boolean;
+  categories: string[];
   onSku: (v: string) => void;
+  onCategory: (v: string) => void;
   onSelling: (v: string) => void;
   onFile: (f: File | undefined) => void;
 }) {
@@ -26,6 +28,15 @@ export default function CostingHero({ p, total, uploading, onSku, onSelling, onF
       <div style={{ flex: 1, minWidth: 130 }}>
         <input id="cost-f-sku" value={p.sku} onChange={e => onSku(e.target.value)}
           placeholder="SKU *" style={{ ...S.fInput, width: '100%', textTransform: 'uppercase', fontFamily: T.mono, fontWeight: 700 }} />
+        {/* Category comes from Settings → Categories and is compulsory (the
+            Price Projector keys its thresholds by it). A stored value that is
+            no longer in Settings stays selectable so old sheets still open. */}
+        <select id="cost-f-category" value={p.category || ''} onChange={e => onCategory(e.target.value)} aria-label="Category" required
+          style={{ ...S.fInput, width: '100%', marginTop: 6, cursor: 'pointer', color: p.category ? T.tx : T.tx3 }}>
+          <option value="">Category *</option>
+          {p.category && !categories.includes(p.category) && <option value={p.category}>{p.category}</option>}
+          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
         <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>{p.components.length} component{p.components.length === 1 ? '' : 's'} · {lines} line{lines === 1 ? '' : 's'}</div>
       </div>
       <div style={{ textAlign: 'right' }}>

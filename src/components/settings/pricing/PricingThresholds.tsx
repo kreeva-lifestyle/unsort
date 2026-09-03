@@ -5,7 +5,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { numericKeyDown } from '../../../lib/numericInput';
-import { useProductCatalog } from '../../../hooks/useProductCatalog';
+import { useSettingsCategories } from '../../minis/costing/useSettingsCategories';
 import { PricingThresholds as Thresholds, Threshold, PRICING_KEYS, savePricingKey } from '../../minis/pricing/pricingConfig';
 
 const card: React.CSSProperties = { background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16, marginBottom: 16 };
@@ -15,12 +15,15 @@ const toDraft = (t: Threshold | undefined) => ({ minMarginPct: t?.minMarginPct =
 const fromDraft = (d: { minMarginPct: string; maxCost: string }): Threshold => ({ minMarginPct: d.minMarginPct.trim() === '' ? null : Number(d.minMarginPct), maxCost: d.maxCost.trim() === '' ? null : Number(d.maxCost) });
 
 export default function PricingThresholds({ thresholds, addToast, onSaved }: { thresholds: Thresholds; addToast: (m: string, t?: string) => void; onSaved: (t: Thresholds) => void }) {
-  const { index } = useProductCatalog();
+  // Rows come from Settings → Categories (the same list the costing sheet
+  // and the projector use); keys are upper-cased so 'Lehenga Choli' and
+  // 'LEHENGA CHOLI' are one rule.
+  const { categories: settingsCats } = useSettingsCategories(addToast);
   const categories = useMemo(() => {
     const set = new Set<string>(Object.keys(thresholds.byCategory));
-    for (const p of index?.all || []) { const c = (p.category || '').trim().toUpperCase(); if (c) set.add(c); }
+    for (const c of settingsCats) { const k = c.trim().toUpperCase(); if (k) set.add(k); }
     return [...set].sort();
-  }, [index, thresholds.byCategory]);
+  }, [settingsCats, thresholds.byCategory]);
   const [draft, setDraft] = useState<Draft>(() => {
     const d: Draft = { [DEFAULT_KEY]: toDraft(thresholds.default) };
     for (const c of Object.keys(thresholds.byCategory)) d[c] = toDraft(thresholds.byCategory[c]);
@@ -65,7 +68,7 @@ export default function PricingThresholds({ thresholds, addToast, onSaved }: { t
           </Fragment>
         ))}
       </div>
-      {categories.length === 0 && <div style={{ fontSize: 11, color: T.tx3, marginTop: 8 }}>Catalog categories appear here once the master sheet has synced.</div>}
+      {categories.length === 0 && <div style={{ fontSize: 11, color: T.tx3, marginTop: 8 }}>Add categories in Settings → Categories to set a rule per category.</div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
         <button type="button" onClick={save} disabled={saving} style={{ ...S.btnPrimary, minHeight: 40, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save thresholds'}</button>
       </div>

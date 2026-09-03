@@ -21,6 +21,7 @@ import PrintPreview from './PrintPreview';
 import { purchasePlanHtml } from './purchasePlan';
 import { costingSheetHtml } from './costingSheet';
 import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
+import { useSettingsCategories } from './useSettingsCategories';
 
 export default function CostingEditor({ product, saved, library, topSubs, onSaved, onBack, addToast }: {
   product: CostingProduct;
@@ -40,6 +41,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
   // Owner's flow: pieces to make -> totals and purchase plan use the same number.
   const [pieces, setPieces] = useState('');
   const { ask, modalProps } = useConfirm();
+  const { categories } = useSettingsCategories(addToast);
   // A saved, complete component starts folded (compact overview); anything
   // new or with problems starts open. Computed once at mount.
   const [openDefaults] = useState<boolean[]>(() => product.components.map(c =>
@@ -80,7 +82,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
     // snap to their one existing spelling ("cups" == "CUPS" == "Cups").
     const comps = canonicalizeNames(pruneBlank(p.components), library);
     setP(prev => ({ ...prev, components: comps }));
-    const errs = validateSheetDetailed(p.sku, comps);
+    const errs = validateSheetDetailed(p.sku, comps, p.category);
     setErrors(errs);
     if (errs.length) return;
     setSaving(true);
@@ -90,6 +92,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
         id: p.id, sku: p.sku.trim().toUpperCase(), image_url: p.image_url,
         maintenance_pct: num(p.maintenance_pct), components: comps,
         notes: p.notes, created_by: user?.id, updated_at: new Date().toISOString(),
+        category: (p.category || '').trim(),
         selling_price: String(p.selling_price ?? '').trim() ? num(p.selling_price ?? '') : null,
       };
       const { error } = await supabase.from('costing_products').upsert(row);
@@ -112,7 +115,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
     if (which === 'plan' && !(Math.floor(num(pieces)) > 0)) { addToast('Enter "Pieces to make" first — the plan is calculated from it', 'error'); return; }
     const comps = canonicalizeNames(pruneBlank(p.components), library);
     setP(prev => ({ ...prev, components: comps }));
-    const errs = validateSheetDetailed(p.sku, comps);
+    const errs = validateSheetDetailed(p.sku, comps, p.category);
     if (errs.length) { setErrors(errs); addToast('Fix the highlighted fields first', 'error'); return; }
     setErrors([]);
     (which === 'plan' ? setPlanOpen : setSheetOpen)(true);
@@ -121,8 +124,9 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
   const total = totalCost(p.components, p.maintenance_pct);
   return (
     <div style={{ fontFamily: T.sans, color: T.tx }}>
-      <CostingHero p={p} total={total} uploading={uploading}
+      <CostingHero p={p} total={total} uploading={uploading} categories={categories}
         onSku={v => setP(prev => ({ ...prev, sku: v }))}
+        onCategory={v => setP(prev => ({ ...prev, category: v }))}
         onSelling={v => setP(prev => ({ ...prev, selling_price: v }))}
         onFile={uploadImage} />
 

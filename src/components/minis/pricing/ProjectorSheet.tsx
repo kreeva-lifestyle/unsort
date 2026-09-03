@@ -9,7 +9,6 @@ import { friendlyError } from '../../../lib/friendlyError';
 import { numericKeyDown } from '../../../lib/numericInput';
 import { money, num } from '../costing/costingModel';
 import PrintPreview from '../costing/PrintPreview';
-import SuggestInput from '../../ui/SuggestInput';
 import type { PricingConfig, MaintenanceBase } from './pricingConfig';
 import { PricedProduct, ProductPricing, project } from './pricingModel';
 import { suggestions } from './suggestions';
@@ -57,8 +56,12 @@ export default function ProjectorSheet({ product, config, catalogPrice, catalogC
       </div>
 
       <div style={card}>
-        <label style={S.fLabel}>Category (for thresholds)</label>
-        <SuggestInput value={p.category || ''} onChange={v => setP(prev => ({ ...prev, category: v.toUpperCase() }))} options={categories} placeholder="e.g. LEHENGA CHOLI" style={{ ...S.fInput, width: '100%' }} />
+        <label style={S.fLabel}>Category (from Settings → Categories; drives the threshold)</label>
+        <select value={p.category || ''} onChange={e => setP(prev => ({ ...prev, category: e.target.value }))} aria-label="Category" style={{ ...S.fInput, width: '100%', cursor: 'pointer', color: p.category ? T.tx : T.tx3 }}>
+          <option value="">Select category…</option>
+          {p.category && !categories.includes(p.category) && <option value={p.category}>{p.category}</option>}
+          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
       </div>
 
       <div style={card}>

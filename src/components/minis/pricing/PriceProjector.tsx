@@ -10,6 +10,7 @@ import { SkeletonRows } from '../../ui/Skeleton';
 import Empty from '../../ui/Empty';
 import { money } from '../costing/costingModel';
 import { loadPricingConfig, PricingConfig, emptyConfig } from './pricingConfig';
+import { useSettingsCategories } from '../costing/useSettingsCategories';
 import { PricedProduct, project } from './pricingModel';
 import ProjectorSheet from './ProjectorSheet';
 
@@ -23,6 +24,7 @@ export default function PriceProjector({ addToast, navigateTo, onHome }: { addTo
   const [search, setSearch] = useState('');
   const [onlyFlagged, setOnlyFlagged] = useState(false);
   const { index } = useProductCatalog();
+  const { categories } = useSettingsCategories(addToast);
   // One back control for the whole tool: a sheet goes back to the list, the
   // list goes back to Minis. The phone's back gesture follows the same order.
   useBackClose(!!open, () => setOpen(null));
@@ -40,7 +42,6 @@ export default function PriceProjector({ addToast, navigateTo, onHome }: { addTo
   }, []);
 
   const catalogOf = (sku: string) => resolveSku(index, sku)?.product ?? null;
-  const categories = useMemo(() => { const s = new Set<string>(); for (const p of index?.all || []) { const c = (p.category || '').trim().toUpperCase(); if (c) s.add(c); } return [...s].sort(); }, [index]);
   const rows = useMemo(() => (list ?? []).map(p => {
     const cat = catalogOf(p.sku);
     const price = cat?.price_exc_gst != null ? Number(cat.price_exc_gst) : null;

@@ -15,6 +15,8 @@ export interface CostingProduct {
   maintenance_pct: number | string; components: CostingComponent[];
   notes: string;
   selling_price?: number | string | null;
+  /** Settings → Categories name (compulsory since the Price Projector keys thresholds by it). */
+  category?: string | null;
   updated_at?: string;
 }
 
@@ -87,10 +89,11 @@ export interface SheetProblem { msg: string; target: string }
 
 /** Owner's rule: main component, sub component, supplier, qty, unit and rate
  *  are compulsory. Returns human-readable problems, empty when saveable. */
-export function validateSheetDetailed(sku: string, components: CostingComponent[]): SheetProblem[] {
+export function validateSheetDetailed(sku: string, components: CostingComponent[], category?: string | null): SheetProblem[] {
   const errs: SheetProblem[] = [];
   const push = (msg: string, target: string) => errs.push({ msg, target });
   if (!sku.trim()) push('SKU is required', 'cost-f-sku');
+  if (!(category || '').trim()) push('Category is required — pick one from Settings → Categories', 'cost-f-category');
   if (components.length === 0) push('Add at least one main component', 'cost-f-sku');
   components.forEach((c, ci) => {
     const cn = c.name.trim() || `Main component ${ci + 1}`;
@@ -116,8 +119,8 @@ export function validateSheetDetailed(sku: string, components: CostingComponent[
   return errs;
 }
 
-export const validateSheet = (sku: string, components: CostingComponent[]): string[] =>
-  validateSheetDetailed(sku, components).map(e => e.msg);
+export const validateSheet = (sku: string, components: CostingComponent[], category?: string | null): string[] =>
+  validateSheetDetailed(sku, components, category).map(e => e.msg);
 
 /** Drop fully-blank sub-component lines (the keyboard flow auto-adds a fresh
  *  line after each completed one — an untouched leftover must not block save)
