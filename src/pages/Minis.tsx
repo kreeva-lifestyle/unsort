@@ -355,8 +355,9 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
   );
   if (view === 'pricing') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 14 }}>{back}</div>
-      <PriceProjector addToast={addToast} navigateTo={navigateTo} />
+      {/* No {back} here: the projector renders ONE arrow that leaves a sheet
+          first and Minis second, so a sheet never shows two back buttons. */}
+      <PriceProjector addToast={addToast} navigateTo={navigateTo} onHome={() => setView('home')} />
     </div>
   );
 

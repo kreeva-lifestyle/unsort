@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { useProductCatalog, resolveSku } from '../../../hooks/useProductCatalog';
+import { useBackClose } from '../../../hooks/useBackClose';
 import { SkeletonRows } from '../../ui/Skeleton';
 import Empty from '../../ui/Empty';
 import { money } from '../costing/costingModel';
@@ -15,13 +16,21 @@ import ProjectorSheet from './ProjectorSheet';
 const COLS = 'id, sku, image_url, maintenance_pct, components, notes, selling_price, category, pricing, updated_at';
 const DOT: Record<string, string> = { ok: T.gr, below_margin: T.re, over_cost: T.re, no_price: T.yl };
 
-export default function PriceProjector({ addToast, navigateTo }: { addToast: (m: string, t?: string) => void; navigateTo?: (tab: string) => void }) {
+export default function PriceProjector({ addToast, navigateTo, onHome }: { addToast: (m: string, t?: string) => void; navigateTo?: (tab: string) => void; onHome: () => void }) {
   const [list, setList] = useState<PricedProduct[] | null>(null);
   const [config, setConfig] = useState<PricingConfig>(emptyConfig());
   const [open, setOpen] = useState<PricedProduct | null>(null);
   const [search, setSearch] = useState('');
   const [onlyFlagged, setOnlyFlagged] = useState(false);
   const { index } = useProductCatalog();
+  // One back control for the whole tool: a sheet goes back to the list, the
+  // list goes back to Minis. The phone's back gesture follows the same order.
+  useBackClose(!!open, () => setOpen(null));
+  const backArrow = (
+    <button type="button" onClick={() => (open ? setOpen(null) : onHome())} style={{ ...S.btnGhost, padding: '6px 10px', minHeight: 36 }} aria-label={open ? 'Back to list' : 'Back to Minis'}>
+      <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+    </button>
+  );
 
   useEffect(() => {
     loadPricingConfig().then(({ config: c, error }) => { if (error) addToast('Pricing settings failed to load — ' + friendlyError(error), 'error'); setConfig(c); });
@@ -43,7 +52,7 @@ export default function PriceProjector({ addToast, navigateTo }: { addToast: (m:
   if (open) {
     const r = rows.find(x => x.p.id === open.id);
     return <ProjectorSheet product={r?.p || open} config={config} catalogPrice={r?.catalogPrice ?? null} catalogCategory={r?.catalogCategory ?? null} categories={categories} addToast={addToast}
-      onBack={() => setOpen(null)} onSaved={saved => { setList(l => (l ?? []).map(x => (x.id === saved.id ? saved : x))); setOpen(null); }} />;
+      backSlot={backArrow} onSaved={saved => { setList(l => (l ?? []).map(x => (x.id === saved.id ? saved : x))); setOpen(null); }} />;
   }
 
   const q = search.trim().toUpperCase();
@@ -58,6 +67,7 @@ export default function PriceProjector({ addToast, navigateTo }: { addToast: (m:
         </div>
       )}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        {backArrow}
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SKU or category…" style={{ ...S.fInput, flex: 1, minWidth: 160 }} />
         <button type="button" className="touch44" onClick={() => setOnlyFlagged(v => !v)} aria-pressed={onlyFlagged} style={{ ...S.btnGhost, minHeight: 36, color: onlyFlagged ? T.re : T.tx2 }}>Below threshold{flagged ? ` (${flagged})` : ''}</button>
       </div>
