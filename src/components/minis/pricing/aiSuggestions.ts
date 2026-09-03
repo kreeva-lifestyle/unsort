@@ -8,7 +8,11 @@ import { supabase, SUPABASE_ANON_KEY } from '../../../lib/supabase';
 export const AI_FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/pricing-ai';
 
 export interface AiSuggestion { title: string; detail: string; area: string; impact: 'high' | 'medium' | 'low'; savingPerPc: number | null }
-export interface AiBatch { id: string; costing_product_id: string; input_hash: string; model: string; suggestions: AiSuggestion[]; created_at: string }
+export interface AiUsage { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number }
+export interface AiBatch { id: string; costing_product_id: string; input_hash: string; model: string; suggestions: AiSuggestion[]; created_at: string; usage?: AiUsage | null; est_usd?: number | null }
+
+/** "$0.0042" — four decimals because one Haiku call is a fraction of a cent. */
+export const usd = (n: number | null | undefined) => (n == null ? '—' : `$${Number(n).toFixed(4)}`);
 
 const canonical = (v: unknown): string => {
   if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
@@ -24,7 +28,7 @@ export async function inputHash(facts: unknown): Promise<string> {
 
 export async function loadAiBatch(productId: string): Promise<{ batch: AiBatch | null; error: unknown }> {
   const { data, error } = await supabase.from('pricing_ai_suggestions')
-    .select('id, costing_product_id, input_hash, model, suggestions, created_at')
+    .select('id, costing_product_id, input_hash, model, suggestions, created_at, usage, est_usd')
     .eq('costing_product_id', productId).order('created_at', { ascending: false }).limit(1).maybeSingle();
   return { batch: (data as AiBatch | null) ?? null, error };
 }

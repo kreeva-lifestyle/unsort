@@ -25,8 +25,15 @@ const fail = (status: number, error: string, req: Request, details?: string) => 
 const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SB_SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const svcHeaders = { apikey: SB_SVC, authorization: `Bearer ${SB_SVC}` };
-const MODELS: Record<string, true> = { 'claude-haiku-4-5': true, 'claude-sonnet-5': true, 'claude-opus-4-8': true };
+// USD per million tokens (input / output) — same table as listing-ai.
+const MODELS: Record<string, { in: number; out: number }> = { 'claude-haiku-4-5': { in: 1, out: 5 }, 'claude-sonnet-5': { in: 3, out: 15 }, 'claude-opus-4-8': { in: 5, out: 25 } };
 const DEFAULT_MODEL = 'claude-haiku-4-5';
+interface Usage { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
+const estUsdOf = (model: string, u: Usage): number => {
+  const p = MODELS[model] || MODELS[DEFAULT_MODEL];
+  const usd = (u.input_tokens * p.in + u.cache_creation_input_tokens * p.in * 1.25 + u.cache_read_input_tokens * p.in * 0.1 + u.output_tokens * p.out) / 1e6;
+  return Math.round(usd * 10000) / 10000;
+};
 
 async function getSecret(key: string): Promise<string | null> {
   const r = await fetch(`${SB_URL}/rest/v1/app_secrets?key=eq.${encodeURIComponent(key)}&select=value`, { headers: svcHeaders });
@@ -100,15 +107,18 @@ Deno.serve(async (req) => {
   const suggestions = clean(parsed);
   if (suggestions.length === 0) return fail(502, 'The model returned nothing usable — try again', req, text.slice(0, 300));
 
+  const u = data?.usage || {};
+  const usage: Usage = { input_tokens: u.input_tokens || 0, output_tokens: u.output_tokens || 0, cache_read_input_tokens: u.cache_read_input_tokens || 0, cache_creation_input_tokens: u.cache_creation_input_tokens || 0 };
+  const estUsd = estUsdOf(model, usage);
+
   // Replace the product's batch: old rows out, new row in (service role).
   const del = await fetch(`${SB_URL}/rest/v1/pricing_ai_suggestions?costing_product_id=eq.${productId}`, { method: 'DELETE', headers: svcHeaders });
   if (!del.ok) return fail(500, 'Could not clear the previous suggestions', req, await del.text());
   const ins = await fetch(`${SB_URL}/rest/v1/pricing_ai_suggestions`, {
     method: 'POST', headers: { ...svcHeaders, 'content-type': 'application/json', prefer: 'return=representation' },
-    body: JSON.stringify({ costing_product_id: productId, input_hash: inputHash, model, suggestions, created_by: who.id }),
+    body: JSON.stringify({ costing_product_id: productId, input_hash: inputHash, model, suggestions, created_by: who.id, usage, est_usd: estUsd }),
   });
   const rows = await ins.json().catch(() => []);
   if (!ins.ok || !rows?.[0]) return fail(500, 'Could not save the suggestions', req, JSON.stringify(rows).slice(0, 300));
-  const u = data?.usage || {};
-  return json({ ok: true, row: rows[0], model, usage: { input_tokens: u.input_tokens || 0, output_tokens: u.output_tokens || 0 } }, req);
+  return json({ ok: true, row: rows[0], model, usage, estUsd }, req);
 });
