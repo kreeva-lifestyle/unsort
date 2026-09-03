@@ -5,18 +5,17 @@
 //                        unit — Meter/Yard lines are fabric, the rest material)
 //   stitching          : the Settings cost heads (per piece / per fabric
 //                        meter / % of material), each overridable per product
-//   maintenance        : the sheet's maintenance % on materials only (what the
-//                        costing sheet has always meant) or on everything
+//   maintenance        : the sheet's maintenance % on the WHOLE cost —
+//                        fabric + material + stitching (owner's rule)
 // target price (ex GST) = (cost + fixed profit) / (1 − profit% / 100)
 // margin% = (price − cost) / price   ← margin on price, as the costing hero shows
 import { CostingProduct, CostingSub, num, subCost, selectedSupplier } from '../costing/costingModel';
-import type { PricingConfig, StitchHead, Threshold, MaintenanceBase } from './pricingConfig';
+import type { PricingConfig, StitchHead, Threshold } from './pricingConfig';
 
 export interface ProductPricing {
   stitching?: Record<string, { enabled?: boolean; qty?: number | null; rate?: number | null }>;
   profit?: { pct?: number | null; fixed?: number | null };
   thresholds?: { minMarginPct?: number | null; maxCost?: number | null };
-  maintenanceBase?: MaintenanceBase;
 }
 export interface PricedProduct extends CostingProduct { category?: string | null; pricing?: ProductPricing | null }
 
@@ -29,7 +28,7 @@ export interface StitchLine { head: StitchHead; enabled: boolean; qty: number; r
 export interface CostBreakdown {
   fabric: number; material: number; fabricMeters: number;
   stitching: StitchLine[]; stitchingTotal: number;
-  maintenancePct: number; maintenanceBase: MaintenanceBase; maintenance: number;
+  maintenancePct: number; maintenance: number;
   costPerPc: number;
 }
 
@@ -49,9 +48,9 @@ export function costBreakdown(p: PricedProduct, cfg: PricingConfig): CostBreakdo
   });
   const stitchingTotal = r2(stitching.reduce((t, l) => t + l.cost, 0));
   const maintenancePct = num(p.maintenance_pct);
-  const maintenanceBase: MaintenanceBase = p.pricing?.maintenanceBase || cfg.defaults.maintenanceBase;
-  const maintenance = r2((maintenanceBase === 'all' ? fabric + material + stitchingTotal : fabric + material) * maintenancePct / 100);
-  return { fabric, material, fabricMeters, stitching, stitchingTotal, maintenancePct, maintenanceBase, maintenance, costPerPc: r2(fabric + material + stitchingTotal + maintenance) };
+  // Maintenance is a share of the whole make — fabric, material AND stitching.
+  const maintenance = r2((fabric + material + stitchingTotal) * maintenancePct / 100);
+  return { fabric, material, fabricMeters, stitching, stitchingTotal, maintenancePct, maintenance, costPerPc: r2(fabric + material + stitchingTotal + maintenance) };
 }
 
 /** Indian GST slab for garments (owner's rule, same as the rate card):

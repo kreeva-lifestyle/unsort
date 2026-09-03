@@ -18,7 +18,7 @@ export function pricingSheetHtml(p: PricedProduct, pr: Projection, sugs: Suggest
 ${row('Fabric' + (b.fabricMeters ? ` (${b.fabricMeters} m)` : ''), money(b.fabric))}
 ${row('Material', money(b.material))}
 ${stitching}
-${row(`Maintenance ${b.maintenancePct}% on ${b.maintenanceBase === 'all' ? 'materials + stitching' : 'materials'}`, money(b.maintenance))}
+${row(`Maintenance ${b.maintenancePct}% on the whole make`, money(b.maintenance))}
 ${row('Cost per piece', money(b.costPerPc), 'total')}
 </tbody></table>
 <div class="grid">

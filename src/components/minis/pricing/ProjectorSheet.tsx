@@ -9,7 +9,7 @@ import { friendlyError } from '../../../lib/friendlyError';
 import { numericKeyDown } from '../../../lib/numericInput';
 import { money, num } from '../costing/costingModel';
 import PrintPreview from '../costing/PrintPreview';
-import type { PricingConfig, MaintenanceBase } from './pricingConfig';
+import type { PricingConfig } from './pricingConfig';
 import { PricedProduct, ProductPricing, project } from './pricingModel';
 import { suggestions } from './suggestions';
 import { pricingSheetHtml } from './pricingSheet';
@@ -71,10 +71,7 @@ export default function ProjectorSheet({ product, config, catalogPrice, catalogC
         <div style={{ fontSize: 11, color: T.tx3, marginTop: 6 }}>Stitching (from Settings → Pricing)</div>
         <StitchingOverrides breakdown={b} overrides={p.pricing?.stitching} onChange={s => setPricing({ stitching: s })} />
         <div style={{ ...rowS, borderTop: `1px solid ${T.bd}`, marginTop: 4 }}>
-          <span>Maintenance {b.maintenancePct}% on&nbsp;
-            <select value={b.maintenanceBase} onChange={e => setPricing({ maintenanceBase: e.target.value as MaintenanceBase })} style={{ ...S.fInput, display: 'inline-block', width: 'auto', height: 30, padding: '2px 6px', fontSize: 11 }}>
-              <option value="materials">materials</option><option value="all">materials + stitching</option>
-            </select></span>
+          <span>Maintenance {b.maintenancePct}% <span style={{ color: T.tx3 }}>on fabric + material + stitching</span></span>
           <span style={{ fontFamily: T.mono }}>{money(b.maintenance)}</span>
         </div>
         <div style={{ ...rowS, fontSize: 16, fontWeight: 800, color: T.tx, fontFamily: T.sora, borderTop: `1px solid ${T.bd}`, paddingTop: 8 }}><span>Cost / pc</span><span>{money(b.costPerPc)}</span></div>

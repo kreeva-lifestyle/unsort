@@ -9,8 +9,7 @@ export type StitchBasis = 'per_pc' | 'per_meter' | 'pct_of_material';
 export interface StitchHead { id: string; name: string; basis: StitchBasis; rate: number; active: boolean }
 export interface Threshold { minMarginPct: number | null; maxCost: number | null }
 export interface PricingThresholds { default: Threshold; byCategory: Record<string, Threshold> }
-export type MaintenanceBase = 'materials' | 'all';
-export interface PricingDefaults { profit: { pct: number; fixed: number }; maintenanceBase: MaintenanceBase }
+export interface PricingDefaults { profit: { pct: number; fixed: number } }
 export interface PricingConfig { stitching: StitchHead[]; thresholds: PricingThresholds; defaults: PricingDefaults }
 
 export const PRICING_KEYS = { stitching: 'pricing_stitching', thresholds: 'pricing_thresholds', defaults: 'pricing_defaults' } as const;
@@ -20,7 +19,7 @@ export const BASIS_LABEL: Record<StitchBasis, string> = { per_pc: '₹ per piece
 export const emptyConfig = (): PricingConfig => ({
   stitching: [],
   thresholds: { default: { minMarginPct: null, maxCost: null }, byCategory: {} },
-  defaults: { profit: { pct: 0, fixed: 0 }, maintenanceBase: 'materials' },
+  defaults: { profit: { pct: 0, fixed: 0 } },
 });
 
 const n = (v: unknown, fallback = 0): number => { const x = Number(v); return Number.isFinite(x) ? x : fallback; };
@@ -49,7 +48,7 @@ export const normalizeThresholds = (v: unknown): PricingThresholds => {
 export const normalizeDefaults = (v: unknown): PricingDefaults => {
   const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
   const p = (o.profit && typeof o.profit === 'object' ? o.profit : {}) as Record<string, unknown>;
-  return { profit: { pct: n(p.pct), fixed: n(p.fixed) }, maintenanceBase: o.maintenanceBase === 'all' ? 'all' : 'materials' };
+  return { profit: { pct: n(p.pct), fixed: n(p.fixed) } };
 };
 
 export async function loadPricingConfig(): Promise<{ config: PricingConfig; error: unknown }> {
