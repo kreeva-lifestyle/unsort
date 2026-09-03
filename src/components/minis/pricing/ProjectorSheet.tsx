@@ -15,6 +15,8 @@ import { suggestions } from './suggestions';
 import { pricingSheetHtml } from './pricingSheet';
 import StitchingOverrides from './StitchingOverrides';
 import SuggestionsList from './SuggestionsList';
+import AiSuggestionsCard from './AiSuggestionsCard';
+import { inputHash } from './aiSuggestions';
 
 const card: React.CSSProperties = { background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 14, marginBottom: 12 };
 const rowS: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 12, color: T.tx2, padding: '5px 0' };
@@ -32,6 +34,20 @@ export default function ProjectorSheet({ product, config, catalogPrice, catalogC
 
   const pr = useMemo(() => project(p, config, catalogPrice), [p, config, catalogPrice]);
   const sugs = useMemo(() => suggestions(p, config, pr), [p, config, pr]);
+  // Exact numbers the AI reasons over; their fingerprint marks a saved batch
+  // stale the moment any of them changes.
+  const facts = useMemo(() => ({
+    sku: p.sku, category: p.category || null,
+    fabric: pr.breakdown.fabric, fabricMeters: pr.breakdown.fabricMeters, material: pr.breakdown.material,
+    stitching: pr.breakdown.stitching.filter(l => l.enabled).map(l => ({ head: l.head.name, basis: l.head.basis, rate: l.rate, cost: l.cost })),
+    maintenancePct: pr.breakdown.maintenancePct, maintenance: pr.breakdown.maintenance, costPerPc: pr.breakdown.costPerPc,
+    profit: pr.profit, targetPriceExGst: pr.target.exc, gstPct: pr.target.gstPct,
+    sellingPrice: pr.price, priceSource: pr.priceSource, profitAmount: pr.profitAmount, marginPct: pr.marginPct,
+    threshold: { minMarginPct: pr.threshold.minMarginPct, maxCost: pr.threshold.maxCost, source: pr.threshold.source }, status: pr.status,
+    lines: p.components.flatMap(c => c.subs.map(s => ({ component: c.name, sub: s.name, qty: num(s.qty), unit: s.unit, suppliers: s.suppliers.filter(x => x.name.trim()).length }))),
+  }), [p, pr]);
+  const [hash, setHash] = useState<string | null>(null);
+  useEffect(() => { let alive = true; inputHash(facts).then(h => { if (alive) setHash(h); }); return () => { alive = false; }; }, [facts]);
   const setPricing = (patch: Partial<ProductPricing>) => setP(prev => ({ ...prev, pricing: { ...(prev.pricing || {}), ...patch } }));
   const dirty = JSON.stringify({ a: p.pricing, b: p.selling_price, c: p.category }) !== JSON.stringify({ a: product.pricing || {}, b: product.selling_price, c: product.category });
   const b = pr.breakdown; const st = STATUS[pr.status];
@@ -111,6 +127,7 @@ export default function ProjectorSheet({ product, config, catalogPrice, catalogC
       </div>
 
       <SuggestionsList items={sugs} />
+      <AiSuggestionsCard productId={p.id} hash={hash} facts={facts} deterministic={sugs.map(s => ({ title: s.title, detail: s.detail }))} addToast={addToast} />
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
         <button type="button" onClick={() => setPrintHtml(pricingSheetHtml(p, pr, sugs))} style={{ ...S.btnGhost, minHeight: 44 }}>Print / PDF</button>
