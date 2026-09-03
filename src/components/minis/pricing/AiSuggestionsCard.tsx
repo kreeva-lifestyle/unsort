@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { T, S, Icon, alpha } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { money } from '../costing/costingModel';
-import { AiBatch, AiSuggestion, loadAiBatch, generateAiBatch } from './aiSuggestions';
+import { AiBatch, AiSuggestion, loadAiBatch, generateAiBatch, usd } from './aiSuggestions';
 
 const IMPACT: Record<AiSuggestion['impact'], string> = { high: T.gr, medium: T.yl, low: T.tx3 };
 const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -29,7 +29,7 @@ export default function AiSuggestionsCard({ productId, hash, facts, deterministi
     const { batch: b, error } = await generateAiBatch(productId, hash, facts, deterministic);
     setBusy(false);
     if (error || !b) { addToast(error || 'AI suggestions failed', 'error'); return; }
-    setBatch(b); addToast('AI suggestions saved', 'success');
+    setBatch(b); addToast(`AI suggestions saved — this generation cost ${usd(b.est_usd)}`, 'success');
   };
 
   const frame: React.CSSProperties = {
@@ -80,8 +80,11 @@ export default function AiSuggestionsCard({ productId, hash, facts, deterministi
           </div>
         ))}
         {batch && (
-          <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, marginTop: 8, letterSpacing: '0.06em' }}>
-            Generated {when(batch.created_at)} · {batch.model} · saved with this product
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginTop: 8, fontSize: 9, color: T.tx3, fontFamily: T.mono, letterSpacing: '0.06em' }}>
+            <span>Generated {when(batch.created_at)} · {batch.model} · saved with this product</span>
+            <span style={{ color: T.ac2 }} title={batch.usage ? `${batch.usage.input_tokens.toLocaleString('en-IN')} in · ${batch.usage.output_tokens.toLocaleString('en-IN')} out tokens` : undefined}>
+              cost {usd(batch.est_usd)}{batch.usage ? ` · ${batch.usage.input_tokens.toLocaleString('en-IN')} in / ${batch.usage.output_tokens.toLocaleString('en-IN')} out` : ''}
+            </span>
           </div>
         )}
       </div>
