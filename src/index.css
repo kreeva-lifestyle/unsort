@@ -572,3 +572,7 @@ body.modal-open .fab { display: none !important; }
   .challan-recent::-webkit-scrollbar { display: none; }
   .challan-line-total { display: flex !important; }
 }
+
+/* Price Projector AI card: moving highlight while the model thinks. */
+@keyframes aiShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.ai-shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, oklch(0.55 0.22 265 / .55) 50%, rgba(255,255,255,0.04) 100%); background-size: 200% 100%; animation: aiShimmer 1.4s linear infinite; }
