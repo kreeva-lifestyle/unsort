@@ -13,8 +13,9 @@ import PrinterSettings from '../components/settings/PrinterSettings';
 import PaymentQR from '../components/settings/PaymentQR';
 import ErrorLogs from '../components/settings/ErrorLogs';
 import ListingAISettings from '../components/settings/ListingAISettings';
+import PricingSettings from '../components/settings/PricingSettings';
 
-const TAB_ICONS: Record<string, string> = { myprofile: 'user', categories: 'grid', locations: 'pin', brands: 'tag', users: 'users', packtime: 'scan', printers: 'print', listingai: 'cpu' };
+const TAB_ICONS: Record<string, string> = { myprofile: 'user', categories: 'grid', locations: 'pin', brands: 'tag', users: 'users', packtime: 'scan', printers: 'print', listingai: 'cpu', pricing: 'receipt' };
 
 export default function Settings({ profile, addToast, active = true }: { profile: any; addToast: (msg: string, type?: string) => void; active?: boolean }) {
   const isAdmin = profile?.role === 'admin';
@@ -23,7 +24,7 @@ export default function Settings({ profile, addToast, active = true }: { profile
   // Printers config is per-PC (localStorage) — every print-station operator
   // needs it regardless of role, so it lives in the base tab list.
   const tabs = [{ id: 'myprofile', label: 'My Profile' }, { id: 'printers', label: 'Printers' }];
-  if (canManage) tabs.push({ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }, { id: 'brands', label: 'Brands' });
+  if (canManage) tabs.push({ id: 'categories', label: 'Categories' }, { id: 'locations', label: 'Locations' }, { id: 'brands', label: 'Brands' }, { id: 'pricing', label: 'Pricing' });
   if (isAdmin) tabs.push({ id: 'users', label: 'Users' }, { id: 'packtime', label: 'PackStation' }, { id: 'payment', label: 'Payment QR' }, { id: 'listingai', label: 'Listing AI' }, { id: 'errorlogs', label: 'Error Logs' });
   const [tab, setTab] = useState('myprofile');
   // Back returns to My Profile instead of leaving Settings entirely.
@@ -47,6 +48,7 @@ export default function Settings({ profile, addToast, active = true }: { profile
       {tab === 'locations' && canManage && <LocationsSettings addToast={addToast} canEdit={canManage} />}
       {tab === 'users' && isAdmin && <UsersSettings addToast={addToast} profile={profile} />}
       {tab === 'brands' && canManage && <BrandsSettings addToast={addToast} />}
+      {tab === 'pricing' && canManage && <PricingSettings addToast={addToast} />}
       {tab === 'packtime' && isAdmin && <PackStationSettings addToast={addToast} />}
       {tab === 'printers' && <PrinterSettings addToast={addToast} />}
       {tab === 'payment' && isAdmin && <PaymentQR addToast={addToast} />}
