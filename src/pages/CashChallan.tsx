@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { printOrQueue } from '../lib/printQueue';
 import { useAuth } from '../hooks/useAuth';
 import { canAccessModule } from '../lib/tabs';
+import { computeItemTotal, computeItemDiscount, challanTotals, autoRoundOff, ROUND_OFF_LIMIT } from '../components/challan/challanTotals';
 import { logSwallowed } from '../lib/errorLogger';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
@@ -114,6 +115,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [items, setItems] = useState<ChallanItem[]>([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
   const [shippingCharges, setShippingCharges] = useState(0);
+  // null = automatic round-off (nearest rupee); a number = operator override.
+  const [manualRoundOff, setManualRoundOff] = useState<number | null>(null);
   const [notes, setNotes] = useState('');
   const [tags, setTags] = useState('');
   const [paymentMode, setPaymentMode] = useState('');
@@ -200,15 +203,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ₹2,000, Discount -₹3,000, Total -₹1,000) so they can see and correct
   // the mistake. Save is blocked downstream by itemValidationError +
   // grandTotal < 0 checks before anything hits the DB.
-  const computeItemLineTotal = (it: ChallanItem) => Math.round((it.quantity * it.price) * 100) / 100;
-  const computeItemDiscount = (it: ChallanItem) => {
-    const d = it.discount_value || 0;
-    const raw = it.discount_type === 'percentage' ? (it.quantity * it.price * d / 100) : d;
-    return Math.round(raw * 100) / 100;
-  };
-  const computeItemTotal = (it: ChallanItem) => {
-    return Math.round((computeItemLineTotal(it) - computeItemDiscount(it)) * 100) / 100;
-  };
+  // Line math lives in challanTotals.ts (shared with openEdit and the harness).
 
   // Human-readable validation for a single line item. Returns null when OK,
   // or the specific reason it's invalid. Used for inline red border while the
@@ -231,16 +226,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     }
     return null;
   };
-  // Subtotal = raw line totals (pre-discount). Discount = raw sum as entered.
-  // Total = subtotal - discount + shipping (can go negative while editing).
-  const subtotal = Math.round(items.reduce((s, i) => s + computeItemLineTotal(i), 0) * 100) / 100;
-  const totalDiscount = Math.round(items.reduce((s, i) => s + computeItemDiscount(i), 0) * 100) / 100;
-  // Returns never carry shipping/porter charges (owner policy) — the field is
-  // hidden in return mode and any lingering value is ignored here.
-  const clampedShipping = isReturn ? 0 : Math.max(0, shippingCharges);
-  const afterAll = Math.round((subtotal - totalDiscount + clampedShipping) * 100) / 100;
-  const roundOff = Math.round((Math.round(afterAll) - afterAll) * 100) / 100;
-  const grandTotal = Math.round(afterAll);
+  // Totals: automatic nearest-rupee round-off unless the operator set one by
+  // hand (manualRoundOff !== null). See challanTotals.ts.
+  const { subtotal, totalDiscount, clampedShipping, roundOff, grandTotal } = challanTotals(items, shippingCharges, isReturn, manualRoundOff);
 
   // ── Fetch challans ─────────────────────────────────────────────────────────
   const fetchChallans = useCallback(async (silent = false) => {
@@ -348,14 +336,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
           savedAt: Date.now(), userId: currentUserId, editingId: editing?.id || null,
-          customerName, selectedCustomerId, customerPhone, items, shippingCharges,
+          customerName, selectedCustomerId, customerPhone, items, shippingCharges, manualRoundOff,
           notes, tags, paymentMode, paymentDate, amountPaid, challanStatus, isReturn,
           returnSourceId: returnSource?.id || null, returnSourceNumber: returnSource?.challan_number || null,
         }));
       } catch {}
     }, 2000);
     return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
-  }, [showModal, customerName, selectedCustomerId, customerPhone, items, shippingCharges, notes, tags, paymentMode, paymentDate, amountPaid, challanStatus, isReturn, currentUserId, editing, returnSource]);
+  }, [showModal, customerName, selectedCustomerId, customerPhone, items, shippingCharges, manualRoundOff, notes, tags, paymentMode, paymentDate, amountPaid, challanStatus, isReturn, currentUserId, editing, returnSource]);
 
   // Restore draft when modal opens for a NEW challan
   useEffect(() => {
@@ -375,6 +363,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       setCustomerPhone(d.customerPhone || '');
       setItems(d.items || [{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
       setShippingCharges(d.shippingCharges || 0);
+      setManualRoundOff(typeof d.manualRoundOff === 'number' && Number.isFinite(d.manualRoundOff) ? d.manualRoundOff : null);
       setNotes(d.notes || '');
       setTags(d.tags || '');
       setPaymentMode(d.paymentMode || '');
@@ -621,6 +610,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       if (err) { setFormError(`Row ${i + 1} (${items[i].sku || '—'}): ${err}`); return; }
     }
     if (!isReturn && shippingCharges < 0) { setFormError('Shipping/Porter charges cannot be negative'); return; }
+    if (manualRoundOff !== null && (!Number.isFinite(manualRoundOff) || Math.abs(manualRoundOff) > ROUND_OFF_LIMIT)) { setFormError('Round off must be between −₹999.99 and +₹999.99'); return; }
     // Owner policy (2026-06): every return must be linked to its source
     // invoice — free-form returns skipped all quantity validation.
     if (isReturn && !returnSource && !editing) { setFormError('Select the source invoice for this return'); return; }
@@ -740,7 +730,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         }
         const today = localToday();
         const prevPaid = Number(editing.amount_paid || 0);
-        const payDiff = amountPaid - prevPaid;
+        // 2dp: the payment-sync trigger compares the ledger with zero tolerance.
+        const payDiff = Math.round((amountPaid - prevPaid) * 100) / 100;
         const { error: upErr } = await supabase.rpc('update_challan_with_items', {
           p_challan_id: editing.id,
           p_challan: { ...challanData, tags: challanData.tags || null },
@@ -749,7 +740,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         });
         if (upErr) throw new Error(upErr.message);
         // Structured field-level diff for audit
-        const tracked: (keyof typeof challanData)[] = ['status', 'amount_paid', 'payment_mode', 'payment_date', 'total', 'customer_name', 'shipping_charges', 'notes'];
+        const tracked: (keyof typeof challanData)[] = ['status', 'amount_paid', 'payment_mode', 'payment_date', 'total', 'round_off', 'customer_name', 'shipping_charges', 'notes'];
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         for (const k of tracked) { const prev = (editing as Record<string, unknown>)[k]; const next = (challanData as Record<string, unknown>)[k]; if (String(prev ?? '') !== String(next ?? '')) changes[k] = { from: prev, to: next }; }
         await ccAuditLog('UPDATE', editing.id, `Challan #${editing.challan_number} updated`, Object.keys(changes).length > 0 ? changes : undefined);
@@ -1009,8 +1000,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     setSelectedCustomerId(c.customer_id);
     setCustomerPhone(c.customer_phone || cust?.phone || '');
     setIsReturn(!!c.is_return);
-    setItems((citems || []).map(i => ({ sku: i.sku || '', description: i.description, quantity: i.quantity, price: Number(i.price), total: Number(i.total), discount_type: i.discount_type || 'flat', discount_value: Number(i.discount_value || 0), discount_amount: Number(i.discount_amount || 0) })));
+    const loadedItems = (citems || []).map(i => ({ sku: i.sku || '', description: i.description, quantity: i.quantity, price: Number(i.price), total: Number(i.total), discount_type: i.discount_type || 'flat', discount_value: Number(i.discount_value || 0), discount_amount: Number(i.discount_amount || 0) }));
+    setItems(loadedItems);
     setShippingCharges(Number(c.shipping_charges || 0));
+    // A stored round-off that differs from what the form would compute on its
+    // own was set by hand — keep it manual so a re-save doesn't silently
+    // revert the operator's figure.
+    const storedRoundOff = Number(c.round_off || 0);
+    setManualRoundOff(Math.abs(storedRoundOff - autoRoundOff(loadedItems, Number(c.shipping_charges || 0), !!c.is_return)) > 0.005 ? storedRoundOff : null);
     setNotes(c.notes || '');
     setTags((c.tags || []).join(', '));
     setPaymentMode(c.payment_mode || '');
@@ -1027,7 +1024,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (draftTimerRef.current) { clearTimeout(draftTimerRef.current); draftTimerRef.current = null; }
     setShowModal(false); setEditing(null); setCustomerName(''); setSelectedCustomerId(null); setCustomerPhone(''); setIsReturn(false); setReturnSource(null); setReturnSearchQ(''); setReturnResults([]);
     setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
-    setShippingCharges(0); setNotes(''); setTags('');
+    setShippingCharges(0); setManualRoundOff(null); setNotes(''); setTags('');
     setPaymentMode(''); setPaymentDate(''); setAmountPaid(0); setChallanStatus('unpaid');
     setCustomerSuggestions([]);
     setAuditTrail(null);
@@ -1199,7 +1196,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // BULK_PAY log entry claiming money was received.
     const paidOk: Challan[] = [];
     for (const c of bulkPayable) {
-      const outstanding = Number(c.total) - Number(c.amount_paid || 0);
+      const outstanding = Math.round((Number(c.total) - Number(c.amount_paid || 0)) * 100) / 100;
       const { data: updated, error: upErr } = await supabase.from('cash_challans').update({
         status: 'paid', amount_paid: Number(c.total), payment_mode: bulkPayMode,
         payment_date: payDate, modified_by: user?.id, updated_at: new Date().toISOString(),
@@ -1385,6 +1382,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       subtotal={subtotal}
       totalDiscount={totalDiscount}
       roundOff={roundOff}
+      manualRoundOff={manualRoundOff}
+      setManualRoundOff={setManualRoundOff}
       grandTotal={grandTotal}
       auditTrail={auditTrail}
       setAuditTrail={setAuditTrail}
