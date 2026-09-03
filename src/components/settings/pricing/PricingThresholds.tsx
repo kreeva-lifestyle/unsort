@@ -18,7 +18,8 @@ export default function PricingThresholds({ thresholds, addToast, onSaved }: { t
   // Rows come from Settings → Categories (the same list the costing sheet
   // and the projector use); keys are upper-cased so 'Lehenga Choli' and
   // 'LEHENGA CHOLI' are one rule.
-  const { categories: settingsCats } = useSettingsCategories(addToast);
+  const { categories: settingsCats, loaded: catsLoaded } = useSettingsCategories(addToast);
+  const label = useMemo(() => { const m: Record<string, string> = {}; for (const c of settingsCats) m[c.trim().toUpperCase()] = c.trim(); return m; }, [settingsCats]);
   const categories = useMemo(() => {
     const set = new Set<string>(Object.keys(thresholds.byCategory));
     for (const c of settingsCats) { const k = c.trim().toUpperCase(); if (k) set.add(k); }
@@ -63,12 +64,12 @@ export default function PricingThresholds({ thresholds, addToast, onSaved }: { t
         <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>Default (all)</span>{inputs(DEFAULT_KEY)}
         {categories.map(c => (
           <Fragment key={c}>
-            <span style={{ fontSize: 12, color: T.tx2 }}>{c}</span>
+            <span style={{ fontSize: 12, color: T.tx2 }}>{label[c] || c}</span>
             {inputs(c)}
           </Fragment>
         ))}
       </div>
-      {categories.length === 0 && <div style={{ fontSize: 11, color: T.tx3, marginTop: 8 }}>Add categories in Settings → Categories to set a rule per category.</div>}
+      {catsLoaded && categories.length === 0 && <div style={{ fontSize: 11, color: T.tx3, marginTop: 8 }}>Add categories in Settings → Categories to set a rule per category.</div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
         <button type="button" onClick={save} disabled={saving} style={{ ...S.btnPrimary, minHeight: 40, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save thresholds'}</button>
       </div>

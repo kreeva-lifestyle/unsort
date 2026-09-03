@@ -68,7 +68,7 @@ export function suggestions(p: PricedProduct, _cfg: PricingConfig, pr: Projectio
   // 6. Maintenance sensitivity.
   if (b.maintenancePct > 0) {
     const perPoint = r2(b.maintenance / b.maintenancePct);
-    out.push({ kind: 'maintenance', title: `Maintenance ${b.maintenancePct}% = ${money(b.maintenance)}`, detail: `Each 1 point of maintenance is ${money(perPoint)} per piece (applied to ${b.maintenanceBase === 'all' ? 'materials + stitching' : 'materials only'}).`, savingPerPc: perPoint });
+    out.push({ kind: 'maintenance', title: `Maintenance ${b.maintenancePct}% = ${money(b.maintenance)}`, detail: `Each 1 point of maintenance is ${money(perPoint)} per piece (applied to fabric, material and stitching).`, savingPerPc: perPoint });
   }
 
   // 7. GST boundary: a price just above ₹2,500 pays 18% instead of 5%.
