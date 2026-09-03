@@ -2,7 +2,7 @@
 // profit target → suggested price, actual price + margin against the
 // threshold, and the suggestions. Saves only the pricing columns of the
 // costing row (pricing, selling_price, category) — never the components.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
@@ -22,9 +22,9 @@ const rowS: React.CSSProperties = { display: 'flex', justifyContent: 'space-betw
 const numIn: React.CSSProperties = { ...S.fInput, width: 110, height: 34, padding: '4px 8px', fontFamily: T.mono, textAlign: 'right' as const };
 const STATUS: Record<string, { label: string; color: string }> = { ok: { label: 'Within threshold', color: T.gr }, below_margin: { label: 'Below minimum margin', color: T.re }, over_cost: { label: 'Over maximum cost', color: T.re }, no_price: { label: 'No selling price', color: T.yl } };
 
-export default function ProjectorSheet({ product, config, catalogPrice, catalogCategory, categories, addToast, onBack, onSaved }: {
+export default function ProjectorSheet({ product, config, catalogPrice, catalogCategory, categories, addToast, backSlot, onSaved }: {
   product: PricedProduct; config: PricingConfig; catalogPrice: number | null; catalogCategory: string | null; categories: string[];
-  addToast: (m: string, t?: string) => void; onBack: () => void; onSaved: (p: PricedProduct) => void;
+  addToast: (m: string, t?: string) => void; backSlot: ReactNode; onSaved: (p: PricedProduct) => void;
 }) {
   const [p, setP] = useState<PricedProduct>({ ...product, pricing: product.pricing || {} });
   const [saving, setSaving] = useState(false);
@@ -51,7 +51,7 @@ export default function ProjectorSheet({ product, config, catalogPrice, catalogC
   return (
     <div style={{ fontFamily: T.sans, color: T.tx }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-        <button type="button" onClick={onBack} style={{ ...S.btnGhost, minHeight: 40 }}>← Back</button>
+        {backSlot}
         <div style={{ fontFamily: T.mono, fontSize: 15, fontWeight: 700 }}>{p.sku}</div>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: st.color }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: st.color }} />{st.label}</span>
       </div>
