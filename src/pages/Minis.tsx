@@ -22,6 +22,7 @@ import ForwardDropbox from '../components/minis/forward/ForwardDropbox';
 import ClientFinder from '../components/minis/clientfinder/ClientFinder';
 import DropboxUploader from '../components/minis/uploader/DropboxUploader';
 import ProductCosting from '../components/minis/costing/ProductCosting';
+import PriceProjector from '../components/minis/pricing/PriceProjector';
 import OtpInbox from '../components/minis/OtpInbox';
 import { exportName, fileDate } from '../lib/exportName';
 
@@ -29,7 +30,7 @@ const SIZE_MAP: Record<number, string> = { 32: 'XXS', 34: 'XS', 36: 'S', 38: 'M'
 
 interface UtsavRow { relid: string; vendorno: string; stock: number; leadtime: number; block: number; designno: string; size: number; catalogname: string; updateddate: string; aryaSku: string }
 
-type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'address' | 'trackly' | 'return_labels' | 'ratecard' | 'dropbox_links' | 'forward_dropbox' | 'master_assistant' | 'client_finder' | 'dropbox_upload' | 'costing' | 'otp';
+type MiniView = 'home' | 'utsav' | 'cbazaar' | 'odette' | 'address' | 'trackly' | 'return_labels' | 'ratecard' | 'dropbox_links' | 'forward_dropbox' | 'master_assistant' | 'client_finder' | 'dropbox_upload' | 'costing' | 'otp' | 'pricing';
 
 export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab: string) => void; active?: boolean }) {
   const { addToast } = useNotifications();
@@ -77,7 +78,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
 
   const setView = useCallback((v: MiniView) => setViewState(v), []);
 
-  const viewLabels: Record<MiniView, string | null> = { home: null, cbazaar: 'Cbazaar Import', odette: 'Odette Import', address: 'LabelMaker', utsav: 'Utsav Import', trackly: 'Trackly', return_labels: 'Product QC Labels', ratecard: 'RateCard Studio', dropbox_links: 'Dropbox Link Generator', forward_dropbox: 'Forward → Dropbox', master_assistant: 'Master Assistant', client_finder: 'Client Finder', dropbox_upload: 'Dropbox Uploader', costing: 'Product Costing', otp: 'OTP Inbox' };
+  const viewLabels: Record<MiniView, string | null> = { home: null, cbazaar: 'Cbazaar Import', odette: 'Odette Import', address: 'LabelMaker', utsav: 'Utsav Import', trackly: 'Trackly', return_labels: 'Product QC Labels', ratecard: 'RateCard Studio', dropbox_links: 'Dropbox Link Generator', forward_dropbox: 'Forward → Dropbox', master_assistant: 'Master Assistant', client_finder: 'Client Finder', dropbox_upload: 'Dropbox Uploader', costing: 'Product Costing', otp: 'OTP Inbox', pricing: 'Price Projector' };
   const { set: setBreadcrumb } = useBreadcrumb();
   useEffect(() => {
     setBreadcrumb(viewLabels[view] ? [viewLabels[view]!] : null);
@@ -352,6 +353,12 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
       <ProductCosting addToast={addToast} />
     </div>
   );
+  if (view === 'pricing') return (
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      <div style={{ marginBottom: 14 }}>{back}</div>
+      <PriceProjector addToast={addToast} navigateTo={navigateTo} />
+    </div>
+  );
 
   if (view === 'dropbox_upload') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
@@ -497,6 +504,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
           { id: 'client_finder' as MiniView, title: 'Client Finder', desc: 'Upload a product photo or pick a SKU → the websites that have posted that image, exported to Excel' },
           { id: 'dropbox_upload' as MiniView, title: 'Dropbox Uploader', desc: 'Send any file to Dropbox — pick the folder each time, watch the progress, get told if it fails' },
           { id: 'costing' as MiniView, title: 'Product Costing', desc: 'Cost a product from its components and suppliers — photo, material codes, and a purchase plan PDF for any quantity' },
+          { id: 'pricing' as MiniView, title: 'Price Projector', desc: 'Project a selling price from fabric, material, stitching, maintenance and profit — thresholds per category and cost-cutting suggestions' },
           { id: 'otp' as MiniView, title: 'OTP Inbox', desc: 'OTPs from the owner\u2019s phone, live — staff tap to copy, codes expire in minutes' },
         ].map(t => (
           <div key={t.id} onClick={() => setView(t.id)} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '20px 18px', cursor: 'pointer', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'oklch(0.55 0.22 265 / .3)'; e.currentTarget.style.background = 'oklch(0.55 0.22 265 / .04)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
