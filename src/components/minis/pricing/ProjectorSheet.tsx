@@ -1,7 +1,9 @@
 // One product's price projection: cost stack with stitching overrides,
 // profit target → suggested price, actual price + margin against the
 // threshold, and the suggestions. Saves only the pricing columns of the
-// costing row (pricing, selling_price, category) — never the components.
+// costing row (pricing, selling_price, category). The one components write
+// is the explicit "Use ₹x as rate" evidence action, which copies a paid PO
+// rate onto the sheet line the owner tapped.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
@@ -16,41 +18,54 @@ import { pricingSheetHtml } from './pricingSheet';
 import StitchingOverrides from './StitchingOverrides';
 import SuggestionsList from './SuggestionsList';
 import AiSuggestionsCard from './AiSuggestionsCard';
-import { inputHash } from './aiSuggestions';
+import { useProjectionFacts } from './useProjectionFacts';
+import type { EvidenceAction } from './evidence';
+import type { PoLine } from './poLines';
 
 const card: React.CSSProperties = { background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 14, marginBottom: 12 };
 const rowS: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 12, color: T.tx2, padding: '5px 0' };
 const numIn: React.CSSProperties = { ...S.fInput, width: 110, height: 34, padding: '4px 8px', fontFamily: T.mono, textAlign: 'right' as const };
 const STATUS: Record<string, { label: string; color: string }> = { ok: { label: 'Within threshold', color: T.gr }, below_margin: { label: 'Below minimum margin', color: T.re }, over_cost: { label: 'Over maximum cost', color: T.re }, no_price: { label: 'No selling price', color: T.yl } };
 
-export default function ProjectorSheet({ product, config, catalogPrice, catalogCategory, categories, addToast, backSlot, onSaved }: {
+export default function ProjectorSheet({ product, config, catalogPrice, catalogCategory, categories, peers, poLines, navigateTo, addToast, backSlot, onSaved, onPatched }: {
   product: PricedProduct; config: PricingConfig; catalogPrice: number | null; catalogCategory: string | null; categories: string[];
+  peers: PricedProduct[]; poLines: PoLine[]; navigateTo?: (tab: string) => void;
   addToast: (m: string, t?: string) => void; backSlot: ReactNode; onSaved: (p: PricedProduct) => void;
+  /** A sheet line changed on the server (evidence action) — keep the list in sync without closing. */
+  onPatched: (p: PricedProduct) => void;
 }) {
   const [p, setP] = useState<PricedProduct>({ ...product, pricing: product.pricing || {} });
   const [saving, setSaving] = useState(false);
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [printHtml, setPrintHtml] = useState<string | null>(null);
   useEffect(() => { if (!product.category && catalogCategory) setP(prev => ({ ...prev, category: catalogCategory })); }, [product.category, catalogCategory]);
 
   const pr = useMemo(() => project(p, config, catalogPrice), [p, config, catalogPrice]);
   const sugs = useMemo(() => suggestions(p, config, pr), [p, config, pr]);
-  // Exact numbers the AI reasons over; their fingerprint marks a saved batch
-  // stale the moment any of them changes.
-  const facts = useMemo(() => ({
-    sku: p.sku, category: p.category || null,
-    fabric: pr.breakdown.fabric, fabricMeters: pr.breakdown.fabricMeters, material: pr.breakdown.material,
-    stitching: pr.breakdown.stitching.filter(l => l.enabled).map(l => ({ head: l.head.name, basis: l.head.basis, rate: l.rate, cost: l.cost })),
-    maintenancePct: pr.breakdown.maintenancePct, maintenance: pr.breakdown.maintenance, costPerPc: pr.breakdown.costPerPc,
-    profit: pr.profit, targetPriceExGst: pr.target.exc, gstPct: pr.target.gstPct,
-    sellingPrice: pr.price, priceSource: pr.priceSource, profitAmount: pr.profitAmount, marginPct: pr.marginPct,
-    threshold: { minMarginPct: pr.threshold.minMarginPct, maxCost: pr.threshold.maxCost, source: pr.threshold.source }, status: pr.status,
-    lines: p.components.flatMap(c => c.subs.map(s => ({ component: c.name, sub: s.name, qty: num(s.qty), unit: s.unit, suppliers: s.suppliers.filter(x => x.name.trim()).length }))),
-  }), [p, pr]);
-  const [hash, setHash] = useState<string | null>(null);
-  useEffect(() => { let alive = true; inputHash(facts).then(h => { if (alive) setHash(h); }); return () => { alive = false; }; }, [facts]);
+  const { facts, evidence, hash } = useProjectionFacts(p, pr, config, peers, poLines);
   const setPricing = (patch: Partial<ProductPricing>) => setP(prev => ({ ...prev, pricing: { ...(prev.pricing || {}), ...patch } }));
   const dirty = JSON.stringify({ a: p.pricing, b: p.selling_price, c: p.category }) !== JSON.stringify({ a: product.pricing || {}, b: product.selling_price, c: product.category });
   const b = pr.breakdown; const st = STATUS[pr.status];
+
+  const applyEvidence = async (a: EvidenceAction) => {
+    if (a.type === 'open_po') { if (navigateTo) navigateTo('purchaseorders'); else addToast(`PO #${a.po} is in Purchase Orders`, 'info'); return; }
+    if (a.type === 'exclude_head') {
+      setPricing({ stitching: { ...(p.pricing?.stitching || {}), [a.headId]: { ...((p.pricing?.stitching || {})[a.headId] || {}), enabled: false } } });
+      addToast('Head excluded for this product — Save projection to keep it', 'success'); return;
+    }
+    // use_rate: the selected supplier's rate on that sheet line becomes the paid rate.
+    const comps = p.components.map((c, ci) => ci !== a.ci ? c : { ...c, subs: c.subs.map((s, si) => {
+      if (si !== a.si) return s;
+      const idx = Math.max(0, s.suppliers.findIndex(x => x.selected));
+      return { ...s, suppliers: s.suppliers.map((x, xi) => (xi === idx ? { ...x, rate: a.rate } : x)) };
+    }) });
+    setActionBusy(`use_rate:${a.ci}:${a.si}`);
+    const { error } = await supabase.from('costing_products').update({ components: comps, updated_at: new Date().toISOString() }).eq('id', p.id);
+    setActionBusy(null);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    const next = { ...p, components: comps, updated_at: new Date().toISOString() };
+    setP(next); onPatched(next); addToast(`Rate updated to ${money(a.rate)} on the costing sheet`, 'success');
+  };
 
   const save = async () => {
     if (pr.profit.pct >= 100 || pr.profit.pct < 0) { addToast('Profit % must be 0–99', 'error'); return; }
@@ -127,7 +142,8 @@ export default function ProjectorSheet({ product, config, catalogPrice, catalogC
       </div>
 
       <SuggestionsList items={sugs} />
-      <AiSuggestionsCard productId={p.id} hash={hash} facts={facts} deterministic={sugs.map(s => ({ title: s.title, detail: s.detail }))} addToast={addToast} />
+      <AiSuggestionsCard productId={p.id} hash={hash} facts={facts} evidence={evidence} deterministic={sugs.map(s => ({ title: s.title, detail: s.detail }))} addToast={addToast}
+        actionBusy={actionBusy} onAction={applyEvidence} />
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
         <button type="button" onClick={() => setPrintHtml(pricingSheetHtml(p, pr, sugs))} style={{ ...S.btnGhost, minHeight: 44 }}>Print / PDF</button>

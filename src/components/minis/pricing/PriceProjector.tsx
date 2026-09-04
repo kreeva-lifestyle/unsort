@@ -13,6 +13,7 @@ import { loadPricingConfig, PricingConfig, emptyConfig } from './pricingConfig';
 import { useSettingsCategories } from '../costing/useSettingsCategories';
 import { PricedProduct, project } from './pricingModel';
 import ProjectorSheet from './ProjectorSheet';
+import { loadPoLines, PoLine } from './poLines';
 
 const COLS = 'id, sku, image_url, maintenance_pct, components, notes, selling_price, category, pricing, updated_at';
 const DOT: Record<string, string> = { ok: T.gr, below_margin: T.re, over_cost: T.re, no_price: T.yl };
@@ -20,6 +21,7 @@ const DOT: Record<string, string> = { ok: T.gr, below_margin: T.re, over_cost: T
 export default function PriceProjector({ addToast, navigateTo, onHome }: { addToast: (m: string, t?: string) => void; navigateTo?: (tab: string) => void; onHome: () => void }) {
   const [list, setList] = useState<PricedProduct[] | null>(null);
   const [config, setConfig] = useState<PricingConfig>(emptyConfig());
+  const [poLines, setPoLines] = useState<PoLine[]>([]);
   const [open, setOpen] = useState<PricedProduct | null>(null);
   const [search, setSearch] = useState('');
   const [onlyFlagged, setOnlyFlagged] = useState(false);
@@ -38,6 +40,8 @@ export default function PriceProjector({ addToast, navigateTo, onHome }: { addTo
     loadPricingConfig().then(({ config: c, error }) => { if (error) addToast('Pricing settings failed to load — ' + friendlyError(error), 'error'); setConfig(c); });
     supabase.from('costing_products').select(COLS).order('updated_at', { ascending: false }).limit(500)
       .then(({ data, error }) => { if (error) { addToast(friendlyError(error), 'error'); setList([]); return; } setList((data ?? []) as PricedProduct[]); });
+    // Purchase-order lines are evidence for every sheet — one query per open.
+    loadPoLines().then(({ lines, error }) => { if (error) addToast('Purchase orders failed to load — ' + friendlyError(error), 'error'); setPoLines(lines); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -52,8 +56,10 @@ export default function PriceProjector({ addToast, navigateTo, onHome }: { addTo
 
   if (open) {
     const r = rows.find(x => x.p.id === open.id);
-    return <ProjectorSheet product={r?.p || open} config={config} catalogPrice={r?.catalogPrice ?? null} catalogCategory={r?.catalogCategory ?? null} categories={categories} addToast={addToast}
-      backSlot={backArrow} onSaved={saved => { setList(l => (l ?? []).map(x => (x.id === saved.id ? saved : x))); setOpen(null); }} />;
+    const patch = (saved: PricedProduct) => setList(l => (l ?? []).map(x => (x.id === saved.id ? saved : x)));
+    return <ProjectorSheet product={r?.p || open} config={config} catalogPrice={r?.catalogPrice ?? null} catalogCategory={r?.catalogCategory ?? null} categories={categories}
+      peers={rows.map(x => x.p)} poLines={poLines} navigateTo={navigateTo} addToast={addToast}
+      backSlot={backArrow} onSaved={saved => { patch(saved); setOpen(null); }} onPatched={patch} />;
   }
 
   const q = search.trim().toUpperCase();
