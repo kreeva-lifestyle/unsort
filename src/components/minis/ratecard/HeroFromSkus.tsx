@@ -12,6 +12,13 @@ import { call, explainGen } from '../dropboxlinks/api';
 
 interface Candidate { sku: string; name: string; path: string; url: string }
 
+// Candidates per SKU set, kept for a while: every catalog pick used to fan
+// out to Dropbox (a search per root per SKU, three folder listings each,
+// then temporary links) — and picking the same catalog twice did it twice.
+// Temporary links last 4h; 30 minutes keeps well inside that.
+const CACHE_TTL = 30 * 60_000;
+const photoCache = new Map<string, { at: number; cands: Candidate[]; note: string }>();
+
 export default function HeroFromSkus({ skus, shareToken, onPick, addToast }: {
   skus: string[];
   shareToken?: string;
@@ -24,16 +31,21 @@ export default function HeroFromSkus({ skus, shareToken, onPick, addToast }: {
   const [note, setNote] = useState('');
   const loadingRef = useRef(false);
 
-  const load = async () => {
+  const load = async (force = false) => {
     if (loadingRef.current) return;
+    const key = `${shareToken || ''}|${skus.join(',')}`;
+    const hit = photoCache.get(key);
+    if (!force && hit && Date.now() - hit.at < CACHE_TTL) { setCands(hit.cands); setNote(hit.note); return; }
     loadingRef.current = true;
     setLoading(true); setNote('');
     try {
       const { status, data } = await call({ action: 'ratecard_photos', skus, ...(shareToken ? { shareToken } : {}) });
       if (!data?.ok) { setCands([]); setNote(explainGen(data, status)); return; }
-      setCands(data.candidates as Candidate[]);
+      const cands = data.candidates as Candidate[];
       const missed = (data.misses || []) as { sku: string; reason: string }[];
-      if (missed.length) setNote(`No photo for ${missed.map(m => m.sku).join(', ')}`);
+      const note = missed.length ? `No photo for ${missed.map(m => m.sku).join(', ')}` : '';
+      photoCache.set(key, { at: Date.now(), cands, note });
+      setCands(cands); setNote(note);
     } catch {
       setCands([]); setNote('Could not load product photos — check the connection and try again');
     } finally { loadingRef.current = false; setLoading(false); }
@@ -70,7 +82,7 @@ export default function HeroFromSkus({ skus, shareToken, onPick, addToast }: {
         <span style={{ ...S.fLabel }}>Catalog photo — tap one{loading ? '' : ', or use Upload below'}</span>
         {loading && <span style={{ fontSize: 10, color: T.tx3 }}>Finding product photos…</span>}
         {!loading && (
-          <button onClick={load} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 28 }}>
+          <button onClick={() => load(true)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 28 }}>
             {cands !== null && cands.length > 0 ? 'Show different photos' : 'Load product photos'}
           </button>
         )}

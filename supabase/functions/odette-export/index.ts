@@ -22,7 +22,7 @@
 // Dropbox creds + folder links live in app_secrets (service-role only).
 
 // deno-lint-ignore-file no-explicit-any
-import { catalogFolder, catalogZip, catalogList } from './catalog.ts';
+import { catalogFolder, catalogPack, catalogList, gate } from './catalog.ts';
 
 const ALLOWED_ORIGINS = [
   'https://dailyoffice.aryadesigns.co.in',
@@ -212,6 +212,11 @@ function samplePhotoCandidates<T>(lists: { sku: string; files: T[] }[], cap: num
   }
   return out;
 }
+
+// Rate-card photo candidates per SKU set (temporary links last 4h; this
+// is well inside that). See the ratecard_photos handler.
+const PHOTO_TTL_MS = 10 * 60_000;
+const photoCache = new Map<string, { at: number; body: Record<string, unknown> }>();
 
 // Resolve the enabled linkgen roots to Dropbox paths (shared by the photo
 // actions; same cache and TTL the linkgen action uses).
@@ -720,20 +725,26 @@ Deno.serve(async (req) => {
     // ratecard share token (sellers on the public link). Candidates use
     // files/get_temporary_link (4h direct URLs) - no permanent share links
     // are minted for photos nobody picks.
-    // Catalog Downloads (RateCard Studio): catalogs with an active design, a
-    // catalog folder + its SKU sub-folders marked active/inactive, and one SKU
-    // folder streamed as a zip. Session or share token. See catalog.ts.
-    if (action === 'catalog_list' || action === 'catalog_folder' || action === 'catalog_zip') {
-      const deps = { dbx, getDropboxToken, resolveGenRootPaths, callerRole, ratecardShareOk, nameMatchesSku, normSku, json, fail, corsHeaders, asciiArg, sbUrl: SB_URL, sbSvc: SB_SVC };
-      return action === 'catalog_list' ? await catalogList(body, req, deps) : action === 'catalog_folder' ? await catalogFolder(body, req, deps) : await catalogZip(body, req, deps);
+    // Catalog Downloads (RateCard Studio): catalogs by brand with active
+    // counts, a catalog folder + its SKU sub-folders marked active/inactive,
+    // and the vendor pack (active folders copied inside Dropbox, one download
+    // link). Session or share token. See catalog.ts.
+    const rcDeps = { dbx, getDropboxToken, resolveGenRootPaths, callerRole, ratecardShareOk, nameMatchesSku, normSku, json, fail, corsHeaders, ensureSharedLink, sbUrl: SB_URL, sbSvc: SB_SVC };
+    if (action === 'catalog_list' || action === 'catalog_folder' || action === 'catalog_pack') {
+      return action === 'catalog_list' ? await catalogList(body, req, rcDeps) : action === 'catalog_folder' ? await catalogFolder(body, req, rcDeps) : await catalogPack(body, req, rcDeps);
     }
 
     if (action === 'ratecard_photos') {
-      if (!(await callerRole(req)) && !(await ratecardShareOk(String(body?.shareToken || '')))) {
-        return fail(401, 'Sign in to DailyOffice first', req);
-      }
-      const skusIn: string[] = [...new Set((Array.isArray(body?.skus) ? body.skus : []).map((x: unknown) => normSku(x)).filter(Boolean))] as string[];
+      // The most expensive call a seller link can make (a search per root
+      // per SKU, then listings and links): 5 a minute per IP on the token
+      // path, and the answer for a SKU set is kept 10 minutes so re-picking
+      // the same catalog costs nothing.
+      const denied = await gate(body, req, rcDeps, 'rp', 5); if (denied) return denied;
+      const skusIn: string[] = [...new Set((Array.isArray(body?.skus) ? body.skus.slice(0, 64) : []).map((x: unknown) => normSku(x)).filter(Boolean))] as string[];
       if (skusIn.length === 0) return fail(400, 'No SKUs to look up', req);
+      const photoKey = [...skusIn].sort().join(',');
+      const photoHit = photoCache.get(photoKey);
+      if (photoHit && Date.now() - photoHit.at < PHOTO_TTL_MS) return json({ ...photoHit.body, cached: true }, req);
       // With more than 8 SKUs, 8 are sampled at random - one image each.
       const skus = skusIn.length > 8 ? [...skusIn].sort(() => Math.random() - 0.5).slice(0, 8) : skusIn;
       let token = '';
@@ -790,8 +801,10 @@ Deno.serve(async (req) => {
         const tl = await dbx(token, 'files/get_temporary_link', { path: pk.file.path });
         return tl.status < 400 && tl.data?.link ? { sku: pk.sku, name: pk.file.name, path: pk.file.path, url: String(tl.data.link) } : null;
       }))).filter(Boolean);
-      return json({ ok: candidates.length > 0, candidates, misses: misses.length ? misses : undefined,
-        error: candidates.length === 0 ? 'No product photos found for these SKUs' : undefined }, req);
+      const photoBody = { ok: candidates.length > 0, candidates, misses: misses.length ? misses : undefined,
+        error: candidates.length === 0 ? 'No product photos found for these SKUs' : undefined };
+      if (candidates.length > 0) { if (photoCache.size > 500) photoCache.clear(); photoCache.set(photoKey, { at: Date.now(), body: photoBody }); }
+      return json(photoBody, req);
     }
 
     // The chosen candidate, fetched server-side and returned as bytes so the
@@ -799,9 +812,7 @@ Deno.serve(async (req) => {
     // toBlob and break the JPG export). Path must sit INSIDE a configured
     // search folder - a share token cannot reach the rest of the Dropbox.
     if (action === 'ratecard_photo_fetch') {
-      if (!(await callerRole(req)) && !(await ratecardShareOk(String(body?.shareToken || '')))) {
-        return fail(401, 'Sign in to DailyOffice first', req);
-      }
+      const denied = await gate(body, req, rcDeps, 'rf', 30); if (denied) return denied;
       const path = String(body?.path || '').trim().toLowerCase();
       if (!path.startsWith('/')) return fail(400, 'Bad photo path', req);
       let token = '';

@@ -1,7 +1,8 @@
 // Catalog Downloads ↔ odette-export. Session token when signed in, the
-// seller-link share token otherwise (the edge fn accepts either).
-import { supabase, SUPABASE_ANON_KEY } from '../../../lib/supabase';
-import { FN, call, explainGen } from '../dropboxlinks/api';
+// seller-link share token otherwise (the edge fn accepts either). The
+// catalog list is cached per token for a few minutes: the studio's pills
+// remount the picker, and a remount must not be a server call.
+import { call, explainGen } from '../dropboxlinks/api';
 
 export type FolderStatus = 'active' | 'inactive' | 'unknown';
 export interface CatalogFolder { name: string; path: string; files: number; bytes: number; sku: string | null; status: FolderStatus }
@@ -10,11 +11,28 @@ export interface CatalogResult {
   folder: { name: string; path: string }; items: CatalogFolder[]; missing: string[];
   totals: { active: number; files: number; bytes: number }; loose: number; sheetCount: number; truncated: boolean;
 }
+/** One catalog on one sheet tab; `last` is its highest row — newest first. */
+export interface Catalog { name: string; tab: string; count: number; active: number; last: number }
 
-export async function catalogList(shareToken?: string): Promise<{ name: string; count: number; active: number }[]> {
-  const { status, data } = await call({ action: 'catalog_list', ...(shareToken ? { shareToken } : {}) });
-  if (!data?.ok) throw new Error(explainGen(data, status));
-  return (data.catalogs || []) as { name: string; count: number; active: number }[];
+const LIST_TTL = 5 * 60_000;
+const listCache = new Map<string, { at: number; list: Catalog[] }>();
+const inflight = new Map<string, Promise<Catalog[]>>();
+
+export async function catalogList(shareToken?: string, force = false): Promise<Catalog[]> {
+  const key = shareToken || 'session';
+  const hit = listCache.get(key);
+  if (!force && hit && Date.now() - hit.at < LIST_TTL) return hit.list;
+  const running = inflight.get(key);
+  if (running) return running;
+  const p = (async () => {
+    const { status, data } = await call({ action: 'catalog_list', ...(shareToken ? { shareToken } : {}) });
+    if (!data?.ok) throw new Error(explainGen(data, status));
+    const list = (data.catalogs || []) as Catalog[];
+    listCache.set(key, { at: Date.now(), list });
+    return list;
+  })();
+  inflight.set(key, p);
+  try { return await p; } finally { inflight.delete(key); }
 }
 
 export async function catalogFolder(catalog: string, shareToken?: string, path?: string): Promise<{ result?: CatalogResult; candidates?: CatalogCandidate[]; error?: string }> {
@@ -24,25 +42,14 @@ export async function catalogFolder(catalog: string, shareToken?: string, path?:
   return { result: data as CatalogResult };
 }
 
-/** One SKU folder as a zip, streamed from Dropbox through the edge fn.
- *  Bytes are collected here so the caller can report progress. */
-export async function fetchFolderZip(path: string, shareToken: string | undefined, signal: AbortSignal, onBytes: (n: number) => void): Promise<Uint8Array> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const jwt = session?.access_token || SUPABASE_ANON_KEY;
-  const r = await fetch(FN, {
-    method: 'POST', signal,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}`, apikey: SUPABASE_ANON_KEY },
-    body: JSON.stringify({ action: 'catalog_zip', path, ...(shareToken ? { shareToken } : {}) }),
-  });
-  if (!r.ok || !r.body) { const data = await r.json().catch(() => ({})); throw new Error(explainGen(data, r.status)); }
-  const reader = r.body.getReader();
-  const chunks: Uint8Array[] = []; let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) { chunks.push(value); total += value.length; onBytes(value.length); }
-  }
-  const out = new Uint8Array(total); let off = 0;
-  for (const c of chunks) { out.set(c, off); off += c.length; }
-  return out;
+export interface PackResult { url?: string; pending?: boolean; jobId?: string; packPath?: string; count?: number; files?: number; bytes?: number; reused?: boolean; error?: string }
+
+/** Build or reuse the pack inside Dropbox. `pending` means the copy is
+ *  still running — call again with the jobId. */
+export async function catalogPack(catalog: string, path: string, shareToken?: string, jobId?: string): Promise<PackResult> {
+  const { status, data } = await call({ action: 'catalog_pack', catalog, path, ...(shareToken ? { shareToken } : {}), ...(jobId ? { jobId } : {}) });
+  if (!data?.ok) return { error: explainGen(data, status) };
+  return data as PackResult;
 }
+
+export const mb = (bytes: number) => bytes >= 1024 * 1024 * 100 ? `${Math.round(bytes / 1048576)} MB` : bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
