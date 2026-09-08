@@ -15,7 +15,7 @@ import MasterLinkCheck from '../components/minis/LinkCheck';
 import VirtualStock from '../components/minis/VirtualStock';
 import Trackly from '../components/minis/Trackly';
 import ReturnLabels from '../components/minis/ReturnLabels';
-import RateCardGenerator from '../components/minis/ratecard/RateCardGenerator';
+import RateCardStudio from '../components/minis/ratecard/RateCardStudio';
 import MasterAssistant from '../components/listingai/assistant/MasterAssistant';
 import DropboxLinkGenerator from '../components/minis/dropboxlinks/DropboxLinkGenerator';
 import ForwardDropbox from '../components/minis/forward/ForwardDropbox';
@@ -378,7 +378,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
   if (view === 'ratecard') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ marginBottom: 14 }}>{back}</div>
-      <RateCardGenerator addToast={addToast} />
+      <RateCardStudio addToast={addToast} />
     </div>
   );
 

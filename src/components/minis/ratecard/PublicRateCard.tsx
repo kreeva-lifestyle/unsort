@@ -6,7 +6,7 @@
 // its own header and a small inline toast strip (there is no ToastContainer).
 import { useState, useCallback } from 'react';
 import { T } from '../../../lib/theme';
-import RateCardGenerator from './RateCardGenerator';
+import RateCardStudio from './RateCardStudio';
 
 interface Toast { id: number; msg: string; kind: string }
 
@@ -30,7 +30,7 @@ export default function PublicRateCard({ token }: { token: string }) {
           </div>
         </div>
 
-        <RateCardGenerator addToast={addToast} lockedMode="master" shareToken={token} />
+        <RateCardStudio addToast={addToast} lockedMode="master" shareToken={token} />
 
         <div style={{ textAlign: 'center', fontSize: 10, color: T.tx3, marginTop: 22, lineHeight: 1.6 }}>
           Arya Designs · ARYA &amp; DRESSTIVE<br />Rates are live from our master sheet.

@@ -22,6 +22,7 @@
 // Dropbox creds + folder links live in app_secrets (service-role only).
 
 // deno-lint-ignore-file no-explicit-any
+import { catalogFolder, catalogZip, catalogList } from './catalog.ts';
 
 const ALLOWED_ORIGINS = [
   'https://dailyoffice.aryadesigns.co.in',
@@ -719,6 +720,14 @@ Deno.serve(async (req) => {
     // ratecard share token (sellers on the public link). Candidates use
     // files/get_temporary_link (4h direct URLs) - no permanent share links
     // are minted for photos nobody picks.
+    // Catalog Downloads (RateCard Studio): catalogs with an active design, a
+    // catalog folder + its SKU sub-folders marked active/inactive, and one SKU
+    // folder streamed as a zip. Session or share token. See catalog.ts.
+    if (action === 'catalog_list' || action === 'catalog_folder' || action === 'catalog_zip') {
+      const deps = { dbx, getDropboxToken, resolveGenRootPaths, callerRole, ratecardShareOk, nameMatchesSku, normSku, json, fail, corsHeaders, asciiArg, sbUrl: SB_URL, sbSvc: SB_SVC };
+      return action === 'catalog_list' ? await catalogList(body, req, deps) : action === 'catalog_folder' ? await catalogFolder(body, req, deps) : await catalogZip(body, req, deps);
+    }
+
     if (action === 'ratecard_photos') {
       if (!(await callerRole(req)) && !(await ratecardShareOk(String(body?.shareToken || '')))) {
         return fail(401, 'Sign in to DailyOffice first', req);
