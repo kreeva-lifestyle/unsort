@@ -5,7 +5,7 @@
 // stale the edge function silently falls back to reading Google live, which is
 // correct but slow — so the state has to be visible somewhere rather than only
 // in a table nobody opens.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { T } from '../../lib/theme';
 
@@ -25,10 +25,16 @@ interface SyncRow { tab: string; status: string; last_success_at: string | null;
 
 export default function MasterFreshness() {
   const [rows, setRows] = useState<SyncRow[] | null>(null);
+  const el = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
+    // Only while someone can see it: the app keeps visited tabs mounted
+    // (display:none), so an unguarded interval kept polling from every tab
+    // the owner had ever opened the studio in, in the background, forever.
+    const visible = () => document.visibilityState === 'visible' && (!el.current || el.current.offsetParent !== null);
     const load = async () => {
+      if (!visible()) return;
       const { data } = await supabase.from('master_sheet_sync')
         .select('tab, status, last_success_at, row_count').order('tab');
       if (alive && data) setRows(data);
@@ -36,8 +42,10 @@ export default function MasterFreshness() {
     load();
     // Polled, not realtime: one row per tab changing every few minutes is not
     // worth a websocket subscription on every client.
-    const t = setInterval(load, 60_000);
-    return () => { alive = false; clearInterval(t); };
+    const t = setInterval(load, 120_000);
+    const onWake = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onWake);
+    return () => { alive = false; clearInterval(t); document.removeEventListener('visibilitychange', onWake); };
   }, []);
 
   if (!rows || rows.length === 0) return null;
@@ -61,7 +69,7 @@ export default function MasterFreshness() {
         : `Master synced ${ago(age)} · ${designs.toLocaleString('en-IN')} designs`;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color, marginBottom: 8 }}>
+    <div ref={el} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color, marginBottom: 8 }}>
       <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, opacity: failing || stale ? 1 : 0.6, flexShrink: 0 }} />
       <span>{label}</span>
     </div>

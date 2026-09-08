@@ -2,7 +2,7 @@
 // pills. Active ones are what the pack will contain.
 import { T } from '../../../lib/theme';
 import type { CatalogResult, FolderStatus } from './api';
-import { mb } from './packZip';
+import { mb } from './api';
 
 const DOT: Record<FolderStatus, { color: string; label: string }> = { active: { color: T.gr, label: 'active' }, inactive: { color: T.tx3, label: 'inactive · skipped' }, unknown: { color: T.yl, label: 'not on the sheet for this catalog · skipped' } };
 
