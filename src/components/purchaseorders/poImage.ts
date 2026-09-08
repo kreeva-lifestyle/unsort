@@ -2,7 +2,10 @@
 // share sheet (navigator.share). Falls back to a download where Web Share isn't
 // available (desktop). Mirrors the RateCard canvas approach so we get a real,
 // shareable document image without any PDF dependency.
+// Rates are OFF unless asked for (owner's rule: the image that goes to a
+// vendor must not carry rates, amounts or totals).
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
+import type { PoDocOptions } from './poPdf';
 import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
 import { exportName } from '../../lib/exportName';
 
@@ -16,7 +19,8 @@ const trunc = (ctx: CanvasRenderingContext2D, s: string, max: number) => {
   return t + '…';
 };
 
-export function renderPoImage(po: PurchaseOrder, items: PurchaseOrderItem[]): Promise<Blob> {
+export function renderPoImage(po: PurchaseOrder, items: PurchaseOrderItem[], opts: PoDocOptions = {}): Promise<Blob> {
+  const rates = opts.rates === true;
   const S = 2;            // supersample for crisp text
   const W = 720, PAD = 40;
   const hasSku = items.some(it => it.sku);
@@ -24,7 +28,7 @@ export function renderPoImage(po: PurchaseOrder, items: PurchaseOrderItem[]): Pr
   const totalRows = [
     Number(po.discount_amount) > 0, Number(po.tax_amount) > 0, Number(po.other_charges) > 0, Number(po.round_off) !== 0,
   ].filter(Boolean).length + 1; // + subtotal (grand drawn separately)
-  const H = 150 + 96 + 34 + items.length * rowH + 24 + totalRows * 24 + 44 + 40 + PAD;
+  const H = 150 + 96 + 34 + items.length * rowH + (rates ? 24 + totalRows * 24 + 44 : 0) + 40 + PAD;
 
   const c = document.createElement('canvas');
   c.width = W * S; c.height = H * S;
@@ -72,7 +76,7 @@ export function renderPoImage(po: PurchaseOrder, items: PurchaseOrderItem[]): Pr
 
   y += 74 + 24;
   // Items table header
-  const cols = colX(W, PAD, hasSku);
+  const cols = colX(W, PAD, hasSku, rates);
   ctx.fillStyle = '#F3F4F6'; ctx.fillRect(PAD, y - 18, W - PAD * 2, 26);
   ctx.fillStyle = '#6B7280'; ctx.font = `600 10px ${SANS}`;
   ctx.textAlign = 'left';
@@ -80,7 +84,8 @@ export function renderPoImage(po: PurchaseOrder, items: PurchaseOrderItem[]): Pr
   if (hasSku) ctx.fillText('SKU', cols.sku, y);
   ctx.fillText('ITEM', cols.item, y);
   ctx.textAlign = 'right';
-  ctx.fillText('QTY', cols.qty, y); ctx.fillText('RATE', cols.rate, y); ctx.fillText('AMOUNT', cols.amount, y);
+  ctx.fillText('QTY', cols.qty, y);
+  if (rates) { ctx.fillText('RATE', cols.rate, y); ctx.fillText('AMOUNT', cols.amount, y); }
   ctx.textAlign = 'left'; ctx.fillText('UNIT', cols.unit, y);
   y += 20;
 
@@ -94,15 +99,18 @@ export function renderPoImage(po: PurchaseOrder, items: PurchaseOrderItem[]): Pr
     ctx.fillStyle = '#374151'; ctx.fillText(it.unit || '—', cols.unit, y);
     ctx.textAlign = 'right';
     ctx.fillText(String(Number(it.quantity)), cols.qty, y);
-    ctx.fillText(it.rate == null ? '—' : inr(it.rate), cols.rate, y);
-    ctx.fillText(it.amount == null ? '—' : inr(it.amount), cols.amount, y);
+    if (rates) {
+      ctx.fillText(it.rate == null ? '—' : inr(it.rate), cols.rate, y);
+      ctx.fillText(it.amount == null ? '—' : inr(it.amount), cols.amount, y);
+    }
     ctx.strokeStyle = '#F1F1F4'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, y + 10); ctx.lineTo(W - PAD, y + 10); ctx.stroke();
     y += rowH;
   });
 
-  // Totals (right aligned block)
+  // Totals (right aligned block) — only with rates.
   y += 14;
   const line = (label: string, val: string, bold = false) => {
+    if (!rates) return;
     ctx.textAlign = 'left'; ctx.fillStyle = bold ? '#111827' : '#6B7280'; ctx.font = `${bold ? 700 : 400} ${bold ? 15 : 12}px ${SANS}`;
     ctx.fillText(label, W - PAD - 240, y);
     ctx.textAlign = 'right'; ctx.fillText(val, W - PAD, y);
@@ -113,9 +121,11 @@ export function renderPoImage(po: PurchaseOrder, items: PurchaseOrderItem[]): Pr
   if (Number(po.tax_amount) > 0) line(`Tax (${Number(po.tax_percent)}%)`, '₹' + inr(po.tax_amount));
   if (Number(po.other_charges) > 0) line('Other charges', '₹' + inr(po.other_charges));
   if (Number(po.round_off) !== 0) line('Round off', (Number(po.round_off) < 0 ? '−₹' : '₹') + inr(Math.abs(Number(po.round_off))));
-  ctx.strokeStyle = '#111827'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(W - PAD - 240, y - 12); ctx.lineTo(W - PAD, y - 12); ctx.stroke();
-  y += 6;
-  line('Grand Total', '₹' + inr(po.grand_total), true);
+  if (rates) {
+    ctx.strokeStyle = '#111827'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(W - PAD - 240, y - 12); ctx.lineTo(W - PAD, y - 12); ctx.stroke();
+    y += 6;
+    line('Grand Total', '₹' + inr(po.grand_total), true);
+  }
 
   // Footer
   ctx.textAlign = 'left'; ctx.fillStyle = '#9CA3AF'; ctx.font = `400 10px ${SANS}`;
@@ -124,13 +134,14 @@ export function renderPoImage(po: PurchaseOrder, items: PurchaseOrderItem[]): Pr
   return new Promise((resolve, reject) => c.toBlob(b => b ? resolve(b) : reject(new Error('Could not render the image')), 'image/png'));
 }
 
-function colX(W: number, PAD: number, hasSku: boolean) {
+function colX(W: number, PAD: number, hasSku: boolean, rates: boolean) {
   const num = PAD + 4;
   const sku = PAD + 26;
   const item = hasSku ? PAD + 116 : PAD + 26;
   const amount = W - PAD - 4;    // right-aligned
   const rate = amount - 92;      // right-aligned
-  const unit = amount - 206;     // left-aligned (short: Meter/Piece)
+  // Without rates the quantity and unit take the right edge.
+  const unit = rates ? amount - 206 : amount - 66;   // left-aligned (short: Meter/Piece)
   const qty = unit - 15;         // right-aligned, sits just before unit
   return { num, sku, item, unit, qty, rate, amount };
 }
@@ -144,9 +155,9 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 // Share the PO image via the native share sheet; download as a fallback.
-export async function sharePoImage(po: PurchaseOrder, items: PurchaseOrderItem[], addToast: (m: string, t?: string) => void) {
+export async function sharePoImage(po: PurchaseOrder, items: PurchaseOrderItem[], addToast: (m: string, t?: string) => void, opts: PoDocOptions = {}) {
   let blob: Blob;
-  try { blob = await renderPoImage(po, items); }
+  try { blob = await renderPoImage(po, items, opts); }
   catch { addToast('Could not build the PO image', 'error'); return; }
   const file = new File([blob], exportName('PO', [po.po_number, po.vendor_name], 'png'), { type: 'image/png' });
   const nav = navigator as Navigator & { canShare?: (d: unknown) => boolean };

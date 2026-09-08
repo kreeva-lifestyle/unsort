@@ -20,6 +20,7 @@ import { buildPoPdf } from '../components/purchaseorders/poPdf';
 import { sharePoImage } from '../components/purchaseorders/poImage';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../types/database';
 import { useModalLock } from '../hooks/useModalLock';
+import Toggle from '../components/ui/Toggle';
 
 const COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, created_by, modified_by, created_at, updated_at';
 
@@ -62,7 +63,10 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const [duplicating, setDuplicating] = useState<EditingPO | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [receiving, setReceiving] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[] } | null>(null);
-  const [printData, setPrintData] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[]; html: string } | null>(null);
+  // rates: OFF by default — the document that reaches a vendor must not
+  // carry rates or totals (owner's rule); the switch in the overlay turns
+  // them on for an internal copy.
+  const [printData, setPrintData] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[]; html: string; rates: boolean } | null>(null);
   const printFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   const totalPages = Math.ceil(totalCount / pageSize);
@@ -157,7 +161,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
       if (error) { addToast(friendlyError(error), 'error'); return; }
       items = (data as PurchaseOrderItem[] | null) || [];
     }
-    setPrintData({ po: poRow, items, html: buildPoPdf(poRow, items) });
+    setPrintData({ po: poRow, items, html: buildPoPdf(poRow, items, { rates: false }), rates: false });
   }, [addToast]);
 
   const closeForm = () => { setShowForm(false); setEditing(null); setDuplicating(null); };
@@ -225,13 +229,17 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
         <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: T.bg, display: 'flex', flexDirection: 'column', overscrollBehavior: 'contain' }}>
           <div style={{ padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(8,11,20,.95)', backdropFilter: 'blur(20px)' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, fontFamily: T.sora }}>Purchase Order</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: printData.rates ? T.yl : T.tx3, marginLeft: 'auto', marginRight: 12 }}>
+              {printData.rates ? 'Rates shown' : 'Rates hidden'}
+              <Toggle size="sm" on={printData.rates} label="Show rates" onToggle={() => setPrintData(d => d && ({ ...d, rates: !d.rates, html: buildPoPdf(d.po, d.items, { rates: !d.rates }) }))} />
+            </label>
             <button onClick={() => setPrintData(null)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: T.tx2, cursor: 'pointer', fontSize: 16 }} aria-label="Close">&times;</button>
           </div>
           <iframe ref={printFrameRef} srcDoc={printData.html} style={{ flex: 1, border: 'none', width: '100%', background: '#fff' }} title="Purchase Order preview" />
           <div style={{ padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: 'rgba(8,11,20,.95)', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 8, justifyContent: 'center' }}>
             <button onClick={() => setPrintData(null)} style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: T.tx2, fontSize: 13, cursor: 'pointer', fontWeight: 500, flex: 1, maxWidth: 130 }}>Close</button>
             <button onClick={() => printOrQueue('document', printData.html, 'A4', 'Purchase Order', undefined, addToast, printFrameRef.current)} style={{ padding: '10px 18px', borderRadius: 8, border: `1px solid ${T.ac3}`, background: T.ac3, color: T.ac2, fontSize: 13, fontWeight: 600, cursor: 'pointer', flex: 1, maxWidth: 130 }}>Print</button>
-            <button onClick={() => { if (sharing) return; setSharing(true); sharePoImage(printData.po, printData.items, addToast).finally(() => setSharing(false)); }} style={{ padding: '10px 18px', borderRadius: 8, border: 'none', ...S.btnPrimary, fontSize: 13, flex: 1, maxWidth: 130, opacity: sharing ? 0.5 : 1, pointerEvents: sharing ? 'none' as const : 'auto' as const }}>{sharing ? 'Sharing…' : 'Share'}</button>
+            <button onClick={() => { if (sharing) return; setSharing(true); sharePoImage(printData.po, printData.items, addToast, { rates: printData.rates }).finally(() => setSharing(false)); }} style={{ padding: '10px 18px', borderRadius: 8, border: 'none', ...S.btnPrimary, fontSize: 13, flex: 1, maxWidth: 130, opacity: sharing ? 0.5 : 1, pointerEvents: sharing ? 'none' as const : 'auto' as const }}>{sharing ? 'Sharing…' : 'Share'}</button>
           </div>
         </div>, document.body)}
 

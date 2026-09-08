@@ -1,6 +1,9 @@
 // A4 Purchase Order document — self-contained HTML string for the print
 // overlay + printOrQueue. Every interpolated value goes through escHtml to
 // prevent HTML injection from vendor names / item names / notes.
+// Rates are OFF unless asked for (owner's rule: a PO that goes to a vendor
+// must not carry rates) — without them the sheet is items, quantities and
+// units only, no amounts and no totals.
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
 import { docTitle } from '../../lib/exportName';
@@ -10,13 +13,17 @@ const escHtml = escHtmlShared;
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = (d: string | null | undefined) => d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
-export function buildPoPdf(po: PurchaseOrder, items: PurchaseOrderItem[]): string {
+export interface PoDocOptions { rates?: boolean }
+
+export function buildPoPdf(po: PurchaseOrder, items: PurchaseOrderItem[], opts: PoDocOptions = {}): string {
+  const rates = opts.rates === true;
   const hasSku = items.some(it => it.sku);
   const rows = items.map((it, i) => {
     const rate = it.rate == null ? '—' : inr(it.rate);
     const amt = it.amount == null ? '—' : inr(it.amount);
     const skuCell = hasSku ? `<td>${escHtml(it.sku || '—')}</td>` : '';
-    return `<tr><td>${i + 1}</td>${skuCell}<td>${escHtml(it.item_name)}</td><td class="r">${Number(it.quantity)}</td><td>${escHtml(it.unit || '—')}</td><td class="r">${rate}</td><td class="r">${amt}</td></tr>`;
+    const moneyCells = rates ? `<td class="r">${rate}</td><td class="r">${amt}</td>` : '';
+    return `<tr><td>${i + 1}</td>${skuCell}<td>${escHtml(it.item_name)}</td><td class="r">${Number(it.quantity)}</td><td>${escHtml(it.unit || '—')}</td>${moneyCells}</tr>`;
   }).join('');
 
   const money = (label: string, val: unknown, sign = '') =>
@@ -81,10 +88,10 @@ export function buildPoPdf(po: PurchaseOrder, items: PurchaseOrderItem[]): strin
     </div>
   </div>
   <table>
-    <thead><tr><th>#</th>${hasSku ? '<th>SKU</th>' : ''}<th>Item</th><th class="r">Qty</th><th>Unit</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead>
+    <thead><tr><th>#</th>${hasSku ? '<th>SKU</th>' : ''}<th>Item</th><th class="r">Qty</th><th>Unit</th>${rates ? '<th class="r">Rate</th><th class="r">Amount</th>' : ''}</tr></thead>
     <tbody>${rows}</tbody>
   </table>
-  <div class="totals"><table>${totalRows}<tr class="grand"><td>Grand Total</td><td class="r">₹${inr(po.grand_total)}</td></tr></table></div>
+  ${rates ? `<div class="totals"><table>${totalRows}<tr class="grand"><td>Grand Total</td><td class="r">₹${inr(po.grand_total)}</td></tr></table></div>` : ''}
   ${po.notes ? `<div class="foot"><strong>Notes:</strong> ${escHtml(po.notes)}</div>` : ''}
   <div class="foot">This is a computer-generated purchase order and does not require a signature.</div>
 </body></html>`;
