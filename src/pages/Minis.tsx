@@ -61,6 +61,10 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     setIgnoredSkus(m);
   }, [addToast]);
   useEffect(() => { fetchIgnored(); }, [fetchIgnored]);
+  // A tile low on the home grid (RateCard Studio, on a phone) opens its view
+  // with the page still scrolled to where the tile was, so the view's back
+  // button sat above the fold. Every view starts at the top.
+  useEffect(() => { document.querySelector('main')?.scrollTo({ top: 0 }); window.scrollTo({ top: 0 }); }, [view]);
 
   const ignoreSku = async (row: CompareRow) => {
     const key = row._key;

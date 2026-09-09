@@ -46,8 +46,8 @@ export interface PackResult { url?: string; pending?: boolean; jobId?: string; p
 
 /** Build or reuse the pack inside Dropbox. `pending` means the copy is
  *  still running — call again with the jobId. */
-export async function catalogPack(catalog: string, path: string, shareToken?: string, jobId?: string): Promise<PackResult> {
-  const { status, data } = await call({ action: 'catalog_pack', catalog, path, ...(shareToken ? { shareToken } : {}), ...(jobId ? { jobId } : {}) });
+export async function catalogPack(catalog: string, path: string, shareToken?: string, jobId?: string, packPath?: string): Promise<PackResult> {
+  const { status, data } = await call({ action: 'catalog_pack', catalog, path, ...(shareToken ? { shareToken } : {}), ...(jobId ? { jobId, packPath } : {}) });
   if (!data?.ok) return { error: explainGen(data, status) };
   return data as PackResult;
 }

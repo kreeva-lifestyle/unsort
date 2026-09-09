@@ -8,20 +8,26 @@ const DOT: Record<FolderStatus, { color: string; label: string }> = { active: { 
 
 export default function FolderList({ r }: { r: CatalogResult }) {
   const t = r.totals;
+  // A book that is not on the master sheet has no active/inactive to go by:
+  // every folder goes into the pack, and the row says so.
+  const offSheet = r.sheetCount === 0;
+  const label = (s: FolderStatus) => (offSheet && s === 'unknown' ? 'included · not on the sheet' : DOT[s].label);
+  const included = (s: FolderStatus) => s === 'active' || (offSheet && s === 'unknown');
   return (
     <div style={{ marginTop: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', fontSize: 11, color: T.tx2, marginBottom: 6 }}>
         <span><span style={{ fontFamily: T.mono, color: T.tx }}>{r.folder.name}</span> · {r.items.length} folder{r.items.length === 1 ? '' : 's'}</span>
-        <span style={{ fontFamily: T.mono, color: t.active ? T.gr : T.tx3 }}>{t.active} active · {t.files} file{t.files === 1 ? '' : 's'} · {mb(t.bytes)}</span>
+        <span style={{ fontFamily: T.mono, color: t.active ? T.gr : T.tx3 }}>{t.active} {offSheet ? 'included' : 'active'} · {t.files} file{t.files === 1 ? '' : 's'} · {mb(t.bytes)}</span>
       </div>
+      {offSheet && <div style={{ fontSize: 10, color: T.yl, marginBottom: 6 }}>This catalog is not on the master sheet, so there is no active list to filter by — every folder is included.</div>}
       {r.truncated && <div style={{ fontSize: 10, color: T.yl, marginBottom: 6 }}>This folder is very large — only the first part was listed.</div>}
       <div style={{ maxHeight: 320, overflowY: 'auto', WebkitOverflowScrolling: 'touch', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
         {r.items.map((it, i) => (
-          <div key={it.path} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderTop: i ? `1px solid ${T.bd}` : 'none', minHeight: 36, opacity: it.status === 'active' ? 1 : 0.6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: DOT[it.status].color, flexShrink: 0 }} />
+          <div key={it.path} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderTop: i ? `1px solid ${T.bd}` : 'none', minHeight: 36, opacity: included(it.status) ? 1 : 0.6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: included(it.status) ? T.gr : DOT[it.status].color, flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: T.mono, fontSize: 12, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</div>
-              <div style={{ fontSize: 10, color: T.tx3, lineHeight: 1.4 }}>{it.files} file{it.files === 1 ? '' : 's'} · {mb(it.bytes)} · {DOT[it.status].label}</div>
+              <div style={{ fontSize: 10, color: T.tx3, lineHeight: 1.4 }}>{it.files} file{it.files === 1 ? '' : 's'} · {mb(it.bytes)} · {label(it.status)}</div>
             </div>
           </div>
         ))}

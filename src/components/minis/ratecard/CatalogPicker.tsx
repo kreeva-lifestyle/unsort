@@ -1,7 +1,10 @@
 // Catalog picker for RateCard Studio (From Master and Catalog downloads):
 // a type-to-search box over the master sheet's CATALOG column, grouped by
-// brand (the sheet tab — Arya Designs, Dresstive) with the newest catalog
-// first: whatever sits lowest on the sheet was added last. Portaled list
+// brand (the sheet tab — Dresstive first, then Arya Designs, owner's order)
+// with the newest catalog first: whatever sits lowest on the sheet was added
+// last. Only catalogs with at least one active design are listed (owner's
+// rule for every flow). Catalog downloads may also search Dropbox for a
+// name that is not on the sheet at all. Portaled list
 // (AnchoredList) because iOS never renders <datalist>. The list itself is
 // one cached server call per few minutes, shared across remounts.
 import { useState, useEffect, useMemo } from 'react';
@@ -11,17 +14,19 @@ import AnchoredList from '../../ui/AnchoredList';
 import { catalogList, type Catalog } from '../catalogdl/api';
 
 const TAB_LABEL: Record<string, string> = { ARYA: 'Arya Designs', DRESSTIVE: 'Dresstive' };
-const TAB_ORDER = ['ARYA', 'DRESSTIVE'];
+const TAB_ORDER = ['DRESSTIVE', 'ARYA'];
 const labelOf = (tab: string) => TAB_LABEL[tab] || tab || 'Other';
 
-export default function CatalogPicker({ shareToken, disabled, onPick, addToast, onlyActive, hint }: {
+export default function CatalogPicker({ shareToken, disabled, onPick, addToast, onlyActive = true, hint, allowSearch }: {
   shareToken?: string;
   disabled: boolean;
   onPick: (name: string) => void;
   addToast: (m: string, t?: string) => void;
-  /** Catalog Downloads: hide catalogs with no active design and say how many are active. */
+  /** Hide catalogs with no active design (default) and say how many are active. */
   onlyActive?: boolean;
   hint?: string;
+  /** Catalog downloads: a typed name that matches no listed catalog can still be searched in Dropbox. */
+  allowSearch?: boolean;
 }) {
   const [catalogs, setCatalogs] = useState<Catalog[] | null>(null);
   const [q, setQ] = useState('');
@@ -46,19 +51,25 @@ export default function CatalogPicker({ shareToken, disabled, onPick, addToast, 
   }, [catalogs, onlyActive, q]);
   const flat = useMemo(() => groups.flatMap(g => g.items), [groups]);
   const total = (catalogs || []).filter(c => !onlyActive || c.active > 0).length;
-  const showList = open && flat.length > 0;
+  // A typed name that is not on the list: Catalog downloads can still look
+  // for that folder in Dropbox (a book that is not on the master sheet).
+  const typed = q.trim();
+  const searchRow = !!allowSearch && typed.length >= 2 && !(catalogs || []).some(c => c.name.toLowerCase() === typed.toLowerCase());
+  const showList = open && (flat.length > 0 || searchRow);
+  const rows = flat.length + (searchRow ? 1 : 0);
 
   const pick = (c: Catalog) => { setQ(c.name); setOpen(false); setHi(-1); onPick(c.name); };
+  const pickTyped = () => { setOpen(false); setHi(-1); onPick(typed); };
   const keyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!showList) return;
-    if (e.key === 'ArrowDown') { e.preventDefault(); setHi(h => (h + 1) % flat.length); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setHi(h => (h <= 0 ? flat.length - 1 : h - 1)); }
-    else if (e.key === 'Enter' && hi >= 0 && flat[hi]) { e.preventDefault(); pick(flat[hi]); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHi(h => (h + 1) % rows); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHi(h => (h <= 0 ? rows - 1 : h - 1)); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (hi >= 0 && flat[hi]) pick(flat[hi]); else if (searchRow && (hi === flat.length || hi < 0)) pickTyped(); }
     else if (e.key === 'Escape') { e.preventDefault(); setOpen(false); setHi(-1); }
   };
 
   // No catalog column in the master (or none readable) — From Master's SKU box still works.
-  if (catalogs && total === 0) return onlyActive ? <div style={{ fontSize: 11, color: T.tx3, marginBottom: 10 }}>No catalog has an active design right now.</div> : null;
+  if (catalogs && total === 0 && !allowSearch) return <div style={{ fontSize: 11, color: T.tx3, marginBottom: 10 }}>No catalog has an active design right now.</div>;
   const countText = (c: Catalog) => onlyActive ? `${c.active} active of ${c.count}` : `${c.count} design${c.count === 1 ? '' : 's'}`;
 
   return (
@@ -90,6 +101,12 @@ export default function CatalogPicker({ shareToken, disabled, onPick, addToast, 
               </div>); })}
           </div>
         ))}
+        {searchRow && (
+          <div role="option" aria-selected={hi === flat.length} onMouseDown={e => { e.preventDefault(); pickTyped(); }} onMouseEnter={() => setHi(flat.length)}
+            style={{ padding: '9px 12px', minHeight: 40, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', background: hi === flat.length ? T.ac3 : 'transparent', color: T.ac2, fontSize: 12 }}>
+            Search Dropbox for “{typed}” <span style={{ fontSize: 10, color: T.tx3 }}>· not on the master sheet</span>
+          </div>
+        )}
       </AnchoredList>
       <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>{hint ?? 'Type to search — newest catalogs first, grouped by brand. Picking one loads its designs and names the card. Or type SKUs below.'}</div>
     </div>

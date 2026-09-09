@@ -219,12 +219,15 @@ export async function catalogFolder(body: any, req: Request, d: Deps): Promise<R
   if (!sr.ok) return d.fail(502, 'Could not read the master mirror for that catalog', req);
   const folders = [...sub.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   const out = classifyFolders(folders, sheet, d.nameMatchesSku, d.normSku);
+  // A book that is not on the master sheet (owner's ask): nothing to filter
+  // by, so every folder counts and the pack takes them all.
+  if (sheet.length === 0) out.totals = { active: out.items.length, files: out.items.reduce((t, i) => t + i.files, 0), bytes: out.items.reduce((t, i) => t + i.bytes, 0) };
   return d.json({ ok: true, folder, ...out, loose, sheetCount: sheet.length, truncated }, req);
 }
 
 // Packs live here, and ONLY here: the delete below refuses any other path.
 export const PACK_ROOT = '/DailyOffice Vendor Packs';
-const packName = (catalog: string) => `${safeFile(catalog)} (active)`;
+const packName = (catalog: string, all = false) => `${safeFile(catalog)} (${all ? 'all' : 'active'})`;
 
 /** Pure: does an existing pack already hold exactly the active folders
  *  (same names, same file counts, same bytes)? Then it is reused unchanged. */
@@ -253,13 +256,15 @@ export async function catalogPack(body: any, req: Request, d: Deps): Promise<Res
   const catalog = String(body?.catalog || '').trim().slice(0, 120);
   const path = String(body?.path || '').trim().toLowerCase();
   const jobId = String(body?.jobId || '').trim();
-  const packPath = `${PACK_ROOT}/${packName(catalog)}`;
+  let packPath = `${PACK_ROOT}/${packName(catalog)}`;
   if (!catalog || !path.startsWith('/')) return d.fail(400, 'Pick a catalog first', req);
   let token = '';
   try { token = await d.getDropboxToken(); } catch { return d.json({ ok: false, error: 'dropbox_not_connected' }, req, 409); }
 
-  // Polling a copy that was still running.
+  // Polling a copy that was still running (the pack path travels with it).
   if (jobId) {
+    const given = String(body?.packPath || '').trim();
+    if (given.toLowerCase().startsWith(PACK_ROOT.toLowerCase() + '/')) packPath = given;
     const ck = await d.dbx(token, 'files/copy_batch/check_v2', { async_job_id: jobId });
     if (ck.status >= 400) return d.fail(502, 'Dropbox lost track of the copy — try again', req, JSON.stringify(ck.data).slice(0, 200));
     const tag = ck.data?.['.tag'];
@@ -278,9 +283,11 @@ export async function catalogPack(body: any, req: Request, d: Deps): Promise<Res
   if (!sr.ok) return d.fail(502, 'Could not read the master mirror for that catalog', req);
   const sheet: SheetRow[] = await sr.json().catch(() => []);
   const out = classifyFolders([...listed.sub.values()], sheet, d.nameMatchesSku, d.normSku);
-  const active = out.items.filter(i => i.status === 'active');
+  // Not on the master sheet → every folder; on the sheet → active only.
+  const active = sheet.length === 0 ? out.items : out.items.filter(i => i.status === 'active');
   if (active.length === 0) return d.json({ ok: false, error: 'No active design in this catalog folder' }, req);
-  const extra = { count: active.length, files: out.totals.files, bytes: out.totals.bytes };
+  const extra = { count: active.length, files: active.reduce((t, i) => t + i.files, 0), bytes: active.reduce((t, i) => t + i.bytes, 0) };
+  if (sheet.length === 0) packPath = `${PACK_ROOT}/${packName(catalog, true)}`;
 
   // Reuse a pack that already matches; otherwise rebuild it from scratch.
   const existing = await d.dbx(token, 'files/get_metadata', { path: packPath });
