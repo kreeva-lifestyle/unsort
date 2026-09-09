@@ -82,7 +82,7 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
           })}
 
           <div style={{ borderTop: comp.subs.length ? `1px solid ${T.bd}` : 'none', paddingTop: comp.subs.length ? 4 : 0 }}>
-            <SubChips presets={topSubs} comp={comp} onAdd={s => addLine(s)} />
+            <SubChips presets={topSubs} comp={comp} onAdd={s => addLine(s)} disabled={!comp.name.trim()} />
             <button onClick={() => addLine()} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, marginTop: 8, borderStyle: 'dashed' }}>+ Add line</button>
           </div>
         </div>

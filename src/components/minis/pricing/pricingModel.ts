@@ -88,9 +88,13 @@ export function project(p: PricedProduct, cfg: PricingConfig, catalogPriceExc?: 
   const breakdown = costBreakdown(p, cfg);
   const profit = { pct: num(p.pricing?.profit?.pct ?? cfg.defaults.profit.pct), fixed: num(p.pricing?.profit?.fixed ?? cfg.defaults.profit.fixed) };
   const exc = targetPrice(breakdown.costPerPc, profit);
+  // The master sheet's PRICE EXC GST is the final selling price whenever it
+  // exists (owner's rule) — the sheet's own value only fills in for designs
+  // the master has no price for.
   const sheetPrice = num(p.selling_price);
-  const price = sheetPrice > 0 ? sheetPrice : (catalogPriceExc && catalogPriceExc > 0 ? catalogPriceExc : null);
-  const priceSource = sheetPrice > 0 ? 'sheet' : price ? 'catalog' : 'none';
+  const master = catalogPriceExc && catalogPriceExc > 0 ? catalogPriceExc : null;
+  const price = master ?? (sheetPrice > 0 ? sheetPrice : null);
+  const priceSource = master ? 'catalog' : price ? 'sheet' : 'none';
   const profitAmount = price === null ? null : r2(price - breakdown.costPerPc);
   const marginPct = price === null || price <= 0 ? null : r2((price - breakdown.costPerPc) / price * 100);
   const threshold = resolveThreshold(cfg, p.category, p.pricing?.thresholds);

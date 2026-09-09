@@ -4,11 +4,13 @@ import { T, S } from '../../../lib/theme';
 import { numericKeyDown } from '../../../lib/numericInput';
 import { CostingProduct, money, num } from './costingModel';
 
-export default function CostingHero({ p, total, uploading, categories, onSku, onCategory, onSelling, onFile }: {
+export default function CostingHero({ p, total, uploading, categories, masterPrice, onSku, onCategory, onSelling, onFile }: {
   p: CostingProduct;
   total: number;
   uploading: boolean;
   categories: string[];
+  /** Master sheet PRICE EXC GST for this SKU — when present it is the final price and the field locks. */
+  masterPrice: number | null;
   onSku: (v: string) => void;
   onCategory: (v: string) => void;
   onSelling: (v: string) => void;
@@ -47,10 +49,12 @@ export default function CostingHero({ p, total, uploading, categories, onSku, on
 
     <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: 'oklch(0.72 0.19 145 / .05)', border: '1px solid oklch(0.72 0.19 145 / .18)', borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
       <div>
-        <label style={S.fLabel}>Selling price</label>
-        <input value={p.selling_price ?? ''} onChange={e => onSelling(e.target.value)}
-          onKeyDown={e => numericKeyDown(e)} type="number" min="0" placeholder="₹"
-          style={{ ...S.fInput, width: 110, fontFamily: T.mono }} />
+        <label style={S.fLabel}>Selling price{masterPrice ? ' · master sheet' : ''}</label>
+        {masterPrice
+          ? <div title="Final price from the master sheet (PRICE EXC GST) — change it there" style={{ ...S.fInput, width: 130, fontFamily: T.mono, fontWeight: 700, color: T.gr, display: 'flex', alignItems: 'center', background: 'oklch(0.72 0.19 145 / .06)', borderColor: 'oklch(0.72 0.19 145 / .3)' }}>{money(masterPrice)}</div>
+          : <input value={p.selling_price ?? ''} onChange={e => onSelling(e.target.value)}
+              onKeyDown={e => numericKeyDown(e)} type="number" min="0" placeholder="₹"
+              style={{ ...S.fInput, width: 110, fontFamily: T.mono }} />}
       </div>
       <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
         <div style={{ fontSize: 10, color: T.tx3 }}>Margin</div>

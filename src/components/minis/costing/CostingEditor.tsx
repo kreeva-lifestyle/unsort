@@ -2,7 +2,7 @@
 // with a selling-price + margin strip, collapsible component cards whose
 // rows open the LineSheet, and Save in the sticky total bar. Compulsory
 // fields still enforced at SAVE — a half-filled sheet is never stored.
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
@@ -22,6 +22,7 @@ import { purchasePlanHtml } from './purchasePlan';
 import { costingSheetHtml } from './costingSheet';
 import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 import { useSettingsCategories } from './useSettingsCategories';
+import { useProductCatalog, resolveSku } from '../../../hooks/useProductCatalog';
 
 export default function CostingEditor({ product, saved, library, topSubs, onSaved, onBack, addToast }: {
   product: CostingProduct;
@@ -42,6 +43,13 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
   const [pieces, setPieces] = useState('');
   const { ask, modalProps } = useConfirm();
   const { categories } = useSettingsCategories(addToast);
+  // The master sheet's PRICE EXC GST is the final selling price when it
+  // exists (owner's rule): it fills the field, locks it, and is saved with
+  // the sheet so the Price Projector and reports agree.
+  const { index } = useProductCatalog();
+  const masterHit = resolveSku(index, p.sku)?.product ?? null;
+  const masterPrice = masterHit && masterHit.price_exc_gst != null && Number(masterHit.price_exc_gst) > 0 ? Number(masterHit.price_exc_gst) : null;
+  useEffect(() => { if (masterPrice && num(p.selling_price ?? '') !== masterPrice) setP(prev => ({ ...prev, selling_price: masterPrice })); }, [masterPrice, p.selling_price]);
   // A saved, complete component starts folded (compact overview); anything
   // new or with problems starts open. Computed once at mount.
   const [openDefaults] = useState<boolean[]>(() => product.components.map(c =>
@@ -124,7 +132,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
   const total = totalCost(p.components, p.maintenance_pct);
   return (
     <div style={{ fontFamily: T.sans, color: T.tx }}>
-      <CostingHero p={p} total={total} uploading={uploading} categories={categories}
+      <CostingHero p={p} total={total} uploading={uploading} categories={categories} masterPrice={masterPrice}
         onSku={v => setP(prev => ({ ...prev, sku: v }))}
         onCategory={v => setP(prev => ({ ...prev, category: v }))}
         onSelling={v => setP(prev => ({ ...prev, selling_price: v }))}

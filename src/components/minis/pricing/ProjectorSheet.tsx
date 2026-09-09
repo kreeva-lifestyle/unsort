@@ -39,6 +39,10 @@ export default function ProjectorSheet({ product, config, catalogPrice, catalogC
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [printHtml, setPrintHtml] = useState<string | null>(null);
   useEffect(() => { if (!product.category && catalogCategory) setP(prev => ({ ...prev, category: catalogCategory })); }, [product.category, catalogCategory]);
+  // Master price is final: it is stored on the sheet too, so every report
+  // agrees, and the input becomes a read-only figure.
+  const masterPrice = catalogPrice && catalogPrice > 0 ? catalogPrice : null;
+  useEffect(() => { if (masterPrice && num(product.selling_price) !== masterPrice) setP(prev => ({ ...prev, selling_price: masterPrice })); }, [masterPrice, product.selling_price]);
 
   const pr = useMemo(() => project(p, config, catalogPrice), [p, config, catalogPrice]);
   const sugs = useMemo(() => suggestions(p, config, pr), [p, config, pr]);
@@ -118,16 +122,21 @@ export default function ProjectorSheet({ product, config, catalogPrice, catalogC
             <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 800, color: T.gr }}>{money(pr.target.exc)} <span style={{ fontSize: 11, color: T.tx3, fontWeight: 500 }}>ex GST</span></div>
             <div style={{ fontSize: 11, color: T.tx2 }}>{money(pr.target.inc)} inc {pr.target.gstPct}% GST</div>
           </div>
-          <button type="button" className="touch44" onClick={() => setP(prev => ({ ...prev, selling_price: pr.target.exc }))} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>Use as selling price</button>
+          {!masterPrice && <button type="button" className="touch44" onClick={() => setP(prev => ({ ...prev, selling_price: pr.target.exc }))} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>Use as selling price</button>}
         </div>
       </div>
 
       <div style={card}>
         <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Selling price and margin</div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>
-          <div><label style={S.fLabel}>Selling price ex GST</label><input type="number" min="0" step="1" inputMode="decimal" value={num(p.selling_price) > 0 ? String(p.selling_price) : ''} placeholder={catalogPrice ? `${catalogPrice} (catalog)` : '—'} onKeyDown={e => numericKeyDown(e)} onChange={e => setP(prev => ({ ...prev, selling_price: e.target.value === '' ? null : Number(e.target.value) }))} style={numIn} /></div>
+          <div>
+            <label style={S.fLabel}>Selling price ex GST{masterPrice ? ' · master sheet' : ''}</label>
+            {masterPrice
+              ? <div title="Final price from the master sheet (PRICE EXC GST) — change it there" style={{ ...numIn, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', color: T.gr, fontWeight: 700, background: 'oklch(0.72 0.19 145 / .06)', borderColor: 'oklch(0.72 0.19 145 / .3)' }}>{money(masterPrice)}</div>
+              : <input type="number" min="0" step="1" inputMode="decimal" value={num(p.selling_price) > 0 ? String(p.selling_price) : ''} placeholder="—" onKeyDown={e => numericKeyDown(e)} onChange={e => setP(prev => ({ ...prev, selling_price: e.target.value === '' ? null : Number(e.target.value) }))} style={numIn} />}
+          </div>
           <div style={{ flex: 1, minWidth: 160 }}>
-            <div style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Profit · margin{pr.priceSource === 'catalog' ? ' (catalog price)' : ''}</div>
+            <div style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Profit · margin{pr.priceSource === 'catalog' ? ' (master sheet price)' : ''}</div>
             <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 800, color: pr.profitAmount === null ? T.tx3 : pr.profitAmount >= 0 ? T.gr : T.re }}>{pr.profitAmount === null ? '—' : `${money(pr.profitAmount)} · ${pr.marginPct?.toFixed(1)}%`}</div>
           </div>
         </div>

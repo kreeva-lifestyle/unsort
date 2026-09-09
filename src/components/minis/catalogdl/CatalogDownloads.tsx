@@ -40,7 +40,7 @@ export default function CatalogDownloads({ addToast, shareToken }: { addToast: (
       let r = await catalogPack(result.folder.name, result.folder.path, shareToken);
       for (let i = 0; r.pending && r.jobId && i < POLL_MAX && alive.current; i++) {
         await new Promise(res => setTimeout(res, POLL_MS));
-        r = await catalogPack(result.folder.name, result.folder.path, shareToken, r.jobId);
+        r = await catalogPack(result.folder.name, result.folder.path, shareToken, r.jobId, r.packPath);
       }
       if (!alive.current) return;
       if (r.error) throw new Error(r.error);
@@ -58,7 +58,7 @@ export default function CatalogDownloads({ addToast, shareToken }: { addToast: (
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: T.tx, marginBottom: 2 }}>Catalog downloads</div>
         <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.5, marginBottom: 10 }}>Pick a catalog. Its folder is found in Dropbox and one zip is prepared with the photos of every <span style={{ color: T.gr }}>active</span> design — inactive designs are left out.</div>
-        <CatalogPicker shareToken={shareToken} disabled={busy} addToast={addToast} onPick={n => find(n)} onlyActive hint="Type to search. Newest catalogs first; only catalogs with an active design are listed." />
+        <CatalogPicker shareToken={shareToken} disabled={busy} addToast={addToast} onPick={n => find(n)} onlyActive allowSearch hint="Type to search. Newest catalogs first; only catalogs with an active design are listed. A book that is not on the sheet can be typed and searched in Dropbox." />
         {finding && <div style={{ fontSize: 11, color: T.tx3 }}>Looking for “{catalog}” in Dropbox…</div>}
         {candidates && (
           <div style={{ marginTop: 6 }}>
@@ -74,7 +74,7 @@ export default function CatalogDownloads({ addToast, shareToken }: { addToast: (
             {!pack && (
               <button type="button" className="touch44" onClick={download} disabled={busy || result.totals.active === 0}
                 style={{ ...S.btnPrimary, minHeight: 44, flex: 1, pointerEvents: busy ? 'none' : 'auto', opacity: busy || result.totals.active === 0 ? 0.5 : 1 }}>
-                {packing ? 'Preparing in Dropbox…' : `Prepare pack · ${result.totals.active} active`}
+                {packing ? 'Preparing in Dropbox…' : `Prepare pack · ${result.totals.active} ${result.sheetCount === 0 ? 'folders' : 'active'}`}
               </button>
             )}
             {pack?.url && (

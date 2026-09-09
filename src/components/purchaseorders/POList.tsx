@@ -62,6 +62,24 @@ const itemsLabel = (po: PORow) => {
   return { head: sku || name || 'item', sub };
 };
 
+// "Pending since": how long an open PO has been waiting, from its PO date
+// (or creation) — owner's ask, so a forgotten order stands out in the grid.
+// Closed orders (completed / cancelled) never show it.
+const OPEN_STATUSES = new Set(['draft', 'approved', 'sent', 'partially_received']);
+const pendingDays = (po: PORow): number | null => {
+  if (!OPEN_STATUSES.has(po.status)) return null;
+  const since = po.po_date ? new Date(po.po_date + 'T00:00:00') : po.created_at ? new Date(po.created_at) : null;
+  if (!since || Number.isNaN(since.getTime())) return null;
+  return Math.max(0, Math.floor((Date.now() - since.getTime()) / 86400000));
+};
+const pendingColor = (d: number) => (d > 14 ? T.re : d > 7 ? T.yl : T.tx3);
+const PendingSince = ({ po, inline }: { po: PORow; inline?: boolean }) => {
+  const d = pendingDays(po);
+  if (d === null) return null;
+  const text = d === 0 ? 'pending since today' : `pending ${d} d`;
+  return inline ? <span style={{ color: pendingColor(d) }}>{text}</span> : <div style={{ fontSize: 9, color: pendingColor(d), marginTop: 3, fontFamily: T.mono, whiteSpace: 'nowrap' }}>{text}</div>;
+};
+
 const progress = (po: PORow) => {
   const its = po.purchase_order_items || [];
   const ordered = its.reduce((s, it) => s + Number(it.quantity || 0), 0);
@@ -147,7 +165,7 @@ export default function POList(p: Props) {
                         </div>
                       ) : <span style={{ fontSize: 11, color: T.tx3 }}>—</span>}
                     </td>
-                    <td style={{ ...S.tdStyle, textAlign: 'center' }}><StatusPill status={po.status} sc={sc} /></td>
+                    <td style={{ ...S.tdStyle, textAlign: 'center' }}><StatusPill status={po.status} sc={sc} /><PendingSince po={po} /></td>
                     <td style={{ ...S.tdStyle, padding: '11px 8px', textAlign: 'right' }}>
                       <button onClick={e => { e.stopPropagation(); p.onPrint(po); }} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 4, opacity: 0.5 }} title="Print" aria-label="Print">
                         <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.tx2, strokeWidth: 2 }}><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
@@ -184,6 +202,7 @@ export default function POList(p: Props) {
                   {(() => { const il = itemsLabel(po); return <span style={{ color: T.tx2 }}>{il.head}{il.sub ? ` · ${il.sub}` : ''}</span>; })()}
                   {po.po_date && <><span>·</span><span>{new Date(po.po_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span></>}
                   {(po.status === 'partially_received' || po.status === 'completed') && <><span>·</span><span style={{ color: pr.pct >= 100 ? T.gr : T.yl }}>{pr.pct}% received</span></>}
+                  {pendingDays(po) !== null && <><span>·</span><PendingSince po={po} inline /></>}
                 </div>
               </div>
             </SwipeRow>

@@ -5,7 +5,7 @@
 // and suppliers with material codes AND rates (owner's explicit call —
 // chips are the ONE place that fills the rate; typing and supplier-pick
 // still leave it blank). Chips already on this component hide.
-import { S } from '../../../lib/theme';
+import { S, T } from '../../../lib/theme';
 import { CostingComponent, CostingSub, blankSupplier } from './costingModel';
 
 export interface SubPreset {
@@ -13,10 +13,12 @@ export interface SubPreset {
   suppliers: { name: string; materialCode: string; rate: number | string; selected: boolean }[];
 }
 
-export default function SubChips({ presets, comp, onAdd }: {
+export default function SubChips({ presets, comp, onAdd, disabled }: {
   presets: SubPreset[];
   comp: CostingComponent;
   onAdd: (s: CostingSub) => void;
+  /** Owner's rule: a sub-component belongs to a NAMED main component — chips wait for the name. */
+  disabled?: boolean;
 }) {
   const used = new Set(comp.subs.map(s => s.name.trim().toUpperCase()).filter(Boolean));
   const chips = presets.filter(p => p.name.trim() && !used.has(p.name.trim().toUpperCase())).slice(0, 8);
@@ -26,13 +28,14 @@ export default function SubChips({ presets, comp, onAdd }: {
     suppliers: p.suppliers.length ? p.suppliers.map(x => ({ ...x })) : [blankSupplier()],
   });
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
       {chips.map(p => (
-        <button key={p.name} onClick={() => onAdd(toSub(p))} aria-label={`Add ${p.name}`}
-          style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, padding: '5px 12px', fontSize: 11, borderRadius: 999 }}>
+        <button key={p.name} onClick={() => !disabled && onAdd(toSub(p))} aria-label={`Add ${p.name}`} disabled={disabled} aria-disabled={disabled}
+          style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, padding: '5px 12px', fontSize: 11, borderRadius: 999, opacity: disabled ? 0.35 : 1, cursor: disabled ? 'not-allowed' : 'pointer', pointerEvents: disabled ? 'none' : 'auto' }}>
           + {p.name}
         </button>
       ))}
+      {disabled && <span style={{ fontSize: 10, color: T.tx3 }}>name the main component first</span>}
     </div>
   );
 }
