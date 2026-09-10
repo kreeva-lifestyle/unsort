@@ -38,6 +38,8 @@ interface Props {
   canCreate: boolean;
   onOpenDetail: (po: PORow) => void;
   onPrint: (po: PORow) => void;
+  /** Opens the vendor pendency report (vendor picked inside). */
+  onPendency: () => void;
   page: number;
   totalPages: number;
   onPageChange: (p: number | ((prev: number) => number)) => void;
@@ -99,6 +101,10 @@ export default function POList(p: Props) {
         <button onClick={p.onToggleFilters} style={{ ...S.btnGhost, color: p.showFilters || filterActive ? T.ac2 : T.tx3, borderColor: p.showFilters || filterActive ? T.ac3 : T.bd2, background: p.showFilters ? T.ac3 : 'rgba(255,255,255,0.03)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
           Filters{filterActive ? ` (${[p.statusFilter, p.typeFilter, p.creatorFilter, p.dateFrom, p.dateTo].filter(Boolean).length})` : ''}
+        </button>
+        <button onClick={p.onPendency} title="Pending orders per vendor — print or share" style={{ ...S.btnGhost, color: T.tx3, borderColor: T.bd2, background: 'rgba(255,255,255,0.03)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+          Pending
         </button>
       </div>
 

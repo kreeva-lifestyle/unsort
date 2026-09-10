@@ -18,6 +18,7 @@ import PODetail from '../components/purchaseorders/PODetail';
 import POReceive from '../components/purchaseorders/POReceive';
 import { buildPoPdf } from '../components/purchaseorders/poPdf';
 import { sharePoImage } from '../components/purchaseorders/poImage';
+import PendencyReport from '../components/purchaseorders/PendencyReport';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../types/database';
 import { useModalLock } from '../hooks/useModalLock';
 import Toggle from '../components/ui/Toggle';
@@ -68,6 +69,9 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   // them on for an internal copy.
   const [printData, setPrintData] = useState<{ po: PurchaseOrder; items: PurchaseOrderItem[]; html: string; rates: boolean } | null>(null);
   const printFrameRef = useRef<HTMLIFrameElement | null>(null);
+  // Vendor pendency report (owner's ask): open orders for one vendor with
+  // pending-since headlined, shareable as an image. null = closed.
+  const [pendency, setPendency] = useState<{ vendor: string | null } | null>(null);
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
@@ -206,6 +210,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
         onResetPage={() => setPage(0)}
         onOpenEmpty={() => { setEditing(null); setDuplicating(null); setShowForm(true); }} canCreate={canCreate}
         onOpenDetail={openDetail} onPrint={(po) => openPrint(po)}
+        onPendency={() => setPendency({ vendor: null })}
         page={page} totalPages={totalPages} onPageChange={setPage}
       />
 
@@ -219,8 +224,11 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
         onDuplicate={() => { setDuplicating({ ...detail.po, items: detail.items }); setEditing(null); setDetail(null); setShowForm(true); }}
         onReceive={() => { setReceiving({ po: detail.po, items: detail.items }); }}
         onPrint={() => openPrint(detail.po, detail.items)}
+        onPendency={() => setPendency({ vendor: detail.po.vendor_name })}
         addToast={addToast}
       />}
+
+      {pendency && <PendencyReport vendor={pendency.vendor} onClose={() => setPendency(null)} addToast={addToast} />}
 
       {receiving && <POReceive po={receiving.po} items={receiving.items} onClose={() => setReceiving(null)}
         onReceived={() => { setReceiving(null); refreshDetail(); }} addToast={addToast} />}
@@ -243,7 +251,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
           </div>
         </div>, document.body)}
 
-      {active !== false && !detail && !showForm && !receiving && !printData && canCreate && createPortal(
+      {active !== false && !detail && !showForm && !receiving && !printData && !pendency && canCreate && createPortal(
         <button className="fab" aria-label="New purchase order" onClick={() => { setEditing(null); setDuplicating(null); setShowForm(true); }}>+</button>,
         document.body,
       )}
