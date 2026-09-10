@@ -913,6 +913,8 @@ export interface PurchaseOrder {
   expected_date: string | null;
   payment_terms: string | null;
   notes: string | null;
+  /** Internal: how many finished pieces this purchase is for. Never printed or shared. */
+  for_pieces: number | null;
   subtotal: number | null;
   discount_type: 'flat' | 'percentage' | null;
   discount_value: number | null;
@@ -976,6 +978,7 @@ export type POHeaderInput = {
   expected_date?: string | null;
   payment_terms?: string | null;
   notes?: string | null;
+  for_pieces?: number | null;
   discount_type?: 'flat' | 'percentage' | null;
   discount_value?: number | null;
   tax_percent?: number | null;

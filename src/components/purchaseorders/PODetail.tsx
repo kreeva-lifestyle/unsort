@@ -102,6 +102,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
             <Info label="PO Date" value={fmtDate(po.po_date)} />
             <Info label="Expected" value={fmtDate(po.expected_date)} />
             {po.payment_terms && <Info label="Payment terms" value={po.payment_terms} />}
+            {po.for_pieces != null && po.for_pieces > 0 && <Info label="For pieces · internal" value={<span style={{ fontFamily: T.mono }}>{po.for_pieces} pcs</span>} />}
           </div>
 
           {/* Items */}
