@@ -40,6 +40,7 @@ export function buildPoPdf(po: PurchaseOrder, items: PurchaseOrderItem[], opts: 
     po.vendor_phone ? `<div>Phone: ${escHtml(po.vendor_phone)}</div>` : '',
   ].filter(Boolean).join('');
 
+  // po.for_pieces is internal and deliberately left out of the Details box.
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escHtml(docTitle('Purchase-Order', po.po_number, po.vendor_name))}</title>
 <style>

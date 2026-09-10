@@ -71,6 +71,7 @@ export function renderPoImage(po: PurchaseOrder, items: PurchaseOrderItem[], opt
   ctx.fillStyle = '#374151'; ctx.font = `400 12px ${SANS}`;
   if (po.vendor_phone) ctx.fillText('Phone: ' + po.vendor_phone, PAD + 12, y + 56);
   const dx = PAD + boxW + 32;
+  // for_pieces is internal and deliberately not drawn.
   ctx.fillText('Type: ' + (PO_TYPE_LABELS[po.po_type] || po.po_type), dx, y + 38);
   ctx.fillText((po.expected_date ? 'Expected: ' + fmtDate(po.expected_date) : (po.payment_terms ? 'Terms: ' + po.payment_terms : '')), dx, y + 56);
 

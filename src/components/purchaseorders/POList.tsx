@@ -155,6 +155,7 @@ export default function POList(p: Props) {
                     <td style={S.tdStyle}>{(() => { const il = itemsLabel(po); return (<>
                       <div style={{ fontSize: 12, fontFamily: T.mono, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{il.head}</div>
                       {il.sub && <div style={{ fontSize: 9, color: T.tx3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{il.sub}</div>}
+                      {po.for_pieces != null && po.for_pieces > 0 && <div style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, whiteSpace: 'nowrap' }}>for {po.for_pieces} pcs</div>}
                     </>); })()}</td>
                     <td style={{ ...S.tdStyle, textAlign: 'right' }}><span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(po.grand_total || 0).toLocaleString('en-IN')}</span></td>
                     <td style={S.tdStyle}>
@@ -200,6 +201,7 @@ export default function POList(p: Props) {
                 <div style={{ fontSize: 11, color: T.tx3, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span>{PO_TYPE_LABELS[po.po_type] || po.po_type}</span><span>·</span>
                   {(() => { const il = itemsLabel(po); return <span style={{ color: T.tx2 }}>{il.head}{il.sub ? ` · ${il.sub}` : ''}</span>; })()}
+                  {po.for_pieces != null && po.for_pieces > 0 && <><span>·</span><span>for {po.for_pieces} pcs</span></>}
                   {po.po_date && <><span>·</span><span>{new Date(po.po_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span></>}
                   {(po.status === 'partially_received' || po.status === 'completed') && <><span>·</span><span style={{ color: pr.pct >= 100 ? T.gr : T.yl }}>{pr.pct}% received</span></>}
                   {pendingDays(po) !== null && <><span>·</span><PendingSince po={po} inline /></>}
