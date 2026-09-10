@@ -16,7 +16,7 @@ import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog }
 const fmtDate = (d: string | null | undefined) => d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN');
 
-export default function PODetail({ po, items, receipts, audit, statusColors, canManage, onClose, onChanged, onEdit, onDuplicate, onReceive, onPrint, addToast }: {
+export default function PODetail({ po, items, receipts, audit, statusColors, canManage, onClose, onChanged, onEdit, onDuplicate, onReceive, onPrint, onPendency, addToast }: {
   po: PurchaseOrder;
   items: PurchaseOrderItem[];
   receipts: PurchaseOrderReceipt[];
@@ -29,6 +29,8 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
   onDuplicate: () => void;
   onReceive: () => void;
   onPrint: () => void;
+  /** Vendor pendency report, preselected on this PO's vendor. */
+  onPendency: () => void;
   addToast: (m: string, t?: string) => void;
 }) {
   const { ask, modalProps } = useConfirm();
@@ -102,7 +104,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
             <Info label="PO Date" value={fmtDate(po.po_date)} />
             <Info label="Expected" value={fmtDate(po.expected_date)} />
             {po.payment_terms && <Info label="Payment terms" value={po.payment_terms} />}
-            {po.for_pieces != null && po.for_pieces > 0 && <Info label="For pieces · internal" value={<span style={{ fontFamily: T.mono }}>{po.for_pieces} pcs</span>} />}
+            {po.for_pieces != null && po.for_pieces > 0 && <Info label="For pieces" value={<span style={{ fontFamily: T.mono }}>{po.for_pieces} pcs</span>} />}
           </div>
 
           {/* Items */}
@@ -174,6 +176,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
         {/* Actions */}
         <div className="po-actions" style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button onClick={onPrint} style={{ ...S.btnGhost, ...S.btnSm }}>Print / Share</button>
+          <button onClick={onPendency} style={{ ...S.btnGhost, ...S.btnSm }}>Vendor pending</button>
           <button onClick={onDuplicate} style={{ ...S.btnGhost, ...S.btnSm }}>Duplicate</button>
           {canEdit && <button onClick={onEdit} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</button>}
           {canCancel && <button onClick={() => setStatus('cancelled', 'cancelled')} disabled={!!busy} style={{ ...S.btnDanger, ...S.btnSm, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy === 'cancelled' ? 'Cancelling…' : 'Cancel PO'}</button>}

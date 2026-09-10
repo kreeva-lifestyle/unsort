@@ -191,7 +191,7 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
               <input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="e.g. 30 days" style={S.fInput} />
             </div>
             <div>
-              <label style={S.fLabel}>For how many pcs? · internal</label>
+              <label style={S.fLabel}>For how many pcs?</label>
               <input value={forPieces} onChange={e => setForPieces(e.target.value)} onKeyDown={e => numericKeyDown(e)} inputMode="numeric" placeholder="e.g. 120" aria-label="For how many pieces"
                 style={{ ...S.fInput, fontFamily: T.mono }} />
               <div style={{ fontSize: 10, color: T.tx3, marginTop: 3 }}>not shown on the shared or printed PO</div>
