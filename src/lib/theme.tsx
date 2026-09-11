@@ -334,13 +334,16 @@ export const CHALLAN_STATUS_COLORS: Record<string, { bg: string; color: string }
 };
 
 // Purchase Order lifecycle colours — draft→grey, approved→indigo, sent→blue,
-// partially_received→amber, completed→green, cancelled→red.
+// partially_received→amber, completed→green, closed→slate, cancelled→red.
+// Closed (the balance was written off) is neither a success nor a failure,
+// so it reads neutral — never green, never red.
 export const PO_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   draft: { bg: 'oklch(1 0 0 / 0.06)', color: T.tx3 },
   approved: { bg: T.ac3, color: T.ac2 },
   sent: { bg: oklchTint(0.77, 0.14, 230, 0.10), color: T.bl },
   partially_received: { bg: oklchTint(0.78, 0.18, 75, 0.10), color: T.yl },
   completed: { bg: oklchTint(0.72, 0.19, 145, 0.10), color: T.gr },
+  closed: { bg: oklchTint(0.70, 0.04, 250, 0.10), color: 'oklch(0.70 0.04 250)' },
   cancelled: { bg: oklchTint(0.63, 0.22, 25, 0.10), color: T.re },
 };
 

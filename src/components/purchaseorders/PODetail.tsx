@@ -10,6 +10,9 @@ import { friendlyError } from '../../lib/friendlyError';
 import { poAuditLog } from './poAudit';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import { useModalLock } from '../../hooks/useModalLock';
+import POCloseModal, { pendingOf } from './POCloseModal';
+import POActivity from './POActivity';
+import POReceipts from './POReceipts';
 import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../../types/database';
 
@@ -36,6 +39,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
   const { ask, modalProps } = useConfirm();
   useModalLock();
   const [busy, setBusy] = useState('');
+  const [closing, setClosing] = useState(false);
   const sc = statusColors[po.status] || statusColors.draft;
 
   const setStatus = async (status: 'approved' | 'sent' | 'cancelled', label: string) => {
@@ -73,6 +77,26 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
   };
   const canRemoveReceipt = canManage && !['draft', 'cancelled'].includes(po.status);
 
+  // Short-close: end an order whose balance will never arrive. Reopen undoes
+  // it (the server recomputes the status from the receipts), so a mis-tap is
+  // not a dead end.
+  const reopen = async () => {
+    if (busy) return;
+    setBusy('reopen');
+    try {
+      const { error } = await supabase.rpc('set_po_status', { p_po_id: po.id, p_status: 'reopen' });
+      if (error) throw new Error(error.message);
+      await poAuditLog('REOPENED', po.id, `PO #${po.po_number} reopened`);
+      addToast('Purchase order reopened', 'success');
+      onChanged();
+    } catch (e) { addToast(friendlyError(e), 'error'); }
+    setBusy('');
+  };
+
+  const isOpen = ['approved', 'sent', 'partially_received'].includes(po.status);
+  const stillPending = items.some(it => pendingOf(it) > 0);
+  const canClose = isOpen && stillPending && canManage;
+  const canReopen = po.status === 'closed' && canManage;
   const canReceive = ['approved', 'sent', 'partially_received'].includes(po.status);
   const canApprove = po.status === 'draft' && canManage;
   // "Mark Sent" only makes sense before goods start arriving; once a PO is
@@ -105,6 +129,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
             <Info label="Expected" value={fmtDate(po.expected_date)} />
             {po.payment_terms && <Info label="Payment terms" value={po.payment_terms} />}
             {po.for_pieces != null && po.for_pieces > 0 && <Info label="For pieces" value={<span style={{ fontFamily: T.mono }}>{po.for_pieces} pcs</span>} />}
+            {po.status === 'closed' && <Info label="Closed" value={<span style={{ fontSize: 12 }}>{fmtDate(po.closed_at)}{po.close_reason ? <span style={{ color: T.tx3 }}> · {po.close_reason}</span> : null}</span>} />}
           </div>
 
           {/* Items */}
@@ -140,43 +165,17 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${T.bd}`, paddingTop: 6, marginTop: 2, fontSize: 15, fontWeight: 700, color: T.tx }}><span>Grand Total</span><span style={{ fontFamily: T.mono }}>₹{inr(po.grand_total)}</span></div>
           </div>
 
-          {/* Receipts */}
-          {receipts.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: T.tx2, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Receipts</div>
-              {receipts.map(r => {
-                const item = items.find(it => it.id === r.po_item_id);
-                return (
-                  <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '7px 10px', background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
-                    <div style={{ minWidth: 0 }}><span style={{ color: T.tx }}>{item?.item_name || 'Item'}</span> <span style={{ color: T.gr, fontFamily: T.mono }}>+{Number(r.received_qty)}</span>{r.remarks && <span style={{ color: T.tx3, marginLeft: 6 }}>· {r.remarks}</span>}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                      <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{fmtDate(r.receipt_date)}</span>
-                      {canRemoveReceipt && <button onClick={() => removeReceipt(r)} disabled={!!busy} title="Remove this receipt" style={{ border: 'none', background: 'none', color: T.re, cursor: busy ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: 600, padding: '2px 4px', opacity: busy ? 0.5 : 0.85 }}>Undo</button>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <POReceipts receipts={receipts} items={items} canRemove={canRemoveReceipt} busy={busy} onRemove={removeReceipt} />
 
-          {/* Timeline */}
-          {audit && audit.length > 0 && (
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: T.tx2, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Activity</div>
-              {audit.map(a => (
-                <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: 11 }}>
-                  <div><span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: T.ac3, color: T.ac2, fontWeight: 700, marginRight: 6 }}>{a.action}</span><span style={{ color: T.tx2 }}>{a.details}</span></div>
-                  <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, flexShrink: 0, marginLeft: 8 }}>{a.created_at ? new Date(a.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <POActivity audit={audit} />
         </div>
 
         {/* Actions */}
         <div className="po-actions" style={{ padding: '12px 18px', borderTop: `1px solid ${T.bd}`, display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button onClick={onPrint} style={{ ...S.btnGhost, ...S.btnSm }}>Print / Share</button>
           <button onClick={onPendency} style={{ ...S.btnGhost, ...S.btnSm }}>Vendor pending</button>
+          {canClose && <button onClick={() => setClosing(true)} title="The rest is not coming — write off the balance" style={{ ...S.btnGhost, ...S.btnSm }}>Close remaining</button>}
+          {canReopen && <button onClick={reopen} disabled={!!busy} style={{ ...S.btnGhost, ...S.btnSm, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy === 'reopen' ? 'Reopening…' : 'Reopen'}</button>}
           <button onClick={onDuplicate} style={{ ...S.btnGhost, ...S.btnSm }}>Duplicate</button>
           {canEdit && <button onClick={onEdit} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</button>}
           {canCancel && <button onClick={() => setStatus('cancelled', 'cancelled')} disabled={!!busy} style={{ ...S.btnDanger, ...S.btnSm, pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{busy === 'cancelled' ? 'Cancelling…' : 'Cancel PO'}</button>}
@@ -186,6 +185,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
         </div>
       </div>
       <ConfirmModal {...modalProps} />
+      {closing && <POCloseModal po={po} items={items} onClose={() => setClosing(false)} onClosed={() => { setClosing(false); onChanged(); }} addToast={addToast} />}
     </div>,
     document.body,
   );
