@@ -7,6 +7,7 @@ import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { CostingProduct, blankComponent, totalCost, money, buildLibrary } from './costingModel';
+import { withTemplates } from './costingTemplates';
 import CostingEditor from './CostingEditor';
 import { SubPreset } from './SubChips';
 import AskBox from './AskBox';
@@ -62,7 +63,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
   if (editing) {
     // Everything typed on ANY sheet, offered back as dropdown suggestions —
     // one spelling per supplier keeps the purchase plan grouped correctly.
-    const library = buildLibrary(list ?? []);
+    const library = withTemplates(buildLibrary(list ?? []), list ?? []);
     return (
       <CostingEditor product={editing} saved={editingSaved} library={library} topSubs={presets} addToast={addToast}
         onBack={() => { setEditing(null); load(); }}

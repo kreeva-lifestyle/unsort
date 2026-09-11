@@ -12,6 +12,7 @@ import {
 import LineSheet from './LineSheet';
 import SubChips, { SubPreset } from './SubChips';
 import SuggestInput from '../../ui/SuggestInput';
+import { cloneSub, templateFor, type ComponentTemplate } from './costingTemplates';
 
 const BAD = '1px solid rgba(239,68,68,.55)';
 
@@ -26,11 +27,23 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [lineFor, setLineFor] = useState<number | null>(null);
+  // Garment template (owner's ask): a component with nothing typed yet can
+  // start from the usual lines of LEHANGA / BLOUSE / TOP… in one tap. The
+  // note stays until the first edit so the copied rates get a look.
+  const [copiedFrom, setCopiedFrom] = useState<string | null>(null);
+  const isBlank = (s: ReturnType<typeof blankSub>) => !s.name.trim() && !String(s.qty).trim() && s.suppliers.every(x => !x.name.trim() && !String(x.rate).trim());
+  const fresh = comp.subs.every(isBlank);
+  const named = templateFor(library, comp.name);
+  const applyTemplate = (t: ComponentTemplate) => { onChange({ name: t.name, subs: t.subs.map(cloneSub) }); setCopiedFrom(t.sku); };
+  const chip = (active: boolean): React.CSSProperties => ({ ...S.btnGhost, ...S.btnSm, minHeight: 32, padding: '5px 12px', fontSize: 11, borderRadius: 999, ...(active ? { borderColor: T.ac3, color: T.ac2, background: T.ac3 } : {}) });
 
-  const patchSub = (i: number, next: ReturnType<typeof blankSub>) =>
+  const patchSub = (i: number, next: ReturnType<typeof blankSub>) => {
+    setCopiedFrom(null);
     onChange({ ...comp, subs: comp.subs.map((s, j) => (j === i ? next : s)) });
-  const removeSub = (i: number) => onChange({ ...comp, subs: comp.subs.filter((_, j) => j !== i) });
+  };
+  const removeSub = (i: number) => { setCopiedFrom(null); onChange({ ...comp, subs: comp.subs.filter((_, j) => j !== i) }); };
   const addLine = (s = blankSub()) => {
+    setCopiedFrom(null);
     onChange({ ...comp, subs: [...comp.subs, s] });
     setLineFor(comp.subs.length);   // open the fresh line straight away
   };
@@ -49,6 +62,18 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
 
       {open && (
         <div style={{ borderTop: `1px solid ${T.bd}`, padding: '10px 14px 12px' }}>
+          {fresh && (library.templates?.length ?? 0) > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }} data-fx={`cost-tpl-${idx}`}>
+              {named ? (
+                <button onClick={() => applyTemplate(named)} style={chip(true)}>+ Add the usual {named.subs.length} line{named.subs.length === 1 ? '' : 's'} from {named.sku}</button>
+              ) : (<>
+                <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Start from</span>
+                {library.templates!.slice(0, 8).map(t => (
+                  <button key={t.name} onClick={() => applyTemplate(t)} title={`${t.subs.length} lines from ${t.sku}`} style={chip(false)}>{t.name}</button>
+                ))}
+              </>)}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
             <SuggestInput value={comp.name} onChange={v => onChange({ ...comp, name: v })} options={library.mains}
               placeholder="Main component — e.g. Fabric *" style={{ ...S.fInput, flex: 1, minWidth: 0, ...(comp.name.trim() ? {} : { border: BAD }) }} />
@@ -81,6 +106,7 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
             );
           })}
 
+          {copiedFrom && <div style={{ fontSize: 10, color: T.yl, padding: '6px 10px 2px' }}>usual lines copied from {copiedFrom} · check quantities and rates</div>}
           <div style={{ borderTop: comp.subs.length ? `1px solid ${T.bd}` : 'none', paddingTop: comp.subs.length ? 4 : 0 }}>
             <SubChips presets={topSubs} comp={comp} onAdd={s => addLine(s)} disabled={!comp.name.trim()} />
             <button onClick={() => addLine()} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, marginTop: 8, borderStyle: 'dashed' }}>+ Add line</button>
@@ -89,9 +115,10 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
       )}
 
       {lineFor !== null && comp.subs[lineFor] && (
-        <LineSheet sub={comp.subs[lineFor]} compName={comp.name} library={library}
+        <LineSheet key={lineFor} sub={comp.subs[lineFor]} compName={comp.name} library={library}
           onChange={next => patchSub(lineFor, next)}
           onRemove={() => removeSub(lineFor)}
+          onNext={() => { setLineFor(null); addLine(); }}
           onClose={() => setLineFor(null)} />
       )}
     </div>

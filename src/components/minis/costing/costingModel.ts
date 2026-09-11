@@ -143,6 +143,9 @@ export interface CostingLibrary {
   mains: string[];
   subs: string[];
   suppliers: { name: string; materialCode: string; rate: number | string }[];
+  /** Garment templates + per-material presets — filled by withTemplates() in costingTemplates.ts. */
+  templates?: import('./costingTemplates').ComponentTemplate[];
+  subPresets?: Record<string, import('./costingTemplates').SubPreset>;
 }
 
 export function buildLibrary(products: CostingProduct[]): CostingLibrary {

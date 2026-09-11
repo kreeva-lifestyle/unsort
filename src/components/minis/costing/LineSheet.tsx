@@ -15,20 +15,35 @@ import {
   selectedSupplier, subCost, subProblems, cheaperAlt, money, num,
 } from './costingModel';
 import SupplierModal from './SupplierModal';
+import { applyPreset, presetFor } from './costingTemplates';
 import SuggestInput from '../../ui/SuggestInput';
 import { useModalLock } from '../../../hooks/useModalLock';
 
 const BAD = '1px solid rgba(239,68,68,.55)';
 
-export default function LineSheet({ sub, compName, library, onChange, onRemove, onClose }: {
+export default function LineSheet({ sub, compName, library, onChange, onRemove, onNext, onClose }: {
   sub: CostingSub;
   compName: string;
   library: CostingLibrary;
   onChange: (next: CostingSub) => void;
   onRemove: () => void;
+  /** Done & next: close this line and open a fresh one (owner's chain-entry flow). */
+  onNext?: () => void;
   onClose: () => void;
 }) {
   const [supOpen, setSupOpen] = useState(false);
+  // Which sheet the prefilled rate came from — shown until the rate is
+  // edited, because rates move and a silent stale rate priced a sheet once.
+  const [rateFrom, setRateFrom] = useState<string | null>(null);
+  // Picking a material name (a TAPPED suggestion, never typing) brings its
+  // unit, supplier, code and last rate; only empty fields are filled.
+  const pickName = (name: string) => {
+    const preset = presetFor(library, name);
+    const r = applyPreset({ ...sub, name }, preset);
+    onChange(r.sub);
+    if (r.filled.rate && preset) setRateFrom(preset.sku);
+  };
+  const pickUnit = (u: string) => onChange({ ...sub, unit: u, qty: u === 'Pcs' && !String(sub.qty).trim() ? '1' : sub.qty });
   // useModalLock only drops the class when no other .modal-inner is mounted,
   // so SupplierModal closing on top no longer unlocks the page behind us.
   useModalLock();
@@ -59,7 +74,7 @@ export default function LineSheet({ sub, compName, library, onChange, onRemove, 
         </div>
         <div style={{ padding: '14px 18px', overflowY: 'auto' }}>
           <label style={S.fLabel}>Sub component <span style={{ color: T.re }}>*</span></label>
-          <SuggestInput value={sub.name} onChange={v => onChange({ ...sub, name: v })} options={library.subs}
+          <SuggestInput value={sub.name} onChange={v => onChange({ ...sub, name: v })} onPick={pickName} options={library.subs}
             placeholder='e.g. Georgette 60"' style={{ ...fld(bad.name), marginBottom: 12 }} />
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
@@ -69,7 +84,7 @@ export default function LineSheet({ sub, compName, library, onChange, onRemove, 
                 type="number" min="0" enterKeyHint="next" placeholder="0" style={fld(bad.qty)} />
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                 {UNITS.map(u => (
-                  <button key={u} onClick={() => onChange({ ...sub, unit: u })}
+                  <button key={u} onClick={() => pickUnit(u)}
                     style={{ ...S.btnGhost, ...S.btnSm, minHeight: 28, borderRadius: 999, padding: '4px 12px',
                       ...(sub.unit === u ? { borderColor: T.ac, color: T.ac2, background: 'rgba(99,102,241,.1)' } : bad.unit ? { border: BAD } : {}) }}>
                     {u}
@@ -79,8 +94,10 @@ export default function LineSheet({ sub, compName, library, onChange, onRemove, 
             </div>
             <div>
               <label style={S.fLabel}>Rate (today&rsquo;s) <span style={{ color: T.re }}>*</span></label>
-              <input value={sel?.rate ?? ''} onChange={e => patchSel({ rate: e.target.value })} onKeyDown={e => numericKeyDown(e)}
-                type="number" min="0" enterKeyHint="done" placeholder="0" style={fld(bad.rate)} />
+              <input value={sel?.rate ?? ''} onChange={e => { setRateFrom(null); patchSel({ rate: e.target.value }); }}
+                onKeyDown={e => { numericKeyDown(e); if (e.key === 'Enter' && onNext) { e.preventDefault(); onNext(); } }}
+                type="number" min="0" enterKeyHint={onNext ? 'next' : 'done'} placeholder="0" style={fld(bad.rate)} />
+              {rateFrom && <div style={{ fontSize: 10, color: T.yl, marginTop: 4 }}>last used on {rateFrom} · check it</div>}
               <label style={{ ...S.fLabel, marginTop: 8, display: 'block' }}>Material code</label>
               <input value={sel?.materialCode ?? ''} onChange={e => patchSel({ materialCode: e.target.value })}
                 placeholder="Code" style={{ ...fld(false), fontFamily: T.mono, height: 36, fontSize: 13 }} />
@@ -118,7 +135,8 @@ export default function LineSheet({ sub, compName, library, onChange, onRemove, 
 
           <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
             <button onClick={() => { onRemove(); onClose(); }} style={{ ...S.btnDanger, minHeight: 44 }}>Delete</button>
-            <button onClick={onClose} style={{ ...S.btnPrimary, flex: 1, minHeight: 44 }}>Done</button>
+            <button onClick={onClose} style={{ ...(onNext ? S.btnGhost : S.btnPrimary), flex: onNext ? undefined : 1, minHeight: 44 }}>Done</button>
+            {onNext && <button onClick={onNext} style={{ ...S.btnPrimary, flex: 1, minHeight: 44 }}>Done &amp; next</button>}
           </div>
         </div>
       </div>
