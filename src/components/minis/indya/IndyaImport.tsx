@@ -3,11 +3,12 @@
 //   2 download the SKU sheet — every row's lookup SKU with the size rules
 //     applied — and hand it to the vendors;
 //   3 add the stock files the vendors send back (the Odette ones), plus the
-//     optional Correct-SKU sheet, Blocked Inventory and Virtual Stock;
+//     optional Blocked Inventory and Virtual Stock; the saved SKU map fixes
+//     Indya's misspelt codes before every lookup;
 //   4 compute;  5 download the SAME file with only the Stock column changed.
 // Owns its Back arrow and the Virtual Stock editor (the Trackly shape) so
 // Minis.tsx stays small.
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { T, S, alpha } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { downloadFile } from '../../../lib/downloadFile';
@@ -15,8 +16,9 @@ import { saveWorkbook } from '../../../lib/xlsxDownload';
 import { exportName, fileDate } from '../../../lib/exportName';
 import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 import VirtualStock from '../VirtualStock';
+import IndyaSkuMap from './IndyaSkuMap';
 import { looksLikeHtmlReport, latin1, parseMasterHtml, rewriteMasterBytes, type MasterRow } from './indyaMaster';
-import { readVendorFile, readBlockedFile, readCorrectionFile, MAX_FILE_BYTES, type VendorFile, type Corrections } from './indyaFiles';
+import { readVendorFile, readBlockedFile, MAX_FILE_BYTES, type VendorFile, type Corrections } from './indyaFiles';
 import { computeIndya, type ComputeResult, type Flag } from './indyaCompute';
 import { exportSkuSheet } from './indyaSkuSheet';
 import IndyaToolbar from './IndyaToolbar';
@@ -35,7 +37,9 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
   const [master, setMaster] = useState<{ name: string; bytes: Uint8Array; rows: MasterRow[] } | null>(null);
   const [vendors, setVendors] = useState<VendorFile[]>([]);
   const [blocked, setBlocked] = useState<{ name: string; map: Record<string, number>; count: number } | null>(null);
-  const [corr, setCorr] = useState<Corrections | null>(null);
+  const [corr, setCorr] = useState<Corrections | null>(null);   // the saved SKU map, owned by IndyaSkuMap
+  const [mapPrefill, setMapPrefill] = useState<{ code: string; n: number } | null>(null);
+  const onMapChange = useCallback((c: Corrections) => { setCorr(c.count ? c : null); setResult(null); }, []);
   const [result, setResult] = useState<(ComputeResult & { blob: Blob }) | null>(null);
   const [busy, setBusy] = useState('');
   const [filter, setFilterState] = useState<Filter>('all');
@@ -73,11 +77,6 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
   const importBlocked = async (file: File) => {
     setBusy('blocked');
     try { const b = await readBlockedFile(file); setBlocked(b); setResult(null); addToast(`${b.count} blocked values from ${Object.keys(b.map).length} SKUs`, 'success'); } catch (err) { fail(err); }
-    setBusy('');
-  };
-  const importCorr = async (file: File) => {
-    setBusy('corr');
-    try { const c = await readCorrectionFile(file); setCorr(c); setResult(null); addToast(`${c.count} SKU corrections loaded`, 'success'); } catch (err) { fail(err); }
     setBusy('');
   };
   const skuSheet = async () => {
@@ -120,8 +119,8 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
     setBusy('');
   };
   const reset = async () => {
-    if (!await ask({ title: 'Clear everything?', message: 'The master, vendor, blocked and correction files and the computed result are dropped. You can import them again.', confirmLabel: 'Clear', cancelLabel: 'Keep', danger: true })) return;
-    setMaster(null); setVendors([]); setBlocked(null); setCorr(null); setResult(null); setFilter('all'); setSearch(''); setPerPage(25);
+    if (!await ask({ title: 'Clear everything?', message: 'The master, vendor and blocked files and the computed result are dropped. The saved SKU map stays.', confirmLabel: 'Clear', cancelLabel: 'Keep', danger: true })) return;
+    setMaster(null); setVendors([]); setBlocked(null); setResult(null); setFilter('all'); setSearch(''); setPerPage(25);
   };
 
   const filtered = useMemo(() => {
@@ -149,18 +148,19 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
         </button>
       </div>
       <VirtualStock stock={virtualStock} setStock={setVirtualStock} addToast={addToast} />
+      <IndyaSkuMap addToast={addToast} onChange={onMapChange} prefill={mapPrefill} />
 
-      <IndyaToolbar busy={busy} hasMaster={!!master} hasVendors={vendors.length > 0} hasCorr={!!corr} hasBlocked={!!blocked} hasResult={!!result} anything={!!(master || vendors.length || blocked || corr)}
-        onMaster={importMaster} onVendors={importVendors} onCorr={importCorr} onBlocked={importBlocked} onSkuSheet={skuSheet} onCompute={compute} onDownload={download} onReset={reset} />
+      <IndyaToolbar busy={busy} hasMaster={!!master} hasVendors={vendors.length > 0} hasBlocked={!!blocked} hasResult={!!result} anything={!!(master || vendors.length || blocked)}
+        onMaster={importMaster} onVendors={importVendors} onBlocked={importBlocked} onSkuSheet={skuSheet} onCompute={compute} onDownload={download} onReset={reset} />
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
         {master && <span style={chip(T.ac3, T.ac2)}>Master: {master.rows.length.toLocaleString('en-IN')} rows</span>}
         {vendors.map((v, i) => <span key={i} style={chip('rgba(255,255,255,.04)', T.tx2, T.bd)}>{v.name} ({v.rows.length.toLocaleString('en-IN')})</span>)}
-        {corr && <span style={chip('oklch(0.77 0.14 230 / .08)', T.bl, 'oklch(0.77 0.14 230 / .2)')}>Corrections: {corr.count}</span>}
+        {corr && <span style={chip('oklch(0.77 0.14 230 / .08)', T.bl, 'oklch(0.77 0.14 230 / .2)')}>SKU map: {corr.count} fix{corr.count === 1 ? '' : 'es'}</span>}
         {blocked && <span style={chip('oklch(0.78 0.18 75 / .08)', T.yl, 'oklch(0.78 0.18 75 / .2)')}>Blocked: {Object.keys(blocked.map).length} SKUs</span>}
       </div>
       <div style={{ fontSize: 10.5, color: T.tx3, marginBottom: 12, lineHeight: 1.5 }}>
-        Each row is looked up as <span style={{ fontFamily: T.mono }}>code-SIZE</span>: the code exactly as Indya sent it first, then again with a size stuck on the code dropped; Unstitched uses the bare code; 2XL and XXL are the same; a dashless spelling still matches (shown as “loose match”). The SKU sheet lists that SKU for every row — give it to the vendors and add the stock files they return. Sizes above XXL are not made: they are left out of the SKU sheet and written as 0. A correct-SKU sheet replaces the code before the lookup. Duplicate Indya listings of one product get the same stock. Unknown codes are written as “SKU mismatch”; a known code with no stock in that size is 0.
+        Each row is looked up as <span style={{ fontFamily: T.mono }}>code-SIZE</span>: the code exactly as Indya sent it first, then again with a size stuck on the code dropped; Unstitched uses the bare code; 2XL and XXL are the same; a dashless spelling still matches (shown as “loose match”). The SKU sheet lists that SKU for every row — give it to the vendors and add the stock files they return. Sizes above XXL are not made: they are left out of the SKU sheet and written as 0. The SKU map replaces a misspelt code before the lookup (codes only — one fix covers every size). Duplicate Indya listings of one product get the same stock. Unknown codes are written as “SKU mismatch”; a known code with no stock in that size is 0.
       </div>
 
       {result && c && <>
@@ -172,7 +172,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
             </button>
           ))}
         </div>
-        <IndyaUnknown bases={result.unknownBases} onPick={b => { setFilter('unknown'); setSearch(b); }} />
+        <IndyaUnknown bases={result.unknownBases} onPick={b => { setFilter('unknown'); setSearch(b); }} onMap={b => { setMapPrefill({ code: b, n: Date.now() }); window.scrollTo({ top: 0, behavior: 'smooth' }); document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' }); }} />
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: 180, maxWidth: 320 }}>
             <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
@@ -188,7 +188,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
       </>}
 
       {!result && !master && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Import Indya’s product master. Then download the SKU sheet for the vendors, and add the stock files they send back.</div>}
-      {!result && master && vendors.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Master loaded. Download the SKU sheet for the vendors, then add the stock files they return (and the correct-SKU sheet if you have one).</div>}
+      {!result && master && vendors.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Master loaded. Download the SKU sheet for the vendors, then add the stock files they return.</div>}
       {!result && master && vendors.length > 0 && <div style={{ padding: 30, textAlign: 'center', color: T.yl, fontSize: 12 }}>Ready. Tap Compute.</div>}
       <ConfirmModal {...modalProps} />
     </div>

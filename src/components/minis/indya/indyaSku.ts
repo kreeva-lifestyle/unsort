@@ -86,6 +86,22 @@ export function stripSize(code: string, size?: string): string {
 
 export const baseOf = (vendorSku: string, size?: string): string => stripSize(vendorSku, size);
 
+/** A design code with no size on it — what the SKU map accepts on both sides. */
+export const isCodeOnly = (v: string): boolean => { const n = normKey(v); return !!n && stripSize(n) === n; };
+
+/** The code a master row is looked up under, after the SKU map. The map
+ *  holds codes only, so the row's VendorSKU is tried as sent, then with its
+ *  stuck-on size dropped, each strictly and then by shape. A correction
+ *  sheet may also map an Indya SKU directly (bySku). */
+export function resolveCode(vendorSku: string, size: string, indyaSku: string,
+  c?: { bySku: Map<string, string>; byVendor: Map<string, string>; byShape?: Map<string, string> } | null): { code: string; corrected: string | null } {
+  if (!c) return { code: vendorSku, corrected: null };
+  const raw = normKey(vendorSku), base = stripSize(raw, size);
+  const hit = c.bySku.get(normKey(indyaSku)) ?? c.byVendor.get(raw) ?? c.byVendor.get(base)
+    ?? c.byShape?.get(shapeKey(raw)) ?? c.byShape?.get(shapeKey(base)) ?? null;
+  return hit ? { code: hit, corrected: hit } : { code: vendorSku, corrected: null };
+}
+
 /** Every key worth trying for one master row, best first, no duplicates. */
 export function lookupKeys(vendorSku: string, size: string): string[] {
   const raw = normKey(vendorSku);

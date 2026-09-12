@@ -14,12 +14,6 @@ const QTY_ALIASES = ['qty', 'quantity', 'availableqty', 'availablestock', 'qtyav
 // A header carrying one of these is descriptive, never a key or a number.
 const NEVER = ['name', 'desc', 'status', 'date', 'price', 'rate', 'colour', 'color', 'size', 'remark', 'image', 'url'];
 const BLOCKED_ALIASES = ['blockedcommitted', 'blocked', 'committed', 'reserved'];
-// Correct-SKU sheet (owner's ask): Indya's code → the code our stock is
-// actually under. Key column may be Indya's SKU or the VendorSKU; value
-// column is the corrected code.
-const CORRECT_ALIASES = ['correct', 'correctsku', 'correctedsku', 'newsku', 'aryasku', 'oursku', 'actualsku', 'rightsku', 'mapto', 'replacement'];
-const INDYA_KEY_ALIASES = ['indyasku', 'indya', 'sku', 'skucode'];
-const VENDOR_KEY_ALIASES = ['vendorsku', 'vendor', 'wrongsku', 'wrong', 'oldsku', 'old', 'given', 'sent'];
 
 const norm = (v: unknown) => String(v ?? '').trim().toLowerCase().replace(/[^a-z]/g, '');
 const cellText = (v: unknown) => v == null ? '' : typeof v === 'number' ? String(v) : String(v).trim();
@@ -93,34 +87,5 @@ export async function readBlockedFile(file: File): Promise<{ name: string; map: 
   return { name: file.name, map, count };
 }
 
-export interface Corrections { name: string; bySku: Map<string, string>; byVendor: Map<string, string>; count: number }
-
-/** Correct-SKU sheet → two maps. Columns are found by name; a two-column
- *  sheet with no recognisable header is read as (any code) → (correct code). */
-export async function readCorrectionFile(file: File): Promise<Corrections> {
-  const rows = await grid(file);
-  let at = 0, valCol = 1, skuCol = -1, vendorCol = -1;
-  for (let i = 0; i < Math.min(rows.length, 20); i++) {
-    const heads = (rows[i] || []).map(norm);
-    const v = heads.findIndex(h => h && CORRECT_ALIASES.some(a => h === a || h.includes(a)));
-    if (v < 0) continue;
-    at = i + 1; valCol = v;
-    vendorCol = heads.findIndex((h, j) => j !== v && h && VENDOR_KEY_ALIASES.some(a => h === a || h.includes(a)));
-    skuCol = heads.findIndex((h, j) => j !== v && j !== vendorCol && h && INDYA_KEY_ALIASES.some(a => h === a || h.includes(a)));
-    break;
-  }
-  const bySku = new Map<string, string>(), byVendor = new Map<string, string>();
-  const loose = skuCol < 0 && vendorCol < 0;   // no named key column: the other column is "any code"
-  const keyCol = valCol === 0 ? 1 : 0;
-  for (let i = at; i < rows.length; i++) {
-    const r = rows[i] || [];
-    const val = normKey(cellText(r[valCol]));
-    if (!val) continue;
-    if (loose) { const k = normKey(cellText(r[keyCol])); if (k && k !== val) { bySku.set(k, val); byVendor.set(k, val); } continue; }
-    if (skuCol >= 0) { const k = normKey(cellText(r[skuCol])); if (k) bySku.set(k, val); }
-    if (vendorCol >= 0) { const k = normKey(cellText(r[vendorCol])); if (k) byVendor.set(k, val); }
-  }
-  const count = new Set([...bySku.keys(), ...byVendor.keys()]).size;
-  if (count === 0) throw new Error(`${file.name}: no corrections found — needs a “Correct SKU” column`);
-  return { name: file.name, bySku, byVendor, count };
-}
+/** Code fixes applied before any lookup — filled by the saved SKU map (indyaMap.ts). */
+export interface Corrections { name: string; bySku: Map<string, string>; byVendor: Map<string, string>; byShape?: Map<string, string>; count: number }

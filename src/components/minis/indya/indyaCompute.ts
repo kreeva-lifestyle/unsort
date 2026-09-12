@@ -18,7 +18,7 @@
 //   above XXL      — vendors do not make it → 0, no lookup at all (owner)
 //   otherwise      — max(0, total + virtual − blocked); virtual alone can
 //                    stock a row no vendor lists (Odette parity)
-import { lookupKeys, baseOf, normKey, shapeKey, isNoSize, isAboveXXL } from './indyaSku';
+import { lookupKeys, baseOf, normKey, shapeKey, isNoSize, isAboveXXL, resolveCode } from './indyaSku';
 import type { MasterRow } from './indyaMaster';
 import type { VendorFile, Corrections } from './indyaFiles';
 
@@ -61,12 +61,8 @@ const pickNum = (keys: string[], m: { strict: Map<string, number>; shape: Map<st
 const isNA = (q: string) => q.trim() === '' || q.trim().toUpperCase() === 'NA' || q.trim().toUpperCase() === 'N/A';
 const isOos = (q: string) => /out[\s_-]*of[\s_-]*stock/i.test(q);
 
-/** The code we look up for a row: the correction sheet wins (by Indya SKU,
- *  then by VendorSKU), else Indya's VendorSKU as given. */
-const codeFor = (r: MasterRow, c?: Corrections | null): { code: string; corrected: string | null } => {
-  const hit = c ? (c.bySku.get(normKey(r.sku)) ?? c.byVendor.get(normKey(r.vendorSku)) ?? null) : null;
-  return hit ? { code: hit, corrected: hit } : { code: r.vendorSku, corrected: null };
-};
+/** The code we look up for a row: the SKU map / correction sheet wins (see resolveCode), else Indya's VendorSKU as given. */
+const codeFor = (r: MasterRow, c?: Corrections | null) => resolveCode(r.vendorSku, r.size, r.sku, c);
 
 type Shared = Omit<ResultRow, 'i' | 'sku' | 'vendorSku' | 'size' | 'oldStock' | 'siblings' | 'unstitched' | 'corrected' | 'stripped'>;
 
