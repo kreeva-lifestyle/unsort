@@ -25,15 +25,22 @@ const normHead = (s: string) => decodeEntities(s).replace(/<[^>]*>/g, '').replac
 const fmt = (n: number) => n.toLocaleString('en-IN');
 
 /** null when the bytes look like Indya's HTML report; otherwise a short
- *  reason saying what the file actually is (real Excel, UTF-16, no table). */
+ *  reason saying what the file actually is (real Excel, UTF-16, or — when
+ *  no table is found anywhere — how the file starts, so a screenshot of the
+ *  toast says which file was picked). */
 export function looksLikeHtmlReport(bytes: Uint8Array): string | null {
   const not = (what: string) => `Not Indya’s report: ${what} — pick the .xls Indya sent`;
   if (bytes.length < 8) return not('the file is empty');
   if ((bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes[0] === 0xfe && bytes[1] === 0xff)) return not('this is a UTF-16 text file');
   if (bytes[0] === 0xd0 && bytes[1] === 0xcf) return not('this is a real Excel workbook');
   if (bytes[0] === 0x50 && bytes[1] === 0x4b) return not('this is a real Excel workbook');
-  const head = latin1(bytes.subarray(0, 2048)).toLowerCase();
-  return head.includes('<table') ? null : not('no HTML table found');
+  // UTF-16 without a byte-order mark: every other byte is NUL.
+  const probe = bytes.subarray(0, 512);
+  let nul = 0; for (const x of probe) if (x === 0) nul++;
+  if (nul > probe.length / 4) return not('this is a UTF-16 text file');
+  if (/<table\b/i.test(latin1(bytes))) return null;
+  const peek = latin1(bytes.subarray(0, 80)).replace(/[^\x20-\x7e]+/g, ' ').replace(/[<>{}]/g, '').trim().slice(0, 20);
+  return `Not Indya’s report (starts “${peek}”) — pick the .xls Indya sent`;
 }
 
 export const latin1 = (bytes: Uint8Array): string => new TextDecoder('latin1').decode(bytes);
