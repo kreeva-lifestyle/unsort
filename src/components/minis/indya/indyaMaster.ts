@@ -1,0 +1,108 @@
+// Indya's "ProductMasterReport.xls" is not a spreadsheet: it is one HTML
+// <table> (SKU | VendorSKU | Size | Stock), machine-generated, ASCII, CRLF.
+// The owner must hand the SAME file back with only Stock changed, so we
+// never re-serialise it. We locate each Stock cell's byte range and copy
+// every other byte verbatim. Pure functions — the harness runs them on the
+// real report.
+//
+// Offsets: the text is decoded as latin1 (one char per byte), so a string
+// offset IS a byte offset for any ASCII-superset encoding. The rewrite is
+// ONE forward pass over the rows (a per-cell slice+concat measured 22 s on
+// this 25k-row file; the single pass takes milliseconds).
+import { escHtml } from '../../../lib/escape';
+import { decodeEntities } from './indyaSku';
+
+export interface MasterRow { i: number; sku: string; vendorSku: string; size: string; stock: string; stockStart: number; stockEnd: number }
+export interface MasterFile { rows: MasterRow[]; columns: string[] }
+
+const WANT = ['SKU', 'VENDORSKU', 'SIZE', 'STOCK'] as const;
+const normHead = (s: string) => decodeEntities(s).replace(/<[^>]*>/g, '').replace(/[^A-Za-z]/g, '').toUpperCase();
+
+/** True when the bytes look like Indya's HTML report (not BIFF, not XLSX, not UTF-16). */
+export function looksLikeHtmlReport(bytes: Uint8Array): boolean {
+  if (bytes.length < 8) return false;
+  if ((bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes[0] === 0xfe && bytes[1] === 0xff)) return false; // UTF-16 BOM
+  if (bytes[0] === 0xd0 && bytes[1] === 0xcf) return false; // OLE2 (real .xls)
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b) return false; // ZIP (.xlsx)
+  const head = latin1(bytes.subarray(0, 2048)).toLowerCase();
+  return head.includes('<table');
+}
+
+export const latin1 = (bytes: Uint8Array): string => new TextDecoder('latin1').decode(bytes);
+
+/** Parse the report. Throws a plain-English Error when the shape is not
+ *  the one we can safely write back (the caller toasts it). */
+export function parseMasterHtml(text: string): MasterFile {
+  // O(n) shape check first: a report with unclosed <tr>/<td> would send the
+  // lazy row regex quadratic (measured ~10 s on a 1.6 MB file), and cannot
+  // be written back safely anyway.
+  const count = (re: RegExp) => (text.match(re) || []).length;
+  const trOpen = count(/<tr\b/gi), trClose = count(/<\/tr\s*>/gi);
+  if (trOpen !== trClose) throw new Error(`This report has ${trOpen} <tr> tags but ${trClose} </tr> tags — the file cannot be written back safely`);
+  const tdOpen = count(/<t[dh]\b/gi), tdClose = count(/<\/t[dh]\s*>/gi);
+  if (tdOpen !== tdClose) throw new Error(`This report has ${tdOpen} cell tags but ${tdClose} closing cell tags — the file cannot be written back safely`);
+  const rowRe = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi;
+  const cellRe = /<t([dh])\b[^>]*>([\s\S]*?)<\/t\1>/gi;
+  const rows: MasterRow[] = [];
+  let columns: string[] | null = null;
+  let idx: Record<(typeof WANT)[number], number> | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = rowRe.exec(text))) {
+    const rowStart = m.index + m[0].indexOf('>') + 1;   // <tr\b[^>]*> ends at the first '>'
+    const cells: { text: string; start: number; end: number }[] = [];
+    cellRe.lastIndex = 0;
+    let c: RegExpExecArray | null;
+    while ((c = cellRe.exec(m[1]))) {
+      const inner = c[2];
+      const open = c[0].slice(0, c[0].indexOf('>') + 1);
+      if ((open.match(/"/g) || []).length % 2 || (open.match(/'/g) || []).length % 2) throw new Error('A cell tag has an unbalanced quote — the file cannot be written back safely');
+      const start = rowStart + c.index + open.length;   // the opening tag has no '>' inside (guarded above)
+      cells.push({ text: inner, start, end: start + inner.length });
+    }
+    if (cells.length === 0) continue;
+    if (!columns) {
+      columns = cells.map(x => normHead(x.text));
+      const found = Object.fromEntries(WANT.map(w => [w, columns!.indexOf(w)])) as Record<(typeof WANT)[number], number>;
+      const missing = WANT.filter(w => found[w] < 0);
+      if (missing.length) throw new Error(`This is not Indya's product master — the header row has no ${missing.join(', ')} column`);
+      idx = found;
+      continue;
+    }
+    if (cells.length !== columns.length) throw new Error(`Row ${rows.length + 2} has ${cells.length} cells, the header has ${columns.length} — the file cannot be written back safely`);
+    const st = cells[idx!.STOCK];
+    if (st.text.includes('<')) throw new Error(`Row ${rows.length + 2}: the Stock cell contains markup — the file cannot be written back safely`);
+    rows.push({
+      i: rows.length,
+      sku: decodeEntities(cells[idx!.SKU].text).trim(),
+      vendorSku: decodeEntities(cells[idx!.VENDORSKU].text).trim(),
+      size: decodeEntities(cells[idx!.SIZE].text).trim(),
+      stock: decodeEntities(st.text).trim(),
+      stockStart: st.start, stockEnd: st.end,
+    });
+  }
+  if (!columns) throw new Error('No table rows found in the file');
+  if (rows.length === 0) throw new Error('The report has a header but no product rows');
+  return { rows, columns };
+}
+
+/** The original bytes with only the Stock cells replaced. One forward pass. */
+export function rewriteMasterBytes(bytes: Uint8Array, rows: MasterRow[], stocks: (string | number)[]): Uint8Array<ArrayBuffer> {
+  if (stocks.length !== rows.length) throw new Error('stock count does not match row count');
+  const enc = new TextEncoder();
+  const parts: Uint8Array[] = [];
+  let total = 0, prev = 0;
+  for (let k = 0; k < rows.length; k++) {
+    const r = rows[k];
+    if (r.stockStart < prev) throw new Error('rows are not in file order');
+    const head = bytes.subarray(prev, r.stockStart);
+    const val = enc.encode(escHtml(String(stocks[k])));
+    parts.push(head, val); total += head.length + val.length;
+    prev = r.stockEnd;
+  }
+  const tail = bytes.subarray(prev);
+  parts.push(tail); total += tail.length;
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
