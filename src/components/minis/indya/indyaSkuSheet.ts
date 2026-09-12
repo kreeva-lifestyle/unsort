@@ -5,7 +5,7 @@
 // file goes to the vendors, so it is ONE column of distinct SKUs and
 // nothing else (owner: "a sheet just with sku"); the per-row mapping stays
 // in memory for the harness and the results table.
-import { lookupKeys, normKey, shapeKey, isAboveXXL } from './indyaSku';
+import { lookupKeys, shapeKey, isAboveXXL, resolveCode } from './indyaSku';
 import type { MasterRow } from './indyaMaster';
 import type { Corrections } from './indyaFiles';
 import { saveWorkbook } from '../../../lib/xlsxDownload';
@@ -24,7 +24,7 @@ export function buildSkuSheet(master: MasterRow[], corrections?: Corrections | n
   const rows: [string, string, string, string][] = [];
   let skipped = 0;
   for (const r of master) {
-    const code = corrections ? (corrections.bySku.get(normKey(r.sku)) ?? corrections.byVendor.get(normKey(r.vendorSku)) ?? r.vendorSku) : r.vendorSku;
+    const { code } = resolveCode(r.vendorSku, r.size, r.sku, corrections);
     const keys = lookupKeys(code, r.size);
     const sku = keys[keys.length - 1];
     rows.push([r.sku, r.vendorSku, r.size, sku]);
