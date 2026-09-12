@@ -3,14 +3,18 @@
 // On phones, an <a download> click is a dead end inside the installed PWA
 // (iOS silently drops it, or opens the CSV as a wall of text). The native
 // share sheet is what people actually want there — WhatsApp, Files, Mail.
-// Desktop browsers have no file share, so they get the plain download.
+// Desktops get the plain download. Chrome and Edge on Windows implement
+// Web Share too (the owner got the Windows share panel instead of a file in
+// Downloads), so the sheet is gated by DEVICE — touch-first, no hover — not
+// by feature detection.
 //
 // Resolves true when the file was handed over, false when the user dismissed
 // the share sheet. Throws on real failures so callers can toast friendlyError.
 export async function downloadFile(blob: Blob, name: string): Promise<boolean> {
   const file = new File([blob], name, { type: blob.type || 'application/octet-stream' });
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-  if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
+  const touchFirst = typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
+  if (touchFirst && nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
     try {
       await nav.share({ files: [file], title: name });
       return true;
