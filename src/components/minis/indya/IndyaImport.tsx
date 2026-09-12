@@ -18,7 +18,7 @@ import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 import VirtualStock from '../VirtualStock';
 import IndyaSkuMap from './IndyaSkuMap';
 import { looksLikeHtmlReport, latin1, parseMasterHtml, rewriteMasterBytes, type MasterRow } from './indyaMaster';
-import { readVendorFile, readBlockedFile, MAX_FILE_BYTES, type VendorFile, type Corrections } from './indyaFiles';
+import { readVendorFile, readBlockedFile, readBytes, type VendorFile, type Corrections } from './indyaFiles';
 import { computeIndya, type ComputeResult, type Flag } from './indyaCompute';
 import { exportSkuSheet } from './indyaSkuSheet';
 import IndyaToolbar from './IndyaToolbar';
@@ -55,9 +55,9 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
   const importMaster = async (file: File) => {
     setBusy('master');
     try {
-      if (file.size > MAX_FILE_BYTES) throw new Error(`${file.name} is over 15 MB`);
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      if (!looksLikeHtmlReport(bytes)) throw new Error('This is not Indya’s product master report (expected the HTML-table .xls Indya sends)');
+      const bytes = await readBytes(file);
+      const notReport = looksLikeHtmlReport(bytes);
+      if (notReport) throw new Error(notReport);
       const { rows } = parseMasterHtml(latin1(bytes));
       setMaster({ name: file.name, bytes, rows }); setResult(null);
       addToast(`${file.name}: ${rows.length.toLocaleString('en-IN')} rows — next, download the SKU sheet for the vendors`, 'success');
