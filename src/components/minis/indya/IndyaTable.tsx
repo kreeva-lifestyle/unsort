@@ -33,6 +33,7 @@ export default function IndyaTable({ rows, page, perPage, onPage, onPerPage }: {
                     <span>→ {r.hitKey ?? r.key}</span>
                     {r.stripped && <span style={{ padding: '1px 6px', borderRadius: 4, background: alpha(T.yl, 0.12), color: T.yl, fontSize: 9, fontWeight: 700 }}>stripped</span>}
                     {r.viaShape && <span style={{ padding: '1px 6px', borderRadius: 4, background: alpha(T.bl, 0.12), color: T.bl, fontSize: 9, fontWeight: 700 }}>loose match</span>}
+                    {r.lehenga && <span style={{ padding: '1px 6px', borderRadius: 4, background: alpha(T.gr, 0.12), color: T.gr, fontSize: 9, fontWeight: 700 }}>lehenga</span>}
                     {r.siblings > 1 && <span style={{ padding: '1px 6px', borderRadius: 4, background: T.ac3, color: T.ac2, fontSize: 9, fontWeight: 700 }}>×{r.siblings} shared</span>}
                   </div>
                 </td>

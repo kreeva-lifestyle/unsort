@@ -25,7 +25,7 @@ import IndyaToolbar from './IndyaToolbar';
 import IndyaTable, { flagLabel } from './IndyaTable';
 import IndyaUnknown from './IndyaUnknown';
 
-type Filter = 'all' | Flag | 'shared' | 'unstitched' | 'stripped' | 'corrected';
+type Filter = 'all' | Flag | 'shared' | 'unstitched' | 'stripped' | 'corrected' | 'lehenga';
 const chip = (bg: string, color: string, border = 'transparent'): React.CSSProperties => ({ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: bg, color, border: `1px solid ${border}` });
 
 export default function IndyaImport({ addToast, virtualStock, setVirtualStock, onBack }: {
@@ -127,7 +127,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
     if (!result) return [];
     const q = search.trim().toUpperCase();
     return result.rows.filter(r =>
-      (filter === 'all' || (filter === 'shared' ? r.siblings > 1 : filter === 'unstitched' ? r.unstitched : filter === 'stripped' ? r.stripped : filter === 'corrected' ? !!r.corrected : r.flag === filter)) &&
+      (filter === 'all' || (filter === 'shared' ? r.siblings > 1 : filter === 'unstitched' ? r.unstitched : filter === 'stripped' ? r.stripped : filter === 'corrected' ? !!r.corrected : filter === 'lehenga' ? r.lehenga : r.flag === filter)) &&
       (!q || r.sku.toUpperCase().includes(q) || r.vendorSku.toUpperCase().includes(q) || r.key.includes(q)));
   }, [result, filter, search]);
 
@@ -137,7 +137,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
     { key: 'unknown', label: 'Unknown code', count: c.unknown, color: T.re }, { key: 'size_missing', label: 'Size not stocked', count: c.size_missing, color: T.tx3 }, { key: 'oversize', label: 'Above XXL', count: c.oversize, color: T.tx3 },
     { key: 'oos', label: 'Out of stock', count: c.oos, color: T.re }, { key: 'shared', label: 'Shared code', count: c.shared, color: T.ac2 },
     { key: 'blocked', label: 'Blocked', count: c.blocked, color: '#F97316' }, { key: 'unstitched', label: 'Unstitched', count: c.unstitched, color: T.tx3 },
-    { key: 'stripped', label: 'Stripped', count: c.stripped, color: T.yl }, ...(c.corrected ? [{ key: 'corrected' as Filter, label: 'Corrected', count: c.corrected, color: T.bl }] : []),
+    { key: 'stripped', label: 'Stripped', count: c.stripped, color: T.yl }, ...(c.lehenga ? [{ key: 'lehenga' as Filter, label: 'Lehenga', count: c.lehenga, color: T.gr }] : []), ...(c.corrected ? [{ key: 'corrected' as Filter, label: 'Corrected', count: c.corrected, color: T.bl }] : []),
   ] : [];
 
   return (
@@ -160,7 +160,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
         {blocked && <span style={chip('oklch(0.78 0.18 75 / .08)', T.yl, 'oklch(0.78 0.18 75 / .2)')}>Blocked: {Object.keys(blocked.map).length} SKUs</span>}
       </div>
       <div style={{ fontSize: 10.5, color: T.tx3, marginBottom: 12, lineHeight: 1.5 }}>
-        Each row is looked up as <span style={{ fontFamily: T.mono }}>code-SIZE</span>: the code exactly as Indya sent it first, then again with a size stuck on the code dropped; Unstitched uses the bare code; 2XL and XXL are the same; a dashless spelling still matches (shown as “loose match”). The SKU sheet lists that SKU for every row — give it to the vendors and add the stock files they return. Sizes above XXL are not made: they are left out of the SKU sheet and written as 0. The SKU map replaces a misspelt code before the lookup (codes only — one fix covers every size). Duplicate Indya listings of one product get the same stock. Unknown codes are written as “SKU mismatch”; a known code with no stock in that size is 0.
+        Each row is looked up as <span style={{ fontFamily: T.mono }}>code-SIZE</span>: the code exactly as Indya sent it first, then again with a size stuck on the code dropped; Unstitched uses the bare code; 2XL and XXL are the same; a dashless spelling still matches (shown as “loose match”). The SKU sheet lists that SKU for every row — give it to the vendors and add the stock files they return. Sizes above XXL are not made: they are left out of the SKU sheet and written as 0. A LEHENGA CHOLI stock given on the bare code is applied to every size up to XXL and Unstitched. The SKU map replaces a misspelt code before the lookup (codes only — one fix covers every size). Duplicate Indya listings of one product get the same stock. Unknown codes are written as “SKU mismatch”; a known code with no stock in that size is 0.
       </div>
 
       {result && c && <>

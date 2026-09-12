@@ -16,34 +16,40 @@
 //   out of stock   — every file says 0 / out of stock → 0
 //   blocked        — blocked wipes the balance → 0
 //   above XXL      — vendors do not make it → 0, no lookup at all (owner)
+//   LEHENGA CHOLI  — a vendor's BARE-code row with category LEHENGA CHOLI
+//                    is the product's stock for every size up to XXL and
+//                    Unstitched, overriding that file's sized rows (owner:
+//                    the bare row decides; sized-only products stay per size)
 //   otherwise      — max(0, total + virtual − blocked); virtual alone can
 //                    stock a row no vendor lists (Odette parity)
-import { lookupKeys, baseOf, normKey, shapeKey, isNoSize, isAboveXXL, resolveCode } from './indyaSku';
+import { lookupKeys, baseOf, normKey, shapeKey, isNoSize, isAboveXXL, resolveCode, isCodeOnly } from './indyaSku';
 import type { MasterRow } from './indyaMaster';
 import type { VendorFile, Corrections } from './indyaFiles';
 
 export type Flag = 'ok' | 'last' | 'oos' | 'unknown' | 'size_missing' | 'blocked' | 'oversize';
 export interface ResultRow {
   i: number; sku: string; vendorSku: string; size: string; oldStock: string;
-  key: string; hitKey: string | null; stripped: boolean; viaShape: boolean; unstitched: boolean; corrected: string | null;
+  key: string; hitKey: string | null; stripped: boolean; viaShape: boolean; unstitched: boolean; corrected: string | null; lehenga: boolean;
   siblings: number; total: number; vendorCount: number; naCount: number; oosCount: number;
   virtual: number; blocked: number; final: number; flag: Flag; out: string;
 }
-export interface Counts { total: number; ok: number; last: number; oos: number; unknown: number; size_missing: number; blocked: number; oversize: number; unstitched: number; shared: number; stripped: number; viaShape: number; corrected: number }
+export interface Counts { total: number; ok: number; last: number; oos: number; unknown: number; size_missing: number; blocked: number; oversize: number; unstitched: number; shared: number; stripped: number; viaShape: number; corrected: number; lehenga: number }
 export interface ComputeResult { rows: ResultRow[]; counts: Counts; unknownBases: { base: string; rows: number }[]; stocks: string[] }
 
 export const MISMATCH = 'SKU mismatch';
 
-interface VendorIndex { strict: Map<string, string>; shape: Map<string, string>; bases: Set<string> }
+interface VendorIndex { strict: Map<string, string>; shape: Map<string, string>; bases: Set<string>; lehenga: Map<string, string> }
+const isLehenga = (cat?: string) => normKey(cat).replace(/[^A-Z]/g, '') === 'LEHENGACHOLI';
 
 function indexVendor(v: VendorFile): VendorIndex {
-  const strict = new Map<string, string>(), shape = new Map<string, string>(), bases = new Set<string>();
+  const strict = new Map<string, string>(), shape = new Map<string, string>(), bases = new Set<string>(), lehenga = new Map<string, string>();
   for (const r of v.rows) {
     const k = normKey(r.sku);
     strict.set(k, r.qty); shape.set(shapeKey(k), r.qty);        // last duplicate wins (Odette parity)
     bases.add(shapeKey(baseOf(k))); bases.add(shapeKey(k));
+    if (isLehenga(r.cat) && isCodeOnly(k)) lehenga.set(shapeKey(k), r.qty);
   }
-  return { strict, shape, bases };
+  return { strict, shape, bases, lehenga };
 }
 
 /** Numbers keyed both ways so a dashless spelling still finds its entry. */
@@ -82,15 +88,18 @@ export function computeIndya(master: MasterRow[], vendors: VendorFile[], virtual
     const keys = masterKeys[members[0]];
     const raw = normKey(codes[members[0]].code);
     if (isAboveXXL(master[members[0]].size)) {
-      byGroup.set(gk, { key: keys[keys.length - 1], hitKey: null, viaShape: false, total: 0, vendorCount: 0, naCount: 0, oosCount: 0, virtual: 0, blocked: 0, final: 0, flag: 'oversize', out: '0' });
+      byGroup.set(gk, { key: keys[keys.length - 1], hitKey: null, viaShape: false, total: 0, vendorCount: 0, naCount: 0, oosCount: 0, virtual: 0, blocked: 0, final: 0, flag: 'oversize', out: '0', lehenga: false });
       continue;
     }
-    const baseShapes = new Set([shapeKey(raw), shapeKey(baseOf(raw, master[members[0]].size)), ...keys.map(shapeKey)]);
-    let total = 0, vendorCount = 0, naCount = 0, oosCount = 0, hitKey: string | null = null, viaShape = false, known = false;
+    const baseShape = shapeKey(baseOf(raw, master[members[0]].size));
+    const baseShapes = new Set([shapeKey(raw), baseShape, ...keys.map(shapeKey)]);
+    let total = 0, vendorCount = 0, naCount = 0, oosCount = 0, hitKey: string | null = null, viaShape = false, known = false, lehenga = false;
     for (const vi of idx) {
       if ([...baseShapes].some(s => vi.bases.has(s))) known = true;
       let qty: string | undefined, hk: string | null = null, loose = false;
-      for (const k of keys) { if (vi.strict.has(k)) { qty = vi.strict.get(k); hk = k; break; } }
+      const lq = vi.lehenga.get(baseShape) ?? vi.lehenga.get(shapeKey(raw));
+      if (lq !== undefined) { qty = lq; hk = keys[keys.length - 1]; lehenga = true; }
+      if (qty === undefined) for (const k of keys) { if (vi.strict.has(k)) { qty = vi.strict.get(k); hk = k; break; } }
       if (qty === undefined) for (const k of keys) { const q = vi.shape.get(shapeKey(k)); if (q !== undefined) { qty = q; hk = k; loose = true; break; } }
       if (qty === undefined || isNA(qty)) { naCount++; continue; }
       if (!hitKey) { hitKey = hk; viaShape = loose; }
@@ -107,7 +116,7 @@ export function computeIndya(master: MasterRow[], vendors: VendorFile[], virtual
     } else if (blk > 0 && final <= 0) { flag = 'blocked'; out = '0'; }
     else if (total === 0 && oosCount > 0 && virt === 0) { flag = 'oos'; out = '0'; }
     else { flag = final === 1 ? 'last' : 'ok'; out = String(Math.max(0, final)); }
-    byGroup.set(gk, { key: hitKey ?? keys[keys.length - 1], hitKey, viaShape, total, vendorCount, naCount, oosCount, virtual: virt, blocked: blk, final, flag, out });
+    byGroup.set(gk, { key: hitKey ?? keys[keys.length - 1], hitKey, viaShape, total, vendorCount, naCount, oosCount, virtual: virt, blocked: blk, final, flag, out, lehenga });
   }
   const effCount = new Map<string, number>();
   for (const [gk, members] of groups) { const e = shapeKey(byGroup.get(gk)!.key); effCount.set(e, (effCount.get(e) || 0) + members.length); }
@@ -117,7 +126,7 @@ export function computeIndya(master: MasterRow[], vendors: VendorFile[], virtual
     const code = normKey(codes[i].code);
     return { i, sku: r.sku, vendorSku: r.vendorSku, size: r.size, oldStock: r.stock, ...g, siblings: effCount.get(shapeKey(g.key)) || 1, unstitched: isNoSize(r.size), corrected: codes[i].corrected, stripped: baseOf(code, r.size) !== code };
   });
-  const counts: Counts = { total: rows.length, ok: 0, last: 0, oos: 0, unknown: 0, size_missing: 0, blocked: 0, oversize: 0, unstitched: 0, shared: 0, stripped: 0, viaShape: 0, corrected: 0 };
+  const counts: Counts = { total: rows.length, ok: 0, last: 0, oos: 0, unknown: 0, size_missing: 0, blocked: 0, oversize: 0, unstitched: 0, shared: 0, stripped: 0, viaShape: 0, corrected: 0, lehenga: 0 };
   const unknownMap = new Map<string, number>();
   for (const r of rows) {
     counts[r.flag]++;
@@ -126,6 +135,7 @@ export function computeIndya(master: MasterRow[], vendors: VendorFile[], virtual
     if (r.stripped) counts.stripped++;
     if (r.viaShape) counts.viaShape++;
     if (r.corrected) counts.corrected++;
+    if (r.lehenga) counts.lehenga++;
     if (r.flag === 'unknown') { const b = baseOf(codes[r.i].code, r.size); unknownMap.set(b, (unknownMap.get(b) || 0) + 1); }
   }
   const unknownBases = [...unknownMap.entries()].map(([base, n]) => ({ base, rows: n })).sort((a, b) => b.rows - a.rows || a.base.localeCompare(b.base));
