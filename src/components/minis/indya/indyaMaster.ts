@@ -8,12 +8,15 @@
 // Offsets: the text is decoded as latin1 (one char per byte), so a string
 // offset IS a byte offset for any ASCII-superset encoding. The rewrite is
 // ONE forward pass over the rows (a per-cell slice+concat measured 22 s on
-// this 25k-row file; the single pass takes milliseconds).
-import { escHtml } from '../../../lib/escape';
+// this 25k-row file; the single pass takes milliseconds). Indya's newer CSV
+// export goes through indyaMasterCsv.ts and the same rewrite.
+import { escHtml, csvCell } from '../../../lib/escape';
 import { decodeEntities } from './indyaSku';
+import { looksLikeCsvMaster } from './indyaMasterCsv';
 
 export interface MasterRow { i: number; sku: string; vendorSku: string; size: string; stock: string; stockStart: number; stockEnd: number }
 export interface MasterFile { rows: MasterRow[]; columns: string[] }
+export type MasterKind = 'html' | 'csv';
 
 const WANT = ['SKU', 'VENDORSKU', 'SIZE', 'STOCK'] as const;
 const normHead = (s: string) => decodeEntities(s).replace(/<[^>]*>/g, '').replace(/[^A-Za-z]/g, '').toUpperCase();
@@ -24,12 +27,12 @@ const normHead = (s: string) => decodeEntities(s).replace(/<[^>]*>/g, '').replac
 // wrong" instead. Keep them short and say "row tags", not "<tr>".
 const fmt = (n: number) => n.toLocaleString('en-IN');
 
-/** null when the bytes look like Indya's HTML report; otherwise a short
- *  reason saying what the file actually is (real Excel, UTF-16, or — when
- *  no table is found anywhere — how the file starts, so a screenshot of the
+/** Which master this is — the HTML report (.xls) or the CSV export — or a
+ *  short reason saying what the file actually is (real Excel, UTF-16, or —
+ *  when neither shape is found — how the file starts, so a screenshot of the
  *  toast says which file was picked). */
-export function looksLikeHtmlReport(bytes: Uint8Array): string | null {
-  const not = (what: string) => `Not Indya’s report: ${what} — pick the .xls Indya sent`;
+export function sniffMaster(bytes: Uint8Array): MasterKind | { reason: string } {
+  const not = (what: string) => ({ reason: `Not Indya’s report: ${what} — pick the file Indya sent` });
   if (bytes.length < 8) return not('the file is empty');
   if ((bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes[0] === 0xfe && bytes[1] === 0xff)) return not('this is a UTF-16 text file');
   if (bytes[0] === 0xd0 && bytes[1] === 0xcf) return not('this is a real Excel workbook');
@@ -42,10 +45,11 @@ export function looksLikeHtmlReport(bytes: Uint8Array): string | null {
   // frameset stub (the data moves to a _files folder) — nothing to import,
   // and the bytes Indya needs back are gone.
   const head = latin1(bytes.subarray(0, 4096));
-  if (/Excel Workbook Frameset|name=Generator content="Microsoft Excel/i.test(head)) return 'Excel re-saved this file and dropped the data — download it from Indya again';
-  if (/<table\b/i.test(latin1(bytes))) return null;
+  if (/Excel Workbook Frameset|name=Generator content="Microsoft Excel/i.test(head)) return { reason: 'Excel re-saved this file and dropped the data — download it from Indya again' };
+  if (looksLikeCsvMaster(head)) return 'csv';
+  if (/<table\b/i.test(latin1(bytes))) return 'html';
   const peek = latin1(bytes.subarray(0, 80)).replace(/[^\x20-\x7e]+/g, ' ').replace(/[<>{}]/g, '').trim().slice(0, 20);
-  return `Not Indya’s report (starts “${peek}”) — pick the .xls Indya sent`;
+  return { reason: `Not Indya’s report (starts “${peek}”) — pick the file Indya sent` };
 }
 
 export const latin1 = (bytes: Uint8Array): string => new TextDecoder('latin1').decode(bytes);
@@ -105,17 +109,24 @@ export function parseMasterHtml(text: string): MasterFile {
   return { rows, columns };
 }
 
+/** A CSV value written raw when it is plain (digits, "SKU mismatch") and the
+ *  original field was bare; quoted when the original was, or when it must be. */
+type Encode = (v: string, quoted: boolean) => string;
+const csvValue: Encode = (v, quoted) => quoted || /[",\r\n]|^[=+\-@\t]/.test(v) ? csvCell(v) : v;
+
 /** The original bytes with only the Stock cells replaced. One forward pass. */
-export function rewriteMasterBytes(bytes: Uint8Array, rows: MasterRow[], stocks: (string | number)[]): Uint8Array<ArrayBuffer> {
+export function rewriteMasterBytes(bytes: Uint8Array, rows: MasterRow[], stocks: (string | number)[], kind: MasterKind = 'html'): Uint8Array<ArrayBuffer> {
   if (stocks.length !== rows.length) throw new Error('stock count does not match row count');
   const enc = new TextEncoder();
+  const encode: Encode = kind === 'csv' ? csvValue : v => escHtml(v);
   const parts: Uint8Array[] = [];
   let total = 0, prev = 0;
   for (let k = 0; k < rows.length; k++) {
     const r = rows[k];
     if (r.stockStart < prev) throw new Error('rows are not in file order');
     const head = bytes.subarray(prev, r.stockStart);
-    const val = enc.encode(escHtml(String(stocks[k])));
+    const quoted = kind === 'csv' && r.stockEnd - r.stockStart >= 2 && bytes[r.stockStart] === 0x22;
+    const val = enc.encode(encode(String(stocks[k]), quoted));
     parts.push(head, val); total += head.length + val.length;
     prev = r.stockEnd;
   }

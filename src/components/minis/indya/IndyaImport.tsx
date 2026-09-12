@@ -1,5 +1,5 @@
 // Indya Import — the owner's flow, numbered on the toolbar:
-//   1 import Indya's product master (an HTML table saved as .xls);
+//   1 import Indya's product master (an HTML table saved as .xls, or the CSV export);
 //   2 download the SKU sheet — every row's lookup SKU with the size rules
 //     applied — and hand it to the vendors;
 //   3 add the stock files the vendors send back (the Odette ones), plus the
@@ -17,7 +17,8 @@ import { exportName, fileDate } from '../../../lib/exportName';
 import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 import VirtualStock from '../VirtualStock';
 import IndyaSkuMap from './IndyaSkuMap';
-import { looksLikeHtmlReport, latin1, parseMasterHtml, rewriteMasterBytes, type MasterRow } from './indyaMaster';
+import { sniffMaster, latin1, parseMasterHtml, rewriteMasterBytes, type MasterRow, type MasterKind } from './indyaMaster';
+import { parseMasterCsv } from './indyaMasterCsv';
 import { readVendorFile, readBlockedFile, readBytes, type VendorFile, type Corrections } from './indyaFiles';
 import { computeIndya, type ComputeResult, type Flag } from './indyaCompute';
 import { exportSkuSheet } from './indyaSkuSheet';
@@ -34,7 +35,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
   setVirtualStock: (s: Record<string, number>) => void;
   onBack: () => void;
 }) {
-  const [master, setMaster] = useState<{ name: string; bytes: Uint8Array; rows: MasterRow[] } | null>(null);
+  const [master, setMaster] = useState<{ name: string; bytes: Uint8Array; rows: MasterRow[]; kind: MasterKind } | null>(null);
   const [vendors, setVendors] = useState<VendorFile[]>([]);
   const [blocked, setBlocked] = useState<{ name: string; map: Record<string, number>; count: number } | null>(null);
   const [corr, setCorr] = useState<Corrections | null>(null);   // the saved SKU map, owned by IndyaSkuMap
@@ -56,10 +57,10 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
     setBusy('master');
     try {
       const bytes = await readBytes(file);
-      const notReport = looksLikeHtmlReport(bytes);
-      if (notReport) throw new Error(notReport);
-      const { rows } = parseMasterHtml(latin1(bytes));
-      setMaster({ name: file.name, bytes, rows }); setResult(null);
+      const kind = sniffMaster(bytes);
+      if (typeof kind !== 'string') throw new Error(kind.reason);
+      const { rows } = kind === 'csv' ? parseMasterCsv(latin1(bytes)) : parseMasterHtml(latin1(bytes));
+      setMaster({ name: file.name, bytes, rows, kind }); setResult(null);
       addToast(`${file.name}: ${rows.length.toLocaleString('en-IN')} rows — next, download the SKU sheet for the vendors`, 'success');
     } catch (err) { fail(err); }
     setBusy('');
@@ -91,7 +92,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
     setTimeout(() => {   // let "Computing…" paint before the synchronous work
       try {
         const r = computeIndya(master.rows, vendors, virtualStock, blocked?.map ?? {}, corr);
-        const blob = new Blob([rewriteMasterBytes(master.bytes, master.rows, r.stocks)], { type: 'application/vnd.ms-excel' });
+        const blob = new Blob([rewriteMasterBytes(master.bytes, master.rows, r.stocks, master.kind)], { type: master.kind === 'csv' ? 'text/csv' : 'application/vnd.ms-excel' });
         setResult({ ...r, blob }); setFilter('all'); setSearch('');
         const c = r.counts;
         addToast(`${c.total.toLocaleString('en-IN')} rows — ${(c.ok + c.last).toLocaleString('en-IN')} updated, ${c.unknown} unknown code, ${c.size_missing.toLocaleString('en-IN')} size not stocked, ${c.oos} out of stock${c.blocked ? `, ${c.blocked} blocked` : ''}`, 'success');
@@ -160,7 +161,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
         {blocked && <span style={chip('oklch(0.78 0.18 75 / .08)', T.yl, 'oklch(0.78 0.18 75 / .2)')}>Blocked: {Object.keys(blocked.map).length} SKUs</span>}
       </div>
       <div style={{ fontSize: 10.5, color: T.tx3, marginBottom: 12, lineHeight: 1.5 }}>
-        Each row is looked up as <span style={{ fontFamily: T.mono }}>code-SIZE</span>: the code exactly as Indya sent it first, then again with a size stuck on the code dropped; Unstitched uses the bare code; 2XL and XXL are the same; a dashless spelling still matches (shown as “loose match”). The SKU sheet lists that SKU for every row — give it to the vendors and add the stock files they return. Import the .xls exactly as downloaded — opening it in Excel and saving destroys it. Sizes above XXL are not made: they are left out of the SKU sheet and written as 0. A LEHENGA CHOLI stock given on the bare code is applied to every size up to XXL and Unstitched. The SKU map replaces a misspelt code before the lookup (codes only — one fix covers every size). Duplicate Indya listings of one product get the same stock. Unknown codes are written as “SKU mismatch”; a known code with no stock in that size is 0.
+        Each row is looked up as <span style={{ fontFamily: T.mono }}>code-SIZE</span>: the code exactly as Indya sent it first, then again with a size stuck on the code dropped; Unstitched uses the bare code; 2XL and XXL are the same; a dashless spelling still matches (shown as “loose match”). The SKU sheet lists that SKU for every row — give it to the vendors and add the stock files they return. Import Indya’s file exactly as downloaded (.xls or .csv) — opening it in Excel and saving destroys it. Sizes above XXL are not made: they are left out of the SKU sheet and written as 0. A LEHENGA CHOLI stock given on the bare code is applied to every size up to XXL and Unstitched. The SKU map replaces a misspelt code before the lookup (codes only — one fix covers every size). Duplicate Indya listings of one product get the same stock. Unknown codes are written as “SKU mismatch”; a known code with no stock in that size is 0.
       </div>
 
       {result && c && <>
