@@ -45,6 +45,16 @@ export const decodeEntities = (s: string): string =>
 /** "Unstitched", "Semi-Stitched", "Free Size" … — sizes that are not sizes. */
 export const isNoSize = (size: string): boolean => NO_SIZE.has(normKey(size).replace(/[^A-Z]/g, ''));
 
+/** 3XL and up, either spelling (3XL / XXXL … 10XL). Owner: vendors do not
+ *  make anything above XXL — these rows are left out of the SKU sheet and
+ *  their stock is written as 0 without any lookup. */
+export const isAboveXXL = (size: string): boolean => {
+  const s = normKey(size);
+  const m = /^(\d{1,2})XL$/.exec(s);
+  if (m) return Number(m[1]) >= 3;
+  return /^X{3,}L$/.test(s);
+};
+
 /** Both spellings of a size, the given one first: 2XL ↔ XXL … 10XL ↔ XXXXXXXXXXL. */
 export function sizeSpellings(size: string): string[] {
   const s = normKey(size);

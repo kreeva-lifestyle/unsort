@@ -3,8 +3,8 @@
 import { T, S, alpha } from '../../../lib/theme';
 import type { ResultRow, Flag } from './indyaCompute';
 
-export const flagColor = (f: Flag) => f === 'oos' ? T.re : f === 'blocked' ? '#F97316' : f === 'unknown' ? T.re : f === 'size_missing' ? T.tx3 : f === 'last' ? T.yl : T.gr;
-export const flagLabel = (f: Flag) => f === 'oos' ? 'Out of stock' : f === 'blocked' ? 'Blocked' : f === 'unknown' ? 'Unknown code' : f === 'size_missing' ? 'Size not stocked' : f === 'last' ? 'Last qty' : 'Updated';
+export const flagColor = (f: Flag) => f === 'oos' ? T.re : f === 'blocked' ? '#F97316' : f === 'unknown' ? T.re : f === 'size_missing' || f === 'oversize' ? T.tx3 : f === 'last' ? T.yl : T.gr;
+export const flagLabel = (f: Flag) => f === 'oos' ? 'Out of stock' : f === 'blocked' ? 'Blocked' : f === 'unknown' ? 'Unknown code' : f === 'size_missing' ? 'Size not stocked' : f === 'oversize' ? 'Above XXL' : f === 'last' ? 'Last qty' : 'Updated';
 
 export default function IndyaTable({ rows, page, perPage, onPage, onPerPage }: {
   rows: ResultRow[];

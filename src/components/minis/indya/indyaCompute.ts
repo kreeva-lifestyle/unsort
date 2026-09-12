@@ -15,20 +15,21 @@
 //   size missing   — the code is known somewhere, this size is not → 0
 //   out of stock   — every file says 0 / out of stock → 0
 //   blocked        — blocked wipes the balance → 0
+//   above XXL      — vendors do not make it → 0, no lookup at all (owner)
 //   otherwise      — max(0, total + virtual − blocked); virtual alone can
 //                    stock a row no vendor lists (Odette parity)
-import { lookupKeys, baseOf, normKey, shapeKey, isNoSize } from './indyaSku';
+import { lookupKeys, baseOf, normKey, shapeKey, isNoSize, isAboveXXL } from './indyaSku';
 import type { MasterRow } from './indyaMaster';
 import type { VendorFile, Corrections } from './indyaFiles';
 
-export type Flag = 'ok' | 'last' | 'oos' | 'unknown' | 'size_missing' | 'blocked';
+export type Flag = 'ok' | 'last' | 'oos' | 'unknown' | 'size_missing' | 'blocked' | 'oversize';
 export interface ResultRow {
   i: number; sku: string; vendorSku: string; size: string; oldStock: string;
   key: string; hitKey: string | null; stripped: boolean; viaShape: boolean; unstitched: boolean; corrected: string | null;
   siblings: number; total: number; vendorCount: number; naCount: number; oosCount: number;
   virtual: number; blocked: number; final: number; flag: Flag; out: string;
 }
-export interface Counts { total: number; ok: number; last: number; oos: number; unknown: number; size_missing: number; blocked: number; unstitched: number; shared: number; stripped: number; viaShape: number; corrected: number }
+export interface Counts { total: number; ok: number; last: number; oos: number; unknown: number; size_missing: number; blocked: number; oversize: number; unstitched: number; shared: number; stripped: number; viaShape: number; corrected: number }
 export interface ComputeResult { rows: ResultRow[]; counts: Counts; unknownBases: { base: string; rows: number }[]; stocks: string[] }
 
 export const MISMATCH = 'SKU mismatch';
@@ -84,6 +85,10 @@ export function computeIndya(master: MasterRow[], vendors: VendorFile[], virtual
   for (const [gk, members] of groups) {
     const keys = masterKeys[members[0]];
     const raw = normKey(codes[members[0]].code);
+    if (isAboveXXL(master[members[0]].size)) {
+      byGroup.set(gk, { key: keys[keys.length - 1], hitKey: null, viaShape: false, total: 0, vendorCount: 0, naCount: 0, oosCount: 0, virtual: 0, blocked: 0, final: 0, flag: 'oversize', out: '0' });
+      continue;
+    }
     const baseShapes = new Set([shapeKey(raw), shapeKey(baseOf(raw, master[members[0]].size)), ...keys.map(shapeKey)]);
     let total = 0, vendorCount = 0, naCount = 0, oosCount = 0, hitKey: string | null = null, viaShape = false, known = false;
     for (const vi of idx) {
@@ -116,7 +121,7 @@ export function computeIndya(master: MasterRow[], vendors: VendorFile[], virtual
     const code = normKey(codes[i].code);
     return { i, sku: r.sku, vendorSku: r.vendorSku, size: r.size, oldStock: r.stock, ...g, siblings: effCount.get(shapeKey(g.key)) || 1, unstitched: isNoSize(r.size), corrected: codes[i].corrected, stripped: baseOf(code, r.size) !== code };
   });
-  const counts: Counts = { total: rows.length, ok: 0, last: 0, oos: 0, unknown: 0, size_missing: 0, blocked: 0, unstitched: 0, shared: 0, stripped: 0, viaShape: 0, corrected: 0 };
+  const counts: Counts = { total: rows.length, ok: 0, last: 0, oos: 0, unknown: 0, size_missing: 0, blocked: 0, oversize: 0, unstitched: 0, shared: 0, stripped: 0, viaShape: 0, corrected: 0 };
   const unknownMap = new Map<string, number>();
   for (const r of rows) {
     counts[r.flag]++;
