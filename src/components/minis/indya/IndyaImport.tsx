@@ -135,7 +135,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
   const c = result?.counts;
   const counters: { key: Filter; label: string; count: number; color: string }[] = c ? [
     { key: 'all', label: 'Total', count: c.total, color: T.tx2 }, { key: 'ok', label: 'Updated', count: c.ok, color: T.gr }, { key: 'last', label: 'Last qty', count: c.last, color: T.yl },
-    { key: 'unknown', label: 'Unknown code', count: c.unknown, color: T.re }, { key: 'size_missing', label: 'Size not stocked', count: c.size_missing, color: T.tx3 },
+    { key: 'unknown', label: 'Unknown code', count: c.unknown, color: T.re }, { key: 'size_missing', label: 'Size not stocked', count: c.size_missing, color: T.tx3 }, { key: 'oversize', label: 'Above XXL', count: c.oversize, color: T.tx3 },
     { key: 'oos', label: 'Out of stock', count: c.oos, color: T.re }, { key: 'shared', label: 'Shared code', count: c.shared, color: T.ac2 },
     { key: 'blocked', label: 'Blocked', count: c.blocked, color: '#F97316' }, { key: 'unstitched', label: 'Unstitched', count: c.unstitched, color: T.tx3 },
     { key: 'stripped', label: 'Stripped', count: c.stripped, color: T.yl }, ...(c.corrected ? [{ key: 'corrected' as Filter, label: 'Corrected', count: c.corrected, color: T.bl }] : []),
@@ -160,7 +160,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
         {blocked && <span style={chip('oklch(0.78 0.18 75 / .08)', T.yl, 'oklch(0.78 0.18 75 / .2)')}>Blocked: {Object.keys(blocked.map).length} SKUs</span>}
       </div>
       <div style={{ fontSize: 10.5, color: T.tx3, marginBottom: 12, lineHeight: 1.5 }}>
-        Each row is looked up as <span style={{ fontFamily: T.mono }}>code-SIZE</span>: the code exactly as Indya sent it first, then again with a size stuck on the code dropped; Unstitched uses the bare code; 2XL and XXL are the same; a dashless spelling still matches (shown as “loose match”). The SKU sheet lists that SKU for every row — give it to the vendors and add the stock files they return. A correct-SKU sheet replaces the code before the lookup. Duplicate Indya listings of one product get the same stock. Unknown codes are written as “SKU mismatch”; a known code with no stock in that size is 0.
+        Each row is looked up as <span style={{ fontFamily: T.mono }}>code-SIZE</span>: the code exactly as Indya sent it first, then again with a size stuck on the code dropped; Unstitched uses the bare code; 2XL and XXL are the same; a dashless spelling still matches (shown as “loose match”). The SKU sheet lists that SKU for every row — give it to the vendors and add the stock files they return. Sizes above XXL are not made: they are left out of the SKU sheet and written as 0. A correct-SKU sheet replaces the code before the lookup. Duplicate Indya listings of one product get the same stock. Unknown codes are written as “SKU mismatch”; a known code with no stock in that size is 0.
       </div>
 
       {result && c && <>
