@@ -25,6 +25,8 @@ import { exportSkuSheet } from './indyaSkuSheet';
 import IndyaToolbar from './IndyaToolbar';
 import IndyaTable, { flagLabel } from './IndyaTable';
 import IndyaUnknown from './IndyaUnknown';
+import IndyaHint from './IndyaHint';
+import IndyaCoverage from './IndyaCoverage';
 
 type Filter = 'all' | Flag | 'shared' | 'unstitched' | 'stripped' | 'corrected' | 'lehenga';
 const chip = (bg: string, color: string, border = 'transparent'): React.CSSProperties => ({ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: bg, color, border: `1px solid ${border}` });
@@ -160,9 +162,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
         {corr && <span style={chip('oklch(0.77 0.14 230 / .08)', T.bl, 'oklch(0.77 0.14 230 / .2)')}>SKU map: {corr.count} fix{corr.count === 1 ? '' : 'es'}</span>}
         {blocked && <span style={chip('oklch(0.78 0.18 75 / .08)', T.yl, 'oklch(0.78 0.18 75 / .2)')}>Blocked: {Object.keys(blocked.map).length} SKUs</span>}
       </div>
-      <div style={{ fontSize: 10.5, color: T.tx3, marginBottom: 12, lineHeight: 1.5 }}>
-        Each row is looked up as <span style={{ fontFamily: T.mono }}>code-SIZE</span>: the code exactly as Indya sent it first, then again with a size stuck on the code dropped; Unstitched uses the bare code; 2XL and XXL are the same; a dashless spelling still matches (shown as “loose match”). The SKU sheet lists that SKU for every row — give it to the vendors and add the stock files they return. Import Indya’s file exactly as downloaded (.xls or .csv) — opening it in Excel and saving destroys it. Sizes above XXL are not made: they are left out of the SKU sheet and written as 0. A LEHENGA CHOLI stock given on the bare code is applied to every size up to XXL and Unstitched. The SKU map replaces a misspelt code before the lookup (codes only — one fix covers every size). Duplicate Indya listings of one product get the same stock. Unknown codes are written as “SKU mismatch”; a known code with no stock in that size is 0.
-      </div>
+      <IndyaHint />
 
       {result && c && <>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -191,6 +191,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
       {!result && !master && <div style={{ padding: 40, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Import Indya’s product master. Then download the SKU sheet for the vendors, and add the stock files they send back.</div>}
       {!result && master && vendors.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Master loaded. Download the SKU sheet for the vendors, then add the stock files they return.</div>}
       {!result && master && vendors.length > 0 && <div style={{ padding: 30, textAlign: 'center', color: T.yl, fontSize: 12 }}>Ready. Tap Compute.</div>}
+      <IndyaCoverage master={master?.rows ?? null} corrections={corr} addToast={addToast} />
       <ConfirmModal {...modalProps} />
     </div>
   );
