@@ -16,15 +16,20 @@ export default function IndyaToolbar({ busy, hasMaster, hasVendors, hasBlocked, 
 }) {
   const masterRef = useRef<HTMLInputElement>(null), vendorRef = useRef<HTMLInputElement>(null), blockedRef = useRef<HTMLInputElement>(null);
   const bt = (style: React.CSSProperties, disabled = !!busy): React.CSSProperties => ({ ...style, opacity: disabled ? 0.5 : 1, pointerEvents: disabled ? 'none' : 'auto' });
-  const one = (fn: (f: File) => void) => (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) fn(f); };
-  const many = (e: React.ChangeEvent<HTMLInputElement>) => { const fs = Array.from(e.target.files || []); e.target.value = ''; if (fs.length) onVendors(fs); };
+  // The input is cleared BEFORE the picker opens (so the same file can be
+  // picked twice), never inside onChange: on iOS the picked File is a
+  // temporary copy tied to the input's file list, and clearing the input
+  // before the read finishes makes that read fail.
+  const pick = (ref: React.RefObject<HTMLInputElement | null>) => () => { if (ref.current) { ref.current.value = ''; ref.current.click(); } };
+  const one = (fn: (f: File) => void) => (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) fn(f); };
+  const many = (e: React.ChangeEvent<HTMLInputElement>) => { const fs = Array.from(e.target.files || []); if (fs.length) onVendors(fs); };
   return (
     <>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button type="button" className="touch44" onClick={() => masterRef.current?.click()} style={bt(S.btnPrimary)}>{busy === 'master' ? 'Reading…' : hasMaster ? 'Replace Indya master' : '1 · Import Indya master'}</button>
+        <button type="button" className="touch44" onClick={pick(masterRef)} style={bt(S.btnPrimary)}>{busy === 'master' ? 'Reading…' : hasMaster ? 'Replace Indya master' : '1 · Import Indya master'}</button>
         {hasMaster && <button type="button" className="touch44" onClick={onSkuSheet} style={bt({ ...S.btnGhost, ...BLUE })}>{busy === 'skus' ? 'Preparing…' : '2 · Download SKU sheet'}</button>}
-        <button type="button" className="touch44" onClick={() => vendorRef.current?.click()} style={bt(S.btnGhost)}>{busy === 'vendor' ? 'Reading…' : `${hasMaster ? '3 · ' : ''}+ Add vendor files`}</button>
-        <button type="button" className="touch44" onClick={() => blockedRef.current?.click()} style={bt({ ...S.btnGhost, ...AMBER })}>{busy === 'blocked' ? 'Reading…' : hasBlocked ? 'Replace blocked' : 'Blocked inventory'}</button>
+        <button type="button" className="touch44" onClick={pick(vendorRef)} style={bt(S.btnGhost)}>{busy === 'vendor' ? 'Reading…' : `${hasMaster ? '3 · ' : ''}+ Add vendor files`}</button>
+        <button type="button" className="touch44" onClick={pick(blockedRef)} style={bt({ ...S.btnGhost, ...AMBER })}>{busy === 'blocked' ? 'Reading…' : hasBlocked ? 'Replace blocked' : 'Blocked inventory'}</button>
         {hasMaster && hasVendors && <button type="button" className="touch44" onClick={onCompute} style={bt(S.btnSuccess)}>{busy === 'compute' ? 'Computing…' : '4 · Compute'}</button>}
         {hasResult && <button type="button" className="touch44" onClick={onDownload} style={bt({ ...S.btnPrimary, background: T.gr, color: '#fff', fontWeight: 700 })}>{busy === 'download' ? 'Preparing…' : '5 · Download updated file'}</button>}
         {anything && <button type="button" className="touch44" onClick={onReset} style={bt(S.btnDanger)}>Reset</button>}

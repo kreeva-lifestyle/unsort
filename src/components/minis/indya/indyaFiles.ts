@@ -18,10 +18,22 @@ const BLOCKED_ALIASES = ['blockedcommitted', 'blocked', 'committed', 'reserved']
 const norm = (v: unknown) => String(v ?? '').trim().toLowerCase().replace(/[^a-z]/g, '');
 const cellText = (v: unknown) => v == null ? '' : typeof v === 'number' ? String(v) : String(v).trim();
 
+/** A file name short enough to sit inside a toast message. */
+const shortName = (name: string) => name.length > 28 ? `${name.slice(0, 25)}…` : name;
+
+/** The file's bytes, or a short plain-English reason. Every message thrown
+ *  in this mini must stay under 80 characters with no '<' or '{' — that is
+ *  friendlyError's pass-through rule; anything longer is shown as
+ *  "Something went wrong", which is exactly what the owner cannot act on. */
+export async function readBytes(file: File): Promise<Uint8Array> {
+  if (file.size > MAX_FILE_BYTES) throw new Error(`${shortName(file.name)} is over 15 MB`);
+  try { return new Uint8Array(await file.arrayBuffer()); }
+  catch { throw new Error(`Could not read ${shortName(file.name)} — pick it again from Files`); }
+}
+
 async function grid(file: File): Promise<unknown[][]> {
-  if (file.size > MAX_FILE_BYTES) throw new Error(`${file.name} is over 15 MB`);
   const XLSX = await import('xlsx');
-  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  const wb = XLSX.read(await readBytes(file), { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   if (!ws) throw new Error(`${file.name} has no sheets`);
   return XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, defval: null });

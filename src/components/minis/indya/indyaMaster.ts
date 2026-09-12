@@ -18,14 +18,22 @@ export interface MasterFile { rows: MasterRow[]; columns: string[] }
 const WANT = ['SKU', 'VENDORSKU', 'SIZE', 'STOCK'] as const;
 const normHead = (s: string) => decodeEntities(s).replace(/<[^>]*>/g, '').replace(/[^A-Za-z]/g, '').toUpperCase();
 
-/** True when the bytes look like Indya's HTML report (not BIFF, not XLSX, not UTF-16). */
-export function looksLikeHtmlReport(bytes: Uint8Array): boolean {
-  if (bytes.length < 8) return false;
-  if ((bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes[0] === 0xfe && bytes[1] === 0xff)) return false; // UTF-16 BOM
-  if (bytes[0] === 0xd0 && bytes[1] === 0xcf) return false; // OLE2 (real .xls)
-  if (bytes[0] === 0x50 && bytes[1] === 0x4b) return false; // ZIP (.xlsx)
+// Every message thrown here is shown to the owner as-is ONLY while it is
+// under 80 characters with no '<' or '{' (friendlyError's pass-through
+// rule) — longer, or quoting a tag, and the toast says "Something went
+// wrong" instead. Keep them short and say "row tags", not "<tr>".
+const fmt = (n: number) => n.toLocaleString('en-IN');
+
+/** null when the bytes look like Indya's HTML report; otherwise a short
+ *  reason saying what the file actually is (real Excel, UTF-16, no table). */
+export function looksLikeHtmlReport(bytes: Uint8Array): string | null {
+  const not = (what: string) => `Not Indya’s report: ${what} — pick the .xls Indya sent`;
+  if (bytes.length < 8) return not('the file is empty');
+  if ((bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes[0] === 0xfe && bytes[1] === 0xff)) return not('this is a UTF-16 text file');
+  if (bytes[0] === 0xd0 && bytes[1] === 0xcf) return not('this is a real Excel workbook');
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b) return not('this is a real Excel workbook');
   const head = latin1(bytes.subarray(0, 2048)).toLowerCase();
-  return head.includes('<table');
+  return head.includes('<table') ? null : not('no HTML table found');
 }
 
 export const latin1 = (bytes: Uint8Array): string => new TextDecoder('latin1').decode(bytes);
@@ -38,9 +46,9 @@ export function parseMasterHtml(text: string): MasterFile {
   // be written back safely anyway.
   const count = (re: RegExp) => (text.match(re) || []).length;
   const trOpen = count(/<tr\b/gi), trClose = count(/<\/tr\s*>/gi);
-  if (trOpen !== trClose) throw new Error(`This report has ${trOpen} <tr> tags but ${trClose} </tr> tags — the file cannot be written back safely`);
+  if (trOpen !== trClose) throw new Error(`Row tags don’t balance (${fmt(trOpen)} open / ${fmt(trClose)} close) — can’t write it back`);
   const tdOpen = count(/<t[dh]\b/gi), tdClose = count(/<\/t[dh]\s*>/gi);
-  if (tdOpen !== tdClose) throw new Error(`This report has ${tdOpen} cell tags but ${tdClose} closing cell tags — the file cannot be written back safely`);
+  if (tdOpen !== tdClose) throw new Error(`Cell tags don’t balance (${fmt(tdOpen)} open / ${fmt(tdClose)} close) — can’t write it back`);
   const rowRe = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi;
   const cellRe = /<t([dh])\b[^>]*>([\s\S]*?)<\/t\1>/gi;
   const rows: MasterRow[] = [];
@@ -55,7 +63,7 @@ export function parseMasterHtml(text: string): MasterFile {
     while ((c = cellRe.exec(m[1]))) {
       const inner = c[2];
       const open = c[0].slice(0, c[0].indexOf('>') + 1);
-      if ((open.match(/"/g) || []).length % 2 || (open.match(/'/g) || []).length % 2) throw new Error('A cell tag has an unbalanced quote — the file cannot be written back safely');
+      if ((open.match(/"/g) || []).length % 2 || (open.match(/'/g) || []).length % 2) throw new Error(`Row ${fmt(rows.length + 2)}: a cell tag has an unbalanced quote — can’t write it back`);
       const start = rowStart + c.index + open.length;   // the opening tag has no '>' inside (guarded above)
       cells.push({ text: inner, start, end: start + inner.length });
     }
@@ -64,13 +72,13 @@ export function parseMasterHtml(text: string): MasterFile {
       columns = cells.map(x => normHead(x.text));
       const found = Object.fromEntries(WANT.map(w => [w, columns!.indexOf(w)])) as Record<(typeof WANT)[number], number>;
       const missing = WANT.filter(w => found[w] < 0);
-      if (missing.length) throw new Error(`This is not Indya's product master — the header row has no ${missing.join(', ')} column`);
+      if (missing.length) throw new Error(`Not Indya’s master — the header has no ${missing.join(', ')} column`);
       idx = found;
       continue;
     }
-    if (cells.length !== columns.length) throw new Error(`Row ${rows.length + 2} has ${cells.length} cells, the header has ${columns.length} — the file cannot be written back safely`);
+    if (cells.length !== columns.length) throw new Error(`Row ${fmt(rows.length + 2)} has ${cells.length} cells, the header has ${columns.length} — can’t write it back`);
     const st = cells[idx!.STOCK];
-    if (st.text.includes('<')) throw new Error(`Row ${rows.length + 2}: the Stock cell contains markup — the file cannot be written back safely`);
+    if (st.text.includes('<')) throw new Error(`Row ${fmt(rows.length + 2)}: the Stock cell contains markup — can’t write it back`);
     rows.push({
       i: rows.length,
       sku: decodeEntities(cells[idx!.SKU].text).trim(),
