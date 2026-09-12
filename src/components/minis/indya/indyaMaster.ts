@@ -38,6 +38,11 @@ export function looksLikeHtmlReport(bytes: Uint8Array): string | null {
   const probe = bytes.subarray(0, 512);
   let nul = 0; for (const x of probe) if (x === 0) nul++;
   if (nul > probe.length / 4) return not('this is a UTF-16 text file');
+  // Opened in Excel and saved: Excel rewrites the report as a "Web Page"
+  // frameset stub (the data moves to a _files folder) — nothing to import,
+  // and the bytes Indya needs back are gone.
+  const head = latin1(bytes.subarray(0, 4096));
+  if (/Excel Workbook Frameset|name=Generator content="Microsoft Excel/i.test(head)) return 'Excel re-saved this file and dropped the data — download it from Indya again';
   if (/<table\b/i.test(latin1(bytes))) return null;
   const peek = latin1(bytes.subarray(0, 80)).replace(/[^\x20-\x7e]+/g, ' ').replace(/[<>{}]/g, '').trim().slice(0, 20);
   return `Not Indya’s report (starts “${peek}”) — pick the .xls Indya sent`;
