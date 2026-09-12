@@ -9,6 +9,11 @@
 // Why it matters: these land in customers', sellers' and vendors' Downloads
 // folders next to hundreds of other files. "export.xlsx" or "order-preview
 // (3).xlsx" tells nobody anything a week later.
+//
+// The one documented exception: Indya Import (src/components/minis/indya)
+// hands back the marketplace's own report under the exact name it arrived
+// with — the owner's explicit call, because that file goes straight back to
+// Indya's importer unchanged apart from the Stock column.
 const BRAND = 'Arya';
 
 // Filename-safe: keep letters/digits/dash, turn everything else into single
