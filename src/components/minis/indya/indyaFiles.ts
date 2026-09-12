@@ -5,7 +5,7 @@
 // (a title row above the header no longer yields garbage keys).
 import { normKey } from './indyaSku';
 
-export interface VendorRow { sku: string; qty: string }
+export interface VendorRow { sku: string; qty: string; cat?: string }
 export interface VendorFile { name: string; rows: VendorRow[]; note?: string }
 export const MAX_FILE_BYTES = 15 * 1024 * 1024;
 
@@ -58,12 +58,15 @@ export async function readVendorFile(file: File): Promise<VendorFile> {
   const rows = await grid(file);
   const h = findHeader(rows, SKU_ALIASES, QTY_ALIASES);
   const at = h ? h.at : 0, key = h ? h.key : 0, val = h ? h.val : 1;
+  // Optional category column (the vendor sheets carry one): LEHENGA CHOLI
+  // rows get special treatment in compute.
+  const cat = h ? (rows[h.at] || []).map(norm).findIndex(x => x === 'category' || x.includes('category')) : -1;
   const out: VendorRow[] = [];
   for (let i = at + 1; i < rows.length; i++) {
     const r = rows[i] || [];
     const sku = normKey(cellText(r[key]));
     if (!sku) continue;
-    out.push({ sku, qty: cellText(r[val]) });
+    out.push(cat >= 0 ? { sku, qty: cellText(r[val]), cat: cellText(r[cat]) } : { sku, qty: cellText(r[val]) });
   }
   if (out.length === 0) throw new Error(`${file.name}: no SKU rows found`);
   return { name: file.name, rows: out, note: h ? undefined : 'no SKU/qty header found — used columns A and B' };
