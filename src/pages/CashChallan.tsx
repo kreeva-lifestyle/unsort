@@ -1109,8 +1109,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // Consume the credit of every selected return: its amount_paid rises to
     // total (settle_return_refund), so it stops offsetting outstanding and the
     // negative payment row nets the cash book against the sale payments above.
-    // Note: batch Undo restores the SALES only — a consumed credit stays
-    // consumed (settle again is impossible; the RPC refuses double-settling).
+    // The settle rows carry the batch id, so batch Undo hands the credits
+    // back along with reversing the sales (undo_challan_batch).
     // Settle failures are counted SEPARATELY from sale failures so the summary
     // toast never reports a failed settle as a failed sale payment.
     let settleFail = 0, settledCount = 0;

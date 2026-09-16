@@ -78,7 +78,7 @@ export default function ChallanBulkActions(p: Props) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', marginBottom: 8, background: 'oklch(0.72 0.19 145 / .06)', border: '1px solid oklch(0.72 0.19 145 / .15)', borderRadius: 6 }}>
           <span style={{ fontSize: 10, color: T.gr, fontWeight: 600, flex: 1 }}>
             {p.lastBatch.id}: {p.lastBatch.count} challans paid{p.lastBatch.settled > 0 ? ` + ${p.lastBatch.settled} return credit${p.lastBatch.settled === 1 ? '' : 's'} settled` : ''} via {p.lastBatch.mode}
-            {p.lastBatch.settled > 0 && <span style={{ color: T.yl, fontWeight: 500 }}> — Undo restores the sales only; settled return credits stay consumed</span>}
+            {p.lastBatch.settled > 0 && <span style={{ color: T.tx3, fontWeight: 500 }}> — Undo restores the sales and hands the return credits back</span>}
           </span>
           <button disabled={p.undoingBatch} onClick={p.onUndoBatch} style={{ ...S.btnDanger, ...S.btnSm, pointerEvents: p.undoingBatch ? 'none' : 'auto', opacity: p.undoingBatch ? 0.5 : 1 }}>{p.undoingBatch ? 'Undoing…' : 'Undo Batch'}</button>
           <button type="button" onClick={p.onDismissBatch} style={{ ...S.modalClose, margin: '-8px -8px -8px 0' }} aria-label="Dismiss">&#215;</button>
