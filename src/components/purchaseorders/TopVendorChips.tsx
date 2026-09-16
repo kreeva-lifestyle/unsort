@@ -6,6 +6,7 @@
 // the vendor exactly like picking from the dropdown.
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { logSwallowed } from '../../lib/errorLogger';
 import { S } from '../../lib/theme';
 
 type V = { id: string | null; name: string; phone: string };
@@ -14,7 +15,8 @@ export default function TopVendorChips({ onPick }: { onPick: (v: V) => void }) {
   const [tops, setTops] = useState<V[]>([]);
   useEffect(() => {
     supabase.from('app_settings').select('value').eq('key', 'po_top_vendors').maybeSingle()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) { logSwallowed('PO top vendors', error); return; } // chips are a convenience
         if (Array.isArray(data?.value)) setTops((data.value as V[]).filter(v => (v?.name || '').trim()));
       });
   }, []);

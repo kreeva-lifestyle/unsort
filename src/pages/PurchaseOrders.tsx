@@ -176,7 +176,8 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     // Edits originate from the detail view — reopen it so the user keeps their
     // place instead of being dropped back to the list.
     if (!isNew) {
-      const { data } = await supabase.from('purchase_orders').select(COLS).eq('id', r.id).maybeSingle();
+      const { data, error } = await supabase.from('purchase_orders').select(COLS).eq('id', r.id).maybeSingle();
+      if (error) { addToast(friendlyError(error), 'error'); return; }
       if (data) openDetail(data as PurchaseOrder);
     }
   };
@@ -185,7 +186,9 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   // Approve / Mark Sent / Cancel / Receive — reflect immediately in the buttons.
   const refreshDetail = async () => {
     if (!detail) return;
-    const { data } = await supabase.from('purchase_orders').select(COLS).eq('id', detail.po.id).maybeSingle();
+    const { data, error } = await supabase.from('purchase_orders').select(COLS).eq('id', detail.po.id).maybeSingle();
+    // A failed re-read must not quietly re-render the old status and buttons.
+    if (error) { addToast(friendlyError(error), 'error'); fetchPos(true); return; }
     await openDetail((data as PurchaseOrder) ?? detail.po);
     fetchPos(true);
   };

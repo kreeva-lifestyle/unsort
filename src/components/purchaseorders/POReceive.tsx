@@ -59,7 +59,7 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
     // Refresh the totals and make the user confirm against the fresh numbers.
     try {
       const { data: fresh, error: fe } = await supabase.from('purchase_order_items').select('id, received_qty').eq('po_id', po.id);
-      if (fe) throw new Error(fe.message);
+      if (fe) throw fe;
       const freshMap = Object.fromEntries(((fresh as { id: string; received_qty: number }[] | null) || []).map(r => [r.id, Number(r.received_qty || 0)]));
       const changed = items.some(it => (freshMap[it.id] ?? 0) !== recvdOf(it));
       if (changed) {
@@ -72,7 +72,7 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
     try {
       const p_receipts = receipts.map(r => ({ ...r, receipt_date: date || null, remarks: remarks.trim() || null }));
       const { error: e } = await supabase.rpc('receive_po_items', { p_po_id: po.id, p_receipts });
-      if (e) throw new Error(e.message);
+      if (e) throw e;
       addToast('Receipt recorded', 'success');
       onReceived();
     } catch (e) { setError(friendlyError(e)); setSaving(false); return; }
@@ -81,12 +81,12 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
 
   return createPortal(
     <div style={S.modalOverlay} onClick={onClose}>
-      <div className="modal-inner" style={{ ...S.modalBox, width: 560 }} onClick={e => e.stopPropagation()}>
+      <div className="modal-inner" style={{ ...S.modalBox, width: 560, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>Receive — PO #{po.po_number}</span>
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
-        <div style={{ padding: '16px 18px', overflowY: 'auto', maxHeight: 'calc(90vh - 130px)' }}>
+        <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {items.map(it => {
               const rem = remainingOf(it);

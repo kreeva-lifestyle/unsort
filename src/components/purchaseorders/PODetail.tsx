@@ -50,7 +50,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
     setBusy(status);
     try {
       const { error } = await supabase.rpc('set_po_status', { p_po_id: po.id, p_status: status });
-      if (error) throw new Error(error.message);
+      if (error) throw error;
       addToast(`Purchase order ${label}`, 'success');
       onChanged();
     } catch (e) { addToast(friendlyError(e), 'error'); }
@@ -66,7 +66,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
     setBusy('r' + r.id);
     try {
       const { error } = await supabase.rpc('delete_po_receipt', { p_receipt_id: r.id });
-      if (error) throw new Error(error.message);
+      if (error) throw error;
       addToast('Receipt removed', 'success');
       onChanged();
     } catch (e) { addToast(friendlyError(e), 'error'); }
@@ -82,7 +82,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
     setBusy('reopen');
     try {
       const { error } = await supabase.rpc('set_po_status', { p_po_id: po.id, p_status: 'reopen' });
-      if (error) throw new Error(error.message);
+      if (error) throw error;
       addToast('Purchase order reopened', 'success');
       onChanged();
     } catch (e) { addToast(friendlyError(e), 'error'); }
@@ -107,7 +107,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
 
   return createPortal(
     <div style={S.modalOverlay} onClick={onClose}>
-      <div className="modal-inner" style={{ ...S.modalBox, width: 720 }} onClick={e => e.stopPropagation()}>
+      <div className="modal-inner" style={{ ...S.modalBox, width: 720, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={S.modalTitle}>PO #{po.po_number}</span>
@@ -116,7 +116,9 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
 
-        <div style={{ padding: '16px 18px', overflowY: 'auto', maxHeight: 'calc(90vh - 190px)' }}>
+        {/* One scrolling body inside a flex column (see POForm): the old
+            calc(90vh - 190px) was taller than the mobile bottom sheet. */}
+        <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           {/* Header info */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 16 }}>
             <Info label="Vendor" value={<><div style={{ fontWeight: 600 }}>{po.vendor_name}</div>{po.vendor_phone && <div style={{ fontSize: 11, color: T.tx3, fontFamily: T.mono }}>{po.vendor_phone}</div>}</>} />

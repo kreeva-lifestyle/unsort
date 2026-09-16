@@ -47,7 +47,7 @@ export default function POCloseModal({ po, items, onClose, onClosed, addToast }:
     setSaving(true);
     try {
       const { error: e } = await supabase.rpc('close_po_short', { p_po_id: po.id, p_reason: r });
-      if (e) throw new Error(e.message);
+      if (e) throw e;
       addToast(`PO #${po.po_number} closed`, 'success');
       onClosed();
     } catch (e) { setError(friendlyError(e)); setSaving(false); return; }
@@ -56,13 +56,13 @@ export default function POCloseModal({ po, items, onClose, onClosed, addToast }:
 
   return createPortal(
     <div style={S.modalOverlay} onClick={onClose}>
-      <div className="modal-inner" style={{ ...S.modalBox, width: 460 }} onClick={e => e.stopPropagation()}>
+      <div className="modal-inner" style={{ ...S.modalBox, width: 460, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
           <span style={S.modalTitle}>Close remaining · PO #{po.po_number}</span>
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
 
-        <div style={{ padding: '16px 18px', overflowY: 'auto', maxHeight: 'calc(90vh - 170px)' }}>
+        <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5, marginBottom: 12 }}>
             You are saying the rest of this order is not coming. What has already been received stays on record, and the order stops showing in the pending list and the vendor report.
           </div>

@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { useBackClose } from '../../hooks/useBackClose';
 import { friendlyError } from '../../lib/friendlyError';
+import { logSwallowed } from '../../lib/errorLogger';
 import { numericKeyDown } from '../../lib/numericInput';
 import VendorPicker from './VendorPicker';
 import TopVendorChips from './TopVendorChips';
@@ -87,7 +88,8 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
     let q = supabase.from('purchase_orders').select('po_type, purchase_order_items(unit)')
       .order('created_at', { ascending: false }).limit(1);
     q = v.id ? q.eq('vendor_id', v.id) : q.ilike('vendor_name', v.name.trim());
-    const { data } = await q;
+    const { data, error } = await q;
+    if (error) { logSwallowed('PO vendor defaults', error); return; } // best-effort prefill
     const last = data?.[0] as { po_type: PurchaseOrderType; purchase_order_items?: { unit: string | null }[] } | undefined;
     if (!last) return;
     setPoType(prev => prev || last.po_type);
@@ -139,11 +141,12 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
       const p_items = clean.map(({ it }) => ({ item_name: it.item_name.trim(), sku: it.sku.trim() || null, quantity: num(it.quantity), unit: it.unit.trim() || null, rate: it.rate === '' ? null : num(it.rate) }));
       if (editing) {
         const { error: e } = await supabase.rpc('update_po_with_items', { p_po_id: editing.id, p_po, p_items });
-        if (e) throw new Error(e.message);
+        if (e) throw e;
         onSaved({ id: editing.id, po_number: editing.po_number }, false);
       } else {
         const { data, error: e } = await supabase.rpc('create_po_with_items', { p_po, p_items });
-        if (e || !data?.id) throw new Error(e?.message || 'Could not create the purchase order');
+        if (e) throw e;
+        if (!data?.id) throw new Error('Could not create the purchase order');
         onSaved({ id: data.id, po_number: data.po_number }, true);
       }
     } catch (e) { setError(friendlyError(e)); setSaving(false); return; }
