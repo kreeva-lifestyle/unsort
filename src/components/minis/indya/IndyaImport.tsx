@@ -154,7 +154,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
       <IndyaSkuMap addToast={addToast} onChange={onMapChange} prefill={mapPrefill} />
 
       <IndyaToolbar busy={busy} hasMaster={!!master} hasVendors={vendors.length > 0} hasBlocked={!!blocked} hasResult={!!result} anything={!!(master || vendors.length || blocked)}
-        onMaster={importMaster} onVendors={importVendors} onBlocked={importBlocked} onSkuSheet={skuSheet} onCompute={compute} onDownload={download} onReset={reset} />
+        addToast={addToast} onMaster={importMaster} onVendors={importVendors} onBlocked={importBlocked} onSkuSheet={skuSheet} onCompute={compute} onDownload={download} onReset={reset} />
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
         {master && <span style={chip(T.ac3, T.ac2)}>Master: {master.rows.length.toLocaleString('en-IN')} rows</span>}
