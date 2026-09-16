@@ -133,9 +133,10 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const notifyPos = useActiveRefetch(active ?? true, () => fetchPos(true));
   useEffect(() => {
     const ch = supabase.channel('purchase_orders_rt')
+      // Header only: every PO RPC that touches items or receipts also stamps
+      // the header's updated_at in the same transaction, so the two extra
+      // table-wide subscriptions only fanned out duplicate events.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, notifyPos)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_order_items' }, notifyPos)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_order_receipts' }, notifyPos)
       // Reconnect catch-up: realtime never replays missed events.
       .subscribe(status => { if (status === 'SUBSCRIBED') notifyPos(); });
     return () => { supabase.removeChannel(ch); };

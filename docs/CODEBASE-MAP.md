@@ -200,7 +200,7 @@ marked (G).
 #### Purchase Orders
 | Path | Lines | Purpose | Touches |
 |---|---|---|---|
-| `pages/PurchaseOrders.tsx` | 260 | Paginated list w/ items join, search (vendor / number / SKU via RPC), filters, realtime, print overlay, pendency report | `purchase_orders` (+embedded items), `purchase_order_items`, `purchase_order_receipts`, `audit_log`, `profiles`; RPC `search_po_ids`; channel `purchase_orders_rt` on 3 tables; `printOrQueue('document','A4')` |
+| `pages/PurchaseOrders.tsx` | 260 | Paginated list w/ items join, search (vendor / number / SKU via RPC), filters, realtime, print overlay, pendency report | `purchase_orders` (+embedded items), `purchase_order_items`, `purchase_order_receipts`, `audit_log`, `profiles`; RPC `search_po_ids`; channel `purchase_orders_rt` on `purchase_orders` only (every RPC stamps the header); `printOrQueue('document','A4')` |
 | `components/purchaseorders/POForm.tsx` | 275 | Create/edit/duplicate; vendor smart defaults | RPCs `create_po_with_items`, `update_po_with_items`; `purchase_orders` last-PO lookup |
 | `components/purchaseorders/PODetail.tsx` | 196 | Detail + status actions | RPCs `set_po_status` (`approved/sent/cancelled/reopen`), `delete_po_receipt` |
 | `components/purchaseorders/POReceive.tsx` | 134 | Receive goods (stale-tally guard) | RPC `receive_po_items` |
@@ -209,7 +209,7 @@ marked (G).
 | `components/purchaseorders/TopVendorChips.tsx` | 33 | Top-5 vendor chips | `app_settings.po_top_vendors` |
 | `components/purchaseorders/POList.tsx`, `POReceipts.tsx`, `POActivity.tsx` | 240, 33, 19 | Presentational | pure |
 | `components/purchaseorders/PendencyReport.tsx` + `pendencyData/Doc/Image` | 98+95+80+153 | Vendor pendency report (A4 print + PNG share) | `purchase_orders` selects; `printOrQueue` |
-| `components/purchaseorders/poPdf.ts`, `poImage.ts`, `poAudit.ts` | 99, 175, 27 | PO A4 HTML, canvas PNG share, audit writer (`audit_log`, `module='purchase_order'`) | — |
+| `components/purchaseorders/poPdf.ts`, `poImage.ts` | 99, 175 | PO A4 HTML, canvas PNG share. Audit rows are written by the PO RPCs themselves (`audit_write`, migration `20260916143000`); `poAudit.ts` is gone | — |
 
 #### Attendance
 | Path | Lines | Purpose | Touches |
@@ -645,7 +645,7 @@ CLAUDE.md: "Do not add new direct Sheets API reads — extend the mirror" and "n
 - Cash Book / challan locks are DB triggers (`prevent_*`, `protect_*`) mirrored client-side; paid→unpaid is only allowed inside RPC transactions that set `app.challan_rpc`. Purchase orders use the same trick with `app.po_rpc` — direct writes to PO tables fail.
 - `products.total_components` and `item_components` rows are trigger-maintained; Inventory's add flow sleeps 500 ms and trusts the trigger.
 - PIN: never read `profiles.cash_pin`; `confirm_handover` verifies it server-side with lockout; `check_pin_exists`/`set_own_pin` manage it; `get_own_pin`/`verify_own_pin` exist but are unused by the client.
-- `audit_log.user_email` holds a display name in the challan module; `loadAuditTrail` matches on the text of `details`.
+- `audit_log.user_id` / `user_email` are stamped from the session by the `trg_audit_log_stamp_actor` trigger (profile name, else email) on every insert; the money-moving PO and challan RPCs write their own audit rows inside the transaction. `loadAuditTrail` still matches on the text of `details`.
 - PostgREST caps responses at 1000 rows — use `fetchPaged` or `.range` loops (`useProductCatalog`, `BrandTags` order sheet, `PackTime` export do; several selects listed in §7.9 do not).
 
 **Bugs found while reading (not fixed — outside the onboarding scope)**
