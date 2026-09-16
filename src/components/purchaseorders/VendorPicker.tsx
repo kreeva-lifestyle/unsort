@@ -32,10 +32,13 @@ export default function VendorPicker({ value, onPick, addToast, disabled }: {
 
   const search = useCallback(async (term: string) => {
     if (term.trim().length < 1) { setSuggestions([]); return; }
-    const { data } = await supabase.from('po_vendors').select('id, name, phone')
+    const { data, error } = await supabase.from('po_vendors').select('id, name, phone')
       .eq('is_active', true).ilike('name', `%${term.replace(/[%_]/g, '\\$&')}%`).order('name').limit(6);
+    // An empty list on a failed search reads as "new vendor" and invites a
+    // duplicate quick-add — say that the search failed instead.
+    if (error) { addToast(friendlyError(error), 'error'); return; }
     setSuggestions((data as VendorRow[] | null) || []);
-  }, []);
+  }, [addToast]);
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false); };
@@ -60,8 +63,9 @@ export default function VendorPicker({ value, onPick, addToast, disabled }: {
       if (error) {
         // Unique (lower(name), phone) clash → fetch and reuse the existing row.
         if (error.code === '23505') {
-          const { data: existing } = await supabase.from('po_vendors').select('id, name, phone')
+          const { data: existing, error: exErr } = await supabase.from('po_vendors').select('id, name, phone')
             .ilike('name', newName.trim()).eq('phone', newPhone.trim()).maybeSingle();
+          if (exErr) { addToast(friendlyError(exErr), 'error'); setSaving(false); return; }
           if (existing) { pick(existing as VendorRow); addToast('Vendor already existed — selected it', 'success'); setAdding(false); setSaving(false); return; }
         }
         addToast(friendlyError(error), 'error'); setSaving(false); return;

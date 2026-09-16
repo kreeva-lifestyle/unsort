@@ -191,7 +191,7 @@ export default function ChallanForm(p: ChallanFormProps) {
           {!p.editing && recentCustomers.length > 0 && !p.customerName && (
             <div className="challan-recent" style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
               {recentCustomers.map(c => (
-                <span key={c.name} onClick={() => { p.setCustomerName(c.name); if (c.id) { p.setSelectedCustomerId(c.id); supabase.from('cash_challan_customers').select('phone').eq('name', c.name).maybeSingle().then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); if (data?.phone) p.setCustomerPhone(data.phone); }); } p.setCustomerSuggestions([]); }}
+                <span key={c.name} onClick={() => { p.setCustomerName(c.name); if (c.id) { p.setSelectedCustomerId(c.id); supabase.from('cash_challan_customers').select('phone').eq('id', c.id).maybeSingle().then(({ data, error }) => { if (error) addToast(friendlyError(error), 'error'); if (data?.phone) p.setCustomerPhone(data.phone); }); } p.setCustomerSuggestions([]); }}
                   style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: 'pointer', background: T.ac3, border: `1px solid ${T.ac3}`, color: T.ac2, whiteSpace: 'nowrap' }}>{c.name}</span>
               ))}
             </div>

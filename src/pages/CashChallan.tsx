@@ -388,7 +388,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const searchReturnSource = useCallback(async (q: string) => {
     if (!q.trim()) { setReturnResults([]); return; }
     const num = parseInt(q);
-    let query = supabase.from('cash_challans').select('*, cash_challan_items(sku, description, quantity, price, total, discount_type, discount_value, discount_amount)').eq('is_return', false).neq('status', 'voided');
+    let query = supabase.from('cash_challans').select('id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, created_at, updated_at, cash_challan_items(sku, description, quantity, price, total, discount_type, discount_value, discount_amount)').eq('is_return', false).neq('status', 'voided');
     if (num && !isNaN(num)) query = query.eq('challan_number', num);
     else query = query.ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
     const { data, error } = await query.order('created_at', { ascending: false }).limit(10);
@@ -416,7 +416,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Customer auto-suggest ──────────────────────────────────────────────────
   const searchCustomers = useCallback(async (q: string) => {
     if (q.length < 2) { setCustomerSuggestions([]); return; }
-    const { data } = await supabase.from('cash_challan_customers').select('id, name, phone, address').ilike('name', `%${q.replace(/[%_]/g, '\\$&')}%`).limit(5);
+    const { data, error } = await supabase.from('cash_challan_customers').select('id, name, phone, address').ilike('name', `%${q.replace(/[%_]/g, '\\$&')}%`).limit(5);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
     const rows = (data as Customer[] | null) || [];
     setCustomerSuggestions(rows);
     // Auto-fill phone if exact match found (case-insensitive)
@@ -532,18 +533,21 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       // Validate against FRESH source items, not the snapshot captured when
       // the invoice was selected — the source can be edited by another user
       // between selection and save. Also fetch cumulative previous returns.
-      const [{ data: freshItems, error: srcErr }, { data: prevReturns }] = await Promise.all([
+      const [{ data: freshItems, error: srcErr }, { data: prevReturns, error: prevErr }] = await Promise.all([
         supabase.from('cash_challan_items').select('sku, quantity').eq('challan_id', returnSource.id),
         supabase.from('cash_challans').select('id').eq('source_challan_id', returnSource.id).eq('is_return', true).neq('status', 'voided'),
       ]);
-      if (srcErr) { setFormError('Could not verify the source invoice — ' + friendlyError(srcErr)); return; }
+      if (srcErr || prevErr) { setFormError('Could not verify the source invoice — ' + friendlyError(srcErr || prevErr)); return; }
       type SrcItemRow = Pick<DbCashChallanItem, 'sku' | 'quantity'>;
       const sourceItems = (freshItems as SrcItemRow[] | null) || [];
       type IdRow = Pick<CashChallan, 'id'>;
       const prevReturnIds = ((prevReturns as IdRow[] | null) || []).map((r) => r.id).filter((id) => !editing || id !== editing.id);
       const prevQtyMap: Record<string, number> = {};
       if (prevReturnIds.length > 0) {
-        const { data: prevItems } = await supabase.from('cash_challan_items').select('sku, quantity').in('challan_id', prevReturnIds);
+        const { data: prevItems, error: prevItemsErr } = await supabase.from('cash_challan_items').select('sku, quantity').in('challan_id', prevReturnIds);
+        // A failed lookup must not read as "nothing returned yet" — that would
+        // let the whole invoice be returned again.
+        if (prevItemsErr) { setFormError('Could not check earlier returns — ' + friendlyError(prevItemsErr)); return; }
         type PrevItemRow = Pick<DbCashChallanItem, 'sku' | 'quantity'>;
         ((prevItems as PrevItemRow[] | null) || []).forEach((pi) => { const key = pi.sku ?? ''; prevQtyMap[key] = (prevQtyMap[key] || 0) + pi.quantity; });
       }
@@ -602,7 +606,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       const trimmed = customerName.trim();
       let q = supabase.from('cash_challan_customers').select('id').ilike('name', trimmed);
       if (trimmedPhone) q = q.eq('phone', trimmedPhone); else q = q.is('phone', null);
-      const { data: existing } = await q.maybeSingle();
+      const { data: existing, error: exErr } = await q.maybeSingle();
+      if (exErr) { setFormError('Could not look up the customer — ' + friendlyError(exErr)); return; }
       if (existing) {
         custId = existing.id;
       } else {
@@ -610,7 +615,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         if (insErr && insErr.code === '23505') {
           let rq = supabase.from('cash_challan_customers').select('id').ilike('name', trimmed);
           if (trimmedPhone) rq = rq.eq('phone', trimmedPhone); else rq = rq.is('phone', null);
-          const { data: raceCust } = await rq.maybeSingle();
+          const { data: raceCust, error: raceErr } = await rq.maybeSingle();
+          if (raceErr) { setFormError('Could not look up the customer — ' + friendlyError(raceErr)); return; }
           custId = raceCust?.id || null;
         } else {
           custId = newCust?.id || null;
@@ -635,7 +641,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     let createdId: string | null = null;
     try {
       if (editing) {
-        const { data: current } = await supabase.from('cash_challans').select('updated_at').eq('id', editing.id).maybeSingle();
+        const { data: current, error: curErr } = await supabase.from('cash_challans').select('updated_at').eq('id', editing.id).maybeSingle();
+        if (curErr) throw curErr; // a failed check must not silently skip the stale-edit guard
         if (current && editing.updated_at && current.updated_at !== editing.updated_at) {
           const msg = 'This challan was modified by another user. Please close and reopen to get latest data.';
           setFormError(msg);
@@ -674,6 +681,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const savedPhone = customerPhone.trim();
     const savedItemCount = items.length;
     const savedNumber = editing ? editing.challan_number : createdNumber;
+    if (!wasNew) addToast(`Challan #${savedNumber} updated`, 'success');
     // Payment recorded during this edit (0 for new challans — those use the
     // creation message below, which already covers the payment).
     const paidDelta = editing ? amountPaid - Number(editing.amount_paid || 0) : 0;
@@ -786,7 +794,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (outstanding <= 0) { addToast('Cannot remind — challan is fully paid', 'error'); return; }
     const phone = (c as any).customer_phone || null;
     if (!phone && c.customer_id) {
-      const { data: cust } = await supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle();
+      const { data: cust, error: custErr } = await supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle();
+      if (custErr) { addToast(friendlyError(custErr), 'error'); return; }
       if (cust?.phone && isValidPhone(cust.phone)) { window.location.href = `https://wa.me/${waPhone(cust.phone)}?text=${await buildReminderMsg(c)}`; return; }
     }
     if (phone && isValidPhone(phone)) {
@@ -878,10 +887,13 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const openEdit = async (c: Challan) => {
     if (c.status === 'voided') { addToast('Cannot edit a voided challan', 'error'); return; }
     if (c.status === 'paid') { addToast('Cannot edit a paid challan — use ☑ Select → Unpay to revert the payment first', 'error'); return; }
-    const [{ data: citems }, { data: cust }] = await Promise.all([
+    const [{ data: citems, error: itemsErr }, { data: cust, error: custErr }] = await Promise.all([
       supabase.from('cash_challan_items').select('sku, description, quantity, price, total, discount_type, discount_value, discount_amount').eq('challan_id', c.id).order('sort_order'),
-      c.customer_id ? supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle() : Promise.resolve({ data: null }),
+      c.customer_id ? supabase.from('cash_challan_customers').select('phone').eq('id', c.customer_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     ]);
+    // Never open the edit form on a failed items fetch: it would show zero
+    // items, and saving would replace the real ones.
+    if (itemsErr || custErr) { addToast(friendlyError(itemsErr || custErr), 'error'); return; }
     setEditing(c);
     setCustomerName(c.customer_name);
     setSelectedCustomerId(c.customer_id);
