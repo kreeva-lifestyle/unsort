@@ -97,3 +97,7 @@ $function$;
 create index if not exists idx_audit_module_record on public.audit_log (module, record_id, created_at desc);
 create index if not exists idx_cash_challans_tags on public.cash_challans using gin (tags);
 create index if not exists idx_purchase_orders_vendor_name_trgm on public.purchase_orders using gin (vendor_name gin_trgm_ops);
+
+-- inr_text (20260916143000) was created without a pinned search_path — the
+-- advisor flagged it the same way. It touches no tables, but pin it anyway.
+alter function public.inr_text(numeric) set search_path = 'public';
