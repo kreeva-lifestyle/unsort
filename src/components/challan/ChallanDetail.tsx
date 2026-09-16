@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
-import { logSwallowed } from '../../lib/errorLogger';
 import { friendlyError } from '../../lib/friendlyError';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useAuth } from '../../hooks/useAuth';
@@ -24,6 +23,8 @@ interface Props {
   onReturn: () => void;
   onVoid: () => void;
   onSettled?: () => void;
+  /** A field the sheet changed in place (notes, an item's SKU): the parent merges it into its state. */
+  onPatched?: (patch: Partial<Challan>) => void;
   onNext?: () => void;
   onPrev?: () => void;
   hasNext?: boolean;
@@ -36,7 +37,7 @@ const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91'
 
 type TimelineEntry = { type: 'audit' | 'payment'; time: string; action?: string; details?: string; user_name?: string; changes?: Record<string, { from: unknown; to: unknown }> | null; amount?: number; payment_mode?: string; is_reversal?: boolean; notes?: string; batch_id?: string | null };
 
-export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid, onSettled, onNext, onPrev, hasNext, hasPrev, qrUrl, upiId }: Props) {
+export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, onRemind, onReturn, onVoid, onSettled, onPatched, onNext, onPrev, hasNext, hasPrev, qrUrl, upiId }: Props) {
   const { addToast } = useNotifications();
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
@@ -87,34 +88,33 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
     setShowQrShare(false);
   };
 
+  // Both edits go through an RPC that writes the change and its audit row in
+  // one transaction (the SKU one also enforces admin server-side). The parent
+  // receives the patch through onPatched and updates its own state — the old
+  // code mutated the prop object in place, so the list never re-rendered.
   const saveNotes = async () => {
     const newNotes = editNotesVal.trim() || null;
     const oldNotes = c.notes || null;
     if (newNotes === oldNotes) { setEditingNotes(false); return; }
     setSavingNotes(true);
-    try {
-      const { error } = await supabase.from('cash_challans').update({ notes: newNotes }).eq('id', c.id);
-      if (error) { addToast(friendlyError(error), 'error'); setSavingNotes(false); return; }
-      await supabase.from('audit_log').insert({ module: 'cash_challan', record_id: c.id, action: 'NOTES_EDIT', details: `Notes ${newNotes ? 'updated' : 'removed'} on challan #${c.challan_number}`, user_email: profile?.email, changes: { notes: { from: oldNotes, to: newNotes } } }).then(({ error: ae }) => { if (ae) { logSwallowed('Challan audit log', ae); addToast('Saved, but the audit log failed — ' + friendlyError(ae), 'error'); } });
-      (c as any).notes = newNotes;
-      addToast('Notes updated', 'success');
-    } catch (e: any) { addToast(friendlyError(e), 'error'); }
+    const { error } = await supabase.rpc('update_challan_notes', { p_id: c.id, p_notes: newNotes });
     setSavingNotes(false);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    onPatched?.({ notes: newNotes });
+    addToast('Notes updated', 'success');
     setEditingNotes(false);
   };
 
   const saveSkuEdit = async (item: Partial<CashChallanItem>, oldSku: string) => {
     const newSku = editSkuVal.trim();
     if (!newSku || newSku === oldSku) { setEditSkuIdx(null); return; }
+    if (!item.id) { addToast('Reopen this challan to edit its SKU', 'error'); return; }
     setSavingSku(true);
-    try {
-      const { error } = await supabase.from('cash_challan_items').update({ sku: newSku }).eq('id', item.id);
-      if (error) { addToast(friendlyError(error), 'error'); setSavingSku(false); return; }
-      await supabase.from('audit_log').insert({ module: 'cash_challan', record_id: c.id, action: 'SKU_EDIT', details: `SKU changed: ${oldSku} → ${newSku} (challan #${c.challan_number})`, user_email: profile?.email, changes: { sku: { from: oldSku, to: newSku } } }).then(({ error: ae }) => { if (ae) { logSwallowed('Challan audit log', ae); addToast('Saved, but the audit log failed — ' + friendlyError(ae), 'error'); } });
-      (item as any).sku = newSku;
-      addToast(`SKU updated: ${oldSku} → ${newSku}`, 'success');
-    } catch (e: any) { addToast(friendlyError(e), 'error'); }
+    const { error } = await supabase.rpc('update_challan_item_sku', { p_item_id: item.id, p_sku: newSku });
     setSavingSku(false);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    onPatched?.({ cash_challan_items: (c.cash_challan_items || []).map(x => (x.id === item.id ? { ...x, sku: newSku } : x)) });
+    addToast(`SKU updated: ${oldSku} → ${newSku}`, 'success');
     setEditSkuIdx(null);
   };
   const scrollRef = useRef<HTMLDivElement>(null);
