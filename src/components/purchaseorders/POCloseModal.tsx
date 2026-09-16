@@ -10,7 +10,6 @@ import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { useModalLock } from '../../hooks/useModalLock';
 import { useBackClose } from '../../hooks/useBackClose';
-import { poAuditLog } from './poAudit';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 
 const PRESETS = [
@@ -49,7 +48,6 @@ export default function POCloseModal({ po, items, onClose, onClosed, addToast }:
     try {
       const { error: e } = await supabase.rpc('close_po_short', { p_po_id: po.id, p_reason: r });
       if (e) throw new Error(e.message);
-      await poAuditLog('CLOSED', po.id, `PO #${po.po_number} closed with ${qty(totalPending)} pending — ${r}`);
       addToast(`PO #${po.po_number} closed`, 'success');
       onClosed();
     } catch (e) { setError(friendlyError(e)); setSaving(false); return; }

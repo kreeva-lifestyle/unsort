@@ -9,7 +9,6 @@ import { T, S } from '../../lib/theme';
 import { useBackClose } from '../../hooks/useBackClose';
 import { friendlyError } from '../../lib/friendlyError';
 import { numericKeyDown } from '../../lib/numericInput';
-import { poAuditLog } from './poAudit';
 import VendorPicker from './VendorPicker';
 import TopVendorChips from './TopVendorChips';
 import SkuInput from '../ui/SkuInput';
@@ -141,12 +140,10 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
       if (editing) {
         const { error: e } = await supabase.rpc('update_po_with_items', { p_po_id: editing.id, p_po, p_items });
         if (e) throw new Error(e.message);
-        await poAuditLog('UPDATE', editing.id, `PO #${editing.po_number} updated`);
         onSaved({ id: editing.id, po_number: editing.po_number }, false);
       } else {
         const { data, error: e } = await supabase.rpc('create_po_with_items', { p_po, p_items });
         if (e || !data?.id) throw new Error(e?.message || 'Could not create the purchase order');
-        await poAuditLog('CREATE', data.id, `PO #${data.po_number} raised for ${vendor.name.trim()}${grand > 0 ? ` — ₹${grand.toLocaleString('en-IN')}` : ''}`);
         onSaved({ id: data.id, po_number: data.po_number }, true);
       }
     } catch (e) { setError(friendlyError(e)); setSaving(false); return; }
