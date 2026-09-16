@@ -7,7 +7,6 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
-import { poAuditLog } from './poAudit';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import { useModalLock } from '../../hooks/useModalLock';
 import POCloseModal, { pendingOf } from './POCloseModal';
@@ -52,7 +51,6 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
     try {
       const { error } = await supabase.rpc('set_po_status', { p_po_id: po.id, p_status: status });
       if (error) throw new Error(error.message);
-      await poAuditLog(status.toUpperCase(), po.id, `PO #${po.po_number} ${label}`);
       addToast(`Purchase order ${label}`, 'success');
       onChanged();
     } catch (e) { addToast(friendlyError(e), 'error'); }
@@ -69,7 +67,6 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
     try {
       const { error } = await supabase.rpc('delete_po_receipt', { p_receipt_id: r.id });
       if (error) throw new Error(error.message);
-      await poAuditLog('RECEIPT_REMOVED', po.id, `PO #${po.po_number} — removed receipt of +${Number(r.received_qty)}${item ? ` (${item.item_name})` : ''}`);
       addToast('Receipt removed', 'success');
       onChanged();
     } catch (e) { addToast(friendlyError(e), 'error'); }
@@ -86,7 +83,6 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
     try {
       const { error } = await supabase.rpc('set_po_status', { p_po_id: po.id, p_status: 'reopen' });
       if (error) throw new Error(error.message);
-      await poAuditLog('REOPENED', po.id, `PO #${po.po_number} reopened`);
       addToast('Purchase order reopened', 'success');
       onChanged();
     } catch (e) { addToast(friendlyError(e), 'error'); }

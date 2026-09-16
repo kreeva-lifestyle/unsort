@@ -13,7 +13,6 @@ import { useBackClose } from '../../hooks/useBackClose';
 import { friendlyError } from '../../lib/friendlyError';
 import { numericKeyDown } from '../../lib/numericInput';
 import DateInput from '../ui/DateInput';
-import { poAuditLog } from './poAudit';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import { useModalLock } from '../../hooks/useModalLock';
 
@@ -74,8 +73,6 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
       const p_receipts = receipts.map(r => ({ ...r, receipt_date: date || null, remarks: remarks.trim() || null }));
       const { error: e } = await supabase.rpc('receive_po_items', { p_po_id: po.id, p_receipts });
       if (e) throw new Error(e.message);
-      const totalQty = receipts.reduce((s, r) => s + r.received_qty, 0);
-      await poAuditLog('RECEIVE', po.id, `PO #${po.po_number} — received ${totalQty} across ${receipts.length} item${receipts.length === 1 ? '' : 's'}`);
       addToast('Receipt recorded', 'success');
       onReceived();
     } catch (e) { setError(friendlyError(e)); setSaving(false); return; }
