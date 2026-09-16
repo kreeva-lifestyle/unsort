@@ -821,42 +821,24 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   };
 
   // ── Void challan ───────────────────────────────────────────────────────────
+  // One transaction (void_challan): the DB re-reads the row under lock, so a
+  // sale with money recorded is refused there, and a return first withdraws
+  // its credit from every sale it was applied to (those go back to
+  // partial/unpaid) and reverses its own ledger. The old client path voided a
+  // return without touching the sale it had settled, leaving that sale paid
+  // by a credit that no longer existed.
   const voidChallan = async (id: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: before } = await supabase.from('cash_challans').select('challan_number, customer_name, total, amount_paid, status, payment_mode, inventory_deducted, is_return').eq('id', id).maybeSingle();
-    if (!before) return;
-    if (before.status === 'voided') { addToast('Already voided', 'error'); return; }
-    if (before.is_return) {
-      // Returns are always 'paid' (refund recorded), so the sales rules below
-      // would make a mistaken return permanently unfixable. Voiding a return
-      // means the refund comes back — record that on its payment trail.
-      const { data: updated, error: voidErr } = await supabase.from('cash_challans').update({ status: 'voided', voided_by: user?.id, voided_at: new Date().toISOString() }).eq('id', id).neq('status', 'voided').select('id');
-      if (voidErr) { addToast(friendlyError(voidErr), 'error'); return; }
-      if (!updated || updated.length === 0) { addToast('Return was already voided', 'error'); fetchChallans(); return; }
-      if (Number(before.amount_paid || 0) > 0) {
-        const { error: revErr } = await supabase.from('cash_challan_payments').insert({
-          challan_id: id, amount: Number(before.amount_paid), payment_mode: before.payment_mode || 'Cash',
-          payment_date: localToday(), paid_by: user?.id,
-          notes: `Return #${before.challan_number} voided — refund of ₹${before.amount_paid} received back`, is_reversal: true,
-        });
-        if (revErr) addToast('Refund reversal record failed — ' + friendlyError(revErr), 'error');
-      }
-      await ccAuditLog('VOID', id, `Return #${before.challan_number} (${before.customer_name}) voided — refund ₹${before.total} reversed`, { status: { from: before.status, to: 'voided' } });
-      addToast(`Return #${before.challan_number} voided`, 'success');
-      if (before.inventory_deducted) addToast(`Inventory was updated for this return — please reverse the inventory transaction manually`, 'error');
-      fetchChallans();
-      return;
-    }
-    if (before.status === 'paid') { addToast('Cannot void a fully paid challan — use ☑ Select → Unpay first', 'error'); return; }
-    // Challans with money recorded against them are never voided directly —
-    // the payment must be explicitly removed first so cash records stay clean.
-    if (Number(before.amount_paid || 0) > 0) { addToast(`Challan #${before.challan_number} has ₹${Number(before.amount_paid).toLocaleString('en-IN')} recorded. Remove the payment first (edit → set Unpaid), then void.`, 'error'); return; }
-    const { data: updated, error: voidErr } = await supabase.from('cash_challans').update({ status: 'voided', voided_by: user?.id, voided_at: new Date().toISOString() }).eq('id', id).or('amount_paid.is.null,amount_paid.eq.0').neq('status', 'voided').select('id');
-    if (voidErr) { addToast(friendlyError(voidErr), 'error'); return; }
-    if (!updated || updated.length === 0) { addToast('Challan changed since you opened it (voided or paid elsewhere) — refresh and retry', 'error'); fetchChallans(); return; }
-    await ccAuditLog('VOID', id, `Challan #${before.challan_number} (${before.customer_name}) voided — was ₹${before.total}`, { status: { from: before.status, to: 'voided' } });
-    addToast(`Challan #${before.challan_number} voided`, 'success');
-    if (before.inventory_deducted) addToast(`Inventory was deducted for this challan — please reverse the inventory transaction manually`, 'error');
+    const { data, error } = await supabase.rpc('void_challan', { p_id: id });
+    if (error) { addToast(friendlyError(error), 'error'); fetchChallans(); return; }
+    const r = (data || {}) as { challan_number: number; customer_name: string; total: number; is_return: boolean; inventory_deducted: boolean; prev_status: string; credit_withdrawn: { challan_number: number; amount: number; status: string }[]; refund_reversed: number };
+    const label = r.is_return ? 'Return' : 'Challan';
+    const withdrawn = (r.credit_withdrawn || []).map(w => `₹${Number(w.amount).toLocaleString('en-IN')} credit withdrawn from #${w.challan_number} (now ${w.status})`);
+    const refund = Number(r.refund_reversed) > 0 ? `refund ₹${Number(r.refund_reversed).toLocaleString('en-IN')} reversed` : '';
+    const trail = [...withdrawn, refund].filter(Boolean).join('; ');
+    await ccAuditLog('VOID', id, `${label} #${r.challan_number} (${r.customer_name}) voided — was ₹${r.total}${trail ? `; ${trail}` : ''}`, { status: { from: r.prev_status, to: 'voided' } });
+    addToast(`${label} #${r.challan_number} voided`, 'success');
+    for (const w of withdrawn) addToast(w, 'info');
+    if (r.inventory_deducted) addToast(`Inventory was ${r.is_return ? 'updated' : 'deducted'} for this ${label.toLowerCase()} — please reverse the inventory transaction manually`, 'error');
     fetchChallans();
   };
 
@@ -1607,7 +1589,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           <div className="modal-inner" style={{ ...S.modalBox, maxWidth: 340, padding: '20px 18px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <div style={{ marginBottom: 6 }}><svg viewBox="0 0 24 24" style={{ width: 28, height: 28, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round' }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg></div>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 4 }}>Void Challan?</div>
-            <div style={{ fontSize: 11, color: T.tx3, marginBottom: confirmAction.inventoryDeducted ? 8 : 14 }}>{`Challan #${confirmAction.challanNumber} will be marked voided. This cannot be undone.`}</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginBottom: confirmAction.inventoryDeducted ? 8 : 14 }}>{`${confirmAction.isReturn ? 'Return' : 'Challan'} #${confirmAction.challanNumber} will be marked voided. This cannot be undone.${confirmAction.isReturn ? ' If its credit was applied to a sale, that sale goes back to pending.' : ''}`}</div>
             {confirmAction.inventoryDeducted && (
               <div style={{ background: 'oklch(0.78 0.18 75 / .08)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.yl, marginBottom: 14, textAlign: 'left' as const }}>
                 Inventory was {confirmAction.isReturn ? 'added back' : 'deducted'} for this challan. After voiding, you'll need to reverse the inventory {confirmAction.isReturn ? 'addition' : 'deduction'} manually.
