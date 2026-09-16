@@ -242,7 +242,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (!silent) setLoading(true);
     // Explicit columns (house rule — no select-* on growable tables): same
     // list the ledger fetch at ~:576 uses, so nothing the UI reads is missing.
-    let query = supabase.from('cash_challans').select('id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, handover_id, inventory_deducted, created_by, modified_by, voided_by, voided_at, created_at, updated_at, cash_challan_items(sku, quantity, price, discount_type, discount_value, discount_amount, total), handover:cash_handovers!handover_id(handover_number)', { count: 'estimated' });
+    let query = supabase.from('cash_challans').select('id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, handover_id, inventory_deducted, created_by, modified_by, voided_by, voided_at, created_at, updated_at, cash_challan_items(id, sku, quantity, price, discount_type, discount_value, discount_amount, total), handover:cash_handovers!handover_id(handover_number)', { count: 'estimated' });
     if (debouncedSearch) {
       const s = debouncedSearch.replace(/[%_,().]/g, '');
       const num = parseInt(s);
@@ -1440,6 +1440,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         onReturn={() => { const c = viewingChallan; setViewingChallan(null); setIsReturn(true); setChallanStatus('paid'); setAmountPaid(0); setPaymentMode(''); setPaymentDate(''); selectReturnSource(c); setShowModal(true); }}
         onVoid={() => { const c = viewingChallan; setViewingChallan(null); setConfirmAction({ type: 'void', id: c.id, challanNumber: c.challan_number, inventoryDeducted: !!c.inventory_deducted, isReturn: !!c.is_return }); }}
         onSettled={() => { fetchChallans(); }}
+        onPatched={(patch) => { const id = viewingChallan.id; const p = patch as Partial<Challan>; setChallans(cs => cs.map(ch => (ch.id === id ? { ...ch, ...p } : ch))); setViewingChallan(v => (v && v.id === id ? { ...v, ...p } : v)); }}
         hasNext={idx < challans.length - 1}
         hasPrev={idx > 0}
         onNext={() => { if (idx < challans.length - 1) setViewingChallan(challans[idx + 1]); }}
