@@ -15,6 +15,7 @@ import { numericKeyDown } from '../../lib/numericInput';
 import DateInput from '../ui/DateInput';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import { useModalLock } from '../../hooks/useModalLock';
+import { itemLabel } from './poItemLabel';
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
@@ -95,7 +96,7 @@ export default function POReceive({ po, items, onClose, onReceived, addToast }: 
               return (
                 <div key={it.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 8 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.item_name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemLabel(it)}</div>
                     <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 2 }}>
                       Ordered {Number(it.quantity)}{it.unit ? ` ${it.unit}` : ''} · Received {recvd} · {over > 0
                         ? <span style={{ color: T.yl }}>+{over} extra</span>

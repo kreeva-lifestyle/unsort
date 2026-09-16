@@ -12,18 +12,16 @@ import { logSwallowed } from '../../lib/errorLogger';
 import { numericKeyDown } from '../../lib/numericInput';
 import VendorPicker from './VendorPicker';
 import TopVendorChips from './TopVendorChips';
-import SkuInput from '../ui/SkuInput';
+import POItemRows, { blankItem } from './POItemRows';
+import type { FormItem } from './POItemRows';
 import DateInput from '../ui/DateInput';
 import { PO_TYPES, PO_TYPE_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderType } from '../../types/database';
 import { useModalLock } from '../../hooks/useModalLock';
 
-type FormItem = { sku: string; item_name: string; quantity: string; unit: string; rate: string };
 export type EditingPO = PurchaseOrder & { items?: PurchaseOrderItem[] };
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const blankItem = (): FormItem => ({ sku: '', item_name: '', quantity: '1', unit: '', rate: '' });
-const UNIT_OPTIONS = ['Meter', 'Piece'];
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
 
 export default function POForm({ editing, duplicateFrom, onClose, onSaved, addToast }: {
@@ -44,7 +42,7 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
   // purchase is for. Shown in the app only — never on the shared/printed PO.
   const [forPieces, setForPieces] = useState(src?.for_pieces ? String(src.for_pieces) : '');
   const [items, setItems] = useState<FormItem[]>(
-    src?.items?.length ? src.items.map(it => ({ sku: it.sku ?? '', item_name: it.item_name, quantity: String(it.quantity), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()]
+    src?.items?.length ? src.items.map(it => ({ sku: it.sku ?? '', item_name: it.item_name, fabric_code: it.fabric_code ?? '', quantity: String(it.quantity), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()]
   );
   const [showCharges, setShowCharges] = useState(!!(src?.discount_value || src?.tax_percent || src?.other_charges));
   const [discountType, setDiscountType] = useState(src?.discount_type ?? 'flat');
@@ -108,12 +106,14 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
     // default quantity of '1' alone must not keep an untouched "+ Add item" row
     // alive (it would then fail "item name is required" for a row the user
     // never used). Keep the ORIGINAL index so errors point at the visual row.
-    const clean = items.map((it, idx) => ({ it, idx })).filter(({ it }) => it.sku.trim() || it.item_name.trim() || it.unit.trim() || it.rate.trim());
+    const clean = items.map((it, idx) => ({ it, idx })).filter(({ it }) => it.sku.trim() || it.item_name.trim() || it.fabric_code.trim() || it.unit.trim() || it.rate.trim());
     if (clean.length === 0) { setError('Add at least one item'); return; }
     const skuRequired = poType === 'fabric' || poType === 'material';
     for (const { it, idx } of clean) {
       if (!it.item_name.trim()) { setError(`Row ${idx + 1}: item name is required`); return; }
       if (skuRequired && !it.sku.trim()) { setError(`Row ${idx + 1} (${it.item_name}): SKU is required for Fabric / Material items`); return; }
+      // Owner's rule: every fabric line names its fabric code (the RPC refuses it too).
+      if (poType === 'fabric' && !it.fabric_code.trim()) { setError(`Row ${idx + 1} (${it.item_name}): fabric code is required for fabric items`); return; }
       if (num(it.quantity) <= 0) { setError(`Row ${idx + 1} (${it.item_name}): quantity must be greater than 0`); return; }
       if (it.rate && num(it.rate) < 0) { setError(`Row ${idx + 1} (${it.item_name}): rate cannot be negative`); return; }
     }
@@ -138,7 +138,9 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
         tax_percent: num(taxPercent),
         other_charges: num(otherCharges),
       };
-      const p_items = clean.map(({ it }) => ({ item_name: it.item_name.trim(), sku: it.sku.trim() || null, quantity: num(it.quantity), unit: it.unit.trim() || null, rate: it.rate === '' ? null : num(it.rate) }));
+      // The code travels only on fabric POs — a type switched away from
+      // fabric must not carry a stale code into a job-work / material item.
+      const p_items = clean.map(({ it }) => ({ item_name: it.item_name.trim(), sku: it.sku.trim() || null, fabric_code: poType === 'fabric' ? it.fabric_code.trim() || null : null, quantity: num(it.quantity), unit: it.unit.trim() || null, rate: it.rate === '' ? null : num(it.rate) }));
       if (editing) {
         const { error: e } = await supabase.rpc('update_po_with_items', { p_po_id: editing.id, p_po, p_items });
         if (e) throw e;
@@ -199,38 +201,7 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
           </div>
 
           <label style={S.fLabel}>Items *</label>
-          {/* One CARD per item (the costing-editor pattern the owner approved):
-              a fixed structure that never free-wraps — the old six-boxes-in-a-
-              flex-row layout broke into ragged lines at phone width. */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-            {items.map((it, i) => {
-              const amt = num(it.quantity) * num(it.rate);
-              return (
-                <div key={i} style={{ border: `1px solid ${T.bd}`, borderRadius: 8, padding: 10, background: 'rgba(255,255,255,0.015)' }}>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
-                    {/* sizes off (owner's call): POs order fabric/job work at
-                        the parent-design level. */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <SkuInput value={it.sku} onChange={v => setItem(i, { sku: v })} sizes={false} placeholder={poType === 'fabric' || poType === 'material' ? 'SKU *' : 'SKU'} style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
-                    </div>
-                    <button onClick={() => removeRow(i)} disabled={items.length === 1} style={{ border: 'none', background: 'none', cursor: items.length === 1 ? 'not-allowed' : 'pointer', color: T.re, opacity: items.length === 1 ? 0.25 : 0.7, fontSize: 18, padding: '8px 10px', lineHeight: 1, flexShrink: 0 }} aria-label="Remove item">&times;</button>
-                  </div>
-                  <input value={it.item_name} onChange={e => setItem(i, { item_name: e.target.value })} placeholder="Item name *" style={{ ...S.fInput, width: '100%', marginBottom: 8 }} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                    <input value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Qty" style={{ ...S.fInput, width: '100%', minWidth: 0, fontFamily: T.mono }} />
-                    <select value={it.unit} onChange={e => setItem(i, { unit: e.target.value })} style={{ ...S.fInput, width: '100%', minWidth: 0, color: it.unit ? T.tx : T.tx3 }}>
-                      <option value="">Unit</option>
-                      {it.unit && !UNIT_OPTIONS.includes(it.unit) && <option value={it.unit}>{it.unit}</option>}
-                      {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
-                    </select>
-                    <input value={it.rate} onChange={e => setItem(i, { rate: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Rate" style={{ ...S.fInput, width: '100%', minWidth: 0, fontFamily: T.mono }} />
-                  </div>
-                  {amt > 0 && <div style={{ textAlign: 'right', fontSize: 12, fontFamily: T.mono, color: T.tx2, marginTop: 6 }}>= ₹{amt.toLocaleString('en-IN')}</div>}
-                </div>
-              );
-            })}
-          </div>
-          <button onClick={addRow} style={{ ...S.btnGhost, ...S.btnSm, marginTop: 8, borderStyle: 'dashed', minHeight: 36 }}>+ Add item</button>
+          <POItemRows items={items} poType={poType} onChange={setItem} onRemove={removeRow} onAdd={addRow} />
 
           <div style={{ marginTop: 14, borderTop: `1px solid ${T.bd}`, paddingTop: 12 }}>
             <button onClick={() => setShowCharges(s => !s)} style={{ border: 'none', background: 'none', color: T.tx3, fontSize: 11, cursor: 'pointer', padding: 0 }}>{showCharges ? '− Hide' : '+ Add'} discount / tax / charges</button>

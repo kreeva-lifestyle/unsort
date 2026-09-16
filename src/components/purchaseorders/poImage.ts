@@ -8,6 +8,7 @@ import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import type { PoDocOptions } from './poPdf';
 import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
 import { exportName } from '../../lib/exportName';
+import { itemLabel } from './poItemLabel';
 
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = (d: string | null | undefined) => d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -96,7 +97,7 @@ export function renderPoImage(po: PurchaseOrder, items: PurchaseOrderItem[], opt
     ctx.fillStyle = '#111827'; ctx.textAlign = 'left';
     ctx.fillText(String(i + 1), cols.num, y);
     if (hasSku) { ctx.fillStyle = '#374151'; ctx.fillText(trunc(ctx, it.sku || '—', cols.item - cols.sku - 8), cols.sku, y); }
-    ctx.fillStyle = '#111827'; ctx.fillText(trunc(ctx, it.item_name, cols.qty - cols.item - 40), cols.item, y);
+    ctx.fillStyle = '#111827'; ctx.fillText(trunc(ctx, itemLabel(it), cols.qty - cols.item - 40), cols.item, y);
     ctx.fillStyle = '#374151'; ctx.fillText(it.unit || '—', cols.unit, y);
     ctx.textAlign = 'right';
     ctx.fillText(String(Number(it.quantity)), cols.qty, y);

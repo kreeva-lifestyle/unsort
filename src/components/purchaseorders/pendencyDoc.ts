@@ -6,6 +6,7 @@ import { escHtml } from '../../lib/escape';
 import { docTitle } from '../../lib/exportName';
 import { PO_STATUS_LABELS } from '../../types/database';
 import type { PendencyReport } from './pendencyData';
+import { itemLabel } from './poItemLabel';
 
 export interface PendencyDocOptions { rates?: boolean }
 
@@ -21,7 +22,7 @@ export function buildPendencyHtml(r: PendencyReport, opts: PendencyDocOptions = 
   const rates = opts.rates === true;
   const hasSku = r.pos.some(p => p.items.some(it => it.sku));
   const blocks = r.pos.map(p => {
-    const rows = p.items.map((it, i) => `<tr><td>${i + 1}</td>${hasSku ? `<td class="m">${escHtml(it.sku || '—')}</td>` : ''}<td>${escHtml(it.item_name)}</td><td class="r">${qty(it.quantity)}</td><td class="r">${qty(it.received)}</td><td class="r b">${qty(it.pending)}</td><td>${escHtml(it.unit || '—')}</td>${rates ? `<td class="r">${it.rate == null ? '—' : inr(it.rate)}</td><td class="r">${it.rate == null ? '—' : inr(it.pending * it.rate)}</td>` : ''}</tr>`).join('');
+    const rows = p.items.map((it, i) => `<tr><td>${i + 1}</td>${hasSku ? `<td class="m">${escHtml(it.sku || '—')}</td>` : ''}<td>${escHtml(itemLabel(it))}</td><td class="r">${qty(it.quantity)}</td><td class="r">${qty(it.received)}</td><td class="r b">${qty(it.pending)}</td><td>${escHtml(it.unit || '—')}</td>${rates ? `<td class="r">${it.rate == null ? '—' : inr(it.rate)}</td><td class="r">${it.rate == null ? '—' : inr(it.pending * it.rate)}</td>` : ''}</tr>`).join('');
     return `<section class="po">
       <div class="pohead">
         <div><span class="num">PO #${escHtml(p.po_number)}</span> <span class="sub">dated ${fmtDate(p.po_date)} · ${escHtml(PO_STATUS_LABELS[p.status] || p.status)}${p.expected_date ? ` · expected ${fmtDate(p.expected_date)}` : ''}</span></div>

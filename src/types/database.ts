@@ -943,6 +943,8 @@ export interface PurchaseOrderItem {
   po_id: string;
   item_name: string;
   sku: string | null;
+  /** Fabric POs only: the vendor's fabric code (compulsory there, null elsewhere). */
+  fabric_code: string | null;
   quantity: number;
   unit: string | null;
   rate: number | null;
@@ -967,6 +969,7 @@ export interface PurchaseOrderReceipt {
 export type POItemInput = {
   item_name: string;
   sku?: string | null;
+  fabric_code?: string | null;
   quantity: number;
   unit?: string | null;
   rate?: number | null;

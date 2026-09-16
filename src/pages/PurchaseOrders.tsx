@@ -81,7 +81,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const fetchPos = useCallback(async (silent = false) => {
     const seq = ++fetchSeq.current;
     if (!silent) setLoading(true);
-    let q = supabase.from('purchase_orders').select(`${COLS}, purchase_order_items(sku, item_name, quantity, received_qty)`, { count: 'estimated' });
+    let q = supabase.from('purchase_orders').select(`${COLS}, purchase_order_items(sku, item_name, fabric_code, quantity, received_qty)`, { count: 'estimated' });
     if (debouncedSearch) {
       // Vendor name always matches; a pure number also matches the PO #; and
       // ANY term (numeric SKUs like "15003" included) also matches line-item
@@ -149,7 +149,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   // Load full items + receipts + audit for a PO, then open the detail panel.
   const openDetail = useCallback(async (poRow: PurchaseOrder) => {
     const [itemsRes, receiptsRes, auditRes] = await Promise.all([
-      supabase.from('purchase_order_items').select('id, po_id, item_name, sku, quantity, unit, rate, amount, received_qty, sort_order, created_at').eq('po_id', poRow.id).order('sort_order'),
+      supabase.from('purchase_order_items').select('id, po_id, item_name, sku, fabric_code, quantity, unit, rate, amount, received_qty, sort_order, created_at').eq('po_id', poRow.id).order('sort_order'),
       supabase.from('purchase_order_receipts').select('id, po_id, po_item_id, received_qty, receipt_date, remarks, received_by, created_at').eq('po_id', poRow.id).order('created_at', { ascending: false }),
       supabase.from('audit_log').select('id, action, module, record_id, details, user_id, user_email, created_at, changes').eq('module', 'purchase_order').eq('record_id', poRow.id).order('created_at', { ascending: false }).limit(30),
     ]);
@@ -162,7 +162,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const openPrint = useCallback(async (poRow: PurchaseOrder, preItems?: PurchaseOrderItem[]) => {
     let items = preItems;
     if (!items) {
-      const { data, error } = await supabase.from('purchase_order_items').select('id, po_id, item_name, sku, quantity, unit, rate, amount, received_qty, sort_order, created_at').eq('po_id', poRow.id).order('sort_order');
+      const { data, error } = await supabase.from('purchase_order_items').select('id, po_id, item_name, sku, fabric_code, quantity, unit, rate, amount, received_qty, sort_order, created_at').eq('po_id', poRow.id).order('sort_order');
       if (error) { addToast(friendlyError(error), 'error'); return; }
       items = (data as PurchaseOrderItem[] | null) || [];
     }

@@ -11,6 +11,7 @@ import { friendlyError } from '../../lib/friendlyError';
 import { useModalLock } from '../../hooks/useModalLock';
 import { useBackClose } from '../../hooks/useBackClose';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
+import { itemLabel } from './poItemLabel';
 
 const PRESETS = [
   'Vendor delivered short',
@@ -71,7 +72,7 @@ export default function POCloseModal({ po, items, onClose, onClosed, addToast }:
             {open.map(({ it, pending }) => (
               <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: `1px solid ${T.bd}`, fontSize: 12 }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.item_name}</div>
+                  <div style={{ color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemLabel(it)}</div>
                   {it.sku && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{it.sku}</div>}
                 </div>
                 <div style={{ fontFamily: T.mono, color: T.yl, flexShrink: 0 }}>{qty(pending)}{it.unit ? ` ${it.unit}` : ''}</div>
