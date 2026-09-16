@@ -448,7 +448,8 @@ List = `programs` (not deleted, `count:'estimated'`, `textSearch('search_vector'
 | `minis/indya/IndyaImport.tsx` | 198 | Indya flow owner (master, vendors, blocked, SKU sheet, compute, download) | files in memory; `downloadFile`, `saveWorkbook` |
 | `minis/indya/IndyaSkuMap.tsx` + `indyaMap.ts` | 142 + 69 | Wrong→correct code map | `indya_sku_map` select (≤5000)/upsert (chunks of 500, `onConflict wrong_norm`)/delete; CSV via `csvCell` |
 | `minis/indya/IndyaCoverage.tsx` + `indyaCoverage.ts` | 133 + 84 | Active catalog variants missing from Indya | `useProductCatalog` |
-| `minis/indya/indyaMaster.ts`, `indyaMasterCsv.ts`, `indyaFiles.ts`, `indyaCompute.ts`, `indyaSku.ts`, `indyaSkuSheet.ts`, `IndyaTable.tsx`, `IndyaToolbar.tsx`, `IndyaUnknown.tsx`, `IndyaHint.tsx` | 139, 88, 106, 143, 116, 48, 60, 42, 24, 11 | Byte-exact master parse/rewrite, vendor/blocked readers, pure aggregation, SKU key rules, exports, UI | `xlsx` (dynamic import) |
+| `minis/indya/indyaMaster.ts`, `indyaMasterCsv.ts`, `indyaFiles.ts`, `indyaCompute.ts`, `indyaSku.ts`, `indyaSkuSheet.ts`, `IndyaTable.tsx`, `IndyaToolbar.tsx`, `IndyaUnknown.tsx`, `IndyaHint.tsx` | 139, 88, 106, 143, 116, 48, 60, 44, 24, 11 | Byte-exact master parse/rewrite, vendor/blocked readers, pure aggregation, SKU key rules, exports, UI | `xlsx` (dynamic import) |
+| `minis/indya/IndyaBarcodes.tsx` + `indyaBarcodeParse.ts` + `indyaBarcodeLabel.ts` + `pdfObjects.ts` | 96 + 160 + 55 + 178 | "Convert Indya barcode": reads Indya's barcode label PDFs in the browser (no PDF library — own object reader + content-stream interpreter), N labels per page, bars replayed as SVG from the PDF's own `re` rectangles, every text run kept with size/weight, printed on 1.97×2.97 in | `printOrQueue('label_small')`; copies expanded in the HTML |
 | `supabase/functions/odette-export/index.ts` + `catalog.ts` | 1261 + 317 | Dropbox + Google Sheets edge function (22 actions, §3.10) | `app_secrets` (Dropbox keys, roots, fwd folder, selftest secret), `profiles`, `ratecard_share`, `link_check_approvals`, `product_catalog`, `master_sheet_rows`; Google Sheets read **and write**; Dropbox API |
 | `supabase/functions/pricing-ai/index.ts` | 163 | Evidence-cited AI insights | `app_secrets` (`anthropic_api_key`, `listing_ai_model`), `profiles`, `pricing_ai_suggestions` delete+insert; Anthropic Messages API |
 
@@ -481,6 +482,7 @@ All printing goes through `printOrQueue(slot, html, size, title, copies?, addToa
 |---|---|---|---|---|---|
 | `components/minis/ReturnLabels.tsx:461` (Product QC / Return labels) | `label_small` | `{1.97, 2.97}` in | `size:1.97in 2.97in; margin:0`, `.label` 1.97×2.97 in, one per page | yes | passes `printCount` as `copies` |
 | `pages/BrandTags.tsx:803` | `label_small` | `{1.97, 2.97}` | same | yes | copies expanded into the HTML; one job per batch |
+| `components/minis/indya/IndyaBarcodes.tsx` (Convert Indya barcode) | `label_small` | `{1.97, 2.97}` | same | yes | copies expanded into the HTML; inline fit script shrinks overflowing labels |
 | `pages/Inventory.tsx:533` (barcode) | `label_small` | `{1.97, 2.97}` | `margin:10mm` (no size) | **no** → hidden iframe in default mode | JsBarcode canvas data-URL |
 | `components/minis/AddressPrinter.tsx:214` | `label_large` | `{4, 6}` | `size:4in 6in; margin:0` | yes | |
 | `settings/PrinterSettings.tsx:85` test print | any | A4 / 4×6 / 1.97×2.97 | inline | — | calls `printHtml` directly (bypasses the queue); `${printer}` not `escHtml`'d |

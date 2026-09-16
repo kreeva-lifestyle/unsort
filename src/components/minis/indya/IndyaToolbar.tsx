@@ -3,14 +3,15 @@
 // that file under the size limit.
 import { useRef } from 'react';
 import { T, S } from '../../../lib/theme';
+import IndyaBarcodes from './IndyaBarcodes';
 
 const ACCEPT = '.xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv';
 const hidden = { position: 'absolute' as const, width: 0, height: 0, overflow: 'hidden' as const, opacity: 0 };
 const BLUE = { color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)' };
 const AMBER = { color: T.yl, border: '1px solid oklch(0.78 0.18 75 / .2)', background: 'oklch(0.78 0.18 75 / .06)' };
 
-export default function IndyaToolbar({ busy, hasMaster, hasVendors, hasBlocked, hasResult, anything, onMaster, onVendors, onBlocked, onSkuSheet, onCompute, onDownload, onReset }: {
-  busy: string; hasMaster: boolean; hasVendors: boolean; hasBlocked: boolean; hasResult: boolean; anything: boolean;
+export default function IndyaToolbar({ busy, hasMaster, hasVendors, hasBlocked, hasResult, anything, addToast, onMaster, onVendors, onBlocked, onSkuSheet, onCompute, onDownload, onReset }: {
+  busy: string; hasMaster: boolean; hasVendors: boolean; hasBlocked: boolean; hasResult: boolean; anything: boolean; addToast: (msg: string, type?: string) => void;
   onMaster: (f: File) => void; onVendors: (f: File[]) => void; onBlocked: (f: File) => void;
   onSkuSheet: () => void; onCompute: () => void; onDownload: () => void; onReset: () => void;
 }) {
@@ -32,6 +33,7 @@ export default function IndyaToolbar({ busy, hasMaster, hasVendors, hasBlocked, 
         <button type="button" className="touch44" onClick={pick(blockedRef)} style={bt({ ...S.btnGhost, ...AMBER })}>{busy === 'blocked' ? 'Reading…' : hasBlocked ? 'Replace blocked' : 'Blocked inventory'}</button>
         {hasMaster && hasVendors && <button type="button" className="touch44" onClick={onCompute} style={bt(S.btnSuccess)}>{busy === 'compute' ? 'Computing…' : '4 · Compute'}</button>}
         {hasResult && <button type="button" className="touch44" onClick={onDownload} style={bt({ ...S.btnPrimary, background: T.gr, color: '#fff', fontWeight: 700 })}>{busy === 'download' ? 'Preparing…' : '5 · Download updated file'}</button>}
+        <IndyaBarcodes addToast={addToast} busy={!!busy} />
         {anything && <button type="button" className="touch44" onClick={onReset} style={bt(S.btnDanger)}>Reset</button>}
       </div>
       <input ref={masterRef} type="file" accept={ACCEPT} onChange={one(onMaster)} style={hidden} aria-label="Indya master file" />
