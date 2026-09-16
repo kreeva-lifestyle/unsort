@@ -8,7 +8,7 @@ import type { PurchaseOrderStatus } from '../../types/database';
 
 export const PENDING_STATUSES: PurchaseOrderStatus[] = ['approved', 'sent', 'partially_received'];
 
-export interface PendencyItem { sku: string | null; item_name: string; unit: string | null; quantity: number; received: number; pending: number; rate: number | null }
+export interface PendencyItem { sku: string | null; item_name: string; fabric_code: string | null; unit: string | null; quantity: number; received: number; pending: number; rate: number | null }
 export interface PendencyPo {
   id: string; po_number: number; po_date: string | null; expected_date: string | null; status: PurchaseOrderStatus;
   /** ISO date the wait is counted from — the PO date, else the day it was created. */
@@ -31,7 +31,7 @@ const dateOnly = (iso: string) => iso.slice(0, 10);
 
 type Row = {
   id: string; po_number: number; po_date: string | null; expected_date: string | null; status: PurchaseOrderStatus; created_at: string | null; vendor_phone: string | null;
-  purchase_order_items: { sku: string | null; item_name: string; unit: string | null; quantity: number; received_qty: number | null; rate: number | null; sort_order: number | null }[] | null;
+  purchase_order_items: { sku: string | null; item_name: string; fabric_code: string | null; unit: string | null; quantity: number; received_qty: number | null; rate: number | null; sort_order: number | null }[] | null;
 };
 
 /** Pure: shape raw rows into the report (harness-testable). `now` only feeds the generated stamp. */
@@ -43,7 +43,7 @@ export function buildReport(vendor: string, rows: Row[], now = new Date()): Pend
       .slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map(it => {
         const quantity = Number(it.quantity || 0), received = Number(it.received_qty || 0);
-        return { sku: it.sku, item_name: it.item_name, unit: it.unit, quantity, received, pending: Math.max(0, quantity - received), rate: it.rate == null ? null : Number(it.rate) };
+        return { sku: it.sku, item_name: it.item_name, fabric_code: it.fabric_code, unit: it.unit, quantity, received, pending: Math.max(0, quantity - received), rate: it.rate == null ? null : Number(it.rate) };
       })
       .filter(it => it.pending > 0);
     if (items.length === 0) continue; // everything received, only the status lags
@@ -69,7 +69,7 @@ export function buildReport(vendor: string, rows: Row[], now = new Date()): Pend
 
 export async function fetchVendorPendency(vendor: string): Promise<PendencyReport> {
   const { data, error } = await supabase.from('purchase_orders')
-    .select('id, po_number, po_date, expected_date, status, created_at, vendor_phone, purchase_order_items(sku, item_name, unit, quantity, received_qty, rate, sort_order)')
+    .select('id, po_number, po_date, expected_date, status, created_at, vendor_phone, purchase_order_items(sku, item_name, fabric_code, unit, quantity, received_qty, rate, sort_order)')
     .eq('vendor_name', vendor).in('status', PENDING_STATUSES)
     .order('po_date', { ascending: true }).limit(200);
   if (error) throw error;

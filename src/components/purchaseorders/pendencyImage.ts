@@ -5,6 +5,7 @@
 import type { PendencyReport, PendencyPo } from './pendencyData';
 import { ageColor, ageBg, fmtDate, waitText } from './pendencyDoc';
 import type { PendencyDocOptions } from './pendencyDoc';
+import { itemLabel } from './poItemLabel';
 import { exportName } from '../../lib/exportName';
 import { PO_STATUS_LABELS } from '../../types/database';
 
@@ -108,7 +109,7 @@ export function renderPendencyImage(r: PendencyReport, opts: PendencyDocOptions 
       ctx.font = `400 11.5px ${SANS}`; ctx.textAlign = 'left'; ctx.fillStyle = '#111827';
       ctx.fillText(String(i + 1), cols.num, ry);
       if (hasSku) { ctx.fillStyle = '#374151'; ctx.fillText(trunc(ctx, it.sku || '—', cols.item - cols.sku - 8), cols.sku, ry); }
-      ctx.fillStyle = '#111827'; ctx.fillText(trunc(ctx, it.item_name, cols.ord - 60 - cols.item), cols.item, ry);
+      ctx.fillStyle = '#111827'; ctx.fillText(trunc(ctx, itemLabel(it), cols.ord - 60 - cols.item), cols.item, ry);
       ctx.fillStyle = '#374151'; ctx.fillText(it.unit || '—', cols.unit, ry);
       ctx.textAlign = 'right'; ctx.fillText(qty(it.quantity), cols.ord, ry); ctx.fillText(qty(it.received), cols.rec, ry);
       ctx.fillStyle = '#111827'; ctx.font = `700 11.5px ${SANS}`; ctx.fillText(qty(it.pending), cols.pen, ry);

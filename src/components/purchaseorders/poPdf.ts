@@ -8,6 +8,7 @@ import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
 import { docTitle } from '../../lib/exportName';
 import { escHtml as escHtmlShared } from '../../lib/escape';
+import { itemLabel } from './poItemLabel';
 
 const escHtml = escHtmlShared;
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -23,7 +24,7 @@ export function buildPoPdf(po: PurchaseOrder, items: PurchaseOrderItem[], opts: 
     const amt = it.amount == null ? '—' : inr(it.amount);
     const skuCell = hasSku ? `<td>${escHtml(it.sku || '—')}</td>` : '';
     const moneyCells = rates ? `<td class="r">${rate}</td><td class="r">${amt}</td>` : '';
-    return `<tr><td>${i + 1}</td>${skuCell}<td>${escHtml(it.item_name)}</td><td class="r">${Number(it.quantity)}</td><td>${escHtml(it.unit || '—')}</td>${moneyCells}</tr>`;
+    return `<tr><td>${i + 1}</td>${skuCell}<td>${escHtml(itemLabel(it))}</td><td class="r">${Number(it.quantity)}</td><td>${escHtml(it.unit || '—')}</td>${moneyCells}</tr>`;
   }).join('');
 
   const money = (label: string, val: unknown, sign = '') =>

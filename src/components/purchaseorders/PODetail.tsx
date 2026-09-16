@@ -12,6 +12,7 @@ import { useModalLock } from '../../hooks/useModalLock';
 import POCloseModal, { pendingOf } from './POCloseModal';
 import POActivity from './POActivity';
 import POReceipts from './POReceipts';
+import { itemLabel } from './poItemLabel';
 import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../../types/database';
 
@@ -140,7 +141,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
                     const rem = Math.max(0, Number(it.quantity) - Number(it.received_qty || 0));
                     return (
                       <tr key={it.id} style={{ borderBottom: `1px solid ${T.bd}` }}>
-                        <td style={S.tdStyle}><span style={{ fontSize: 13, color: T.tx }}>{it.item_name}</span>{it.unit && <span style={{ fontSize: 10, color: T.tx3, marginLeft: 4 }}>/{it.unit}</span>}{it.sku && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 1 }}>{it.sku}</div>}</td>
+                        <td style={S.tdStyle}><span style={{ fontSize: 13, color: T.tx }}>{itemLabel(it)}</span>{it.unit && <span style={{ fontSize: 10, color: T.tx3, marginLeft: 4 }}>/{it.unit}</span>}{it.sku && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 1 }}>{it.sku}</div>}</td>
                         <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono }}>{Number(it.quantity)}</td>
                         <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono, color: Number(it.received_qty) > 0 ? T.gr : T.tx3 }}>{Number(it.received_qty || 0)}{Number(it.received_qty) > Number(it.quantity) && <span style={{ color: T.yl, fontSize: 10, marginLeft: 4 }}>+{Number(it.received_qty) - Number(it.quantity)}</span>}</td>
                         <td style={{ ...S.tdStyle, textAlign: 'right', fontFamily: T.mono, color: rem > 0 ? T.yl : T.tx3 }}>{rem}</td>
