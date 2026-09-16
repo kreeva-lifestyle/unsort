@@ -39,6 +39,7 @@ import { T, S, CHALLAN_STATUS_COLORS as STATUS_COLORS } from '../lib/theme';
 import { exportName, docTitle, fileRange } from '../lib/exportName';
 import { useModalLock } from '../hooks/useModalLock';
 import { escHtml as escHtmlShared, csvCell } from '../lib/escape';
+import { fetchPaged } from '../lib/fetchPaged';
 
 const waPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return '91' + (d.startsWith('91') && d.length > 10 ? d.slice(2) : d); };
 // Strip the country code only when it IS a country code (>10 digits) — a
@@ -48,6 +49,13 @@ const isValidPhone = (raw: string) => { const d = raw.replace(/\D/g, ''); return
 // boundary 5.5h, so a payment entered 00:00–05:30 IST lands on the previous day
 // and drops out of the Cash Book / analytics for that day.
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+// Rows of the customer_ledger RPC → the ledger view model.
+type LedgerRpcRow = { id: string | null; name: string; total: number; paid: number; outstanding: number; count: number; aging_current: number; aging_d30: number; aging_d60: number; aging_d90plus: number };
+const mapLedgerRows = (rows: unknown) => ((rows as LedgerRpcRow[] | null) || []).map(r => ({
+  id: r.id, name: r.name, total: Number(r.total), paid: Number(r.paid), outstanding: Number(r.outstanding), count: Number(r.count),
+  aging: { current: Number(r.aging_current), d30: Number(r.aging_d30), d60: Number(r.aging_d60), d90plus: Number(r.aging_d90plus) },
+}));
 
 // View model: form-state representation of a cash_challan_items row.
 // Differs from DB row: `id` optional (unsaved items), no challan_id/sort_order
@@ -429,142 +437,49 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // Previous comparable period (audit P2: "This period vs Previous")
     const prevToDt = new Date(fromDt.getTime() - 1);
     const prevFromDt = new Date(prevToDt.getTime() - rangeMs);
-    type AnalyticsRow = Pick<CashChallan, 'total' | 'payment_mode' | 'status' | 'is_return' | 'customer_name'>;
-    const fromIso = fromDt.toISOString(); const toIso = toDt.toISOString();
-    const fromDate = analyticsFrom; const toDate = analyticsTo;
-    // Explicit high row cap — without .limit() PostgREST silently truncates
-    // at its server default (~1000 rows) and the figures would understate
-    // with no warning. At the cap we flag `truncated` for the UI.
-    const CAP = 10000;
-    const [{ data }, { count: voidedCount }, { data: prevData }, { data: paymentsInPeriod, error: payErr }] = await Promise.all([
-      supabase.from('cash_challans').select('total, payment_mode, status, is_return, customer_name').gte('created_at', fromIso).lte('created_at', toIso).neq('status', 'voided').limit(CAP),
-      supabase.from('cash_challans').select('id', { count: 'estimated', head: true }).gte('created_at', fromIso).lte('created_at', toIso).eq('status', 'voided'),
-      supabase.from('cash_challans').select('total, is_return').gte('created_at', prevFromDt.toISOString()).lte('created_at', prevToDt.toISOString()).neq('status', 'voided').limit(CAP),
-      // Mode breakup from the payments ledger, not challan totals — a partial
-      // challan only counts what was actually collected, reversals subtract,
-      // and refunds on returns count as money out.
-      //
-      // The `!challan_id` hint is required, not decorative: this table has TWO
-      // foreign keys to cash_challans (challan_id and settled_against, the
-      // latter added with return-credit settlement). Without the hint PostgREST
-      // cannot pick one and rejects the whole query with PGRST201, which is how
-      // this panel silently went blank.
-      supabase.from('cash_challan_payments').select('amount, payment_mode, is_reversal, challan:cash_challans!challan_id(is_return)').gte('payment_date', fromDate).lte('payment_date', toDate).limit(CAP),
-    ]);
-    const rows = (data as AnalyticsRow[] | null) || [];
-    const totalRevenue = rows.reduce((s, r) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
-    // Top customers by NET sales value (returns subtract - same sign rule as
-    // Net Revenue above); customers netting <= 0 in the range never chart.
-    const byCustomer = new Map<string, number>();
-    for (const r of rows) {
-      const n = (r.customer_name || '').trim() || '(no name)';
-      byCustomer.set(n, (byCustomer.get(n) || 0) + (r.is_return ? -1 : 1) * Number(r.total));
-    }
-    const positive = [...byCustomer.entries()].filter(([, v]) => v > 0);
-    const topCustomers = positive.sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, value]) => ({ name, value }));
-    // Never let the breakup fail quietly: an empty byMode is indistinguishable
-    // from "no payments this period" once it reaches the panel.
-    if (payErr) addToast(friendlyError(payErr), 'error');
-    const byMode: Record<string, number> = {};
-    type PayRow = { amount: number; payment_mode: string | null; is_reversal: boolean | null; challan: { is_return: boolean | null } | null };
-    ((paymentsInPeriod as unknown as PayRow[] | null) || []).forEach((r) => {
-      const m = r.payment_mode || 'Unset';
-      const sign = (r.is_reversal ? -1 : 1) * (r.challan?.is_return ? -1 : 1);
-      byMode[m] = (byMode[m] || 0) + sign * Number(r.amount);
+    // One RPC (challan_analytics) aggregates in SQL: net revenue and counts
+    // by created_at, the mode breakup from the payments ledger by
+    // payment_date (reversals subtract, refunds on returns are money out),
+    // top customers by net value. The old four raw-row fetches were capped
+    // at 10,000 but PostgREST answers at most 1000 rows, so past that the
+    // figures silently understated.
+    const { data, error } = await supabase.rpc('challan_analytics', {
+      p_from: fromDt.toISOString(), p_to: toDt.toISOString(),
+      p_prev_from: prevFromDt.toISOString(), p_prev_to: prevToDt.toISOString(),
+      p_pay_from: analyticsFrom, p_pay_to: analyticsTo,
     });
-    const salesCount = rows.filter((r) => !r.is_return).length;
-    const returnsCount = rows.filter((r) => r.is_return).length;
-    const prevRows = (prevData as Pick<CashChallan, 'total' | 'is_return'>[] | null) || [];
-    const prevRevenue = prevRows.reduce((s, r) => s + (r.is_return ? -1 : 1) * Number(r.total), 0);
-    const prevCount = prevRows.filter(r => !r.is_return).length;
-    if (rows.length >= CAP || prevRows.length >= CAP || ((paymentsInPeriod as unknown[] | null) || []).length >= CAP) {
-      addToast(`Analytics computed from the first ${CAP.toLocaleString('en-IN')} rows — narrow the date range for exact figures`, 'error');
-    }
-    setAnalytics({ totalRevenue, count: salesCount, byMode, returnsCount, voidedCount: voidedCount || 0, prevRevenue, prevCount, topCustomers, customerCount: positive.length } as typeof analytics);
+    if (error) { addToast(friendlyError(error), 'error'); return; }
+    const a = (data || {}) as { total_revenue?: number; sales_count?: number; returns_count?: number; voided_count?: number; prev_revenue?: number; prev_count?: number; top_customers?: { name: string; value: number }[]; customer_count?: number; by_mode?: Record<string, number> };
+    setAnalytics({
+      totalRevenue: Number(a.total_revenue || 0), count: Number(a.sales_count || 0),
+      byMode: Object.fromEntries(Object.entries(a.by_mode || {}).map(([k, v]) => [k, Number(v)])),
+      returnsCount: Number(a.returns_count || 0), voidedCount: Number(a.voided_count || 0),
+      prevRevenue: Number(a.prev_revenue || 0), prevCount: Number(a.prev_count || 0),
+      topCustomers: (a.top_customers || []).map(t => ({ name: t.name, value: Number(t.value) })), customerCount: Number(a.customer_count || 0),
+    });
   }, [analyticsFrom, analyticsTo, addToast]);
 
-  // ── Fetch ledger (recent 10 customers) ──────────────────────────────────────
-  // Ledger aggregation keys on customer_id (name fallback for legacy rows
-  // without one) — keying on the display name merged different customers who
-  // share a name and split a customer across renames.
-  const ledgerKey = (id: string | null, name: string) => id || `name:${name}`;
+  // ── Customer ledger ────────────────────────────────────────────────────────
+  // customer_ledger() aggregates EVERY non-voided challan per customer in SQL
+  // (keyed on customer_id, name fallback for legacy rows; a return subtracts;
+  // a refund on a return counts negative in paid). The old client reduce ran
+  // over only the last N challans, so an old unpaid balance vanished from a
+  // customer's outstanding. `limit` now caps customers, not challans.
   const fetchLedger = useCallback(async (limit = ledgerFetchLimit) => {
-    const { data, error } = await supabase.from('cash_challans').select('customer_id, customer_name, total, amount_paid, is_return, created_at, status').neq('status', 'voided').order('created_at', { ascending: false }).limit(limit);
+    const { data, error } = await supabase.rpc('customer_ledger', { p_query: null, p_limit: limit });
     if (error) { addToast(friendlyError(error), 'error'); return; }
-    // At the cap, older challans are missing from the aggregates — tell the
-    // user instead of silently understating balances.
-    setLedgerTruncated(((data as unknown[] | null) || []).length >= limit);
-    type LedgerRow = Pick<CashChallan, 'customer_id' | 'customer_name' | 'total' | 'amount_paid' | 'is_return' | 'created_at' | 'status'>;
-    const now = Date.now();
-    const daysSince = (d: string) => Math.floor((now - new Date(d).getTime()) / 86400000);
-    const map: Record<string, { id: string | null; name: string; total: number; paid: number; count: number; latest: string; aging: { current: number; d30: number; d60: number; d90plus: number } }> = {};
-    ((data as LedgerRow[] | null) || []).forEach((r) => {
-      const key = ledgerKey(r.customer_id, r.customer_name);
-      const sign = r.is_return ? -1 : 1;
-      if (!map[key]) map[key] = { id: r.customer_id, name: r.customer_name, total: 0, paid: 0, count: 0, latest: r.created_at ?? '', aging: { current: 0, d30: 0, d60: 0, d90plus: 0 } };
-      map[key].total += sign * Number(r.total);
-      // Returns are credits — a return reduces net billed (via sign*total).
-      // amount_paid on a return = credit already refunded to the customer in
-      // cash (settle_return_refund / old refund model): money handed back, so
-      // it counts NEGATIVE in paid and the balance owed goes back up.
-      map[key].paid += r.is_return ? -Number(r.amount_paid || 0) : Number(r.amount_paid || 0);
-      map[key].count++;
-      const outstanding = Number(r.total) - Number(r.amount_paid || 0);
-      if (!r.is_return && outstanding > 0 && r.status !== 'paid') {
-        const days = daysSince(r.created_at ?? '');
-        if (days <= 30) map[key].aging.current += outstanding;
-        else if (days <= 60) map[key].aging.d30 += outstanding;
-        else if (days <= 90) map[key].aging.d60 += outstanding;
-        else map[key].aging.d90plus += outstanding;
-      }
-    });
-    const list = Object.values(map).map((v) => ({ id: v.id, name: v.name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count, aging: v.aging }));
-    list.sort((a, b) => {
-      if (a.outstanding > 0 && b.outstanding <= 0) return -1;
-      if (a.outstanding <= 0 && b.outstanding > 0) return 1;
-      if (a.outstanding > 0 && b.outstanding > 0) return b.outstanding - a.outstanding;
-      return 0;
-    });
+    const list = mapLedgerRows(data);
+    setLedgerTruncated(list.length >= limit);
     setLedgerCustomers(list);
   }, [ledgerFetchLimit]);
 
   const searchLedgerCustomer = useCallback(async (q: string) => {
     if (!q.trim()) { fetchLedger(); return; }
-    const { data, error } = await supabase.from('cash_challans').select('customer_id, customer_name, total, amount_paid, is_return, created_at, status').neq('status', 'voided').ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
+    const { data, error } = await supabase.rpc('customer_ledger', { p_query: q.trim(), p_limit: 500 });
     if (error) { addToast(friendlyError(error), 'error'); return; }
-    type LedgerSearchRow = Pick<CashChallan, 'customer_id' | 'customer_name' | 'total' | 'amount_paid' | 'is_return' | 'created_at' | 'status'>;
-    const now = Date.now();
-    const daysSince = (d: string) => Math.floor((now - new Date(d).getTime()) / 86400000);
-    const map: Record<string, { id: string | null; name: string; total: number; paid: number; count: number; aging: { current: number; d30: number; d60: number; d90plus: number } }> = {};
-    ((data as LedgerSearchRow[] | null) || []).forEach((r) => {
-      const key = ledgerKey(r.customer_id, r.customer_name);
-      const sign = r.is_return ? -1 : 1;
-      if (!map[key]) map[key] = { id: r.customer_id, name: r.customer_name, total: 0, paid: 0, count: 0, aging: { current: 0, d30: 0, d60: 0, d90plus: 0 } };
-      map[key].total += sign * Number(r.total);
-      // Returns are credits — a return reduces net billed (via sign*total).
-      // amount_paid on a return = credit already refunded to the customer in
-      // cash (settle_return_refund / old refund model): money handed back, so
-      // it counts NEGATIVE in paid and the balance owed goes back up.
-      map[key].paid += r.is_return ? -Number(r.amount_paid || 0) : Number(r.amount_paid || 0);
-      map[key].count++;
-      const outstanding = Number(r.total) - Number(r.amount_paid || 0);
-      if (!r.is_return && outstanding > 0 && r.status !== 'paid') {
-        const days = daysSince(r.created_at ?? '');
-        if (days <= 30) map[key].aging.current += outstanding;
-        else if (days <= 60) map[key].aging.d30 += outstanding;
-        else if (days <= 90) map[key].aging.d60 += outstanding;
-        else map[key].aging.d90plus += outstanding;
-      }
-    });
-    const list = Object.values(map).map((v) => ({ id: v.id, name: v.name, total: v.total, paid: v.paid, outstanding: v.total - v.paid, count: v.count, aging: v.aging }));
-    list.sort((a, b) => {
-      if (a.outstanding > 0 && b.outstanding <= 0) return -1;
-      if (a.outstanding <= 0 && b.outstanding > 0) return 1;
-      if (a.outstanding > 0 && b.outstanding > 0) return b.outstanding - a.outstanding;
-      return 0;
-    });
+    const list = mapLedgerRows(data);
     setLedgerCustomers(list);
-    setLedgerTruncated(false); // search has no row cap — results are complete
+    setLedgerTruncated(list.length >= 500);
   }, [fetchLedger]);
 
   const fetchLedgerDetailWithRange = useCallback(async (cust: { id: string | null; name: string }, from: string, to: string) => {
@@ -1098,18 +1013,23 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // ── Export challans as CSV with item-level detail ─────────────────────────
   const exportChallansCSV = async () => {
     if (!dateFrom || !dateTo) { addToast('Select a date range in Filters before exporting', 'error'); setShowFilters(true); return; }
-    let q = supabase.from('cash_challans').select('challan_number, customer_name, status, subtotal, discount_amount, shipping_charges, round_off, total, amount_paid, payment_mode, payment_date, is_return, notes, tags, created_at, cash_challan_items(sku, description, quantity, price, discount_type, discount_value, discount_amount, total)').neq('status', 'voided');
-    if (search) { const s = search.replace(/[%_,().]/g, ''); const num = parseInt(s); if (!isNaN(num)) q = q.or(`challan_number.eq.${num},customer_name.ilike.%${s.trim()}%`); else if (s.trim()) q = q.ilike('customer_name', `%${s}%`); }
-    if (statusFilter) q = q.eq('status', statusFilter);
-    if (tagFilter) q = q.contains('tags', [tagFilter]);
-    // IST day boundaries (see fetchChallans)
-    if (dateFrom) q = q.gte('created_at', new Date(dateFrom + 'T00:00:00').toISOString());
-    if (dateTo) q = q.lte('created_at', new Date(dateTo + 'T23:59:59').toISOString());
-    q = q.order('created_at', { ascending: false }).limit(5000);
-    const { data, error } = await q;
+    const build = () => {
+      let q = supabase.from('cash_challans').select('challan_number, customer_name, status, subtotal, discount_amount, shipping_charges, round_off, total, amount_paid, payment_mode, payment_date, is_return, notes, tags, created_at, cash_challan_items(sku, description, quantity, price, discount_type, discount_value, discount_amount, total)').neq('status', 'voided');
+      if (search) { const s = search.replace(/[%_,().]/g, ''); const num = parseInt(s); if (!isNaN(num)) q = q.or(`challan_number.eq.${num},customer_name.ilike.%${s.trim()}%`); else if (s.trim()) q = q.ilike('customer_name', `%${s}%`); }
+      if (statusFilter) q = q.eq('status', statusFilter);
+      if (tagFilter) q = q.contains('tags', [tagFilter]);
+      // IST day boundaries (see fetchChallans)
+      if (dateFrom) q = q.gte('created_at', new Date(dateFrom + 'T00:00:00').toISOString());
+      if (dateTo) q = q.lte('created_at', new Date(dateTo + 'T23:59:59').toISOString());
+      return q.order('created_at', { ascending: false });
+    };
+    // PostgREST answers at most 1000 rows per request (a .limit(5000) silently
+    // returned the first 1000) — page in 1000s, up to 20,000 challans.
+    const MAX = 20000;
+    const { data, error } = await fetchPaged((from, to) => build().range(from, to), MAX);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     if (!data || data.length === 0) { addToast('No challans to export', 'error'); return; }
-    if (data.length >= 5000) addToast('Export capped at the most recent 5,000 challans — narrow the date range for a complete file', 'error');
+    if (data.length >= MAX) addToast('Export capped at the most recent 20,000 challans — narrow the date range for a complete file', 'error');
     // Prefix ' on leading =+-@ so Excel/Sheets never treat customer-typed
     // text as a formula (CSV injection) — same guard as TracklyImport.
     const esc = csvCell;
