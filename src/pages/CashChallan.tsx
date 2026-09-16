@@ -1179,7 +1179,6 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const payDate = bulkPayDate || today;
     if (payDate > today) { addToast('Payment date cannot be in the future', 'error'); return; }
     setBulkBusy(true);
-    const { data: { user } } = await supabase.auth.getUser();
     const ids = bulkPayable.map(c => c.id);
     const settleableReturns = bulkReturns.filter(c => Number(c.total) - Number(c.amount_paid || 0) > 0.009);
     if (ids.length === 0 && settleableReturns.length === 0) { setShowBulkPay(false); setBulkBusy(false); return; }
@@ -1192,35 +1191,27 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       ? `Batch ${batchId} — settled ₹${bulkSalesOutstanding.toLocaleString('en-IN')} outstanding against ₹${bulkReturnsTotal.toLocaleString('en-IN')} returns. Refunded ₹${received.toLocaleString('en-IN')} to customer via ${bulkPayMode}`
       : `Batch ${batchId} — received ₹${received.toLocaleString('en-IN')} against ₹${bulkNetTotal.toLocaleString('en-IN')} outstanding${Math.abs(received - bulkNetTotal) > 0.009 ? ` (${received > bulkNetTotal ? 'excess' : 'short'} ₹${Math.abs(received - bulkNetTotal).toLocaleString('en-IN')})` : ''}`;
     let failCount = 0;
-    // Audit only what actually happened — a failed update must not get a
-    // BULK_PAY log entry claiming money was received.
+    // One transaction for the whole batch (pay_challan_batch): each challan is
+    // locked, its outstanding comes from the live row (not this page's
+    // snapshot), and header + payment row are written together. Anything the
+    // DB could not pay comes back as `skipped` with the reason — the old client
+    // loop's "mark paid, then insert, then un-mark on failure" left paid
+    // challans with no payment row because the un-mark is refused outside an
+    // RPC. Audit only what actually happened.
     const paidOk: Challan[] = [];
-    for (const c of bulkPayable) {
-      const outstanding = Math.round((Number(c.total) - Number(c.amount_paid || 0)) * 100) / 100;
-      const { data: updated, error: upErr } = await supabase.from('cash_challans').update({
-        status: 'paid', amount_paid: Number(c.total), payment_mode: bulkPayMode,
-        payment_date: payDate, modified_by: user?.id, updated_at: new Date().toISOString(),
-      }).eq('id', c.id).in('status', ['unpaid', 'partial']).select('id');
-      if (upErr || !updated || updated.length === 0) { failCount++; continue; }
-      if (outstanding > 0) {
-        const { error: payErr } = await supabase.from('cash_challan_payments').insert({
-          challan_id: c.id, amount: outstanding, payment_mode: bulkPayMode,
-          payment_date: payDate, paid_by: user?.id, notes: receiptNote, batch_id: batchId, is_reversal: false,
-        });
-        if (payErr) {
-          // The challan was already marked paid but its payment row failed to
-          // write — undo the mark, so the books never show a paid challan with
-          // no payment record, and count it as a FAILURE, not a success.
-          await supabase.from('cash_challans').update({
-            status: c.status, amount_paid: c.amount_paid, payment_mode: c.payment_mode,
-            payment_date: c.payment_date, updated_at: new Date().toISOString(),
-          }).eq('id', c.id);
-          failCount++; continue;
-        }
+    const skipped: { challan_number?: number; reason: string }[] = [];
+    if (ids.length > 0) {
+      const { data: payRes, error: payErr } = await supabase.rpc('pay_challan_batch', { p_ids: ids, p_mode: bulkPayMode, p_date: payDate, p_batch_id: batchId, p_note: receiptNote });
+      if (payErr) { addToast(friendlyError(payErr), 'error'); setBulkBusy(false); return; }
+      const rows = ((payRes as { challan_id: string; challan_number?: number; paid?: number; skipped?: string }[] | null) || []);
+      for (const r of rows) {
+        const c = bulkPayable.find(x => x.id === r.challan_id);
+        if (r.skipped || !c) { failCount++; skipped.push({ challan_number: r.challan_number, reason: r.skipped || 'not in the batch' }); continue; }
+        paidOk.push(c);
       }
-      paidOk.push(c);
     }
     for (const c of paidOk) await ccAuditLog(isRefund ? 'SETTLE_REFUND' : 'BULK_PAY', c.id, `${isRefund ? 'Settled against returns' : 'Bulk paid'} (${batchId}) — ₹${(Number(c.total) - Number(c.amount_paid || 0)).toLocaleString('en-IN')} via ${bulkPayMode}`, { status: { from: c.status, to: 'paid' }, amount_paid: { from: c.amount_paid, to: c.total }, ...(isRefund ? { refunded: { from: 0, to: received } } : { received_amount: { from: Math.abs(bulkNetTotal), to: received } }) });
+    for (const s of skipped.slice(0, 3)) addToast(`${s.challan_number ? `#${s.challan_number}: ` : ''}${s.reason}`, 'error');
     // Consume the credit of every selected return: its amount_paid rises to
     // total (settle_return_refund), so it stops offsetting outstanding and the
     // negative payment row nets the cash book against the sale payments above.
