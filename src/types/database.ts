@@ -915,6 +915,8 @@ export interface PurchaseOrder {
   notes: string | null;
   /** Internal: how many finished pieces this purchase is for. Never printed or shared. */
   for_pieces: number | null;
+  /** The product costing this PO was raised from (explicit link, set null if the costing is deleted). */
+  costing_product_id: string | null;
   subtotal: number | null;
   discount_type: 'flat' | 'percentage' | null;
   discount_value: number | null;
@@ -986,6 +988,7 @@ export type POHeaderInput = {
   payment_terms?: string | null;
   notes?: string | null;
   for_pieces?: number | null;
+  costing_product_id?: string | null;
   discount_type?: 'flat' | 'percentage' | null;
   discount_value?: number | null;
   tax_percent?: number | null;

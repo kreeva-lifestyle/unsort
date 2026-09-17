@@ -9,7 +9,11 @@ import { PO_TYPE_LABELS, PO_STATUS_LABELS, PO_STATUSES } from '../../types/datab
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import { itemLabel } from './poItemLabel';
 
-export type PORow = PurchaseOrder & { purchase_order_items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'received_qty'>> };
+export type PORow = PurchaseOrder & {
+  purchase_order_items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'received_qty'>>;
+  /** The costing this PO was raised from (embedded via costing_product_id). */
+  costing_products?: { sku: string } | null;
+};
 
 interface Props {
   pos: PORow[];

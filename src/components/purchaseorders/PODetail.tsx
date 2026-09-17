@@ -41,6 +41,8 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
   const [busy, setBusy] = useState('');
   const [closing, setClosing] = useState(false);
   const sc = statusColors[po.status] || statusColors.draft;
+  // Raised from a costing sheet: the list embed carries the costing's SKU.
+  const costingSku = (po as PurchaseOrder & { costing_products?: { sku: string } | null }).costing_products?.sku ?? null;
 
   const setStatus = async (status: 'approved' | 'sent' | 'cancelled', label: string) => {
     if (busy) return;
@@ -128,6 +130,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
             <Info label="Expected" value={fmtDate(po.expected_date)} />
             {po.payment_terms && <Info label="Payment terms" value={po.payment_terms} />}
             {po.for_pieces != null && po.for_pieces > 0 && <Info label="For pieces" value={<span style={{ fontFamily: T.mono }}>{po.for_pieces} pcs</span>} />}
+            {costingSku && <Info label="From costing" value={<span style={{ fontFamily: T.mono }}>{costingSku}</span>} />}
             {po.status === 'closed' && <Info label="Closed" value={<span style={{ fontSize: 12 }}>{fmtDate(po.closed_at)}{po.close_reason ? <span style={{ color: T.tx3 }}> · {po.close_reason}</span> : null}</span>} />}
           </div>
 

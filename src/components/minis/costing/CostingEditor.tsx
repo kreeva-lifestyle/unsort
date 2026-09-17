@@ -19,6 +19,7 @@ import SheetProblems from './SheetProblems';
 import { optimizeImage } from './imageResize';
 import PrintPreview from './PrintPreview';
 import { purchasePlanHtml } from './purchasePlan';
+import RaisePOModal from './RaisePOModal';
 import { costingSheetHtml } from './costingSheet';
 import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 import { useSettingsCategories } from './useSettingsCategories';
@@ -39,6 +40,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
   const [uploading, setUploading] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [raiseOpen, setRaiseOpen] = useState(false);
   // Owner's flow: pieces to make -> totals and purchase plan use the same number.
   const [pieces, setPieces] = useState('');
   const { ask, modalProps } = useConfirm();
@@ -118,15 +120,17 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
   const patchComp = (i: number, next: ReturnType<typeof blankComponent>) =>
     setP(prev => ({ ...prev, components: prev.components.map((c, j) => (j === i ? next : c)) }));
 
-  // Both PDFs need a valid sheet; the purchase plan additionally needs pieces.
-  const openPdf = (which: 'sheet' | 'plan') => {
-    if (which === 'plan' && !(Math.floor(num(pieces)) > 0)) { addToast('Enter "Pieces to make" first — the plan is calculated from it', 'error'); return; }
+  // Both PDFs need a valid sheet; the purchase plan and Raise POs also need
+  // pieces, and Raise POs needs a SAVED sheet (the POs link back to its id).
+  const openPdf = (which: 'sheet' | 'plan' | 'raise') => {
+    if (which !== 'sheet' && !(Math.floor(num(pieces)) > 0)) { addToast('Enter "Pieces to make" first — the plan is calculated from it', 'error'); return; }
+    if (which === 'raise' && !saved) { addToast('Save the costing first — the POs link back to it', 'error'); return; }
     const comps = canonicalizeNames(pruneBlank(p.components), library);
     setP(prev => ({ ...prev, components: comps }));
     const errs = validateSheetDetailed(p.sku, comps, p.category);
     if (errs.length) { setErrors(errs); addToast('Fix the highlighted fields first', 'error'); return; }
     setErrors([]);
-    (which === 'plan' ? setPlanOpen : setSheetOpen)(true);
+    (which === 'plan' ? setPlanOpen : which === 'raise' ? setRaiseOpen : setSheetOpen)(true);
   };
 
   const total = totalCost(p.components, p.maintenance_pct);
@@ -165,6 +169,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
         {saved && <button onClick={deleteCosting} style={{ ...S.btnDanger, minHeight: 44 }}>Delete</button>}
         <button onClick={() => openPdf('sheet')} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Costing PDF</button>
         <button onClick={() => openPdf('plan')} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Purchase plan (PDF)</button>
+        <button onClick={() => openPdf('raise')} style={{ ...S.btnGhost, minHeight: 44, color: T.ac2 }}>Raise POs</button>
         <button onClick={save} disabled={saving}
           style={{ ...S.btnPrimary, flex: 1, minWidth: 140, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
           {saving ? 'Saving…' : 'Save'}
@@ -179,6 +184,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
       {sheetOpen && (
         <PrintPreview title={`Product costing — ${p.sku}`} html={costingSheetHtml(p)} onClose={() => setSheetOpen(false)} />
       )}
+      {raiseOpen && <RaisePOModal product={p} pieces={Math.floor(num(pieces))} onClose={() => setRaiseOpen(false)} addToast={addToast} />}
       <ConfirmModal {...modalProps} />
     </div>
   );

@@ -202,7 +202,7 @@ marked (G).
 | Path | Lines | Purpose | Touches |
 |---|---|---|---|
 | `pages/PurchaseOrders.tsx` | 260 | Paginated list w/ items join, search (vendor / number / SKU / fabric code / item name via RPC), filters, realtime, print overlay, pendency report | `purchase_orders` (+embedded items), `purchase_order_items`, `purchase_order_receipts`, `audit_log`, `profiles`; RPC `search_po_ids`; channel `purchase_orders_rt` on `purchase_orders` only (every RPC stamps the header); `printOrQueue('document','A4')` |
-| `components/purchaseorders/POForm.tsx` | 246 | Create/edit/duplicate; vendor smart defaults; fabric code compulsory on fabric POs (the RPCs refuse it too) | RPCs `create_po_with_items`, `update_po_with_items`; `purchase_orders` last-PO lookup |
+| `components/purchaseorders/POForm.tsx` | 252 | Create/edit/duplicate/prefill (`POPrefill` from a costing sheet); vendor smart defaults; fabric code compulsory on fabric POs (the RPCs refuse it too); carries `costing_product_id` | RPCs `create_po_with_items`, `update_po_with_items`; `purchase_orders` last-PO lookup |
 | `components/purchaseorders/POItemRows.tsx` | 86 | The form's item cards; fabric POs get a "Fabric code" `SuggestInput` fed by earlier codes | RPC `po_fabric_codes` |
 | `components/purchaseorders/ItemNameChips.tsx` | 38 | Last-5 item-name chips under an empty item-name box, scoped to the PO type, deduped case-insensitively | RPC `po_recent_item_names` |
 | `components/purchaseorders/poItemLabel.ts` | 9 | `itemLabel(it)` = `name · fabric_code` — the one way a PO line is printed (detail, receive, close, receipts, list, PDF, image, pendency, pricing evidence) | pure |
@@ -430,7 +430,8 @@ List = `programs` (not deleted, `count:'estimated'`, `textSearch('search_vector'
 | Path | Lines | Purpose | Touches |
 |---|---|---|---|
 | `minis/costing/ProductCosting.tsx` | 121 | Costing list, duplicate, new; loads chip names | `costing_products` select (≤500); `app_settings.costing_top_subs` |
-| `minis/costing/CostingEditor.tsx` | 185 | One sheet: hero, components, totals, notes, save/delete, PDFs | `costing_products` upsert/delete; bucket `costing-images`; `useProductCatalog`; `products` (categories) |
+| `minis/costing/CostingEditor.tsx` | 191 | One sheet: hero, components, totals, notes, save/delete, PDFs, Raise POs | `costing_products` upsert/delete; bucket `costing-images`; `useProductCatalog`; `products` (categories) |
+| `minis/costing/RaisePOModal.tsx` | 116 | Purchase plan grouped by supplier → one draft PO each, opened in the real `POForm` pre-filled (vendor matched by name, type, SKU, sub-material, material code as fabric code, qty, rate, pieces, `costing_product_id`) | `po_vendors` select; `POForm` (lazy) → RPC `create_po_with_items` |
 | `minis/costing/costingModel.ts` | 206 | Shapes + arithmetic, validation, library harvest, purchase plan | pure |
 | `minis/costing/LineSheet.tsx`, `SupplierModal.tsx`, `ComponentCard.tsx`, `CostingHero.tsx`, `TotalsCard.tsx`, `SubChips.tsx`, `SheetProblems.tsx`, `AskBox.tsx`, `PrintPreview.tsx` | 151, 122, 126, 67, 43, 41, 29, 113, 32 | Editor UI; `PrintPreview` = iframe `srcDoc` + `contentWindow.print()` | portals + `useModalLock` |
 | `minis/costing/costingAsk.ts`, `costingNames.ts`, `costingSheet.ts`, `costingTemplates.ts`, `imageResize.ts`, `purchasePlan.ts`, `useSettingsCategories.ts` | 138, 30, 82, 70, 28, 89, 22 | Ask engine, name canonicalisation, print HTML (`escHtml`), templates/presets, photo resize, purchase-plan HTML, categories loader | `products` select `name` (active, ≤500) |
