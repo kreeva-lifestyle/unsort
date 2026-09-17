@@ -10,6 +10,7 @@ import { logSwallowed } from '../../lib/errorLogger';
 import { numericKeyDown } from '../../lib/numericInput';
 import SkuInput from '../ui/SkuInput';
 import SuggestInput from '../ui/SuggestInput';
+import ItemNameChips, { useRecentItemNames } from './ItemNameChips';
 import type { PurchaseOrderType } from '../../types/database';
 
 export type FormItem = { sku: string; item_name: string; fabric_code: string; quantity: string; unit: string; rate: string };
@@ -26,6 +27,7 @@ export default function POItemRows({ items, poType, onChange, onRemove, onAdd }:
 }) {
   const fabric = poType === 'fabric';
   const skuRequired = fabric || poType === 'material';
+  const recentNames = useRecentItemNames(poType);
   // Previously used fabric codes, fetched once the first time the form is a
   // fabric PO (never on a job-work form). Best-effort: without the list the
   // box is still a plain text field.
@@ -63,6 +65,7 @@ export default function POItemRows({ items, poType, onChange, onRemove, onAdd }:
                     style={{ ...S.fInput, width: '100%', minWidth: 0, fontFamily: T.mono }} inputProps={{ 'aria-label': 'Fabric code' }} />
                 )}
               </div>
+              {!it.item_name.trim() && <ItemNameChips names={recentNames} onPick={n => onChange(i, { item_name: n })} />}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                 <input value={it.quantity} onChange={e => onChange(i, { quantity: e.target.value })} onKeyDown={e => numericKeyDown(e)} inputMode="decimal" placeholder="Qty" style={{ ...S.fInput, width: '100%', minWidth: 0, fontFamily: T.mono }} />
                 <select value={it.unit} onChange={e => onChange(i, { unit: e.target.value })} style={{ ...S.fInput, width: '100%', minWidth: 0, color: it.unit ? T.tx : T.tx3 }}>
