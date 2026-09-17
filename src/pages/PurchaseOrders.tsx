@@ -23,7 +23,7 @@ import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog }
 import { useModalLock } from '../hooks/useModalLock';
 import Toggle from '../components/ui/Toggle';
 
-const COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, for_pieces, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, closed_at, closed_by, close_reason, created_by, modified_by, created_at, updated_at';
+const COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, for_pieces, costing_product_id, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, closed_at, closed_by, close_reason, created_by, modified_by, created_at, updated_at';
 
 type Detail = { po: PurchaseOrder; items: PurchaseOrderItem[]; receipts: PurchaseOrderReceipt[]; audit: AuditLog[] | null };
 
@@ -81,7 +81,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const fetchPos = useCallback(async (silent = false) => {
     const seq = ++fetchSeq.current;
     if (!silent) setLoading(true);
-    let q = supabase.from('purchase_orders').select(`${COLS}, purchase_order_items(sku, item_name, fabric_code, quantity, received_qty)`, { count: 'estimated' });
+    let q = supabase.from('purchase_orders').select(`${COLS}, costing_products(sku), purchase_order_items(sku, item_name, fabric_code, quantity, received_qty)`, { count: 'estimated' });
     if (debouncedSearch) {
       // Vendor name always matches; a pure number also matches the PO #; and
       // ANY term (numeric SKUs like "15003" included) also matches line-item
@@ -119,7 +119,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     // mount fetch, and the superseded one returns above without clearing;
     // gating this on !silent left the skeletons up forever.
     if (error) { addToast(friendlyError(error), 'error'); setLoading(false); return; }
-    setPos((data as PORow[] | null) || []);
+    setPos((data as unknown as PORow[] | null) || []);
     setTotalCount(count || 0);
     setLoading(false);
   }, [debouncedSearch, statusFilter, typeFilter, creatorFilter, dateFrom, dateTo, page, pageSize, addToast]);

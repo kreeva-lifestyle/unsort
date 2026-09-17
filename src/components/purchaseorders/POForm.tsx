@@ -20,18 +20,23 @@ import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderType } from '../../
 import { useModalLock } from '../../hooks/useModalLock';
 
 export type EditingPO = PurchaseOrder & { items?: PurchaseOrderItem[] };
+/** A pre-filled NEW order (e.g. raised from a costing sheet's purchase plan): any header fields plus draft lines. */
+export type POPrefill = Partial<PurchaseOrder> & { items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'unit' | 'rate'>> };
 
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
 
-export default function POForm({ editing, duplicateFrom, onClose, onSaved, addToast }: {
+export default function POForm({ editing, duplicateFrom, prefill, onClose, onSaved, addToast }: {
   editing: EditingPO | null;
   duplicateFrom?: EditingPO | null;
+  prefill?: POPrefill | null;
   onClose: () => void;
   onSaved: (r: { id: string; po_number: number }, isNew: boolean) => void;
   addToast: (m: string, t?: string) => void;
 }) {
-  const src = editing || duplicateFrom || null;
+  const src: POPrefill | null = editing || duplicateFrom || prefill || null;
+  // Costing link travels with the order it was raised from (or the one being edited).
+  const costingId = src?.costing_product_id ?? null;
   const [vendor, setVendor] = useState<{ id: string | null; name: string; phone: string }>({ id: src?.vendor_id ?? null, name: src?.vendor_name ?? '', phone: src?.vendor_phone ?? '' });
   const [poType, setPoType] = useState<PurchaseOrderType | ''>(src?.po_type ?? '');
   const [poDate, setPoDate] = useState(editing?.po_date ?? localToday());
@@ -42,7 +47,7 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
   // purchase is for. Shown in the app only — never on the shared/printed PO.
   const [forPieces, setForPieces] = useState(src?.for_pieces ? String(src.for_pieces) : '');
   const [items, setItems] = useState<FormItem[]>(
-    src?.items?.length ? src.items.map(it => ({ sku: it.sku ?? '', item_name: it.item_name, fabric_code: it.fabric_code ?? '', quantity: String(it.quantity), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()]
+    src?.items?.length ? src.items.map(it => ({ sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', quantity: String(it.quantity), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()]
   );
   const [showCharges, setShowCharges] = useState(!!(src?.discount_value || src?.tax_percent || src?.other_charges));
   const [discountType, setDiscountType] = useState(src?.discount_type ?? 'flat');
@@ -129,6 +134,7 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
         po_type: poType, po_date: poDate || null, expected_date: expectedDate || null,
         payment_terms: paymentTerms.trim() || null, notes: notes.trim() || null,
         for_pieces: pieces,
+        costing_product_id: costingId,
         // Always send the values held in state — the Grand Total preview
         // includes them whether or not the charges section is expanded, so
         // collapsing the section must never silently strip an existing
@@ -163,7 +169,7 @@ export default function POForm({ editing, duplicateFrom, onClose, onSaved, addTo
           off-screen and two scroll areas fought over the touch. */}
       <div className="modal-inner" style={{ ...S.modalBox, width: 640, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
-          <span style={S.modalTitle}>{editing ? `Edit PO #${editing.po_number}` : duplicateFrom ? 'Duplicate Purchase Order' : 'New Purchase Order'}</span>
+          <span style={S.modalTitle}>{editing ? `Edit PO #${editing.po_number}` : duplicateFrom ? 'Duplicate Purchase Order' : prefill ? 'New PO from costing' : 'New Purchase Order'}</span>
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
