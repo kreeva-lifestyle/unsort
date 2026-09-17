@@ -6,6 +6,7 @@ import { T, S, alpha } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import DateInput from '../ui/DateInput';
 import AuditTrailModal from './AuditTrailModal';
+import ReturnSourcePicker from './ReturnSourcePicker';
 import SkuInput from '../ui/SkuInput';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
@@ -158,23 +159,8 @@ export default function ChallanForm(p: ChallanFormProps) {
 
         {/* Return: Select source invoice */}
         {p.isReturn && !p.editing && !p.returnSource && (
-          <div style={{ background: 'oklch(0.63 0.22 25 / .04)', border: '1px solid oklch(0.63 0.22 25 / .15)', borderRadius: 10, padding: 14, marginBottom: 12 }}>
-            <label style={{ ...lbl, color: T.re }}>Select Original Invoice *</label>
-            <input type="text" value={p.returnSearchQ} onChange={e => { p.setReturnSearchQ(e.target.value); clearTimeout(searchTimeout.current); searchTimeout.current = setTimeout(() => p.searchReturnSource(e.target.value), 300); }}
-              placeholder="Search by challan # or customer name..." style={inp} autoFocus />
-            {p.returnResults.length > 0 && <div style={{ marginTop: 6, border: `1px solid ${T.bd}`, borderRadius: 6, maxHeight: 200, overflowY: 'auto' }}>
-              {p.returnResults.map(c => (
-                <div key={c.id} onClick={() => p.selectReturnSource(c)} style={{ padding: '8px 12px', borderBottom: `1px solid ${T.bd}`, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <div>
-                    <span style={{ fontFamily: T.mono, fontSize: 11, color: T.ac2 }}>#{c.challan_number}</span>
-                    <span style={{ marginLeft: 8, fontSize: 11, color: T.tx }}>{c.customer_name}</span>
-                  </div>
-                  <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.tx }}>₹{Number(c.total).toLocaleString('en-IN')}</span>
-                </div>
-              ))}
-            </div>}
-          </div>
+          <ReturnSourcePicker query={p.returnSearchQ} onQueryChange={p.setReturnSearchQ} results={p.returnResults} onSearch={p.searchReturnSource} onSelect={p.selectReturnSource}
+            customerName={p.customerName} style={inp} labelStyle={lbl} />
         )}
         {p.isReturn && p.returnSource && !p.editing && (
           <div style={{ background: 'oklch(0.63 0.22 25 / .04)', border: '1px solid oklch(0.63 0.22 25 / .15)', borderRadius: 10, padding: '8px 14px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
