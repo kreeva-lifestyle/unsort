@@ -202,7 +202,8 @@ marked (G).
 |---|---|---|---|
 | `pages/PurchaseOrders.tsx` | 260 | Paginated list w/ items join, search (vendor / number / SKU / fabric code / item name via RPC), filters, realtime, print overlay, pendency report | `purchase_orders` (+embedded items), `purchase_order_items`, `purchase_order_receipts`, `audit_log`, `profiles`; RPC `search_po_ids`; channel `purchase_orders_rt` on `purchase_orders` only (every RPC stamps the header); `printOrQueue('document','A4')` |
 | `components/purchaseorders/POForm.tsx` | 246 | Create/edit/duplicate; vendor smart defaults; fabric code compulsory on fabric POs (the RPCs refuse it too) | RPCs `create_po_with_items`, `update_po_with_items`; `purchase_orders` last-PO lookup |
-| `components/purchaseorders/POItemRows.tsx` | 83 | The form's item cards; fabric POs get a "Fabric code" `SuggestInput` fed by earlier codes | RPC `po_fabric_codes` |
+| `components/purchaseorders/POItemRows.tsx` | 86 | The form's item cards; fabric POs get a "Fabric code" `SuggestInput` fed by earlier codes | RPC `po_fabric_codes` |
+| `components/purchaseorders/ItemNameChips.tsx` | 38 | Last-5 item-name chips under an empty item-name box, scoped to the PO type, deduped case-insensitively | RPC `po_recent_item_names` |
 | `components/purchaseorders/poItemLabel.ts` | 9 | `itemLabel(it)` = `name · fabric_code` — the one way a PO line is printed (detail, receive, close, receipts, list, PDF, image, pendency, pricing evidence) | pure |
 | `components/purchaseorders/PODetail.tsx` | 196 | Detail + status actions | RPCs `set_po_status` (`approved/sent/cancelled/reopen`), `delete_po_receipt` |
 | `components/purchaseorders/POReceive.tsx` | 134 | Receive goods (stale-tally guard) | RPC `receive_po_items` |
