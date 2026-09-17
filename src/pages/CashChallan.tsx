@@ -385,17 +385,28 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   }, [showModal, editing, currentUserId, clearDraft]);
 
   // ── Return source invoice search ────────────────────────────────────────────
+  // Matches challan #, customer name or a sold SKU (search_return_source_ids),
+  // scoped to the customer already typed on the form when there is one —
+  // so typing the SKU lands on the invoice it was sold on. A slower stale
+  // response must never overwrite a newer search's results.
+  const returnSearchSeq = useRef(0);
   const searchReturnSource = useCallback(async (q: string) => {
+    const seq = ++returnSearchSeq.current;
     if (!q.trim()) { setReturnResults([]); return; }
-    const num = parseInt(q);
-    let query = supabase.from('cash_challans').select('id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, created_at, updated_at, cash_challan_items(sku, description, quantity, price, total, discount_type, discount_value, discount_amount)').eq('is_return', false).neq('status', 'voided');
-    if (num && !isNaN(num)) query = query.eq('challan_number', num);
-    else query = query.ilike('customer_name', `%${q.replace(/[%_]/g, '\\$&')}%`);
-    const { data, error } = await query.order('created_at', { ascending: false }).limit(10);
+    const { data: idRows, error: idErr } = await supabase.rpc('search_return_source_ids', {
+      p_q: q.trim(), p_customer_id: selectedCustomerId, p_customer_name: selectedCustomerId ? null : (customerName.trim() || null), p_limit: 10,
+    });
+    if (seq !== returnSearchSeq.current) return;
+    if (idErr) { addToast(friendlyError(idErr), 'error'); return; }
+    const ids = (idRows as string[] | null) || [];
+    if (ids.length === 0) { setReturnResults([]); return; }
+    const { data, error } = await supabase.from('cash_challans')
+      .select('id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, created_at, updated_at, cash_challan_items(sku, description, quantity, price, total, discount_type, discount_value, discount_amount)')
+      .in('id', ids).order('created_at', { ascending: false });
+    if (seq !== returnSearchSeq.current) return;
     if (error) { addToast(friendlyError(error), 'error'); return; }
     setReturnResults((data as Challan[] | null) || []);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedCustomerId, customerName, addToast]);
 
   const selectReturnSource = (challan: Challan) => {
     if (challan.status === 'voided') { setReturnResults([]); return; }
