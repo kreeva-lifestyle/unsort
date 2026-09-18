@@ -1,7 +1,7 @@
 // The Great Vibes script used for catalog names on the rate card and the
 // index. Canvas text needs the face registered on document.fonts; the load
 // is best-effort and never blocks — callers fall back to Sora. Shared by
-// RateCardGenerator and IndexMaker so the font is fetched once per page.
+// RateCardGenerator and CatalogMaker so the font is fetched once per page.
 import { useState, useEffect } from 'react';
 
 const SCRIPT_FONT_URL = 'https://fonts.gstatic.com/s/greatvibes/v21/RWmMoKWR9v4ksMfaWd_JN9XFiaQoDmlr.woff2';
