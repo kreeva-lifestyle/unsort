@@ -4,12 +4,15 @@ import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { exportName, fileDate } from '../../../lib/exportName';
 
-export default function RateCardActions({ result, catalogName, addToast }: {
+export default function RateCardActions({ result, catalogName, fileLabel = 'Rate-Card', addToast }: {
   result: { url: string; blob: Blob };
   catalogName: string;
+  /** File-name prefix and share caption: 'Rate-Card' (default) or 'Index'. */
+  fileLabel?: string;
   addToast: (m: string, t?: string) => void;
 }) {
-  const fileName = () => exportName('Rate-Card', [catalogName.trim() || 'Catalog', fileDate()], 'jpg');
+  const kind = fileLabel.replace(/-/g, ' ').toLowerCase();
+  const fileName = () => exportName(fileLabel, [catalogName.trim() || 'Catalog', fileDate()], 'jpg');
 
   const download = () => {
     const a = document.createElement('a');
@@ -30,7 +33,7 @@ export default function RateCardActions({ result, catalogName, addToast }: {
   // user can drop it into a chat.
   const whatsapp = async () => {
     const file = new File([result.blob], fileName(), { type: 'image/jpeg' });
-    const text = `${catalogName.trim() || 'Rate card'} — rate card`;
+    const text = `${catalogName.trim() || fileLabel} — ${kind}`;
     if (navigator.canShare?.({ files: [file] }) && navigator.share) {
       try { await navigator.share({ files: [file], title: catalogName.trim(), text }); }
       catch (e: any) { if (e?.name !== 'AbortError') addToast(friendlyError(e), 'error'); }
@@ -43,7 +46,7 @@ export default function RateCardActions({ result, catalogName, addToast }: {
 
   return (
     <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 12 }}>
-      <img src={result.url} alt="Rate card preview" style={{ width: '100%', borderRadius: 8, display: 'block', marginBottom: 10 }} />
+      <img src={result.url} alt={`${fileLabel} preview`} style={{ width: '100%', borderRadius: 8, display: 'block', marginBottom: 10 }} />
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={whatsapp} style={{ ...S.btnPrimary, flex: 1, justifyContent: 'center', background: T.gr, border: 'none', color: '#fff' }}>WhatsApp</button>
         <button onClick={share} style={{ ...S.btnGhost, flex: 1, justifyContent: 'center' }}>Share</button>

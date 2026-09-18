@@ -440,8 +440,9 @@ List = `programs` (not deleted, `count:'estimated'`, `textSearch('search_vector'
 | `minis/pricing/aiSuggestions.ts` | 56 | Load latest AI batch / call edge | `pricing_ai_suggestions` select; edge `pricing-ai` (`suggest`) |
 | `minis/pricing/pricingConfig.ts`, `pricingModel.ts`, `evidence.ts`, `evidenceSheet.ts`, `suggestions.ts`, `poLines.ts`, `useProjectionFacts.ts`, `pricingSheet.ts`, `normName.ts` | 71, 108, 114, 72, 81, 34, 29, 31, 4 | Config load/save (`app_settings` `pricing_*`), pure projection maths, evidence engine, rule suggestions, PO lines loader, hash, print HTML | `app_settings` select/upsert; `purchase_order_items` select |
 | `minis/pricing/AiSuggestionsCard.tsx`, `EvidenceList.tsx`, `StitchingOverrides.tsx`, `SuggestionsList.tsx` | 112, 52, 47, 27 | UI | — |
-| `minis/ratecard/RateCardStudio.tsx` | 26 | Pill switch: Rate card / Catalog downloads | — |
-| `minis/ratecard/RateCardGenerator.tsx` | 216 | Studio form (modes, markup, disclaimer, hero, Generate → canvas JPEG) | Google font fetch; `/arya-designs-logo.png` |
+| `minis/ratecard/RateCardStudio.tsx` | 32 | Pill switch: Rate card / Catalog downloads / Index maker (in-app only) | — |
+| `minis/ratecard/RateCardGenerator.tsx` | 209 | Studio form (modes, markup, disclaimer, hero, Generate → canvas JPEG) | `useScriptFont`; `/arya-designs-logo.png` |
+| `minis/ratecard/IndexMaker.tsx`, `IndexTile.tsx`, `renderIndex.ts`, `useScriptFont.ts` | 151, 43, 131, 25 | Index maker: photos + SKU each (SKU pre-filled from file name, reorder, sort, duplicate warning) → canvas JPEG grid captioned with SKUs + gold ornament, logo beside (landscape, 4 cols) or above (portrait, 3 cols), Olive / Charcoal / Ivory, optional script title; shared Great Vibes loader | `/arya-designs-logo.png`; Google font fetch; result via `RateCardActions` (`fileLabel="Index"`) |
 | `minis/ratecard/MasterRateCard.tsx` | 166 | From-Master mode | edge `listing-ai` `ratecard_rows`; localStorage `ratecard_master_cols_v1` |
 | `minis/ratecard/ManualRateEditor.tsx` | 128 | Manual grid, autosaved draft | localStorage `ratecard_manual_draft_v1` |
 | `minis/ratecard/HeroFromSkus.tsx` | 106 | Auto-loads product photos | edge `odette-export` `ratecard_photos`, `ratecard_photo_fetch` |
