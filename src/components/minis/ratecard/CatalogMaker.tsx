@@ -13,7 +13,7 @@ import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { renderIndex, indexGeometry, INDEX_MOODS, INDEX_MAX_TILES } from './renderIndex';
 import type { IndexMood, IndexLayout, IndexSource } from './renderIndex';
-import { renderPage, pageCount, PER_PAGE, PAGE_W, PAGE_H } from './renderPages';
+import { renderPage, pageCount, PER_PAGE, PAGE_H } from './renderPages';
 import { decodeForRender, mapLimit } from './indexPhotos';
 import { useCatalogPhotos } from './useCatalogPhotos';
 import CatalogTile from './CatalogTile';
@@ -45,32 +45,37 @@ export default function CatalogMaker({ addToast }: { addToast: (m: string, t?: s
   const geo = indexGeometry(Math.max(1, tiles.length), layout, !!title.trim());
   const sizeLine = output === 'index'
     ? `${geo.cols} × ${geo.rows} grid · ${geo.W}×${geo.H} px`
-    : `${pageCount(tiles.length)} page${pageCount(tiles.length) === 1 ? '' : 's'} · ${PER_PAGE} per page · ${PAGE_W}×${PAGE_H} px`;
+    : `${pageCount(tiles.length)} page${pageCount(tiles.length) === 1 ? '' : 's'} · ${PER_PAGE} per page · ${PAGE_H} px tall`;
 
   const generate = async () => {
     if (!ready) return;
     setBusy('Preparing photos…');
+    const release = (imgs: IndexSource[]) => imgs.forEach(im => { if ('close' in im) im.close(); });
     try {
-      const imgs: IndexSource[] = await mapLimit(tiles, 4, t => decodeForRender(t.file, t.w, t.h), done => setBusy(`Preparing photo ${done} of ${tiles.length}…`));
-      const drawn = tiles.map((t, i) => ({ img: imgs[i], sku: t.sku }));
-      setBusy('Drawing…');
-      await new Promise(r => setTimeout(r, 0)); // let the label paint before the synchronous draw
       const out: PageResult[] = [];
       if (output === 'index') {
+        // Index tiles are 400×600: a 900 px decode of every photo is enough and fits forty in memory.
+        const imgs = await mapLimit(tiles, 4, t => decodeForRender(t.file, t.w, t.h), done => setBusy(`Preparing photo ${done} of ${tiles.length}…`));
+        setBusy('Drawing…');
+        await new Promise(r => setTimeout(r, 0)); // let the label paint before the synchronous draw
         const logoImg = await loadImg('/arya-designs-logo.png').catch(() => null);
         if (!logoImg) addToast('Logo image failed to load — index generated without it', 'info');
         const canvas = document.createElement('canvas');
-        renderIndex(canvas, { tiles: drawn, title, mood, layout, logoImg, scriptFont });
+        renderIndex(canvas, { tiles: tiles.map((t, i) => ({ img: imgs[i], sku: t.sku })), title, mood, layout, logoImg, scriptFont });
+        release(imgs);
         out.push(await toBlob(canvas).then(blob => ({ url: URL.createObjectURL(blob), blob })));
       } else {
-        for (let i = 0; i < drawn.length; i += PER_PAGE) {
-          setBusy(`Drawing page ${i / PER_PAGE + 1} of ${pageCount(drawn.length)}…`);
+        // Pages are full-height photos: decode each page's two at 1600 px, draw, release, next.
+        for (let i = 0; i < tiles.length; i += PER_PAGE) {
+          setBusy(`Page ${i / PER_PAGE + 1} of ${pageCount(tiles.length)}…`);
+          const slice = tiles.slice(i, i + PER_PAGE);
+          const imgs = await Promise.all(slice.map(t => decodeForRender(t.file, t.w, t.h, PAGE_H)));
           const canvas = document.createElement('canvas');
-          renderPage(canvas, drawn.slice(i, i + PER_PAGE));
+          renderPage(canvas, slice.map((t, j) => ({ img: imgs[j], sku: t.sku })));
+          release(imgs);
           out.push(await toBlob(canvas).then(blob => ({ url: URL.createObjectURL(blob), blob })));
         }
       }
-      imgs.forEach(im => { if ('close' in im) im.close(); });
       clear(); setPages(out);
       addToast(output === 'index' ? 'Index ready' : `${out.length} page${out.length === 1 ? '' : 's'} ready`, 'success');
     } catch (e) { addToast(friendlyError(e), 'error'); }
