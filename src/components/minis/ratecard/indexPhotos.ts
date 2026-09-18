@@ -27,17 +27,18 @@ export async function makeThumb(file: File): Promise<PhotoMeta> {
   return { thumb: URL.createObjectURL(blob), ...meta };
 }
 
-/** Decode a photo at (about) tile size. Falls back to a full decode + canvas
- *  downscale where resize options are unsupported. */
-export async function decodeForRender(file: File, w: number, h: number): Promise<IndexSource> {
-  const s = Math.min(1, RENDER_EDGE / Math.max(w, h, 1));
+/** Decode a photo at (about) the size it will be drawn: `edge` is the long
+ *  edge wanted (index tiles 900, full-height pages 1600). Falls back to a
+ *  full decode + canvas downscale where resize options are unsupported. */
+export async function decodeForRender(file: File, w: number, h: number, edge = RENDER_EDGE): Promise<IndexSource> {
+  const s = Math.min(1, edge / Math.max(w, h, 1));
   if (w > 0 && h > 0) {
     try {
       return await createImageBitmap(file, { resizeWidth: Math.max(1, Math.round(w * s)), resizeHeight: Math.max(1, Math.round(h * s)), resizeQuality: 'medium' });
     } catch { /* fall through */ }
   }
   const bmp = await createImageBitmap(file);
-  const s2 = Math.min(1, RENDER_EDGE / Math.max(bmp.width, bmp.height));
+  const s2 = Math.min(1, edge / Math.max(bmp.width, bmp.height));
   if (s2 === 1) return bmp;
   const c = document.createElement('canvas');
   c.width = Math.round(bmp.width * s2); c.height = Math.round(bmp.height * s2);
