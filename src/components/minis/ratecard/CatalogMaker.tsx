@@ -66,12 +66,14 @@ export default function CatalogMaker({ addToast }: { addToast: (m: string, t?: s
         out.push(await toBlob(canvas).then(blob => ({ url: URL.createObjectURL(blob), blob })));
       } else {
         // Pages are full-height photos: decode each page's two at 1600 px, draw, release, next.
+        // An odd last page gets the brand panel (logo + catalog name) in its empty half.
+        const logoImg = tiles.length % PER_PAGE ? await loadImg('/arya-designs-logo.png').catch(() => null) : null;
         for (let i = 0; i < tiles.length; i += PER_PAGE) {
           setBusy(`Page ${i / PER_PAGE + 1} of ${pageCount(tiles.length)}…`);
           const slice = tiles.slice(i, i + PER_PAGE);
           const imgs = await Promise.all(slice.map(t => decodeForRender(t.file, t.w, t.h, PAGE_H)));
           const canvas = document.createElement('canvas');
-          renderPage(canvas, slice.map((t, j) => ({ img: imgs[j], sku: t.sku })));
+          renderPage(canvas, slice.map((t, j) => ({ img: imgs[j], sku: t.sku })), { title, logoImg, scriptFont });
           release(imgs);
           out.push(await toBlob(canvas).then(blob => ({ url: URL.createObjectURL(blob), blob })));
         }
@@ -111,7 +113,7 @@ export default function CatalogMaker({ addToast }: { addToast: (m: string, t?: s
           {output === 'index' && <div><label style={S.fLabel}>Mood</label>{seg(mood, (Object.keys(INDEX_MOODS) as IndexMood[]).map(k => [k, INDEX_MOODS[k].label]), setMood)}</div>}
         </div>
         <div style={{ fontSize: 10, color: T.tx3, marginTop: -6, marginBottom: 12 }}>
-          {output === 'index' ? 'Index: one grid image with the logo; the backdrop is blended from the photos themselves.' : 'Pages: two SKUs per page on a clean white sheet, each photo whole with its code beneath — no backdrop, no frame.'}
+          {output === 'index' ? 'Index: one grid image with the logo; the backdrop is blended from the photos themselves.' : 'Pages: two photos per page edge to edge, each with its code inside. An odd last page shows the logo and catalog name in its other half.'}
         </div>
 
         {tiles.length > 0 && (
