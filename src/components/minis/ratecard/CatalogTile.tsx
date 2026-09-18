@@ -1,12 +1,12 @@
-// One photo card in the Index maker editor: thumbnail, SKU box, reorder and
-// remove. Memoised with id-keyed callbacks, so typing an SKU on one card
-// re-renders that card alone, not all forty.
+// One photo card in the Catalog maker editor: thumbnail, SKU box, reorder
+// and remove. Memoised with id-keyed callbacks, so typing an SKU on one
+// card re-renders that card alone, not all forty.
 import { memo } from 'react';
 import { T, S } from '../../../lib/theme';
 
 export interface DraftTile { id: string; file: File; sku: string; thumb: string | null; w: number; h: number }
 
-function IndexTile({ tile, index, count, duplicate, onSku, onMove, onRemove }: {
+function CatalogTile({ tile, index, count, duplicate, onSku, onMove, onRemove }: {
   tile: DraftTile;
   index: number;
   count: number;
@@ -46,4 +46,4 @@ function IndexTile({ tile, index, count, duplicate, onSku, onMove, onRemove }: {
   );
 }
 
-export default memo(IndexTile);
+export default memo(CatalogTile);
