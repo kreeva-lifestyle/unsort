@@ -6,14 +6,49 @@
 // An odd count leaves the last page with one photo: the other half then
 // carries the brand — logo and catalog name over a blurred, tinted copy of
 // that photo (owner: use the blank space; never a flat colour).
-import { font, GOLD, GOLD_DEEP } from './canvasKit';
+import { GOLD, GOLD_DEEP } from './canvasKit';
 import { paintBackdrop } from './indexBackdrop';
 import type { IndexTile, IndexSource } from './renderIndex';
 
 export const PAGE_H = 1600;
 export const PER_PAGE = 2;
 export const pageCount = (n: number) => Math.max(1, Math.ceil(n / PER_PAGE));
-export interface PageBrand { title: string; logoImg: HTMLImageElement | null; scriptFont: string }
+export interface PageBrand { title: string; logoImg: HTMLImageElement | null; scriptFont: string; displayFont: string }
+
+// The code, set like a couture label: a small "ARYA DESIGNS" kicker, the
+// code beneath in Cinzel (the logo's Roman capitals) — cream-gold, light,
+// letter-spaced — and a slim gold rule with a diamond leading into it.
+const caption = (ctx: CanvasRenderingContext2D, right: number, sku: string, w: number, displayFont: string) => {
+  const pad = 48, base = PAGE_H - 54;
+  const tracked = (px: string) => { try { (ctx as any).letterSpacing = px; } catch { /* noop */ } };
+  ctx.save();
+  ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 1;
+  // code
+  tracked('5px');
+  ctx.font = `500 34px '${displayFont}', serif`;
+  let label = sku.trim().toUpperCase();
+  while (label.length > 3 && ctx.measureText(label).width > w - pad * 2 - 120) label = label.slice(0, -1);
+  if (label !== sku.trim().toUpperCase()) label += '…';
+  ctx.fillStyle = GOLD;
+  ctx.fillText(label, right - pad, base);
+  const codeW = ctx.measureText(label).width;
+  // kicker
+  tracked('6px');
+  ctx.font = `400 15px '${displayFont}', serif`;
+  ctx.fillStyle = 'rgba(239,223,180,0.78)';
+  ctx.fillText('ARYA DESIGNS', right - pad, base - 44);
+  tracked('0px');
+  // rule + diamond leading into the code
+  const y = base - 12, xEnd = right - pad - codeW - 26;
+  const g = ctx.createLinearGradient(xEnd - 90, y, xEnd, y);
+  g.addColorStop(0, 'rgba(217,188,126,0)'); g.addColorStop(1, GOLD);
+  ctx.strokeStyle = g; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(xEnd - 90, y); ctx.lineTo(xEnd - 12, y); ctx.stroke();
+  ctx.fillStyle = GOLD;
+  ctx.beginPath(); ctx.moveTo(xEnd - 6, y - 6); ctx.lineTo(xEnd, y); ctx.lineTo(xEnd - 6, y + 6); ctx.lineTo(xEnd - 12, y); ctx.closePath(); ctx.fill();
+  ctx.restore();
+};
 
 const dims = (im: IndexSource): [number, number] => ('naturalWidth' in im ? [im.naturalWidth, im.naturalHeight] : [im.width, im.height]);
 
@@ -48,25 +83,15 @@ export function renderPage(canvas: HTMLCanvasElement, tiles: IndexTile[], brand?
   canvas.width = Math.max(1, widths.reduce((a, b) => a + b, 0) + panel); canvas.height = PAGE_H;
   const ctx = canvas.getContext('2d')!;
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  const tracked = (px: string) => { try { (ctx as any).letterSpacing = px; } catch { /* noop */ } };
   let x = 0;
   use.forEach((t, i) => {
     const w = widths[i];
     ctx.drawImage(t.img, x, 0, w, PAGE_H);
-    // code inside the photo, bottom right
-    const pad = 44;
-    ctx.save();
-    ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
-    tracked('2px');
-    ctx.font = font(700, 52);
-    let label = t.sku.trim().toUpperCase();
-    while (label.length > 3 && ctx.measureText(label).width > w - pad * 2) label = label.slice(0, -1);
-    if (label !== t.sku.trim().toUpperCase()) label += '…';
-    ctx.shadowColor = 'rgba(0,0,0,0.75)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 2;
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(label, x + w - pad, PAGE_H - pad);
-    ctx.restore();
-    tracked('0px');
+    // a soft dark fade in the corner so the caption reads on pale fabric too
+    const fade = ctx.createLinearGradient(0, PAGE_H - 260, 0, PAGE_H);
+    fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,0.38)');
+    ctx.fillStyle = fade; ctx.fillRect(x, PAGE_H - 260, w, 260);
+    caption(ctx, x + w, t.sku, w, brand?.displayFont || 'Sora');
     x += w;
   });
   if (panel && brand) brandPanel(ctx, x, panel, use[0].img, brand);
