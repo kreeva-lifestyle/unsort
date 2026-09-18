@@ -17,8 +17,8 @@ import SellerLinkBar from './SellerLinkBar';
 import MasterFreshness from '../../ui/MasterFreshness';
 import MarkupRow from './MarkupRow';
 import RateCardActions from './RateCardActions';
+import { useScriptFont } from './useScriptFont';
 
-const SCRIPT_FONT_URL = 'https://fonts.gstatic.com/s/greatvibes/v21/RWmMoKWR9v4ksMfaWd_JN9XFiaQoDmlr.woff2';
 const DEFAULT_DISCLAIMER = 'ALL RATES ARE FLAT NO DISCOUNT AND EXCLUSIVE OF GST AND SHIPPING';
 
 const loadImg = (src: string) => new Promise<HTMLImageElement>((res, rej) => {
@@ -45,18 +45,11 @@ export default function RateCardGenerator({ addToast, lockedMode, shareToken }: 
   const [markupKind, setMarkupKind] = useState<'pct' | 'flat'>('pct');
   const [markupVal, setMarkupVal] = useState('');
   const [result, setResult] = useState<{ url: string; blob: Blob } | null>(null);
-  const [scriptReady, setScriptReady] = useState(false);
+  // Script face for the catalog name (shared loader; falls back to Sora).
+  const scriptFont = useScriptFont();
   const heroRef = useRef<HTMLInputElement>(null);
   const xlsRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    // Fancy script font for the catalog name — canvas needs it registered on
-    // document.fonts. Falls back to Sora if the fetch fails; never blocks.
-    // (No fonts.check() guard: it returns true for families the page never
-    // registered, so it would skip the load and we'd render the fallback.)
-    const face = new FontFace('Great Vibes', `url(${SCRIPT_FONT_URL})`);
-    face.load().then(f => { document.fonts.add(f); setScriptReady(true); }).catch(() => {});
-  }, []);
   useEffect(() => () => { if (heroUrl) URL.revokeObjectURL(heroUrl); }, [heroUrl]);
   useEffect(() => () => { if (result) URL.revokeObjectURL(result.url); }, [result]);
 
@@ -110,7 +103,7 @@ export default function RateCardGenerator({ addToast, lockedMode, shareToken }: 
       await renderRateCard(canvas, {
         heroImg, logoImg, catalogName: catalogName.trim(), rows: effective.rows, columns: effective.columns,
         skuCol: effective.skuCol, priceCol: effective.priceCol,
-        disclaimer, stats: effective.stats, scriptFont: scriptReady ? 'Great Vibes' : 'Sora',
+        disclaimer, stats: effective.stats, scriptFont,
       });
       const blob = await new Promise<Blob>((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('Could not create the image')), 'image/jpeg', 0.92));
       setResult(prev => { if (prev) URL.revokeObjectURL(prev.url); return { url: URL.createObjectURL(blob), blob }; });
