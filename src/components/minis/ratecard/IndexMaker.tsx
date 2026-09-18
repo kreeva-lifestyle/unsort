@@ -1,14 +1,16 @@
 // Index maker (RateCard Studio): drop in the design photos, give each its
 // SKU, and get a catalog index image — a photo grid captioned with SKUs, the
-// brand logo beside or above it (owner's sample: 4×2 grid, logo on the
-// right, olive background). Nothing is uploaded; the image is drawn on a
-// canvas by renderIndex.ts and shared through the same panel as the rate
-// card. SKUs pre-fill from the file names ("100001.jpg" → 100001).
-import { useState, useEffect, useMemo, useRef } from 'react';
+// brand logo beside or above it, on a backdrop blended from the photos
+// themselves. Nothing is uploaded; the image is drawn on a canvas by
+// renderIndex.ts and shared through the same panel as the rate card. SKUs
+// pre-fill from the file names ("100001.jpg" → 100001). Photos go through
+// indexPhotos.ts (thumbnails for the editor, tile-size decodes at Generate).
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
-import { renderIndex, indexGeometry, INDEX_THEMES, INDEX_MAX_TILES } from './renderIndex';
-import type { IndexTheme, IndexLayout, IndexSource } from './renderIndex';
+import { renderIndex, indexGeometry, INDEX_MOODS, INDEX_MAX_TILES } from './renderIndex';
+import type { IndexMood, IndexLayout } from './renderIndex';
+import { makeThumb, decodeForRender, mapLimit } from './indexPhotos';
 import IndexTile from './IndexTile';
 import type { DraftTile } from './IndexTile';
 import RateCardActions from './RateCardActions';
@@ -18,50 +20,52 @@ const skuFromName = (name: string) => name.replace(/\.[^.]+$/, '').replace(/[_\s
 const loadImg = (src: string) => new Promise<HTMLImageElement>((res, rej) => {
   const img = new Image(); img.onload = () => res(img); img.onerror = () => rej(new Error('Could not load image')); img.src = src;
 });
-// Phone photos are 3–8 MB; a 1400 px long edge is plenty for a 400 px tile
-// and keeps forty of them in memory at once.
-const decodeTile = async (file: File): Promise<IndexSource> => {
-  const bmp = await createImageBitmap(file);
-  const scale = Math.min(1, 1400 / Math.max(bmp.width, bmp.height));
-  if (scale === 1) return bmp;
-  const c = document.createElement('canvas');
-  c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
-  c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
-  bmp.close();
-  return c;
-};
+const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export default function IndexMaker({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const [tiles, setTiles] = useState<DraftTile[]>([]);
   const [title, setTitle] = useState('');
-  const [theme, setTheme] = useState<IndexTheme>('olive');
+  const [mood, setMood] = useState<IndexMood>('dark');
   const [layout, setLayout] = useState<IndexLayout>('landscape');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState('');
   const [result, setResult] = useState<{ url: string; blob: Blob } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scriptFont = useScriptFont();
-
-  useEffect(() => () => { tiles.forEach(t => URL.revokeObjectURL(t.url)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Thumbnails are object URLs: revoke on remove and on unmount.
+  const thumbs = useRef(new Map<string, string>());
+  useEffect(() => () => { thumbs.current.forEach(u => URL.revokeObjectURL(u)); }, []);
   useEffect(() => () => { if (result) URL.revokeObjectURL(result.url); }, [result]);
 
   const addFiles = (list: FileList | File[]) => {
     const files = Array.from(list).filter(f => f.type.startsWith('image/'));
     if (files.length === 0) { addToast('Pick image files', 'error'); return; }
+    let added: DraftTile[] = [];
     setTiles(prev => {
       const room = INDEX_MAX_TILES - prev.length;
       if (room <= 0) { addToast(`An index holds up to ${INDEX_MAX_TILES} photos`, 'error'); return prev; }
       if (files.length > room) addToast(`Only the first ${room} photos were added — an index holds up to ${INDEX_MAX_TILES}`, 'info');
-      const next = files.slice(0, room).map(f => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, file: f, url: URL.createObjectURL(f), sku: skuFromName(f.name) }));
-      return [...prev, ...next];
+      added = files.slice(0, room).map(f => ({ id: newId(), file: f, sku: skuFromName(f.name), thumb: null, w: 0, h: 0 }));
+      return [...prev, ...added];
     });
     setResult(null);
+    // Thumbnails three at a time; each card fills in as its photo is read.
+    mapLimit(added, 3, async t => {
+      try {
+        const m = await makeThumb(t.file);
+        thumbs.current.set(t.id, m.thumb);
+        setTiles(prev => prev.some(x => x.id === t.id) ? prev.map(x => (x.id === t.id ? { ...x, ...m } : x)) : (URL.revokeObjectURL(m.thumb), prev));
+      } catch { addToast(`Could not read ${t.file.name}`, 'error'); setTiles(prev => prev.filter(x => x.id !== t.id)); }
+    });
   };
-  const patch = (id: string, sku: string) => { setTiles(prev => prev.map(t => (t.id === id ? { ...t, sku } : t))); setResult(null); };
-  const move = (i: number, dir: -1 | 1) => {
+  const onSku = useCallback((id: string, sku: string) => { setTiles(prev => prev.map(t => (t.id === id ? { ...t, sku } : t))); setResult(null); }, []);
+  const onMove = useCallback((i: number, dir: -1 | 1) => {
     setTiles(prev => { const j = i + dir; if (j < 0 || j >= prev.length) return prev; const n = prev.slice(); [n[i], n[j]] = [n[j], n[i]]; return n; });
     setResult(null);
-  };
-  const remove = (id: string) => { setTiles(prev => { const t = prev.find(x => x.id === id); if (t) URL.revokeObjectURL(t.url); return prev.filter(x => x.id !== id); }); setResult(null); };
+  }, []);
+  const onRemove = useCallback((id: string) => {
+    const u = thumbs.current.get(id); if (u) { URL.revokeObjectURL(u); thumbs.current.delete(id); }
+    setTiles(prev => prev.filter(x => x.id !== id)); setResult(null);
+  }, []);
   const sortBySku = () => { setTiles(prev => prev.slice().sort((a, b) => a.sku.localeCompare(b.sku, undefined, { numeric: true }))); setResult(null); };
 
   const dupes = useMemo(() => {
@@ -70,24 +74,27 @@ export default function IndexMaker({ addToast }: { addToast: (m: string, t?: str
     return new Set([...seen.entries()].filter(([, n]) => n > 1).map(([k]) => k));
   }, [tiles]);
   const missing = tiles.filter(t => !t.sku.trim()).length;
-  const ready = tiles.length > 0 && missing === 0 && !busy;
+  const reading = tiles.filter(t => !t.thumb).length;
+  const ready = tiles.length > 0 && missing === 0 && reading === 0 && !busy;
   const geo = indexGeometry(Math.max(1, tiles.length), layout, !!title.trim());
 
   const generate = async () => {
     if (!ready) return;
-    setBusy(true);
+    setBusy('Preparing photos…');
     try {
       const logoImg = await loadImg('/arya-designs-logo.png').catch(() => null);
       if (!logoImg) addToast('Logo image failed to load — index generated without it', 'info');
-      const imgs = await Promise.all(tiles.map(t => decodeTile(t.file)));
+      const imgs = await mapLimit(tiles, 4, t => decodeForRender(t.file, t.w, t.h), done => setBusy(`Preparing photo ${done} of ${tiles.length}…`));
+      setBusy('Drawing…');
+      await new Promise(r => setTimeout(r, 0)); // let the label paint before the synchronous draw
       const canvas = document.createElement('canvas');
-      renderIndex(canvas, { tiles: tiles.map((t, i) => ({ img: imgs[i], sku: t.sku })), title, theme, layout, logoImg, scriptFont });
+      renderIndex(canvas, { tiles: tiles.map((t, i) => ({ img: imgs[i], sku: t.sku })), title, mood, layout, logoImg, scriptFont });
       imgs.forEach(im => { if ('close' in im) im.close(); });
       const blob = await new Promise<Blob>((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('Could not create the image')), 'image/jpeg', 0.92));
       setResult(prev => { if (prev) URL.revokeObjectURL(prev.url); return { url: URL.createObjectURL(blob), blob }; });
       addToast('Index ready', 'success');
     } catch (e) { addToast(friendlyError(e), 'error'); }
-    setBusy(false);
+    setBusy('');
   };
 
   const seg = <V extends string>(value: V, opts: [V, string][], onPick: (v: V) => void) => (
@@ -115,30 +122,30 @@ export default function IndexMaker({ addToast }: { addToast: (m: string, t?: str
             <input value={title} onChange={e => { setTitle(e.target.value); setResult(null); }} placeholder="e.g. Tehzeeb" style={{ ...S.fInput, width: '100%' }} />
           </div>
           <div><label style={S.fLabel}>Layout</label>{seg(layout, [['landscape', 'Landscape'], ['portrait', 'Portrait']], setLayout)}</div>
-          <div><label style={S.fLabel}>Background</label>{seg(theme, (Object.keys(INDEX_THEMES) as IndexTheme[]).map(k => [k, INDEX_THEMES[k].label]), setTheme)}</div>
+          <div><label style={S.fLabel}>Mood</label>{seg(mood, (Object.keys(INDEX_MOODS) as IndexMood[]).map(k => [k, INDEX_MOODS[k].label]), setMood)}</div>
         </div>
+        <div style={{ fontSize: 10, color: T.tx3, marginTop: -6, marginBottom: 12 }}>The backdrop is blended from the photos themselves, so every index takes its collection's colour.</div>
 
         {tiles.length > 0 && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{geo.cols} × {geo.rows} grid · {geo.W}×{geo.H} px</span>
+              <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{geo.cols} × {geo.rows} grid · {geo.W}×{geo.H} px{reading > 0 ? ` · reading ${reading}…` : ''}</span>
               <button type="button" onClick={sortBySku} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>Sort by SKU</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(128px, 1fr))', gap: 8, marginBottom: 12 }}>
               {tiles.map((t, i) => (
-                <IndexTile key={t.id} tile={t} index={i} count={tiles.length} duplicate={dupes.has(t.sku.trim().toUpperCase())}
-                  onSku={v => patch(t.id, v)} onMove={d => move(i, d)} onRemove={() => remove(t.id)} />
+                <IndexTile key={t.id} tile={t} index={i} count={tiles.length} duplicate={dupes.has(t.sku.trim().toUpperCase())} onSku={onSku} onMove={onMove} onRemove={onRemove} />
               ))}
             </div>
           </>
         )}
 
         <button onClick={generate} disabled={!ready} style={{ ...S.btnPrimary, width: '100%', justifyContent: 'center', pointerEvents: busy ? 'none' : 'auto', opacity: ready ? 1 : 0.5 }}>
-          {busy ? 'Generating…' : 'Generate Index'}
+          {busy || 'Generate Index'}
         </button>
         {!ready && !busy && (
           <div style={{ fontSize: 10, color: T.tx3, marginTop: 6, textAlign: 'center', lineHeight: 1.5 }}>
-            To enable: {[tiles.length === 0 && 'add at least one photo', missing > 0 && `type the SKU on ${missing} photo${missing === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}
+            To enable: {[tiles.length === 0 && 'add at least one photo', missing > 0 && `type the SKU on ${missing} photo${missing === 1 ? '' : 's'}`, reading > 0 && 'wait for the photos to finish reading'].filter(Boolean).join(' · ')}
           </div>
         )}
         {ready && dupes.size > 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 6, textAlign: 'center' }}>Repeated SKU{dupes.size === 1 ? '' : 's'}: {[...dupes].join(', ')} — the index will still generate</div>}
