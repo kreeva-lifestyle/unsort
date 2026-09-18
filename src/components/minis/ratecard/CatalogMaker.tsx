@@ -19,7 +19,7 @@ import { useCatalogPhotos } from './useCatalogPhotos';
 import CatalogTile from './CatalogTile';
 import CatalogResults from './CatalogResults';
 import type { PageResult } from './CatalogResults';
-import { useScriptFont } from './useScriptFont';
+import { useScriptFont, useDisplayFont } from './useScriptFont';
 
 type Output = 'index' | 'pages';
 const loadImg = (src: string) => new Promise<HTMLImageElement>((res, rej) => {
@@ -39,6 +39,7 @@ export default function CatalogMaker({ addToast }: { addToast: (m: string, t?: s
   const { tiles } = photos;
   const fileRef = useRef<HTMLInputElement>(null);
   const scriptFont = useScriptFont();
+  const displayFont = useDisplayFont();
   useEffect(() => () => { pages.forEach(p => URL.revokeObjectURL(p.url)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ready = tiles.length > 0 && photos.missing === 0 && photos.reading === 0 && !busy;
@@ -73,7 +74,7 @@ export default function CatalogMaker({ addToast }: { addToast: (m: string, t?: s
           const slice = tiles.slice(i, i + PER_PAGE);
           const imgs = await Promise.all(slice.map(t => decodeForRender(t.file, t.w, t.h, PAGE_H)));
           const canvas = document.createElement('canvas');
-          renderPage(canvas, slice.map((t, j) => ({ img: imgs[j], sku: t.sku })), { title, logoImg, scriptFont });
+          renderPage(canvas, slice.map((t, j) => ({ img: imgs[j], sku: t.sku })), { title, logoImg, scriptFont, displayFont });
           release(imgs);
           out.push(await toBlob(canvas).then(blob => ({ url: URL.createObjectURL(blob), blob })));
         }
