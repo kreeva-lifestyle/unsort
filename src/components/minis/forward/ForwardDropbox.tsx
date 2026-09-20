@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import { T, S, Icon } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { useAuth } from '../../../hooks/useAuth';
+import { useBackClose } from '../../../hooks/useBackClose';
 import { call } from '../dropboxlinks/api';
 import { captureFrame, rotate90, Compressed } from './compressImage';
 import FwdSettings from './FwdSettings';
@@ -110,6 +111,11 @@ export default function ForwardDropbox({ addToast, onBack }: { addToast: (m: str
     return () => stopCam();
   }, [mobile, mode, showSettings, showReconnect, startCam, stopCam]);
   useEffect(() => () => clearTimeout(focusTimer.current), []);
+  // Each sheet over the camera owns a history entry: device Back = Retake /
+  // close the sheet, one level at a time, never straight out of the tool.
+  useBackClose(mode === 'review', () => { setPending(null); setMode('camera'); });
+  useBackClose(showSettings, () => setShowSettings(false));
+  useBackClose(showReconnect, () => setShowReconnect(false));
   // Admins may need to reconnect Dropbox — fetch the public OAuth app key for
   // the reconnect card's authorize link. Re-tried when the sheet opens so one
   // transient failure at mount doesn't leave the card stuck on "Loading…".
