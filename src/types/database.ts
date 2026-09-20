@@ -32,6 +32,8 @@ export interface Profile {
   cash_pin: string | null;
   phone: string | null;
   module_access: Record<string, boolean> | null;
+  /** Dashboard quick-access shortcut ids, the user's own (see lib/shortcuts.ts). Not in the auth profile select. */
+  quick_chips?: string[];
   // PIN brute-force tracking — written only by the verify_own_pin RPC
   // (SECURITY DEFINER); not client-readable, present here for completeness.
   pin_failed_attempts: number;

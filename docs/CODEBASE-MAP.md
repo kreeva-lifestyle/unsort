@@ -153,7 +153,8 @@ marked (G).
 #### Dashboard
 | Path | Lines | Purpose | Touches |
 |---|---|---|---|
-| `pages/Dashboard.tsx` | 385 | KPI hero, alerts, 7-day scan / 30-day revenue bars, breakdown, top outstanding customers, Notes | RPC `dashboard_summary(p_month_start, p_today, p_week_ago)`; `tasks` select/insert/update/delete; channel `dash-sync` on `inventory_items`, `cash_challans`, `tasks` (no filter); sessionStorage `challan_search` (deep link into Cash Challan) |
+| `components/dashboard/QuickChips.tsx`, `QuickChipsPicker.tsx`, `lib/shortcuts.ts` | 78, 76, 49 | Quick-access strip: the user's own pinned shortcuts to module tabs and Minis tools (catalogue from `TAB_IDS` + `MINI_TILES`, filtered by `canAccessTab` on every render, max 12, role defaults until customised; Edit = remove / reorder; picker with search). Minis tools open via sessionStorage `minis_open`, read once by the hub (`takePendingMini`) | `profiles.quick_chips` select/update (own row, column grant; migration `20260920100000`) |
+| `pages/Dashboard.tsx` | 387 | Quick-access strip, KPI hero, alerts, 7-day scan / 30-day revenue bars, breakdown, top outstanding customers, Notes | RPC `dashboard_summary(p_month_start, p_today, p_week_ago)`; `tasks` select/insert/update/delete; channel `dash-sync` on `inventory_items`, `cash_challans`, `tasks` (no filter); sessionStorage `challan_search` (deep link into Cash Challan) |
 
 #### Inventory (+ Spare Parts) and Brand Tags
 | Path | Lines | Purpose | Touches |

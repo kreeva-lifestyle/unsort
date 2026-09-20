@@ -9,6 +9,7 @@ import { friendlyError } from '../lib/friendlyError';
 import ConfirmModal, { useConfirm } from '../components/ui/ConfirmModal';
 import CountUp from '../components/ui/CountUp';
 import Skeleton from '../components/ui/Skeleton';
+import QuickChips from '../components/dashboard/QuickChips';
 
 type OverdueAlert = { name: string; amount: number; days: number };
 type DryCleanAlert = { days: number };
@@ -145,6 +146,7 @@ export default function Dashboard({ navigateTo, active }: { navigateTo?: (tab: s
           <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 2, animation: refreshing ? 'spin 1s linear infinite' : 'none' }}><path d="M23 4v6h-6M1 20v-6h6" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" /></svg>
         </button>
       </div>
+      <QuickChips navigateTo={navigateTo} />
 
       {/* Row 1a: Today's Revenue — hero card (audit P1: the one number that matters) */}
       <div
