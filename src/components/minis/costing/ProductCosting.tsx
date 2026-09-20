@@ -7,7 +7,7 @@ import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { CostingProduct, blankComponent, totalCost, money, buildLibrary } from './costingModel';
-import { withTemplates } from './costingTemplates';
+import { withTemplates, withCommonTemplates, type CommonSubsMap } from './costingTemplates';
 import CostingEditor from './CostingEditor';
 import { SubPreset } from './SubChips';
 import AskBox from './AskBox';
@@ -19,6 +19,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
   // Cron-ranked most-repeated sub names (app_settings.costing_top_subs,
   // recounted every 4 days) — the editor shows them as one-tap chips.
   const [topSubs, setTopSubs] = useState<string[]>([]);
+  const [commonSubs, setCommonSubs] = useState<CommonSubsMap | null>(null);
   // Whether the open costing already exists in the DB - a new or duplicated
   // one has nothing to delete, so the editor hides its Delete button.
   const [editingSaved, setEditingSaved] = useState(false);
@@ -31,9 +32,14 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
         if (error) { addToast(friendlyError(error), 'error'); setList([]); return; }
         setList((data ?? []) as CostingProduct[]);
       });
-    supabase.from('app_settings').select('value').eq('key', 'costing_top_subs').maybeSingle()
+    // Both cron-built helpers in one read: top sub chips, and the lines
+    // common to each main component (app_settings.costing_common_subs).
+    supabase.from('app_settings').select('key, value').in('key', ['costing_top_subs', 'costing_common_subs'])
       .then(({ data }) => {
-        if (Array.isArray(data?.value)) setTopSubs((data.value as unknown[]).map(String));
+        for (const row of (data as { key: string; value: unknown }[] | null) || []) {
+          if (row.key === 'costing_top_subs' && Array.isArray(row.value)) setTopSubs((row.value as unknown[]).map(String));
+          if (row.key === 'costing_common_subs' && row.value && typeof row.value === 'object') setCommonSubs(row.value as CommonSubsMap);
+        }
       });
   };
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -63,7 +69,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
   if (editing) {
     // Everything typed on ANY sheet, offered back as dropdown suggestions —
     // one spelling per supplier keeps the purchase plan grouped correctly.
-    const library = withTemplates(buildLibrary(list ?? []), list ?? []);
+    const library = withCommonTemplates(withTemplates(buildLibrary(list ?? []), list ?? []), commonSubs);
     return (
       <CostingEditor product={editing} saved={editingSaved} library={library} topSubs={presets} addToast={addToast}
         onBack={() => { setEditing(null); load(); }}

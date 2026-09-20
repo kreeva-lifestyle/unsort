@@ -34,7 +34,7 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
   const isBlank = (s: ReturnType<typeof blankSub>) => !s.name.trim() && !String(s.qty).trim() && s.suppliers.every(x => !x.name.trim() && !String(x.rate).trim());
   const fresh = comp.subs.every(isBlank);
   const named = templateFor(library, comp.name);
-  const applyTemplate = (t: ComponentTemplate) => { onChange({ name: t.name, subs: t.subs.map(cloneSub) }); setCopiedFrom(t.sku); };
+  const applyTemplate = (t: ComponentTemplate) => { onChange({ name: t.name, subs: t.subs.map(cloneSub) }); setCopiedFrom(t.source === 'common' ? `${t.sheets} sheets (latest rates)` : t.sku); };
   const chip = (active: boolean): React.CSSProperties => ({ ...S.btnGhost, ...S.btnSm, minHeight: 32, padding: '5px 12px', fontSize: 11, borderRadius: 999, ...(active ? { borderColor: T.ac3, color: T.ac2, background: T.ac3 } : {}) });
 
   const patchSub = (i: number, next: ReturnType<typeof blankSub>) => {
@@ -65,11 +65,13 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
           {fresh && (library.templates?.length ?? 0) > 0 && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }} data-fx={`cost-tpl-${idx}`}>
               {named ? (
-                <button onClick={() => applyTemplate(named)} style={chip(true)}>+ Add the usual {named.subs.length} line{named.subs.length === 1 ? '' : 's'} from {named.sku}</button>
+                <button onClick={() => applyTemplate(named)} style={chip(true)}>
+                  + Add the {named.subs.length} line{named.subs.length === 1 ? '' : 's'} {named.source === 'common' ? `common to your ${named.sheets} ${named.name} sheets` : `from ${named.sku}`}
+                </button>
               ) : (<>
                 <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Start from</span>
                 {library.templates!.slice(0, 8).map(t => (
-                  <button key={t.name} onClick={() => applyTemplate(t)} title={`${t.subs.length} lines from ${t.sku}`} style={chip(false)}>{t.name}</button>
+                  <button key={t.name} onClick={() => applyTemplate(t)} title={t.source === 'common' ? `${t.subs.length} lines common to ${t.sheets} sheets` : `${t.subs.length} lines from ${t.sku}`} style={chip(false)}>{t.name}</button>
                 ))}
               </>)}
             </div>
@@ -106,7 +108,7 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
             );
           })}
 
-          {copiedFrom && <div style={{ fontSize: 10, color: T.yl, padding: '6px 10px 2px' }}>usual lines copied from {copiedFrom} · check quantities and rates</div>}
+          {copiedFrom && <div style={{ fontSize: 10, color: T.yl, padding: '6px 10px 2px' }}>lines added from {copiedFrom} · check quantities and rates</div>}
           <div style={{ borderTop: comp.subs.length ? `1px solid ${T.bd}` : 'none', paddingTop: comp.subs.length ? 4 : 0 }}>
             <SubChips presets={topSubs} comp={comp} onAdd={s => addLine(s)} disabled={!comp.name.trim()} />
             <button onClick={() => addLine()} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, marginTop: 8, borderStyle: 'dashed' }}>+ Add line</button>
