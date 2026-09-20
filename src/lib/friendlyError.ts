@@ -36,6 +36,7 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   if (l.includes('chk_po_type')) return 'Invalid purchase order type — choose Fabric, Job Work, or Material.';
   if (l.includes('approved purchase orders cannot be edited')) return 'This purchase order is approved and can no longer be edited — cancel it and create a new one.';
   if (l.includes('fabric item needs a fabric code')) return 'Every fabric item needs a fabric code.';
+  if (l.includes('for how many pcs is required')) return 'For how many pcs is required — a whole number above 0.';
   if (l.includes('at least one item') || l.includes('item_name')) return 'Add at least one item with a name and quantity.';
   if (code === '23514' || l.includes('check constraint')) return 'One of the values is outside the allowed range.';
   if (code === '23502' || l.includes('not null')) return 'A required field is missing.';

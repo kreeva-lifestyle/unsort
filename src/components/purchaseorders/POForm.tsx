@@ -125,8 +125,10 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
     if (discountType === 'percentage' && num(discountValue) > 100) { setError('Discount cannot exceed 100%'); return; }
     if (discountType === 'flat' && num(discountValue) > subtotal) { setError('Discount cannot exceed the subtotal'); return; }
     if (num(taxPercent) > 100) { setError('Tax % cannot exceed 100'); return; }
-    const pieces = forPieces.trim() ? Number(forPieces) : null;
-    if (pieces !== null && (!Number.isInteger(pieces) || pieces <= 0)) { setError('For how many pcs must be a whole number greater than 0'); return; }
+    // Owner's rule: compulsory, digits only (the input already strips anything else).
+    if (!forPieces.trim()) { setError('For how many pcs is required'); return; }
+    const pieces = Number(forPieces);
+    if (!Number.isInteger(pieces) || pieces <= 0) { setError('For how many pcs must be a whole number greater than 0'); return; }
     setSaving(true);
     try {
       const p_po = {
@@ -199,9 +201,9 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
               <input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="e.g. 30 days" style={S.fInput} />
             </div>
             <div>
-              <label style={S.fLabel}>For how many pcs?</label>
-              <input value={forPieces} onChange={e => setForPieces(e.target.value)} onKeyDown={e => numericKeyDown(e)} inputMode="numeric" placeholder="e.g. 120" aria-label="For how many pieces"
-                style={{ ...S.fInput, fontFamily: T.mono }} />
+              <label style={S.fLabel}>For how many pcs? *</label>
+              <input value={forPieces} onChange={e => setForPieces(e.target.value.replace(/\D/g, ''))} onKeyDown={e => numericKeyDown(e)} inputMode="numeric" placeholder="e.g. 120" aria-label="For how many pieces" required
+                style={{ ...S.fInput, fontFamily: T.mono, borderColor: error && !forPieces.trim() ? 'oklch(0.63 0.22 25 / .5)' : undefined }} />
               <div style={{ fontSize: 10, color: T.tx3, marginTop: 3 }}>not shown on the shared or printed PO</div>
             </div>
           </div>
