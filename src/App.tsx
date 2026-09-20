@@ -83,7 +83,8 @@ import { NotificationProvider, useNotifications } from './hooks/useNotifications
 import { BreadcrumbProvider } from './hooks/useBreadcrumb';
 import { closeAllLayers, closeTopLayer, useBackClose } from './hooks/useBackClose';
 
-import { TAB_IDS, canAccessTab, getFirstAllowedTab } from './lib/tabs';
+import { TAB_IDS, canAccessTab, canSeeDashboardData, getFirstAllowedTab } from './lib/tabs';
+import HomeLite from './components/dashboard/HomeLite';
 import { initGlobalPrintMode } from './lib/printQueue';
 import { logError } from './lib/errorLogger';
 import { useViewportRestore } from './hooks/useViewportRestore';
@@ -245,7 +246,7 @@ const MainApp = () => {
       <HeaderComponent title={titles[tab]} onNotifClick={handleNotifClick} notifications={notifications} markAsRead={markAsRead} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(o => !o)} />
       <main ref={mainRef} style={{ flex: 1, overflow: 'auto' }}>
         <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}><div className="spinner" /></div>}>
-        {mounted.has('dashboard') && checkTab('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard navigateTo={setTab} active={tab === 'dashboard'} /></div>}
+        {mounted.has('dashboard') && <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}>{canSeeDashboardData(profile?.role, profile?.module_access) ? <Dashboard navigateTo={setTab} active={tab === 'dashboard'} /> : <HomeLite navigateTo={setTab} />}</div>}
         {mounted.has('inventory') && checkTab('inventory') && <div style={{ display: tab === 'inventory' ? 'block' : 'none' }}><Inventory openItemId={notifItemId} onItemOpened={() => setNotifItemId(null)} active={tab === 'inventory'} /></div>}
         {mounted.has('brandtag') && checkTab('brandtag') && <div style={{ display: tab === 'brandtag' ? 'block' : 'none' }}><BrandTagPrinter /></div>}
         {mounted.has('packtime') && checkTab('packtime') && <div style={{ display: tab === 'packtime' ? 'block' : 'none' }}><PackTime active={tab === 'packtime'} /></div>}

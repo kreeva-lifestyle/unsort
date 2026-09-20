@@ -6,7 +6,7 @@ const TAB_TO_MODULE: Record<string, string> = {
 };
 
 export const MODULE_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard', inventory: 'Inventory', extras: 'Spare Parts',
+  dashboard: 'Dashboard data', inventory: 'Inventory', extras: 'Spare Parts',
   packtime: 'PackStation', brandtag: 'Brand Tags', challan: 'Cash Challan',
   cashbook: 'Cash Book', purchaseorders: 'Purchase Orders', listingai: 'Listing AI', attendance: 'Attendance', programs: 'Programs', minis: 'Minis', printstation: 'Print Station',
 };
@@ -29,9 +29,15 @@ export const canAccessModule = (role: string | null | undefined, key: string, mo
   return !(moduleAccess && moduleAccess[key] === false);
 };
 
+// The admin's "Dashboard" toggle governs the dashboard DATA (revenue, alerts,
+// trends). The Home tab itself is always reachable: without the data it
+// shows only the greeting and the user's quick-access chips (HomeLite).
+export const canSeeDashboardData = (role: string | null | undefined, moduleAccess?: Record<string, boolean> | null): boolean =>
+  !!role && canAccessModule(role, 'dashboard', moduleAccess);
+
 export const canAccessTab = (role: string | null | undefined, tab: string, moduleAccess?: Record<string, boolean> | null): boolean => {
   if (!role) return tab === 'dashboard';
-  if (tab === 'settings') return true;
+  if (tab === 'settings' || tab === 'dashboard') return true;
   if (role === 'admin') return true;
   const modKey = TAB_TO_MODULE[tab];
   if (modKey && moduleAccess && moduleAccess[modKey] === false) return false;

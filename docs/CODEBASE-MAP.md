@@ -83,7 +83,7 @@ marked (G).
 |---|---|---|---|---|
 | `lib/theme.tsx` | 409 | Design tokens `T` (OKLCH), style recipes `S`, `alpha()`, `oklchTint()`, `Pill`, `Icon` (22 stroke icons), `CHALLAN_STATUS_COLORS`, `PO_STATUS_COLORS` | `T, S, alpha, oklchTint, Pill, Icon, …` | none |
 | `lib/supabase.ts` | 7 | Supabase client; the only place the anon key lives | `supabase, SUPABASE_ANON_KEY` | — |
-| `lib/tabs.ts` | 44 | Tab ids, module labels, role/`module_access` gating | `TAB_IDS, MODULE_LABELS, ALL_MODULE_KEYS, canAccessTab, canAccessModule, getFirstAllowedTab` | reads `profiles.role` / `module_access` passed in |
+| `lib/tabs.ts` | 50 | Tab ids, module labels, role/`module_access` gating. The Home tab (`dashboard`) is always reachable; the admin's "Dashboard data" toggle gates the numbers via `canSeeDashboardData` (App mounts `Dashboard` or `HomeLite`) | `TAB_IDS, MODULE_LABELS, ALL_MODULE_KEYS, canAccessTab, canAccessModule, canSeeDashboardData, getFirstAllowedTab` | reads `profiles.role` / `module_access` passed in |
 | `lib/friendlyError.ts` | 64 | Maps Postgres/GoTrue/network errors to human copy; `console.error`s the raw message | `friendlyError` | — |
 | `lib/printQueue.ts` | 202 | Global print mode (`app_settings.print_mode` ↔ `localStorage.print_mode`), `printOrQueue` (cloud → `print_queue` insert + per-job watcher; default → iframe print), `browserPrint` | `getPrintMode, setPrintMode, initGlobalPrintMode, submitPrintJob, printOrQueue` | `app_settings` select/upsert (`print_mode`, `print_station_heartbeat`); `print_queue` insert/select; channels `app-settings-print-mode` (filter `key=eq.print_mode`) and `print-job-<id>` (filter `id=eq.<id>`) |
 | `lib/qzPrint.ts` | 153 | Lazy-loaded QZ Tray wrapper: pinned certificate, remote SHA-512 signing via `sign-qz`, slot→printer map, `printHtml` | `connect, disconnect, isConnected, listPrinters, getSlotPrinter, setSlotPrinter, printHtml, friendlyPrintError, SLOT_LABELS, PageSize` | edge `sign-qz` (raw fetch); localStorage `qz_printer_label_small/label_large/document` |
@@ -153,6 +153,7 @@ marked (G).
 #### Dashboard
 | Path | Lines | Purpose | Touches |
 |---|---|---|---|
+| `components/dashboard/HomeLite.tsx` | 22 | Home for a user without dashboard data: greeting + quick-access chips, nothing fetched | — |
 | `components/dashboard/QuickChips.tsx`, `QuickChipsPicker.tsx`, `lib/shortcuts.ts` | 78, 76, 49 | Quick-access strip: the user's own pinned shortcuts to module tabs and Minis tools (catalogue from `TAB_IDS` + `MINI_TILES`, filtered by `canAccessTab` on every render, max 12, role defaults until customised; Edit = remove / reorder; picker with search). Minis tools open via sessionStorage `minis_open`, read once by the hub (`takePendingMini`) | `profiles.quick_chips` select/update (own row, column grant; migration `20260920100000`) |
 | `pages/Dashboard.tsx` | 387 | Quick-access strip, KPI hero, alerts, 7-day scan / 30-day revenue bars, breakdown, top outstanding customers, Notes | RPC `dashboard_summary(p_month_start, p_today, p_week_ago)`; `tasks` select/insert/update/delete; channel `dash-sync` on `inventory_items`, `cash_challans`, `tasks` (no filter); sessionStorage `challan_search` (deep link into Cash Challan) |
 
