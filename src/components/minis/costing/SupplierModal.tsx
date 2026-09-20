@@ -26,16 +26,12 @@ export default function SupplierModal({ subName, suppliers, known, onDone, onClo
 
   const patch = (i: number, p: Partial<CostingSupplier>) =>
     setRows(prev => prev.map((r, j) => (j === i ? { ...r, ...p } : r)));
-  // TAPPING a known supplier from the suggestions autofills its last-used
-  // material code into a still-empty field. The rate is NEVER pre-filled
-  // (owner's call: rates change, a stale one silently priced the sheet).
-  const pickName = (i: number, name: string) => {
-    const k = known.find(x => x.name.toUpperCase() === name.trim().toUpperCase());
-    setRows(prev => prev.map((r, j) => (j === i ? {
-      ...r, name,
-      materialCode: r.materialCode.trim() ? r.materialCode : (k?.materialCode ?? r.materialCode),
-    } : r)));
-  };
+  // TAPPING a known supplier from the suggestions fills the name only. The
+  // material code is NEVER pre-filled (owner's rule: it is per design, so
+  // every auto-suggest leaves it blank), and neither is the rate (rates
+  // change; a stale one once silently priced the sheet).
+  const pickName = (i: number, name: string) =>
+    setRows(prev => prev.map((r, j) => (j === i ? { ...r, name } : r)));
   const select = (i: number) =>
     setRows(prev => prev.map((r, j) => ({ ...r, selected: j === i })));
   const remove = (i: number) =>

@@ -21,10 +21,12 @@ export interface SubPreset { unit: string; qty: string; sku: string; suppliers: 
 const key = (s: string) => s.trim().toUpperCase();
 
 /** Deep copy — the suppliers array included — so a template line never
- *  shares references with the sheet it came from. */
+ *  shares references with the sheet it came from. Auto-filled lines never
+ *  carry a material code (owner's rule): the code is per design, so it is
+ *  left blank for the user to type; supplier, unit and rate come through. */
 export const cloneSub = (s: CostingSub): CostingSub => ({
   name: s.name, qty: s.qty, unit: s.unit,
-  suppliers: s.suppliers.map(x => ({ ...x })),
+  suppliers: s.suppliers.map(x => ({ ...x, materialCode: '' })),
 });
 
 /** Templates and presets from every saved sheet. `products` must be newest
@@ -44,7 +46,7 @@ export function withTemplates(lib: CostingLibrary, products: CostingProduct[]): 
       }
       for (const s of lines) {
         const sk = key(s.name);
-        if (!presets[sk]) presets[sk] = { unit: s.unit, qty: String(s.qty ?? ''), sku: p.sku, suppliers: s.suppliers.filter(x => x.name.trim()).map(x => ({ ...x })) };
+        if (!presets[sk]) presets[sk] = { unit: s.unit, qty: String(s.qty ?? ''), sku: p.sku, suppliers: s.suppliers.filter(x => x.name.trim()).map(x => ({ ...x, materialCode: '' })) };
       }
     }
   }
@@ -60,7 +62,7 @@ export function withCommonTemplates(lib: CostingLibrary, common: CommonSubsMap |
   const templates = lib.templates.map(t => {
     const c = common[key(t.name)];
     if (!c || c.sheets < 2 || !Array.isArray(c.subs) || c.subs.length === 0) return t;
-    const subs: CostingSub[] = c.subs.map(s => ({ name: s.name, qty: String(s.qty ?? ''), unit: s.unit || '', suppliers: (s.suppliers || []).map(x => ({ ...x })) }));
+    const subs: CostingSub[] = c.subs.map(s => ({ name: s.name, qty: String(s.qty ?? ''), unit: s.unit || '', suppliers: (s.suppliers || []).map(x => ({ ...x, materialCode: '' })) }));
     return { ...t, subs, source: 'common' as const, sheets: c.sheets, uses: Math.max(t.uses, c.sheets) };
   });
   return { ...lib, templates: templates.sort((a, b) => b.uses - a.uses || a.name.localeCompare(b.name)) };

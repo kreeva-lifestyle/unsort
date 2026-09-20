@@ -44,15 +44,16 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
   };
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A chip carries the WHOLE line: the newest sheet using that sub donates
-  // its unit and suppliers with material codes and rates (owner's call —
-  // chips alone auto-fill the price; only the qty is left to type).
+  // A chip carries the line: the newest sheet using that sub donates its
+  // unit and suppliers with rates (owner's call — chips auto-fill the
+  // price; qty is left to type). The material code is NOT carried: it is
+  // per design, so it stays blank for the user (owner's rule).
   const presets: SubPreset[] = topSubs.map(n => {
     for (const p of list ?? []) for (const c of p.components) for (const s of c.subs) {
       if (s.name.trim().toUpperCase() === n.toUpperCase()) {
         return { name: s.name.trim(), unit: s.unit,
           suppliers: s.suppliers.filter(x => x.name.trim()).map(x => ({
-            name: x.name.trim(), materialCode: x.materialCode.trim(), rate: x.rate, selected: !!x.selected })) };
+            name: x.name.trim(), materialCode: '', rate: x.rate, selected: !!x.selected })) };
       }
     }
     return { name: n, unit: '', suppliers: [] };
