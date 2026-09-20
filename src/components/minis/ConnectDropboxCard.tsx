@@ -40,7 +40,7 @@ export default function ConnectDropboxCard({ appKey, call, addToast, onConnected
     <div style={{ background: 'oklch(0.77 0.14 230 / .05)', border: '1px solid oklch(0.77 0.14 230 / .2)', borderRadius: 10, padding: 14, marginBottom: 12, maxWidth: 560 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: T.bl, marginBottom: 8 }}>Connect Dropbox (one-time, admin)</div>
       <ol style={{ margin: '0 0 10px 16px', padding: 0, fontSize: 11.5, color: T.tx2, lineHeight: 1.9 }}>
-        <li>{appKey ? <a href={authUrl(appKey)} target="_blank" rel="noreferrer" style={{ color: T.bl, fontWeight: 600 }}>Click here to open Dropbox</a> : <span style={{ color: T.tx3 }}>Loading…</span>} and press <b>Allow</b>.</li>
+        <li>{appKey ? <a href={authUrl(appKey)} target="_blank" rel="noreferrer" style={{ color: T.bl, fontWeight: 600 }}>Open Dropbox to authorise ↗</a> : <span style={{ color: T.tx3 }}>Loading…</span>} and press <b>Allow</b>.</li>
         <li>Dropbox will show an <b>access code</b> — copy it.</li>
         <li>Paste the code below and press Connect.</li>
       </ol>

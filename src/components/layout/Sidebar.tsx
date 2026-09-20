@@ -49,13 +49,18 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
       {/* Navigation */}
       <nav style={{ flex: 1, padding: '12px 10px' }}>
         {tabs.map((t) => (
-          <div key={t.id} onClick={() => setActiveTab(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', margin: '1px 0', cursor: 'pointer', background: activeTab === t.id ? T.ac3 : 'transparent', color: activeTab === t.id ? T.ac2 : T.tx3, fontSize: 13, fontWeight: activeTab === t.id ? 600 : 400, fontFamily: T.sans, borderRadius: 8, transition: 'all .18s ease', position: 'relative' }}
+          // A real link: keyboard-reachable, open-in-new-tab works, and the
+          // active page is announced. A plain click still goes through
+          // setActiveTab (closes open layers, pushes one history entry).
+          <a key={t.id} href={`#/${t.id}`} aria-current={activeTab === t.id ? 'page' : undefined}
+            onClick={e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); setActiveTab(t.id); }}
+            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', margin: '1px 0', cursor: 'pointer', textDecoration: 'none', background: activeTab === t.id ? T.ac3 : 'transparent', color: activeTab === t.id ? T.ac2 : T.tx3, fontSize: 13, fontWeight: activeTab === t.id ? 600 : 400, fontFamily: T.sans, borderRadius: 8, transition: 'all .18s ease', position: 'relative' }}
             onMouseEnter={e => { if (activeTab !== t.id) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = T.tx2; } }}
             onMouseLeave={e => { if (activeTab !== t.id) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx3; } }}>
             <Icon name={t.icon} size={18} />
             {t.label}
             {activeTab === t.id && <span style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: 4, height: 24, borderRadius: '0 4px 4px 0', background: `linear-gradient(180deg, ${T.ac}, ${T.ac2})`, boxShadow: `0 0 12px ${T.ac80}` }} />}
-          </div>
+          </a>
         ))}
       </nav>
 

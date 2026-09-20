@@ -12,6 +12,7 @@ import CostingEditor from './CostingEditor';
 import { SubPreset } from './SubChips';
 import AskBox from './AskBox';
 import { useBackClose } from '../../../hooks/useBackClose';
+import { useCrumb } from '../../../hooks/useBreadcrumb';
 
 export default function ProductCosting({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const [list, setList] = useState<CostingProduct[] | null>(null);
@@ -47,6 +48,8 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
   // The open sheet owns one history entry, so the device Back returns to
   // this list (same as the sheet's Back button) instead of closing the tool.
   useBackClose(!!editing, () => { setEditing(null); load(); });
+  // Header reads "Minis / Product Costing / FD-1" while a sheet is open.
+  useCrumb(editing ? (editing.sku || 'New costing') : null);
 
   // A chip carries the line: the newest sheet using that sub donates its
   // unit and suppliers with rates (owner's call — chips auto-fill the

@@ -113,7 +113,7 @@ marked (G).
 | `hooks/useModalLock.ts` | 17 | `body.modal-open` toggle, released only when no `.modal-inner` remains | DOM |
 | `hooks/useActiveRefetch.ts` | 60 | Throttled refetch only while the tab is active/visible; marks stale otherwise | DOM events |
 | `hooks/useViewportRestore.ts` | 93 | iOS standalone keyboard-shrink fix (display:none round-trip on `#root`) | DOM |
-| `hooks/useBreadcrumb.tsx` | 12 | Header breadcrumb context | — |
+| `hooks/useBreadcrumb.tsx` | 45 | Header breadcrumb context: `set(crumbs)` for a page's own trail + `useCrumb(label)` for one open sub-view (appended outer → inner, gone on close) | — |
 | `hooks/useDebouncedFetch.ts` | 29 | Debounced/flushable fetch wrapper | — |
 | `hooks/useUndoDelete.ts` | 60 | 5-s undoable delete (table per call); failure only `console.error` | dynamic `supabase.from(table).delete()` |
 | `hooks/useProductCatalog.ts` | 275 | Module-singleton SKU catalog (sorted index + Map), localStorage cache `unsort.product_catalog.v1` validated by fingerprint; `searchProducts/resolveSku/needsSize/variantSku` | `product_catalog` select (paged 1000, explicit cols; fingerprint `count:'exact'` + max `updated_at`) |
@@ -125,8 +125,8 @@ marked (G).
 | `App.tsx` | 339 | Error boundary (→ `logError`), chunk-reload guard, lazy pages via `retryImport`, hash routing (`#/<tab>`, public `#/s/<code>`, `#/share/program/<hex>`, `#/rc/<32hex>`, recovery hash), auth gate, keeps visited tabs mounted (`display:none`), mobile bottom nav (Home/Inventory/PackStation/Challan/More), per-tab scroll memory, global shortcuts (Esc, ⌘F, ⌘N), `InstallPrompt`, `initGlobalPrintMode` | localStorage `sidebarOpen`; sessionStorage `chunkReloadedAt`, `pwa-dismiss` |
 | `main.tsx` | 71 | Mount, global error handlers, SW registration + update overlay, iOS `:active` enabler, haptics | `navigator.serviceWorker` |
 | `index.css` | 578 | The only stylesheet: body/root frame (dvh + `translateZ(0)`), iOS input-zoom fix (16px), select chevron, date-input normalisation, animations, `--nav-h` bottom-nav geometry, `.page-pad`, `.modal-inner` bottom sheets, FAB, `.desktop-only/.mobile-only`, per-module mobile overrides (challan, attendance, inventory, minis, programs) | — |
-| `components/layout/Sidebar.tsx` | 74 | Desktop sidebar / mobile drawer; tab list filtered by `canAccessTab`; sign-out (clears `ccDraft`, reloads) | localStorage `ccDraft` |
-| `components/layout/Header.tsx` | 60 | Title + breadcrumb, sidebar toggle, notifications dropdown | — |
+| `components/layout/Sidebar.tsx` | 79 | Desktop sidebar / mobile drawer; tab list filtered by `canAccessTab`, each a real `<a href="#/tab" aria-current>` (plain click → `setActiveTab`, modifier click opens a tab); sign-out (clears `ccDraft`, reloads) | localStorage `ccDraft` |
+| `components/layout/Header.tsx` | 93 | `<nav aria-label="Breadcrumb">`: page title (tap = `closeAllLayers`, back to the page root) / middle crumbs (tap = `closeTopLayer`) / current (`aria-current`); sets `document.title` innermost-first; sidebar toggle, notifications dropdown | — |
 | `components/layout/ToastContainer.tsx` | 18 | Portalled toast strip (z 20000) | — |
 | `components/ui/ActionSheet.tsx` | 68 | Mobile row-action bottom sheet | portal, `useBackClose`, `useModalLock` |
 | `components/ui/AnchoredList.tsx` | 68 | Fixed-position portal dropdown under an input (flips above keyboard) | — |
@@ -530,7 +530,7 @@ Non-print exports: CSV via hand-built strings or `csvCell` (see §7.9), XLSX via
 | **`app_secrets`** (server-only) | `anthropic_api_key`, `listing_ai_model`, `dropbox_refresh_token`, `dropbox_app_key`, `dropbox_app_secret`, `dropbox_linkgen_roots`, `dropbox_root_<tab>`, `dropbox_fwd_folder`, `uploader_selftest_secret`, `client_finder_ping_secret`, `master_sync_secret`, `otp_push_secret` | edge functions with the service role; RLS has **0 policies** (nothing client-side can read it). Dropbox tokens never reach the browser; only the public OAuth `appKey` does. |
 | **`notifications`** | table + channel filtered by `user_id` | `useNotifications` (list, badge, toast on INSERT); inserted by `master-sync` spellfix; `type='pair_complete'` rows carry `entity_id` → Inventory opens that item |
 | **Toasts** | `useNotifications().addToast` | every page; passed as a prop into components |
-| **Breadcrumb** | `useBreadcrumb` | Inventory (Spare Parts), Cash Challan (Cash Book/Ledger/Analytics/#N), PackTime (Scan History), Minis (tool label), Settings (tab) |
+| **Breadcrumb** | `useBreadcrumb` / `useCrumb` | Inventory (Spare Parts), Cash Challan (Cash Book/Ledger/Analytics/#N), PackTime (Scan History), Minis (tool label), Settings (tab); `useCrumb`: Product Costing sheet (SKU), Purchase Orders detail (PO #N) |
 | **`print_queue`** | table | producers via `printOrQueue`; consumer `PrintStation`; admin view `PrinterSettings` |
 | **`master_sheet_*`** | mirror tables (admin/manager read; sync table any authenticated) | written only by `master-sync`; read by `listing-ai` (service role), `MasterFreshness` (client), `refresh_product_catalog()` |
 | **`product_catalog`** | derived from the mirror every 2 min | `useProductCatalog` → `SkuInput` (Challan, PO, Brand Tags, Dropbox Link Generator, Client Finder, RateCard) |
