@@ -6,7 +6,7 @@ import { SUPABASE_ANON_KEY, supabase } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
 import { friendlyError } from '../lib/friendlyError';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
-import { useBackClose } from '../hooks/useBackClose';
+import { useBackClose, closeTopLayer } from '../hooks/useBackClose';
 import AddressPrinter from '../components/minis/AddressPrinter';
 import CbazaarImport from '../components/minis/CbazaarImport';
 import OdetteImport from '../components/minis/OdetteImport';
@@ -282,7 +282,10 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     }
   };
 
-  const back = <button onClick={() => setView('home')} style={{ ...S.btnGhost, padding: '6px 10px' }} aria-label="Back">
+  // The arrow steps back ONE level like the device Back: an open sub-view
+  // (a costing sheet, a modal) closes first, and only the tool's own layer
+  // returns to the grid — it used to jump home over whatever was open.
+  const back = <button onClick={() => { if (!closeTopLayer()) setView('home'); }} style={{ ...S.btnGhost, padding: '6px 10px' }} aria-label="Back">
     <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
   </button>;
 
