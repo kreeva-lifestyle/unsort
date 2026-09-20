@@ -11,6 +11,7 @@ import { useActiveRefetch } from '../hooks/useActiveRefetch';
 import { useNotifications } from '../hooks/useNotifications';
 import { T, S, PO_STATUS_COLORS } from '../lib/theme';
 import { useBackClose } from '../hooks/useBackClose';
+import { useCrumb } from '../hooks/useBreadcrumb';
 import { friendlyError } from '../lib/friendlyError';
 import POList, { type PORow } from '../components/purchaseorders/POList';
 import POForm, { type EditingPO } from '../components/purchaseorders/POForm';
@@ -144,6 +145,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
 
   useModalLock(!!printData);
   useBackClose(!!detail, () => setDetail(null));
+  useCrumb(detail ? `PO #${detail.po.po_number}` : null); // header: "Purchase Orders / PO #12"
   useBackClose(!!printData, () => setPrintData(null));
 
   // Load full items + receipts + audit for a PO, then open the detail panel.
