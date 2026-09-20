@@ -10,6 +10,7 @@ import { numericKeyDown } from '../../../lib/numericInput';
 import { CostingSupplier, blankSupplier, num, cheaperAlt, money } from './costingModel';
 import SuggestInput from '../../ui/SuggestInput';
 import { useModalLock } from '../../../hooks/useModalLock';
+import { useBackClose } from '../../../hooks/useBackClose';
 
 export default function SupplierModal({ subName, suppliers, known, onDone, onClose }: {
   subName: string;
@@ -23,6 +24,8 @@ export default function SupplierModal({ subName, suppliers, known, onDone, onClo
   const [error, setError] = useState('');
 
   useModalLock();
+  // Device Back = Cancel: the working copy is discarded, the line sheet stays.
+  useBackClose(true, onClose);
 
   const patch = (i: number, p: Partial<CostingSupplier>) =>
     setRows(prev => prev.map((r, j) => (j === i ? { ...r, ...p } : r)));

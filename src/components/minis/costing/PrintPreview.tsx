@@ -4,12 +4,15 @@
 // the time this renders, the html is good.
 import { createPortal } from 'react-dom';
 import { T, S } from '../../../lib/theme';
+import { useBackClose } from '../../../hooks/useBackClose';
 
 export default function PrintPreview({ title, html, onClose }: {
   title: string;
   html: string;
   onClose: () => void;
 }) {
+  // Device Back closes the preview only, never the sheet or tool under it.
+  useBackClose(true, onClose);
   const print = () => {
     const frame = document.getElementById('costing-print-frame') as HTMLIFrameElement | null;
     frame?.contentWindow?.focus();

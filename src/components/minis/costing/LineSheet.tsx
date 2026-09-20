@@ -18,6 +18,7 @@ import SupplierModal from './SupplierModal';
 import { applyPreset, presetFor } from './costingTemplates';
 import SuggestInput from '../../ui/SuggestInput';
 import { useModalLock } from '../../../hooks/useModalLock';
+import { useBackClose } from '../../../hooks/useBackClose';
 
 const BAD = '1px solid rgba(239,68,68,.55)';
 
@@ -47,6 +48,8 @@ export default function LineSheet({ sub, compName, library, onChange, onRemove, 
   // useModalLock only drops the class when no other .modal-inner is mounted,
   // so SupplierModal closing on top no longer unlocks the page behind us.
   useModalLock();
+  // Device Back closes this sheet only (edits are already in the parent).
+  useBackClose(true, onClose);
 
   const sel = selectedSupplier(sub);
   const bad = subProblems(sub);
