@@ -28,7 +28,8 @@ export default function PaymentQR({ addToast }: { addToast: (msg: string, type: 
     if (file.size > 5 * 1024 * 1024) { addToast('Image must be under 5MB', 'error'); return; }
     setUploading(true);
     const path = `qr-${Date.now()}.${file.name.split('.').pop() || 'png'}`;
-    const { error: upErr } = await supabase.storage.from('payment-qr').upload(path, file, { contentType: file.type, upsert: true });
+    // Timestamped name = new url per upload, so a year of caching never shows a stale QR.
+    const { error: upErr } = await supabase.storage.from('payment-qr').upload(path, file, { contentType: file.type, upsert: true, cacheControl: '31536000' });
     if (upErr) { addToast(friendlyError(upErr), 'error'); setUploading(false); return; }
     const { data: urlData } = supabase.storage.from('payment-qr').getPublicUrl(path);
     const publicUrl = urlData.publicUrl;

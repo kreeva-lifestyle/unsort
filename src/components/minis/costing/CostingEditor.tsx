@@ -75,7 +75,9 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
       // Phone photos are 3-8 MB; resize + re-encode BEFORE upload (~200 KB).
       const { blob, type } = await optimizeImage(file);
       const path = `${p.id}.jpg`;
-      const { error } = await supabase.storage.from('costing-images').upload(path, blob, { contentType: type, upsert: true });
+      // A year of caching is safe: the ?v= below gives every replacement a
+      // new url, so a cached one can never show a replaced photo.
+      const { error } = await supabase.storage.from('costing-images').upload(path, blob, { contentType: type, upsert: true, cacheControl: '31536000' });
       if (error) throw error;
       const { data } = supabase.storage.from('costing-images').getPublicUrl(path);
       // Cache-buster: upsert keeps the URL, else the old photo sticks around.
