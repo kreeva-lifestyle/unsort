@@ -10,7 +10,12 @@
 // ever overwrites a value the user typed; presets fill empty fields only.
 import type { CostingProduct, CostingSub, CostingSupplier, CostingLibrary } from './costingModel';
 
-export interface ComponentTemplate { name: string; sku: string; uses: number; subs: CostingSub[] }
+/** `source` 'common' = the lines shared across `sheets` sheets (cron-built,
+ *  app_settings.costing_common_subs); 'sheet' = the newest sheet's lines
+ *  (fallback for a component the cron has not seen or that exists once). */
+export interface ComponentTemplate { name: string; sku: string; uses: number; subs: CostingSub[]; source: 'common' | 'sheet'; sheets: number }
+/** app_settings.costing_common_subs, keyed by UPPER(component name). */
+export type CommonSubsMap = Record<string, { name: string; sheets: number; subs: { name: string; unit: string; qty: string; suppliers: CostingSupplier[]; uses: number }[] }>;
 export interface SubPreset { unit: string; qty: string; sku: string; suppliers: CostingSupplier[] }
 
 const key = (s: string) => s.trim().toUpperCase();
@@ -35,7 +40,7 @@ export function withTemplates(lib: CostingLibrary, products: CostingProduct[]): 
       if (ck) {
         const t = tpl.get(ck);
         if (t) t.uses += 1;
-        else if (lines.length) tpl.set(ck, { name: c.name.trim(), sku: p.sku, uses: 1, subs: lines.map(cloneSub) });
+        else if (lines.length) tpl.set(ck, { name: c.name.trim(), sku: p.sku, uses: 1, subs: lines.map(cloneSub), source: 'sheet', sheets: 1 });
       }
       for (const s of lines) {
         const sk = key(s.name);
@@ -45,6 +50,20 @@ export function withTemplates(lib: CostingLibrary, products: CostingProduct[]): 
   }
   const templates = [...tpl.values()].sort((a, b) => b.uses - a.uses || a.name.localeCompare(b.name));
   return { ...lib, templates, subPresets: presets };
+}
+
+/** Swap in the COMMON lines where the cron has them for two or more sheets:
+ *  what every (or most every) LEHANGA carries, not one sheet's copy with its
+ *  one-off extras. Keeps the sheet template where the cron has nothing yet. */
+export function withCommonTemplates(lib: CostingLibrary, common: CommonSubsMap | null): CostingLibrary {
+  if (!common || !lib.templates) return lib;
+  const templates = lib.templates.map(t => {
+    const c = common[key(t.name)];
+    if (!c || c.sheets < 2 || !Array.isArray(c.subs) || c.subs.length === 0) return t;
+    const subs: CostingSub[] = c.subs.map(s => ({ name: s.name, qty: String(s.qty ?? ''), unit: s.unit || '', suppliers: (s.suppliers || []).map(x => ({ ...x })) }));
+    return { ...t, subs, source: 'common' as const, sheets: c.sheets, uses: Math.max(t.uses, c.sheets) };
+  });
+  return { ...lib, templates: templates.sort((a, b) => b.uses - a.uses || a.name.localeCompare(b.name)) };
 }
 
 export const templateFor = (lib: CostingLibrary, name: string): ComponentTemplate | null =>
