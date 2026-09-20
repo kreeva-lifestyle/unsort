@@ -13,6 +13,7 @@ import OdetteImport from '../components/minis/OdetteImport';
 import OdetteCoverageCheck from '../components/minis/OdetteCoverageCheck';
 import IndyaImport from '../components/minis/indya/IndyaImport';
 import { MINI_LABELS, MINI_TILES, type MiniView } from '../components/minis/miniRegistry';
+import { takePendingMini } from '../lib/shortcuts';
 import MasterLinkCheck from '../components/minis/LinkCheck';
 import VirtualStock from '../components/minis/VirtualStock';
 import Trackly from '../components/minis/Trackly';
@@ -94,8 +95,9 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
   // app — including ones in other tabs — silently discarding open tool state.)
   useBackClose(view !== 'home', () => setViewState('home'));
   // Leaving the tab closes the tool, so returning shows the grid, not a
-  // half-used tool from an hour ago.
-  useEffect(() => { if (!active) setViewState('home'); }, [active]);
+  // half-used tool from an hour ago — unless a dashboard quick-access chip
+  // asked for a tool, in which case open straight into it.
+  useEffect(() => { if (!active) setViewState('home'); else { const p = takePendingMini(); if (p) setViewState(p); } }, [active]);
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
