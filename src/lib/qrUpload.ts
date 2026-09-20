@@ -15,7 +15,8 @@ export async function uploadQrImage(file: File): Promise<{ url?: string; error?:
   // upsert never applied anyway.
   const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
   const path = `emp-qr-${crypto.randomUUID()}.${ext}`;
-  const { error: upErr } = await supabase.storage.from('employee-qr').upload(path, file, { contentType: file.type });
+  // Random name = new url per upload, so a year of caching never shows a stale QR.
+  const { error: upErr } = await supabase.storage.from('employee-qr').upload(path, file, { contentType: file.type, cacheControl: '31536000' });
   if (upErr) return { error: friendlyError(upErr) };
   const { data } = supabase.storage.from('employee-qr').getPublicUrl(path);
   return { url: data.publicUrl };

@@ -86,7 +86,7 @@ export default function PriceProjector({ addToast, navigateTo, onHome }: { addTo
         {shown.map(({ p, pr }) => (
           <button type="button" key={p.id} onClick={() => setOpen(p)} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer', textAlign: 'left', color: T.tx, font: 'inherit', minHeight: 44 }}>
             <div style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', background: T.s2, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {p.image_url ? <img src={p.image_url} alt={p.sku} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 9, color: T.tx3 }}>no photo</span>}
+              {p.image_url ? <img src={p.image_url} alt={p.sku} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 9, color: T.tx3 }}>no photo</span>}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: DOT[pr.status], flexShrink: 0 }} /><span style={{ fontFamily: T.mono, fontSize: 13, fontWeight: 700 }}>{p.sku}</span><span style={{ fontSize: 10, color: T.tx3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.category || ''}</span></div>
