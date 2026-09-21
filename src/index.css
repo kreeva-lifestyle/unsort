@@ -375,7 +375,7 @@ body.modal-open .fab { display: none !important; }
   .challan-form .challan-item-row select { font-size: 14px !important; padding: 6px !important; width: auto !important; }
   .challan-form-grid-2 { grid-template-columns: 1fr !important; }
   .challan-form-grid-3 { grid-template-columns: 1fr !important; }
-  .challan-form-grid-4 { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .challan-form-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px 12px !important; }
   .challan-form-grid-4 input[type="date"] { height: 38px !important; font-size: 16px !important; padding: 6px 8px !important; } /* 16px: below that iOS zooms on focus */
 
   /* Bulk toolbar */
@@ -565,8 +565,9 @@ body.modal-open .fab { display: none !important; }
   .challan-save-inline { display: none !important; }
   /* Clearance for nav + savebar (overrides the older 80px rule above). */
   .challan-form { padding-bottom: calc(var(--nav-h) + 92px) !important; }
-  /* Status/Mode/Amount/Date: 4-across is unreadable at 393px — go 2×2. */
-  .challan-form-grid-4 { grid-template-columns: 1fr 1fr !important; }
+  /* Status/Mode/Amount/Date: 2×2 with EQUAL columns (minmax(0,1fr) — a bare
+     1fr lets the date box grow to its content and squeezes the amount). */
+  .challan-form-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   /* Recent customers: one swipeable row instead of a two-row pill wall. */
   .challan-recent { flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .challan-recent::-webkit-scrollbar { display: none; }
