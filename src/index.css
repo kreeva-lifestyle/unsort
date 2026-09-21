@@ -366,13 +366,24 @@ body.modal-open .fab { display: none !important; }
   .challan-form { padding: 12px 12px 80px !important; }
   .challan-form input, .challan-form select, .challan-form textarea { font-size: 16px !important; }
   .challan-item-grid-wrap { overflow-x: hidden !important; }
-  .challan-item-row { display: flex !important; flex-wrap: wrap !important; gap: 6px !important; padding: 10px 10px !important; }
-  .challan-item-row input[data-sku] { width: 100% !important; flex: none !important; }
-  .challan-item-row input:not([data-sku]) { flex: 1 !important; min-width: 60px !important; }
-  .challan-item-row .challan-disc-col { display: flex !important; flex: 1.5 !important; min-width: 90px !important; gap: 4px !important; }
-  .challan-item-row .challan-qty-col { flex: 1.2 !important; min-width: 140px !important; } /* 44px − / + steppers + readable number */
-  .challan-form .challan-item-row input { font-size: 14px !important; padding: 8px 6px !important; }
-  .challan-form .challan-item-row select { font-size: 14px !important; padding: 6px !important; width: auto !important; }
+  /* Item row on a phone = a card with fixed places, not a wrapping flex row
+     (that left the SKU box half-width — SkuInput is a wrapper DIV, so the
+     old input[data-sku] rule never reached the flex child — and dropped the
+     × onto a line of its own). Row 1: SKU full width + ×. Row 2: Qty stepper ·
+     Price · Discount. Row 3: the line net. Columns are minmax(0, …) so the
+     three cells stay put whatever is typed. */
+  .challan-item-row { display: grid !important; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) 40px !important; grid-template-areas: "sku sku sku x" "qty price disc disc" "tot tot tot tot" !important; gap: 8px !important; padding: 10px 12px 12px !important; align-items: center !important; }
+  .challan-item-row > div:first-child { grid-area: sku; min-width: 0; }
+  .challan-item-row .challan-qty-col { grid-area: qty; min-width: 0 !important; min-height: 44px !important; }
+  .challan-item-row .challan-qty-col .step44 { width: 36px !important; }
+  .challan-item-row .challan-price-col { grid-area: price; min-width: 0 !important; width: 100% !important; }
+  .challan-item-row .challan-disc-col { grid-area: disc; display: flex !important; gap: 4px !important; min-width: 0 !important; }
+  .challan-item-row .challan-disc-col select { flex: none !important; width: 44px !important; min-height: 44px !important; }
+  .challan-item-row .challan-remove { grid-area: x; justify-self: end !important; min-width: 40px !important; min-height: 44px !important; }
+  .challan-item-row .challan-line-total { grid-area: tot; display: flex !important; }
+  /* 16px: below that iOS zooms on focus (the old 14px here undid the rule above). */
+  .challan-form .challan-item-row input { font-size: 16px !important; padding: 8px 8px !important; min-height: 44px !important; }
+  .challan-form .challan-item-row select { font-size: 16px !important; padding: 6px 4px !important; }
   .challan-form-grid-2 { grid-template-columns: 1fr !important; }
   .challan-form-grid-3 { grid-template-columns: 1fr !important; }
   .challan-form-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px 12px !important; }
