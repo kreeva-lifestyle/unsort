@@ -10,6 +10,7 @@ import { logSwallowed } from '../lib/errorLogger';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import { useBackClose } from '../hooks/useBackClose';
+import Contacts from '../components/contacts/Contacts';
 import ChallanAnalytics from '../components/challan/ChallanAnalytics';
 import ChallanLedger from '../components/challan/ChallanLedger';
 import ChallanForm from '../components/challan/ChallanForm';
@@ -162,6 +163,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // Ledger
   const [showLedger, setShowLedger] = useState(false);
+  const [showContacts, setShowContacts] = useState(false); // shared Contacts view (components/contacts)
   // Two-signal open: fetch BEFORE flipping the view so Ledger/Analytics never
   // flash a misleading empty state on slow links.
   const [viewOpening, setViewOpening] = useState<'ledger' | 'analytics' | null>(null);
@@ -286,6 +288,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   useBackClose(showCashBook, () => setShowCashBook(false));
   useBackClose(showAnalytics, () => setShowAnalytics(false));
   useBackClose(showLedger, () => { setShowLedger(false); setLedgerSearch(''); });
+  useBackClose(showContacts, () => setShowContacts(false));
   useBackClose(!!ledgerDetail, () => setLedgerDetail(null));
   useBackClose(!!viewingChallan, () => setViewingChallan(null));
   // Back closes the form but KEEPS the auto-saved draft: closeModal() calls
@@ -1299,6 +1302,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     />
   </>);
 
+  if (showContacts) return <Contacts canEdit={['admin', 'manager', 'operator'].includes(profile?.role || '')} onBack={() => setShowContacts(false)} addToast={addToast} />;
+
   // ── Analytics Screen ───────────────────────────────────────────────────────
   if (showAnalytics) return (
     <>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { setShowAnalytics(false); }} style={S.btnGhost}>← Back</button></div><ChallanAnalytics
@@ -1351,6 +1356,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             btnSm pills looked undersized next to the primary CTA). Order runs
             plain views → tinted sibling module → primary action. */}
         <div className="challan-nav-btns" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={() => setShowContacts(true)} style={S.btnGhost}>Contacts</button>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('analytics'); await fetchAnalytics(); setViewOpening(null); setShowAnalytics(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'analytics' ? 0.6 : 1 }}>{viewOpening === 'analytics' ? 'Opening…' : 'Analytics'}</button>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('ledger'); await fetchLedger(); setViewOpening(null); setShowLedger(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'ledger' ? 0.6 : 1 }}>{viewOpening === 'ledger' ? 'Opening…' : 'Ledger'}</button>
           {canAccessModule(profile?.role, 'cashbook', profile?.module_access) && <button onClick={() => { setShowCashBook(true); }} style={{ ...S.btnGhost, color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .25)', background: 'oklch(0.72 0.19 145 / .06)' }}>Cash Book</button>}
@@ -1554,7 +1560,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           inside the page it sits within <main overflow:auto>, and iOS Safari
           anchors position:fixed children to the scroll box, dropping the FAB
           into the content (it landed on the pagination bar). */}
-      {active !== false && !viewingChallan && !showLedger && !showAnalytics && !showCashBook && !showModal && createPortal(
+      {active !== false && !viewingChallan && !showLedger && !showAnalytics && !showCashBook && !showContacts && !showModal && createPortal(
         <button className="fab" aria-label="Add new challan" onClick={() => { setShowModal(true); }}>+</button>,
         document.body,
       )}

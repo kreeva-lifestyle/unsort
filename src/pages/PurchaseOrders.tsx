@@ -20,6 +20,7 @@ import POReceive from '../components/purchaseorders/POReceive';
 import { buildPoPdf } from '../components/purchaseorders/poPdf';
 import { sharePoImage } from '../components/purchaseorders/poImage';
 import PendencyReport from '../components/purchaseorders/PendencyReport';
+import Contacts from '../components/contacts/Contacts';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../types/database';
 import { useModalLock } from '../hooks/useModalLock';
 import Toggle from '../components/ui/Toggle';
@@ -145,6 +146,8 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
 
   useModalLock(!!printData);
   useBackClose(!!detail, () => setDetail(null));
+  const [showContacts, setShowContacts] = useState(false); // shared Contacts view (components/contacts)
+  useBackClose(showContacts, () => setShowContacts(false));
   useCrumb(detail ? `PO #${detail.po.po_number}` : null); // header: "Purchase Orders / PO #12"
   useBackClose(!!printData, () => setPrintData(null));
 
@@ -196,11 +199,16 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     fetchPos(true);
   };
 
+  if (showContacts) return <Contacts canEdit={canCreate} onBack={() => setShowContacts(false)} addToast={addToast} />;
+
   return (
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 12, color: T.tx3 }}>{totalCount} purchase order{totalCount === 1 ? '' : 's'} · fabric, job work &amp; materials</div>
-        {canCreate && <button onClick={() => { setEditing(null); setDuplicating(null); setShowForm(true); }} style={S.btnPrimary} className="desktop-only">+ New Purchase Order</button>}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setShowContacts(true)} style={S.btnGhost}>Contacts</button>
+          {canCreate && <button onClick={() => { setEditing(null); setDuplicating(null); setShowForm(true); }} style={S.btnPrimary} className="desktop-only">+ New Purchase Order</button>}
+        </div>
       </div>
 
       <POList

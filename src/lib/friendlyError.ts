@@ -14,6 +14,7 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   if ((code === '23505' || l.includes('duplicate key')) && l.includes('listing_templates_name')) return 'A template with this name already exists — open it to edit, or use a different name.';
   if ((code === '23505' || l.includes('duplicate key')) && l.includes('short_code')) return 'This short code is already taken. Try a different one.';
   if ((code === '23505' || l.includes('duplicate key')) && l.includes('link_check_approvals')) return 'This link is already marked correct.';
+  if ((code === '23505' || l.includes('duplicate key')) && l.includes('cash_challan_customers')) return 'A customer with this name already exists — open that contact instead.';
   if (code === '23505' || l.includes('duplicate key')) return 'A record with these details already exists.';
   if (code === '23503' || l.includes('foreign key')) return 'Cannot complete — this item is still referenced elsewhere.';
   // apply_return_credit's guidance messages are already human and DATED
