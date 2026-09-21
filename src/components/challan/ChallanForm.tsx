@@ -4,7 +4,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { T, S, alpha } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
-import DateInput from '../ui/DateInput';
+import PaymentFields from './PaymentFields';
 import AuditTrailModal from './AuditTrailModal';
 import ReturnSourcePicker from './ReturnSourcePicker';
 import SkuInput from '../ui/SkuInput';
@@ -17,8 +17,6 @@ import type { CashChallan, CashChallanCustomer, AuditLog } from '../../types/dat
 type Challan = Omit<CashChallan, 'created_at' | 'updated_at'> & { created_at: string; updated_at: string };
 type Customer = Pick<CashChallanCustomer, 'id' | 'name' | 'phone' | 'address'>;
 interface ChallanItem { id?: string; sku: string; description: string; quantity: number; price: number; total: number; discount_type?: string; discount_value?: number; discount_amount?: number }
-
-const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Other'];
 
 export type ChallanFormProps = {
   // Mode
@@ -387,32 +385,9 @@ export default function ChallanForm(p: ChallanFormProps) {
                 </div>
               );
             })()}
-            <div className="challan-form-grid-4" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
-              <div>
-                <label style={lbl}>Status</label>
-                <select value={p.challanStatus} onChange={e => p.setChallanStatus(e.target.value)} style={{ ...inp, fontSize: 11 }}>
-                  <option value="unpaid">Unpaid</option>
-                  <option value="paid">Paid</option>
-                  <option value="partial">Partial</option>
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Payment Mode</label>
-                <select value={p.paymentMode} onChange={e => p.setPaymentMode(e.target.value)} style={{ ...inp, fontSize: 11 }}>
-                  <option value="">Select...</option>
-                  {p.paymentMode && !PAYMENT_MODES.includes(p.paymentMode) && <option value={p.paymentMode} disabled>{p.paymentMode}</option>}
-                  {PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Amount Paid</label>
-                <input type="number" min="0" value={p.amountPaid || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setAmountPaid(Math.max(0, Number(e.target.value)))} placeholder="Amount received" style={{ ...inp, fontFamily: T.mono, fontSize: 11 }} />
-              </div>
-              <div>
-                <label style={lbl}>Payment Date</label>
-                <DateInput value={p.paymentDate} onChange={e => p.setPaymentDate(e.target.value)} style={{ width: '100%' }} />
-              </div>
-            </div>
+            {/* Status / Mode / Amount Paid (with the FULL shortcut) / Date */}
+            <PaymentFields status={p.challanStatus} setStatus={p.setChallanStatus} mode={p.paymentMode} setMode={p.setPaymentMode}
+              amount={p.amountPaid} setAmount={p.setAmountPaid} date={p.paymentDate} setDate={p.setPaymentDate} total={p.grandTotal} lbl={lbl} inp={inp} />
           </>)}
         </div>
 
