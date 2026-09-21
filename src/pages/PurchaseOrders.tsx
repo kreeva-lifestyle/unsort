@@ -25,7 +25,7 @@ import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog }
 import { useModalLock } from '../hooks/useModalLock';
 import Toggle from '../components/ui/Toggle';
 
-const COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, for_pieces, costing_product_id, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, closed_at, closed_by, close_reason, created_by, modified_by, created_at, updated_at';
+const COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, for_pieces, lump_sum, costing_product_id, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, closed_at, closed_by, close_reason, created_by, modified_by, created_at, updated_at';
 
 type Detail = { po: PurchaseOrder; items: PurchaseOrderItem[]; receipts: PurchaseOrderReceipt[]; audit: AuditLog[] | null };
 

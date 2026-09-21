@@ -46,6 +46,8 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
   // Internal planning count (owner's ask): how many finished pieces this
   // purchase is for. Shown in the app only — never on the shared/printed PO.
   const [forPieces, setForPieces] = useState(src?.for_pieces ? String(src.for_pieces) : '');
+  // Lump sum (owner's ask): priced as a whole, so the piece count is optional.
+  const [lumpSum, setLumpSum] = useState(!!src?.lump_sum);
   const [items, setItems] = useState<FormItem[]>(
     src?.items?.length ? src.items.map(it => ({ sku: it.sku ?? '', item_name: it.item_name ?? '', fabric_code: it.fabric_code ?? '', quantity: String(it.quantity), unit: it.unit ?? '', rate: it.rate == null ? '' : String(it.rate) })) : [blankItem()]
   );
@@ -125,17 +127,18 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
     if (discountType === 'percentage' && num(discountValue) > 100) { setError('Discount cannot exceed 100%'); return; }
     if (discountType === 'flat' && num(discountValue) > subtotal) { setError('Discount cannot exceed the subtotal'); return; }
     if (num(taxPercent) > 100) { setError('Tax % cannot exceed 100'); return; }
-    // Owner's rule: compulsory, digits only (the input already strips anything else).
-    if (!forPieces.trim()) { setError('For how many pcs is required'); return; }
-    const pieces = Number(forPieces);
-    if (!Number.isInteger(pieces) || pieces <= 0) { setError('For how many pcs must be a whole number greater than 0'); return; }
+    // Owner's rule: compulsory, digits only (the input already strips anything
+    // else) — unless the order is a lump sum, where it is optional.
+    const pieces = lumpSum ? (forPieces.trim() ? Number(forPieces) : null) : Number(forPieces);
+    if (!lumpSum && !forPieces.trim()) { setError('For how many pcs is required — or tick Lump sum'); return; }
+    if (pieces !== null && (!Number.isInteger(pieces) || pieces <= 0)) { setError('For how many pcs must be a whole number greater than 0'); return; }
     setSaving(true);
     try {
       const p_po = {
         vendor_id: vendor.id, vendor_name: vendor.name.trim(), vendor_phone: vendor.phone.trim() || null,
         po_type: poType, po_date: poDate || null, expected_date: expectedDate || null,
         payment_terms: paymentTerms.trim() || null, notes: notes.trim() || null,
-        for_pieces: pieces,
+        for_pieces: pieces, lump_sum: lumpSum,
         costing_product_id: costingId,
         // Always send the values held in state — the Grand Total preview
         // includes them whether or not the charges section is expanded, so
@@ -201,10 +204,16 @@ export default function POForm({ editing, duplicateFrom, prefill, onClose, onSav
               <input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="e.g. 30 days" style={S.fInput} />
             </div>
             <div>
-              <label style={S.fLabel}>For how many pcs? *</label>
-              <input value={forPieces} onChange={e => setForPieces(e.target.value.replace(/\D/g, ''))} onKeyDown={e => numericKeyDown(e)} inputMode="numeric" placeholder="e.g. 120" aria-label="For how many pieces" required
-                style={{ ...S.fInput, fontFamily: T.mono, borderColor: error && !forPieces.trim() ? 'oklch(0.63 0.22 25 / .5)' : undefined }} />
-              <div style={{ fontSize: 10, color: T.tx3, marginTop: 3 }}>not shown on the shared or printed PO</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <label style={S.fLabel}>For how many pcs?{lumpSum ? '' : ' *'}</label>
+                {/* The tick makes the count optional: a lump-sum order is priced as a whole. */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: lumpSum ? T.ac2 : T.tx3, cursor: 'pointer', minHeight: 24, marginBottom: 6, textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
+                  <input type="checkbox" checked={lumpSum} onChange={e => setLumpSum(e.target.checked)} style={{ accentColor: T.ac, width: 14, height: 14, margin: 0 }} />Lump sum
+                </label>
+              </div>
+              <input value={forPieces} onChange={e => setForPieces(e.target.value.replace(/\D/g, ''))} onKeyDown={e => numericKeyDown(e)} inputMode="numeric" placeholder={lumpSum ? 'optional for a lump sum' : 'e.g. 120'} aria-label="For how many pieces" required={!lumpSum}
+                style={{ ...S.fInput, fontFamily: T.mono, borderColor: error && !lumpSum && !forPieces.trim() ? 'oklch(0.63 0.22 25 / .5)' : undefined }} />
+              <div style={{ fontSize: 10, color: T.tx3, marginTop: 3 }}>{lumpSum ? 'lump sum — priced as a whole; ' : ''}not shown on the shared or printed PO</div>
             </div>
           </div>
 
