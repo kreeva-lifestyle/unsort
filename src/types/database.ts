@@ -915,8 +915,10 @@ export interface PurchaseOrder {
   expected_date: string | null;
   payment_terms: string | null;
   notes: string | null;
-  /** Internal: how many finished pieces this purchase is for. Never printed or shared. */
+  /** Internal: how many finished pieces this purchase is for. Never printed or shared. NULL only on a lump-sum order. */
   for_pieces: number | null;
+  /** Priced as a whole — "For how many pcs" is optional on such an order. */
+  lump_sum: boolean;
   /** The product costing this PO was raised from (explicit link, set null if the costing is deleted). */
   costing_product_id: string | null;
   subtotal: number | null;
@@ -990,6 +992,7 @@ export type POHeaderInput = {
   payment_terms?: string | null;
   notes?: string | null;
   for_pieces?: number | null;
+  lump_sum?: boolean;
   costing_product_id?: string | null;
   discount_type?: 'flat' | 'percentage' | null;
   discount_value?: number | null;
