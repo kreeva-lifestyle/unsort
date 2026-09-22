@@ -387,7 +387,7 @@ export default function ChallanForm(p: ChallanFormProps) {
             })()}
             {/* Status / Mode / Amount Paid (with the FULL shortcut) / Date */}
             <PaymentFields status={p.challanStatus} setStatus={p.setChallanStatus} mode={p.paymentMode} setMode={p.setPaymentMode}
-              amount={p.amountPaid} setAmount={p.setAmountPaid} date={p.paymentDate} setDate={p.setPaymentDate} total={p.grandTotal} lbl={lbl} inp={inp} />
+              amount={p.amountPaid} setAmount={p.setAmountPaid} date={p.paymentDate} setDate={p.setPaymentDate} total={p.grandTotal} recordedPaid={p.editing ? Number(p.editing.amount_paid || 0) : 0} lbl={lbl} inp={inp} />
           </>)}
         </div>
 

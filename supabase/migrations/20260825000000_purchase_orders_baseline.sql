@@ -8,6 +8,23 @@
 -- them. It was NOT applied to the live project (the objects exist there);
 -- replay it only on a fresh database. Later migrations replace the
 -- functions with create or replace, so they layer cleanly on top.
+--
+-- Guarded (audit M6, 22 Sep 2026): the whole body runs inside one DO block
+-- that RETURNS when public.purchase_orders already exists, so a `db push`
+-- against the live project neither aborts on the duplicate policies nor
+-- replaces the hardened search_po_ids / protect_po_immutability /
+-- receive_po_items with these original bodies. pg_trgm is created first
+-- because idx_po_items_sku_trgm needs it and a fresh database has no
+-- extension yet. Everything inside is the original text, unchanged.
+
+create extension if not exists pg_trgm;
+
+do $baseline$
+begin
+if to_regclass('public.purchase_orders') is not null then
+  raise notice 'purchase_orders baseline: objects already exist — skipped';
+  return;
+end if;
 
 create sequence if not exists public.purchase_orders_po_number_seq;
 
@@ -224,3 +241,5 @@ begin
   update purchase_orders set status = case when v_full = v_total then 'completed' else 'partially_received' end, modified_by = auth.uid(), updated_at = now() where id = p_po_id;
   return jsonb_build_object('ok', true, 'received_count', v_n);
 end $function$;
+
+end $baseline$;
