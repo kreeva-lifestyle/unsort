@@ -93,12 +93,15 @@ async function shareOk(d: Deps, tok: string): Promise<boolean> {
 
 /** Auth + rate limit for the rate-card Dropbox actions: a signed-in user
  *  (3× cap) or a valid share token (cap). Null means "go ahead". */
-export async function gate(body: any, req: Request, d: Deps, key: string, max: number): Promise<Response | null> {
-  if (await d.callerRole(req)) return limited(req, key + ':s', max * 3) ? d.fail(429, 'Too many requests - wait a minute and try again', req) : null;
+/** `session` = a signed-in DailyOffice user; false = a seller-link token.
+ *  Token callers are held to the master list and never see raw Dropbox
+ *  error detail (audit H3). */
+export async function gate(body: any, req: Request, d: Deps, key: string, max: number): Promise<{ denied: Response | null; session: boolean }> {
+  if (await d.callerRole(req)) return { denied: limited(req, key + ':s', max * 3) ? d.fail(429, 'Too many requests - wait a minute and try again', req) : null, session: true };
   const tok = String(body?.shareToken || '').trim();
-  if (!tok || !(await shareOk(d, tok))) return d.fail(401, 'Sign in to DailyOffice first, or open this from the seller link', req);
-  if (limited(req, key, max)) return d.fail(429, 'Too many requests - wait a minute and try again', req);
-  return null;
+  if (!tok || !(await shareOk(d, tok))) return { denied: d.fail(401, 'Sign in to DailyOffice first, or open this from the seller link', req), session: false };
+  if (limited(req, key, max)) return { denied: d.fail(429, 'Too many requests - wait a minute and try again', req), session: false };
+  return { denied: null, session: false };
 }
 const authed = gate;
 
@@ -118,15 +121,15 @@ const NON_CATALOG = new Set(['singles', 'single', 'noncatalog', 'nocatalog', 'na
 /** Catalogs from the master mirror with brand (sheet tab), design and
  *  active counts, and the catalog's last row on the sheet — the dropdown
  *  groups by brand and shows the newest (highest row) first. */
-export async function catalogList(body: any, req: Request, d: Deps): Promise<Response> {
-  const denied = await authed(body, req, d, 'cl', 20); if (denied) return denied;
-  if (listCache && Date.now() - listCache.at < LIST_TTL) return d.json({ ok: true, catalogs: listCache.catalogs, cached: true }, req);
+type CatalogEntry = { name: string; tab: string; count: number; active: number; last: number };
+async function loadCatalogs(d: Deps): Promise<{ catalogs: CatalogEntry[] | null; cached: boolean }> {
+  if (listCache && Date.now() - listCache.at < LIST_TTL) return { catalogs: listCache.catalogs as CatalogEntry[], cached: true };
   const h = { apikey: d.sbSvc, authorization: `Bearer ${d.sbSvc}` };
   const [pr, mr] = await Promise.all([
     fetch(`${d.sbUrl}/rest/v1/product_catalog?select=catalog,is_active,tab&catalog=not.is.null&limit=20000`, { headers: h }),
     fetch(`${d.sbUrl}/rest/v1/master_sheet_rows?select=tab,catalog,row_num&catalog=not.is.null&limit=50000`, { headers: h }),
   ]);
-  if (!pr.ok || !mr.ok) return d.fail(502, 'Could not read the master mirror', req);
+  if (!pr.ok || !mr.ok) return { catalogs: null, cached: false };
   const rows: { catalog: string | null; is_active: boolean; tab: string | null }[] = await pr.json().catch(() => []);
   const order: { tab: string | null; catalog: string | null; row_num: number }[] = await mr.json().catch(() => []);
   const counts = new Map<string, { name: string; tab: string; count: number; active: number; last: number }>();
@@ -144,7 +147,21 @@ export async function catalogList(body: any, req: Request, d: Deps): Promise<Res
   }
   const catalogs = [...counts.values()].sort((a, b) => a.tab.localeCompare(b.tab) || b.last - a.last || a.name.localeCompare(b.name));
   listCache = { at: Date.now(), catalogs };
-  return d.json({ ok: true, catalogs }, req);
+  return { catalogs, cached: false };
+}
+
+export async function catalogList(body: any, req: Request, d: Deps): Promise<Response> {
+  const g = await authed(body, req, d, 'cl', 20); if (g.denied) return g.denied;
+  const { catalogs, cached } = await loadCatalogs(d);
+  if (!catalogs) return d.fail(502, 'Could not read the master mirror', req);
+  return d.json({ ok: true, catalogs, ...(cached ? { cached: true } : {}) }, req);
+}
+
+/** Seller-link callers may only touch catalogs the master sheet knows — no
+ *  free-text folder search, no pack folders named by an outsider. */
+async function onSheet(d: Deps, catalog: string): Promise<boolean> {
+  const { catalogs } = await loadCatalogs(d);
+  return !!catalogs && catalogs.some(c => normName(c.name) === normName(catalog));
 }
 
 /** One recursive listing of a folder: its direct sub-folders with file
@@ -177,10 +194,12 @@ async function listSubfolders(d: Deps, token: string, path: string, cacheable = 
 }
 
 export async function catalogFolder(body: any, req: Request, d: Deps): Promise<Response> {
-  const denied = await authed(body, req, d, 'cf', 20); if (denied) return denied;
+  const g = await authed(body, req, d, 'cf', 20); if (g.denied) return g.denied;
+  const det = (s?: string) => (g.session ? s : undefined);
   const catalog = String(body?.catalog || '').trim().slice(0, 120);
   const picked = String(body?.path || '').trim().toLowerCase();
   if (!catalog) return d.fail(400, 'Pick a catalog first', req);
+  if (!g.session && !(await onSheet(d, catalog))) return d.fail(403, 'That catalog is not on the master sheet', req);
   let token = '';
   try { token = await d.getDropboxToken(); } catch { return d.json({ ok: false, error: 'dropbox_not_connected' }, req, 409); }
   const roots = await d.resolveGenRootPaths(token);
@@ -212,7 +231,7 @@ export async function catalogFolder(body: any, req: Request, d: Deps): Promise<R
   }
 
   const { sub, loose, truncated, error } = await listSubfolders(d, token, folder.path, true);
-  if (error) return d.fail(502, 'Could not list that catalog folder in Dropbox', req, error);
+  if (error) return d.fail(502, 'Could not list that catalog folder in Dropbox', req, det(error));
 
   const sr = await fetch(`${d.sbUrl}/rest/v1/product_catalog?catalog=eq.${encodeURIComponent(catalog)}&select=sku,sku_norm,is_active&limit=2000`, { headers: { apikey: d.sbSvc, authorization: `Bearer ${d.sbSvc}` } });
   const sheet: SheetRow[] = sr.ok ? await sr.json().catch(() => []) : [];
@@ -252,12 +271,14 @@ async function packLink(token: string, packPath: string, req: Request, d: Deps, 
  *  download link. Long copies come back `pending` with a job id the client
  *  polls with; every step stays inside Dropbox. */
 export async function catalogPack(body: any, req: Request, d: Deps): Promise<Response> {
-  const denied = await authed(body, req, d, 'cp', 10); if (denied) return denied;
+  const g = await authed(body, req, d, 'cp', 10); if (g.denied) return g.denied;
+  const det = (s?: string) => (g.session ? s : undefined);
   const catalog = String(body?.catalog || '').trim().slice(0, 120);
   const path = String(body?.path || '').trim().toLowerCase();
   const jobId = String(body?.jobId || '').trim();
   let packPath = `${PACK_ROOT}/${packName(catalog)}`;
   if (!catalog || !path.startsWith('/')) return d.fail(400, 'Pick a catalog first', req);
+  if (!g.session && !(await onSheet(d, catalog))) return d.fail(403, 'That catalog is not on the master sheet', req);
   let token = '';
   try { token = await d.getDropboxToken(); } catch { return d.json({ ok: false, error: 'dropbox_not_connected' }, req, 409); }
 
@@ -266,10 +287,10 @@ export async function catalogPack(body: any, req: Request, d: Deps): Promise<Res
     const given = String(body?.packPath || '').trim();
     if (given.toLowerCase().startsWith(PACK_ROOT.toLowerCase() + '/')) packPath = given;
     const ck = await d.dbx(token, 'files/copy_batch/check_v2', { async_job_id: jobId });
-    if (ck.status >= 400) return d.fail(502, 'Dropbox lost track of the copy — try again', req, JSON.stringify(ck.data).slice(0, 200));
+    if (ck.status >= 400) return d.fail(502, 'Dropbox lost track of the copy — try again', req, det(JSON.stringify(ck.data).slice(0, 200)));
     const tag = ck.data?.['.tag'];
     if (tag === 'in_progress') return d.json({ ok: true, pending: true, jobId, packPath }, req);
-    if (tag !== 'complete') return d.fail(502, 'Dropbox could not copy the folders', req, JSON.stringify(ck.data).slice(0, 200));
+    if (tag !== 'complete') return d.fail(502, 'Dropbox could not copy the folders', req, det(JSON.stringify(ck.data).slice(0, 200)));
     return packLink(token, packPath, req, d, {});
   }
 
@@ -278,7 +299,7 @@ export async function catalogPack(body: any, req: Request, d: Deps): Promise<Res
   const meta = await d.dbx(token, 'files/get_metadata', { path });
   if (meta.status >= 400 || meta.data?.['.tag'] !== 'folder') return d.fail(404, 'That folder no longer exists in Dropbox', req);
   const listed = await listSubfolders(d, token, path, true);
-  if (listed.error) return d.fail(502, 'Could not list that catalog folder in Dropbox', req, listed.error);
+  if (listed.error) return d.fail(502, 'Could not list that catalog folder in Dropbox', req, det(listed.error));
   const sr = await fetch(`${d.sbUrl}/rest/v1/product_catalog?catalog=eq.${encodeURIComponent(catalog)}&select=sku,sku_norm,is_active&limit=2000`, { headers: { apikey: d.sbSvc, authorization: `Bearer ${d.sbSvc}` } });
   if (!sr.ok) return d.fail(502, 'Could not read the master mirror for that catalog', req);
   const sheet: SheetRow[] = await sr.json().catch(() => []);
@@ -296,22 +317,22 @@ export async function catalogPack(body: any, req: Request, d: Deps): Promise<Res
     if (!have.error && !have.truncated && samePack(active, have.sub)) return packLink(token, String(existing.data.path_lower), req, d, { ...extra, reused: true });
     if (!String(existing.data.path_lower).startsWith(PACK_ROOT.toLowerCase() + '/')) return d.fail(500, 'Refusing to replace a folder outside the packs folder', req);
     const del = await d.dbx(token, 'files/delete_v2', { path: String(existing.data.path_lower) });
-    if (del.status >= 400) return d.fail(502, 'Could not replace the old pack in Dropbox', req, JSON.stringify(del.data).slice(0, 200));
+    if (del.status >= 400) return d.fail(502, 'Could not replace the old pack in Dropbox', req, det(JSON.stringify(del.data).slice(0, 200)));
   }
   const mk = await d.dbx(token, 'files/create_folder_v2', { path: packPath, autorename: false });
-  if (mk.status >= 400) return d.fail(502, 'Could not create the pack folder in Dropbox', req, JSON.stringify(mk.data).slice(0, 200));
+  if (mk.status >= 400) return d.fail(502, 'Could not create the pack folder in Dropbox', req, det(JSON.stringify(mk.data).slice(0, 200)));
   const cp = await d.dbx(token, 'files/copy_batch_v2', { entries: active.map(a => ({ from_path: a.path, to_path: `${packPath}/${a.name}` })), autorename: false });
-  if (cp.status >= 400) return d.fail(502, 'Dropbox refused to copy the folders', req, JSON.stringify(cp.data).slice(0, 200));
+  if (cp.status >= 400) return d.fail(502, 'Dropbox refused to copy the folders', req, det(JSON.stringify(cp.data).slice(0, 200)));
   if (cp.data?.['.tag'] === 'complete') return packLink(token, packPath, req, d, extra);
   const id = String(cp.data?.async_job_id || '');
-  if (!id) return d.fail(502, 'Dropbox gave no copy job id', req, JSON.stringify(cp.data).slice(0, 200));
+  if (!id) return d.fail(502, 'Dropbox gave no copy job id', req, det(JSON.stringify(cp.data).slice(0, 200)));
   // Copies inside Dropbox usually finish in seconds — wait a little here
   // before handing the poll to the client.
   for (let i = 0; i < 8; i++) {
     await new Promise(r => setTimeout(r, 1500));
     const ck = await d.dbx(token, 'files/copy_batch/check_v2', { async_job_id: id });
     if (ck.data?.['.tag'] === 'complete') return packLink(token, packPath, req, d, extra);
-    if (ck.data?.['.tag'] !== 'in_progress') return d.fail(502, 'Dropbox could not copy the folders', req, JSON.stringify(ck.data).slice(0, 200));
+    if (ck.data?.['.tag'] !== 'in_progress') return d.fail(502, 'Dropbox could not copy the folders', req, det(JSON.stringify(ck.data).slice(0, 200)));
   }
   return d.json({ ok: true, pending: true, jobId: id, packPath, ...extra }, req);
 }

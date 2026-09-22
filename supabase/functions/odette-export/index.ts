@@ -739,7 +739,7 @@ Deno.serve(async (req) => {
       // per SKU, then listings and links): 5 a minute per IP on the token
       // path, and the answer for a SKU set is kept 10 minutes so re-picking
       // the same catalog costs nothing.
-      const denied = await gate(body, req, rcDeps, 'rp', 5); if (denied) return denied;
+      const denied = (await gate(body, req, rcDeps, 'rp', 5)).denied; if (denied) return denied;
       const skusIn: string[] = [...new Set((Array.isArray(body?.skus) ? body.skus.slice(0, 64) : []).map((x: unknown) => normSku(x)).filter(Boolean))] as string[];
       if (skusIn.length === 0) return fail(400, 'No SKUs to look up', req);
       const photoKey = [...skusIn].sort().join(',');
@@ -812,7 +812,7 @@ Deno.serve(async (req) => {
     // toBlob and break the JPG export). Path must sit INSIDE a configured
     // search folder - a share token cannot reach the rest of the Dropbox.
     if (action === 'ratecard_photo_fetch') {
-      const denied = await gate(body, req, rcDeps, 'rf', 30); if (denied) return denied;
+      const denied = (await gate(body, req, rcDeps, 'rf', 30)).denied; if (denied) return denied;
       const path = String(body?.path || '').trim().toLowerCase();
       if (!path.startsWith('/')) return fail(400, 'Bad photo path', req);
       let token = '';

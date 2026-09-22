@@ -9,7 +9,13 @@ const CACHE = 'dailyoffice-__BUILD_TS__';
 // cannot grow without bound — the oldest entries go first.
 const IMG_CACHE = 'dailyoffice-images-v1';
 const IMG_MAX = 200;
-const isPublicImage = url => url.hostname.includes('supabase') && url.pathname.startsWith('/storage/v1/object/public/');
+// IMAGES only: an <img>/CSS request, or a url in one of the three photo
+// buckets. Other public objects (program voice notes are <audio> — Safari
+// fetches those with Range headers and needs the real 206) go to the
+// network untouched.
+const IMG_BUCKETS = /^\/storage\/v1\/object\/public\/(costing-images|payment-qr|employee-qr)\//;
+const isPublicImage = (url, req) => url.hostname.includes('supabase') && url.pathname.startsWith('/storage/v1/object/public/')
+  && (req.destination === 'image' || IMG_BUCKETS.test(url.pathname));
 const trimImages = cache => cache.keys().then(keys =>
   Promise.all(keys.slice(0, Math.max(0, keys.length - IMG_MAX)).map(k => cache.delete(k))));
 
@@ -33,13 +39,16 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // Ranged requests (media seeking) must reach the server as sent: a cached
+  // or refetched 200 in place of a 206 breaks playback on Safari/iOS.
+  if (e.request.headers.has('range')) return;
   const url = new URL(e.request.url);
 
   // Public storage images: cache-first, forever (see IMG_CACHE above). An
   // <img> request is no-cors, whose opaque response is unusable and
   // quota-padded, so the miss is refetched with CORS (the buckets allow
   // any origin); if that ever fails the plain request goes out as before.
-  if (isPublicImage(url)) {
+  if (isPublicImage(url, e.request)) {
     e.respondWith(caches.open(IMG_CACHE).then(cache => cache.match(url.href).then(hit => hit ||
       fetch(url.href, { mode: 'cors', credentials: 'omit' }).then(r => {
         if (r.ok) { const clone = r.clone(); cache.put(url.href, clone).then(() => trimImages(cache)).catch(() => {}); }
