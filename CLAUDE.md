@@ -10,6 +10,21 @@ After every set of changes:
 
 This applies to all code changes. No confirmation needed.
 
+## Pre-merge self-review — MANDATORY
+Before creating the PR, re-read the full diff (`git diff main...HEAD`) as a
+reviewer, not the author, and check:
+1. Logic: conditions, calculations, date/timezone (UTC vs IST), status
+   transitions, rounding on money/quantities
+2. Every changed RPC/function signature → all callers still match
+3. Any migration: RLS + policy, indexes on filter columns,
+   `types/database.ts` updated
+4. No swallowed errors, every `addToast` wrapped in `friendlyError`, no
+   `select('*')` on growing tables
+5. `npm run build` passes
+6. Did this change break anything that CALLS the code I touched? Trace it.
+List what you checked and anything you fixed in the PR description. If
+unsure about a risk, say so instead of merging.
+
 ## Post-deploy verification — MANDATORY
 After every merge to main, you MUST:
 1. **Wait for the Pages run** — build + deploy takes 1–4 minutes. Poll
@@ -21,6 +36,11 @@ After every merge to main, you MUST:
 4. Think before acting: deploys queue (`cancel-in-progress: false`), so
    several quick merges wait on each other. Batch related changes into
    one PR when possible instead of merging 3 PRs in 2 minutes.
+
+## Post-deploy smoke test — MANDATORY
+After the Pages run succeeds, state in plain language what the user should
+tap through to confirm the change works (2–4 steps max), and what "broken"
+would look like.
 
 ## File layout
 - Modular structure — DO NOT put new code in App.tsx
