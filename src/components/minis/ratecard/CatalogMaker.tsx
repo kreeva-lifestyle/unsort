@@ -88,7 +88,7 @@ export default function CatalogMaker({ addToast }: { addToast: (m: string, t?: s
   const seg = <V extends string>(value: V, opts: [V, string][], onPick: (v: V) => void) => (
     <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, padding: 3 }}>
       {opts.map(([v, label]) => (
-        <button key={v} type="button" onClick={() => { onPick(v); clear(); }} aria-pressed={value === v}
+        <button key={v} type="button" className="touch44" onClick={() => { onPick(v); clear(); }} aria-pressed={value === v}
           style={{ ...S.btnSm, minHeight: 30, border: 'none', cursor: 'pointer', borderRadius: 6, background: value === v ? T.ac3 : 'transparent', color: value === v ? T.ac2 : T.tx3, fontWeight: value === v ? 700 : 500 }}>{label}</button>
       ))}
     </div>

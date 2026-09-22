@@ -50,6 +50,8 @@ export const T = {
   re:  'oklch(0.63 0.22 25)',
   yl:  'oklch(0.78 0.18 75)',
   bl:  'oklch(0.77 0.14 230)',
+  or:  'oklch(0.75 0.18 50)',   // orange — a state between yellow and red (Indya "blocked")
+  gd:  'oklch(0.80 0.08 85)',   // brand gold (the Minis dot, the AD crest)
 
   // Alpha variants (use these instead of appending hex suffixes to oklch)
   ac87: oklchTint(0.55, 0.22, 265, 0.87),

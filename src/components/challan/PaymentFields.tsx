@@ -51,7 +51,7 @@ export default function PaymentFields({ status, setStatus, mode, setMode, amount
     <div className="challan-form-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px 12px' }}>
       <div>
         <label style={lbl}>Status</label>
-        <select value={status} onChange={e => onStatus(e.target.value)} style={{ ...inp, fontSize: 11 }}>
+        <select value={status} onChange={e => onStatus(e.target.value)} style={inp}>
           <option value="unpaid">Unpaid</option>
           <option value="paid">Paid</option>
           <option value="partial">Partial</option>
@@ -59,7 +59,7 @@ export default function PaymentFields({ status, setStatus, mode, setMode, amount
       </div>
       <div>
         <label style={lbl}>Payment Mode</label>
-        <select value={mode} onChange={e => setMode(e.target.value)} style={{ ...inp, fontSize: 11 }}>
+        <select value={mode} onChange={e => setMode(e.target.value)} style={inp}>
           <option value="">Select...</option>
           {mode && !PAYMENT_MODES.includes(mode) && <option value={mode} disabled>{mode}</option>}
           {PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
@@ -69,7 +69,7 @@ export default function PaymentFields({ status, setStatus, mode, setMode, amount
         <label style={lbl}>Amount Paid</label>
         <div style={{ position: 'relative' }}>
           <input type="number" min="0" value={amount || ''} onKeyDown={e => numericKeyDown(e)} onChange={e => setAmount(Math.max(0, Number(e.target.value)))}
-            placeholder="Amount" style={{ ...inp, fontFamily: T.mono, fontSize: 11, paddingRight: canFill ? 56 : undefined }} />
+            placeholder="Amount" style={{ ...inp, fontFamily: T.mono, paddingRight: canFill ? 56 : undefined }} />
           {/* Sits inside the box like a wallet's MAX button: the whole input
               height is the tap target, and it disappears once the amount IS
               the total, so a settled challan shows a plain field. */}

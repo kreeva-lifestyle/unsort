@@ -31,6 +31,7 @@ export default function IndyaSkuMap({ addToast, onChange, prefill }: {
   const [editId, setEditId] = useState<string | null>(null);
   const [editWrong, setEditWrong] = useState('');
   const [editCorrect, setEditCorrect] = useState('');
+  const [rowBusy, setRowBusy] = useState<string | null>(null); // id of the row whose Save / Del is in flight
   const { ask, modalProps } = useConfirm();
 
   // Callbacks live in refs so `load` is stable: a parent re-render must never
@@ -57,17 +58,21 @@ export default function IndyaSkuMap({ addToast, onChange, prefill }: {
   };
   const saveEdit = async (r: MapRow) => {
     const problem = checkEntry(editWrong, editCorrect);
-    if (problem) { addToast(problem, 'error'); return; }
+    if (problem || rowBusy) { if (problem) addToast(problem, 'error'); return; }
+    setRowBusy(r.id);
     try {
       if (editWrong.trim().toUpperCase() !== r.wrong.toUpperCase()) await deleteSkuMap(r.id);   // the key changed: replace the row
       await upsertSkuMap([{ wrong: editWrong, correct: editCorrect, note: r.note }]);
       setEditId(null); addToast('SKU map updated', 'success'); await load();
     } catch (e) { addToast('Update failed — ' + friendlyError(e), 'error'); }
+    setRowBusy(null);
   };
   const remove = async (r: MapRow) => {
-    if (!await ask({ title: 'Remove this fix?', message: `${r.wrong} → ${r.correct}`, confirmLabel: 'Remove', danger: true })) return;
+    if (rowBusy || !await ask({ title: 'Remove this fix?', message: `${r.wrong} → ${r.correct}`, confirmLabel: 'Remove', danger: true })) return;
+    setRowBusy(r.id);
     try { await deleteSkuMap(r.id); addToast('Removed', 'success'); setPage(0); await load(); }
     catch (e) { addToast('Delete failed — ' + friendlyError(e), 'error'); }
+    setRowBusy(null);
   };
   const exportCsv = () => {
     if (!rows.length) { addToast('The SKU map is empty', 'error'); return; }
@@ -117,12 +122,12 @@ export default function IndyaSkuMap({ addToast, onChange, prefill }: {
                   <input value={editWrong} onChange={e => setEditWrong(e.target.value)} autoFocus aria-label="Edit code as Indya sent it" style={{ ...S.fInput, flex: 1, minWidth: 110, height: 32, fontSize: 12, fontFamily: T.mono, padding: '4px 8px', textTransform: 'uppercase' }} />
                   <span style={{ color: T.tx3 }}>→</span>
                   <input value={editCorrect} onChange={e => setEditCorrect(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveEdit(r); if (e.key === 'Escape') setEditId(null); }} aria-label="Edit correct SKU" style={{ ...S.fInput, flex: 1, minWidth: 110, height: 32, fontSize: 12, fontFamily: T.mono, padding: '4px 8px', textTransform: 'uppercase' }} />
-                  <button type="button" className="touch44" onClick={() => saveEdit(r)} style={{ ...S.btnSuccess, ...S.btnSm }}>Save</button>
+                  <button type="button" className="touch44" onClick={() => saveEdit(r)} style={bt({ ...S.btnSuccess, ...S.btnSm }, rowBusy === r.id)}>{rowBusy === r.id ? 'Saving…' : 'Save'}</button>
                   <button type="button" className="touch44" onClick={() => setEditId(null)} style={{ ...S.btnGhost, ...S.btnSm }}>Cancel</button>
                 </>) : (<>
                   <div style={{ flex: 1, minWidth: 0, fontFamily: T.mono, fontSize: 12, color: T.tx }}><span style={{ color: T.re, textDecoration: 'line-through', textDecorationColor: 'rgba(239,68,68,.5)' }}>{r.wrong}</span> <span style={{ color: T.tx3 }}>→</span> <b style={{ color: T.gr }}>{r.correct}</b></div>
                   <button type="button" className="touch44" onClick={() => { setEditId(r.id); setEditWrong(r.wrong); setEditCorrect(r.correct); }} style={{ ...S.btnGhost, ...S.btnSm }}>Edit</button>
-                  <button type="button" className="touch44" onClick={() => remove(r)} style={{ ...S.btnDanger, ...S.btnSm }}>Del</button>
+                  <button type="button" className="touch44" onClick={() => remove(r)} style={bt({ ...S.btnDanger, ...S.btnSm }, rowBusy === r.id)}>{rowBusy === r.id ? 'Deleting…' : 'Del'}</button>
                 </>)}
               </div>
             ))}

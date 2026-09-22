@@ -1,19 +1,19 @@
-// Purchase Orders — container. Owns paginated fetch (head-count + explicit
-// columns + items join for receive-progress), debounced search, filters,
-// filtered realtime, and modal orchestration (form / detail / receive /
-// print). Mirrors the Cash Challan module; PO ≈ challan, receipts ≈ payments.
-import { useState, useEffect, useCallback, useRef } from 'react';
+// Purchase Orders — container. The list data (paginated fetch, search,
+// filters, realtime) lives in usePoList; this page owns the modal
+// orchestration (form / detail / receive / print / pendency / contacts).
+// Mirrors the Cash Challan module; PO ≈ challan, receipts ≈ payments.
+import { useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { printOrQueue } from '../lib/printQueue';
 import { useAuth } from '../hooks/useAuth';
-import { useActiveRefetch } from '../hooks/useActiveRefetch';
 import { useNotifications } from '../hooks/useNotifications';
 import { T, S, PO_STATUS_COLORS } from '../lib/theme';
 import { useBackClose } from '../hooks/useBackClose';
 import { useCrumb } from '../hooks/useBreadcrumb';
 import { friendlyError } from '../lib/friendlyError';
-import POList, { type PORow } from '../components/purchaseorders/POList';
+import POList from '../components/purchaseorders/POList';
+import { usePoList, PO_COLS as COLS } from '../components/purchaseorders/usePoList';
 import POForm, { type EditingPO } from '../components/purchaseorders/POForm';
 import PODetail from '../components/purchaseorders/PODetail';
 import POReceive from '../components/purchaseorders/POReceive';
@@ -25,8 +25,6 @@ import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog }
 import { useModalLock } from '../hooks/useModalLock';
 import Toggle from '../components/ui/Toggle';
 
-const COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, for_pieces, lump_sum, costing_product_id, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, closed_at, closed_by, close_reason, created_by, modified_by, created_at, updated_at';
-
 type Detail = { po: PurchaseOrder; items: PurchaseOrderItem[]; receipts: PurchaseOrderReceipt[]; audit: AuditLog[] | null };
 
 export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
@@ -36,31 +34,13 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const canManage = role === 'admin' || role === 'manager';
   const canCreate = role === 'admin' || role === 'manager' || role === 'operator';
 
-  const [pos, setPos] = useState<PORow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(25);
+  const {
+    pos, loading, page, setPage, pageSize, setPageSize, totalCount, totalPages,
+    search, updateSearch, statusFilter, setStatusFilter, typeFilter, setTypeFilter, creatorFilter, setCreatorFilter,
+    dateFrom, setDateFrom, dateTo, setDateTo, showFilters, setShowFilters, users, fetchPos, clearFilters,
+  } = usePoList(active, addToast);
+
   const [sharing, setSharing] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
-  const updateSearch = (v: string) => { setSearch(v); clearTimeout(searchTimer.current); searchTimer.current = setTimeout(() => setDebouncedSearch(v), 400); };
-  useEffect(() => () => clearTimeout(searchTimer.current), []);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [creatorFilter, setCreatorFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [users, setUsers] = useState<{ id: string; full_name: string }[]>([]);
-
-  // Active users for the "Created By" filter dropdown (pattern from CashBook).
-  useEffect(() => {
-    supabase.from('profiles').select('id, full_name').eq('is_active', true).order('full_name').limit(200)
-      .then(({ data }) => setUsers((data as { id: string; full_name: string }[] | null) || []));
-  }, []);
-
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<EditingPO | null>(null);
   const [duplicating, setDuplicating] = useState<EditingPO | null>(null);
@@ -74,75 +54,6 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   // Vendor pendency report (owner's ask): open orders for one vendor with
   // pending-since headlined, shareable as an image. null = closed.
   const [pendency, setPendency] = useState<{ vendor: string | null } | null>(null);
-
-  const totalPages = Math.ceil(totalCount / pageSize);
-
-  // Monotonic fetch id — a slower stale response (e.g. the SKU-search path has
-  // an extra awaited RPC) must never overwrite the result of a newer fetch.
-  const fetchSeq = useRef(0);
-  const fetchPos = useCallback(async (silent = false) => {
-    const seq = ++fetchSeq.current;
-    if (!silent) setLoading(true);
-    let q = supabase.from('purchase_orders').select(`${COLS}, costing_products(sku), purchase_order_items(sku, item_name, fabric_code, quantity, received_qty)`, { count: 'estimated' });
-    if (debouncedSearch) {
-      // Vendor name always matches; a pure number also matches the PO #; and
-      // ANY term (numeric SKUs like "15003" included) also matches line-item
-      // SKUs via search_po_ids. The RPC gets the RAW term (parameterized, so
-      // safe) — stripping dots/underscores made "DRS_178" unfindable; only
-      // the or-filter string needs the PostgREST-syntax characters removed.
-      const raw = debouncedSearch.trim();
-      const s = raw.replace(/[%_,().]/g, '').trim();
-      const ors: string[] = [];
-      if (s) {
-        ors.push(`vendor_name.ilike.%${s}%`);
-        // <=9 digits only: a 13-digit barcode overflows int4 and 400s the query.
-        if (/^\d{1,9}$/.test(s)) ors.push(`po_number.eq.${parseInt(s)}`);
-      }
-      if (raw) {
-        const { data: idRows, error: rpcErr } = await supabase.rpc('search_po_ids', { q: raw });
-        // A swallowed error here made SKU search silently degrade to
-        // vendor-only — surface it so a break is visible, not mysterious.
-        if (rpcErr) addToast(`SKU search failed — ${friendlyError(rpcErr)}`, 'error');
-        const ids = (idRows as string[] | null) || [];
-        if (ids.length > 0) ors.push(`id.in.(${ids.slice(0, 200).join(',')})`);
-      }
-      if (ors.length > 0) q = q.or(ors.join(','));
-    }
-    if (statusFilter) q = q.eq('status', statusFilter);
-    if (typeFilter) q = q.eq('po_type', typeFilter);
-    if (creatorFilter) q = q.eq('created_by', creatorFilter);
-    if (dateFrom) q = q.gte('po_date', dateFrom);
-    if (dateTo) q = q.lte('po_date', dateTo);
-    q = q.order('po_number', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
-    const { data, count, error } = await q;
-    if (seq !== fetchSeq.current) return; // a newer fetch superseded this one
-    // We ARE the latest fetch, so ALWAYS clear loading — even on the silent
-    // path. A silent refetch (channel connect / foreground) can supersede the
-    // mount fetch, and the superseded one returns above without clearing;
-    // gating this on !silent left the skeletons up forever.
-    if (error) { addToast(friendlyError(error), 'error'); setLoading(false); return; }
-    setPos((data as unknown as PORow[] | null) || []);
-    setTotalCount(count || 0);
-    setLoading(false);
-  }, [debouncedSearch, statusFilter, typeFilter, creatorFilter, dateFrom, dateTo, page, pageSize, addToast]);
-
-  useEffect(() => { fetchPos(); }, [fetchPos]);
-
-  // Realtime, gated on the page being the VISIBLE tab (hidden tabs stay
-  // mounted forever — refetching them was invisible server load). Hidden
-  // events mark the page stale; one refetch fires on switching back / app
-  // resume. The hook throttles bursts and owns the foreground listeners.
-  const notifyPos = useActiveRefetch(active ?? true, () => fetchPos(true));
-  useEffect(() => {
-    const ch = supabase.channel('purchase_orders_rt')
-      // Header only: every PO RPC that touches items or receipts also stamps
-      // the header's updated_at in the same transaction, so the two extra
-      // table-wide subscriptions only fanned out duplicate events.
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, notifyPos)
-      // Reconnect catch-up: realtime never replays missed events.
-      .subscribe(status => { if (status === 'SUBSCRIBED') notifyPos(); });
-    return () => { supabase.removeChannel(ch); };
-  }, [notifyPos]);
 
   useModalLock(!!printData);
   useBackClose(!!detail, () => setDetail(null));
@@ -220,7 +131,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
         creatorFilter={creatorFilter} onCreatorFilterChange={setCreatorFilter} users={users}
         dateFrom={dateFrom} onDateFromChange={setDateFrom} dateTo={dateTo} onDateToChange={setDateTo}
         pageSize={pageSize} onPageSizeChange={setPageSize}
-        onClearFilters={() => { setStatusFilter(''); setTypeFilter(''); setCreatorFilter(''); setDateFrom(''); setDateTo(''); setPage(0); }}
+        onClearFilters={clearFilters}
         onResetPage={() => setPage(0)}
         onOpenEmpty={() => { setEditing(null); setDuplicating(null); setShowForm(true); }} canCreate={canCreate}
         onOpenDetail={openDetail} onPrint={(po) => openPrint(po)}

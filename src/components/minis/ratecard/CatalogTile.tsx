@@ -29,9 +29,9 @@ function CatalogTile({ tile, index, count, duplicate, onSku, onMove, onRemove }:
         {tile.thumb
           ? <img src={tile.thumb} alt="" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
           : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: T.tx3 }}>Reading…</div>}
-        <span style={{ position: 'absolute', top: 6, left: 6, fontSize: 10, fontFamily: T.mono, fontWeight: 700, color: '#fff', background: 'rgba(0,0,0,.55)', padding: '2px 7px', borderRadius: 4 }}>{index + 1}</span>
+        <span style={{ position: 'absolute', top: 6, left: 6, fontSize: 10, fontFamily: T.mono, fontWeight: 700, color: T.tx, background: 'rgba(0,0,0,.55)', padding: '2px 7px', borderRadius: 4 }}>{index + 1}</span>
         <button type="button" onClick={() => onRemove(tile.id)} aria-label="Remove photo"
-          style={{ position: 'absolute', top: 4, right: 4, width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 16, lineHeight: 1, cursor: 'pointer' }}>&times;</button>
+          style={{ position: 'absolute', top: 4, right: 4, width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,.55)', color: T.tx, fontSize: 18, lineHeight: 1, cursor: 'pointer' }}>&times;</button>
       </div>
       <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <input value={tile.sku} onChange={e => onSku(tile.id, e.target.value)} placeholder="SKU *" aria-label={`SKU for photo ${index + 1}`}

@@ -7,6 +7,7 @@ import { ageColor, ageBg, fmtDate, waitText } from './pendencyDoc';
 import type { PendencyDocOptions } from './pendencyDoc';
 import { itemLabel } from './poItemLabel';
 import { exportName } from '../../lib/exportName';
+import { friendlyError } from '../../lib/friendlyError';
 import { PO_STATUS_LABELS } from '../../types/database';
 
 const SANS = "-apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
@@ -139,12 +140,12 @@ function colX(hasSku: boolean, rates: boolean) {
 export async function sharePendencyImage(r: PendencyReport, addToast: (m: string, t?: string) => void, opts: PendencyDocOptions = {}) {
   let blob: Blob;
   try { blob = await renderPendencyImage(r, opts); }
-  catch { addToast('Could not build the report image', 'error'); return; }
+  catch (e) { addToast(`Could not build the report image — ${friendlyError(e)}`, 'error'); return; }
   const file = new File([blob], exportName('Pending-Orders', [r.vendor], 'png'), { type: 'image/png' });
   const nav = navigator as Navigator & { canShare?: (d: unknown) => boolean };
   if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
     try { await nav.share({ files: [file], title: `Pending orders — ${r.vendor}`, text: `Pending orders — ${r.vendor}` }); }
-    catch (e) { if ((e as Error)?.name !== 'AbortError') addToast('Sharing was cancelled', 'error'); }
+    catch (e) { if ((e as Error)?.name !== 'AbortError') addToast(`Could not share — ${friendlyError(e)}`, 'error'); }
     return;
   }
   const url = URL.createObjectURL(blob);
