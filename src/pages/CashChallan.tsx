@@ -1118,33 +1118,26 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // RPC. Audit only what actually happened.
     const paidOk: Challan[] = [];
     const skipped: { challan_number?: number; reason: string }[] = [];
-    if (ids.length > 0) {
-      const { data: payRes, error: payErr } = await supabase.rpc('pay_challan_batch', {
-        p_ids: ids, p_mode: bulkPayMode, p_date: payDate, p_batch_id: batchId, p_note: receiptNote, p_refund: isRefund,
-        p_extra: isRefund ? { refunded: { from: 0, to: received } } : { received_amount: { from: Math.abs(bulkNetTotal), to: received } },
-      });
-      if (payErr) { addToast(friendlyError(payErr), 'error'); setBulkBusy(false); return; }
-      const rows = ((payRes as { challan_id: string; challan_number?: number; paid?: number; skipped?: string }[] | null) || []);
-      for (const r of rows) {
-        const c = bulkPayable.find(x => x.id === r.challan_id);
-        if (r.skipped || !c) { failCount++; skipped.push({ challan_number: r.challan_number, reason: r.skipped || 'not in the batch' }); continue; }
-        paidOk.push(c);
-      }
+    // The selected returns are consumed INSIDE the same RPC/transaction as
+    // the sale payments (p_return_ids): the batch is counted net of their
+    // credit, so a return that cannot be settled rolls the whole batch back
+    // instead of leaving the sales "paid" with the credit still spendable.
+    // Their rows carry the batch id, so batch Undo hands the credits back.
+    const settleFail = 0; let settledCount = 0;
+    const { data: payRes, error: payErr } = await supabase.rpc('pay_challan_batch', {
+      p_ids: ids, p_mode: bulkPayMode, p_date: payDate, p_batch_id: batchId, p_note: receiptNote, p_refund: isRefund,
+      p_extra: isRefund ? { refunded: { from: 0, to: received } } : { received_amount: { from: Math.abs(bulkNetTotal), to: received } },
+      p_return_ids: settleableReturns.map(c => c.id),
+    });
+    if (payErr) { addToast(friendlyError(payErr), 'error'); setBulkBusy(false); return; }
+    const rows = ((payRes as { challan_id: string; challan_number?: number; paid?: number; skipped?: string; is_return?: boolean }[] | null) || []);
+    for (const r of rows) {
+      if (r.is_return) { settledCount++; continue; }
+      const c = bulkPayable.find(x => x.id === r.challan_id);
+      if (r.skipped || !c) { failCount++; skipped.push({ challan_number: r.challan_number, reason: r.skipped || 'not in the batch' }); continue; }
+      paidOk.push(c);
     }
     for (const s of skipped.slice(0, 3)) addToast(`${s.challan_number ? `#${s.challan_number}: ` : ''}${s.reason}`, 'error');
-    // Consume the credit of every selected return: its amount_paid rises to
-    // total (settle_return_refund), so it stops offsetting outstanding and the
-    // negative payment row nets the cash book against the sale payments above.
-    // The settle rows carry the batch id, so batch Undo hands the credits
-    // back along with reversing the sales (undo_challan_batch).
-    // Settle failures are counted SEPARATELY from sale failures so the summary
-    // toast never reports a failed settle as a failed sale payment.
-    let settleFail = 0, settledCount = 0;
-    for (const c of settleableReturns) {
-      const { error: settleErr } = await supabase.rpc('settle_return_refund', { p_challan_id: c.id, p_mode: bulkPayMode, p_batch_id: batchId });
-      if (settleErr) { addToast(`Return #${c.challan_number}: ${friendlyError(settleErr)}`, 'error'); settleFail++; continue; }
-      settledCount++;
-    }
     setLastBatch({ id: batchId, count: ids.length, mode: bulkPayMode, settled: settledCount });
     setShowBulkPay(false); setBulkPayMode(''); setBulkReceivedAmount(''); setBulkPayDate(''); exitBulkMode(); fetchChallans();
     if (failCount > 0 || settleFail > 0) {
