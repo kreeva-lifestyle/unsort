@@ -53,6 +53,10 @@ export function closeAllLayers() {
   while (stack.length) stack.pop()!.close();
 }
 
+// How many layers are open — lets a caller tell whether a close() took effect
+// before asking for the next one (the breadcrumb's unwind).
+export const layerCount = (): number => stack.length;
+
 // Closes the topmost layer, if any. Used by the global Escape handler. It goes
 // through the layer's own close(), so the unmount cleanup below owns the
 // history pop — exactly the same path as tapping ×.

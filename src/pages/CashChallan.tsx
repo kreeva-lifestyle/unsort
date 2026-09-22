@@ -1123,16 +1123,16 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // credit, so a return that cannot be settled rolls the whole batch back
     // instead of leaving the sales "paid" with the credit still spendable.
     // Their rows carry the batch id, so batch Undo hands the credits back.
-    const settleFail = 0; let settledCount = 0;
     const { data: payRes, error: payErr } = await supabase.rpc('pay_challan_batch', {
       p_ids: ids, p_mode: bulkPayMode, p_date: payDate, p_batch_id: batchId, p_note: receiptNote, p_refund: isRefund,
       p_extra: isRefund ? { refunded: { from: 0, to: received } } : { received_amount: { from: Math.abs(bulkNetTotal), to: received } },
-      p_return_ids: settleableReturns.map(c => c.id),
+      p_return_ids: settleableReturns.map(c => c.id), p_received: isRefund ? null : received,
     });
     if (payErr) { addToast(friendlyError(payErr), 'error'); setBulkBusy(false); return; }
-    const rows = ((payRes as { challan_id: string; challan_number?: number; paid?: number; skipped?: string; is_return?: boolean }[] | null) || []);
+    const rows = ((payRes as { challan_id: string; challan_number?: number; paid?: number; skipped?: string; is_return?: boolean; written_off?: number }[] | null) || []);
+    const writtenOff = rows.reduce((s, r) => s + Number(r.written_off || 0), 0); const settleFail = 0; let settledCount = 0; // short payment → 'Write-off' rows on the last challans paid
     for (const r of rows) {
-      if (r.is_return) { settledCount++; continue; }
+      if (r.written_off || r.is_return) { if (r.is_return) settledCount++; continue; }
       const c = bulkPayable.find(x => x.id === r.challan_id);
       if (r.skipped || !c) { failCount++; skipped.push({ challan_number: r.challan_number, reason: r.skipped || 'not in the batch' }); continue; }
       paidOk.push(c);
@@ -1146,7 +1146,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       if (settleableReturns.length > 0) parts.push(`${settledCount} of ${settleableReturns.length} return credits settled${settleFail > 0 ? ` (${settleFail} failed)` : ''}`);
       addToast(`${parts.join(' · ')} (${batchId})`, 'error');
     }
-    else addToast(isRefund ? `Settled ${ids.length} challans, refunded ₹${received.toLocaleString('en-IN')} (${batchId})` : `${ids.length > 0 ? `${ids.length} challans marked as paid` : `${settledCount} return credit${settledCount === 1 ? '' : 's'} settled`} (${batchId})`, 'success');
+    else addToast(isRefund ? `Settled ${ids.length} challans, refunded ₹${received.toLocaleString('en-IN')} (${batchId})` : `${ids.length > 0 ? `${ids.length} challans marked as paid` : `${settledCount} return credit${settledCount === 1 ? '' : 's'} settled`}${writtenOff > 0 ? `, ₹${writtenOff.toLocaleString('en-IN')} written off` : ''} (${batchId})`, 'success');
     // Offer a WhatsApp receipt when the whole batch belongs to one customer
     // (the common per-customer settlement case). Mixed selections: skip.
     if (paidOk.length > 0) {

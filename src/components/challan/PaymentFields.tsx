@@ -6,6 +6,10 @@
 //   - the FULL chip inside Amount Paid does the same from any status.
 // A typed amount is never overwritten by the status change; the chip is an
 // explicit tap, so it always sets the total.
+// On an EDIT of a challan that already carries a payment (`recordedPaid`),
+// topping up to the total is a NEW payment taken now: it is dated today and
+// the mode is cleared for the operator to pick — the earlier payment's date
+// and mode belong to that payment, not to this one (audit M1).
 import { T } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import DateInput from '../ui/DateInput';
@@ -14,23 +18,28 @@ export const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 
 
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
-export default function PaymentFields({ status, setStatus, mode, setMode, amount, setAmount, date, setDate, total, lbl, inp }: {
+export default function PaymentFields({ status, setStatus, mode, setMode, amount, setAmount, date, setDate, total, recordedPaid = 0, lbl, inp }: {
   status: string; setStatus: (v: string) => void;
   mode: string; setMode: (v: string) => void;
   amount: number; setAmount: (v: number) => void;
   date: string; setDate: (v: string) => void;
   total: number;
+  recordedPaid?: number;
   lbl: React.CSSProperties; inp: React.CSSProperties;
 }) {
+  const stampTopUp = () => {
+    if (recordedPaid > 0 && total > recordedPaid) { setDate(today()); setMode(''); }
+    else if (!date) setDate(today());
+  };
   const fillFull = () => {
     setAmount(total);
     setStatus('paid');
-    if (!date) setDate(today());
+    stampTopUp();
     if (mode === 'Return Credit') setMode('');
   };
   const onStatus = (v: string) => {
     setStatus(v);
-    if (v === 'paid' && amount < total) { setAmount(total); if (!date) setDate(today()); }
+    if (v === 'paid' && amount < total) { setAmount(total); stampTopUp(); }
   };
   const canFill = total > 0 && amount !== total;
 

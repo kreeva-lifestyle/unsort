@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { T } from '../../lib/theme';
 import { useBreadcrumb } from '../../hooks/useBreadcrumb';
-import { closeAllLayers, closeTopLayer } from '../../hooks/useBackClose';
+import { closeAllLayers, closeTopLayer, layerCount } from '../../hooks/useBackClose';
 
 // A crumb that can be tapped looks like text but is a real button: keyboard
 // reachable, a 44px target, no link semantics (nothing here is a URL of its
@@ -30,6 +30,22 @@ export default function Header({ title, onNotifClick, notifications, markAsRead,
     if (onNotifClick) onNotifClick(n);
   };
 
+  // A middle crumb unwinds to ITSELF, not just one level: layers close from
+  // the top one at a time (each close is the layer's own, so its history entry
+  // goes with it) until the trail is that crumb's length. Layers without a
+  // crumb (a modal over a sub-view) are closed on the way. Each step waits
+  // for the commit and stops if a close changed nothing, so it cannot spin.
+  const crumbsRef = useRef(crumbs); crumbsRef.current = crumbs;
+  const unwindTo = (keep: number) => {
+    const step = () => {
+      if (crumbsRef.current.length <= keep) return;
+      const before = layerCount();
+      if (!closeTopLayer()) return;
+      setTimeout(() => { if (layerCount() < before) step(); }, 40);
+    };
+    step();
+  };
+
   const last = crumbs.length - 1;
   return (
     <header className="header-bar" style={{ background: T.s, borderBottom: `1px solid ${T.bd}`, padding: '0 16px', position: 'sticky', top: 0, zIndex: 50, height: 56, display: 'flex', alignItems: 'center' }}>
@@ -41,8 +57,8 @@ export default function Header({ title, onNotifClick, notifications, markAsRead,
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.bl, boxShadow: `0 0 8px ${T.bl}`, flexShrink: 0 }} />
           {/* Breadcrumb trail: every level but the current one is a way back —
               the page name closes every open layer (back to the page root),
-              a middle crumb closes the layer above it, the last is where you
-              are (aria-current). Mirrors the device Back, one level at a time. */}
+              a middle crumb closes every layer above it, the last is where
+              you are (aria-current). */}
           <nav aria-label="Breadcrumb" style={{ minWidth: 0 }}>
             <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
               <li>
@@ -57,7 +73,7 @@ export default function Header({ title, onNotifClick, notifications, markAsRead,
                   <span aria-hidden="true" style={{ color: T.tx3, margin: '0 5px', fontSize: 12 }}>/</span>
                   {i === last
                     ? <span aria-current="page" style={{ color: T.tx }}>{c}</span>
-                    : <button type="button" onClick={() => closeTopLayer()} title={`Back to ${c}`} style={{ ...crumbBtn, color: T.tx3 }}>{c}</button>}
+                    : <button type="button" onClick={() => unwindTo(i + 1)} title={`Back to ${c}`} style={{ ...crumbBtn, color: T.tx3 }}>{c}</button>}
                 </li>
               ))}
             </ol>

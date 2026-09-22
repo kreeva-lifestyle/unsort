@@ -2,16 +2,22 @@
 // the merge rules are in contactsMerge.ts (pure); this file is the only one
 // that talks to Supabase.
 import { supabase } from '../../lib/supabase';
+import { fetchPaged } from '../../lib/fetchPaged';
 import { mergeContacts, type ContactRow, type ContactForm, type CustomerSrc, type VendorSrc } from './contactsMerge';
+
+// PostgREST answers 1000 rows per request whatever .limit() asks, so both
+// masters are paged (fetchPaged) up to this ceiling — a customer past the
+// first thousand must still find their supplier twin in the merge.
+const MAX_ROWS = 20000;
 
 export async function loadContacts(): Promise<ContactRow[]> {
   const [c, v] = await Promise.all([
-    supabase.from('cash_challan_customers').select('id, name, phone, address').order('name').limit(2000),
-    supabase.from('po_vendors').select('id, name, phone, gstin, address, notes, is_active').order('name').limit(2000),
+    fetchPaged((from, to) => supabase.from('cash_challan_customers').select('id, name, phone, address').order('name').order('id').range(from, to), MAX_ROWS),
+    fetchPaged((from, to) => supabase.from('po_vendors').select('id, name, phone, gstin, address, notes, is_active').order('name').order('id').range(from, to), MAX_ROWS),
   ]);
   if (c.error) throw c.error;
   if (v.error) throw v.error;
-  return mergeContacts((c.data || []) as CustomerSrc[], (v.data || []) as VendorSrc[]);
+  return mergeContacts(c.data as CustomerSrc[], v.data as VendorSrc[]);
 }
 
 /** save_contact (SECURITY INVOKER): one transaction across both tables.

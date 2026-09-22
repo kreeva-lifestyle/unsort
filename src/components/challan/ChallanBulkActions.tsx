@@ -49,8 +49,10 @@ interface Props {
 
 export default function ChallanBulkActions(p: Props) {
   // Short-payment acknowledgement: marking everything FULLY paid while the
-  // customer paid less writes the gap off silently — that needs an explicit
-  // tick, not just a hint. Reset each time the modal opens.
+  // customer paid less writes the gap off — that needs an explicit tick, not
+  // just a hint. The gap is booked by pay_challan_batch as its own 'Write-off'
+  // ledger rows (never as cash), so the day's cash by mode stays true. Reset
+  // each time the modal opens.
   const [shortAck, setShortAck] = useState(false);
   useModalLock(p.showBulkPay || p.showBulkUnpay);
   useEffect(() => { if (p.showBulkPay) setShortAck(false); }, [p.showBulkPay]);
@@ -110,7 +112,7 @@ export default function ChallanBulkActions(p: Props) {
             {isShort && (
               <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'oklch(0.78 0.18 75 / .06)', border: '1px solid oklch(0.78 0.18 75 / .25)', borderRadius: 6, padding: '8px 10px', fontSize: 10.5, color: T.yl, marginBottom: 12, lineHeight: 1.5, cursor: 'pointer' }}>
                 <input type="checkbox" checked={shortAck} onChange={e => setShortAck(e.target.checked)} style={{ width: 16, height: 16, marginTop: 1, flexShrink: 0 }} />
-                <span>Customer paid <b>₹{shortBy.toLocaleString('en-IN')} less</b> than the outstanding. Mark all challans FULLY paid anyway — the gap is only written in the payment note, it will NOT show as due anywhere.</span>
+                <span>Customer paid <b>₹{shortBy.toLocaleString('en-IN')} less</b> than the outstanding. Mark all challans FULLY paid anyway — the gap is booked as a <b>Write-off</b> entry in the payment ledger (not as {p.bulkPayMode || 'cash'}) and will NOT show as due anywhere.</span>
               </label>
             )}
             <div style={{ display: 'flex', gap: 8 }}>
