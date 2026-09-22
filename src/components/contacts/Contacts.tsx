@@ -3,6 +3,7 @@
 // search over name / phone / address and a filter for the module's side.
 // Mounted as a sub-view by both pages; the parent owns the Back entry.
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { useCrumb } from '../../hooks/useBreadcrumb';
@@ -47,7 +48,7 @@ export default function Contacts({ canEdit, onBack, addToast }: {
         <div style={{ fontSize: 12, color: T.tx3, flex: 1, minWidth: 120 }}>
           {rows === null ? 'Loading contacts…' : `${rows.length} contact${rows.length === 1 ? '' : 's'} · ${counts!.customer} customer${counts!.customer === 1 ? '' : 's'} · ${counts!.supplier} supplier${counts!.supplier === 1 ? '' : 's'}`}
         </div>
-        {canEdit && <button onClick={() => setEditing('new')} style={S.btnPrimary}>+ New contact</button>}
+        {canEdit && <button className="desktop-only" onClick={() => setEditing('new')} style={S.btnPrimary}>+ New contact</button>}
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -88,6 +89,12 @@ export default function Contacts({ canEdit, onBack, addToast }: {
       {editing !== null && (
         <ContactModal contact={editing === 'new' ? null : editing} canEdit={canEdit} addToast={addToast}
           onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />
+      )}
+      {/* Mobile: the FAB replaces the header button (house rule); the parent
+          page hides its own FAB while this view is open. */}
+      {canEdit && editing === null && createPortal(
+        <button className="fab" aria-label="New contact" onClick={() => setEditing('new')}>+</button>,
+        document.body,
       )}
     </div>
   );

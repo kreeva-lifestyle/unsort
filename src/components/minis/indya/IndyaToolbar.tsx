@@ -32,7 +32,7 @@ export default function IndyaToolbar({ busy, hasMaster, hasVendors, hasBlocked, 
         <button type="button" className="touch44" onClick={pick(vendorRef)} style={bt(S.btnGhost)}>{busy === 'vendor' ? 'Reading…' : `${hasMaster ? '3 · ' : ''}+ Add vendor files`}</button>
         <button type="button" className="touch44" onClick={pick(blockedRef)} style={bt({ ...S.btnGhost, ...AMBER })}>{busy === 'blocked' ? 'Reading…' : hasBlocked ? 'Replace blocked' : 'Blocked inventory'}</button>
         {hasMaster && hasVendors && <button type="button" className="touch44" onClick={onCompute} style={bt(S.btnSuccess)}>{busy === 'compute' ? 'Computing…' : '4 · Compute'}</button>}
-        {hasResult && <button type="button" className="touch44" onClick={onDownload} style={bt({ ...S.btnPrimary, background: T.gr, color: '#fff', fontWeight: 700 })}>{busy === 'download' ? 'Preparing…' : '5 · Download updated file'}</button>}
+        {hasResult && <button type="button" className="touch44" onClick={onDownload} style={bt({ ...S.btnPrimary, background: T.gr, color: T.tx, fontWeight: 700 })}>{busy === 'download' ? 'Preparing…' : '5 · Download updated file'}</button>}
         <IndyaBarcodes addToast={addToast} busy={!!busy} />
         {anything && <button type="button" className="touch44" onClick={onReset} style={bt(S.btnDanger)}>Reset</button>}
       </div>

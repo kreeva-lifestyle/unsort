@@ -100,7 +100,7 @@ export default function RaisePOModal({ product, pieces, onClose, addToast }: {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    {!done && <button type="button" onClick={() => setInhouseFor(sup, true)} title="Work done by us — no PO" style={{ border: 'none', background: 'none', color: T.tx3, fontSize: 10, cursor: 'pointer', padding: '4px 2px', minHeight: 30 }}>Mark in-house</button>}
+                    {!done && <button type="button" className="touch44" onClick={() => setInhouseFor(sup, true)} title="Work done by us — no PO" style={{ border: 'none', background: 'none', color: T.tx3, fontSize: 10, cursor: 'pointer', padding: '6px 8px', minHeight: 36 }}>Mark in-house</button>}
                     {done
                       ? <span style={{ fontSize: 11, fontWeight: 700, color: T.gr, whiteSpace: 'nowrap' }}>PO #{done} drafted</span>
                       : <button onClick={() => setOpenFor(sup)} disabled={vendors === null} style={{ ...S.btnPrimary, minHeight: 36, whiteSpace: 'nowrap', opacity: vendors === null ? 0.5 : 1 }}>Create draft PO</button>}
@@ -125,7 +125,7 @@ export default function RaisePOModal({ product, pieces, onClose, addToast }: {
                   <div key={sup} style={{ border: `1px dashed ${T.bd}`, borderRadius: 10, padding: '8px 12px', marginBottom: 8, opacity: 0.85 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: T.tx2 }}>{sup} <span style={{ fontSize: 10, color: T.tx3, fontWeight: 400 }}>· {rows.map(l => l.sub).join(', ')}</span></span>
-                      <button type="button" onClick={() => setInhouseFor(sup, false)} style={{ border: 'none', background: 'none', color: T.ac2, fontSize: 10, cursor: 'pointer', padding: '4px 2px', minHeight: 30, whiteSpace: 'nowrap' }}>Needs a PO</button>
+                      <button type="button" className="touch44" onClick={() => setInhouseFor(sup, false)} style={{ border: 'none', background: 'none', color: T.ac2, fontSize: 10, cursor: 'pointer', padding: '6px 8px', minHeight: 36, whiteSpace: 'nowrap' }}>Needs a PO</button>
                     </div>
                   </div>
                 );

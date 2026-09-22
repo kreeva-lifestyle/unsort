@@ -7,8 +7,9 @@
 import { supabase } from '../../../lib/supabase';
 import { normKey, shapeKey, isCodeOnly } from './indyaSku';
 import type { Corrections } from './indyaFiles';
+import type { IndyaSkuMap } from '../../../types/database';
 
-export interface MapRow { id: string; wrong: string; correct: string; note: string | null }
+export type MapRow = Pick<IndyaSkuMap, 'id' | 'wrong' | 'correct' | 'note'>;
 export interface MapEntry { wrong: string; correct: string; note?: string | null }
 export const MAP_LIMIT = 5000;
 export const CODE_ONLY_MSG = 'Enter the code only, without a size — e.g. TF-343';

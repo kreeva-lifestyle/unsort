@@ -28,7 +28,7 @@ export default function ItemNameChips({ names, onPick }: { names: string[]; onPi
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: -2, marginBottom: 8 }}>
       {names.map(n => (
-        <button key={n} type="button" onClick={() => onPick(n)} aria-label={`Use item name ${n}`}
+        <button key={n} type="button" className="touch44" onClick={() => onPick(n)} aria-label={`Use item name ${n}`}
           style={{ ...S.btnGhost, ...S.btnSm, minHeight: 30, padding: '4px 12px', fontSize: 11, borderRadius: 999 }}>
           {n}
         </button>

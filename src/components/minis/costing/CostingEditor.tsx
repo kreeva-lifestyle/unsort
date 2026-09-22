@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
+import { useCrumb } from '../../../hooks/useBreadcrumb';
 import {
   CostingProduct, CostingLibrary, SheetProblem, blankComponent, totalCost,
   validateSheetDetailed, pruneBlank, subProblems, num,
@@ -35,6 +36,8 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
   addToast: (m: string, t?: string) => void;
 }) {
   const [p, setP] = useState<CostingProduct>(product);
+  // Header crumb from the SKU as typed: "Minis / Product Costing / FD-1".
+  useCrumb(p.sku.trim().toUpperCase() || 'New costing');
   const [errors, setErrors] = useState<SheetProblem[]>([]);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);

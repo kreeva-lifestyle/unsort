@@ -139,7 +139,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
     { key: 'all', label: 'Total', count: c.total, color: T.tx2 }, { key: 'ok', label: 'Updated', count: c.ok, color: T.gr }, { key: 'last', label: 'Last qty', count: c.last, color: T.yl },
     { key: 'unknown', label: 'Unknown code', count: c.unknown, color: T.re }, { key: 'size_missing', label: 'Size not stocked', count: c.size_missing, color: T.tx3 }, { key: 'oversize', label: 'Above XXL', count: c.oversize, color: T.tx3 },
     { key: 'oos', label: 'Out of stock', count: c.oos, color: T.re }, { key: 'shared', label: 'Shared code', count: c.shared, color: T.ac2 },
-    { key: 'blocked', label: 'Blocked', count: c.blocked, color: '#F97316' }, { key: 'unstitched', label: 'Unstitched', count: c.unstitched, color: T.tx3 },
+    { key: 'blocked', label: 'Blocked', count: c.blocked, color: T.or }, { key: 'unstitched', label: 'Unstitched', count: c.unstitched, color: T.tx3 },
     { key: 'stripped', label: 'Stripped', count: c.stripped, color: T.yl }, ...(c.lehenga ? [{ key: 'lehenga' as Filter, label: 'Lehenga', count: c.lehenga, color: T.gr }] : []), ...(c.corrected ? [{ key: 'corrected' as Filter, label: 'Corrected', count: c.corrected, color: T.bl }] : []),
   ] : [];
 

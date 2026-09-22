@@ -3,11 +3,11 @@
 import { T, S } from '../../lib/theme';
 import Empty from '../ui/Empty';
 import SwipeRow from '../ui/SwipeRow';
-import DateInput from '../ui/DateInput';
 import { SkeletonRows } from '../ui/Skeleton';
-import { PO_TYPE_LABELS, PO_STATUS_LABELS, PO_STATUSES } from '../../types/database';
+import { PO_TYPE_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
-import { itemLabel } from './poItemLabel';
+import POFilters, { type POFiltersProps } from './POFilters';
+import { StatusPill, itemsLabel, pendingDays, PendingSince, progress } from './poListParts';
 
 export type PORow = PurchaseOrder & {
   purchase_order_items?: Array<Pick<PurchaseOrderItem, 'sku' | 'item_name' | 'fabric_code' | 'quantity' | 'received_qty'>>;
@@ -15,7 +15,7 @@ export type PORow = PurchaseOrder & {
   costing_products?: { sku: string } | null;
 };
 
-interface Props {
+interface Props extends POFiltersProps {
   pos: PORow[];
   loading: boolean;
   totalCount: number;
@@ -24,21 +24,8 @@ interface Props {
   onSearchChange: (v: string) => void;
   showFilters: boolean;
   onToggleFilters: () => void;
-  statusFilter: string;
-  onStatusFilterChange: (v: string) => void;
-  typeFilter: string;
-  onTypeFilterChange: (v: string) => void;
-  creatorFilter: string;
-  onCreatorFilterChange: (v: string) => void;
-  users: { id: string; full_name: string }[];
-  dateFrom: string;
-  onDateFromChange: (v: string) => void;
-  dateTo: string;
-  onDateToChange: (v: string) => void;
   pageSize: number;
   onPageSizeChange: (v: number) => void;
-  onClearFilters: () => void;
-  onResetPage: () => void;
   onOpenEmpty: () => void;
   canCreate: boolean;
   onOpenDetail: (po: PORow) => void;
@@ -49,50 +36,6 @@ interface Props {
   totalPages: number;
   onPageChange: (p: number | ((prev: number) => number)) => void;
 }
-
-const StatusPill = ({ status, sc }: { status: string; sc: { bg: string; color: string } }) => (
-  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: sc.bg, color: sc.color, whiteSpace: 'nowrap' }}>
-    <span style={{ width: 7, height: 7, borderRadius: '50%', background: sc.color }} />
-    {PO_STATUS_LABELS[status as keyof typeof PO_STATUS_LABELS] || status}
-  </span>
-);
-
-// "What's on this PO" at a glance (owner's ask): first line-item's SKU and
-// name, then how many more — the full list stays one tap away in the detail.
-const itemsLabel = (po: PORow) => {
-  const its = po.purchase_order_items || [];
-  if (its.length === 0) return { head: '—', sub: '' };
-  const f = its[0];
-  const sku = (f.sku || '').trim();
-  const name = itemLabel({ item_name: (f.item_name || '').trim(), fabric_code: f.fabric_code });
-  const sub = [sku && name ? name : '', its.length > 1 ? `+${its.length - 1} more` : ''].filter(Boolean).join(' · ');
-  return { head: sku || name || 'item', sub };
-};
-
-// "Pending since": how long an open PO has been waiting, from its PO date
-// (or creation) — owner's ask, so a forgotten order stands out in the grid.
-// Closed orders (completed / cancelled) never show it.
-const OPEN_STATUSES = new Set(['draft', 'approved', 'sent', 'partially_received']);
-const pendingDays = (po: PORow): number | null => {
-  if (!OPEN_STATUSES.has(po.status)) return null;
-  const since = po.po_date ? new Date(po.po_date + 'T00:00:00') : po.created_at ? new Date(po.created_at) : null;
-  if (!since || Number.isNaN(since.getTime())) return null;
-  return Math.max(0, Math.floor((Date.now() - since.getTime()) / 86400000));
-};
-const pendingColor = (d: number) => (d > 14 ? T.re : d > 7 ? T.yl : T.tx3);
-const PendingSince = ({ po, inline }: { po: PORow; inline?: boolean }) => {
-  const d = pendingDays(po);
-  if (d === null) return null;
-  const text = d === 0 ? 'pending since today' : `pending ${d} d`;
-  return inline ? <span style={{ color: pendingColor(d) }}>{text}</span> : <div style={{ fontSize: 9, color: pendingColor(d), marginTop: 3, fontFamily: T.mono, whiteSpace: 'nowrap' }}>{text}</div>;
-};
-
-const progress = (po: PORow) => {
-  const its = po.purchase_order_items || [];
-  const ordered = its.reduce((s, it) => s + Number(it.quantity || 0), 0);
-  const received = its.reduce((s, it) => s + Number(it.received_qty || 0), 0);
-  return { count: its.length, ordered, received, pct: ordered > 0 ? Math.min(100, Math.round(received / ordered * 100)) : 0 };
-};
 
 export default function POList(p: Props) {
   const filterActive = p.statusFilter || p.typeFilter || p.creatorFilter || p.dateFrom || p.dateTo;
@@ -113,33 +56,7 @@ export default function POList(p: Props) {
         </button>
       </div>
 
-      {p.showFilters && (
-        <div style={{ marginBottom: 8, padding: 14, background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: T.rLg }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-            <div>
-              <label style={S.fLabel}>Status</label>
-              <select value={p.statusFilter} onChange={e => { p.onStatusFilterChange(e.target.value); p.onResetPage(); }} style={S.fInput}>
-                <option value="">All</option>{PO_STATUSES.map(s => <option key={s} value={s}>{PO_STATUS_LABELS[s]}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={S.fLabel}>Type</label>
-              <select value={p.typeFilter} onChange={e => { p.onTypeFilterChange(e.target.value); p.onResetPage(); }} style={S.fInput}>
-                <option value="">All</option>{(Object.keys(PO_TYPE_LABELS) as (keyof typeof PO_TYPE_LABELS)[]).map(t => <option key={t} value={t}>{PO_TYPE_LABELS[t]}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={S.fLabel}>Created By</label>
-              <select value={p.creatorFilter} onChange={e => { p.onCreatorFilterChange(e.target.value); p.onResetPage(); }} style={S.fInput}>
-                <option value="">Anyone</option>{p.users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-              </select>
-            </div>
-            <div><label style={S.fLabel}>From</label><DateInput value={p.dateFrom} onChange={e => { p.onDateFromChange(e.target.value); p.onResetPage(); }} style={{ width: '100%' }} /></div>
-            <div><label style={S.fLabel}>To</label><DateInput value={p.dateTo} onChange={e => { p.onDateToChange(e.target.value); p.onResetPage(); }} style={{ width: '100%' }} /></div>
-          </div>
-          {filterActive && <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}><button onClick={p.onClearFilters} style={{ ...S.btnGhost, ...S.btnSm, color: T.tx3, border: `1px solid ${T.bd2}`, background: T.glass1 }}>Clear filters</button></div>}
-        </div>
-      )}
+      {p.showFilters && <POFilters {...p} filterActive={!!filterActive} />}
 
       <div style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{p.totalCount} record{p.totalCount === 1 ? '' : 's'}</div>
 
