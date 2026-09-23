@@ -50,18 +50,23 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
   useEffect(() => { loadPin(); }, [loadPin]);
   useEffect(() => { faceIdSupported().then(setFaceSupported); }, []);
 
+  // The prompt can be cancelled from here (the OS sheet may never appear in
+  // a home-screen web app) and gives up on its own after FACE_ID_PROMPT_MS.
+  const faceAbort = useRef<AbortController | null>(null);
   const handleEnableFaceId = async () => {
     if (faceInFlight.current || !profile?.id) return;
     faceInFlight.current = true; setFaceBusy(true);
+    const ctrl = new AbortController(); faceAbort.current = ctrl;
     try {
-      const res = await enrollFaceId({ id: profile.id, email: profile.email, full_name: profile.full_name });
+      const res = await enrollFaceId({ id: profile.id, email: profile.email, full_name: profile.full_name }, ctrl.signal);
       if (!res.ok) { addToast(res.error || 'Face ID setup failed', 'error'); return; }
       setFaceEnrolled(true);
       setFaceEnrolledAt(getFaceIdEnrollment()?.enrolledAt || new Date().toISOString());
       addToast('Face ID enabled — you can now unlock with Face ID on this device', 'success');
     } catch (e) { addToast(friendlyError(e), 'error'); }
-    finally { faceInFlight.current = false; setFaceBusy(false); }
+    finally { faceInFlight.current = false; faceAbort.current = null; setFaceBusy(false); }
   };
+  const cancelEnableFaceId = () => { faceAbort.current?.abort(); };
 
   const handleDisableFaceId = async () => {
     if (!await ask({ title: 'Disable Face ID?', message: 'Signing out will fully log you out again, and the login page will only offer email sign-in on this device.', confirmLabel: 'Disable', danger: true })) return;
@@ -216,7 +221,10 @@ export default function MyProfile({ addToast, profile }: { addToast: (msg: strin
             <button onClick={handleDisableFaceId} style={S.btnDanger}>Disable Face ID</button>
           </div>
         ) : faceSupported ? (
-          <button type="button" onClick={handleEnableFaceId} disabled={faceBusy || !profile?.id} style={{ ...S.btnPrimary, opacity: faceBusy || !profile?.id ? 0.5 : 1, pointerEvents: faceBusy ? 'none' : 'auto' }}>{faceBusy ? 'Waiting for Face ID…' : 'Enable Face ID'}</button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button type="button" onClick={handleEnableFaceId} disabled={faceBusy || !profile?.id} style={{ ...S.btnPrimary, opacity: faceBusy || !profile?.id ? 0.5 : 1, pointerEvents: faceBusy ? 'none' : 'auto' }}>{faceBusy ? 'Waiting for Face ID…' : 'Enable Face ID'}</button>
+            {faceBusy && <button type="button" className="touch44" onClick={cancelEnableFaceId} style={{ ...S.btnGhost, color: T.tx3 }}>Cancel</button>}
+          </div>
         ) : (
           <div style={{ fontSize: 11, color: T.tx3, fontStyle: 'italic' as const }}>Not available on this device or browser. Requires Face ID, Touch ID or Windows Hello.</div>
         )}
