@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { T, S } from '../../lib/theme';
 import { exportName, fileDate } from '../../lib/exportName';
 import { csvCell } from '../../lib/escape';
+import { withAlterations } from '../../lib/sizeAlteration';
 
 const CBAZAAR_SIZE_MAP: Record<string, string> = {
   'XS (Extra small)': 'XS', 'S (Small)': 'S', 'M (Medium)': 'M',
@@ -62,23 +63,31 @@ export default function CbazaarImport({ addToast }: { addToast: (msg: string, ty
     e.target.value = '';
   };
 
-  const exportCsv = () => {
+  // Two exports (owner's ask): ReadyToShipQty as entered, and "with
+  // alterations" — every size also counts the same design's next size up
+  // (lib/sizeAlteration.ts). -NA- and unmapped sizes keep their own number.
+  const exportCsv = (alterations: boolean) => {
     if (rows.length === 0) return;
     const esc = csvCell;
+    const qty = alterations
+      ? withAlterations(rows, r => (r.designNo ? { product: r.designNo.toUpperCase(), size: r.sizeShort } : null), r => r.readyToShipQty, 'sum')
+      : rows.map(r => r.readyToShipQty);
     const header = 'Catalogue,Design No,Size,Product Category,Product Name,ReadyToShipQty,LeadTime,SupplierCost,ARYA SKU';
-    const csvRows = rows.map(r => `${esc(r.catalogue)},${esc(r.designNo)},${esc(r.sizeRaw)},${esc(r.productCategory)},${esc(r.productName)},${r.readyToShipQty},${r.leadTime},${r.supplierCost},${esc(r.aryaSku)}`);
+    const csvRows = rows.map((r, i) => `${esc(r.catalogue)},${esc(r.designNo)},${esc(r.sizeRaw)},${esc(r.productCategory)},${esc(r.productName)},${qty[i]},${r.leadTime},${r.supplierCost},${esc(r.aryaSku)}`);
     const blob = new Blob([header + '\n' + csvRows.join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = exportName('Cbazaar-Upload', [fileDate()], 'csv');
+    a.download = exportName('Cbazaar-Upload', [alterations ? 'alterations' : '', fileDate()], 'csv');
     a.click();
+    addToast(`Cbazaar CSV ready${alterations ? ' (with alterations)' : ''}`, 'success');
   };
 
   return (
     <div style={{ animation: 'fi .15s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
         <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
-        {rows.length > 0 && <div onClick={exportCsv} style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export CSV</div>}
+        {rows.length > 0 && <div onClick={() => exportCsv(false)} style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export CSV</div>}
+        {rows.length > 0 && <div onClick={() => exportCsv(true)} title="Each size also counts the next size up (L → M), one step only" style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export CSV · alterations</div>}
         {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid oklch(0.63 0.22 25 / .2)', background: 'oklch(0.63 0.22 25 / .06)' }}>Close</div>}
       </div>
       <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" onChange={handleImport} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0 }} />

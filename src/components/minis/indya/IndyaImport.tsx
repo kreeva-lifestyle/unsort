@@ -20,7 +20,9 @@ import IndyaSkuMap from './IndyaSkuMap';
 import { sniffMaster, latin1, parseMasterHtml, rewriteMasterBytes, type MasterRow, type MasterKind } from './indyaMaster';
 import { parseMasterCsv } from './indyaMasterCsv';
 import { readVendorFile, readBlockedFile, readBytes, type VendorFile, type Corrections } from './indyaFiles';
-import { computeIndya, type ComputeResult, type Flag } from './indyaCompute';
+import { computeIndya, type ComputeResult } from './indyaCompute';
+import { alterationStocks, alteredCount } from './indyaAlterations';
+import { counterChips, type Filter } from './indyaCounters';
 import { exportSkuSheet } from './indyaSkuSheet';
 import IndyaToolbar from './IndyaToolbar';
 import IndyaTable, { flagLabel } from './IndyaTable';
@@ -28,7 +30,6 @@ import IndyaUnknown from './IndyaUnknown';
 import IndyaHint from './IndyaHint';
 import IndyaCoverage from './IndyaCoverage';
 
-type Filter = 'all' | Flag | 'shared' | 'unstitched' | 'stripped' | 'corrected' | 'lehenga';
 const chip = (bg: string, color: string, border = 'transparent'): React.CSSProperties => ({ padding: '3px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: bg, color, border: `1px solid ${border}` });
 
 export default function IndyaImport({ addToast, virtualStock, setVirtualStock, onBack }: {
@@ -43,7 +44,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
   const [corr, setCorr] = useState<Corrections | null>(null);   // the saved SKU map, owned by IndyaSkuMap
   const [mapPrefill, setMapPrefill] = useState<{ code: string; n: number } | null>(null);
   const onMapChange = useCallback((c: Corrections) => { setCorr(c.count ? c : null); setResult(null); }, []);
-  const [result, setResult] = useState<(ComputeResult & { blob: Blob }) | null>(null);
+  const [result, setResult] = useState<(ComputeResult & { blob: Blob; blobAlt: Blob; altered: number }) | null>(null);
   const [busy, setBusy] = useState('');
   const [filter, setFilterState] = useState<Filter>('all');
   const [search, setSearchState] = useState('');
@@ -94,8 +95,12 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
     setTimeout(() => {   // let "Computing…" paint before the synchronous work
       try {
         const r = computeIndya(master.rows, vendors, virtualStock, blocked?.map ?? {}, corr);
-        const blob = new Blob([rewriteMasterBytes(master.bytes, master.rows, r.stocks, master.kind)], { type: master.kind === 'csv' ? 'text/csv' : 'application/vnd.ms-excel' });
-        setResult({ ...r, blob }); setFilter('all'); setSearch('');
+        // Two files from one compute (owner's ask): the stock as computed, and
+        // "with alterations" — every size also counting the next size up.
+        const alt = alterationStocks(r.rows), type = master.kind === 'csv' ? 'text/csv' : 'application/vnd.ms-excel';
+        const blob = new Blob([rewriteMasterBytes(master.bytes, master.rows, r.stocks, master.kind)], { type });
+        const blobAlt = new Blob([rewriteMasterBytes(master.bytes, master.rows, alt, master.kind)], { type });
+        setResult({ ...r, blob, blobAlt, altered: alteredCount(r.rows, alt) }); setFilter('all'); setSearch('');
         const c = r.counts;
         addToast(`${c.total.toLocaleString('en-IN')} rows — ${(c.ok + c.last).toLocaleString('en-IN')} updated, ${c.unknown} unknown code, ${c.size_missing.toLocaleString('en-IN')} size not stocked, ${c.oos} out of stock${c.blocked ? `, ${c.blocked} blocked` : ''}`, 'success');
         if (!blocked) addToast('No Blocked Inventory sheet — nothing was subtracted', 'info');
@@ -104,10 +109,12 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
     }, 30);
   };
   // No await before downloadFile: iOS only shows the share sheet inside the tap's own activation.
-  const download = () => {
+  const download = (alterations = false) => {
     if (!result || !master || busy) return;
-    setBusy('download');
-    downloadFile(result.blob, master.name).then(ok => saved(ok, `${master.name} ready — upload it to Indya`)).catch(fail).finally(() => setBusy(''));
+    setBusy(alterations ? 'downloadAlt' : 'download');
+    const name = alterations ? master.name.replace(/(\.[^.]+)?$/, '-alterations$1') : master.name;
+    downloadFile(alterations ? result.blobAlt : result.blob, name)
+      .then(ok => saved(ok, `${name} ready — upload it to Indya${alterations ? ` (${result.altered.toLocaleString('en-IN')} rows raised by the next size up)` : ''}`)).catch(fail).finally(() => setBusy(''));
   };
   const exportFilter = async () => {
     if (!filtered.length) { addToast('Nothing to export in this filter', 'error'); return; }
@@ -135,13 +142,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
   }, [result, filter, search]);
 
   const c = result?.counts;
-  const counters: { key: Filter; label: string; count: number; color: string }[] = c ? [
-    { key: 'all', label: 'Total', count: c.total, color: T.tx2 }, { key: 'ok', label: 'Updated', count: c.ok, color: T.gr }, { key: 'last', label: 'Last qty', count: c.last, color: T.yl },
-    { key: 'unknown', label: 'Unknown code', count: c.unknown, color: T.re }, { key: 'size_missing', label: 'Size not stocked', count: c.size_missing, color: T.tx3 }, { key: 'oversize', label: 'Above XXL', count: c.oversize, color: T.tx3 },
-    { key: 'oos', label: 'Out of stock', count: c.oos, color: T.re }, { key: 'shared', label: 'Shared code', count: c.shared, color: T.ac2 },
-    { key: 'blocked', label: 'Blocked', count: c.blocked, color: T.or }, { key: 'unstitched', label: 'Unstitched', count: c.unstitched, color: T.tx3 },
-    { key: 'stripped', label: 'Stripped', count: c.stripped, color: T.yl }, ...(c.lehenga ? [{ key: 'lehenga' as Filter, label: 'Lehenga', count: c.lehenga, color: T.gr }] : []), ...(c.corrected ? [{ key: 'corrected' as Filter, label: 'Corrected', count: c.corrected, color: T.bl }] : []),
-  ] : [];
+  const counters = c ? counterChips(c) : [];
 
   return (
     <div style={{ animation: 'fi .15s ease' }}>
@@ -154,7 +155,7 @@ export default function IndyaImport({ addToast, virtualStock, setVirtualStock, o
       <IndyaSkuMap addToast={addToast} onChange={onMapChange} prefill={mapPrefill} />
 
       <IndyaToolbar busy={busy} hasMaster={!!master} hasVendors={vendors.length > 0} hasBlocked={!!blocked} hasResult={!!result} anything={!!(master || vendors.length || blocked)}
-        addToast={addToast} onMaster={importMaster} onVendors={importVendors} onBlocked={importBlocked} onSkuSheet={skuSheet} onCompute={compute} onDownload={download} onReset={reset} />
+        addToast={addToast} onMaster={importMaster} onVendors={importVendors} onBlocked={importBlocked} onSkuSheet={skuSheet} onCompute={compute} onDownload={() => download(false)} onDownloadAlt={() => download(true)} onReset={reset} />
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
         {master && <span style={chip(T.ac3, T.ac2)}>Master: {master.rows.length.toLocaleString('en-IN')} rows</span>}

@@ -10,10 +10,10 @@ const hidden = { position: 'absolute' as const, width: 0, height: 0, overflow: '
 const BLUE = { color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .2)', background: 'oklch(0.77 0.14 230 / .06)' };
 const AMBER = { color: T.yl, border: '1px solid oklch(0.78 0.18 75 / .2)', background: 'oklch(0.78 0.18 75 / .06)' };
 
-export default function IndyaToolbar({ busy, hasMaster, hasVendors, hasBlocked, hasResult, anything, addToast, onMaster, onVendors, onBlocked, onSkuSheet, onCompute, onDownload, onReset }: {
+export default function IndyaToolbar({ busy, hasMaster, hasVendors, hasBlocked, hasResult, anything, addToast, onMaster, onVendors, onBlocked, onSkuSheet, onCompute, onDownload, onDownloadAlt, onReset }: {
   busy: string; hasMaster: boolean; hasVendors: boolean; hasBlocked: boolean; hasResult: boolean; anything: boolean; addToast: (msg: string, type?: string) => void;
   onMaster: (f: File) => void; onVendors: (f: File[]) => void; onBlocked: (f: File) => void;
-  onSkuSheet: () => void; onCompute: () => void; onDownload: () => void; onReset: () => void;
+  onSkuSheet: () => void; onCompute: () => void; onDownload: () => void; onDownloadAlt: () => void; onReset: () => void;
 }) {
   const masterRef = useRef<HTMLInputElement>(null), vendorRef = useRef<HTMLInputElement>(null), blockedRef = useRef<HTMLInputElement>(null);
   const bt = (style: React.CSSProperties, disabled = !!busy): React.CSSProperties => ({ ...style, opacity: disabled ? 0.5 : 1, pointerEvents: disabled ? 'none' : 'auto' });
@@ -33,6 +33,7 @@ export default function IndyaToolbar({ busy, hasMaster, hasVendors, hasBlocked, 
         <button type="button" className="touch44" onClick={pick(blockedRef)} style={bt({ ...S.btnGhost, ...AMBER })}>{busy === 'blocked' ? 'Reading…' : hasBlocked ? 'Replace blocked' : 'Blocked inventory'}</button>
         {hasMaster && hasVendors && <button type="button" className="touch44" onClick={onCompute} style={bt(S.btnSuccess)}>{busy === 'compute' ? 'Computing…' : '4 · Compute'}</button>}
         {hasResult && <button type="button" className="touch44" onClick={onDownload} style={bt({ ...S.btnPrimary, background: T.gr, color: T.tx, fontWeight: 700 })}>{busy === 'download' ? 'Preparing…' : '5 · Download updated file'}</button>}
+        {hasResult && <button type="button" className="touch44" onClick={onDownloadAlt} title="Each size also counts the next size up (L → M), one step only" style={bt({ ...S.btnPrimary, background: T.gr, color: T.tx, fontWeight: 700 })}>{busy === 'downloadAlt' ? 'Preparing…' : '5b · Download with alterations'}</button>}
         <IndyaBarcodes addToast={addToast} busy={!!busy} />
         {anything && <button type="button" className="touch44" onClick={onReset} style={bt(S.btnDanger)}>Reset</button>}
       </div>
