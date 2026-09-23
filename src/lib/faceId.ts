@@ -26,6 +26,12 @@ const CRED_KEY = 'doFaceIdCred';
 const LOCK_KEY = 'doAppLocked';
 const FAILS_KEY = 'doFaceIdFails';
 export const FACE_ID_MAX_FAILS = 3;
+// Our own deadline on every OS prompt. The WebAuthn `timeout` is only a
+// hint, and a home-screen web app on iOS can leave create()/get() pending
+// for good when the passkey sheet never comes up — the button then read
+// "Waiting for Face ID…" with no way out. Past this, the call is aborted
+// and reported as a timeout the user can retry or cancel.
+export const FACE_ID_PROMPT_MS = 45_000;
 
 export type FaceIdEnrollment = { credId: string; userId: string; email: string; enrolledAt: string };
 export type FaceIdFailCode = 'not_enrolled' | 'cancelled' | 'timeout' | 'wrong_host' | 'unsupported' | 'mismatch' | 'aborted' | 'too_many' | 'exists' | 'failed';
@@ -34,7 +40,7 @@ export type FaceIdResult = { ok: true } | { ok: false; code: FaceIdFailCode; err
 const MSG: Record<FaceIdFailCode, string> = {
   not_enrolled: 'Face ID is not set up on this device.',
   cancelled: "Face ID didn't complete. Tap to try again, or sign in with email.",
-  timeout: 'Face ID timed out — tap to try again.',
+  timeout: "Face ID didn't respond — tap to try again. If it keeps happening, close the app fully and open it again.",
   wrong_host: 'Face ID is set up for a different web address. Sign in with email, then enable Face ID again here.',
   unsupported: 'Face ID is not available on this device or browser.',
   mismatch: 'This passkey belongs to a different account. Sign in with email.',
@@ -114,20 +120,33 @@ const getAssertion = (allow: Uint8Array[] | null, signal?: AbortSignal) =>
     signal,
   }) as Promise<PublicKeyCredential | null>;
 
-const classify = (err: unknown, startedAt: number): FaceIdFailCode => {
+/** One AbortSignal for a prompt: the caller's signal (a Cancel tap) or our
+ *  deadline, whichever fires first. `timedOut()` tells the two apart. */
+const withDeadline = (outer: AbortSignal | undefined, ms: number) => {
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, ms);
+  const onOuter = () => ctrl.abort();
+  if (outer) { if (outer.aborted) ctrl.abort(); else outer.addEventListener('abort', onOuter, { once: true }); }
+  return { signal: ctrl.signal, timedOut: () => timedOut, done: () => { clearTimeout(timer); outer?.removeEventListener('abort', onOuter); } };
+};
+
+const classify = (err: unknown, startedAt: number, timedOut = false): FaceIdFailCode => {
   const name = (err as { name?: string })?.name || '';
-  if (name === 'AbortError') return 'aborted';
+  if (name === 'AbortError') return timedOut ? 'timeout' : 'aborted';
   if (name === 'SecurityError') return 'wrong_host';
   if (name === 'NotSupportedError') return 'unsupported';
   if (name === 'NotAllowedError') return Date.now() - startedAt > 55_000 ? 'timeout' : 'cancelled';
   return 'failed';
 };
 
-export const enrollFaceId = async (user: { id: string; email?: string | null; full_name?: string | null }, signal?: AbortSignal): Promise<FaceIdResult> => {
+export const enrollFaceId = async (user: { id: string; email?: string | null; full_name?: string | null }, outer?: AbortSignal, deadlineMs = FACE_ID_PROMPT_MS): Promise<FaceIdResult> => {
   const record = (rawId: ArrayBuffer): FaceIdResult =>
     saveEnrollment({ credId: b64url(rawId), userId: user.id, email: user.email || '', enrolledAt: new Date().toISOString() })
       ? { ok: true } : { ok: false, code: 'failed', error: 'Could not save the Face ID setup on this device (storage blocked).' };
   const startedAt = Date.now();
+  const dl = withDeadline(outer, deadlineMs);
+  const { signal } = dl;
   try {
     const cred = await navigator.credentials.create({
       publicKey: {
@@ -156,11 +175,11 @@ export const enrollFaceId = async (user: { id: string; email?: string | null; fu
         const handle = decodeHandle((a?.response as AuthenticatorAssertionResponse | undefined)?.userHandle);
         if (a && handle === user.id) return record(a.rawId);
         return fail('exists');
-      } catch { return fail('exists'); }
+      } catch (e2: unknown) { const c = classify(e2, startedAt, dl.timedOut()); return c === 'timeout' || c === 'aborted' ? fail(c) : fail('exists'); }
     }
-    const code = classify(e, startedAt);
+    const code = classify(e, startedAt, dl.timedOut());
     return code === 'cancelled' ? { ok: false, code, error: 'Face ID setup was cancelled.' } : fail(code);
-  }
+  } finally { dl.done(); }
 };
 
 /** Returns true when the enrolment was actually removed. */
@@ -171,24 +190,26 @@ export const disableFaceId = (): boolean => {
 // One OS prompt. Pinned credential first; if the platform cannot find it
 // (stale id) retry once with a discoverable prompt and re-pin. The assertion's
 // user handle must be the enrolled account.
-export const verifyFaceId = async (signal?: AbortSignal): Promise<FaceIdResult> => {
+export const verifyFaceId = async (outer?: AbortSignal, deadlineMs = FACE_ID_PROMPT_MS): Promise<FaceIdResult> => {
   const e = getFaceIdEnrollment();
   if (!e) return fail('not_enrolled');
   if (getFaceIdFails() >= FACE_ID_MAX_FAILS) return fail('too_many');
   const pinned = fromB64url(e.credId);
   const startedAt = Date.now();
+  const dl = withDeadline(outer, deadlineMs);
+  const { signal } = dl;
   let assertion: PublicKeyCredential | null = null;
   try {
     assertion = await getAssertion(pinned ? [pinned] : [], signal);
   } catch (err: unknown) {
-    const code = classify(err, startedAt);
+    const code = classify(err, startedAt, dl.timedOut());
     if (code === 'cancelled' && pinned) {
       try { assertion = await getAssertion([], signal); }
-      catch (err2: unknown) { return afterFail(classify(err2, startedAt)); }
+      catch (err2: unknown) { return afterFail(classify(err2, startedAt, dl.timedOut())); }
     } else {
       return afterFail(code);
     }
-  }
+  } finally { dl.done(); }
   if (!assertion) return afterFail('failed');
   const handle = decodeHandle((assertion.response as AuthenticatorAssertionResponse).userHandle);
   if (handle && handle !== e.userId) return afterFail('mismatch');
@@ -199,7 +220,7 @@ export const verifyFaceId = async (signal?: AbortSignal): Promise<FaceIdResult> 
 };
 
 const afterFail = (code: FaceIdFailCode): FaceIdResult => {
-  if (code === 'aborted') return fail(code);          // a second tap, not the user's fault
+  if (code === 'aborted' || code === 'timeout') return fail(code);   // a second tap or a prompt that never came — not the user's fault
   const n = bumpFails();
   return n >= FACE_ID_MAX_FAILS ? fail('too_many') : fail(code);
 };
