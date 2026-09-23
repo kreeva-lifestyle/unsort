@@ -27,11 +27,8 @@ import DropboxUploader from '../components/minis/uploader/DropboxUploader';
 import ProductCosting from '../components/minis/costing/ProductCosting';
 import PriceProjector from '../components/minis/pricing/PriceProjector';
 import OtpInbox from '../components/minis/OtpInbox';
-import { exportName, fileDate } from '../lib/exportName';
-
-const SIZE_MAP: Record<number, string> = { 32: 'XXS', 34: 'XS', 36: 'S', 38: 'M', 40: 'L', 42: 'XL', 44: 'XXL' };
-
-interface UtsavRow { relid: string; vendorno: string; stock: number; leadtime: number; block: number; designno: string; size: number; catalogname: string; updateddate: string; aryaSku: string }
+import { exportName } from '../lib/exportName';
+import { exportUtsavXls, UTSAV_SIZE_MAP as SIZE_MAP, type UtsavRow } from '../components/minis/utsavExport';
 
 
 export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab: string) => void; active?: boolean }) {
@@ -136,13 +133,11 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     e.target.value = '';
   };
 
-  const exportXls = () => {
+  // Two exports (owner's ask): the stock as entered, and "with alterations"
+  // — every size also counts the next size up (utsavExport.ts).
+  const exportXls = (alterations: boolean) => {
     if (rows.length === 0) { addToast('Nothing to export — import a file first', 'error'); return; }
-    const data = rows.map(r => ({ relid: r.relid, vendorno: r.vendorno, stock: r.stock, leadtime: r.leadtime, block: r.block, 'ARYA SKU': r.aryaSku }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Utsav Export');
-    saveWorkbook(wb, exportName('Utsav-Upload', [fileDate()], 'xls'));
+    exportUtsavXls(rows, alterations).then(ok => addToast(ok ? `Utsav file ready${alterations ? ' (with alterations)' : ''}` : 'Nothing was saved', ok ? 'success' : 'info')).catch(err => addToast(friendlyError(err), 'error'));
   };
 
   const EDGE = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/short-track';
@@ -410,7 +405,8 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
         {back}
         <div style={{ display: 'flex', gap: 6 }}>
           <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
-          {rows.length > 0 && <div onClick={exportXls} style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export XLS</div>}
+          {rows.length > 0 && <div onClick={() => exportXls(false)} style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export XLS</div>}
+          {rows.length > 0 && <div onClick={() => exportXls(true)} title="Each size also counts the next size up (L → M), one step only" style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export XLS · alterations</div>}
           {rows.length > 0 && <div onClick={!comparing ? compareNonUploaded : undefined} style={{ ...S.btnGhost, color: T.yl, border: '1px solid oklch(0.78 0.18 75 / .2)', background: 'oklch(0.78 0.18 75 / .06)', opacity: comparing ? 0.5 : 1, pointerEvents: comparing ? 'none' : 'auto' }}>{comparing ? 'Comparing…' : 'Compare Non-Uploaded'}</div>}
           {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); setCompareRows([]); setCompareHeaders([]); setCompareFilter('all'); setCompareSearch(''); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid oklch(0.63 0.22 25 / .2)', background: 'oklch(0.63 0.22 25 / .06)' }}>Close</div>}
         </div>
