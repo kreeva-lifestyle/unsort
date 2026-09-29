@@ -15,7 +15,7 @@ import type { PurchaseOrderType } from '../../types/database';
 
 export type FormItem = { sku: string; item_name: string; fabric_code: string; quantity: string; unit: string; rate: string };
 export const blankItem = (): FormItem => ({ sku: '', item_name: '', fabric_code: '', quantity: '1', unit: '', rate: '' });
-const UNIT_OPTIONS = ['Meter', 'Piece'];
+const UNIT_OPTIONS = ['Meter', 'Piece', 'Dozen'];
 const num = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
 
 export default function POItemRows({ items, poType, onChange, onRemove, onAdd }: {
