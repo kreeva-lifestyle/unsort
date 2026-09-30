@@ -6,17 +6,17 @@
 // through silently.
 export const MAX_ORIGINAL = 4 * 1024 * 1024;
 
-export async function optimizeImage(file: File): Promise<{ blob: Blob; type: string }> {
+export async function optimizeImage(file: File, maxEdge = 1200, quality = 0.82): Promise<{ blob: Blob; type: string }> {
   try {
     const bmp = await createImageBitmap(file);
-    const scale = Math.min(1, 1200 / Math.max(bmp.width, bmp.height));
+    const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
     const w = Math.max(1, Math.round(bmp.width * scale));
     const h = Math.max(1, Math.round(bmp.height * scale));
     const canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
     canvas.getContext('2d')!.drawImage(bmp, 0, 0, w, h);
     bmp.close();
-    const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.82));
+    const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', quality));
     if (!blob) throw new Error('encode failed');
     return { blob, type: 'image/jpeg' };
   } catch {

@@ -10,6 +10,8 @@
 export interface CostingSupplier { name: string; materialCode: string; rate: number | string; selected?: boolean }
 export interface CostingSub { name: string; qty: number | string; unit: string; suppliers: CostingSupplier[] }
 export interface CostingComponent { name: string; subs: CostingSub[] }
+/** A file on the sheet (costing_products.attachments); see attachmentsStore.ts. */
+export interface CostingAttachment { path: string; url: string; name: string; type: string; size: number; original_size?: number; uploaded_at: string }
 export interface CostingProduct {
   id: string; sku: string; image_url: string | null;
   maintenance_pct: number | string; components: CostingComponent[];
@@ -17,6 +19,7 @@ export interface CostingProduct {
   selling_price?: number | string | null;
   /** Settings → Categories name (compulsory since the Price Projector keys thresholds by it). */
   category?: string | null;
+  attachments?: CostingAttachment[];
   updated_at?: string;
 }
 

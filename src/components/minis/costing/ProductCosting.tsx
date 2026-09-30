@@ -27,7 +27,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
 
   const load = () => {
     supabase.from('costing_products')
-      .select('id, sku, image_url, maintenance_pct, components, notes, selling_price, category, updated_at')
+      .select('id, sku, image_url, maintenance_pct, components, notes, selling_price, category, attachments, updated_at')
       .order('updated_at', { ascending: false }).limit(500)
       .then(({ data, error }) => {
         if (error) { addToast(friendlyError(error), 'error'); setList([]); return; }

@@ -21,6 +21,7 @@ import { optimizeImage } from './imageResize';
 import PrintPreview from './PrintPreview';
 import { purchasePlanHtml } from './purchasePlan';
 import RaisePOModal from './RaisePOModal';
+import CostingAttachments from './CostingAttachments';
 import { costingSheetHtml } from './costingSheet';
 import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 import { useSettingsCategories } from './useSettingsCategories';
@@ -107,7 +108,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
         id: p.id, sku: p.sku.trim().toUpperCase(), image_url: p.image_url,
         maintenance_pct: num(p.maintenance_pct), components: comps,
         notes: p.notes, created_by: user?.id, updated_at: new Date().toISOString(),
-        category: (p.category || '').trim(),
+        category: (p.category || '').trim(), attachments: p.attachments ?? [],
         selling_price: String(p.selling_price ?? '').trim() ? num(p.selling_price ?? '') : null,
       };
       const { error } = await supabase.from('costing_products').upsert(row);
@@ -167,6 +168,8 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
           rows={3} style={{ ...S.fInput, width: '100%', height: 'auto', minHeight: 64, resize: 'vertical', lineHeight: 1.5 }} />
       </div>
 
+      <CostingAttachments costingId={p.id} saved={saved} list={p.attachments ?? []} addToast={addToast}
+        onChange={next => setP(prev => ({ ...prev, attachments: next }))} />
       <SheetProblems problems={errors} />
 
       <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
