@@ -13,6 +13,33 @@ export type OrderRow = CashChallanOrder & { cash_challans: { challan_number: num
 
 export const blankItem = (): CashChallanOrderItem => ({ sku: '', description: '', quantity: 1 });
 
+export type RecentCustomer = { id: string | null; name: string; phone: string | null };
+
+/** The last five customers across challans and pending orders, newest
+ *  first, one entry per name — the one-tap pills on the order form. */
+export async function recentCustomers(): Promise<RecentCustomer[]> {
+  const cols = 'customer_id, customer_name, customer_phone, created_at';
+  const [c, o] = await Promise.all([
+    supabase.from('cash_challans').select(cols).neq('status', 'voided').order('created_at', { ascending: false }).limit(15),
+    supabase.from('cash_challan_orders').select(cols).order('created_at', { ascending: false }).limit(15),
+  ]);
+  if (c.error) throw c.error;
+  if (o.error) throw o.error;
+  type R = { customer_id: string | null; customer_name: string; customer_phone: string | null; created_at: string };
+  const all = ([...(c.data || []), ...(o.data || [])] as R[]).sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
+  const seen = new Set<string>();
+  const out: RecentCustomer[] = [];
+  for (const r of all) {
+    const name = (r.customer_name || '').trim();
+    const k = name.toLowerCase();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push({ id: r.customer_id, name, phone: r.customer_phone });
+    if (out.length === 5) break;
+  }
+  return out;
+}
+
 export const pieceCount = (o: Pick<CashChallanOrder, 'items'>): number =>
   o.items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
 
@@ -26,7 +53,7 @@ export const toChallanItems = (o: Pick<CashChallanOrder, 'items'>) =>
 export function orderProblem(customerName: string, items: CashChallanOrderItem[]): string | null {
   if (!customerName.trim()) return 'Enter the customer name';
   const live = items.filter(it => it.sku.trim() || it.description.trim());
-  if (!live.length) return 'Add at least one item (SKU or description)';
+  if (!live.length) return 'Add at least one item with a SKU';
   const bad = live.find(it => !(Number(it.quantity) > 0));
   if (bad) return `Quantity must be at least 1 (${bad.sku || bad.description})`;
   return null;

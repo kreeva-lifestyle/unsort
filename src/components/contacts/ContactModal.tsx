@@ -12,7 +12,8 @@ import { useModalLock } from '../../hooks/useModalLock';
 import { useBackClose } from '../../hooks/useBackClose';
 import Toggle from '../ui/Toggle';
 import { formOf, validateForm, digits, type ContactRow, type ContactForm } from './contactsMerge';
-import { saveContact } from './contactsModel';
+import { saveContact, deleteContact } from './contactsModel';
+import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 
 const lbl: React.CSSProperties = { ...S.fLabel, marginBottom: 4 };
 const roleChip = (on: boolean, locked: boolean): React.CSSProperties => ({
@@ -31,6 +32,8 @@ export default function ContactModal({ contact, canEdit, onClose, onSaved, addTo
   const [f, setF] = useState<ContactForm>(() => formOf(contact));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { ask, modalProps } = useConfirm();
   const errRef = useRef<HTMLDivElement>(null);
   useModalLock();
   useBackClose(true, onClose);
@@ -52,6 +55,15 @@ export default function ContactModal({ contact, canEdit, onClose, onSaved, addTo
       onSaved();
     } catch (e) { setError(friendlyError(e)); setSaving(false); return; }
     setSaving(false);
+  };
+  // Only a contact no document uses can go; the RPC re-checks and refuses
+  // with the count, so a stale list can never delete a used contact.
+  const remove = async () => {
+    if (!contact || saving || deleting || !canEdit) return;
+    if (!await ask({ title: `Delete ${contact.name}?`, message: 'Allowed only when no challan, pending order or purchase order uses this contact.', confirmLabel: 'Delete', danger: true })) return;
+    setDeleting(true);
+    try { await deleteContact(contact); addToast(`${contact.name} deleted`, 'success'); onSaved(); }
+    catch (e) { setError(friendlyError(e)); setDeleting(false); }
   };
   const onEnter = (e: React.KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); save(); } };
   const ro = !canEdit;
@@ -109,9 +121,11 @@ export default function ContactModal({ contact, canEdit, onClose, onSaved, addTo
         </div>
         <div style={{ display: 'flex', gap: 8, padding: '12px 18px', borderTop: `1px solid ${T.bd}` }}>
           <button type="button" onClick={onClose} style={{ ...S.btnGhost, minHeight: 40 }}>{canEdit ? 'Cancel' : 'Close'}</button>
+          {canEdit && contact && <button type="button" onClick={remove} title="Only an unused contact can be deleted" style={{ ...S.btnDanger, minHeight: 40, pointerEvents: deleting ? 'none' : 'auto', opacity: deleting ? 0.5 : 1 }}>{deleting ? 'Deleting…' : 'Delete'}</button>}
           {canEdit && <button type="button" onClick={save} style={{ ...S.btnPrimary, flex: 1, minHeight: 40, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save contact'}</button>}
         </div>
       </div>
+      <ConfirmModal {...modalProps} />
     </div>,
     document.body,
   );

@@ -58,11 +58,11 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 4 }}>
           {TABS.map(t => (
-            <button key={t.key} onClick={() => { setTab(t.key); setRows(null); }} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 36, ...(tab === t.key ? { background: T.ac3, color: T.ac2 } : { color: T.tx3, borderColor: T.bd2 }) }}>{t.label}</button>
+            <button key={t.key} onClick={() => { setTab(t.key); setRows(null); }} aria-pressed={tab === t.key} style={{ ...S.btnGhost, minHeight: 36, ...(tab === t.key ? { background: T.ac3, color: T.ac2, borderColor: T.ac33 } : { color: T.tx3, borderColor: T.bd2 }) }}>{t.label}</button>
           ))}
         </div>
-        <div style={{ position: 'relative', flex: 1, minWidth: 160 }}>
-          <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+          <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5, pointerEvents: 'none' }}><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search customer…" style={{ ...S.fSearch, width: '100%' }} />
         </div>
       </div>
@@ -100,13 +100,13 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
               </div>
               {o.notes && <div style={{ marginTop: 6, fontSize: 11, color: T.tx3, whiteSpace: 'pre-wrap' }}>{o.notes}</div>}
               {canEdit && (
-                <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
                   {o.status === 'pending' && <>
-                    <button onClick={() => onConvert(o)} disabled={busy} style={{ ...S.btnPrimary, minHeight: 40 }}>Make challan</button>
-                    <button onClick={() => setForm({ open: true, editing: o })} disabled={busy} style={{ ...S.btnGhost, minHeight: 40 }}>Edit</button>
-                    <button onClick={() => cancel(o)} disabled={busy} style={{ ...S.btnDanger, minHeight: 40, marginLeft: 'auto' }}>{busy ? 'Working…' : 'Cancel'}</button>
+                    <button onClick={() => onConvert(o)} disabled={busy} style={{ ...S.btnPrimary, minHeight: 44, flex: 1 }}>Make challan</button>
+                    <button onClick={() => setForm({ open: true, editing: o })} disabled={busy} style={{ ...S.btnGhost, minHeight: 44 }}>Edit</button>
+                    <button onClick={() => cancel(o)} disabled={busy} style={{ ...S.btnDanger, minHeight: 44 }}>{busy ? 'Working…' : 'Cancel'}</button>
                   </>}
-                  {o.status === 'cancelled' && <button onClick={() => reopen(o)} disabled={busy} style={{ ...S.btnGhost, minHeight: 40 }}>{busy ? 'Working…' : 'Reopen'}</button>}
+                  {o.status === 'cancelled' && <button onClick={() => reopen(o)} disabled={busy} style={{ ...S.btnGhost, minHeight: 44 }}>{busy ? 'Working…' : 'Reopen'}</button>}
                 </div>
               )}
             </div>
