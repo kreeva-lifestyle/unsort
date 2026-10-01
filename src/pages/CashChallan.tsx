@@ -17,6 +17,8 @@ import ChallanForm from '../components/challan/ChallanForm';
 import ChallanDetail from '../components/challan/ChallanDetail';
 import ChallanList from '../components/challan/ChallanList';
 import ChallanBulkActions from '../components/challan/ChallanBulkActions';
+import PendingOrders from '../components/challan/PendingOrders';
+import { markOrderConverted, toChallanItems } from '../components/challan/pendingOrdersModel';
 import { friendlyError } from '../lib/friendlyError';
 import { fetchCustomerOutstanding } from '../lib/customerOutstanding';
 import { useActiveRefetch } from '../hooks/useActiveRefetch';
@@ -154,6 +156,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [printHtml, setPrintHtml] = useState<string | null>(null);
   const printIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [viewingChallan, setViewingChallan] = useState<Challan | null>(null);
+  const [showOrders, setShowOrders] = useState(false); const [convertingOrder, setConvertingOrder] = useState<string | null>(null); // Pending Orders view + the order being made into a challan
   const [paymentQrUrl, setPaymentQrUrl] = useState<string | null>(null);
   const [paymentUpiId, setPaymentUpiId] = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -289,6 +292,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   useBackClose(showAnalytics, () => setShowAnalytics(false));
   useBackClose(showLedger, () => { setShowLedger(false); setLedgerSearch(''); });
   useBackClose(showContacts, () => setShowContacts(false));
+  useBackClose(showOrders, () => setShowOrders(false));
   useBackClose(!!ledgerDetail, () => setLedgerDetail(null));
   useBackClose(!!viewingChallan, () => setViewingChallan(null));
   // Back closes the form but KEEPS the auto-saved draft: closeModal() calls
@@ -684,6 +688,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         if (crErr || !newChallan?.id || !newChallan?.challan_number) throw new Error(crErr?.message || 'Failed to create challan — missing response data');
         createdNumber = newChallan.challan_number;
         createdId = newChallan.id;
+        if (convertingOrder) await markOrderConverted(convertingOrder, newChallan.id as string).catch(e => addToast(`Challan #${createdNumber} saved, but the pending order could not be marked converted — ${friendlyError(e)}. Cancel it under Pending Orders.`, 'error'));
       }
     } catch (e: any) {
       setFormError(`Save failed — ${friendlyError(e)}`);
@@ -935,7 +940,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const closeModal = () => {
     clearDraft();
     if (draftTimerRef.current) { clearTimeout(draftTimerRef.current); draftTimerRef.current = null; }
-    setShowModal(false); setEditing(null); setCustomerName(''); setSelectedCustomerId(null); setCustomerPhone(''); setIsReturn(false); setReturnSource(null); setReturnSearchQ(''); setReturnResults([]);
+    setShowModal(false); setEditing(null); setConvertingOrder(null); setCustomerName(''); setSelectedCustomerId(null); setCustomerPhone(''); setIsReturn(false); setReturnSource(null); setReturnSearchQ(''); setReturnResults([]);
     setItems([{ sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
     setShippingCharges(0); setManualRoundOff(null); setNotes(''); setTags('');
     setPaymentMode(''); setPaymentDate(''); setAmountPaid(0); setChallanStatus('unpaid');
@@ -1309,6 +1314,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     /></>
   );
 
+  // ── Pending Orders — components/challan/PendingOrders.tsx; "Make challan" pre-fills the form above (prices blank) and saveChallan marks the order converted ──
+  if (showOrders) return (<>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => setShowOrders(false)} style={S.btnGhost}>← Back</button></div><PendingOrders canEdit={['admin', 'manager', 'operator'].includes(profile?.role || '')} addToast={addToast}
+    onConvert={(o) => { clearDraft(); setCustomerName(o.customer_name); setSelectedCustomerId(o.customer_id); setCustomerPhone(o.customer_phone || ''); setItems(toChallanItems(o)); setNotes(o.notes || ''); setConvertingOrder(o.id); setShowModal(true); }} /></>);
+
   // ── Ledger (list + detail) — extracted to components/challan/ChallanLedger.tsx ──
   if (showLedger) return (
     <>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => { if (ledgerDetail) { setLedgerDetail(null); return; } setShowLedger(false); setLedgerSearch(''); }} style={S.btnGhost}>← Back</button></div><ChallanLedger
@@ -1349,6 +1358,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             btnSm pills looked undersized next to the primary CTA). Order runs
             plain views → tinted sibling module → primary action. */}
         <div className="challan-nav-btns" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={() => setShowOrders(true)} style={S.btnGhost}>Pending Orders</button>
           <button onClick={() => setShowContacts(true)} style={S.btnGhost}>Contacts</button>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('analytics'); await fetchAnalytics(); setViewOpening(null); setShowAnalytics(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'analytics' ? 0.6 : 1 }}>{viewOpening === 'analytics' ? 'Opening…' : 'Analytics'}</button>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('ledger'); await fetchLedger(); setViewOpening(null); setShowLedger(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'ledger' ? 0.6 : 1 }}>{viewOpening === 'ledger' ? 'Opening…' : 'Ledger'}</button>
