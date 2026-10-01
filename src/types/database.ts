@@ -880,6 +880,7 @@ export type LinkCheckApprovalInsert = Pick<LinkCheckApproval, 'sku' | 'url'> & {
 // Split into ./purchaseOrders.ts (audit L4/L6); re-exported so every
 // existing `from '../types/database'` import keeps working.
 export * from './purchaseOrders';
+export * from './challanOrders';
 
 // ─── indya_sku_map (8 cols) ─────────────────────────────────────────────
 // Indya Import's saved SKU fixes: the code as Indya sent it → the correct
