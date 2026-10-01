@@ -8,8 +8,12 @@
 // explicit tap, so it always sets the total.
 // On an EDIT of a challan that already carries a payment (`recordedPaid`),
 // topping up to the total is a NEW payment taken now: it is dated today and
-// the mode is cleared for the operator to pick — the earlier payment's date
-// and mode belong to that payment, not to this one (audit M1).
+// the mode is reset — the earlier payment's date and mode belong to that
+// payment, not to this one (audit M1).
+// `lastMode` is the customer's usual mode (their latest challan's); FULL and
+// Status → Paid pre-select it whenever the mode box is empty or was reset
+// (owner: a customer mostly pays the same way). A mode already chosen by
+// the operator is never overwritten; a new customer gets no pre-selection.
 import { T } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
 import DateInput from '../ui/DateInput';
@@ -18,28 +22,34 @@ export const PAYMENT_MODES = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 
 
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
-export default function PaymentFields({ status, setStatus, mode, setMode, amount, setAmount, date, setDate, total, recordedPaid = 0, lbl, inp }: {
+export default function PaymentFields({ status, setStatus, mode, setMode, amount, setAmount, date, setDate, total, recordedPaid = 0, lastMode = '', lbl, inp }: {
   status: string; setStatus: (v: string) => void;
   mode: string; setMode: (v: string) => void;
   amount: number; setAmount: (v: number) => void;
   date: string; setDate: (v: string) => void;
   total: number;
   recordedPaid?: number;
+  /** The customer's usual payment mode, '' when unknown. */
+  lastMode?: string;
   lbl: React.CSSProperties; inp: React.CSSProperties;
 }) {
-  const stampTopUp = () => {
-    if (recordedPaid > 0 && total > recordedPaid) { setDate(today()); setMode(''); }
-    else if (!date) setDate(today());
+  /** Dates the payment; true when this is a top-up (a fresh payment). */
+  const stampTopUp = (): boolean => {
+    if (recordedPaid > 0 && total > recordedPaid) { setDate(today()); return true; }
+    if (!date) setDate(today());
+    return false;
+  };
+  const pickMode = (fresh: boolean) => {
+    if (fresh || !mode || mode === 'Return Credit') setMode(lastMode);
   };
   const fillFull = () => {
     setAmount(total);
     setStatus('paid');
-    stampTopUp();
-    if (mode === 'Return Credit') setMode('');
+    pickMode(stampTopUp());
   };
   const onStatus = (v: string) => {
     setStatus(v);
-    if (v === 'paid' && amount < total) { setAmount(total); stampTopUp(); }
+    if (v === 'paid' && amount < total) { setAmount(total); pickMode(stampTopUp()); }
   };
   const canFill = total > 0 && amount !== total;
 

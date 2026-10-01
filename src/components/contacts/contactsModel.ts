@@ -22,6 +22,14 @@ export async function loadContacts(): Promise<ContactRow[]> {
 
 /** save_contact (SECURITY INVOKER): one transaction across both tables.
  *  Issued challans and POs are never touched — they keep their snapshot. */
+/** delete_contact (SECURITY INVOKER): removes the customer and/or supplier
+ *  record in one transaction, and refuses when any challan, pending order
+ *  or PO still points at it — nothing is ever orphaned. */
+export async function deleteContact(c: ContactRow): Promise<void> {
+  const { error } = await supabase.rpc('delete_contact', { p_customer_id: c.customerId, p_vendor_id: c.vendorId });
+  if (error) throw error;
+}
+
 export async function saveContact(existing: ContactRow | null, f: ContactForm): Promise<void> {
   const { error } = await supabase.rpc('save_contact', {
     p_customer_id: existing?.customerId ?? null, p_vendor_id: existing?.vendorId ?? null,

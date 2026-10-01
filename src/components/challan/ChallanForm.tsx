@@ -11,6 +11,8 @@ import SkuInput from '../ui/SkuInput';
 import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { fetchCustomerOutstanding } from '../../lib/customerOutstanding';
+import { fetchLastPaymentMode } from './lastPaymentMode';
+import { logSwallowed } from '../../lib/errorLogger';
 import { useNotifications } from '../../hooks/useNotifications';
 import type { CashChallan, CashChallanCustomer, AuditLog } from '../../types/database';
 
@@ -79,6 +81,15 @@ export type ChallanFormProps = {
 };
 
 export default function ChallanForm(p: ChallanFormProps) {
+  // The customer's usual payment mode (latest challan), for FULL / Paid.
+  const [lastMode, setLastMode] = useState('');
+  useEffect(() => {
+    const name = p.customerName.trim();
+    if (p.isReturn || (!p.selectedCustomerId && name.length < 2)) { setLastMode(''); return; }
+    let alive = true;
+    const t = setTimeout(() => { fetchLastPaymentMode(p.selectedCustomerId, name, p.editing?.id).then(mo => { if (alive) setLastMode(mo || ''); }).catch(e => logSwallowed('Last payment mode', e)); }, 300);
+    return () => { alive = false; clearTimeout(t); };
+  }, [p.selectedCustomerId, p.customerName, p.isReturn, p.editing?.id]);
   // Text mirror of the manual round-off so '-' and '2.' can be typed freely;
   // the numeric value goes to the parent only once the text parses.
   const [roundOffText, setRoundOffText] = useState('');
@@ -377,7 +388,7 @@ export default function ChallanForm(p: ChallanFormProps) {
                   {diff > 0 && <div style={{ fontSize: 10, color: T.gr, marginTop: 2 }}>Saving records a new payment of ₹{diff.toLocaleString('en-IN')}{p.paymentMode && p.paymentMode !== 'Return Credit' ? ` via ${p.paymentMode}` : ' — pick the payment mode below'}.</div>}
                   {diff < 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 2 }}>This LOWERS the recorded payment by ₹{Math.abs(diff).toLocaleString('en-IN')} — a reversal entry will be written.</div>}
                   {left > 0 && (
-                    <button onClick={() => { p.setAmountPaid(p.grandTotal); p.setChallanStatus('paid'); p.setPaymentDate(today); if (p.paymentMode === 'Return Credit') p.setPaymentMode(''); }}
+                    <button onClick={() => { p.setAmountPaid(p.grandTotal); p.setChallanStatus('paid'); p.setPaymentDate(today); if (!p.paymentMode || p.paymentMode === 'Return Credit') p.setPaymentMode(lastMode); }}
                       style={{ ...S.btnGhost, ...S.btnSm, marginTop: 6, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .3)', background: 'oklch(0.72 0.19 145 / .06)' }}>
                       Received ₹{left.toLocaleString('en-IN')} now — settle in full
                     </button>
@@ -387,7 +398,7 @@ export default function ChallanForm(p: ChallanFormProps) {
             })()}
             {/* Status / Mode / Amount Paid (with the FULL shortcut) / Date */}
             <PaymentFields status={p.challanStatus} setStatus={p.setChallanStatus} mode={p.paymentMode} setMode={p.setPaymentMode}
-              amount={p.amountPaid} setAmount={p.setAmountPaid} date={p.paymentDate} setDate={p.setPaymentDate} total={p.grandTotal} recordedPaid={p.editing ? Number(p.editing.amount_paid || 0) : 0} lbl={lbl} inp={inp} />
+              amount={p.amountPaid} setAmount={p.setAmountPaid} date={p.paymentDate} setDate={p.setPaymentDate} total={p.grandTotal} recordedPaid={p.editing ? Number(p.editing.amount_paid || 0) : 0} lastMode={lastMode} lbl={lbl} inp={inp} />
           </>)}
         </div>
 
