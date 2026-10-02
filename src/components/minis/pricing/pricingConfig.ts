@@ -10,9 +10,11 @@ export interface StitchHead { id: string; name: string; basis: StitchBasis; rate
 export interface Threshold { minMarginPct: number | null; maxCost: number | null }
 export interface PricingThresholds { default: Threshold; byCategory: Record<string, Threshold> }
 export interface PricingDefaults { profit: { pct: number; fixed: number } }
-export interface PricingConfig { stitching: StitchHead[]; thresholds: PricingThresholds; defaults: PricingDefaults }
+/** Product Costing: what every NEW sheet starts with (Settings → Pricing). */
+export interface CostingDefaults { maintenancePct: number }
+export interface PricingConfig { stitching: StitchHead[]; thresholds: PricingThresholds; defaults: PricingDefaults; costing: CostingDefaults }
 
-export const PRICING_KEYS = { stitching: 'pricing_stitching', thresholds: 'pricing_thresholds', defaults: 'pricing_defaults' } as const;
+export const PRICING_KEYS = { stitching: 'pricing_stitching', thresholds: 'pricing_thresholds', defaults: 'pricing_defaults', costing: 'costing_defaults' } as const;
 
 export const BASIS_LABEL: Record<StitchBasis, string> = { per_pc: '₹ per piece', per_meter: '₹ per fabric meter', pct_of_material: '% of material cost' };
 
@@ -20,6 +22,7 @@ export const emptyConfig = (): PricingConfig => ({
   stitching: [],
   thresholds: { default: { minMarginPct: null, maxCost: null }, byCategory: {} },
   defaults: { profit: { pct: 0, fixed: 0 } },
+  costing: { maintenancePct: 0 },
 });
 
 const n = (v: unknown, fallback = 0): number => { const x = Number(v); return Number.isFinite(x) ? x : fallback; };
@@ -51,6 +54,12 @@ export const normalizeDefaults = (v: unknown): PricingDefaults => {
   return { profit: { pct: n(p.pct), fixed: n(p.fixed) } };
 };
 
+export const normalizeCosting = (v: unknown): CostingDefaults => {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const p = n(o.maintenancePct);
+  return { maintenancePct: p >= 0 && p <= 500 ? p : 0 };
+};
+
 export async function loadPricingConfig(): Promise<{ config: PricingConfig; error: unknown }> {
   const { data, error } = await supabase.from('app_settings').select('key, value').in('key', Object.values(PRICING_KEYS));
   const cfg = emptyConfig();
@@ -59,6 +68,7 @@ export async function loadPricingConfig(): Promise<{ config: PricingConfig; erro
     if (row.key === PRICING_KEYS.stitching) cfg.stitching = normalizeStitching(row.value);
     if (row.key === PRICING_KEYS.thresholds) cfg.thresholds = normalizeThresholds(row.value);
     if (row.key === PRICING_KEYS.defaults) cfg.defaults = normalizeDefaults(row.value);
+    if (row.key === PRICING_KEYS.costing) cfg.costing = normalizeCosting(row.value);
   }
   return { config: cfg, error: null };
 }

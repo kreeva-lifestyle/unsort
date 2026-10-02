@@ -12,6 +12,7 @@ import CostingEditor from './CostingEditor';
 import { SubPreset } from './SubChips';
 import AskBox from './AskBox';
 import { useBackClose } from '../../../hooks/useBackClose';
+import { PRICING_KEYS, normalizeCosting } from '../pricing/pricingConfig';
 
 export default function ProductCosting({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const [list, setList] = useState<CostingProduct[] | null>(null);
@@ -24,22 +25,28 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
   // Whether the open costing already exists in the DB - a new or duplicated
   // one has nothing to delete, so the editor hides its Delete button.
   const [editingSaved, setEditingSaved] = useState(false);
+  // Settings → Pricing → "Product costing default": every new sheet starts
+  // with this maintenance % (owner's ask) instead of 0.
+  const [defaultMaint, setDefaultMaint] = useState(0);
 
   const load = () => {
     supabase.from('costing_products')
       .select('id, sku, image_url, maintenance_pct, components, notes, selling_price, category, attachments, updated_at')
-      .order('updated_at', { ascending: false }).limit(500)
+      // Newest sheet first by CREATION, so editing a sheet never moves it in
+      // the grid (ordering by updated_at did — owner's complaint).
+      .order('created_at', { ascending: false }).order('id').limit(500)
       .then(({ data, error }) => {
         if (error) { addToast(friendlyError(error), 'error'); setList([]); return; }
         setList((data ?? []) as CostingProduct[]);
       });
     // Both cron-built helpers in one read: top sub chips, and the lines
     // common to each main component (app_settings.costing_common_subs).
-    supabase.from('app_settings').select('key, value').in('key', ['costing_top_subs', 'costing_common_subs'])
+    supabase.from('app_settings').select('key, value').in('key', ['costing_top_subs', 'costing_common_subs', PRICING_KEYS.costing])
       .then(({ data }) => {
         for (const row of (data as { key: string; value: unknown }[] | null) || []) {
           if (row.key === 'costing_top_subs' && Array.isArray(row.value)) setTopSubs((row.value as unknown[]).map(String));
           if (row.key === 'costing_common_subs' && row.value && typeof row.value === 'object') setCommonSubs(row.value as CommonSubsMap);
+          if (row.key === PRICING_KEYS.costing) setDefaultMaint(normalizeCosting(row.value).maintenancePct);
         }
       });
   };
@@ -70,7 +77,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
     setEditingSaved(false);
     setEditing({
       id: crypto.randomUUID(), sku: '', image_url: null,
-      maintenance_pct: 0, components: [blankComponent()], notes: '', selling_price: null, category: null,
+      maintenance_pct: defaultMaint, components: [blankComponent()], notes: '', selling_price: null, category: null,
     });
   };
 
