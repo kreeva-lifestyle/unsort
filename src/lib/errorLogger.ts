@@ -22,10 +22,24 @@ const NOISE = [
   'Script error.',
   'Non-Error promise rejection captured',
   'Connection closed before response received',
+  // qz-tray's port probe: while it tries 8181 → 8282 → … a socket from an
+  // earlier attempt can open after a later one failed and nulled the shared
+  // connection object (qz-tray.js findConnection/onopen). The connect()
+  // promise still settles through deeper()/reject, so nothing is lost — it
+  // is the Print Station's 15 s retry on a PC where QZ Tray is closed.
+  "Cannot read properties of null (reading 'established')",
 ];
 
-function isNoise(message: string): boolean {
-  return NOISE.some(n => message.includes(n));
+// A dropped connection is the visitor's network, not an app error: every
+// screen already shows "Network error — check your connection" through
+// friendlyError. The global handler only sees the ones a browser raised as
+// an unhandled rejection (Firefox: "NetworkError when attempting to fetch
+// resource.", Chrome: "Failed to fetch", Safari: "Load failed").
+const NETWORK_DROP = ['NetworkError when attempting to fetch resource', 'Failed to fetch', 'Load failed'];
+
+function isNoise(message: string, source?: ErrorSource): boolean {
+  if (NOISE.some(n => message.includes(n))) return true;
+  return source === 'promise' && NETWORK_DROP.some(n => message.includes(n));
 }
 
 function messageOf(err: unknown): string {
@@ -49,7 +63,7 @@ export function logSwallowed(context: string, err: unknown): void {
 export async function logError(err: unknown, source: ErrorSource, extra?: { componentStack?: string }) {
   try {
     const message = messageOf(err).slice(0, 2000);
-    if (!message || isNoise(message)) return;
+    if (!message || isNoise(message, source)) return;
     if (sessionCount >= SESSION_CAP) return;
 
     const signature = `${source}::${message}`;
