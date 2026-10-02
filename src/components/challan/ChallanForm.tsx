@@ -303,8 +303,11 @@ export default function ChallanForm(p: ChallanFormProps) {
                         if (e.key === 'Enter' && i === p.items.length - 1 && !(p.isReturn && p.returnSource)) {
                           e.preventDefault();
                           p.setItems([...p.items, { sku: '', description: '', quantity: 1, price: 0, total: 0, discount_type: 'flat', discount_value: 0, discount_amount: 0 }]);
+                          // React clears currentTarget once the handler returns,
+                          // so grab the row BEFORE the timeout (error log 29 Aug).
+                          const row = e.currentTarget.closest('[data-items]') as HTMLElement | null;
                           setTimeout(() => {
-                            const inputs = (e.currentTarget.closest('[data-items]') as HTMLElement | null)?.querySelectorAll<HTMLInputElement>('input[data-sku]');
+                            const inputs = row?.querySelectorAll<HTMLInputElement>('input[data-sku]');
                             inputs?.[inputs.length - 1]?.focus();
                           }, 0);
                         }
