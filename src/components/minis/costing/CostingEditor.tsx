@@ -23,6 +23,7 @@ import { purchasePlanHtml } from './purchasePlan';
 import RaisePOModal from './RaisePOModal';
 import CostingAttachments from './CostingAttachments';
 import { costingSheetHtml } from './costingSheet';
+import { shareCostingImage } from './costingShare';
 import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 import { useSettingsCategories } from './useSettingsCategories';
 import { useProductCatalog, resolveSku } from '../../../hooks/useProductCatalog';
@@ -138,7 +139,6 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
     setErrors([]);
     (which === 'plan' ? setPlanOpen : which === 'raise' ? setRaiseOpen : setSheetOpen)(true);
   };
-
   const total = totalCost(p.components, p.maintenance_pct);
   return (
     <div style={{ fontFamily: T.sans, color: T.tx }}>
@@ -175,7 +175,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
       <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
         <button onClick={onBack} style={{ ...S.btnGhost, minHeight: 44 }}>Back</button>
         {saved && <button onClick={deleteCosting} style={{ ...S.btnDanger, minHeight: 44 }}>Delete</button>}
-        <button onClick={() => openPdf('sheet')} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Costing PDF</button>
+        <button onClick={() => openPdf('sheet')} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Costing PDF / Share</button>
         <button onClick={() => openPdf('plan')} style={{ ...S.btnGhost, minHeight: 44, color: T.bl, border: '1px solid oklch(0.77 0.14 230 / .25)' }}>Purchase plan (PDF)</button>
         <button onClick={() => openPdf('raise')} style={{ ...S.btnGhost, minHeight: 44, color: T.ac2 }}>Raise POs</button>
         <button onClick={save} disabled={saving}
@@ -190,7 +190,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
           onClose={() => setPlanOpen(false)} />
       )}
       {sheetOpen && (
-        <PrintPreview title={`Product costing — ${p.sku}`} html={costingSheetHtml(p)} onClose={() => setSheetOpen(false)} />
+        <PrintPreview title={`Product costing — ${p.sku}`} html={costingSheetHtml(p)} onClose={() => setSheetOpen(false)} onShare={() => shareCostingImage(p, addToast)} />
       )}
       {raiseOpen && <RaisePOModal product={p} pieces={Math.floor(num(pieces))} onClose={() => setRaiseOpen(false)} addToast={addToast} />}
       <ConfirmModal {...modalProps} />
