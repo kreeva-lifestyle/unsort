@@ -18,6 +18,10 @@ const LIST_TTL = 5 * 60_000;
 const listCache = new Map<string, { at: number; list: Catalog[] }>();
 const inflight = new Map<string, Promise<Catalog[]>>();
 
+/** Forget every cached catalog list — after the owner's "Refresh" of the
+ *  master copy, the next picker mount must ask the server again. */
+export const clearCatalogCache = () => { listCache.clear(); };
+
 export async function catalogList(shareToken?: string, force = false): Promise<Catalog[]> {
   const key = shareToken || 'session';
   const hit = listCache.get(key);
