@@ -15,6 +15,8 @@ import MasterRateCard from './MasterRateCard';
 import HeroFromSkus from './HeroFromSkus';
 import SellerLinkBar from './SellerLinkBar';
 import MasterFreshness from '../../ui/MasterFreshness';
+import { clearCatalogCache } from '../catalogdl/api';
+import { refreshProductCatalog } from '../../../hooks/useProductCatalog';
 import MarkupRow from './MarkupRow';
 import RateCardActions from './RateCardActions';
 import { useScriptFont } from './useScriptFont';
@@ -45,6 +47,9 @@ export default function RateCardGenerator({ addToast, lockedMode, shareToken }: 
   const [markupKind, setMarkupKind] = useState<'pct' | 'flat'>('pct');
   const [markupVal, setMarkupVal] = useState('');
   const [result, setResult] = useState<{ url: string; blob: Blob } | null>(null);
+  // Bumped after a master Refresh: remounts the From-Master editor so its
+  // catalog picker and SKU boxes read the new copy, not their caches.
+  const [masterKey, setMasterKey] = useState(0);
   // Script face for the catalog name (shared loader; falls back to Sora).
   const scriptFont = useScriptFont();
   const heroRef = useRef<HTMLInputElement>(null);
@@ -143,9 +148,9 @@ export default function RateCardGenerator({ addToast, lockedMode, shareToken }: 
         <input ref={heroRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickHero(f); e.target.value = ''; }} />
         <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) pickExcel(f); e.target.value = ''; }} />
         {mode === 'manual' && <ManualRateEditor onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} />}
-        {mode === 'master' && !lockedMode && <MasterFreshness />}
+        {mode === 'master' && !lockedMode && <MasterFreshness addToast={addToast} onSynced={() => { clearCatalogCache(); refreshProductCatalog(); setParsed(null); setResult(null); setMasterKey(k => k + 1); }} />}
         {mode === 'master' && !lockedMode && <SellerLinkBar addToast={addToast} />}
-        {mode === 'master' && <MasterRateCard onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} shareToken={shareToken} onCatalogName={n => { setCatalogName(n); setResult(null); }} />}
+        {mode === 'master' && <MasterRateCard key={masterKey} onSheet={s => { setParsed(s); setResult(null); }} addToast={addToast} shareToken={shareToken} onCatalogName={n => { setCatalogName(n); setResult(null); }} />}
         {effective && effective.stats && (
           <div style={{ fontSize: 10, color: T.tx3, marginBottom: 10, fontFamily: T.mono }}>
             {effective.stats.designs} designs{effective.stats.total > 0 ? ` · avg RS.${effective.stats.avg.toLocaleString('en-IN')} · total RS.${effective.stats.total.toLocaleString('en-IN')}` : ''}

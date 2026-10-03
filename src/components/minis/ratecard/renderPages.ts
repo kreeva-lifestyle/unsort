@@ -6,8 +6,11 @@
 // An odd count leaves the last page with one photo: the other half then
 // carries the brand — logo and catalog name over a blurred, tinted copy of
 // that photo (owner: use the blank space; never a flat colour).
+// Two photos of ONE code (a pair, see catalogPairs.ts) share the page with
+// the code written once, top right, instead of twice along the bottom.
 import { GOLD, GOLD_DEEP } from './canvasKit';
 import { paintBackdrop } from './indexBackdrop';
+import { samePair } from './catalogPairs';
 import type { IndexTile, IndexSource } from './renderIndex';
 
 export const PAGE_H = 1600;
@@ -18,8 +21,11 @@ export interface PageBrand { title: string; logoImg: HTMLImageElement | null; sc
 // The code, set like a couture label: a small "ARYA DESIGNS" kicker, the
 // code beneath in Cinzel (the logo's Roman capitals) — cream-gold, light,
 // letter-spaced — and a slim gold rule with a diamond leading into it.
-const caption = (ctx: CanvasRenderingContext2D, right: number, sku: string, w: number, displayFont: string) => {
-  const pad = 48, base = PAGE_H - 54;
+// `base` is the code's baseline: bottom of the photo by default, near the top
+// (kicker first, code beneath) for a same-code pair.
+const FADE = 260;
+const caption = (ctx: CanvasRenderingContext2D, right: number, sku: string, w: number, displayFont: string, base = PAGE_H - 54) => {
+  const pad = 48;
   const tracked = (px: string) => { try { (ctx as any).letterSpacing = px; } catch { /* noop */ } };
   ctx.save();
   ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
@@ -83,16 +89,26 @@ export function renderPage(canvas: HTMLCanvasElement, tiles: IndexTile[], brand?
   canvas.width = Math.max(1, widths.reduce((a, b) => a + b, 0) + panel); canvas.height = PAGE_H;
   const ctx = canvas.getContext('2d')!;
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  const face = brand?.displayFont || 'Sora';
+  const pair = samePair(use);
   let x = 0;
   use.forEach((t, i) => {
     const w = widths[i];
     ctx.drawImage(t.img, x, 0, w, PAGE_H);
+    if (pair) { x += w; return; }
     // a soft dark fade in the corner so the caption reads on pale fabric too
-    const fade = ctx.createLinearGradient(0, PAGE_H - 260, 0, PAGE_H);
+    const fade = ctx.createLinearGradient(0, PAGE_H - FADE, 0, PAGE_H);
     fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,0.38)');
-    ctx.fillStyle = fade; ctx.fillRect(x, PAGE_H - 260, w, 260);
-    caption(ctx, x + w, t.sku, w, brand?.displayFont || 'Sora');
+    ctx.fillStyle = fade; ctx.fillRect(x, PAGE_H - FADE, w, FADE);
+    caption(ctx, x + w, t.sku, w, face);
     x += w;
   });
+  if (pair) {
+    // one code for the whole page: fade along the top edge, caption top right
+    const fade = ctx.createLinearGradient(0, 0, 0, FADE);
+    fade.addColorStop(0, 'rgba(0,0,0,0.38)'); fade.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = fade; ctx.fillRect(0, 0, canvas.width, FADE);
+    caption(ctx, canvas.width, use[0].sku, canvas.width, face, 118);
+  }
   if (panel && brand) brandPanel(ctx, x, panel, use[0].img, brand);
 }

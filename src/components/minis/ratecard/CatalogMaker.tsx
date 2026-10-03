@@ -16,7 +16,9 @@ import type { IndexMood, IndexLayout, IndexSource } from './renderIndex';
 import { renderPage, pageCount, PER_PAGE, PAGE_H } from './renderPages';
 import { decodeForRender, mapLimit } from './indexPhotos';
 import { useCatalogPhotos } from './useCatalogPhotos';
+import { oddRepeats, pairedCodes, pairOrder, skuKey } from './catalogPairs';
 import CatalogTile from './CatalogTile';
+import type { Repeat } from './CatalogTile';
 import CatalogResults from './CatalogResults';
 import type { PageResult } from './CatalogResults';
 import { useScriptFont, useDisplayFont } from './useScriptFont';
@@ -42,7 +44,12 @@ export default function CatalogMaker({ addToast }: { addToast: (m: string, t?: s
   const displayFont = useDisplayFont();
   useEffect(() => () => { pages.forEach(p => URL.revokeObjectURL(p.url)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const ready = tiles.length > 0 && photos.missing === 0 && photos.reading === 0 && !busy;
+  // Pages: a repeated code is fine in pairs (one page, code once) and blocked
+  // at 3, 5… (catalogPairs.ts). Index: a repeat is only a warning.
+  const odd = output === 'pages' ? oddRepeats(tiles) : new Map<string, number>();
+  const paired = output === 'pages' ? pairedCodes(tiles) : new Set<string>();
+  const repeatOf = (sku: string): Repeat => { const k = skuKey(sku); return odd.has(k) ? 'odd' : paired.has(k) ? 'pair' : photos.dupes.has(k) ? 'dup' : ''; };
+  const ready = tiles.length > 0 && photos.missing === 0 && photos.reading === 0 && odd.size === 0 && !busy;
   const geo = indexGeometry(Math.max(1, tiles.length), layout, !!title.trim());
   const sizeLine = output === 'index'
     ? `${geo.cols} × ${geo.rows} grid · ${geo.W}×${geo.H} px`
@@ -69,9 +76,10 @@ export default function CatalogMaker({ addToast }: { addToast: (m: string, t?: s
         // Pages are full-height photos: decode each page's two at 1600 px, draw, release, next.
         // An odd last page gets the brand panel (logo + catalog name) in its empty half.
         const logoImg = tiles.length % PER_PAGE ? await loadImg('/arya-designs-logo.png').catch(() => null) : null;
-        for (let i = 0; i < tiles.length; i += PER_PAGE) {
-          setBusy(`Page ${i / PER_PAGE + 1} of ${pageCount(tiles.length)}…`);
-          const slice = tiles.slice(i, i + PER_PAGE);
+        const ordered = pairOrder(tiles); // photos sharing a code land on one page
+        for (let i = 0; i < ordered.length; i += PER_PAGE) {
+          setBusy(`Page ${i / PER_PAGE + 1} of ${pageCount(ordered.length)}…`);
+          const slice = ordered.slice(i, i + PER_PAGE);
           const imgs = await Promise.all(slice.map(t => decodeForRender(t.file, t.w, t.h, PAGE_H)));
           const canvas = document.createElement('canvas');
           renderPage(canvas, slice.map((t, j) => ({ img: imgs[j], sku: t.sku })), { title, logoImg, scriptFont, displayFont });
@@ -114,7 +122,7 @@ export default function CatalogMaker({ addToast }: { addToast: (m: string, t?: s
           {output === 'index' && <div><label style={S.fLabel}>Mood</label>{seg(mood, (Object.keys(INDEX_MOODS) as IndexMood[]).map(k => [k, INDEX_MOODS[k].label]), setMood)}</div>}
         </div>
         <div style={{ fontSize: 10, color: T.tx3, marginTop: -6, marginBottom: 12 }}>
-          {output === 'index' ? 'Index: one grid image with the logo; the backdrop is blended from the photos themselves.' : 'Pages: two photos per page edge to edge, each with its code inside. An odd last page shows the logo and catalog name in its other half.'}
+          {output === 'index' ? 'Index: one grid image with the logo; the backdrop is blended from the photos themselves.' : 'Pages: two photos per page edge to edge, each with its code inside. Two photos of one code share a page with the code written once, top right. An odd last page shows the logo and catalog name in its other half.'}
         </div>
 
         {tiles.length > 0 && (
@@ -125,7 +133,7 @@ export default function CatalogMaker({ addToast }: { addToast: (m: string, t?: s
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(128px, 1fr))', gap: 8, marginBottom: 12 }}>
               {tiles.map((t, i) => (
-                <CatalogTile key={t.id} tile={t} index={i} count={tiles.length} duplicate={photos.dupes.has(t.sku.trim().toUpperCase())} onSku={photos.onSku} onMove={photos.onMove} onRemove={photos.onRemove} />
+                <CatalogTile key={t.id} tile={t} index={i} count={tiles.length} repeat={repeatOf(t.sku)} onSku={photos.onSku} onMove={photos.onMove} onRemove={photos.onRemove} />
               ))}
             </div>
           </>
@@ -136,10 +144,12 @@ export default function CatalogMaker({ addToast }: { addToast: (m: string, t?: s
         </button>
         {!ready && !busy && (
           <div style={{ fontSize: 10, color: T.tx3, marginTop: 6, textAlign: 'center', lineHeight: 1.5 }}>
-            To enable: {[tiles.length === 0 && 'add at least one photo', photos.missing > 0 && `type the SKU on ${photos.missing} photo${photos.missing === 1 ? '' : 's'}`, photos.reading > 0 && 'wait for the photos to finish reading'].filter(Boolean).join(' · ')}
+            To enable: {[tiles.length === 0 && 'add at least one photo', photos.missing > 0 && `type the SKU on ${photos.missing} photo${photos.missing === 1 ? '' : 's'}`, photos.reading > 0 && 'wait for the photos to finish reading',
+              odd.size > 0 && `${[...odd].map(([k, n]) => `${k} is on ${n} photos`).join(', ')} — the same code works only in pairs (2, 4…), so add or remove one`].filter(Boolean).join(' · ')}
           </div>
         )}
-        {ready && photos.dupes.size > 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 6, textAlign: 'center' }}>Repeated SKU{photos.dupes.size === 1 ? '' : 's'}: {[...photos.dupes].join(', ')} — it will still generate</div>}
+        {ready && output === 'pages' && paired.size > 0 && <div style={{ fontSize: 10, color: T.gr, marginTop: 6, textAlign: 'center' }}>Paired code{paired.size === 1 ? '' : 's'}: {[...paired].join(', ')} — both photos go on one page with the code written once, top right</div>}
+        {ready && output === 'index' && photos.dupes.size > 0 && <div style={{ fontSize: 10, color: T.yl, marginTop: 6, textAlign: 'center' }}>Repeated SKU{photos.dupes.size === 1 ? '' : 's'}: {[...photos.dupes].join(', ')} — it will still generate</div>}
       </div>
 
       {pages.length > 0 && <CatalogResults pages={pages} label={output === 'index' ? 'Index' : 'Catalog'} title={title} addToast={addToast} />}

@@ -145,7 +145,7 @@ export default function ListingAI({ addToast, active = true }: { addToast: (m: s
         </div>
       )}
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16 }}>
-        <MasterFreshness />
+        <MasterFreshness addToast={addToast} />
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 12 }}>
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={S.fLabel}>Listing Template</div>

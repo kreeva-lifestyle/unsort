@@ -41,15 +41,21 @@ export const indexGeometry = (n: number, layout: IndexLayout, hasTitle: boolean)
   return { cols, rows, gridW, gridH, W, H };
 };
 
+// A quiet gold accent under the code: a 5 px diamond and two hairlines that
+// fade out — a hint of the rate card's ornament, not a banner (owner: "subtle,
+// not loud, not big").
 const ornament = (ctx: CanvasRenderingContext2D, cx: number, cy: number, gold: string, gold2: string) => {
-  const g = ctx.createLinearGradient(cx - 70, cy, cx + 70, cy);
-  g.addColorStop(0, gold2); g.addColorStop(0.5, gold); g.addColorStop(1, gold2);
-  ctx.fillStyle = g; ctx.strokeStyle = g; ctx.lineWidth = 1.8;
-  ctx.beginPath(); ctx.moveTo(cx, cy - 8); ctx.lineTo(cx + 8, cy); ctx.lineTo(cx, cy + 8); ctx.lineTo(cx - 8, cy); ctx.closePath(); ctx.fill();
+  ctx.save();
+  ctx.globalAlpha = 0.75;
   for (const d of [-1, 1]) {
-    ctx.beginPath(); ctx.moveTo(cx + d * 16, cy); ctx.lineTo(cx + d * 58, cy); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx + d * 65, cy, 3, 0, Math.PI * 2); ctx.fill();
+    const g = ctx.createLinearGradient(cx + d * 12, cy, cx + d * 56, cy);
+    g.addColorStop(0, gold); g.addColorStop(1, 'rgba(217,188,126,0)');
+    ctx.strokeStyle = g; ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.moveTo(cx + d * 12, cy); ctx.lineTo(cx + d * 56, cy); ctx.stroke();
   }
+  ctx.fillStyle = gold2;
+  ctx.beginPath(); ctx.moveTo(cx, cy - 5); ctx.lineTo(cx + 5, cy); ctx.lineTo(cx, cy + 5); ctx.lineTo(cx - 5, cy); ctx.closePath(); ctx.fill();
+  ctx.restore();
 };
 
 export function renderIndex(canvas: HTMLCanvasElement, o: IndexOpts): void {
@@ -98,16 +104,20 @@ export function renderIndex(canvas: HTMLCanvasElement, o: IndexOpts): void {
     ctx.restore();
     rr(ctx, x + 0.75, ty + 0.75, TILE_W - 1.5, TILE_H - 1.5, 12);
     ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1.5; ctx.stroke();
-    // caption
+    // caption — a light, tracked label (not a headline): medium weight,
+    // 26 px, slightly transparent so it sits under the photo rather than
+    // shouting over it.
+    ctx.save();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    tracked('1.5px');
-    ctx.font = font(700, 38); ctx.fillStyle = th.text;
+    tracked('3px');
+    ctx.font = font(500, 26); ctx.fillStyle = th.text; ctx.globalAlpha = 0.82;
     let label = t.sku.trim().toUpperCase();
     while (label.length > 3 && ctx.measureText(label).width > TILE_W - 16) label = label.slice(0, -1);
     if (label !== t.sku.trim().toUpperCase()) label += '…';
-    ctx.fillText(label, x + TILE_W / 2, ty + TILE_H + 46);
+    ctx.fillText(label, x + TILE_W / 2, ty + TILE_H + 42);
     tracked('0px');
-    ornament(ctx, x + TILE_W / 2, ty + TILE_H + 92, th.gold, th.gold2);
+    ctx.restore();
+    ornament(ctx, x + TILE_W / 2, ty + TILE_H + 82, th.gold, th.gold2);
   });
 
   // ---- landscape: logo in its own column, centred on the grid ----

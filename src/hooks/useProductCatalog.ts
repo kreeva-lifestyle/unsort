@@ -158,6 +158,14 @@ const load = async (): Promise<Index> => {
 };
 
 
+/** Drop the in-memory index and the device copy so the next mount refetches
+ *  — used by the Rate Card Studio "Refresh" right after a master sync, when
+ *  the fingerprint may not have moved yet but the owner wants the new rows. */
+export const refreshProductCatalog = (): void => {
+  cache = null;
+  try { localStorage.removeItem(CACHE_KEY); } catch { /* disabled storage */ }
+};
+
 export function useProductCatalog() {
   const [index, setIndex] = useState<Index | null>(cache);
   const [error, setError] = useState('');

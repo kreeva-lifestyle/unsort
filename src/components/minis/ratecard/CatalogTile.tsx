@@ -5,12 +5,20 @@ import { memo } from 'react';
 import { T, S } from '../../../lib/theme';
 
 export interface DraftTile { id: string; file: File; sku: string; thumb: string | null; w: number; h: number }
+// How this photo's code relates to the others: a plain repeat (Index), an
+// odd repeat that blocks Pages, or a pair that shares one page.
+export type Repeat = '' | 'dup' | 'odd' | 'pair';
+const NOTE: Record<Exclude<Repeat, ''>, { text: string; color: string }> = {
+  dup:  { text: 'Same SKU on another photo', color: T.yl },
+  odd:  { text: 'Odd count — codes pair only (2, 4…)', color: T.re },
+  pair: { text: 'Paired — one page, code once', color: T.gr },
+};
 
-function CatalogTile({ tile, index, count, duplicate, onSku, onMove, onRemove }: {
+function CatalogTile({ tile, index, count, repeat, onSku, onMove, onRemove }: {
   tile: DraftTile;
   index: number;
   count: number;
-  duplicate: boolean;
+  repeat: Repeat;
   onSku: (id: string, v: string) => void;
   onMove: (index: number, dir: -1 | 1) => void;
   onRemove: (id: string) => void;
@@ -22,7 +30,7 @@ function CatalogTile({ tile, index, count, duplicate, onSku, onMove, onRemove }:
         style={{ ...S.btnGhost, ...S.btnSm, minWidth: 36, minHeight: 32, padding: '4px 8px', opacity: off ? 0.3 : 1 }}>{dir === -1 ? '‹' : '›'}</button>
     );
   };
-  const bad = !tile.sku.trim() || duplicate;
+  const bad = !tile.sku.trim() || repeat === 'dup' || repeat === 'odd';
   return (
     <div style={{ border: `1px solid ${bad ? 'oklch(0.63 0.22 25 / .45)' : T.bd}`, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ position: 'relative', aspectRatio: '2 / 3', background: T.s2 }}>
@@ -36,7 +44,7 @@ function CatalogTile({ tile, index, count, duplicate, onSku, onMove, onRemove }:
       <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <input value={tile.sku} onChange={e => onSku(tile.id, e.target.value)} placeholder="SKU *" aria-label={`SKU for photo ${index + 1}`}
           style={{ ...S.fInput, width: '100%', fontFamily: T.mono, textTransform: 'uppercase', textAlign: 'center', borderColor: bad ? 'oklch(0.63 0.22 25 / .5)' : undefined }} />
-        {duplicate && <div style={{ fontSize: 10, color: T.yl, textAlign: 'center' }}>Same SKU on another photo</div>}
+        {repeat && <div style={{ fontSize: 10, color: NOTE[repeat].color, textAlign: 'center' }}>{NOTE[repeat].text}</div>}
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
           {nav(-1, 'Move earlier')}
           {nav(1, 'Move later')}
