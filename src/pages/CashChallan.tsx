@@ -1350,21 +1350,21 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
   // ── List View ──────────────────────────────────────────────────────────────
   return (
-    <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
-      {/* Header — Programs-style: subtitle left, action buttons right */}
+    <div className="page-pad has-fab" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
+      {/* Header — Programs-style: subtitle left, action buttons right; on mobile the buttons become a full-width scrolling chip row (challan-nav-wrap fades its edge) */}
       <div className="challan-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 12, color: T.tx3 }}>{totalCount} challan{totalCount === 1 ? '' : 's'} · invoicing, payments, returns</div>
         {/* Full-size ghost buttons (matches Inventory/Programs toolbars — the
             btnSm pills looked undersized next to the primary CTA). Order runs
             plain views → tinted sibling module → primary action. */}
-        <div className="challan-nav-btns" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="challan-nav-wrap"><div className="challan-nav-btns" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => setShowOrders(true)} style={S.btnGhost}>Pending Orders</button>
           <button onClick={() => setShowContacts(true)} style={S.btnGhost}>Contacts</button>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('analytics'); await fetchAnalytics(); setViewOpening(null); setShowAnalytics(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'analytics' ? 0.6 : 1 }}>{viewOpening === 'analytics' ? 'Opening…' : 'Analytics'}</button>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('ledger'); await fetchLedger(); setViewOpening(null); setShowLedger(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'ledger' ? 0.6 : 1 }}>{viewOpening === 'ledger' ? 'Opening…' : 'Ledger'}</button>
           {canAccessModule(profile?.role, 'cashbook', profile?.module_access) && <button onClick={() => { setShowCashBook(true); }} style={{ ...S.btnGhost, color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .25)', background: 'oklch(0.72 0.19 145 / .06)' }}>Cash Book</button>}
           <button onClick={() => { setShowModal(true); }} style={S.btnPrimary} className="desktop-only">+ New Challan</button>
-        </div>
+        </div></div>
       </div>
 
       <ChallanList
