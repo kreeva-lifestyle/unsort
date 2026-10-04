@@ -75,7 +75,8 @@ export default function ChallanList(p: Props) {
             <svg viewBox="0 0 24 24" style={{ width: 13, height: 13, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
             Filters{filterActive ? ` (${[p.statusFilter, p.tagFilter, p.dateFrom, p.dateTo, p.invFilter].filter(Boolean).length})` : ''}
           </button>
-          <button onClick={p.onExport} style={{ ...S.btnGhost, color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .25)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export</button>
+          {/* On mobile Export lives in the Filters panel (challan-export-btn is hidden there) so search + Filters + Select fit on one line. */}
+          <button onClick={p.onExport} className="challan-export-btn" style={{ ...S.btnGhost, color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .25)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export</button>
           <button onClick={p.onToggleBulkMode} style={{ ...S.btnGhost, color: p.bulkMode ? T.ac2 : T.tx3, borderColor: p.bulkMode ? T.ac3 : T.bd2, background: p.bulkMode ? T.ac3 : 'rgba(255,255,255,0.03)' }}>{p.bulkMode ? 'Cancel' : '☑ Select'}</button>
         </div>
       </div>
@@ -111,7 +112,7 @@ export default function ChallanList(p: Props) {
                 <option value="">All</option><option value="yes">Yes</option><option value="no">No</option>
               </select>
             </div>
-            <div>
+            <div className="challan-perpage">
               <label style={S.fLabel}>Per page</label>
               <select value={p.pageSize} onChange={e => { p.onPageSizeChange(Number(e.target.value)); p.onResetPage(); }} style={{ padding: '4px 8px', fontSize: 11, height: 28, borderRadius: 6, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.05)', color: T.tx2, cursor: 'pointer' }}>
                 <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
@@ -119,14 +120,19 @@ export default function ChallanList(p: Props) {
             </div>
           </div>
           {filterActive && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+            <div className="desktop-only" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
               <button onClick={p.onClearFilters} style={{ ...S.btnGhost, ...S.btnSm, color: T.tx3, border: `1px solid ${T.bd2}`, background: T.glass1 }}>Clear filters</button>
             </div>
           )}
+          <div className="mobile-only" style={{ gap: 6, marginTop: 10 }}>
+            <button onClick={p.onExport} style={{ ...S.btnGhost, flex: 1, minHeight: 44, color: T.gr, borderColor: 'oklch(0.72 0.19 145 / .25)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export CSV</button>
+            {filterActive && <button onClick={p.onClearFilters} style={{ ...S.btnGhost, flex: 1, minHeight: 44, color: T.tx3 }}>Clear filters</button>}
+          </div>
         </div>
       )}
 
-      <div style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{p.totalCount} records</div>
+      {/* The count also sits in the pager; on mobile this line is hidden (challan-records). */}
+      <div className="challan-records" style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{p.totalCount} records</div>
 
       {p.loading && <SkeletonRows rows={4} />}
       {!p.loading && p.challans.length === 0 && <div style={{ padding: 14, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8 }}><Empty icon="receipt" title="No challans yet" message="Create your first challan — invoice customers, record payments, and track outstanding amounts all from one place." cta="+ New Challan" onCta={p.onOpenEmpty} /></div>}

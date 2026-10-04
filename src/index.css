@@ -314,6 +314,9 @@ body.modal-open .fab { display: none !important; }
   .mobile-drawer { top: env(safe-area-inset-top, 0) !important; bottom: var(--nav-h) !important; height: auto !important; }
   .mobile-drawer .sidebar { display: flex !important; width: 100% !important; height: 100% !important; padding-bottom: 0 !important; }
   .page-pad { padding: 14px max(12px, env(safe-area-inset-right, 0)) calc(var(--nav-h) + 14px) max(12px, env(safe-area-inset-left, 0)) !important; }
+  /* A page with a FAB: the last card must scroll clear of the 52px button
+     (it sits 12px above the nav), or its right-hand amount hides under it. */
+  .page-pad.has-fab { padding-bottom: calc(var(--nav-h) + 80px) !important; }
   .filter-bar { gap: 6px !important; padding: 8px 10px !important; }
   .filter-bar select, .filter-bar input { font-size: 12px !important; padding: 6px 8px !important; min-width: 0 !important; }
   .header-bar { padding: env(safe-area-inset-top, 0) 16px 0 !important; height: calc(56px + env(safe-area-inset-top, 0)) !important; }
@@ -338,19 +341,30 @@ body.modal-open .fab { display: none !important; }
 
 /* ── Cash Challan module mobile ──────────────────────────── */
 @media (max-width: 768px) {
+  /* Header: the subtitle goes (its count is in the pager) and the view
+     buttons become ONE full-width row that scrolls sideways. The wrap is a
+     flex item that may shrink (min-width 0) — the old strip had
+     flex-shrink: 0, so it grew to its content and the last button was cut
+     off the screen instead of scrolling. The wrap's ::after fades the right
+     edge so a half-visible chip reads as "more this way", not as a cut. */
   .challan-header { flex-direction: row !important; align-items: center !important; gap: 8px !important; margin-bottom: 8px !important; }
-  .challan-header > div:first-child { font-size: 10px !important; flex: 1 !important; }
-  .challan-nav-btns { overflow-x: auto !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important; gap: 4px !important; flex-shrink: 0 !important; }
+  .challan-header > div:first-child { display: none !important; }
+  .challan-nav-wrap { position: relative !important; flex: 1 1 100% !important; min-width: 0 !important; width: 100% !important; }
+  .challan-nav-wrap::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 36px; pointer-events: none; background: linear-gradient(90deg, oklch(0.08 0.02 265 / 0), oklch(0.08 0.02 265)); }
+  .challan-nav-btns { overflow-x: auto !important; flex-wrap: nowrap !important; width: 100% !important; min-width: 0 !important; padding-right: 36px !important; gap: 6px !important; -webkit-overflow-scrolling: touch !important; scrollbar-width: none !important; scroll-snap-type: x proximity; }
   .challan-nav-btns::-webkit-scrollbar { display: none !important; }
-  /* Nav chips scroll horizontally, so they can afford a real tap height —
-     the old 4px/9px override produced 21px-tall buttons. */
-  .challan-nav-btns button { padding: 6px 10px !important; font-size: 11px !important; min-height: 40px !important; white-space: nowrap !important; }
-  .challan-filters { flex-direction: column !important; padding: 8px 10px !important; gap: 6px !important; margin-bottom: 6px !important; align-items: stretch !important; }
-  .challan-filters > div:first-child { min-width: 0 !important; width: 100% !important; }
-  .challan-filters input { width: 100% !important; min-width: 0 !important; height: 32px !important; font-size: 13px !important; }
-  .challan-filter-btns { display: flex !important; flex: none !important; gap: 4px !important; overflow-x: auto !important; scrollbar-width: none !important; }
-  .challan-filter-btns::-webkit-scrollbar { display: none !important; }
-  .challan-filter-btns button { font-size: 11px !important; padding: 4px 10px !important; min-height: 40px !important; white-space: nowrap !important; }
+  /* Full-size ghost buttons (the design's toolbar size), 44px tap height. */
+  .challan-nav-btns button { min-height: 44px !important; white-space: nowrap !important; flex-shrink: 0 !important; scroll-snap-align: start; }
+  /* Toolbar: search + Filters + Select on ONE 44px line (Export moves into
+     the Filters panel on mobile), so the first challan is a row higher. */
+  .challan-filters { flex-direction: row !important; flex-wrap: nowrap !important; padding: 8px !important; gap: 6px !important; margin-bottom: 8px !important; align-items: center !important; }
+  .challan-filters > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; width: auto !important; }
+  .challan-filters input { width: 100% !important; min-width: 0 !important; height: 44px !important; font-size: 16px !important; }
+  .challan-filter-btns { display: flex !important; flex: none !important; gap: 6px !important; }
+  .challan-filter-btns button { min-height: 44px !important; white-space: nowrap !important; padding: 8px 12px !important; }
+  .challan-filter-btns .challan-export-btn { display: none !important; }
+  .challan-perpage { display: none !important; }   /* the pager has it */
+  .challan-records { display: none !important; }   /* the pager has it */
 
   /* Filter grid (Status / Tag / From / To / Per page) — compact for 393px */
   .challan-filter-grid { grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
