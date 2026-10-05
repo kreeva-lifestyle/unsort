@@ -43,7 +43,8 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
   // Notes & attachments start open only when the sheet already has some.
   const [extrasOpen] = useState(() => !!product.notes?.trim() || (product.attachments?.length ?? 0) > 0);
 
-  const actions = { saved, saving: s.saving, onSave: s.save, onDoc: s.openDoc, onBack, onDelete: s.deleteCosting };
+  const actions = { saved, saving: s.saving, deleting: s.deleting, onSave: s.save, onDoc: s.openDoc, onBack, onDelete: s.deleteCosting };
+  const nAtt = p.attachments?.length ?? 0;
   return (
     <div className="cost-editor" style={{ fontFamily: T.sans, color: T.tx }}>
       <div className="cost-layout">
@@ -51,7 +52,7 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
           <CostingHero p={p} uploading={s.uploading} categories={categories}
             onSku={v => s.patch({ sku: v })} onCategory={v => s.patch({ category: v })} onFile={s.uploadImage} />
 
-          <div style={{ ...S.fLabel, margin: '14px 0 6px' }}>Components · {p.components.length}</div>
+          <div style={{ height: 14 }} />
           {p.components.map((c, i) => (
             <ComponentCard key={i} comp={c} idx={i} library={library} topSubs={topSubs}
               defaultOpen={openDefaults[i] ?? true} openRequest={s.errorComps.has(i) ? s.errVersion : 0}
@@ -66,13 +67,13 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
 
         <details className="challan-extras cost-extras" open={extrasOpen} style={{ marginTop: 14 }}>
           <summary style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 36, padding: '6px 0' }}>
-            <span style={{ ...S.fLabel, margin: 0 }}>Notes & attachments{(p.attachments?.length ?? 0) > 0 ? ` · ${p.attachments!.length}` : ''}</span>
+            {/* The count shows only while folded; open, the attachments block carries its own. */}
+            <span style={{ ...S.fLabel, margin: 0 }}>Notes & attachments{nAtt > 0 && <span className="x-closed"> · {nAtt}</span>}</span>
             <span style={{ fontSize: 14, color: T.tx3 }}><span className="x-closed">+</span><span className="x-open">−</span></span>
           </summary>
-          <label style={{ ...S.fLabel, marginTop: 6 }}>Notes</label>
-          <textarea className="cost-note" value={p.notes} onChange={e => s.patch({ notes: e.target.value })}
-            placeholder="Anything to remember about costing this product — wastage, minimums, vendor terms…"
-            rows={3} style={{ ...S.fInput, width: '100%', height: 'auto', minHeight: 64, resize: 'vertical', lineHeight: 1.5 }} />
+          <textarea className="cost-note" value={p.notes} onChange={e => s.patch({ notes: e.target.value })} aria-label="Notes"
+            placeholder="Notes — anything to remember about costing this product: wastage, minimums, vendor terms…"
+            rows={3} style={{ ...S.fInput, width: '100%', height: 'auto', minHeight: 64, resize: 'vertical', lineHeight: 1.5, marginTop: 8 }} />
           <CostingAttachments costingId={p.id} saved={saved} list={p.attachments ?? []} addToast={addToast}
             onChange={next => s.patch({ attachments: next })} />
         </details>

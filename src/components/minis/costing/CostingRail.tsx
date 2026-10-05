@@ -10,7 +10,7 @@ import TotalsCard from './TotalsCard';
 import SheetProblems from './SheetProblems';
 import type { DocKind } from './useCostingSheet';
 
-export default function CostingRail({ components, maintenancePct, onMaintenance, pieces, onPieces, pcs, sellingPrice, masterPrice, onSelling, errors, saved, saving, onSave, onDoc, onBack, onDelete }: {
+export default function CostingRail({ components, maintenancePct, onMaintenance, pieces, onPieces, pcs, sellingPrice, masterPrice, onSelling, errors, saved, saving, deleting, onSave, onDoc, onBack, onDelete }: {
   components: CostingComponent[];
   maintenancePct: number | string;
   onMaintenance: (v: string) => void;
@@ -23,6 +23,7 @@ export default function CostingRail({ components, maintenancePct, onMaintenance,
   errors: SheetProblem[];
   saved: boolean;
   saving: boolean;
+  deleting: boolean;
   onSave: () => void;
   onDoc: (which: DocKind) => void;
   onBack: () => void;
@@ -49,7 +50,7 @@ export default function CostingRail({ components, maintenancePct, onMaintenance,
         {hint && <div style={{ fontSize: 10, color: T.tx3, textAlign: 'center' }}>{hint}</div>}
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
           <button onClick={onBack} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 36 }}>← Back to list</button>
-          {saved && <button onClick={onDelete} style={{ ...S.btnDanger, ...S.btnSm, minHeight: 36 }}>Delete</button>}
+          {saved && <button onClick={onDelete} disabled={deleting} style={{ ...S.btnDanger, ...S.btnSm, minHeight: 36, pointerEvents: deleting ? 'none' : 'auto', opacity: deleting ? 0.5 : 1 }}>{deleting ? 'Deleting…' : 'Delete'}</button>}
         </div>
       </div>
     </aside>

@@ -35,6 +35,7 @@ export function useCostingSheet({ product, saved, library, onSaved, addToast, as
   const [errors, setErrors] = useState<SheetProblem[]>([]);
   const [errVersion, setErrVersion] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [uploading, setUploading] = useState(false);
   // Owner's flow: pieces to make -> totals, purchase plan and POs use the same number.
   const [pieces, setPieces] = useState('');
@@ -108,11 +109,16 @@ export function useCostingSheet({ product, saved, library, onSaved, addToast, as
   // Delete lives INSIDE the open costing (owner's call) - the list cards
   // stay clean. Only offered for a costing that exists in the DB.
   const deleteCosting = async () => {
+    if (deleting) return;
     if (!await ask({ title: `Delete product costing ${p.sku || product.sku}?`, confirmLabel: 'Delete', danger: true })) return;
-    const { error } = await supabase.from('costing_products').delete().eq('id', p.id);
-    if (error) { addToast(friendlyError(error), 'error'); return; }
-    addToast(`${p.sku || product.sku} deleted`, 'success');
-    onSaved(p);
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from('costing_products').delete().eq('id', p.id);
+      if (error) throw error;
+      addToast(`${p.sku || product.sku} deleted`, 'success');
+      onSaved(p);
+    } catch (e) { addToast(friendlyError(e), 'error'); }
+    setDeleting(false);
   };
 
   const uploadImage = async (file: File | undefined) => {
@@ -133,7 +139,7 @@ export function useCostingSheet({ product, saved, library, onSaved, addToast, as
   const removeComp = (i: number) => setP(prev => ({ ...prev, components: prev.components.filter((_, j) => j !== i) }));
 
   return {
-    p, patch, errors, errVersion, errorComps, saving, uploading, pieces, setPieces, pcs, total, masterPrice,
+    p, patch, errors, errVersion, errorComps, saving, deleting, uploading, pieces, setPieces, pcs, total, masterPrice,
     doc, closeDoc: () => setDoc(null), save, openDoc, deleteCosting, uploadImage, patchComp, addComp, removeComp,
   };
 }

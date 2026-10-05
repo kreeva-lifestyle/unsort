@@ -12,7 +12,7 @@ import { SheetProblem, money } from './costingModel';
 import { jumpTo } from './SheetProblems';
 import type { DocKind } from './useCostingSheet';
 
-export default function CostingSaveBar({ sku, total, sell, pcs, errors, saved, saving, onSave, onDoc, onBack, onDelete }: {
+export default function CostingSaveBar({ sku, total, sell, pcs, errors, saved, saving, deleting, onSave, onDoc, onBack, onDelete }: {
   sku: string;
   total: number;
   sell: number;
@@ -20,6 +20,7 @@ export default function CostingSaveBar({ sku, total, sell, pcs, errors, saved, s
   errors: SheetProblem[];
   saved: boolean;
   saving: boolean;
+  deleting: boolean;
   onSave: () => void;
   onDoc: (which: DocKind) => void;
   onBack: () => void;
@@ -33,7 +34,7 @@ export default function CostingSaveBar({ sku, total, sell, pcs, errors, saved, s
     { label: 'Purchase plan (PDF)', color: pcs > 0 ? T.bl : T.tx3, onClick: () => onDoc('plan') },
     { label: 'Raise POs', color: pcs > 0 && saved ? T.ac2 : T.tx3, onClick: () => onDoc('raise') },
     { label: 'Back to list', onClick: onBack },
-    ...(saved ? [{ label: 'Delete costing', danger: true, onClick: onDelete }] : []),
+    ...(saved ? [{ label: deleting ? 'Deleting…' : 'Delete costing', danger: true, onClick: () => { if (!deleting) onDelete(); } }] : []),
   ];
   return (<>
     <div className="cost-savebar">

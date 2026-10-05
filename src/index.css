@@ -634,6 +634,7 @@ body.modal-open .fab { display: none !important; }
   .cost-chips { flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
   .cost-chips::-webkit-scrollbar { display: none; }
   .cost-chip { min-height: 44px !important; padding: 8px 14px !important; font-size: 12px !important; flex-shrink: 0 !important; max-width: 80vw !important; white-space: normal !important; text-align: left !important; }
+  .cost-chips > span { flex-shrink: 0 !important; white-space: nowrap !important; }   /* "Start from" / the disabled hint keep their width */
   .cost-addline, .cost-remove, .cost-problem { min-height: 44px !important; }
   .cost-addline { width: 100% !important; }
   .cost-extras summary { min-height: 44px !important; }
