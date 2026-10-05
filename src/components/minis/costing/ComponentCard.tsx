@@ -48,19 +48,27 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
     onChange({ ...comp, subs: comp.subs.map((s, j) => (j === i ? next : s)) });
   };
   const removeSub = (i: number) => { setCopiedFrom(null); onChange({ ...comp, subs: comp.subs.filter((_, j) => j !== i) }); };
-  const addLine = (s = blankSub()) => {
+  const addLine = (s?: ReturnType<typeof blankSub>) => {
     setCopiedFrom(null);
-    onChange({ ...comp, subs: [...comp.subs, s] });
+    // "+ Add line" on a component that still has an untouched blank line
+    // (every new component starts with one) opens THAT line instead of
+    // stacking a second empty row.
+    const blankAt = s ? -1 : comp.subs.findIndex(isBlank);
+    if (blankAt >= 0) { setLineFor(blankAt); return; }
+    onChange({ ...comp, subs: [...comp.subs, s ?? blankSub()] });
     setLineFor(comp.subs.length);   // open the fresh line straight away
   };
+  // Nothing is red until the user has started: a fresh component shows
+  // neutral prompts, and the save-time problem list flags it (openRequest).
+  const flagged = openRequest > 0;
 
   return (
     <div data-fx={`cost-f-${idx}`} style={bare ? undefined : { border: `1px solid ${T.bd}`, borderRadius: 14, background: 'rgba(255,255,255,0.02)', marginBottom: 10, overflow: 'hidden' }}>
       {/* Header: tap to fold/unfold */}
       {!bare && <div onClick={() => setOpen(o => !o)} role="button"
         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', cursor: 'pointer', minHeight: 44 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: comp.name.trim() ? T.tx2 : T.re }}>
-          {comp.name.trim() || `Component ${idx + 1} — name it *`}
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: comp.name.trim() ? T.tx2 : flagged || !fresh ? T.re : T.tx3 }}>
+          {comp.name.trim() || `Component ${idx + 1} — name it`}
         </span>
         <span style={{ marginLeft: 'auto', fontFamily: T.mono, fontWeight: 700, fontSize: 13, color: T.ac2 }}>{money(componentCost(comp))}</span>
         <span style={{ color: T.tx3, fontSize: 11 }}>{open ? '▲' : '▼'}</span>
@@ -84,24 +92,26 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
           )}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
             <SuggestInput value={comp.name} onChange={v => onChange({ ...comp, name: v })} options={library.mains}
-              placeholder="Main component — e.g. Fabric *" style={{ ...S.fInput, flex: 1, minWidth: 0, ...(comp.name.trim() ? {} : { border: BAD }) }} />
+              inputProps={{ autoFocus: bare && !comp.name.trim(), enterKeyHint: 'done' }}
+              placeholder="Main component — e.g. Fabric *" style={{ ...S.fInput, flex: 1, minWidth: 0, ...(!comp.name.trim() && (flagged || !fresh) ? { border: BAD } : {}) }} />
             <button onClick={onRemove} className="cost-remove" style={{ ...S.btnDanger, ...S.btnSm, minHeight: 36 }}>Remove</button>
           </div>
 
           {comp.subs.map((s, i) => {
             const sel = selectedSupplier(s);
             const bad = subProblems(s);
-            const hasBad = bad.name || bad.qty || bad.unit || bad.supplier || bad.rate;
+            const touched = !isBlank(s) || flagged;
+            const hasBad = touched && (bad.name || bad.qty || bad.unit || bad.supplier || bad.rate);
             const alt = cheaperAlt(s);
             return (
               <div key={i} data-fx={`cost-f-${idx}-${i}`} onClick={() => setLineFor(i)} role="button"
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 4px 10px 10px', borderTop: `1px solid ${T.bd}`, cursor: 'pointer', borderLeft: hasBad ? BAD : '3px solid transparent' }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: s.name.trim() ? T.tx : T.re, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {s.name.trim() || 'Tap to fill this line *'}
+                  <div style={{ fontSize: 13, fontWeight: 600, color: s.name.trim() ? T.tx : hasBad ? T.re : T.tx2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {s.name.trim() || (touched ? 'Tap to fill this line *' : 'Tap to add the first line')}
                   </div>
                   <div style={{ fontSize: 10, color: T.tx3, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {sel?.name.trim() ? <>{sel.name}{sel.materialCode.trim() ? <> · <span style={{ fontFamily: T.mono, color: T.tx2 }}>{sel.materialCode}</span></> : null}</> : <span style={{ color: bad.supplier ? T.re : T.tx3 }}>no supplier</span>}
+                    {sel?.name.trim() ? <>{sel.name}{sel.materialCode.trim() ? <> · <span style={{ fontFamily: T.mono, color: T.tx2 }}>{sel.materialCode}</span></> : null}</> : <span style={{ color: touched && bad.supplier ? T.re : T.tx3 }}>{touched ? 'no supplier' : 'material · qty · supplier · rate'}</span>}
                   </div>
                   {alt && <div style={{ fontSize: 9, color: T.yl, marginTop: 2 }}>▼ {alt.name} {money(alt.saving)} cheaper</div>}
                 </div>

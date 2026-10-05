@@ -52,7 +52,11 @@ export default function LineSheet({ sub, compName, library, onChange, onRemove, 
   useBackClose(true, onClose);
 
   const sel = selectedSupplier(sub);
-  const bad = subProblems(sub);
+  // A line nobody has typed in yet shows calm empty fields; the red borders
+  // start with the first keystroke (live), not before.
+  const fresh = !sub.name.trim() && !String(sub.qty).trim() && sub.suppliers.every(x => !x.name.trim() && !String(x.rate).trim());
+  const p = subProblems(sub);
+  const bad = fresh ? { name: false, qty: false, unit: false, supplier: false, rate: false } : p;
   const alt = cheaperAlt(sub);
   const patchSel = (p: Partial<CostingSupplier>) => {
     const suppliers = sel ? sub.suppliers.map(x => (x === sel ? { ...x, ...p } : x))
@@ -78,6 +82,7 @@ export default function LineSheet({ sub, compName, library, onChange, onRemove, 
         <div style={{ padding: '14px 18px', overflowY: 'auto' }}>
           <label style={S.fLabel}>Sub component <span style={{ color: T.re }}>*</span></label>
           <SuggestInput value={sub.name} onChange={v => onChange({ ...sub, name: v })} onPick={pickName} options={library.subs}
+            inputProps={{ autoFocus: fresh, enterKeyHint: 'next' }}
             placeholder='e.g. Georgette 60"' style={{ ...fld(bad.name), marginBottom: 12 }} />
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
