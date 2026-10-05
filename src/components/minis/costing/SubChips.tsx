@@ -28,14 +28,15 @@ export default function SubChips({ presets, comp, onAdd, disabled }: {
     suppliers: p.suppliers.length ? p.suppliers.map(x => ({ ...x })) : [blankSupplier()],
   });
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
+    <div className="cost-chips" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
+      {/* First in the row so it is the first thing seen in the phone's scroll track. */}
+      {disabled && <span style={{ fontSize: 10, color: T.tx3 }}>name the main component first</span>}
       {chips.map(p => (
-        <button key={p.name} onClick={() => !disabled && onAdd(toSub(p))} aria-label={`Add ${p.name}`} disabled={disabled} aria-disabled={disabled}
+        <button key={p.name} onClick={() => !disabled && onAdd(toSub(p))} className="cost-chip" aria-label={`Add ${p.name}`} disabled={disabled} aria-disabled={disabled}
           style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, padding: '5px 12px', fontSize: 11, borderRadius: 999, opacity: disabled ? 0.35 : 1, cursor: disabled ? 'not-allowed' : 'pointer', pointerEvents: disabled ? 'none' : 'auto' }}>
           + {p.name}
         </button>
       ))}
-      {disabled && <span style={{ fontSize: 10, color: T.tx3 }}>name the main component first</span>}
     </div>
   );
 }

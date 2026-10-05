@@ -94,8 +94,11 @@ export default function CostingAttachments({ costingId, saved, list, onChange, a
                   <span style={{ fontSize: 10, lineHeight: 1.25, textAlign: 'center', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-word' }}>{a.name}</span>
                   <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{fileSize(a.size)}</span>
                 </a>}
-            <button onClick={() => remove(a)} aria-label={`Remove ${a.name}`} disabled={!!busy}
-              style={{ position: 'absolute', top: 2, right: 2, width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'oklch(0 0 0 / .6)', color: T.tx, fontSize: 16, lineHeight: 1, cursor: 'pointer', opacity: busy ? 0.5 : 1 }}>&#215;</button>
+            {/* The hit box grows to 44px on the phone (.cost-att-x); the visible circle stays 28px. */}
+            <button onClick={() => remove(a)} className="cost-att-x" aria-label={`Remove ${a.name}`} disabled={!!busy}
+              style={{ position: 'absolute', top: 2, right: 2, width: 28, height: 28, padding: 0, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: busy ? 0.5 : 1 }}>
+              <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'oklch(0 0 0 / .6)', color: T.tx, fontSize: 16, lineHeight: '28px', textAlign: 'center' }}>&#215;</span>
+            </button>
           </div>
         ))}
         {list.length < MAX_ATTACHMENTS && (

@@ -573,9 +573,10 @@ body.modal-open .fab { display: none !important; }
 .challan-extras .x-open { display: none; }
 .challan-extras[open] .x-open { display: inline; }
 .challan-extras[open] .x-closed { display: none; }
-/* Per-line net + sticky save bar exist only on mobile. */
+/* Per-line net + sticky save bar exist only on mobile. The savebar geometry
+   is shared with the product-costing editor (.cost-savebar). */
 .challan-line-total { display: none; }
-.challan-savebar { display: none; }
+.challan-savebar, .cost-savebar { display: none; }
 @media (max-width: 768px) {
   /* Sticky total + save above the bottom nav: the number the user is
      building toward stays under the thumb for the whole form. */
@@ -585,12 +586,12 @@ body.modal-open .fab { display: none !important; }
      transition, the bar's own background fills to the edge. Anchoring to
      bottom: var(--nav-h) instead left a see-through gap on devices where the
      two measurements disagreed (owner's screenshot). */
-  .challan-savebar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 90; align-items: center; gap: 12px; padding: 10px 14px calc(var(--nav-h) + 10px); background: rgba(8, 11, 20, 0.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid rgba(255, 255, 255, 0.07); }
+  .challan-savebar, .cost-savebar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 90; align-items: center; gap: 12px; padding: 10px 14px calc(var(--nav-h) + 10px); background: rgba(8, 11, 20, 0.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid rgba(255, 255, 255, 0.07); }
   /* The form view ALWAYS carries body.modal-open (CashChallan owns the body
      class), and modal-open hides the bottom nav — so on this screen the bar
      hugs the true bottom with only home-indicator clearance. The nav-height
      padding above stays as the fallback for any state where the nav shows. */
-  body.modal-open .challan-savebar { padding-bottom: max(12px, var(--sab)); }
+  body.modal-open .challan-savebar, body.modal-open .cost-savebar { padding-bottom: max(12px, var(--sab)); }
   body.modal-open .challan-form { padding-bottom: 120px !important; }
   .challan-save-inline { display: none !important; }
   /* Clearance for nav + savebar (overrides the older 80px rule above). */
@@ -602,6 +603,44 @@ body.modal-open .fab { display: none !important; }
   .challan-recent { flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .challan-recent::-webkit-scrollbar { display: none; }
   .challan-line-total { display: flex !important; }
+}
+
+/* ── Product Costing editor (src/components/minis/costing) ────────────────
+   Desktop: the sheet on the left, a sticky money rail (totals, price,
+   pieces, Save) on the right. <main> is the scroller and the 56px header
+   is its sibling, so top:14 sits 14px under the header. Geometry only. */
+.cost-editor { max-width: 1180px; }
+.cost-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+.cost-rail { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 14px; max-height: calc(100vh - 84px); overflow-y: auto; }
+.cost-extras { grid-column: 1; }
+.cost-rail-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.05); }
+.cost-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* Tablet: one reading-width column; the rail sits in flow with its buttons. */
+@media (max-width: 1023px) {
+  .cost-editor { max-width: 760px; }
+  .cost-layout { grid-template-columns: 1fr; }
+  .cost-rail, .cost-extras { grid-column: auto; grid-row: auto; }
+  .cost-rail { position: static; max-height: none; overflow: visible; }
+}
+
+/* Phone: the fixed .cost-savebar replaces the rail's buttons; the bar hides
+   under any bottom sheet (body.modal-open) instead of showing through it. */
+@media (max-width: 768px) {
+  .cost-editor { padding-bottom: 78px !important; }   /* + .page-pad's nav-h + 14 = the challan form's clearance */
+  .cost-rail-actions { display: none !important; }
+  .cost-savebar { gap: 10px !important; }
+  body.modal-open .cost-savebar { display: none !important; }
+  .cost-chips { flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .cost-chips::-webkit-scrollbar { display: none; }
+  .cost-chip { min-height: 44px !important; padding: 8px 14px !important; font-size: 12px !important; flex-shrink: 0 !important; max-width: 80vw !important; white-space: normal !important; text-align: left !important; }
+  .cost-chips > span { flex-shrink: 0 !important; white-space: nowrap !important; }   /* "Start from" / the disabled hint keep their width */
+  .cost-addline, .cost-remove, .cost-problem { min-height: 44px !important; }
+  .cost-addline { width: 100% !important; }
+  .cost-extras summary { min-height: 44px !important; }
+  .cost-note { min-height: 88px !important; }
+  .cost-money input { width: 112px !important; }   /* 16px mobile font: "e.g. 48" needs the room */
+  .cost-att-x { width: 44px !important; height: 44px !important; top: 0 !important; right: 0 !important; }
 }
 
 /* Price Projector AI card: moving highlight while the model thinks. */
