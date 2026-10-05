@@ -1,4 +1,4 @@
-// Catalog Downloads (RateCard Studio → Catalog downloads): vendor packs from
+// Catalog Downloads (Vendor Studio → Catalog downloads): vendor packs from
 // Dropbox. `catalog_folder` finds the catalog's folder inside the configured
 // search roots, lists its SKU sub-folders and marks each active / inactive
 // from the master mirror (product_catalog.is_active); `catalog_pack` copies

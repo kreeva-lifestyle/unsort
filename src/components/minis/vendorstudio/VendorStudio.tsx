@@ -1,4 +1,4 @@
-// RateCard Studio entry: the rate card generator, Catalog downloads (vendor
+// Vendor Studio entry: the rate card generator, Catalog downloads (vendor
 // photo packs from Dropbox), the Catalog maker (index grid / two-per-page
 // sheets from photos + SKUs) and the Product detail generator (WhatsApp
 // write-up from the master sheet, Dropbox photos and the AI). Used by the
@@ -14,7 +14,7 @@ import ProductDetailGenerator from './ProductDetailGenerator';
 
 type Feature = 'card' | 'catalogs' | 'maker' | 'details';
 
-export default function RateCardStudio({ addToast, lockedMode, shareToken }: { addToast: (m: string, t?: string) => void; lockedMode?: 'master'; shareToken?: string }) {
+export default function VendorStudio({ addToast, lockedMode, shareToken }: { addToast: (m: string, t?: string) => void; lockedMode?: 'master'; shareToken?: string }) {
   const [feature, setFeature] = useState<Feature>('card');
   const pill = (f: Feature, label: string) => (
     <button type="button" className="touch44" onClick={() => setFeature(f)} aria-pressed={feature === f}

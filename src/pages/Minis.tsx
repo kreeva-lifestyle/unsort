@@ -18,7 +18,7 @@ import MasterLinkCheck from '../components/minis/LinkCheck';
 import VirtualStock from '../components/minis/VirtualStock';
 import Trackly from '../components/minis/Trackly';
 import ReturnLabels from '../components/minis/ReturnLabels';
-import RateCardStudio from '../components/minis/ratecard/RateCardStudio';
+import VendorStudio from '../components/minis/vendorstudio/VendorStudio';
 import MasterAssistant from '../components/listingai/assistant/MasterAssistant';
 import DropboxLinkGenerator from '../components/minis/dropboxlinks/DropboxLinkGenerator';
 import ForwardDropbox from '../components/minis/forward/ForwardDropbox';
@@ -61,7 +61,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     setIgnoredSkus(m);
   }, [addToast]);
   useEffect(() => { fetchIgnored(); }, [fetchIgnored]);
-  // A tile low on the home grid (RateCard Studio, on a phone) opens its view
+  // A tile low on the home grid (Vendor Studio, on a phone) opens its view
   // with the page still scrolled to where the tile was, so the view's back
   // button sat above the fold. Every view starts at the top.
   useEffect(() => { document.querySelector('main')?.scrollTo({ top: 0 }); window.scrollTo({ top: 0 }); }, [view]);
@@ -290,7 +290,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     address: <AddressPrinter addToast={addToast} />, return_labels: <ReturnLabels addToast={addToast} />,
     dropbox_links: <DropboxLinkGenerator addToast={addToast} />, forward_dropbox: <ForwardDropbox addToast={addToast} onBack={() => setView('home')} />,
     otp: <OtpInbox addToast={addToast} />, costing: <ProductCosting addToast={addToast} />, dropbox_upload: <DropboxUploader addToast={addToast} />,
-    client_finder: <ClientFinder addToast={addToast} />, ratecard: <RateCardStudio addToast={addToast} />, jobwork: <Jobwork addToast={addToast} />,
+    client_finder: <ClientFinder addToast={addToast} />, ratecard: <VendorStudio addToast={addToast} />, jobwork: <Jobwork addToast={addToast} />,
   };
   if (simple[view]) return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>

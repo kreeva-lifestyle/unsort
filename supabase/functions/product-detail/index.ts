@@ -1,4 +1,4 @@
-// product-detail — the Product Detail Generator in Rate Card Studio.
+// product-detail — the Product Detail Generator in Vendor Studio.
 //
 // The operator types a design code. This function gathers everything the
 // write-up needs and asks the model for the WORDS only:

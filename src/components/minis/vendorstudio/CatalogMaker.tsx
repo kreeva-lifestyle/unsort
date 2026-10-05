@@ -1,4 +1,4 @@
-// Catalog maker (RateCard Studio): drop in the design photos, give each its
+// Catalog maker (Vendor Studio): drop in the design photos, give each its
 // SKU, pick an output —
 //   Index: one image, a photo grid captioned with SKUs, the brand logo
 //          beside or above it, on a backdrop blended from the photos.

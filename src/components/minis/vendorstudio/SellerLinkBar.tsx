@@ -1,4 +1,4 @@
-// Owner-only strip inside RateCard Studio (From Master): the single shared
+// Owner-only strip inside Vendor Studio (From Master): the single shared
 // link sellers use to build their own cards. One click — the link and its
 // short URL create themselves on first view, so Copy is the only action.
 import { useState, useEffect, useRef } from 'react';

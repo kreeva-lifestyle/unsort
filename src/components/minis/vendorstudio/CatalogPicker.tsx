@@ -1,4 +1,4 @@
-// Catalog picker for RateCard Studio (From Master and Catalog downloads):
+// Catalog picker for Vendor Studio (From Master and Catalog downloads):
 // a type-to-search box over the master sheet's CATALOG column, grouped by
 // brand (the sheet tab — Dresstive first, then Arya Designs, owner's order)
 // with the newest catalog first: whatever sits lowest on the sheet was added

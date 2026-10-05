@@ -1,4 +1,4 @@
-// RateCard Studio — catalog name + hero photo + rate rows → glassmorphic
+// Vendor Studio — catalog name + hero photo + rate rows → glassmorphic
 // rate-card JPG (WhatsApp-ready). Rows come from an Excel import, the in-app
 // manual editor, or the master sheet (same finalize pass either way). Nothing
 // is uploaded or saved (the manual draft lives in localStorage); the image is

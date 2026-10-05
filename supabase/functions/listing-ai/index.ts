@@ -31,7 +31,7 @@
 // v35: RATECARD_CAP raised 25 -> 50 (owner's rule change); the client's
 // MAX_CARD_ROWS moves with it.
 //
-// v34: catalogs for RateCard Studio. New `ratecard_catalogs` action lists the
+// v34: catalogs for Vendor Studio. New `ratecard_catalogs` action lists the
 // master sheet's distinct catalog names (with design counts) so a seller can
 // pick a catalog instead of typing SKUs; `ratecard_rows` accepts `catalog`
 // and resolves that catalog's SKUs server-side. Bucket names that are not
@@ -40,7 +40,7 @@
 //
 // v33: `ratecard_rows` accepts a SHARE TOKEN as an alternative to a signed-in
 // admin/manager, so sellers can build their own rate cards from a public link
-// (RateCard Studio "From Master" only). The token is looked up with the
+// (Vendor Studio "From Master" only). The token is looked up with the
 // service role in ratecard_share (is_active), never trusted from the client,
 // and is rotatable - deactivating a row instantly kills every copy of that
 // URL. Token callers also pass a per-IP rate limit (60/min) because the route
@@ -86,7 +86,7 @@
 // from the picker - now it shows with a 0/N count instead, and the
 // client can warn per-SKU when a chosen column has gaps.
 //
-// v27: `ratecard_rows` action for RateCard Studio's From-Master mode.
+// v27: `ratecard_rows` action for Vendor Studio's From-Master mode.
 // Given SKUs it returns each one's master row (values keyed by the
 // uppercased header) plus its detected garment category, and the union
 // of non-empty columns - the client builds the rate card from that and
@@ -288,7 +288,7 @@ const SKU_CAP = 5;
 const VALIDATE_CAP = 60;
 // ratecard_rows serves the Rate Card builder - owner's rule: a rate card
 // holds at most 50 designs, so there is nothing to look up beyond that.
-// Keep in sync with MAX_CARD_ROWS in src/components/minis/ratecard/finalizeRateRows.ts.
+// Keep in sync with MAX_CARD_ROWS in src/components/minis/vendorstudio/finalizeRateRows.ts.
 const RATECARD_CAP = 50;
 
 interface Usage { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
@@ -1137,7 +1137,7 @@ function rowTextOf(m: SkuIndexRow): string {
     .join('\n');
 }
 
-// ---- public seller link (RateCard Studio, v33) -----------------------------
+// ---- public seller link (Vendor Studio, v33) -----------------------------
 // The seller link is unauthenticated, so it gets a per-IP budget. In-memory
 // per isolate (same approach as short-track): not a global guarantee, but it
 // blunts scripted enumeration without touching the signed-in path.
@@ -1170,7 +1170,7 @@ function stampShareUse(id: string): void {
   }).catch(() => { /* usage stats are not worth an error */ });
 }
 
-// ---- catalogs (RateCard Studio, v34) --------------------------------------
+// ---- catalogs (Vendor Studio, v34) --------------------------------------
 // The master's catalog column. "CATALOG NO" is a SKU alias, so match only the
 // catalog NAME header.
 const catalogColIndex = (headers: string[]) =>
@@ -1529,7 +1529,7 @@ Deno.serve(async (req) => {
       return json({ ok: true, templateCategory: tplCat, templateCategoryLabel: catLabel(tplCat), categorySource, results, warnings }, req);
     }
 
-    // RateCard Studio's From-Master mode: each SKU's master row + detected
+    // Vendor Studio's From-Master mode: each SKU's master row + detected
     // garment category, plus the union of columns that carry data for these
     // SKUs (feeds the column picker). Free - cached master read, zero AI.
     // Category consistency is enforced client-side from the per-row ids.

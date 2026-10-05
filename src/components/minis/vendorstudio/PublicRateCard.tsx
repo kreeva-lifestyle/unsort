@@ -1,4 +1,4 @@
-// Public seller page: the RateCard Studio "From Master" flow, reachable at
+// Public seller page: the Vendor Studio "From Master" flow, reachable at
 // #/rc/<token> with no login. The token is validated server-side by the
 // listing-ai edge fn (ratecard_share, service-role lookup) - the client just
 // carries it. Sellers type SKUs, pick columns, add their own markup and get a
@@ -6,7 +6,7 @@
 // its own header and a small inline toast strip (there is no ToastContainer).
 import { useState, useCallback } from 'react';
 import { T } from '../../../lib/theme';
-import RateCardStudio from './RateCardStudio';
+import VendorStudio from './VendorStudio';
 
 interface Toast { id: number; msg: string; kind: string }
 
@@ -30,7 +30,7 @@ export default function PublicRateCard({ token }: { token: string }) {
           </div>
         </div>
 
-        <RateCardStudio addToast={addToast} lockedMode="master" shareToken={token} />
+        <VendorStudio addToast={addToast} lockedMode="master" shareToken={token} />
 
         <div style={{ textAlign: 'center', fontSize: 10, color: T.tx3, marginTop: 22, lineHeight: 1.6 }}>
           Arya Designs · ARYA &amp; DRESSTIVE<br />Rates are live from our master sheet.
