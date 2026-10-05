@@ -725,7 +725,7 @@ Deno.serve(async (req) => {
     // ratecard share token (sellers on the public link). Candidates use
     // files/get_temporary_link (4h direct URLs) - no permanent share links
     // are minted for photos nobody picks.
-    // Catalog Downloads (RateCard Studio): catalogs by brand with active
+    // Catalog Downloads (Vendor Studio): catalogs by brand with active
     // counts, a catalog folder + its SKU sub-folders marked active/inactive,
     // and the vendor pack (active folders copied inside Dropbox, one download
     // link). Session or share token. See catalog.ts.

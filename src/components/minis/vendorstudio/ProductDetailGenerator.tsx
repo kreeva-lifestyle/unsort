@@ -1,4 +1,4 @@
-// Rate Card Studio → Product details: type a design code, get the WhatsApp
+// Vendor Studio → Product details: type a design code, get the WhatsApp
 // write-up — facts from the master sheet copy, photos and a view-only HD
 // link from Dropbox, words from the AI on the Settings model. In-app only
 // (it spends the AI key). The price and link boxes re-compose the text, so

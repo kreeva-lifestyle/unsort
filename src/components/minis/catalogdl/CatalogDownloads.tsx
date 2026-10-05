@@ -1,4 +1,4 @@
-// RateCard Studio → Catalog downloads: pick a catalog from the master sheet,
+// Vendor Studio → Catalog downloads: pick a catalog from the master sheet,
 // find its folder in Dropbox, and get ONE download link for a pack holding
 // only the SKU folders whose design is active. The pack is copied and
 // zipped inside Dropbox (see odette-export/catalog.ts) — the app and its
@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
-import CatalogPicker from '../ratecard/CatalogPicker';
+import CatalogPicker from '../vendorstudio/CatalogPicker';
 import { catalogFolder, catalogPack, mb, CatalogCandidate, CatalogResult, PackResult } from './api';
 import FolderList from './FolderList';
 

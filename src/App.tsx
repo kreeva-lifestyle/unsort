@@ -67,7 +67,7 @@ const ListingAIPage = retryImport(() => import('./pages/ListingAIPage'));
 const PrintStation = retryImport(() => import('./pages/PrintStation'));
 const LazyTracklyRedirect = retryImport(() => import('./components/minis/TracklyRedirect'));
 const LazyPasswordReset = retryImport(() => import('./pages/PasswordReset'));
-const LazyPublicRateCard = retryImport(() => import('./components/minis/ratecard/PublicRateCard'));
+const LazyPublicRateCard = retryImport(() => import('./components/minis/vendorstudio/PublicRateCard'));
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import SidebarComponent from './components/layout/Sidebar';
