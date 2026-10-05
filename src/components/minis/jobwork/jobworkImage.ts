@@ -121,21 +121,23 @@ export function renderJobStatement(d: JobDetail, money: boolean, photo: HTMLImag
   return doc.render();
 }
 
-/** All open jobs of one jobworker, in brief, with totals. */
-export function renderVendorStatement(vendor: string, list: JobDetail[], money: boolean): HTMLCanvasElement {
+/** All open jobs of one jobworker, in brief, with totals; photos[i] is job i's thumbnail. */
+export function renderVendorStatement(vendor: string, list: JobDetail[], money: boolean, photos: (HTMLImageElement | null)[] = []): HTMLCanvasElement {
   const doc = new Doc();
   const phone = list.find(d => d.job.vendor_phone)?.job.vendor_phone;
   head(doc, `Pending with ${vendor}${phone ? ' · ' + phone : ''}`, `${list.length} open job${list.length === 1 ? '' : 's'}`, `as of ${fmtDate(today())}`);
-  for (const d of list) {
-    const j = d.job;
-    doc.y += 22; doc.text(`${j.sku}  ·  JW #${j.jw_number}`, PAD, 15, 800);
+  const PH = 56;
+  list.forEach((d, i) => {
+    const j = d.job, photo = photos[i] ?? null, x = photo ? PAD + PH + 14 : PAD, top = doc.y + 10;
+    if (photo) { doc.y = top; doc.image(photo, PAD, PH); }
+    doc.y = top + 12; doc.text(`${j.sku}  ·  JW #${j.jw_number}`, x, 15, 800);
     doc.text(`${j.pcs_remaining} of ${j.pieces} pcs pending`, W - PAD, 13, 700, j.pcs_remaining ? C.amber : C.green, 'right');
-    doc.y += 18; doc.text(`${j.job_type}${j.component ? ' · ' + j.component.toUpperCase() : ''} · given ${shortDate(j.job_date)}${j.expected_date ? ' · due ' + shortDate(j.expected_date) : ''} · ${j.pcs_ok} OK, ${j.pcs_rejected - j.pcs_rework} rejected${j.last_entry_date ? ' · last movement ' + shortDate(j.last_entry_date) : ''}`, PAD, 11, 400, C.mid);
+    doc.y += 18; doc.text(`${j.job_type}${j.component ? ' · ' + j.component.toUpperCase() : ''} · given ${shortDate(j.job_date)}${j.expected_date ? ' · due ' + shortDate(j.expected_date) : ''} · ${j.pcs_ok} OK, ${j.pcs_rejected - j.pcs_rework} rejected${j.last_entry_date ? ' · last movement ' + shortDate(j.last_entry_date) : ''}`, x, 11, 400, C.mid, 'left', W - PAD - x);
     const held = materialBalances(d, j.pcs_ok).filter(b => Math.abs(b.held) > 1e-9);
-    if (held.length) { doc.y += 17; doc.text('With them: ' + held.map(b => `${qty(b.held)} ${unitShort(b.m.unit)} ${b.m.name}`).join(' · '), PAD, 11, 600, C.ink); }
-    if (money) { doc.y += 17; doc.text(`Bill ${inr(j.bill)} · Paid ${inr(j.paid)} · Due ${inr(j.due)}`, PAD, 11, 400, C.mid); }
-    doc.y += 12; doc.rule();
-  }
+    if (held.length) { doc.y += 17; doc.text('With them: ' + held.map(b => `${qty(b.held)} ${unitShort(b.m.unit)} ${b.m.name}`).join(' · '), x, 11, 600, C.ink, 'left', W - PAD - x); }
+    if (money) { doc.y += 17; doc.text(`Bill ${inr(j.bill)} · Paid ${inr(j.paid)} · Due ${inr(j.due)}`, x, 11, 400, C.mid); }
+    doc.y = Math.max(doc.y, photo ? top + PH : 0) + 12; doc.rule();
+  });
   const pend = list.reduce((t, d) => t + d.job.pcs_remaining, 0);
   doc.y += 24; doc.text(`Pieces pending: ${pend}`, PAD, 14, 800);
   if (money) doc.text(`Balance due ${inr(list.reduce((t, d) => t + n(d.job.due), 0))}`, W - PAD, 14, 800, C.amber, 'right');

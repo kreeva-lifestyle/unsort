@@ -1,8 +1,9 @@
-// One job in the list: SKU · JW #, what and with whom, how far along, and
-// where the money stands.
+// One job in the list: the SKU's photo (Dropbox thumbnail), SKU · JW #, what
+// and with whom, how far along, and where the money stands.
 import { T } from '../../../lib/theme';
 import type { JobworkSummary } from '../../../types/database';
 import { StateDot } from './JobHeader';
+import SkuThumb from '../../ui/SkuThumb';
 import { workState, payState, shortDate, inr, isOverdue, n } from './jobworkModel';
 
 export default function JobCard({ job, showMoney, onOpen }: { job: JobworkSummary; showMoney: boolean; onOpen: () => void }) {
@@ -11,7 +12,9 @@ export default function JobCard({ job, showMoney, onOpen }: { job: JobworkSummar
   const pct = Math.min(100, Math.round((Math.max(0, back) / job.pieces) * 100));
   return (
     <div role="button" onClick={onOpen} className="jw-card"
-      style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.rLg, padding: '12px 14px', cursor: 'pointer', marginBottom: 8, transition: 'border-color .15s, background .15s' }}>
+      style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.rLg, padding: '12px 14px', cursor: 'pointer', marginBottom: 8, transition: 'border-color .15s, background .15s' }}>
+      <SkuThumb sku={job.sku} size={56} />
+      <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
         <span style={{ fontFamily: T.mono, fontSize: 14, fontWeight: 700, color: T.tx }}>{job.sku}</span>
         <span style={{ fontFamily: T.mono, fontSize: 10, color: T.tx3 }}>JW #{job.jw_number}</span>
@@ -29,6 +32,7 @@ export default function JobCard({ job, showMoney, onOpen }: { job: JobworkSummar
         {showMoney && <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
           {n(job.due) > 0 && <span style={{ fontFamily: T.mono, color: T.tx2 }}>{inr(job.due)}</span>}<StateDot label={ps.label} t={ps.tone} />
         </span>}
+      </div>
       </div>
     </div>
   );

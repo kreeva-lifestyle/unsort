@@ -1,8 +1,9 @@
-// Top of a job: photo (from the SKU's costing sheet), identity, the piece
+// Top of a job: photo (the SKU's Dropbox thumbnail, else its costing sheet's), identity, the piece
 // counts with a progress bar, and the money line (rate · bill · paid · due).
 import { T } from '../../../lib/theme';
 import type { JobworkSummary } from '../../../types/database';
 import { thumbUrl } from '../costing/costingThumbs';
+import SkuThumb from '../../ui/SkuThumb';
 import { workState, payState, isOverdue, fmtDate, inr, n } from './jobworkModel';
 
 const tone = (t: string) => (({ gr: T.gr, yl: T.yl, re: T.re, bl: T.bl, tx3: T.tx3 }) as Record<string, string>)[t] ?? T.tx3;
@@ -25,10 +26,7 @@ export default function JobHeader({ job, photo }: { job: JobworkSummary; photo: 
   return (
     <div>
       <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ width: 72, height: 72, borderRadius: 12, overflow: 'hidden', background: T.s2, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {photo ? <img src={thumbUrl(photo) || photo} onError={e => { if (e.currentTarget.src !== photo) e.currentTarget.src = photo; }} alt={job.sku} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={{ fontSize: 9, color: T.tx3 }}>no photo</span>}
-        </div>
+        <SkuThumb sku={job.sku} size={72} radius={12} fallback={photo ? thumbUrl(photo) || photo : null} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontFamily: T.mono, fontSize: 18, fontWeight: 700, color: T.tx }}>{job.sku}</span>

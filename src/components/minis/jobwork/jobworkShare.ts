@@ -4,6 +4,7 @@
 import { friendlyError } from '../../../lib/friendlyError';
 import { exportName } from '../../../lib/exportName';
 import { loadForCanvas } from '../costing/costingShare';
+import { skuThumbUrl } from '../../../lib/skuThumbs';
 import { renderJobStatement, renderVendorStatement } from './jobworkImage';
 import { loadVendorOpen } from './jobworkApi';
 import type { JobDetail } from './jobworkModel';
@@ -30,7 +31,9 @@ async function send(blob: Blob, name: string, title: string, addToast: Toast) {
 export async function shareJob(d: JobDetail, money: boolean, photoUrl: string | null, addToast: Toast) {
   let blob: Blob;
   try {
-    const photo = photoUrl ? await loadForCanvas(photoUrl) : null;
+    // The SKU's Dropbox thumbnail first, the costing sheet's photo after.
+    const thumb = await skuThumbUrl(d.job.sku);
+    const photo = (thumb ? await loadForCanvas(thumb) : null) ?? (photoUrl ? await loadForCanvas(photoUrl) : null);
     blob = await toBlob(renderJobStatement(d, money, photo));
   } catch (e) { addToast(friendlyError(e, 'Could not build the statement image'), 'error'); return; }
   await send(blob, exportName('Jobwork', [`JW${d.job.jw_number}`, d.job.sku], 'jpg'), `Jobwork JW #${d.job.jw_number} — ${d.job.sku}`, addToast);
@@ -41,7 +44,11 @@ export async function shareVendor(vendor: string, money: boolean, addToast: Toas
   if (error) { addToast(friendlyError(error), 'error'); return; }
   if (!details.length) { addToast(`No open jobs with ${vendor}`, 'error'); return; }
   let blob: Blob;
-  try { blob = await toBlob(renderVendorStatement(vendor, details, money)); }
+  try {
+    // One small thumbnail per job (cached, 256px) — a missing one leaves its box out.
+    const photos = await Promise.all(details.map(async d => { const u = await skuThumbUrl(d.job.sku); return u ? loadForCanvas(u) : null; }));
+    blob = await toBlob(renderVendorStatement(vendor, details, money, photos));
+  }
   catch (e) { addToast(friendlyError(e, 'Could not build the statement image'), 'error'); return; }
   await send(blob, exportName('Jobwork', [vendor, 'open'], 'jpg'), `Jobwork pending — ${vendor}`, addToast);
 }

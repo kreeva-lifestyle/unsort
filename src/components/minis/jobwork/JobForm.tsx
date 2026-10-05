@@ -13,6 +13,7 @@ import VendorPicker from '../../purchaseorders/VendorPicker';
 import SkuInput from '../../ui/SkuInput';
 import SuggestInput from '../../ui/SuggestInput';
 import DateInput from '../../ui/DateInput';
+import SkuThumb from '../../ui/SkuThumb';
 import MaterialRows from './MaterialRows';
 import { JOB_TYPES, today, inr, type JobDetail } from './jobworkModel';
 import { saveJob, costingFor, type JobDraft, type MaterialDraft, type CostingRef } from './jobworkApi';
@@ -38,6 +39,9 @@ export default function JobForm({ edit, onClose, onSaved, addToast }: {
     .map(m => ({ id: m.id, name: m.name, unit: m.unit, per_piece: m.per_piece == null ? '' : String(m.per_piece) })));
   const locked = useMemo(() => new Set(edit?.entries.flatMap(e => e.jobwork_entry_lines.map(l => l.material_id)) ?? []), [edit]);
   const [costing, setCosting] = useState<CostingRef | null>(null);
+  // The photo is asked for only once the SKU is real (picked from the
+  // suggestions, or an existing job / costing sheet) — never per keystroke.
+  const [picked, setPicked] = useState(!!edit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const patch = (p: Partial<JobDraft>) => { setD(x => ({ ...x, ...p })); setError(''); };
@@ -103,8 +107,11 @@ export default function JobForm({ edit, onClose, onSaved, addToast }: {
           {field('Jobworker', true, <VendorPicker value={d.vendor_name} phone={d.vendor_phone} addToast={addToast}
             onPick={v => patch({ vendor_id: v.id, vendor_name: v.name, vendor_phone: v.phone })} />)}
           <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {field('SKU', true, <SkuInput value={d.sku} sizes={false} onChange={v => patch({ sku: v.toUpperCase() })}
-              onPick={(_p, _s, full) => patch({ sku: full })} style={{ ...S.fInput, width: '100%', textTransform: 'uppercase', fontFamily: T.mono }} />)}
+            {field('SKU', true, <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {(picked || costing) && d.sku.trim() && <SkuThumb sku={d.sku} size={36} radius={8} />}
+              <div style={{ flex: 1, minWidth: 0 }}><SkuInput value={d.sku} sizes={false} onChange={v => { setPicked(false); patch({ sku: v.toUpperCase() }); }}
+                onPick={(_p, _s, full) => { setPicked(true); patch({ sku: full }); }} style={{ ...S.fInput, width: '100%', textTransform: 'uppercase', fontFamily: T.mono }} /></div>
+            </div>)}
             {field('Type of job', true, <SuggestInput value={d.job_type} onChange={v => patch({ job_type: v })} options={JOB_TYPES}
               placeholder="e.g. Embroidery" style={{ ...S.fInput, width: '100%' }} />)}
           </div>
