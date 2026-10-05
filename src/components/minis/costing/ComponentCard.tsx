@@ -16,12 +16,14 @@ import { cloneSub, templateFor, type ComponentTemplate } from './costingTemplate
 
 const BAD = '1px solid rgba(239,68,68,.55)';
 
-export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen, openRequest = 0, onChange, onRemove }: {
+export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen, openRequest = 0, bare = false, onChange, onRemove }: {
   comp: CostingComponent;
   idx: number;
   library: CostingLibrary;
   topSubs: SubPreset[];
   defaultOpen: boolean;
+  /** Phone component page: no fold header or card frame, body always shown. */
+  bare?: boolean;
   /** Bumped by the editor on every failed Save/document attempt that names a
    *  line in this card, so a tapped problem always finds its row unfolded. */
   openRequest?: number;
@@ -53,19 +55,19 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
   };
 
   return (
-    <div data-fx={`cost-f-${idx}`} style={{ border: `1px solid ${T.bd}`, borderRadius: 14, background: 'rgba(255,255,255,0.02)', marginBottom: 10, overflow: 'hidden' }}>
+    <div data-fx={`cost-f-${idx}`} style={bare ? undefined : { border: `1px solid ${T.bd}`, borderRadius: 14, background: 'rgba(255,255,255,0.02)', marginBottom: 10, overflow: 'hidden' }}>
       {/* Header: tap to fold/unfold */}
-      <div onClick={() => setOpen(o => !o)} role="button"
+      {!bare && <div onClick={() => setOpen(o => !o)} role="button"
         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', cursor: 'pointer', minHeight: 44 }}>
         <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: comp.name.trim() ? T.tx2 : T.re }}>
           {comp.name.trim() || `Component ${idx + 1} — name it *`}
         </span>
         <span style={{ marginLeft: 'auto', fontFamily: T.mono, fontWeight: 700, fontSize: 13, color: T.ac2 }}>{money(componentCost(comp))}</span>
         <span style={{ color: T.tx3, fontSize: 11 }}>{open ? '▲' : '▼'}</span>
-      </div>
+      </div>}
 
-      {open && (
-        <div style={{ borderTop: `1px solid ${T.bd}`, padding: '10px 14px 12px' }}>
+      {(open || bare) && (
+        <div style={bare ? undefined : { borderTop: `1px solid ${T.bd}`, padding: '10px 14px 12px' }}>
           {fresh && (library.templates?.length ?? 0) > 0 && (
             <div className="cost-chips" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }} data-fx={`cost-tpl-${idx}`}>
               {named ? (

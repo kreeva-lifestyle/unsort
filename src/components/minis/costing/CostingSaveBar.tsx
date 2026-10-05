@@ -12,7 +12,7 @@ import { SheetProblem, money } from './costingModel';
 import { jumpTo } from './SheetProblems';
 import type { DocKind } from './useCostingSheet';
 
-export default function CostingSaveBar({ sku, total, sell, pcs, errors, saved, saving, deleting, onSave, onDoc, onBack, onDelete }: {
+export default function CostingSaveBar({ sku, total, sell, pcs, errors, saved, saving, deleting, onSave, onDoc, onBack, onDelete, onJump = jumpTo }: {
   sku: string;
   total: number;
   sell: number;
@@ -25,6 +25,8 @@ export default function CostingSaveBar({ sku, total, sell, pcs, errors, saved, s
   onDoc: (which: DocKind) => void;
   onBack: () => void;
   onDelete: () => void;
+  /** Reveal-then-jump for layouts whose fields live in other views (phone). */
+  onJump?: (target: string) => void;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [fixOpen, setFixOpen] = useState(false);
@@ -56,6 +58,6 @@ export default function CostingSaveBar({ sku, total, sell, pcs, errors, saved, s
     </div>
     <ActionSheet open={moreOpen} title={sku.trim().toUpperCase() || 'New costing'} subtitle={`${money(total)} / pc${pcs > 0 ? ` · × ${pcs} pcs` : ''}`} actions={more} onClose={() => setMoreOpen(false)} />
     <ActionSheet open={fixOpen} title="Fix before saving" subtitle={`${errors.length} thing${errors.length === 1 ? '' : 's'} — tap one`}
-      actions={errors.slice(0, 8).map(e => ({ label: e.msg, color: T.re, onClick: () => jumpTo(e.target) }))} onClose={() => setFixOpen(false)} />
+      actions={errors.slice(0, 8).map(e => ({ label: e.msg, color: T.re, onClick: () => onJump(e.target) }))} onClose={() => setFixOpen(false)} />
   </>);
 }

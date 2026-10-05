@@ -3,15 +3,19 @@
 // LineSheet, "+ Add main component", Notes & attachments folded away — with
 // the money and the actions in a sticky rail beside it on desktop and in a
 // fixed bottom bar on the phone. State and every gated action live in
-// useCostingSheet; this file is layout.
-import { useState } from 'react';
+// useCostingSheet; this file is layout. On a phone (useIsPhone) the body is
+// CostingPhone — header, tabs, full-screen component pages — under the same
+// bottom bar; the desktop two-column layout is untouched.
+import { useState, useRef } from 'react';
 import { T, S } from '../../../lib/theme';
 import { CostingProduct, CostingLibrary, subProblems, num } from './costingModel';
 import { useCostingSheet } from './useCostingSheet';
+import { useIsPhone } from '../../../hooks/useIsPhone';
 import ComponentCard from './ComponentCard';
 import CostingHero from './CostingHero';
 import CostingRail from './CostingRail';
 import CostingSaveBar from './CostingSaveBar';
+import CostingPhone from './CostingPhone';
 import { SubPreset } from './SubChips';
 import PrintPreview from './PrintPreview';
 import { purchasePlanHtml } from './purchasePlan';
@@ -45,9 +49,13 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
 
   const actions = { saved, saving: s.saving, deleting: s.deleting, onSave: s.save, onDoc: s.openDoc, onBack, onDelete: s.deleteCosting };
   const nAtt = p.attachments?.length ?? 0;
+  const phone = useIsPhone();
+  // The phone layout reveals the view holding a field before jumping to it.
+  const phoneJump = useRef<(t: string) => void>();
   return (
     <div className="cost-editor" style={{ fontFamily: T.sans, color: T.tx }}>
-      <div className="cost-layout">
+      {phone && <CostingPhone s={s} saved={saved} library={library} topSubs={topSubs} categories={categories} addToast={addToast} jumpRef={phoneJump} />}
+      {!phone && <div className="cost-layout">
         <div className="cost-main">
           <CostingHero p={p} uploading={s.uploading} categories={categories}
             onSku={v => s.patch({ sku: v })} onCategory={v => s.patch({ category: v })} onFile={s.uploadImage} />
@@ -77,9 +85,10 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
           <CostingAttachments costingId={p.id} saved={saved} list={p.attachments ?? []} addToast={addToast}
             onChange={next => s.patch({ attachments: next })} />
         </details>
-      </div>
+      </div>}
 
-      <CostingSaveBar sku={p.sku} total={s.total} sell={num(p.selling_price ?? '')} pcs={s.pcs} errors={s.errors} {...actions} />
+      <CostingSaveBar sku={p.sku} total={s.total} sell={num(p.selling_price ?? '')} pcs={s.pcs} errors={s.errors} {...actions}
+        onJump={phone ? t => phoneJump.current?.(t) : undefined} />
 
       {s.doc === 'plan' && (
         <PrintPreview title={`Purchase plan — ${p.sku} × ${s.pcs} pcs`}

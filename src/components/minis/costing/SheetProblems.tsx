@@ -15,13 +15,13 @@ export const jumpTo = (target: string) => {
   if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) el.focus({ preventScroll: true });
 };
 
-export default function SheetProblems({ problems }: { problems: SheetProblem[] }) {
+export default function SheetProblems({ problems, onJump = jumpTo }: { problems: SheetProblem[]; onJump?: (target: string) => void }) {
   if (problems.length === 0) return null;
   return (
     <div data-fx="cost-problems" style={{ ...S.errorBox, marginTop: 12, lineHeight: 1.5 }}>
       <div style={{ fontWeight: 700, marginBottom: 2 }}>{problems.length} thing{problems.length === 1 ? '' : 's'} to fix — tap one</div>
       {problems.slice(0, 8).map((e, i) => (
-        <div key={i} className="cost-problem" onClick={() => jumpTo(e.target)} role="button"
+        <div key={i} className="cost-problem" onClick={() => onJump(e.target)} role="button"
           style={{ cursor: 'pointer', minHeight: 32, display: 'flex', alignItems: 'center', gap: 6 }}>
           <span>• {e.msg}</span>
           <span style={{ fontSize: 9, opacity: 0.7, textDecoration: 'underline', whiteSpace: 'nowrap', color: T.re }}>fix</span>
