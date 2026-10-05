@@ -27,6 +27,7 @@ import DropboxUploader from '../components/minis/uploader/DropboxUploader';
 import ProductCosting from '../components/minis/costing/ProductCosting';
 import PriceProjector from '../components/minis/pricing/PriceProjector';
 import OtpInbox from '../components/minis/OtpInbox';
+import Jobwork from '../components/minis/jobwork/Jobwork';
 import { exportName } from '../lib/exportName';
 import { exportUtsavXls, UTSAV_SIZE_MAP as SIZE_MAP, type UtsavRow } from '../components/minis/utsavExport';
 
@@ -284,6 +285,20 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const }}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
   </button>;
 
+  // Tools that are just the back arrow + one component share one wrapper.
+  const simple: Partial<Record<MiniView, React.ReactNode>> = {
+    address: <AddressPrinter addToast={addToast} />, return_labels: <ReturnLabels addToast={addToast} />,
+    dropbox_links: <DropboxLinkGenerator addToast={addToast} />, forward_dropbox: <ForwardDropbox addToast={addToast} onBack={() => setView('home')} />,
+    otp: <OtpInbox addToast={addToast} />, costing: <ProductCosting addToast={addToast} />, dropbox_upload: <DropboxUploader addToast={addToast} />,
+    client_finder: <ClientFinder addToast={addToast} />, ratecard: <RateCardStudio addToast={addToast} />, jobwork: <Jobwork addToast={addToast} />,
+  };
+  if (simple[view]) return (
+    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
+      <div style={{ marginBottom: 14 }}>{back}</div>
+      {simple[view]}
+    </div>
+  );
+
   if (view === 'cbazaar') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ marginBottom: 14 }}>{back}</div>
@@ -311,13 +326,6 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     </div>
   );
 
-  if (view === 'address') return (
-    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 14 }}>{back}</div>
-      <AddressPrinter addToast={addToast} />
-    </div>
-  );
-
   if (view === 'trackly') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <Trackly addToast={addToast} onBack={() => setView('home')} />
@@ -329,66 +337,11 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     </div>
   );
 
-  if (view === 'return_labels') return (
-    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 14 }}>{back}</div>
-      <ReturnLabels addToast={addToast} />
-    </div>
-  );
-
-  if (view === 'dropbox_links') return (
-    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 14 }}>{back}</div>
-      <DropboxLinkGenerator addToast={addToast} />
-    </div>
-  );
-
-  if (view === 'forward_dropbox') return (
-    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 14 }}>{back}</div>
-      <ForwardDropbox addToast={addToast} onBack={() => setView('home')} />
-    </div>
-  );
-
-  if (view === 'otp') return (
-    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 14 }}>{back}</div>
-      <OtpInbox addToast={addToast} />
-    </div>
-  );
-
-  if (view === 'costing') return (
-    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 14 }}>{back}</div>
-      <ProductCosting addToast={addToast} />
-    </div>
-  );
   if (view === 'pricing') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       {/* No {back} here: the projector renders ONE arrow that leaves a sheet
           first and Minis second, so a sheet never shows two back buttons. */}
       <PriceProjector addToast={addToast} navigateTo={navigateTo} onHome={() => setView('home')} />
-    </div>
-  );
-
-  if (view === 'dropbox_upload') return (
-    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 14 }}>{back}</div>
-      <DropboxUploader addToast={addToast} />
-    </div>
-  );
-
-  if (view === 'client_finder') return (
-    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 14 }}>{back}</div>
-      <ClientFinder addToast={addToast} />
-    </div>
-  );
-
-  if (view === 'ratecard') return (
-    <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <div style={{ marginBottom: 14 }}>{back}</div>
-      <RateCardStudio addToast={addToast} />
     </div>
   );
 
