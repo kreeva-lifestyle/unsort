@@ -62,11 +62,9 @@ const PurchaseOrders = retryImport(() => import('./pages/PurchaseOrders'));
 const Attendance = retryImport(() => import('./pages/Attendance'));
 const SettingsPage = retryImport(() => import('./pages/Settings'));
 const Inventory = retryImport(() => import('./pages/Inventory'));
-const ProgramsModule = retryImport(() => import('./modules/programs'));
 const Minis = retryImport(() => import('./pages/Minis'));
 const ListingAIPage = retryImport(() => import('./pages/ListingAIPage'));
 const PrintStation = retryImport(() => import('./pages/PrintStation'));
-const LazyPublicShareView = retryImport(() => import('./modules/programs/PublicShareView'));
 const LazyTracklyRedirect = retryImport(() => import('./components/minis/TracklyRedirect'));
 const LazyPasswordReset = retryImport(() => import('./pages/PasswordReset'));
 const LazyPublicRateCard = retryImport(() => import('./components/minis/ratecard/PublicRateCard'));
@@ -200,7 +198,7 @@ const MainApp = () => {
 
   // Lazy mount: only mount a page once its tab is selected
   useEffect(() => { setMounted(prev => { if (prev.has(tab)) return prev; const next = new Set(prev); next.add(tab); return next; }); }, [tab]);
-  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', purchaseorders: 'Purchase Orders', listingai: 'Listing AI', programs: 'Programs', minis: 'Minis', printstation: 'Print Station', attendance: 'Attendance', settings: 'Settings' };
+  const titles: Record<string, string> = { dashboard: 'Dashboard', inventory: 'Inventory', brandtag: 'Brand Tags', packtime: 'PackStation', challan: 'Cash Challan', purchaseorders: 'Purchase Orders', listingai: 'Listing AI', minis: 'Minis', printstation: 'Print Station', attendance: 'Attendance', settings: 'Settings' };
   const handleNotifClick = (n: any) => {
     if (n.entity_id) { setTab('inventory'); setNotifItemId(n.entity_id); }
   };
@@ -254,7 +252,6 @@ const MainApp = () => {
         {mounted.has('purchaseorders') && checkTab('purchaseorders') && <div style={{ display: tab === 'purchaseorders' ? 'block' : 'none' }}><PurchaseOrders active={tab === 'purchaseorders'} /></div>}
         {mounted.has('listingai') && checkTab('listingai') && <div style={{ display: tab === 'listingai' ? 'block' : 'none' }}><ListingAIPage active={tab === 'listingai'} /></div>}
         {mounted.has('attendance') && checkTab('attendance') && <div style={{ display: tab === 'attendance' ? 'block' : 'none' }}><Attendance active={tab === 'attendance'} /></div>}
-        {mounted.has('programs') && checkTab('programs') && <div style={{ display: tab === 'programs' ? 'block' : 'none' }}><ProgramsModule active={tab === 'programs'} /></div>}
         {mounted.has('minis') && checkTab('minis') && <div style={{ display: tab === 'minis' ? 'block' : 'none' }}><Minis navigateTo={setTab} active={tab === 'minis'} /></div>}
         {mounted.has('printstation') && checkTab('printstation') && <div style={{ display: tab === 'printstation' ? 'block' : 'none' }}><PrintStation active={tab === 'printstation'} /></div>}
         {mounted.has('settings') && <div style={{ display: tab === 'settings' ? 'block' : 'none' }}><SettingsPage profile={profile} addToast={addToast} active={tab === 'settings'} /></div>}
@@ -322,10 +319,6 @@ const AppContent = () => {
   // Face ID before it can reach a form that changes the kept session's password.
   const isRecovery = hash.includes('type=recovery') && /(access_token=|code=)/.test(hash);
   if (isRecovery && !auth?.locked) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><PubScroll><LazyPasswordReset /></PubScroll></Suspense>;
-
-  // Public share route — no auth required, rendered before login gate
-  const shareMatch = hash.match(/^#\/share\/program\/([a-f0-9]+)$/);
-  if (shareMatch) return <Suspense fallback={<div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}><PubScroll><LazyPublicShareView shareToken={shareMatch[1]} /></PubScroll></Suspense>;
 
   // Seller rate-card link — no auth; the token is validated server-side.
   const rcMatch = hash.match(/^#\/rc\/([a-f0-9]{32})$/);

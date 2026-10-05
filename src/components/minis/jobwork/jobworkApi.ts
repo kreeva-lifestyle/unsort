@@ -65,6 +65,22 @@ export async function loadVendorOpen(vendorName: string): Promise<{ details: Job
   return { details: loaded.map(r => r.detail).filter((d): d is JobDetail => !!d), error: bad?.error ?? null };
 }
 
+export interface VendorPending { vendor: string; jobs: number; pending: number; overdue: number; due: number }
+/** Jobworkers with open jobs, most pieces pending first (Share pending). */
+export async function openByVendor(): Promise<{ rows: VendorPending[]; error: unknown }> {
+  const { data, error } = await supabase.from('jobwork_order_summary')
+    .select('vendor_name, pcs_remaining, expected_date, due').eq('status', 'open').limit(2000);
+  if (error) return { rows: [], error };
+  const by = new Map<string, VendorPending>(), t = today();
+  for (const r of (data ?? []) as { vendor_name: string; pcs_remaining: number; expected_date: string | null; due: number }[]) {
+    const v = by.get(r.vendor_name) ?? { vendor: r.vendor_name, jobs: 0, pending: 0, overdue: 0, due: 0 };
+    v.jobs += 1; v.pending += r.pcs_remaining; v.due += Number(r.due) || 0;
+    if (r.expected_date && r.expected_date < t && r.pcs_remaining > 0) v.overdue += 1;
+    by.set(r.vendor_name, v);
+  }
+  return { rows: [...by.values()].sort((a, b) => b.pending - a.pending || a.vendor.localeCompare(b.vendor)), error: null };
+}
+
 export interface MaterialDraft { id?: string; name: string; unit: string; per_piece: string }
 export interface JobDraft {
   vendor_id: string | null; vendor_name: string; vendor_phone: string;

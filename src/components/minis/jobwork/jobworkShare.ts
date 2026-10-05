@@ -43,5 +43,5 @@ export async function shareVendor(vendor: string, money: boolean, addToast: Toas
   let blob: Blob;
   try { blob = await toBlob(renderVendorStatement(vendor, details, money)); }
   catch (e) { addToast(friendlyError(e, 'Could not build the statement image'), 'error'); return; }
-  await send(blob, exportName('Jobwork', [vendor, 'open'], 'jpg'), `Open jobwork — ${vendor}`, addToast);
+  await send(blob, exportName('Jobwork', [vendor, 'open'], 'jpg'), `Jobwork pending — ${vendor}`, addToast);
 }

@@ -12,6 +12,7 @@ import type { JobworkSummary } from '../../../types/database';
 import JobCard from './JobCard';
 import JobForm from './JobForm';
 import JobDetailView from './JobDetailView';
+import PendingShareModal from './PendingShareModal';
 import { listJobs, FILTERS, type JobFilter } from './jobworkApi';
 
 export default function Jobwork({ addToast }: { addToast: (m: string, t?: string) => void }) {
@@ -25,6 +26,7 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   const [perPage, setPerPage] = useState(25);
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [sharing, setSharing] = useState(false);
   useBackClose(!!openId, () => setOpenId(null));
 
   const load = useCallback(async () => {
@@ -45,7 +47,8 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
           <div style={{ fontFamily: T.sora, fontSize: 16, fontWeight: 700, color: T.tx }}>Jobwork</div>
           <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>What went out, what came back, what is pending and paid</div>
         </div>
-        <button type="button" className="desktop-only" onClick={() => setCreating(true)} style={{ ...S.btnPrimary, marginLeft: 'auto', height: 36 }}>+ New job</button>
+        <button type="button" className="jw-share-btn" onClick={() => setSharing(true)} style={{ ...S.btnGhost, marginLeft: 'auto', minHeight: 36, flexShrink: 0 }}>Share pending</button>
+        <button type="button" className="desktop-only" onClick={() => setCreating(true)} style={{ ...S.btnPrimary, height: 36 }}>+ New job</button>
       </div>
       <div style={{ position: 'relative', marginBottom: 10 }}>
         <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
@@ -77,6 +80,7 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
         </div>
       )}
       <button type="button" className="fab" onClick={() => setCreating(true)} aria-label="New job">+</button>
+      {sharing && <PendingShareModal boss={boss} onClose={() => setSharing(false)} addToast={addToast} />}
       {creating && <JobForm edit={null} onClose={() => setCreating(false)} onSaved={id => { setCreating(false); load(); setOpenId(id); }} addToast={addToast} />}
     </div>
   );

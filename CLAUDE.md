@@ -50,7 +50,6 @@ would look like.
 - Cash Challan sub-views: `src/components/challan/` (`ChallanAnalytics`, `ChallanLedger`, `ChallanForm` — main `CashChallan.tsx` owns data + list view only)
 - Settings sub-pages: `src/components/settings/`
 - Layout chrome: `src/components/layout/` (`Sidebar`, `Header`, `ToastContainer`)
-- Programs module: `src/modules/programs/` (self-contained: own `hooks/`, `lib/`, `i18n/` with Gujarati)
 - Hooks: `src/hooks/` (`useModalLock`, `useBackClose`, `useConfirm` via ConfirmModal, `useActiveRefetch`, `useViewportRestore`…)
 - The only stylesheet: `src/index.css` — media queries, pseudo-classes, animations, safe-area and the `--nav-h` bottom-nav geometry. Everything else is inline from theme recipes, which is why mobile overrides there need `!important`
 - Types: `src/types/database.ts`

@@ -124,7 +124,8 @@ export function renderJobStatement(d: JobDetail, money: boolean, photo: HTMLImag
 /** All open jobs of one jobworker, in brief, with totals. */
 export function renderVendorStatement(vendor: string, list: JobDetail[], money: boolean): HTMLCanvasElement {
   const doc = new Doc();
-  head(doc, `Open jobs — ${vendor}`, `${list.length} job${list.length === 1 ? '' : 's'}`, `as of ${fmtDate(today())}`);
+  const phone = list.find(d => d.job.vendor_phone)?.job.vendor_phone;
+  head(doc, `Pending with ${vendor}${phone ? ' · ' + phone : ''}`, `${list.length} open job${list.length === 1 ? '' : 's'}`, `as of ${fmtDate(today())}`);
   for (const d of list) {
     const j = d.job;
     doc.y += 22; doc.text(`${j.sku}  ·  JW #${j.jw_number}`, PAD, 15, 800);
