@@ -11,6 +11,7 @@ import { withTemplates, withCommonTemplates, type CommonSubsMap } from './costin
 import CostingEditor from './CostingEditor';
 import { SubPreset } from './SubChips';
 import AskBox from './AskBox';
+import CostingThumb from './CostingThumb';
 import { useBackClose } from '../../../hooks/useBackClose';
 import { PRICING_KEYS, normalizeCosting } from '../pricing/pricingConfig';
 
@@ -118,11 +119,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
         {shown.map(p => (
           <div key={p.id} onClick={() => { setEditingSaved(true); setEditing(p); }}
             style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, borderRadius: 10, border: `1px solid ${T.bd}`, background: 'rgba(255,255,255,0.02)', cursor: 'pointer' }}>
-            <div style={{ width: 56, height: 56, borderRadius: 8, overflow: 'hidden', background: T.s2, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {p.image_url
-                ? <img src={p.image_url} alt={p.sku} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <span style={{ fontSize: 9, color: T.tx3 }}>no photo</span>}
-            </div>
+            <CostingThumb url={p.image_url} alt={p.sku} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: T.mono, fontSize: 13, fontWeight: 700, color: T.tx }}>{p.sku}</div>
               <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>

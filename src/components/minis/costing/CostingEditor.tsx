@@ -17,7 +17,7 @@ import { canonicalizeNames } from './costingNames';
 import { SubPreset } from './SubChips';
 import TotalsCard from './TotalsCard';
 import SheetProblems from './SheetProblems';
-import { optimizeImage } from './imageResize';
+import { uploadProductPhoto } from './costingThumbs';
 import PrintPreview from './PrintPreview';
 import { purchasePlanHtml } from './purchasePlan';
 import RaisePOModal from './RaisePOModal';
@@ -77,16 +77,9 @@ export default function CostingEditor({ product, saved, library, topSubs, onSave
     if (!file || uploading) return;
     setUploading(true);
     try {
-      // Phone photos are 3-8 MB; resize + re-encode BEFORE upload (~200 KB).
-      const { blob, type } = await optimizeImage(file);
-      const path = `${p.id}.jpg`;
-      // A year of caching is safe: the ?v= below gives every replacement a
-      // new url, so a cached one can never show a replaced photo.
-      const { error } = await supabase.storage.from('costing-images').upload(path, blob, { contentType: type, upsert: true, cacheControl: '31536000' });
-      if (error) throw error;
-      const { data } = supabase.storage.from('costing-images').getPublicUrl(path);
-      // Cache-buster: upsert keeps the URL, else the old photo sticks around.
-      const url = `${data.publicUrl}?v=${Date.now()}`;
+      // Phone photos are 3-8 MB; resized + re-encoded BEFORE upload (~200 KB)
+      // with a 112 px thumb for the list (costingThumbs.ts).
+      const url = await uploadProductPhoto(p.id, file);
       setP(prev => ({ ...prev, image_url: url }));
       addToast('Photo uploaded — remember to Save', 'success');
     } catch (e) { addToast(friendlyError(e), 'error'); }
