@@ -34,8 +34,8 @@ export default function CostingPhoneHeader({ p, uploading, categories, problems,
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <span style={{ fontFamily: T.mono, fontSize: 15, fontWeight: 700, color: sku ? T.tx : T.re, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sku || 'SKU needed'}</span>
-          <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999, border: `1px solid ${p.category ? T.bd2 : 'oklch(0.63 0.22 25 / .45)'}`, color: p.category ? T.tx2 : T.re, whiteSpace: 'nowrap', flexShrink: 0 }}>{p.category || 'Category *'}</span>
+          <span style={{ fontFamily: T.mono, fontSize: 15, fontWeight: 700, color: sku ? T.tx : problems.sku ? T.re : T.tx2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sku || 'Add SKU'}</span>
+          <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 999, border: `1px solid ${problems.category ? 'oklch(0.63 0.22 25 / .45)' : T.bd2}`, color: p.category ? T.tx2 : problems.category ? T.re : T.tx3, whiteSpace: 'nowrap', flexShrink: 0 }}>{p.category || 'Category'}</span>
         </div>
         <div style={{ fontSize: 10, color: T.tx3, marginTop: 3 }}>{p.components.length} component{p.components.length === 1 ? '' : 's'} · {lines} line{lines === 1 ? '' : 's'}{uploading ? ' · uploading photo…' : ''}</div>
       </div>
@@ -64,7 +64,7 @@ function EditSheet({ p, uploading, categories, onClose, onSku, onCategory, onFil
           </label>
           <div>
             <label style={S.fLabel}>SKU <span style={{ color: T.re }}>*</span></label>
-            <input id="cost-f-sku" value={p.sku} onChange={e => onSku(e.target.value)} placeholder="e.g. DRS243" enterKeyHint="done"
+            <input id="cost-f-sku" value={p.sku} onChange={e => onSku(e.target.value)} placeholder="e.g. DRS243" enterKeyHint="done" autoFocus={!p.sku.trim()}
               style={{ ...S.fInput, height: 44, textTransform: 'uppercase', fontFamily: T.mono, fontWeight: 700 }} />
           </div>
           <div>

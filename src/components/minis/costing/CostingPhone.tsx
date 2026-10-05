@@ -28,7 +28,9 @@ export default function CostingPhone({ s, saved, library, topSubs, categories, a
   const { p } = s;
   const [tab, setTab] = useState<Tab>('components');
   const [openComp, setOpenComp] = useState<number | null>(null);
-  const [headerOpen, setHeaderOpen] = useState(false);
+  // A new (or duplicated) sheet opens straight onto SKU + category — the
+  // first thing a costing needs — instead of a red header nobody tapped.
+  const [headerOpen, setHeaderOpen] = useState(!saved && !p.sku.trim());
   useBackClose(openComp !== null, () => setOpenComp(null));
 
   const skuBad = s.errors.some(e => e.target === 'cost-f-sku'), catBad = s.errors.some(e => e.target === 'cost-f-category');
@@ -76,15 +78,19 @@ export default function CostingPhone({ s, saved, library, topSubs, categories, a
       {tab === 'components' && (
         <div>
           {p.components.map((c, i) => {
-            const bad = !c.name.trim() || c.subs.length === 0 || c.subs.some(x => Object.values(subProblems(x)).some(Boolean));
+            // Red only once a failed Save named this component; before that
+            // a half-done component is just quietly incomplete.
+            const flagged = s.errorComps.has(i);
+            const incomplete = !c.name.trim() || c.subs.length === 0 || c.subs.some(x => Object.values(subProblems(x)).some(Boolean));
+            const real = c.subs.filter(x => x.name.trim() || String(x.qty).trim()).length;
             const sups = [...new Set(c.subs.map(x => selectedSupplier(x)?.name.trim()).filter(Boolean))];
             return (
               <div key={i} data-fx={`cost-f-${i}`} onClick={() => setOpenComp(i)} role="button"
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', minHeight: 60, marginBottom: 8, border: `1px solid ${bad ? 'oklch(0.63 0.22 25 / .45)' : T.bd}`, borderRadius: T.rXl, background: 'rgba(255,255,255,0.02)', cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', minHeight: 60, marginBottom: 8, border: `1px solid ${flagged ? 'oklch(0.63 0.22 25 / .45)' : T.bd}`, borderRadius: T.rXl, background: 'rgba(255,255,255,0.02)', cursor: 'pointer' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: c.name.trim() ? T.tx : T.re, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name.trim() || `Component ${i + 1} — name it`}</div>
-                  <div style={{ fontSize: 10, color: bad ? T.re : T.tx3, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {c.subs.length} line{c.subs.length === 1 ? '' : 's'}{sups.length ? ` · ${sups.join(', ')}` : ''}{bad ? ' · needs attention' : ''}
+                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: c.name.trim() ? T.tx : flagged ? T.re : T.tx2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name.trim() || `Component ${i + 1} — tap to name it`}</div>
+                  <div style={{ fontSize: 10, color: flagged ? T.re : T.tx3, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {real ? `${real} line${real === 1 ? '' : 's'}` : 'no lines yet'}{sups.length ? ` · ${sups.join(', ')}` : ''}{flagged && incomplete ? ' · needs attention' : ''}
                   </div>
                 </div>
                 <span style={{ fontFamily: T.mono, fontWeight: 700, fontSize: 14, color: T.ac2, flexShrink: 0 }}>{money(componentCost(c))}</span>
