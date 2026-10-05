@@ -61,7 +61,7 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
             <button key={t.key} onClick={() => { setTab(t.key); setRows(null); }} aria-pressed={tab === t.key} style={{ ...S.btnGhost, minHeight: 36, ...(tab === t.key ? { background: T.ac3, color: T.ac2, borderColor: T.ac33 } : { color: T.tx3, borderColor: T.bd2 }) }}>{t.label}</button>
           ))}
         </div>
-        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 340 }}>
           <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5, pointerEvents: 'none' }}><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search customer…" style={{ ...S.fSearch, width: '100%' }} />
         </div>
@@ -99,14 +99,17 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
                 ))}
               </div>
               {o.notes && <div style={{ marginTop: 6, fontSize: 11, color: T.tx3, whiteSpace: 'pre-wrap' }}>{o.notes}</div>}
+              {/* Desktop: natural-width buttons, right-aligned, primary last (house card
+                  layout). Mobile (.order-actions in index.css): Make challan spans
+                  the row, Edit/Cancel share the next one, all 44px. */}
               {canEdit && (
-                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                <div className="order-actions" style={{ display: 'flex', gap: 6, marginTop: 10, justifyContent: 'flex-end' }}>
                   {o.status === 'pending' && <>
-                    <button onClick={() => onConvert(o)} disabled={busy} style={{ ...S.btnPrimary, minHeight: 44, flex: 1 }}>Make challan</button>
-                    <button onClick={() => setForm({ open: true, editing: o })} disabled={busy} style={{ ...S.btnGhost, minHeight: 44 }}>Edit</button>
-                    <button onClick={() => cancel(o)} disabled={busy} style={{ ...S.btnDanger, minHeight: 44 }}>{busy ? 'Working…' : 'Cancel'}</button>
+                    <button onClick={() => setForm({ open: true, editing: o })} disabled={busy} style={S.btnGhost}>Edit</button>
+                    <button onClick={() => cancel(o)} disabled={busy} style={S.btnDanger}>{busy ? 'Working…' : 'Cancel'}</button>
+                    <button onClick={() => onConvert(o)} disabled={busy} className="order-primary" style={S.btnPrimary}>Make challan</button>
                   </>}
-                  {o.status === 'cancelled' && <button onClick={() => reopen(o)} disabled={busy} style={{ ...S.btnGhost, minHeight: 44 }}>{busy ? 'Working…' : 'Reopen'}</button>}
+                  {o.status === 'cancelled' && <button onClick={() => reopen(o)} disabled={busy} style={S.btnGhost}>{busy ? 'Working…' : 'Reopen'}</button>}
                 </div>
               )}
             </div>

@@ -365,6 +365,11 @@ body.modal-open .fab { display: none !important; }
   .challan-filter-btns .challan-export-btn { display: none !important; }
   .challan-perpage { display: none !important; }   /* the pager has it */
   .challan-records { display: none !important; }   /* the pager has it */
+  /* Pending-order cards: Make challan takes the first row, Edit / Cancel
+     split the second; every button a 44px tap target. */
+  .order-actions { flex-wrap: wrap !important; }
+  .order-actions button { min-height: 44px !important; flex: 1 1 auto !important; }
+  .order-actions .order-primary { flex: 1 1 100% !important; order: -1 !important; }
 
   /* Filter grid (Status / Tag / From / To / Per page) — compact for 393px */
   .challan-filter-grid { grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
