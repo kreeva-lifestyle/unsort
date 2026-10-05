@@ -3,7 +3,7 @@
 // a READABLE row (name, supplier · code, cheaper-supplier nudge, qty × rate,
 // cost) that opens the LineSheet editor on tap — no grid of open inputs.
 // Same data shapes as before; only the screens changed.
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { T, S } from '../../../lib/theme';
 import {
   CostingComponent, CostingLibrary, blankSub,
@@ -16,16 +16,20 @@ import { cloneSub, templateFor, type ComponentTemplate } from './costingTemplate
 
 const BAD = '1px solid rgba(239,68,68,.55)';
 
-export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen, onChange, onRemove }: {
+export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen, openRequest = 0, onChange, onRemove }: {
   comp: CostingComponent;
   idx: number;
   library: CostingLibrary;
   topSubs: SubPreset[];
   defaultOpen: boolean;
+  /** Bumped by the editor on every failed Save/document attempt that names a
+   *  line in this card, so a tapped problem always finds its row unfolded. */
+  openRequest?: number;
   onChange: (next: CostingComponent) => void;
   onRemove: () => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => { if (openRequest) setOpen(true); }, [openRequest]);
   const [lineFor, setLineFor] = useState<number | null>(null);
   // Garment template (owner's ask): a component with nothing typed yet can
   // start from the usual lines of LEHANGA / BLOUSE / TOP… in one tap. The
@@ -63,15 +67,15 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
       {open && (
         <div style={{ borderTop: `1px solid ${T.bd}`, padding: '10px 14px 12px' }}>
           {fresh && (library.templates?.length ?? 0) > 0 && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }} data-fx={`cost-tpl-${idx}`}>
+            <div className="cost-chips" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }} data-fx={`cost-tpl-${idx}`}>
               {named ? (
-                <button onClick={() => applyTemplate(named)} style={chip(true)}>
+                <button onClick={() => applyTemplate(named)} className="cost-chip" style={chip(true)}>
                   + Add the {named.subs.length} line{named.subs.length === 1 ? '' : 's'} {named.source === 'common' ? `common to your ${named.sheets} ${named.name} sheets` : `from ${named.sku}`}
                 </button>
               ) : (<>
                 <span style={{ fontSize: 10, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Start from</span>
                 {library.templates!.slice(0, 8).map(t => (
-                  <button key={t.name} onClick={() => applyTemplate(t)} title={t.source === 'common' ? `${t.subs.length} lines common to ${t.sheets} sheets` : `${t.subs.length} lines from ${t.sku}`} style={chip(false)}>{t.name}</button>
+                  <button key={t.name} onClick={() => applyTemplate(t)} className="cost-chip" title={t.source === 'common' ? `${t.subs.length} lines common to ${t.sheets} sheets` : `${t.subs.length} lines from ${t.sku}`} style={chip(false)}>{t.name}</button>
                 ))}
               </>)}
             </div>
@@ -79,7 +83,7 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
             <SuggestInput value={comp.name} onChange={v => onChange({ ...comp, name: v })} options={library.mains}
               placeholder="Main component — e.g. Fabric *" style={{ ...S.fInput, flex: 1, minWidth: 0, ...(comp.name.trim() ? {} : { border: BAD }) }} />
-            <button onClick={onRemove} style={{ ...S.btnDanger, ...S.btnSm, minHeight: 36 }}>Remove</button>
+            <button onClick={onRemove} className="cost-remove" style={{ ...S.btnDanger, ...S.btnSm, minHeight: 36 }}>Remove</button>
           </div>
 
           {comp.subs.map((s, i) => {
@@ -111,7 +115,7 @@ export default function ComponentCard({ comp, idx, library, topSubs, defaultOpen
           {copiedFrom && <div style={{ fontSize: 10, color: T.yl, padding: '6px 10px 2px' }}>lines added from {copiedFrom} · check quantities and rates</div>}
           <div style={{ borderTop: comp.subs.length ? `1px solid ${T.bd}` : 'none', paddingTop: comp.subs.length ? 4 : 0 }}>
             <SubChips presets={topSubs} comp={comp} onAdd={s => addLine(s)} disabled={!comp.name.trim()} />
-            <button onClick={() => addLine()} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, marginTop: 8, borderStyle: 'dashed' }}>+ Add line</button>
+            <button onClick={() => addLine()} className="cost-addline" style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, marginTop: 8, borderStyle: 'dashed' }}>+ Add line</button>
           </div>
         </div>
       )}
