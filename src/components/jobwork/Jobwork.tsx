@@ -45,18 +45,19 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   const pages = Math.max(1, Math.ceil(count / perPage));
   const chip = (on: boolean): React.CSSProperties => ({ ...S.btnGhost, ...S.btnSm, minHeight: 32, borderRadius: 999, padding: '5px 14px', fontSize: 11, flexShrink: 0, ...(on ? { borderColor: T.ac, color: T.ac2, background: T.ac3 } : {}) });
   return (
-    <div className="jw-list" style={{ maxWidth: 1320 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: T.sora, fontSize: 16, fontWeight: 700, color: T.tx }}>Jobwork</div>
-          <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>What went out, what came back, what is pending and paid</div>
+    <div className="jw-list">
+      {/* Same frame as Purchase Orders: the app header already names the page,
+          so one quiet line + the actions, and the content uses the full width. */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12 }}>
+        <div style={{ fontSize: 12, color: T.tx3, minWidth: 0 }}>Work given outside · what went out, came back, is pending and paid</div>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button type="button" className="jw-share-btn" onClick={() => setSharing(true)} style={S.btnGhost}>Share pending</button>
+          <button type="button" className="desktop-only" onClick={() => setCreating(true)} style={S.btnPrimary}>+ New job</button>
         </div>
-        <button type="button" className="jw-share-btn" onClick={() => setSharing(true)} style={{ ...S.btnGhost, marginLeft: 'auto', minHeight: 36, flexShrink: 0 }}>Share pending</button>
-        <button type="button" className="desktop-only" onClick={() => setCreating(true)} style={{ ...S.btnPrimary, height: 36 }}>+ New job</button>
       </div>
       <JobStats boss={boss} version={version} active={filter} onPick={f => { setFilter(f); setPage(0); }} addToast={addToast} />
       <div className="jw-toolbar" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-      <div style={{ position: 'relative', flex: '1 1 320px', maxWidth: 440 }}>
+      <div style={{ position: 'relative', flex: '1 1 320px', maxWidth: 520 }}>
         <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
         <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search SKU, jobworker, job type or JW #" aria-label="Search jobs" style={{ ...S.fSearch, width: '100%' }} />
       </div>

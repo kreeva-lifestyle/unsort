@@ -90,7 +90,7 @@ export default function JobDetailView({ id, onBack, onChanged, addToast }: {
     </div>
   );
   return (
-    <div style={{ maxWidth: 1320 }}>
+    <div>
       {/* The one back control on this page (device Back does the same). */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <button type="button" onClick={onBack} style={{ ...S.btnGhost, minHeight: 36 }}>‹ All jobs</button>
