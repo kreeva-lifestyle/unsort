@@ -15,11 +15,11 @@ import SuggestInput from '../ui/SuggestInput';
 import DateInput from '../ui/DateInput';
 import SkuThumb from '../ui/SkuThumb';
 import MaterialRows from './MaterialRows';
-import { JOB_TYPES, today, inr, type JobDetail } from './jobworkModel';
+import { JOB_TYPES, QTY_UNITS, today, inr, unitLabel, validQty, type JobDetail } from './jobworkModel';
 import { saveJob, costingFor, type JobDraft, type MaterialDraft, type CostingRef } from './jobworkApi';
 import { componentNames, rateHints, materialHints } from './jobworkCosting';
 
-const blank = (): JobDraft => ({ vendor_id: null, vendor_name: '', vendor_phone: '', job_type: '', sku: '', component: '', costing_product_id: null, pieces: '', rate: '', job_date: today(), expected_date: '', notes: '' });
+const blank = (): JobDraft => ({ vendor_id: null, vendor_name: '', vendor_phone: '', job_type: '', sku: '', component: '', costing_product_id: null, pieces: '', qty_unit: 'pcs', rate: '', job_date: today(), expected_date: '', notes: '' });
 
 export default function JobForm({ edit, onClose, onSaved, addToast }: {
   edit: JobDetail | null;
@@ -32,7 +32,7 @@ export default function JobForm({ edit, onClose, onSaved, addToast }: {
   const j = edit?.job;
   const [d, setD] = useState<JobDraft>(() => j ? {
     vendor_id: j.vendor_id, vendor_name: j.vendor_name, vendor_phone: j.vendor_phone ?? '', job_type: j.job_type, sku: j.sku,
-    component: j.component ?? '', costing_product_id: j.costing_product_id, pieces: String(j.pieces), rate: String(j.rate),
+    component: j.component ?? '', costing_product_id: j.costing_product_id, pieces: String(j.pieces), qty_unit: j.qty_unit, rate: String(j.rate),
     job_date: j.job_date, expected_date: j.expected_date ?? '', notes: j.notes ?? '',
   } : blank());
   const [mats, setMats] = useState<MaterialDraft[]>(() => (edit?.materials ?? []).filter(m => !m.removed)
@@ -86,7 +86,8 @@ export default function JobForm({ edit, onClose, onSaved, addToast }: {
     if (!d.vendor_name.trim()) return setError('Pick the jobworker');
     if (!d.sku.trim()) return setError('Enter the SKU');
     if (!d.job_type.trim()) return setError('Pick the type of job');
-    if (!/^\d+$/.test(d.pieces.trim()) || Number(d.pieces) <= 0) return setError('Pieces must be a whole number above 0');
+    if (!validQty(d.pieces, d.qty_unit) || Number(d.pieces) <= 0)
+      return setError(d.qty_unit === 'm' ? 'Meters must be above 0, up to 2 decimals (e.g. 8.80)' : 'Pieces must be a whole number above 0');
     if (d.expected_date && d.expected_date < d.job_date) return setError('Expected back cannot be before the job date');
     const rows = mats.filter(m => m.name.trim());
     setSaving(true);
@@ -135,9 +136,15 @@ export default function JobForm({ edit, onClose, onSaved, addToast }: {
             <div style={{ fontSize: 10, color: T.tx3, marginTop: 4 }}>{costing ? `From the ${costing.sku} costing sheet` : d.sku.trim().length >= 3 ? 'No costing sheet for this SKU — type the component' : ''}</div>
           </div>
           <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {field('Pieces', true, <input value={d.pieces} onChange={e => patch({ pieces: e.target.value })} onKeyDown={e => numericKeyDown(e)}
-              type="number" min="1" inputMode="numeric" placeholder="0" style={{ ...S.fInput, width: '100%' }} />)}
-            {field('Rate per piece (₹)', false, <input value={d.rate} onChange={e => patch({ rate: e.target.value })} onKeyDown={e => numericKeyDown(e)}
+            {/* Pieces are whole; meters take up to 2 decimals (8.80 m). */}
+            {field(unitLabel(d.qty_unit), true, <div style={{ display: 'flex', gap: 6 }}>
+              <input value={d.pieces} onChange={e => patch({ pieces: e.target.value })} onKeyDown={e => numericKeyDown(e)} aria-label="Quantity"
+                type="number" min="0" step={d.qty_unit === 'm' ? '0.01' : '1'} inputMode={d.qty_unit === 'm' ? 'decimal' : 'numeric'} placeholder="0" style={{ ...S.fInput, flex: 1, minWidth: 0 }} />
+              <select value={d.qty_unit} onChange={e => patch({ qty_unit: e.target.value as JobDraft['qty_unit'] })} aria-label="Unit" style={{ ...S.fInput, width: 92, flexShrink: 0 }}>
+                {QTY_UNITS.map(u => <option key={u.id} value={u.id}>{u.label}</option>)}
+              </select>
+            </div>)}
+            {field(`Rate per ${d.qty_unit === 'm' ? 'meter' : 'piece'} (₹)`, false, <input value={d.rate} onChange={e => patch({ rate: e.target.value })} onKeyDown={e => numericKeyDown(e)}
               type="number" min="0" inputMode="decimal" placeholder="0" style={{ ...S.fInput, width: '100%' }} />)}
           </div>
           {hints.length > 0 && (
@@ -153,7 +160,7 @@ export default function JobForm({ edit, onClose, onSaved, addToast }: {
           <div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
               <label style={{ ...S.fLabel, marginBottom: 0 }}>Material given</label>
-              <span style={{ fontSize: 10, color: T.tx3 }}>unit · usage per piece</span>
+              <span style={{ fontSize: 10, color: T.tx3 }}>unit · usage per {d.qty_unit === 'm' ? 'meter' : 'piece'}</span>
               {missing.length > 0 && edit && <button type="button" onClick={() => setMats([...mats.filter(m => m.name.trim()), ...missing])} style={{ ...chip(false), marginLeft: 'auto' }}>+ {missing.length} from costing</button>}
             </div>
             <MaterialRows rows={mats} onChange={setMats} locked={locked} suggestions={fromCosting.map(f => f.name)} />

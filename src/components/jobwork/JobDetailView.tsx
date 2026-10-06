@@ -18,7 +18,7 @@ import CloseJobModal from './CloseJobModal';
 import JobForm from './JobForm';
 import { loadJob, costingImage, deleteEntry, deletePayment, setStatus } from './jobworkApi';
 import { shareJob, shareVendor } from './jobworkShare';
-import { materialBalances, rejectedHeld, inr, type JobDetail, type TimelineRow } from './jobworkModel';
+import { materialBalances, rejectedHeld, inr, per, type JobDetail, type TimelineRow } from './jobworkModel';
 
 type Sheet = null | 'out' | 'in' | 'pay' | 'close' | 'edit' | 'share' | 'more';
 
@@ -105,7 +105,7 @@ export default function JobDetailView({ id, onBack, onChanged, addToast }: {
           <div style={{ ...card, marginTop: 0 }}><JobHeader job={job} photo={photo} /></div>
           {actions('jw-actions jw-actions-inline')}
           {job.close_reason && <div style={{ ...S.warningBox, marginTop: 12 }}>{job.status === 'cancelled' ? 'Cancelled' : 'Closed'}: {job.close_reason}</div>}
-          <div style={card}>{title('Material')}<JobBalance rows={materialBalances(d, job.pcs_ok)} /></div>
+          <div style={card}>{title('Material')}<JobBalance rows={materialBalances(d, job.pcs_ok)} per={per(job.qty_unit)} /></div>
           <div style={card}>{title('What moved, and when')}<JobTimeline detail={d} canFix={boss} onDelete={removeRow} /></div>
           {job.notes && <div style={card}>{title('Notes')}<div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{job.notes}</div></div>}
         </div>
@@ -113,7 +113,7 @@ export default function JobDetailView({ id, onBack, onChanged, addToast }: {
       </div>
 
       <ActionSheet open={sheet === 'share'} title="Share statement" subtitle="Without money for the jobworker; with money for accounts" onClose={() => setSheet(null)} actions={[
-        { label: 'This job — pieces & material', onClick: () => share('job', false) },
+        { label: `This job — ${job.qty_unit === 'm' ? 'meters' : 'pieces'} & material`, onClick: () => share('job', false) },
         ...(boss ? [{ label: 'This job — with rate, bill & payments', onClick: () => share('job', true) }] : []),
         { label: `All open jobs of ${job.vendor_name}`, onClick: () => share('vendor', false) },
         ...(boss ? [{ label: `All open jobs of ${job.vendor_name} — with dues`, onClick: () => share('vendor', true) }] : []),

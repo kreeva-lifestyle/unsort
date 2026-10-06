@@ -3,11 +3,11 @@
 // movement is checked and locked server-side. Every function returns the
 // Supabase error for the caller to toast through friendlyError.
 import { supabase } from '../../lib/supabase';
-import type { JobworkSummary, JobworkMaterial, JobworkPayment, JobworkPaymentInsert, JobworkEntryKind } from '../../types/database';
+import type { JobworkSummary, JobworkMaterial, JobworkPayment, JobworkPaymentInsert, JobworkEntryKind, JobworkQtyUnit } from '../../types/database';
 import type { CostingComponent } from '../minis/costing/costingModel';
 import { today, type EntryWithLines, type JobDetail } from './jobworkModel';
 
-export const SUMMARY_COLS = 'id, jw_number, vendor_id, vendor_name, vendor_phone, job_type, sku, component, costing_product_id, pieces, rate, job_date, expected_date, status, notes, close_reason, created_at, updated_at, pcs_ok, pcs_rejected, pcs_rework, pcs_remaining, out_count, last_entry_date, bill, paid, due, last_pay_date';
+export const SUMMARY_COLS = 'id, jw_number, vendor_id, vendor_name, vendor_phone, job_type, sku, component, costing_product_id, pieces, qty_unit, rate, job_date, expected_date, status, notes, close_reason, created_at, updated_at, pcs_ok, pcs_rejected, pcs_rework, pcs_remaining, out_count, last_entry_date, bill, paid, due, last_pay_date';
 const MATERIAL_COLS = 'id, order_id, name, unit, per_piece, sort_order, removed, created_at, updated_at';
 const ENTRY_COLS = 'id, order_id, kind, entry_date, pcs_ok, pcs_rejected, pcs_rework, note, created_by, created_at, jobwork_entry_lines(material_id, qty)';
 const PAY_COLS = 'id, order_id, pay_date, amount, mode, reference, note, created_by, created_at';
@@ -65,27 +65,29 @@ export async function loadVendorOpen(vendorName: string): Promise<{ details: Job
   return { details: loaded.map(r => r.detail).filter((d): d is JobDetail => !!d), error: bad?.error ?? null };
 }
 
-export interface VendorPending { vendor: string; jobs: number; pending: number; overdue: number; due: number }
-/** Jobworkers with open jobs, most pieces pending first (Share pending). */
+export interface VendorPending { vendor: string; jobs: number; pending: number; pendingM: number; overdue: number; due: number }
+/** Jobworkers with open jobs, most pending first (Share pending). Pieces and
+ *  meters are summed apart — a total across both would mean nothing. */
 export async function openByVendor(): Promise<{ rows: VendorPending[]; error: unknown }> {
   const { data, error } = await supabase.from('jobwork_order_summary')
-    .select('vendor_name, pcs_remaining, expected_date, due').eq('status', 'open').limit(2000);
+    .select('vendor_name, pcs_remaining, qty_unit, expected_date, due').eq('status', 'open').limit(2000);
   if (error) return { rows: [], error };
   const by = new Map<string, VendorPending>(), t = today();
-  for (const r of (data ?? []) as { vendor_name: string; pcs_remaining: number; expected_date: string | null; due: number }[]) {
-    const v = by.get(r.vendor_name) ?? { vendor: r.vendor_name, jobs: 0, pending: 0, overdue: 0, due: 0 };
-    v.jobs += 1; v.pending += r.pcs_remaining; v.due += Number(r.due) || 0;
+  for (const r of (data ?? []) as { vendor_name: string; pcs_remaining: number; qty_unit: string; expected_date: string | null; due: number }[]) {
+    const v = by.get(r.vendor_name) ?? { vendor: r.vendor_name, jobs: 0, pending: 0, pendingM: 0, overdue: 0, due: 0 };
+    v.jobs += 1; v.due += Number(r.due) || 0;
+    if (r.qty_unit === 'm') v.pendingM += Number(r.pcs_remaining) || 0; else v.pending += Number(r.pcs_remaining) || 0;
     if (r.expected_date && r.expected_date < t && r.pcs_remaining > 0) v.overdue += 1;
     by.set(r.vendor_name, v);
   }
-  return { rows: [...by.values()].sort((a, b) => b.pending - a.pending || a.vendor.localeCompare(b.vendor)), error: null };
+  return { rows: [...by.values()].sort((a, b) => b.pending - a.pending || b.pendingM - a.pendingM || a.vendor.localeCompare(b.vendor)), error: null };
 }
 
 export interface MaterialDraft { id?: string; name: string; unit: string; per_piece: string }
 export interface JobDraft {
   vendor_id: string | null; vendor_name: string; vendor_phone: string;
   job_type: string; sku: string; component: string; costing_product_id: string | null;
-  pieces: string; rate: string; job_date: string; expected_date: string; notes: string;
+  pieces: string; qty_unit: JobworkQtyUnit; rate: string; job_date: string; expected_date: string; notes: string;
 }
 
 export async function saveJob(id: string | null, d: JobDraft, materials: MaterialDraft[]) {

@@ -13,7 +13,7 @@ import { useModalLock } from '../../hooks/useModalLock';
 import { useBackClose } from '../../hooks/useBackClose';
 import DateInput from '../ui/DateInput';
 import { addEntry } from './jobworkApi';
-import { today, qty, unitShort, materialBalances, rejectedHeld, n, type JobDetail } from './jobworkModel';
+import { today, qty, qu, unitShort, validQty, materialBalances, rejectedHeld, n, type JobDetail } from './jobworkModel';
 
 export default function EntryModal({ kind, detail, onClose, onSaved, addToast }: {
   kind: 'out' | 'in';
@@ -39,21 +39,23 @@ export default function EntryModal({ kind, detail, onClose, onSaved, addToast }:
   const int = (s: string) => (s.trim() === '' ? 0 : Number(s));
   // First send-out: saving it with nothing filled records the hand-over date.
   const firstOut = kind === 'out' && job.out_count === 0;
+  const u = job.qty_unit, word = u === 'm' ? 'Meters' : 'Pieces';
   const handOverOnly = firstOut && bal.length === 0 && held === 0;
   // What the job still needs of a material: pieces × usage − already sent.
   const need = (b: (typeof bal)[number]) => b.m.per_piece == null ? null : Math.max(0, n(b.m.per_piece) * job.pieces - b.sent);
   const submit = async () => {
     if (saving) return;
     const nums = [ok, rej, rework].map(int);
-    if (nums.some(x => !Number.isInteger(x) || x < 0)) return setError('Pieces must be whole numbers');
-    if (kind === 'in' && nums[0] + nums[1] > job.pcs_remaining) return setError(`Only ${job.pcs_remaining} piece(s) are still with the jobworker`);
-    if (kind === 'out' && nums[2] > held) return setError(`Only ${held} rejected piece(s) can go back for rework`);
+    if ([ok, rej, rework].some(s => s.trim() !== '' && !validQty(s, u)))
+      return setError(u === 'm' ? 'Meters take up to 2 decimals (e.g. 3.25)' : 'Pieces must be whole numbers');
+    if (kind === 'in' && nums[0] + nums[1] > job.pcs_remaining + 1e-9) return setError(`Only ${qu(job.pcs_remaining, u)} still with the jobworker`);
+    if (kind === 'out' && nums[2] > held + 1e-9) return setError(`Only ${qu(held, u)} rejected can go back for rework`);
     const lines = bal.map(b => ({ material_id: b.m.id, qty: Number(q[b.m.id] || 0) }));
     if (lines.some(l => !Number.isFinite(l.qty) || l.qty < 0)) return setError('Quantities cannot be negative');
     const over = kind === 'in' ? bal.find(b => Number(q[b.m.id] || 0) > b.sent - b.returned + 1e-9) : undefined;
     if (over) return setError(`Only ${qty(over.sent - over.returned)} ${unitShort(over.m.unit)} ${over.m.name} was sent and not yet returned`);
     const empty = lines.every(l => !l.qty) && nums.every(x => !x);
-    if (empty && !firstOut) return setError(kind === 'in' ? 'Enter the pieces received or material returned' : 'Enter what was sent');
+    if (empty && !firstOut) return setError(kind === 'in' ? `Enter the ${word.toLowerCase()} received or material returned` : 'Enter what was sent');
     setSaving(true);
     const { error: err } = await addEntry(job.id, kind, { date, ok: nums[0], rejected: nums[1], rework: nums[2], note, lines });
     setSaving(false);
@@ -81,19 +83,19 @@ export default function EntryModal({ kind, detail, onClose, onSaved, addToast }:
             <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.55, background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: T.rSm, padding: '8px 10px' }}>
               {handOverOnly
                 ? <>Records the day the work went to <b style={{ color: T.tx }}>{job.vendor_name}</b> — the job then shows <b style={{ color: T.tx }}>With jobworker</b>. To also track fabric, lining or thread given, add materials under ⋯ More → Edit job.</>
-                : <>Use this whenever something goes to <b style={{ color: T.tx }}>{job.vendor_name}</b>: material for the job{held > 0 ? ', or rejected pieces going back for rework' : ''}.{firstOut ? ' Saved empty, it just records the hand-over date.' : ''} Each send-out is dated on the timeline and the shared statement.</>}
+                : <>Use this whenever something goes to <b style={{ color: T.tx }}>{job.vendor_name}</b>: material for the job{held > 0 ? `, or rejected ${word.toLowerCase()} going back for rework` : ''}.{firstOut ? ' Saved empty, it just records the hand-over date.' : ''} Each send-out is dated on the timeline and the shared statement.</>}
             </div>
           )}
           <div><label style={S.fLabel}>Date</label><DateInput value={date} max={today()} onChange={e => setDate(e.target.value)} style={{ width: '100%', height: 44 }} /></div>
           {kind === 'in' && (<>
-            <div style={{ fontSize: 11, color: T.tx2 }}><b style={{ color: T.tx }}>{job.pcs_remaining}</b> of {job.pieces} pieces still with the jobworker</div>
+            <div style={{ fontSize: 11, color: T.tx2 }}><b style={{ color: T.tx }}>{qu(job.pcs_remaining, u)}</b> of {qu(job.pieces, u)} still with the jobworker</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div><label style={S.fLabel}>Pieces OK</label>{numInput(ok, setOk, 'Pieces OK')}</div>
-              <div><label style={S.fLabel}>Rejected</label>{numInput(rej, setRej, 'Pieces rejected')}</div>
+              <div><label style={S.fLabel}>{word} OK</label>{numInput(ok, setOk, `${word} OK`)}</div>
+              <div><label style={S.fLabel}>{word} rejected</label>{numInput(rej, setRej, `${word} rejected`)}</div>
             </div>
           </>)}
           {kind === 'out' && held > 0 && (
-            <div><label style={S.fLabel}>Rejected pieces sent back for rework <span style={{ color: T.tx3, textTransform: 'none', letterSpacing: 0 }}>({held} with us)</span></label>{numInput(rework, setRework, 'Rework pieces')}</div>
+            <div><label style={S.fLabel}>Rejected {word.toLowerCase()} sent back for rework <span style={{ color: T.tx3, textTransform: 'none', letterSpacing: 0 }}>({qu(held, u)} with us)</span></label>{numInput(rework, setRework, `Rework ${word.toLowerCase()}`)}</div>
           )}
           {bal.length > 0 && (
             <div>

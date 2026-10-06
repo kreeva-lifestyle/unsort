@@ -2,7 +2,7 @@
 // payments, each dated. Admin/manager can delete a wrong entry (confirmed,
 // audited server-side); the job's own guard refuses it once closed.
 import { T } from '../../lib/theme';
-import { timeline, linesText, shortDate, inr, PAY_MODE_LABELS, type JobDetail, type TimelineRow } from './jobworkModel';
+import { timeline, linesText, shortDate, inr, qty, qu, PAY_MODE_LABELS, type JobDetail, type TimelineRow } from './jobworkModel';
 
 export default function JobTimeline({ detail, canFix, onDelete }: {
   detail: JobDetail;
@@ -20,12 +20,13 @@ export default function JobTimeline({ detail, canFix, onDelete }: {
           title = `Paid ${inr(r.pay.amount)}`;
           sub = [PAY_MODE_LABELS[r.pay.mode], r.pay.reference, r.pay.note].filter(Boolean).join(' · ');
         } else {
-          const e = r.entry, mats = linesText(e.jobwork_entry_lines, detail.materials);
+          const e = r.entry, mats = linesText(e.jobwork_entry_lines, detail.materials), u = detail.job.qty_unit;
+          const q = (v: number) => (u === 'm' ? qu(v, u) : String(qty(v)));
           if (r.kind === 'out') {
-            title = e.pcs_rework ? `Sent back ${e.pcs_rework} pc${e.pcs_rework === 1 ? '' : 's'} for rework` : mats ? 'Sent out' : 'Handed over to jobworker';
+            title = e.pcs_rework ? `Sent back ${qu(e.pcs_rework, u)} for rework` : mats ? 'Sent out' : 'Handed over to jobworker';
             sub = [mats, e.note].filter(Boolean).join(' · ');
           } else {
-            const parts = [e.pcs_ok ? `${e.pcs_ok} OK` : '', e.pcs_rejected ? `${e.pcs_rejected} rejected` : ''].filter(Boolean);
+            const parts = [e.pcs_ok ? `${q(e.pcs_ok)} OK` : '', e.pcs_rejected ? `${q(e.pcs_rejected)} rejected` : ''].filter(Boolean);
             title = parts.length ? `Received ${parts.join(', ')}` : 'Material returned';
             sub = [mats && (parts.length ? `returned ${mats}` : mats), e.note].filter(Boolean).join(' · ');
           }

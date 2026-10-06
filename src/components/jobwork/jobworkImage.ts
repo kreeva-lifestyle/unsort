@@ -5,7 +5,7 @@
 // bill, paid, due, payments) appears only when asked for — the default copy
 // can go to the jobworker's supervisor.
 import type { JobDetail } from './jobworkModel';
-import { materialBalances, timeline, linesText, fmtDate, today, shortDate, qty, unitShort, inr, n, PAY_MODE_LABELS, workState } from './jobworkModel';
+import { materialBalances, timeline, linesText, fmtDate, today, shortDate, qty, qu, per, mixedQty, unitShort, inr, n, PAY_MODE_LABELS, workState } from './jobworkModel';
 
 const SANS = "-apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
 const W = 760, PAD = 36, SS = 2;
@@ -57,7 +57,7 @@ function piecesRow(doc: Doc, d: JobDetail) {
   ];
   doc.band(54); const w = (W - 2 * PAD) / 4;
   doc.y += 20; cols.forEach(([l], i) => doc.text(l.toUpperCase(), PAD + 14 + i * w, 9, 700, C.soft));
-  doc.y += 24; cols.forEach(([, v, c], i) => doc.text(String(v), PAD + 14 + i * w, 20, 800, c));
+  doc.y += 24; cols.forEach(([, v, c], i) => doc.text(j.qty_unit === 'm' ? qu(v, 'm') : qty(v), PAD + 14 + i * w, 20, 800, c));
   doc.y += 18;
 }
 
@@ -71,7 +71,7 @@ function materialTable(doc: Doc, d: JobDetail) {
   for (const b of rows) {
     const u = unitShort(b.m.unit), over = b.used != null && b.held < -1e-9;
     doc.y += 20;
-    doc.text(b.m.name + (b.m.per_piece != null ? `  (${qty(b.m.per_piece)} ${u}/pc)` : ''), xs[0], 12, 600, C.ink, 'left', 320);
+    doc.text(b.m.name + (b.m.per_piece != null ? `  (${qty(b.m.per_piece)} ${u}/${per(d.job.qty_unit)})` : ''), xs[0], 12, 600, C.ink, 'left', 320);
     doc.text(`${qty(b.sent)} ${u}`, xs[1] + 70, 12, 400, C.mid, 'right');
     doc.text(`${qty(b.returned)} ${u}`, xs[2] + 70, 12, 400, C.mid, 'right');
     doc.text(b.used == null ? '—' : `${qty(b.used)} ${u}`, xs[3] + 70, 12, 400, C.mid, 'right');
@@ -83,7 +83,7 @@ function materialTable(doc: Doc, d: JobDetail) {
 function moneyLine(doc: Doc, d: JobDetail) {
   const j = d.job;
   doc.y += 22;
-  doc.text(`Rate ${inr(j.rate)}/pc   ·   Bill ${inr(j.bill)} (${j.pcs_ok} pcs OK)   ·   Paid ${inr(j.paid)}`, PAD, 12, 400, C.mid);
+  doc.text(`Rate ${inr(j.rate)}/${per(j.qty_unit)}   ·   Bill ${inr(j.bill)} (${qu(j.pcs_ok, j.qty_unit)} OK)   ·   Paid ${inr(j.paid)}`, PAD, 12, 400, C.mid);
   doc.text(`Due ${inr(j.due)}`, W - PAD, 14, 800, n(j.due) > 0 ? C.amber : C.green, 'right');
 }
 
@@ -108,9 +108,10 @@ export function renderJobStatement(d: JobDetail, money: boolean, photo: HTMLImag
     let t = '';
     if (r.kind === 'pay') t = `Paid ${inr(r.pay.amount)} · ${PAY_MODE_LABELS[r.pay.mode]}${r.pay.reference ? ' · ' + r.pay.reference : ''}`;
     else {
-      const e = r.entry, m = linesText(e.jobwork_entry_lines, d.materials);
-      if (r.kind === 'out') t = e.pcs_rework ? `Sent back ${e.pcs_rework} pcs for rework${m ? ` ${m}` : ''}` : m ? `Sent ${m}` : 'Handed over';
-      else t = [e.pcs_ok ? `Received ${e.pcs_ok} OK` : '', e.pcs_rejected ? `${e.pcs_rejected} rejected` : '', m ? `returned ${m}` : ''].filter(Boolean).join(', ');
+      const e = r.entry, m = linesText(e.jobwork_entry_lines, d.materials), u = d.job.qty_unit;
+      const q = (v: number) => (u === 'm' ? qu(v, u) : qty(v));
+      if (r.kind === 'out') t = e.pcs_rework ? `Sent back ${qu(e.pcs_rework, u)} for rework${m ? ` ${m}` : ''}` : m ? `Sent ${m}` : 'Handed over';
+      else t = [e.pcs_ok ? `Received ${q(e.pcs_ok)} OK` : '', e.pcs_rejected ? `${q(e.pcs_rejected)} rejected` : '', m ? `returned ${m}` : ''].filter(Boolean).join(', ');
       if (e.note) t += ` — ${e.note}`;
     }
     doc.text(t, PAD + 110, 12, 400, r.kind === 'in' ? C.green : r.kind === 'pay' ? C.amber : C.ink, 'left', W - 2 * PAD - 110);
@@ -131,15 +132,15 @@ export function renderVendorStatement(vendor: string, list: JobDetail[], money: 
     const j = d.job, photo = photos[i] ?? null, x = photo ? PAD + PH + 14 : PAD, top = doc.y + 10;
     if (photo) { doc.y = top; doc.image(photo, PAD, PH); }
     doc.y = top + 12; doc.text(`${j.sku}  ·  JW #${j.jw_number}`, x, 15, 800);
-    doc.text(`${j.pcs_remaining} of ${j.pieces} pcs pending`, W - PAD, 13, 700, j.pcs_remaining ? C.amber : C.green, 'right');
-    doc.y += 18; doc.text(`${j.job_type}${j.component ? ' · ' + j.component.toUpperCase() : ''} · given ${shortDate(j.job_date)}${j.expected_date ? ' · due ' + shortDate(j.expected_date) : ''} · ${j.pcs_ok} OK, ${j.pcs_rejected - j.pcs_rework} rejected${j.last_entry_date ? ' · last movement ' + shortDate(j.last_entry_date) : ''}`, x, 11, 400, C.mid, 'left', W - PAD - x);
+    doc.text(`${qty(j.pcs_remaining)} of ${qu(j.pieces, j.qty_unit)} pending`, W - PAD, 13, 700, j.pcs_remaining ? C.amber : C.green, 'right');
+    doc.y += 18; doc.text(`${j.job_type}${j.component ? ' · ' + j.component.toUpperCase() : ''} · given ${shortDate(j.job_date)}${j.expected_date ? ' · due ' + shortDate(j.expected_date) : ''} · ${qty(j.pcs_ok)} OK, ${qty(j.pcs_rejected - j.pcs_rework)} rejected${j.last_entry_date ? ' · last movement ' + shortDate(j.last_entry_date) : ''}`, x, 11, 400, C.mid, 'left', W - PAD - x);
     const held = materialBalances(d, j.pcs_ok).filter(b => Math.abs(b.held) > 1e-9);
     if (held.length) { doc.y += 17; doc.text('With them: ' + held.map(b => `${qty(b.held)} ${unitShort(b.m.unit)} ${b.m.name}`).join(' · '), x, 11, 600, C.ink, 'left', W - PAD - x); }
     if (money) { doc.y += 17; doc.text(`Bill ${inr(j.bill)} · Paid ${inr(j.paid)} · Due ${inr(j.due)}`, x, 11, 400, C.mid); }
     doc.y = Math.max(doc.y, photo ? top + PH : 0) + 12; doc.rule();
   });
-  const pend = list.reduce((t, d) => t + d.job.pcs_remaining, 0);
-  doc.y += 24; doc.text(`Pieces pending: ${pend}`, PAD, 14, 800);
+  const pend = (u: string) => list.reduce((t, d) => t + (d.job.qty_unit === u ? n(d.job.pcs_remaining) : 0), 0);
+  doc.y += 24; doc.text(`Pending: ${mixedQty(pend('pcs'), pend('m'))}`, PAD, 14, 800);
   if (money) doc.text(`Balance due ${inr(list.reduce((t, d) => t + n(d.job.due), 0))}`, W - PAD, 14, 800, C.amber, 'right');
   return doc.render();
 }

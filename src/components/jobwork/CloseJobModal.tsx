@@ -8,6 +8,7 @@ import { useModalLock } from '../../hooks/useModalLock';
 import { useBackClose } from '../../hooks/useBackClose';
 import type { JobworkSummary } from '../../types/database';
 import { setStatus } from './jobworkApi';
+import { qu } from './jobworkModel';
 
 export default function CloseJobModal({ job, onClose, onSaved, addToast }: {
   job: JobworkSummary;
@@ -23,7 +24,7 @@ export default function CloseJobModal({ job, onClose, onSaved, addToast }: {
   const short = job.pcs_remaining > 0;
   const submit = async () => {
     if (saving) return;
-    if (short && !reason.trim()) return setError(`Say why — ${job.pcs_remaining} piece(s) are still pending`);
+    if (short && !reason.trim()) return setError(`Say why — ${qu(job.pcs_remaining, job.qty_unit)} still pending`);
     setSaving(true);
     const { error: err } = await setStatus(job.id, 'closed', reason.trim());
     setSaving(false);
@@ -40,8 +41,8 @@ export default function CloseJobModal({ job, onClose, onSaved, addToast }: {
         </div>
         <div style={{ padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.6 }}>
-            {short ? <>{job.pcs_remaining} of {job.pieces} pieces have not come back. Closing stops further receipts; payments can still be recorded.</>
-              : <>All pieces are accounted for. Closing locks the job; payments can still be recorded.</>}
+            {short ? <>{qu(job.pcs_remaining, job.qty_unit)} of {qu(job.pieces, job.qty_unit)} have not come back. Closing stops further receipts; payments can still be recorded.</>
+              : <>Everything is accounted for. Closing locks the job; payments can still be recorded.</>}
           </div>
           <div>
             <label style={S.fLabel}>Reason {short && <span style={{ color: T.re }}>*</span>}</label>

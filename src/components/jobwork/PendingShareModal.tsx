@@ -12,7 +12,7 @@ import { useBackClose } from '../../hooks/useBackClose';
 import Toggle from '../ui/Toggle';
 import { openByVendor, type VendorPending } from './jobworkApi';
 import { shareVendor } from './jobworkShare';
-import { inr } from './jobworkModel';
+import { inr, mixedQty } from './jobworkModel';
 
 export default function PendingShareModal({ boss, onClose, addToast }: {
   boss: boolean;
@@ -43,7 +43,7 @@ export default function PendingShareModal({ boss, onClose, addToast }: {
         <div style={S.modalHead}>
           <div style={{ minWidth: 0 }}>
             <div style={S.modalTitle}>Share pending</div>
-            <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>All open jobs of one jobworker — pieces pending and material with them</div>
+            <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>All open jobs of one jobworker — what is pending and material with them</div>
           </div>
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
@@ -61,7 +61,7 @@ export default function PendingShareModal({ boss, onClose, addToast }: {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.vendor}</div>
                   <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>
-                    <b style={{ color: r.pending ? T.yl : T.tx2 }}>{r.pending}</b> pcs pending · {r.jobs} open job{r.jobs === 1 ? '' : 's'}
+                    <b style={{ color: r.pending || r.pendingM ? T.yl : T.tx2 }}>{mixedQty(r.pending, r.pendingM)}</b> pending · {r.jobs} open job{r.jobs === 1 ? '' : 's'}
                     {r.overdue > 0 && <span style={{ color: T.re }}> · {r.overdue} overdue</span>}
                     {boss && r.due > 0 && <> · due <span style={{ fontFamily: T.mono, color: T.tx2 }}>{inr(r.due)}</span></>}
                   </div>
