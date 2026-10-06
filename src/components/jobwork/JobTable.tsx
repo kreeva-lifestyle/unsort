@@ -5,7 +5,7 @@ import { T, S } from '../../lib/theme';
 import type { JobworkSummary } from '../../types/database';
 import SkuThumb from '../ui/SkuThumb';
 import { StateDot } from './JobHeader';
-import { workState, payState, shortDate, inr, isOverdue, n } from './jobworkModel';
+import { workState, payState, shortDate, inr, isOverdue, n, qty, qu } from './jobworkModel';
 
 export default function JobTable({ rows, showMoney, onOpen }: { rows: JobworkSummary[]; showMoney: boolean; onOpen: (id: string) => void }) {
   const th = (label: string, align: 'left' | 'right' = 'left', w?: number) => <th style={{ ...S.thStyle, textAlign: align, width: w, whiteSpace: 'nowrap' }}>{label}</th>;
@@ -38,7 +38,7 @@ export default function JobTable({ rows, showMoney, onOpen }: { rows: JobworkSum
                 <td style={td}>
                   <div style={{ height: 4, borderRadius: 4, background: T.s3, overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: T.gr }} /></div>
                   <div style={{ fontSize: 11, color: T.tx3, marginTop: 6 }}>
-                    <b style={{ color: T.tx2 }}>{j.pcs_ok}</b>/{j.pieces} OK{j.pcs_remaining ? <> · <b style={{ color: T.yl }}>{j.pcs_remaining}</b> pending</> : ''}
+                    <b style={{ color: T.tx2 }}>{qty(j.pcs_ok)}</b>/{qu(j.pieces, j.qty_unit)} OK{j.pcs_remaining ? <> · <b style={{ color: T.yl }}>{qty(j.pcs_remaining)}</b> pending</> : ''}
                   </div>
                 </td>
                 <td style={{ ...td, fontSize: 12, whiteSpace: 'nowrap' }}>

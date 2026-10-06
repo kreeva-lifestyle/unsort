@@ -4,7 +4,7 @@ import { T } from '../../lib/theme';
 import type { JobworkSummary } from '../../types/database';
 import { StateDot } from './JobHeader';
 import SkuThumb from '../ui/SkuThumb';
-import { workState, payState, shortDate, inr, isOverdue, n } from './jobworkModel';
+import { workState, payState, shortDate, inr, isOverdue, n, qty, qu } from './jobworkModel';
 
 export default function JobCard({ job, showMoney, onOpen }: { job: JobworkSummary; showMoney: boolean; onOpen: () => void }) {
   const ws = workState(job), ps = payState(job);
@@ -27,7 +27,7 @@ export default function JobCard({ job, showMoney, onOpen }: { job: JobworkSummar
         <div style={{ width: `${pct}%`, height: '100%', background: T.gr }} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 11, color: T.tx3 }}>
-        <span><b style={{ color: T.tx2 }}>{job.pcs_ok}</b>/{job.pieces} OK{job.pcs_remaining ? <> · <b style={{ color: T.yl }}>{job.pcs_remaining}</b> pending</> : ''}</span>
+        <span><b style={{ color: T.tx2 }}>{qty(job.pcs_ok)}</b>/{qu(job.pieces, job.qty_unit)} OK{job.pcs_remaining ? <> · <b style={{ color: T.yl }}>{qty(job.pcs_remaining)}</b> pending</> : ''}</span>
         {job.expected_date && job.status === 'open' && job.pcs_remaining > 0 && <span style={{ color: isOverdue(job) ? T.re : T.tx3 }}>due {shortDate(job.expected_date)}</span>}
         {showMoney && <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
           {n(job.due) > 0 && <span style={{ fontFamily: T.mono, color: T.tx2 }}>{inr(job.due)}</span>}<StateDot label={ps.label} t={ps.tone} />

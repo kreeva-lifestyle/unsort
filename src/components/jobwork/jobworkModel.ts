@@ -2,7 +2,7 @@
 // share image. Pieces: ordered − OK − rejected + sent back for rework =
 // still with the jobworker. Material: sent − returned − (OK pcs × usage/pc)
 // = what the jobworker should still hold (negative = used more than planned).
-import type { JobworkSummary, JobworkMaterial, JobworkEntry, JobworkPayment } from '../../types/database';
+import type { JobworkSummary, JobworkMaterial, JobworkEntry, JobworkPayment, JobworkQtyUnit } from '../../types/database';
 import { fileDate } from '../../lib/exportName';
 
 export const JOB_TYPES = ['Embroidery', 'Handwork', 'Printing', 'Dyeing', 'Washing', 'Stitching', 'Cutwork', 'Finishing'];
@@ -21,6 +21,20 @@ export const today = () => fileDate();
 export const n = (v: unknown): number => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
 /** 2.5 → "2.5", 3 → "3", 2.3333 → "2.33" */
 export const qty = (v: number): string => String(Math.round(n(v) * 100) / 100);
+/** A job is counted in pieces (whole) or meters (2 decimals). */
+export const QTY_UNITS: { id: JobworkQtyUnit; label: string }[] = [{ id: 'pcs', label: 'Pieces' }, { id: 'm', label: 'Meters' }];
+/** A job quantity with its unit: "12 pcs", "8.8 m". */
+export const qu = (v: number, unit?: JobworkQtyUnit): string => `${qty(v)} ${unit === 'm' ? 'm' : 'pcs'}`;
+/** Per-unit suffix for rates and usage: "pc" / "m". */
+export const per = (unit?: JobworkQtyUnit): string => (unit === 'm' ? 'm' : 'pc');
+/** Pending pieces and meters kept apart: "12 pcs · 5.05 m" (zeros left out). */
+export const mixedQty = (pcs: number, m: number): string =>
+  [pcs ? qu(pcs, 'pcs') : '', m ? qu(m, 'm') : ''].filter(Boolean).join(' · ') || '0 pcs';
+/** "Pieces" / "Meters" (form labels). */
+export const unitLabel = (unit?: JobworkQtyUnit): string => (unit === 'm' ? 'Meters' : 'Pieces');
+/** Typed quantity is valid for the unit: whole pieces, or meters with ≤ 2 decimals. */
+export const validQty = (s: string, unit?: JobworkQtyUnit): boolean =>
+  (unit === 'm' ? /^\d+(\.\d{1,2})?$/ : /^\d+$/).test(s.trim());
 export const inr = (v: unknown): string => {
   const x = n(v);
   return (x < 0 ? '−₹' : '₹') + Math.abs(x).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });

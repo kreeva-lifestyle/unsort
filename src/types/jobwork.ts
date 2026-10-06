@@ -4,8 +4,10 @@
 // Writes go through the RPCs save_jobwork_order / add_jobwork_entry /
 // set_jobwork_status; payments are a plain RLS-gated insert.
 
-// --- jobwork_orders (21 cols) ---
+// --- jobwork_orders (22 cols) ---
 export type JobworkStatus = 'open' | 'closed' | 'cancelled';
+/** What a job is counted in: whole pieces, or meters (up to 2 decimals). */
+export type JobworkQtyUnit = 'pcs' | 'm';
 export const JOBWORK_STATUSES: JobworkStatus[] = ['open', 'closed', 'cancelled'];
 
 export interface JobworkOrder {
@@ -19,8 +21,10 @@ export interface JobworkOrder {
   sku: string;
   component: string | null;
   costing_product_id: string | null;
+  /** Quantity given, in qty_unit (whole when 'pcs'). */
   pieces: number;
-  /** Agreed rate per piece; bill = pieces received OK × rate. */
+  qty_unit: JobworkQtyUnit;
+  /** Agreed rate per piece / per meter; bill = quantity received OK × rate. */
   rate: number;
   job_date: string;
   expected_date: string | null;
@@ -37,7 +41,7 @@ export interface JobworkOrder {
 // --- jobwork_order_summary (view: order + totals) ---
 export interface JobworkSummary extends Pick<JobworkOrder,
   'id' | 'jw_number' | 'vendor_id' | 'vendor_name' | 'vendor_phone' | 'job_type' | 'sku' | 'component' |
-  'costing_product_id' | 'pieces' | 'rate' | 'job_date' | 'expected_date' | 'status' | 'notes' | 'close_reason' |
+  'costing_product_id' | 'pieces' | 'qty_unit' | 'rate' | 'job_date' | 'expected_date' | 'status' | 'notes' | 'close_reason' |
   'created_at' | 'updated_at'> {
   pcs_ok: number;
   pcs_rejected: number;

@@ -4,7 +4,7 @@ import { T } from '../../lib/theme';
 import type { JobworkSummary } from '../../types/database';
 import { thumbUrl } from '../minis/costing/costingThumbs';
 import SkuThumb from '../ui/SkuThumb';
-import { workState, payState, isOverdue, fmtDate, inr, n } from './jobworkModel';
+import { workState, payState, isOverdue, fmtDate, inr, n, qty, per } from './jobworkModel';
 
 const tone = (t: string) => (({ gr: T.gr, yl: T.yl, re: T.re, bl: T.bl, tx3: T.tx3 }) as Record<string, string>)[t] ?? T.tx3;
 export const StateDot = ({ label, t }: { label: string; t: string }) => (
@@ -20,7 +20,9 @@ export default function JobHeader({ job, photo }: { job: JobworkSummary; photo: 
   const tile = (label: string, value: number, color: string = T.tx) => (
     <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.rLg, padding: '10px 12px', minWidth: 0 }}>
       <div style={{ fontSize: 9, fontWeight: 600, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
-      <div style={{ fontFamily: T.sora, fontSize: 20, fontWeight: 800, color, marginTop: 2 }}>{value}</div>
+      <div style={{ fontFamily: T.sora, fontSize: 20, fontWeight: 800, color, marginTop: 2 }}>
+        {qty(value)}{job.qty_unit === 'm' && <span style={{ fontSize: 12, fontWeight: 600, color: T.tx3, marginLeft: 3 }}>m</span>}
+      </div>
     </div>
   );
   return (
@@ -52,7 +54,7 @@ export default function JobHeader({ job, photo }: { job: JobworkSummary; photo: 
         <div style={{ width: `${pct}%`, height: '100%', background: `linear-gradient(90deg, ${T.ac}, ${T.gr})` }} />
       </div>
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 11, color: T.tx3 }}>
-        <span>Rate <b style={{ fontFamily: T.mono, color: T.tx2 }}>{inr(job.rate)}/pc</b></span>
+        <span>Rate <b style={{ fontFamily: T.mono, color: T.tx2 }}>{inr(job.rate)}/{per(job.qty_unit)}</b></span>
         <span>Bill <b style={{ fontFamily: T.mono, color: T.tx2 }}>{inr(job.bill)}</b></span>
         <span>Paid <b style={{ fontFamily: T.mono, color: T.tx2 }}>{inr(job.paid)}</b></span>
         <span>Due <b style={{ fontFamily: T.mono, color: n(job.due) > 0 ? T.yl : T.gr }}>{inr(job.due)}</b></span>

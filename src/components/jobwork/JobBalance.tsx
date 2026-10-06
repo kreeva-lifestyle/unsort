@@ -5,7 +5,8 @@
 import { T } from '../../lib/theme';
 import { qty, unitShort, type MaterialBalance } from './jobworkModel';
 
-export default function JobBalance({ rows }: { rows: MaterialBalance[] }) {
+/** `per`: the job's unit for usage ("pc" or "m"). */
+export default function JobBalance({ rows, per = 'pc' }: { rows: MaterialBalance[]; per?: string }) {
   if (!rows.length) return <div style={{ fontSize: 11, color: T.tx3, padding: '6px 0' }}>No material listed on this job — edit it to add what you give the jobworker.</div>;
   return (
     <div>
@@ -17,7 +18,7 @@ export default function JobBalance({ rows }: { rows: MaterialBalance[] }) {
           <div key={b.m.id} style={{ padding: '10px 0', borderTop: i ? `1px solid ${T.bd}` : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: b.m.removed ? T.tx3 : T.tx, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {b.m.name}{b.m.per_piece != null && <span style={{ fontWeight: 400, color: T.tx3, fontSize: 11 }}> · {qty(b.m.per_piece)} {u}/pc</span>}
+                {b.m.name}{b.m.per_piece != null && <span style={{ fontWeight: 400, color: T.tx3, fontSize: 11 }}> · {qty(b.m.per_piece)} {u}/{per}</span>}
               </span>
               <span style={{ marginLeft: 'auto', fontSize: 11, color: T.tx3, whiteSpace: 'nowrap' }}>
                 {over ? 'used over plan' : 'with them'}{' '}
@@ -31,7 +32,7 @@ export default function JobBalance({ rows }: { rows: MaterialBalance[] }) {
           </div>
         );
       })}
-      {rows.some(b => b.used == null) && <div style={{ fontSize: 10, color: T.tx3, marginTop: 6 }}>"—" = no usage per piece set, so "with them" includes what was already used.</div>}
+      {rows.some(b => b.used == null) && <div style={{ fontSize: 10, color: T.tx3, marginTop: 6 }}>"—" = no usage per {per === 'm' ? 'meter' : 'piece'} set, so "with them" includes what was already used.</div>}
     </div>
   );
 }
