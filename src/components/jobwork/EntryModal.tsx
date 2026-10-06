@@ -4,12 +4,12 @@
 // leftover material returned. The server re-checks every limit under a lock.
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { T, S } from '../../../lib/theme';
-import { friendlyError } from '../../../lib/friendlyError';
-import { numericKeyDown } from '../../../lib/numericInput';
-import { useModalLock } from '../../../hooks/useModalLock';
-import { useBackClose } from '../../../hooks/useBackClose';
-import DateInput from '../../ui/DateInput';
+import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
+import { numericKeyDown } from '../../lib/numericInput';
+import { useModalLock } from '../../hooks/useModalLock';
+import { useBackClose } from '../../hooks/useBackClose';
+import DateInput from '../ui/DateInput';
 import { addEntry } from './jobworkApi';
 import { today, qty, unitShort, materialBalances, rejectedHeld, n, type JobDetail } from './jobworkModel';
 

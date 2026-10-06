@@ -2,9 +2,9 @@
 // (totals computed in SQL, paginated); writes go through the RPCs so every
 // movement is checked and locked server-side. Every function returns the
 // Supabase error for the caller to toast through friendlyError.
-import { supabase } from '../../../lib/supabase';
-import type { JobworkSummary, JobworkMaterial, JobworkPayment, JobworkPaymentInsert, JobworkEntryKind } from '../../../types/database';
-import type { CostingComponent } from '../costing/costingModel';
+import { supabase } from '../../lib/supabase';
+import type { JobworkSummary, JobworkMaterial, JobworkPayment, JobworkPaymentInsert, JobworkEntryKind } from '../../types/database';
+import type { CostingComponent } from '../minis/costing/costingModel';
 import { today, type EntryWithLines, type JobDetail } from './jobworkModel';
 
 export const SUMMARY_COLS = 'id, jw_number, vendor_id, vendor_name, vendor_phone, job_type, sku, component, costing_product_id, pieces, rate, job_date, expected_date, status, notes, close_reason, created_at, updated_at, pcs_ok, pcs_rejected, pcs_rework, pcs_remaining, out_count, last_entry_date, bill, paid, due, last_pay_date';

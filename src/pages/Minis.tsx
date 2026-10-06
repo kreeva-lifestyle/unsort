@@ -27,7 +27,6 @@ import DropboxUploader from '../components/minis/uploader/DropboxUploader';
 import ProductCosting from '../components/minis/costing/ProductCosting';
 import PriceProjector from '../components/minis/pricing/PriceProjector';
 import OtpInbox from '../components/minis/OtpInbox';
-import Jobwork from '../components/minis/jobwork/Jobwork';
 import { exportName } from '../lib/exportName';
 import { exportUtsavXls, UTSAV_SIZE_MAP as SIZE_MAP, type UtsavRow } from '../components/minis/utsavExport';
 
@@ -290,7 +289,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     address: <AddressPrinter addToast={addToast} />, return_labels: <ReturnLabels addToast={addToast} />,
     dropbox_links: <DropboxLinkGenerator addToast={addToast} />, forward_dropbox: <ForwardDropbox addToast={addToast} onBack={() => setView('home')} />,
     otp: <OtpInbox addToast={addToast} />, costing: <ProductCosting addToast={addToast} />, dropbox_upload: <DropboxUploader addToast={addToast} />,
-    client_finder: <ClientFinder addToast={addToast} />, ratecard: <VendorStudio addToast={addToast} />, jobwork: <Jobwork addToast={addToast} />,
+    client_finder: <ClientFinder addToast={addToast} />, ratecard: <VendorStudio addToast={addToast} />,
   };
   if (simple[view]) return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>

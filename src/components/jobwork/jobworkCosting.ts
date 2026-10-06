@@ -2,7 +2,7 @@
 // sent (TOP / LEHANGA / DUPATTA…), the labour lines that price outside work
 // (JOBWORK ₹523, HANDWORK ₹560…) as one-tap rate suggestions, and the
 // physical materials of that component with their usage per piece.
-import { selectedSupplier, num, type CostingComponent } from '../costing/costingModel';
+import { selectedSupplier, num, type CostingComponent } from '../minis/costing/costingModel';
 import type { MaterialDraft } from './jobworkApi';
 
 const LABOUR = /job\s*work|hand\s*work|embroid|print|dye|dyeing|cut\s*work|aari|zari|sequin|mirror|smock/i;

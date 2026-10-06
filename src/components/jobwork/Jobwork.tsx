@@ -1,14 +1,14 @@
-// Minis → Jobwork: work sourced outside the company. The list reads the
+// Jobwork (sidebar, below Purchase Orders): work sourced outside the company. The list reads the
 // jobwork_order_summary view (totals in SQL, paginated); a job opens as its
 // own page (device Back returns here). New jobs from the header button on
 // desktop and the FAB on the phone.
 import { useState, useEffect, useCallback } from 'react';
-import { T, S } from '../../../lib/theme';
-import { friendlyError } from '../../../lib/friendlyError';
-import { useAuth } from '../../../hooks/useAuth';
-import { useBackClose } from '../../../hooks/useBackClose';
-import Empty from '../../ui/Empty';
-import type { JobworkSummary } from '../../../types/database';
+import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
+import { useAuth } from '../../hooks/useAuth';
+import { useBackClose } from '../../hooks/useBackClose';
+import Empty from '../ui/Empty';
+import type { JobworkSummary } from '../../types/database';
 import JobCard from './JobCard';
 import JobForm from './JobForm';
 import JobDetailView from './JobDetailView';
@@ -36,7 +36,7 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   }, [search, filter, page, perPage, addToast]);
   useEffect(() => { const t = setTimeout(load, search ? 300 : 0); return () => clearTimeout(t); }, [load, search]);
 
-  if (openId) return <JobDetailView id={openId} onChanged={load} addToast={addToast} />;
+  if (openId) return <JobDetailView id={openId} onBack={() => setOpenId(null)} onChanged={load} addToast={addToast} />;
 
   const pages = Math.max(1, Math.ceil(count / perPage));
   const chip = (on: boolean): React.CSSProperties => ({ ...S.btnGhost, ...S.btnSm, minHeight: 32, borderRadius: 999, padding: '5px 14px', fontSize: 11, flexShrink: 0, ...(on ? { borderColor: T.ac, color: T.ac2, background: T.ac3 } : {}) });

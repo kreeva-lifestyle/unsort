@@ -5,11 +5,11 @@
 // them and the dated last movement.
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { T, S } from '../../../lib/theme';
-import { friendlyError } from '../../../lib/friendlyError';
-import { useModalLock } from '../../../hooks/useModalLock';
-import { useBackClose } from '../../../hooks/useBackClose';
-import Toggle from '../../ui/Toggle';
+import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
+import { useModalLock } from '../../hooks/useModalLock';
+import { useBackClose } from '../../hooks/useBackClose';
+import Toggle from '../ui/Toggle';
 import { openByVendor, type VendorPending } from './jobworkApi';
 import { shareVendor } from './jobworkShare';
 import { inr } from './jobworkModel';

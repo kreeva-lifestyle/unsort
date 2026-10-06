@@ -1,10 +1,10 @@
 // Share a jobwork statement through the phone's share sheet (WhatsApp…),
 // falling back to a download on desktop — same flow as the costing and PO
 // shares. Failures toast; a missing photo just leaves the box out.
-import { friendlyError } from '../../../lib/friendlyError';
-import { exportName } from '../../../lib/exportName';
-import { loadForCanvas } from '../costing/costingShare';
-import { skuThumbUrl } from '../../../lib/skuThumbs';
+import { friendlyError } from '../../lib/friendlyError';
+import { exportName } from '../../lib/exportName';
+import { loadForCanvas } from '../minis/costing/costingShare';
+import { skuThumbUrl } from '../../lib/skuThumbs';
 import { renderJobStatement, renderVendorStatement } from './jobworkImage';
 import { loadVendorOpen } from './jobworkApi';
 import type { JobDetail } from './jobworkModel';

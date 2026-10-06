@@ -3,12 +3,12 @@
 // Payments and corrections are admin/manager only (RLS enforces it; the
 // buttons simply hide for everyone else).
 import { useState, useEffect, useCallback } from 'react';
-import { T, S } from '../../../lib/theme';
-import { friendlyError } from '../../../lib/friendlyError';
-import { logSwallowed } from '../../../lib/errorLogger';
-import { useAuth } from '../../../hooks/useAuth';
-import ActionSheet from '../../ui/ActionSheet';
-import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
+import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
+import { logSwallowed } from '../../lib/errorLogger';
+import { useAuth } from '../../hooks/useAuth';
+import ActionSheet from '../ui/ActionSheet';
+import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import JobHeader from './JobHeader';
 import JobBalance from './JobBalance';
 import JobTimeline from './JobTimeline';
@@ -22,8 +22,9 @@ import { materialBalances, inr, type JobDetail, type TimelineRow } from './jobwo
 
 type Sheet = null | 'out' | 'in' | 'pay' | 'close' | 'edit' | 'share' | 'more';
 
-export default function JobDetailView({ id, onChanged, addToast }: {
+export default function JobDetailView({ id, onBack, onChanged, addToast }: {
   id: string;
+  onBack: () => void;
   onChanged: () => void;
   addToast: (m: string, t?: string) => void;
 }) {
@@ -81,9 +82,11 @@ export default function JobDetailView({ id, onChanged, addToast }: {
   );
   return (
     <div style={{ maxWidth: 860 }}>
-      {/* No back button here: the Minis arrow above already steps back to the
-          list (this page is a back-layer), so the page shows ONE arrow. */}
-      {busy && <div style={{ fontSize: 11, color: T.tx3, marginBottom: 8 }}>{busy}</div>}
+      {/* The one back control on this page (device Back does the same). */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <button type="button" onClick={onBack} style={{ ...S.btnGhost, minHeight: 36 }}>‹ All jobs</button>
+        {busy && <span style={{ fontSize: 11, color: T.tx3 }}>{busy}</span>}
+      </div>
       <div style={{ ...card, marginTop: 0 }}><JobHeader job={job} photo={photo} /></div>
       <div className="jw-actions" style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
         {act('Receive', () => setSheet('in'), true, !open)}
