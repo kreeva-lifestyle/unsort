@@ -22,7 +22,7 @@ export default function JobTimeline({ detail, canFix, onDelete }: {
         } else {
           const e = r.entry, mats = linesText(e.jobwork_entry_lines, detail.materials);
           if (r.kind === 'out') {
-            title = e.pcs_rework ? `Sent back ${e.pcs_rework} pc${e.pcs_rework === 1 ? '' : 's'} for rework` : 'Sent out';
+            title = e.pcs_rework ? `Sent back ${e.pcs_rework} pc${e.pcs_rework === 1 ? '' : 's'} for rework` : mats ? 'Sent out' : 'Handed over to jobworker';
             sub = [mats, e.note].filter(Boolean).join(' · ');
           } else {
             const parts = [e.pcs_ok ? `${e.pcs_ok} OK` : '', e.pcs_rejected ? `${e.pcs_rejected} rejected` : ''].filter(Boolean);

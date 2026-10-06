@@ -10,6 +10,10 @@
 // <SKU>.jpg; the row records status + version (the cache-buster the app adds
 // to the URL). Every later view of that SKU is a plain CDN image — no edge
 // call, no Dropbox call. Writes use the service role; the caller is checked.
+//
+// POST { big: sku } → the same photo at 2048px as raw bytes, for the zoom
+// view. Only on a tap, only for a SKU that already has a thumbnail (its
+// Dropbox path is on the row), and nothing is stored.
 // deno-lint-ignore-file no-explicit-any
 import { getDropboxToken, rootPaths, firstPhoto, thumbnail, normSku } from './dropbox.ts';
 
@@ -77,12 +81,28 @@ async function makeThumb(token: string, roots: string[], sku: string): Promise<{
   return { sku, status: 'ok', version };
 }
 
+async function bigPhoto(req: Request, sku: string): Promise<Response> {
+  if (!SKU_KEY.test(sku)) return json({ ok: false, error: 'Invalid SKU' }, req, 400);
+  const r = await fetch(`${SB_URL}/rest/v1/sku_thumbs?sku=eq.${encodeURIComponent(sku)}&status=eq.ok&select=dropbox_path`, { headers: svcHeaders });
+  const path = r.ok ? (await r.json().catch(() => []))?.[0]?.dropbox_path : null;
+  if (!path) return json({ ok: false, error: 'No photo for this SKU' }, req, 404);
+  let token = '';
+  try { token = await getDropboxToken(); } catch { return json({ ok: false, error: 'dropbox_not_connected' }, req, 409); }
+  const bytes = await thumbnail(token, path, 'w2048h1536');
+  // octet-stream so supabase-js hands the client a Blob.
+  return new Response(bytes, { headers: { ...corsHeaders(req), 'content-type': 'application/octet-stream', 'cache-control': 'private, max-age=3600' } });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(req) });
   if (req.method !== 'POST') return json({ ok: false, error: 'Method not allowed' }, req, 405);
   if (!(await callerOk(req))) return json({ ok: false, error: 'Sign in again to load product photos' }, req, 401);
   let body: any;
   try { body = await req.json(); } catch { return json({ ok: false, error: 'Invalid JSON body' }, req, 400); }
+  if (typeof body?.big === 'string') {
+    try { return await bigPhoto(req, normSku(body.big)); }
+    catch (e) { return json({ ok: false, error: (e as Error).message || 'Could not load the photo' }, req, 500); }
+  }
   const skus = [...new Set((Array.isArray(body?.skus) ? body.skus.slice(0, MAX_SKUS) : []).map(normSku).filter((s: string) => SKU_KEY.test(s)))] as string[];
   if (skus.length === 0) return json({ ok: true, results: [] }, req);
 
