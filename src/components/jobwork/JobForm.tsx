@@ -42,6 +42,14 @@ export default function JobForm({ edit, onClose, onSaved, addToast }: {
   // The photo is asked for only once the SKU is real (picked from the
   // suggestions, or an existing job / costing sheet) — never per keystroke.
   const [picked, setPicked] = useState(!!edit);
+  // …and only after the code has settled: typing DRS177 passes through the
+  // real designs DRS1 and DRS17, which must not each cost a Dropbox lookup.
+  const [thumbSku, setThumbSku] = useState(edit ? edit.job.sku : '');
+  useEffect(() => {
+    if (!(picked || costing) || !d.sku.trim()) { setThumbSku(''); return; }
+    const t = setTimeout(() => setThumbSku(d.sku.trim()), 800);
+    return () => clearTimeout(t);
+  }, [picked, costing, d.sku]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const patch = (p: Partial<JobDraft>) => { setD(x => ({ ...x, ...p })); setError(''); };
@@ -108,7 +116,7 @@ export default function JobForm({ edit, onClose, onSaved, addToast }: {
             onPick={v => patch({ vendor_id: v.id, vendor_name: v.name, vendor_phone: v.phone })} />)}
           <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {field('SKU', true, <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {(picked || costing) && d.sku.trim() && <SkuThumb sku={d.sku} size={36} radius={8} />}
+              {thumbSku && <SkuThumb sku={thumbSku} size={36} radius={8} />}
               <div style={{ flex: 1, minWidth: 0 }}><SkuInput value={d.sku} sizes={false} onChange={v => { setPicked(false); patch({ sku: v.toUpperCase() }); }}
                 onPick={(_p, _s, full) => { setPicked(true); patch({ sku: full }); }} style={{ ...S.fInput, width: '100%', textTransform: 'uppercase', fontFamily: T.mono }} /></div>
             </div>)}

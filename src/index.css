@@ -633,3 +633,25 @@ body.modal-open .fab { display: none !important; }
   .jw-filters > button { min-height: 40px !important; }
   .jw-share-btn { min-height: 44px !important; }
 }
+
+/* Jobwork on desktop: summary tiles, a table instead of cards, and the job
+   page as details + a sticky action column. Below 1024px the job page is one
+   column with the actions inline under the header; phones get cards. */
+.jw-cards { display: none; }
+.jw-row:hover td { background: oklch(0.55 0.22 265 / .04); }
+.jw-detail { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+.jw-side { position: sticky; top: 14px; }
+.jw-side .jw-actions { flex-direction: column; }
+.jw-side .jw-actions > button { flex: 0 0 auto !important; width: 100%; }
+.jw-actions-inline { display: none !important; }
+@media (max-width: 1023px) {
+  .jw-detail { display: block; }
+  .jw-side { display: none; }
+  .jw-actions-inline { display: flex !important; margin-top: 12px; }
+  .jw-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 768px) {
+  .jw-table { display: none !important; }
+  .jw-cards { display: block; }
+  .jw-toolbar > div:first-child { max-width: none !important; flex-basis: 100% !important; }
+}

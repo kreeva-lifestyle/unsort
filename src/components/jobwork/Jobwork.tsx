@@ -10,6 +10,8 @@ import { useBackClose } from '../../hooks/useBackClose';
 import Empty from '../ui/Empty';
 import type { JobworkSummary } from '../../types/database';
 import JobCard from './JobCard';
+import JobTable from './JobTable';
+import JobStats from './JobStats';
 import JobForm from './JobForm';
 import JobDetailView from './JobDetailView';
 import PendingShareModal from './PendingShareModal';
@@ -27,12 +29,14 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [sharing, setSharing] = useState(false);
+  // Bumped after every load so the summary tiles follow edits.
+  const [version, setVersion] = useState(0);
   useBackClose(!!openId, () => setOpenId(null));
 
   const load = useCallback(async () => {
     const r = await listJobs({ search, filter, page, perPage });
     if (r.error) { addToast(friendlyError(r.error), 'error'); setRows([]); return; }
-    setRows(r.rows); setCount(r.count);
+    setRows(r.rows); setCount(r.count); setVersion(v => v + 1);
   }, [search, filter, page, perPage, addToast]);
   useEffect(() => { const t = setTimeout(load, search ? 300 : 0); return () => clearTimeout(t); }, [load, search]);
 
@@ -41,7 +45,7 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   const pages = Math.max(1, Math.ceil(count / perPage));
   const chip = (on: boolean): React.CSSProperties => ({ ...S.btnGhost, ...S.btnSm, minHeight: 32, borderRadius: 999, padding: '5px 14px', fontSize: 11, flexShrink: 0, ...(on ? { borderColor: T.ac, color: T.ac2, background: T.ac3 } : {}) });
   return (
-    <div className="jw-list" style={{ maxWidth: 860 }}>
+    <div className="jw-list" style={{ maxWidth: 1320 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: T.sora, fontSize: 16, fontWeight: 700, color: T.tx }}>Jobwork</div>
@@ -50,14 +54,17 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
         <button type="button" className="jw-share-btn" onClick={() => setSharing(true)} style={{ ...S.btnGhost, marginLeft: 'auto', minHeight: 36, flexShrink: 0 }}>Share pending</button>
         <button type="button" className="desktop-only" onClick={() => setCreating(true)} style={{ ...S.btnPrimary, height: 36 }}>+ New job</button>
       </div>
-      <div style={{ position: 'relative', marginBottom: 10 }}>
+      <JobStats boss={boss} version={version} active={filter} onPick={f => { setFilter(f); setPage(0); }} addToast={addToast} />
+      <div className="jw-toolbar" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+      <div style={{ position: 'relative', flex: '1 1 320px', maxWidth: 440 }}>
         <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
         <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search SKU, jobworker, job type or JW #" aria-label="Search jobs" style={{ ...S.fSearch, width: '100%' }} />
       </div>
-      <div className="jw-filters" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 10 }}>
+      <div className="jw-filters" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
         {FILTERS.filter(f => boss || f.id !== 'unpaid').map(f => (
           <button key={f.id} type="button" onClick={() => { setFilter(f.id); setPage(0); }} aria-pressed={filter === f.id} style={chip(filter === f.id)}>{f.label}</button>
         ))}
+      </div>
       </div>
 
       {rows === null ? <div style={{ padding: 40, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading jobs…</div>
@@ -65,7 +72,10 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
           search || filter !== 'open'
             ? <Empty icon="search" title="No jobs match" message="Try another search or filter." />
             : <Empty icon="clipboard" title="No open jobs" message="Create a job when you give work to an outside jobworker — then record what you send and what comes back." cta="+ New job" onCta={() => setCreating(true)} />
-        ) : rows.map(j => <JobCard key={j.id} job={j} showMoney={boss} onOpen={() => setOpenId(j.id)} />)}
+        ) : (<>
+          <JobTable rows={rows} showMoney={boss} onOpen={setOpenId} />
+          <div className="jw-cards">{rows.map(j => <JobCard key={j.id} job={j} showMoney={boss} onOpen={() => setOpenId(j.id)} />)}</div>
+        </>)}
 
       {count > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>

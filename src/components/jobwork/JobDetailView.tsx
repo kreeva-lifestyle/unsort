@@ -80,25 +80,35 @@ export default function JobDetailView({ id, onBack, onChanged, addToast }: {
   const act = (label: string, onClick: () => void, primary = false, hidden = false) => hidden ? null : (
     <button type="button" onClick={onClick} style={{ ...(primary ? S.btnPrimary : S.btnGhost), minHeight: 44, flex: '1 1 0', pointerEvents: busy ? 'none' : 'auto', opacity: busy ? 0.5 : 1 }}>{label}</button>
   );
+  const actions = (cls: string) => (
+    <div className={cls} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {act('Receive', () => setSheet('in'), true, !open)}
+      {act('Send out', () => setSheet('out'), false, !open)}
+      {act('Pay', () => setSheet('pay'), false, !boss || job.status === 'cancelled')}
+      {act(busy === 'Sharing…' ? 'Sharing…' : 'Share', () => setSheet('share'))}
+      {act('⋯ More', () => setSheet('more'))}
+    </div>
+  );
   return (
-    <div style={{ maxWidth: 860 }}>
+    <div style={{ maxWidth: 1320 }}>
       {/* The one back control on this page (device Back does the same). */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <button type="button" onClick={onBack} style={{ ...S.btnGhost, minHeight: 36 }}>‹ All jobs</button>
         {busy && <span style={{ fontSize: 11, color: T.tx3 }}>{busy}</span>}
       </div>
-      <div style={{ ...card, marginTop: 0 }}><JobHeader job={job} photo={photo} /></div>
-      <div className="jw-actions" style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-        {act('Receive', () => setSheet('in'), true, !open)}
-        {act('Send out', () => setSheet('out'), false, !open)}
-        {act('Pay', () => setSheet('pay'), false, !boss || job.status === 'cancelled')}
-        {act(busy === 'Sharing…' ? 'Sharing…' : 'Share', () => setSheet('share'))}
-        {act('⋯ More', () => setSheet('more'))}
+      {/* Wide screens: details left, a sticky action column right. Narrower:
+          one column, the same actions inline under the header (index.css). */}
+      <div className="jw-detail">
+        <div className="jw-main">
+          <div style={{ ...card, marginTop: 0 }}><JobHeader job={job} photo={photo} /></div>
+          {actions('jw-actions jw-actions-inline')}
+          {job.close_reason && <div style={{ ...S.warningBox, marginTop: 12 }}>{job.status === 'cancelled' ? 'Cancelled' : 'Closed'}: {job.close_reason}</div>}
+          <div style={card}>{title('Material')}<JobBalance rows={materialBalances(d, job.pcs_ok)} /></div>
+          <div style={card}>{title('What moved, and when')}<JobTimeline detail={d} canFix={boss} onDelete={removeRow} /></div>
+          {job.notes && <div style={card}>{title('Notes')}<div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{job.notes}</div></div>}
+        </div>
+        <div className="jw-side">{actions('jw-actions')}</div>
       </div>
-      {job.close_reason && <div style={{ ...S.warningBox, marginTop: 12 }}>{job.status === 'cancelled' ? 'Cancelled' : 'Closed'}: {job.close_reason}</div>}
-      <div style={card}>{title('Material')}<JobBalance rows={materialBalances(d, job.pcs_ok)} /></div>
-      <div style={card}>{title('What moved, and when')}<JobTimeline detail={d} canFix={boss} onDelete={removeRow} /></div>
-      {job.notes && <div style={card}>{title('Notes')}<div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{job.notes}</div></div>}
 
       <ActionSheet open={sheet === 'share'} title="Share statement" subtitle="Without money for the jobworker; with money for accounts" onClose={() => setSheet(null)} actions={[
         { label: 'This job — pieces & material', onClick: () => share('job', false) },
