@@ -8,9 +8,12 @@
 // one call at a time — so a page of 25 jobs costs one table read and, the
 // first time only, a couple of edge calls. Results are cached for the
 // session; a failure just means "no photo" for this session (logged).
+// Photos are per design, so a sized variant (DRS171-L) shows its design's
+// photo (DRS171) — Dropbox has no per-size folders.
 import { useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import { logSwallowed } from './errorLogger';
+import { normSize } from './sizeAlteration';
 import type { SkuThumbRow } from '../types/database';
 
 const RECHECK_MISSING_MS = 3 * 24 * 3600_000;   // same as the edge function
@@ -25,7 +28,11 @@ const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 let edgeChain: Promise<void> = Promise.resolve();
 
-export const normSku = (s: string) => s.trim().toUpperCase();
+export const normSku = (s: string) => {
+  const sku = s.trim().toUpperCase();
+  const m = /^(.+)-([0-9A-Z]{1,5})$/.exec(sku);
+  return m && normSize(m[2]) ? m[1] : sku;
+};
 const urlFor = (sku: string, version: number) =>
   `${supabase.storage.from('sku-thumbs').getPublicUrl(`${sku}.jpg`).data.publicUrl}?v=${version}`;
 const notify = () => listeners.forEach(fn => fn());
