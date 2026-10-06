@@ -1,7 +1,7 @@
 // Everything that happened on a job, oldest first: send-outs, receipts and
 // payments, each dated. Admin/manager can delete a wrong entry (confirmed,
 // audited server-side); the job's own guard refuses it once closed.
-import { T } from '../../../lib/theme';
+import { T } from '../../lib/theme';
 import { timeline, linesText, shortDate, inr, PAY_MODE_LABELS, type JobDetail, type TimelineRow } from './jobworkModel';
 
 export default function JobTimeline({ detail, canFix, onDelete }: {

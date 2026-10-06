@@ -1,9 +1,9 @@
 // One job in the list: the SKU's photo (Dropbox thumbnail), SKU · JW #, what
 // and with whom, how far along, and where the money stands.
-import { T } from '../../../lib/theme';
-import type { JobworkSummary } from '../../../types/database';
+import { T } from '../../lib/theme';
+import type { JobworkSummary } from '../../types/database';
 import { StateDot } from './JobHeader';
-import SkuThumb from '../../ui/SkuThumb';
+import SkuThumb from '../ui/SkuThumb';
 import { workState, payState, shortDate, inr, isOverdue, n } from './jobworkModel';
 
 export default function JobCard({ job, showMoney, onOpen }: { job: JobworkSummary; showMoney: boolean; onOpen: () => void }) {

@@ -2,7 +2,7 @@
 // the jobworker should still hold; under it sent · returned · used by the
 // pieces received OK (when usage/pc is known). A negative hold means more
 // was used than planned — shown in red as "over".
-import { T } from '../../../lib/theme';
+import { T } from '../../lib/theme';
 import { qty, unitShort, type MaterialBalance } from './jobworkModel';
 
 export default function JobBalance({ rows }: { rows: MaterialBalance[] }) {

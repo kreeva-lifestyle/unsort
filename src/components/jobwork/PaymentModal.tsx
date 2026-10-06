@@ -3,13 +3,13 @@
 // is allowed and shows as an advance.
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { T, S } from '../../../lib/theme';
-import { friendlyError } from '../../../lib/friendlyError';
-import { numericKeyDown } from '../../../lib/numericInput';
-import { useModalLock } from '../../../hooks/useModalLock';
-import { useBackClose } from '../../../hooks/useBackClose';
-import DateInput from '../../ui/DateInput';
-import { JOBWORK_PAY_MODES, type JobworkPayMode, type JobworkSummary } from '../../../types/database';
+import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
+import { numericKeyDown } from '../../lib/numericInput';
+import { useModalLock } from '../../hooks/useModalLock';
+import { useBackClose } from '../../hooks/useBackClose';
+import DateInput from '../ui/DateInput';
+import { JOBWORK_PAY_MODES, type JobworkPayMode, type JobworkSummary } from '../../types/database';
 import { addPayment } from './jobworkApi';
 import { today, inr, n, PAY_MODE_LABELS } from './jobworkModel';
 

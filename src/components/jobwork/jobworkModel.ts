@@ -2,8 +2,8 @@
 // share image. Pieces: ordered − OK − rejected + sent back for rework =
 // still with the jobworker. Material: sent − returned − (OK pcs × usage/pc)
 // = what the jobworker should still hold (negative = used more than planned).
-import type { JobworkSummary, JobworkMaterial, JobworkEntry, JobworkPayment } from '../../../types/database';
-import { fileDate } from '../../../lib/exportName';
+import type { JobworkSummary, JobworkMaterial, JobworkEntry, JobworkPayment } from '../../types/database';
+import { fileDate } from '../../lib/exportName';
 
 export const JOB_TYPES = ['Embroidery', 'Handwork', 'Printing', 'Dyeing', 'Stitching', 'Cutwork', 'Finishing'];
 export const MATERIAL_UNITS = ['Meter', 'Pcs', 'Yard', 'Kg', 'Gram', 'Set'];

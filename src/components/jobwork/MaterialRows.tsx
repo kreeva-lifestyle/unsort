@@ -2,9 +2,9 @@
 // lining, lace, cut panels…), its unit, and how much one finished piece
 // uses. Usage/pc is optional — with it the balance can say what the
 // jobworker should still hold; without it the balance shows sent − returned.
-import { T, S } from '../../../lib/theme';
-import { numericKeyDown } from '../../../lib/numericInput';
-import SuggestInput from '../../ui/SuggestInput';
+import { T, S } from '../../lib/theme';
+import { numericKeyDown } from '../../lib/numericInput';
+import SuggestInput from '../ui/SuggestInput';
 import { MATERIAL_UNITS } from './jobworkModel';
 import type { MaterialDraft } from './jobworkApi';
 

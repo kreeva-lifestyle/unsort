@@ -1,9 +1,9 @@
 // Top of a job: photo (the SKU's Dropbox thumbnail, else its costing sheet's), identity, the piece
 // counts with a progress bar, and the money line (rate · bill · paid · due).
-import { T } from '../../../lib/theme';
-import type { JobworkSummary } from '../../../types/database';
-import { thumbUrl } from '../costing/costingThumbs';
-import SkuThumb from '../../ui/SkuThumb';
+import { T } from '../../lib/theme';
+import type { JobworkSummary } from '../../types/database';
+import { thumbUrl } from '../minis/costing/costingThumbs';
+import SkuThumb from '../ui/SkuThumb';
 import { workState, payState, isOverdue, fmtDate, inr, n } from './jobworkModel';
 
 const tone = (t: string) => (({ gr: T.gr, yl: T.yl, re: T.re, bl: T.bl, tx3: T.tx3 }) as Record<string, string>)[t] ?? T.tx3;

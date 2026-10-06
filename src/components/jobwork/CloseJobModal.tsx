@@ -2,11 +2,11 @@
 // server enforces it too) — "closed short" must always say why.
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { T, S } from '../../../lib/theme';
-import { friendlyError } from '../../../lib/friendlyError';
-import { useModalLock } from '../../../hooks/useModalLock';
-import { useBackClose } from '../../../hooks/useBackClose';
-import type { JobworkSummary } from '../../../types/database';
+import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
+import { useModalLock } from '../../hooks/useModalLock';
+import { useBackClose } from '../../hooks/useBackClose';
+import type { JobworkSummary } from '../../types/database';
 import { setStatus } from './jobworkApi';
 
 export default function CloseJobModal({ job, onClose, onSaved, addToast }: {

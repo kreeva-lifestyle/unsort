@@ -4,16 +4,16 @@
 // (JOBWORK ₹523…) and fills the fabric lines with their usage per piece.
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { T, S } from '../../../lib/theme';
-import { friendlyError } from '../../../lib/friendlyError';
-import { numericKeyDown } from '../../../lib/numericInput';
-import { useModalLock } from '../../../hooks/useModalLock';
-import { useBackClose } from '../../../hooks/useBackClose';
-import VendorPicker from '../../purchaseorders/VendorPicker';
-import SkuInput from '../../ui/SkuInput';
-import SuggestInput from '../../ui/SuggestInput';
-import DateInput from '../../ui/DateInput';
-import SkuThumb from '../../ui/SkuThumb';
+import { T, S } from '../../lib/theme';
+import { friendlyError } from '../../lib/friendlyError';
+import { numericKeyDown } from '../../lib/numericInput';
+import { useModalLock } from '../../hooks/useModalLock';
+import { useBackClose } from '../../hooks/useBackClose';
+import VendorPicker from '../purchaseorders/VendorPicker';
+import SkuInput from '../ui/SkuInput';
+import SuggestInput from '../ui/SuggestInput';
+import DateInput from '../ui/DateInput';
+import SkuThumb from '../ui/SkuThumb';
 import MaterialRows from './MaterialRows';
 import { JOB_TYPES, today, inr, type JobDetail } from './jobworkModel';
 import { saveJob, costingFor, type JobDraft, type MaterialDraft, type CostingRef } from './jobworkApi';

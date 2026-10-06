@@ -1,14 +1,14 @@
-export const TAB_IDS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'purchaseorders', 'listingai', 'attendance', 'minis', 'printstation', 'settings'] as const;
+export const TAB_IDS = ['dashboard', 'inventory', 'brandtag', 'packtime', 'challan', 'purchaseorders', 'jobwork', 'listingai', 'attendance', 'minis', 'printstation', 'settings'] as const;
 
 const TAB_TO_MODULE: Record<string, string> = {
   dashboard: 'dashboard', inventory: 'inventory', brandtag: 'brandtag',
-  packtime: 'packtime', challan: 'challan', purchaseorders: 'purchaseorders', listingai: 'listingai', attendance: 'attendance', minis: 'minis', printstation: 'printstation',
+  packtime: 'packtime', challan: 'challan', purchaseorders: 'purchaseorders', jobwork: 'jobwork', listingai: 'listingai', attendance: 'attendance', minis: 'minis', printstation: 'printstation',
 };
 
 export const MODULE_LABELS: Record<string, string> = {
   dashboard: 'Dashboard data', inventory: 'Inventory', extras: 'Spare Parts',
   packtime: 'PackStation', brandtag: 'Brand Tags', challan: 'Cash Challan',
-  cashbook: 'Cash Book', purchaseorders: 'Purchase Orders', listingai: 'Listing AI', attendance: 'Attendance', minis: 'Minis', printstation: 'Print Station',
+  cashbook: 'Cash Book', purchaseorders: 'Purchase Orders', jobwork: 'Jobwork', listingai: 'Listing AI', attendance: 'Attendance', minis: 'Minis', printstation: 'Print Station',
 };
 
 export const ALL_MODULE_KEYS = Object.keys(MODULE_LABELS);
