@@ -5,7 +5,7 @@
 import type { JobworkSummary, JobworkMaterial, JobworkEntry, JobworkPayment } from '../../types/database';
 import { fileDate } from '../../lib/exportName';
 
-export const JOB_TYPES = ['Embroidery', 'Handwork', 'Printing', 'Dyeing', 'Stitching', 'Cutwork', 'Finishing'];
+export const JOB_TYPES = ['Embroidery', 'Handwork', 'Printing', 'Dyeing', 'Washing', 'Stitching', 'Cutwork', 'Finishing'];
 export const MATERIAL_UNITS = ['Meter', 'Pcs', 'Yard', 'Kg', 'Gram', 'Set'];
 export const PAY_MODE_LABELS: Record<string, string> = { cash: 'Cash', bank: 'Bank', upi: 'UPI', cheque: 'Cheque', other: 'Other' };
 
