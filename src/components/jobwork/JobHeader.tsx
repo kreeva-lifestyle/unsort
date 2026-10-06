@@ -26,7 +26,7 @@ export default function JobHeader({ job, photo }: { job: JobworkSummary; photo: 
   return (
     <div>
       <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 12 }}>
-        <SkuThumb sku={job.sku} size={72} radius={12} fallback={photo ? thumbUrl(photo) || photo : null} />
+        <SkuThumb sku={job.sku} size={72} radius={12} fallback={photo ? thumbUrl(photo) || photo : null} full={photo} zoom />
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontFamily: T.mono, fontSize: 18, fontWeight: 700, color: T.tx }}>{job.sku}</span>

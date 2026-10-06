@@ -1,7 +1,9 @@
 // Record one movement on a job. SEND OUT: material quantities given (the
 // suggestion is what the job still needs at its usage per piece) and any
-// rejected pieces going back for rework. RECEIVE: pieces OK / rejected and
-// leftover material returned. The server re-checks every limit under a lock.
+// rejected pieces going back for rework; the first send-out may be empty —
+// it is the hand-over itself (a job with no materials has nothing else to
+// enter). RECEIVE: pieces OK / rejected and leftover material returned. The
+// server re-checks every limit under a lock.
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
@@ -35,6 +37,9 @@ export default function EntryModal({ kind, detail, onClose, onSaved, addToast }:
   const [error, setError] = useState('');
 
   const int = (s: string) => (s.trim() === '' ? 0 : Number(s));
+  // First send-out: saving it with nothing filled records the hand-over date.
+  const firstOut = kind === 'out' && job.out_count === 0;
+  const handOverOnly = firstOut && bal.length === 0 && held === 0;
   // What the job still needs of a material: pieces × usage − already sent.
   const need = (b: (typeof bal)[number]) => b.m.per_piece == null ? null : Math.max(0, n(b.m.per_piece) * job.pieces - b.sent);
   const submit = async () => {
@@ -47,12 +52,13 @@ export default function EntryModal({ kind, detail, onClose, onSaved, addToast }:
     if (lines.some(l => !Number.isFinite(l.qty) || l.qty < 0)) return setError('Quantities cannot be negative');
     const over = kind === 'in' ? bal.find(b => Number(q[b.m.id] || 0) > b.sent - b.returned + 1e-9) : undefined;
     if (over) return setError(`Only ${qty(over.sent - over.returned)} ${unitShort(over.m.unit)} ${over.m.name} was sent and not yet returned`);
-    if (lines.every(l => !l.qty) && nums.every(x => !x)) return setError(kind === 'in' ? 'Enter the pieces received or material returned' : 'Enter what was sent');
+    const empty = lines.every(l => !l.qty) && nums.every(x => !x);
+    if (empty && !firstOut) return setError(kind === 'in' ? 'Enter the pieces received or material returned' : 'Enter what was sent');
     setSaving(true);
     const { error: err } = await addEntry(job.id, kind, { date, ok: nums[0], rejected: nums[1], rework: nums[2], note, lines });
     setSaving(false);
     if (err) { setError(friendlyError(err)); return; }
-    addToast(kind === 'in' ? `Received on JW #${job.jw_number}` : `Sent out on JW #${job.jw_number}`, 'success');
+    addToast(kind === 'in' ? `Received on JW #${job.jw_number}` : empty ? `JW #${job.jw_number} handed over to ${job.vendor_name}` : `Sent out on JW #${job.jw_number}`, 'success');
     onSaved();
   };
 
@@ -71,6 +77,13 @@ export default function EntryModal({ kind, detail, onClose, onSaved, addToast }:
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: '14px 18px 18px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {kind === 'out' && (
+            <div style={{ fontSize: 11, color: T.tx2, lineHeight: 1.55, background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: T.rSm, padding: '8px 10px' }}>
+              {handOverOnly
+                ? <>Records the day the work went to <b style={{ color: T.tx }}>{job.vendor_name}</b> — the job then shows <b style={{ color: T.tx }}>With jobworker</b>. To also track fabric, lining or thread given, add materials under ⋯ More → Edit job.</>
+                : <>Use this whenever something goes to <b style={{ color: T.tx }}>{job.vendor_name}</b>: material for the job{held > 0 ? ', or rejected pieces going back for rework' : ''}.{firstOut ? ' Saved empty, it just records the hand-over date.' : ''} Each send-out is dated on the timeline and the shared statement.</>}
+            </div>
+          )}
           <div><label style={S.fLabel}>Date</label><DateInput value={date} max={today()} onChange={e => setDate(e.target.value)} style={{ width: '100%', height: 44 }} /></div>
           {kind === 'in' && (<>
             <div style={{ fontSize: 11, color: T.tx2 }}><b style={{ color: T.tx }}>{job.pcs_remaining}</b> of {job.pieces} pieces still with the jobworker</div>
@@ -111,7 +124,7 @@ export default function EntryModal({ kind, detail, onClose, onSaved, addToast }:
           <div style={{ display: 'flex', gap: 10 }}>
             <button type="button" onClick={onClose} style={{ ...S.btnGhost, minHeight: 44 }}>Cancel</button>
             <button type="button" onClick={submit} style={{ ...S.btnPrimary, flex: 1, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
-              {saving ? 'Saving…' : kind === 'in' ? 'Save receipt' : 'Save send-out'}
+              {saving ? 'Saving…' : kind === 'in' ? 'Save receipt' : handOverOnly ? 'Mark handed over' : 'Save send-out'}
             </button>
           </div>
         </div>

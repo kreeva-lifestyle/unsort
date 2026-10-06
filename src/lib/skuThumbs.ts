@@ -117,3 +117,23 @@ export function skuThumbUrl(sku: string): Promise<string | null> {
     setTimeout(() => { listeners.delete(fn); res(cache.get(key) ?? null); }, 20_000);
   });
 }
+
+/** The SKU's photo at 2048px for the zoom view, fetched only when someone
+ *  taps a thumbnail; an object URL kept for the session. null = none. */
+const big = new Map<string, Promise<string | null>>();
+export function skuBigPhoto(sku: string): Promise<string | null> {
+  const key = normSku(sku);
+  let p = big.get(key);
+  if (!p) {
+    p = supabase.functions.invoke('sku-thumbs', { body: { big: key } }).then(({ data, error }) => {
+      if (error || !(data instanceof Blob)) {
+        if (error) logSwallowed('sku big photo', error);
+        big.delete(key);   // a later tap may try again
+        return null;
+      }
+      return URL.createObjectURL(new Blob([data], { type: 'image/jpeg' }));
+    });
+    big.set(key, p);
+  }
+  return p;
+}

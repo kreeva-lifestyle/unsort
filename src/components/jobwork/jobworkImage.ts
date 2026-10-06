@@ -109,7 +109,7 @@ export function renderJobStatement(d: JobDetail, money: boolean, photo: HTMLImag
     if (r.kind === 'pay') t = `Paid ${inr(r.pay.amount)} · ${PAY_MODE_LABELS[r.pay.mode]}${r.pay.reference ? ' · ' + r.pay.reference : ''}`;
     else {
       const e = r.entry, m = linesText(e.jobwork_entry_lines, d.materials);
-      if (r.kind === 'out') t = (e.pcs_rework ? `Sent back ${e.pcs_rework} pcs for rework` : 'Sent') + (m ? ` ${m}` : '');
+      if (r.kind === 'out') t = e.pcs_rework ? `Sent back ${e.pcs_rework} pcs for rework${m ? ` ${m}` : ''}` : m ? `Sent ${m}` : 'Handed over';
       else t = [e.pcs_ok ? `Received ${e.pcs_ok} OK` : '', e.pcs_rejected ? `${e.pcs_rejected} rejected` : '', m ? `returned ${m}` : ''].filter(Boolean).join(', ');
       if (e.note) t += ` — ${e.note}`;
     }

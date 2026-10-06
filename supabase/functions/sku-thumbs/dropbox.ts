@@ -92,11 +92,12 @@ export async function firstPhoto(token: string, roots: string[], sku: string): P
   return null;
 }
 
-/** A 256px JPEG thumbnail of one Dropbox file (Dropbox renders it). */
-export async function thumbnail(token: string, path: string): Promise<Uint8Array> {
+/** A JPEG of one Dropbox file, rendered by Dropbox: 256px for the stored
+ *  thumbnail, 2048px for the zoom view (served once per tap, never stored). */
+export async function thumbnail(token: string, path: string, size: 'w256h256' | 'w2048h1536' = 'w256h256'): Promise<Uint8Array> {
   const r = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail_v2', {
     method: 'POST',
-    headers: { authorization: `Bearer ${token}`, 'Dropbox-API-Arg': asciiArg({ resource: { '.tag': 'path', path }, format: 'jpeg', size: 'w256h256', mode: 'bestfit' }) },
+    headers: { authorization: `Bearer ${token}`, 'Dropbox-API-Arg': asciiArg({ resource: { '.tag': 'path', path }, format: 'jpeg', size, mode: 'bestfit' }) },
   });
   if (!r.ok) { try { await r.body?.cancel(); } catch { /* noop */ } throw new Error(`thumbnail ${r.status}`); }
   return new Uint8Array(await r.arrayBuffer());

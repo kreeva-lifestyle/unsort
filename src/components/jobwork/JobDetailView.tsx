@@ -18,7 +18,7 @@ import CloseJobModal from './CloseJobModal';
 import JobForm from './JobForm';
 import { loadJob, costingImage, deleteEntry, deletePayment, setStatus } from './jobworkApi';
 import { shareJob, shareVendor } from './jobworkShare';
-import { materialBalances, inr, type JobDetail, type TimelineRow } from './jobworkModel';
+import { materialBalances, rejectedHeld, inr, type JobDetail, type TimelineRow } from './jobworkModel';
 
 type Sheet = null | 'out' | 'in' | 'pay' | 'close' | 'edit' | 'share' | 'more';
 
@@ -50,6 +50,8 @@ export default function JobDetailView({ id, onBack, onChanged, addToast }: {
   const done = () => { setSheet(null); reload(); onChanged(); };
   if (!d) return <div style={{ padding: 40, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading job…</div>;
   const { job } = d, open = job.status === 'open';
+  // Send out has something to record: the hand-over, material, or rework.
+  const canSend = open && (job.out_count === 0 || d.materials.some(m => !m.removed) || rejectedHeld(job) > 0);
 
   const share = async (what: 'job' | 'vendor', money: boolean) => {
     setSheet(null); setBusy('Sharing…');
@@ -83,7 +85,7 @@ export default function JobDetailView({ id, onBack, onChanged, addToast }: {
   const actions = (cls: string) => (
     <div className={cls} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
       {act('Receive', () => setSheet('in'), true, !open)}
-      {act('Send out', () => setSheet('out'), false, !open)}
+      {act('Send out', () => setSheet('out'), false, !canSend)}
       {act('Pay', () => setSheet('pay'), false, !boss || job.status === 'cancelled')}
       {act(busy === 'Sharing…' ? 'Sharing…' : 'Share', () => setSheet('share'))}
       {act('⋯ More', () => setSheet('more'))}
