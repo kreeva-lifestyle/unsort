@@ -20,6 +20,13 @@
 //   push / reconcile — legacy Google Sheets behaviour
 //
 // Dropbox creds + folder links live in app_secrets (service-role only).
+//
+// DEPLOY WITH verify_jwt: FALSE. The GET ?thumb= path is a plain <img>
+// request with no Authorization header, so the gateway's JWT check would
+// 401 it before this code runs (that is what broke every Dropbox thumbnail
+// in Client Finder and the Link Generator). Auth is done here instead:
+// every POST action re-checks the caller (callerRole / share token via
+// gate()), and the GET accepts only this project's anon key in ?k=.
 
 // deno-lint-ignore-file no-explicit-any
 import { catalogFolder, catalogPack, catalogList, gate } from './catalog.ts';
