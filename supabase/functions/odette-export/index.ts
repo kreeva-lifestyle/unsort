@@ -1150,11 +1150,20 @@ Deno.serve(async (req) => {
       // an unauthenticated anon-key caller.
       if (!(await callerRole(req))) return fail(401, 'Sign in to DailyOffice first', req);
       const odetteSet = new Set(await readSkuColumn(getSheetId(), ODETTE_TAB));
+      // Designs on Odette by bare code: a semi-stitched / unsized design is
+      // "present" if Odette lists it as DRS233 or under any suffix
+      // (DRS233-FREE, DRS233-S…) — the sheet's spelling for those varies.
+      const odetteDesigns = new Set<string>();
+      for (const sku of odetteSet) {
+        odetteDesigns.add(sku);
+        const cut = Math.max(sku.lastIndexOf('-'), sku.lastIndexOf(' '));
+        if (cut > 0) odetteDesigns.add(sku.slice(0, cut).trim());
+      }
       const masterId = getMasterSheetId();
       const SOURCE_COL = 'Source Tab'; const MISSING_SIZE_COL = 'Missing Size'; const EXPECTED_COL = 'Expected Odette SKU';
       const columns: string[] = []; const colSet = new Set<string>(); const expectedSeen = new Set<string>();
       const missing: Record<string, string>[] = []; const tabsRead: { name: string; count: number }[] = []; const warnings: string[] = [];
-      let activeVariants = 0, presentVariants = 0, skipped = 0;
+      let activeVariants = 0, presentVariants = 0;
       for (const tab of MASTER_TABS) {
         try {
           const rows = await readSheetRaw(masterId, tab);
@@ -1175,14 +1184,18 @@ Deno.serve(async (req) => {
             const active = statusIdx < 0 || String(row[statusIdx] ?? '').trim().toLowerCase() === 'active';
             if (!active) continue;
             const sizeRaw = sizeIdx < 0 ? '' : String(row[sizeIdx] ?? '');
-            if (/stit/i.test(sizeRaw)) { skipped++; continue; }
             tabCount++;
             const sizes = sizeRaw.split(/[,/|\s]+/).map(t => t.trim().toUpperCase()).filter(t => SIZE_TOKENS.has(t));
-            const expected = sizes.length ? sizes.map(s => ({ size: s, sku: normSku(`${base}-${s}`) })) : [{ size: '', sku: base }];
+            // Semi-Stitched / Unstitched / no size: one expected row, the bare
+            // code, matched against any spelling of that design on Odette.
+            // (These rows used to be skipped outright, so a design like DRS233
+            // that was never uploaded could not show up here.)
+            const expected = sizes.length ? sizes.map(s => ({ size: s, sku: normSku(`${base}-${s}`), any: false }))
+              : [{ size: sizeRaw.trim(), sku: base, any: true }];
             for (const e of expected) {
               if (expectedSeen.has(e.sku)) continue;
               expectedSeen.add(e.sku); activeVariants++;
-              if (odetteSet.has(e.sku)) { presentVariants++; continue; }
+              if (e.any ? odetteDesigns.has(e.sku) : odetteSet.has(e.sku)) { presentVariants++; continue; }
               const obj: Record<string, string> = {};
               headers.forEach((h, i) => { if (h) obj[h] = String(row[i] ??  ''); });
               obj[MISSING_SIZE_COL] = e.size || '(no size)'; obj[EXPECTED_COL] = e.sku; obj[SOURCE_COL] = tab;
@@ -1194,7 +1207,7 @@ Deno.serve(async (req) => {
       }
       if (colSet.size === 0) return fail(502, 'Could not read any master tab', req, warnings.join(' | ') || 'No data in master tabs');
       columns.unshift(EXPECTED_COL, MISSING_SIZE_COL, SOURCE_COL);
-      return json({ ok: true, columns, missing, counts: { active: activeVariants, odette: presentVariants, missing: missing.length, skipped }, tabsRead, warnings: warnings.length ? warnings : undefined }, req);
+      return json({ ok: true, columns, missing, counts: { active: activeVariants, odette: presentVariants, missing: missing.length }, tabsRead, warnings: warnings.length ? warnings : undefined }, req);
     }
 
     const sheetName = body?.sheetName;
