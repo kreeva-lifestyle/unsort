@@ -288,7 +288,7 @@ marked (G).
 | `listing-ai` | 2583 | `listingai/api.ts` (Listing AI, Bulk Teach, Master Assistant, Settings cards), Vendor Studio | `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `MASTER_SHEET_ID`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`; DB `app_secrets`: `anthropic_api_key`, `listing_ai_model`, `dropbox_refresh_token`, `dropbox_app_key`, `dropbox_app_secret`, `dropbox_linkgen_roots` | 13 actions (§3.7); reads `listing_templates`, `listing_mappings`, `listing_folders`, `master_sheet_*`, `ratecard_share`, `profiles`; RPC `bump_ratecard_share_use`; Anthropic `/v1/messages`, Dropbox, Google Sheets fallback |
 | `master-sync` | 580 | pg_cron only (`trigger_master_sync` → `net.http_post` with `x-sync-secret` from Vault) | `GOOGLE_*`, `MASTER_SHEET_ID`, service role; DB `app_secrets.master_sync_secret` | modes `auto/full/verify/spellfix/spellfix_dry`; writes `master_sheet_rows/columns/sync`, `master_spellfix_log`, `notifications`; the one sanctioned **write-back** to the sheet (spellfix, weekly) |
 | `pricing-ai` | 163 | `minis/pricing/aiSuggestions.ts` | see §3.10 | writes `pricing_ai_suggestions` |
-| `odette-export` | 1261 + `catalog.ts` 317 | OdetteImport, OdetteCoverageCheck, LinkCheck, Dropbox Link Generator, Dropbox Uploader, Forward→Dropbox, Catalog Downloads | `GOOGLE_*`, `ODETTE_SHEET_ID`/`GOOGLE_SHEET_ID`, `MASTER_SHEET_ID`, service role | see §3.10 |
+| `odette-export` | 1261 + `catalog.ts` 317 | OdetteImport, OdetteCoverageCheck, LinkCheck, Dropbox Link Generator, Dropbox Uploader, Forward→Dropbox, Catalog Downloads (gateway `verify_jwt` **off** — the `GET ?thumb=` `<img>` path has no Authorization header; every action checks its caller itself) | `GOOGLE_*`, `ODETTE_SHEET_ID`/`GOOGLE_SHEET_ID`, `MASTER_SHEET_ID`, service role | see §3.10 |
 | `short-track` | 534 | `TracklyRedirect`, `Trackly*`, `Minis.tsx` (`compare`) | service role, `GOOGLE_*` | RPC `record_link_click`; see §3.9 |
 | `client-finder` | 673 | `minis/clientfinder/api.ts` | service role, `GOOGLE_*` (Vision) | `client_finder_searches/hits`; see §3.9 |
 | `otp-inbox` | 112 + `delivery.ts` 131 + `sheetPdf.ts` 104 | iOS Shortcut (POST with shared secret); `OtpSetupGuide` (`setup`) | service role | `otp_inbox` insert/update; `app_secrets.otp_push_secret`; delivery-sheet PDF → Dropbox; see §3.9 |
@@ -695,7 +695,7 @@ CLAUDE.md: "Do not add new direct Sheets API reads — extend the mirror" and "n
 
 **Operational**
 - QZ Tray: the pinned certificate (`lib/qzPrint.ts`) expires 2036-06-03 and must match `QZ_PRIVATE_KEY` in `sign-qz`. Print mode is global; printer assignment is per PC.
-- `packtime` edge function relies on gateway `verify_jwt` being **off** (it verifies the caller itself); the sheet name must exist in `packtime_couriers`.
+- `packtime` edge function relies on gateway `verify_jwt` being **off** (it verifies the caller itself); the sheet name must exist in `packtime_couriers`. Same for `odette-export`: deployed with it on, every Dropbox thumbnail (`GET ?thumb=`, a bare `<img>` request) is 401'd by the gateway and shows as a broken image.
 - Deploys queue (`cancel-in-progress: false`); a cancelled/failed Pages run is usually GitHub-side and is re-run from the Actions tab.
 - `tools/boutique_leads.py` is an unrelated Google-Maps/Playwright lead scraper (no keys, no app dependency, self-described ToS violation) that landed inside PR #1134.
 - The session-start hook runs `tsc` + `eslint` (up to 120 s) but not `vite build`.
