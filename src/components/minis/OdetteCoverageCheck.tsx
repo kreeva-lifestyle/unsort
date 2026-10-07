@@ -30,8 +30,10 @@ function toResult(data: any): ReconcileResult {
 }
 
 // Coverage Check — active (master) SKUs that aren't on the Odette ARYA STOCK
-// sheet yet. The edge function reads both Google Sheets server-side and diffs;
-// this component is just the button + results. No file upload.
+// sheet yet: every size of a sized design (DRS181-M…), and the bare code of a
+// Semi-Stitched / Unstitched design (DRS233). The edge function reads both
+// Google Sheets server-side and diffs; this component is just the button +
+// results. No file upload.
 export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: string, type?: string) => void }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ReconcileResult | null>(null);
@@ -54,7 +56,7 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
       setResult(toResult(data));
       setSearch('');
       (data.warnings || []).forEach((w: string) => addToast(w, 'info'));
-      addToast(`${data.counts.missing} size variant${data.counts.missing === 1 ? '' : 's'} not on Odette (of ${data.counts.active} active variants)`, 'success');
+      addToast(`${data.counts.missing} SKU${data.counts.missing === 1 ? '' : 's'} not on Odette (of ${data.counts.active} active)`, 'success');
     } catch (e: any) { addToast(friendlyError(e), 'error'); }
     setLoading(false);
   };
