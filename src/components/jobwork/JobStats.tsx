@@ -1,29 +1,29 @@
-// The Jobwork summary: four stat tiles (open jobs by state, how much is
-// still out and how much is back, overdue, money owed) and two panels —
-// who holds the most, and when it is due back. One read of the summary
-// view (jobworkStats.ts does the sums); a tile, chip, bar or column taps
-// through to the list below. The last numbers stay on screen while a
-// refresh is in flight, so nothing jumps.
+// The Jobwork summary: four stat tiles (open jobs by state, what is still
+// out and how much of it is back, overdue, money owed) and two panels — who
+// holds the most, and when it is due back. One read of the summary view
+// (jobworkStats.ts does the sums). A tile filters the list below; a
+// jobworker's bar shows exactly that jobworker's jobs. The last numbers stay
+// on screen while a refresh is in flight, so nothing jumps.
 import { useEffect, useState } from 'react';
 import { T } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { supabase } from '../../lib/supabase';
 import type { JobFilter } from './jobworkApi';
 import { inr, qu, qty, mixedQty } from './jobworkModel';
-import { statsOf, STAT_COLS, STATE_LABELS, type JobStatsData, type StatRow, type StateKey } from './jobworkStats';
+import { statsOf, STAT_COLS, STATE_LABELS, OTHERS, type JobStatsData, type StatRow, type StateKey } from './jobworkStats';
 import { Meter, StackBar, BarList, Columns } from './JobCharts';
 
 const STATE_COLORS: Record<StateKey, string> = { notSent: T.tx3, with: T.bl, part: T.yl, overdue: T.re, done: T.gr };
 const STATE_ORDER: StateKey[] = ['notSent', 'with', 'part', 'overdue', 'done'];
 
-export default function JobStats({ boss, version, active, onPick, onSearch, addToast }: {
+export default function JobStats({ boss, version, active, onPick, onVendor, addToast }: {
   boss: boolean;
   /** Bumped by the list after every change so the numbers follow. */
   version: number;
   active: JobFilter;
   onPick: (f: JobFilter) => void;
-  /** A jobworker's bar was tapped: show that jobworker's jobs. */
-  onSearch: (text: string) => void;
+  /** A jobworker's bar was tapped: show exactly that jobworker's open jobs. */
+  onVendor: (vendor: string) => void;
   addToast: (m: string, t?: string) => void;
 }) {
   const [s, setS] = useState<JobStatsData | null>(null);
@@ -39,13 +39,16 @@ export default function JobStats({ boss, version, active, onPick, onSearch, addT
   }, [version, addToast]);
 
   const card: React.CSSProperties = { background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: T.rLg, padding: '12px 14px', minWidth: 0, fontFamily: T.sans };
-  const label = (s: string) => <div style={{ fontSize: 10, fontWeight: 600, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s}</div>;
+  const label = (t: string) => <div style={{ fontSize: 10, fontWeight: 600, color: T.tx3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t}</div>;
+  // The headline figure; `tail` (units) goes on its own line so a long one
+  // never clips the number in the phone's two-column grid.
   const big = (v: string, color: string, tail?: string) => (
-    <div style={{ fontFamily: T.sora, fontSize: 24, fontWeight: 800, color, margin: '4px 0 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1 }}>
-      {s ? v : '—'}{s && tail && <span style={{ fontSize: 12, fontWeight: 600, color: T.tx3, marginLeft: 6 }}>{tail}</span>}
+    <div style={{ margin: '4px 0 8px' }}>
+      <div style={{ fontFamily: T.sora, fontSize: 24, fontWeight: 800, color, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s ? v : '—'}</div>
+      {s && tail && <div style={{ fontSize: 11, fontWeight: 600, color: T.tx3, marginTop: 2 }}>{tail}</div>}
     </div>
   );
-  const sub = (t: string) => <div style={{ fontSize: 11, color: T.tx3, marginTop: 6 }}>{s ? t : ' '}</div>;
+  const sub = (t: string) => <div style={{ fontSize: 11, color: T.tx3, marginTop: 6, lineHeight: 1.45 }}>{s ? t : ' '}</div>;
   const tile = (f: JobFilter | null, body: React.ReactNode) => {
     const on = f !== null && active === f;
     return (
@@ -57,30 +60,32 @@ export default function JobStats({ boss, version, active, onPick, onSearch, addT
     );
   };
 
-  const pctBack = s && s.orderedPcs > 0 ? Math.round((s.okPcs / s.orderedPcs) * 100) : 0;
+  const back = s ? s.orderedPcs - s.pending : 0;
+  const pctBack = s && s.orderedPcs > 0 ? Math.round((back / s.orderedPcs) * 100) : 0;
   const stateParts = STATE_ORDER.map(k => ({ key: k, label: STATE_LABELS[k], count: s?.states[k] ?? 0, color: STATE_COLORS[k] }));
   const dueCols = s ? [
     { key: 'overdue', label: 'Overdue', value: s.dueBack.overdue, color: T.re },
     { key: 'today', label: 'Today', value: s.dueBack.today, color: T.ac2 },
-    { key: 'week', label: 'This week', value: s.dueBack.week, color: T.ac2 },
+    { key: 'week', label: 'Next 7 days', value: s.dueBack.week, color: T.ac2 },
     { key: 'later', label: 'Later', value: s.dueBack.later, color: T.ac2 },
     { key: 'none', label: 'No date', value: s.dueBack.none, color: T.ac2 },
   ] : [];
+  // The bar is pieces only — meters cannot share its axis; they are printed.
   const vendorRows = (s?.byVendor ?? []).map(v => ({
-    key: v.vendor, label: v.vendor, value: v.pending + (v.pending === 0 ? v.pendingM : 0),
-    valueText: mixedQty(v.pending, v.pendingM), sub: `${v.jobs} job${v.jobs === 1 ? '' : 's'}`,
+    key: v.vendor, label: v.vendor, value: v.pending, valueText: mixedQty(v.pending, v.pendingM),
+    sub: `${v.jobs} job${v.jobs === 1 ? '' : 's'}`, pick: v.vendor !== OTHERS,
   }));
 
   return (<>
     <div className="jw-stats" style={{ display: 'grid', gridTemplateColumns: `repeat(${boss ? 4 : 3}, minmax(0, 1fr))`, gap: 10, marginBottom: 10 }}>
       {tile('open', <>
         {label('Open jobs')}{big(String(s?.open ?? 0), T.tx)}
-        <StackBar parts={stateParts} onPick={k => onPick(k === 'overdue' ? 'overdue' : 'open')} />
+        <StackBar parts={stateParts} />
       </>)}
       {tile(null, <>
         {label('Still with jobworkers')}{big(String(s?.pending ?? 0), (s?.pending || s?.pendingM) ? T.yl : T.tx3, s?.pendingM ? `pcs + ${qu(s.pendingM, 'm')}` : 'pcs')}
-        <Meter value={s?.okPcs ?? 0} max={s?.orderedPcs ?? 0} color={T.gr} title={s ? `${qty(s.okPcs)} of ${qty(s.orderedPcs)} pcs received OK` : ''} />
-        {sub(s && s.orderedPcs > 0 ? `${pctBack}% back — ${qty(s.okPcs)} of ${qty(s.orderedPcs)} pcs received OK` : 'nothing out in pieces')}
+        <Meter value={back} max={s?.orderedPcs ?? 0} color={T.gr} title={s ? `${qty(back)} of ${qty(s.orderedPcs)} pcs back` : ''} />
+        {sub(s && s.orderedPcs > 0 ? `${pctBack}% back — ${qty(back)} of ${qty(s.orderedPcs)} pcs handed over, ${qty(s.okPcs)} OK` : 'nothing handed over in pieces')}
       </>)}
       {tile('overdue', <>
         {label('Overdue')}{big(String(s?.overdue ?? 0), (s?.overdue ?? 0) > 0 ? T.re : T.tx3)}
@@ -89,23 +94,22 @@ export default function JobStats({ boss, version, active, onPick, onSearch, addT
       </>)}
       {boss && tile('unpaid', <>
         {label('To pay')}{big(inr(s?.due ?? 0), (s?.due ?? 0) > 0 ? T.yl : T.tx3)}
-        <Meter value={s?.paid ?? 0} max={s?.billed ?? 0} color={T.ac2} title={s ? `${inr(s.paid)} paid of ${inr(s.billed)} billed` : ''} />
-        {sub(s && s.billed > 0 ? `${inr(s.paid)} paid of ${inr(s.billed)} billed · ${s.dueJobs} job${s.dueJobs === 1 ? '' : 's'} with a balance` : 'nothing billed yet')}
+        <Meter value={s ? s.billed - s.due : 0} max={s?.billed ?? 0} color={T.ac2} title={s ? `${inr(s.billed - s.due)} paid against ${inr(s.billed)} billed` : ''} />
+        {sub(s && s.billed > 0 ? `${inr(s.billed - s.due)} paid against ${inr(s.billed)} billed · ${s.dueJobs} job${s.dueJobs === 1 ? '' : 's'} with a balance` : 'nothing billed yet')}
       </>)}
     </div>
     <div className="jw-viz" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)', gap: 10, marginBottom: 14, alignItems: 'start' }}>
       <div style={card}>
         {label('Where the stock is')}
-        <div style={{ fontSize: 11, color: T.tx3, margin: '2px 0 10px' }}>Pending with each jobworker — tap a name to see those jobs</div>
+        <div style={{ fontSize: 11, color: T.tx3, margin: '2px 0 6px' }}>Handed over and not yet back, by jobworker — tap a name to see those jobs</div>
         {!s ? <div style={{ fontSize: 11, color: T.tx3 }}>Loading…</div>
           : vendorRows.length === 0 ? <div style={{ fontSize: 11, color: T.tx3, padding: '8px 0' }}>Nothing is with a jobworker right now.</div>
-          : <BarList rows={vendorRows} color={T.ac2} onPick={v => { if (!v.endsWith(' others')) onSearch(v); }} />}
+          : <BarList rows={vendorRows} color={T.ac2} onPick={onVendor} />}
       </div>
       <div style={card}>
         {label('Due back')}
-        <div style={{ fontSize: 11, color: T.tx3, margin: '2px 0 10px' }}>Open jobs with something pending, by due date</div>
-        {!s ? <div style={{ fontSize: 11, color: T.tx3 }}>Loading…</div>
-          : <Columns cols={dueCols} onPick={k => onPick(k === 'overdue' ? 'overdue' : 'open')} />}
+        <div style={{ fontSize: 11, color: T.tx3, margin: '2px 0 10px' }}>Jobs with something still out, by due date</div>
+        {!s ? <div style={{ fontSize: 11, color: T.tx3 }}>Loading…</div> : <Columns cols={dueCols} />}
       </div>
     </div>
   </>);

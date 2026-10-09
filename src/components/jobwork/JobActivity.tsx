@@ -15,9 +15,20 @@ const ACTIONS: Record<string, { label: string; tone: 'neutral' | 'gr' | 'yl' | '
   CLOSED: { label: 'Closed', tone: 'yl' }, CANCELLED: { label: 'Cancelled', tone: 're' }, OPEN: { label: 'Reopened', tone: 'neutral' },
 };
 
-export default function JobActivity({ rows, jwNumber }: { rows: JobActivityRow[] | null; jwNumber: number }) {
+export default function JobActivity({ rows, jwNumber, onRetry }: {
+  /** null while loading; 'error' when the read failed (the job itself is up). */
+  rows: JobActivityRow[] | null | 'error';
+  jwNumber: number;
+  onRetry: () => void;
+}) {
   const [all, setAll] = useState(false);
   if (rows === null) return <div style={{ fontSize: 11, color: T.tx3, padding: '6px 0' }}>Loading…</div>;
+  if (rows === 'error') return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '2px 0' }}>
+      <span style={{ fontSize: 11, color: T.tx3 }}>Could not load the activity.</span>
+      <button type="button" onClick={onRetry} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 44 }}>Try again</button>
+    </div>
+  );
   if (rows.length === 0) return <div style={{ fontSize: 11, color: T.tx3, padding: '6px 0' }}>No activity recorded yet.</div>;
   const shown = all ? rows : rows.slice(0, SHOW);
   // Rows say "JW #12 — sent out"; on JW #12's own page the prefix is noise.

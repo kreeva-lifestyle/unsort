@@ -35,22 +35,26 @@ export default function JobDetailView({ id, onBack, onChanged, addToast }: {
   const [photo, setPhoto] = useState<string | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [busy, setBusy] = useState('');
-  const [activity, setActivity] = useState<JobActivityRow[] | null>(null);
+  // null = loading, 'error' = the read failed (the card offers a retry).
+  const [activity, setActivity] = useState<JobActivityRow[] | null | 'error'>(null);
   const [names, setNames] = useState<Record<string, string>>({});
   const { ask, modalProps } = useConfirm();
 
+  // Who and when, after the job itself: the audit trail and the names
+  // behind the movements' created_by. Not blocking the page.
+  const loadActivity = useCallback(async (detail: JobDetail) => {
+    setActivity(null);
+    const ids = [...detail.entries.map(e => e.created_by), ...detail.payments.map(p => p.created_by)].filter((x): x is string => !!x);
+    const act = await loadJobActivity(id, ids);
+    if (act.error) { setActivity('error'); addToast(friendlyError(act.error), 'error'); return; }
+    setActivity(act.audit); setNames(act.names);
+  }, [id, addToast]);
   const reload = useCallback(async () => {
     const { detail, error } = await loadJob(id);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     setD(detail);
-    // Who and when, after the job itself: the audit trail and the names
-    // behind the movements' created_by. Not blocking the page.
-    if (!detail) return;
-    const ids = [...detail.entries.map(e => e.created_by), ...detail.payments.map(p => p.created_by)].filter((x): x is string => !!x);
-    const act = await loadJobActivity(id, ids);
-    if (act.error) { addToast(friendlyError(act.error), 'error'); return; }
-    setActivity(act.audit); setNames(act.names);
-  }, [id, addToast]);
+    if (detail) loadActivity(detail);
+  }, [id, addToast, loadActivity]);
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => {
     if (!d?.job.costing_product_id) { setPhoto(null); return; }
@@ -118,7 +122,7 @@ export default function JobDetailView({ id, onBack, onChanged, addToast }: {
           <div style={card}>{title('Material')}<JobBalance rows={materialBalances(d, job.pcs_ok)} per={per(job.qty_unit)} /></div>
           <div style={card}>{title('What moved, and when')}<JobTimeline detail={d} names={names} canFix={boss} onDelete={removeRow} /></div>
           {job.notes && <div style={card}>{title('Notes')}<div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{job.notes}</div></div>}
-          <div style={card}>{title('Who did what')}<JobActivity rows={activity} jwNumber={job.jw_number} /></div>
+          <div style={card}>{title('Who did what')}<JobActivity rows={activity} jwNumber={job.jw_number} onRetry={() => loadActivity(d)} /></div>
         </div>
         <div className="jw-side">{actions('jw-actions')}</div>
       </div>

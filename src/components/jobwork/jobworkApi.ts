@@ -18,8 +18,10 @@ export const FILTERS: { id: JobFilter; label: string }[] = [
   { id: 'closed', label: 'Closed' }, { id: 'all', label: 'All' },
 ];
 
-export async function listJobs(opts: { search: string; filter: JobFilter; page: number; perPage: number }) {
+export async function listJobs(opts: { search: string; filter: JobFilter; page: number; perPage: number; vendor?: string | null }) {
   let q = supabase.from('jobwork_order_summary').select(SUMMARY_COLS, { count: 'exact' });
+  // Exactly one jobworker (a tap on the summary's bar) — not a text match.
+  if (opts.vendor) q = q.eq('vendor_name', opts.vendor);
   if (opts.filter === 'open') q = q.eq('status', 'open');
   if (opts.filter === 'overdue') q = q.eq('status', 'open').lt('expected_date', today()).gt('pcs_remaining', 0);
   if (opts.filter === 'unpaid') q = q.neq('status', 'cancelled').gt('due', 0);
