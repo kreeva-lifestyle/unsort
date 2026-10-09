@@ -49,8 +49,11 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
   // Active users for the "Created By" filter dropdown (pattern from CashBook).
   useEffect(() => {
     supabase.from('profiles').select('id, full_name').eq('is_active', true).order('full_name').limit(200)
-      .then(({ data }) => setUsers((data as { id: string; full_name: string }[] | null) || []));
-  }, []);
+      .then(({ data, error }) => {
+        if (error) { addToast(friendlyError(error), 'error'); return; }
+        setUsers((data as { id: string; full_name: string }[] | null) || []);
+      });
+  }, [addToast]);
 
   const totalPages = Math.ceil(totalCount / pageSize);
 

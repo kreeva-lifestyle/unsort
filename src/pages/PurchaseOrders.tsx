@@ -21,11 +21,12 @@ import POReceive from '../components/purchaseorders/POReceive';
 import POPrintOverlay from '../components/purchaseorders/POPrintOverlay';
 import PendencyReport from '../components/purchaseorders/PendencyReport';
 import Contacts from '../components/contacts/Contacts';
-import { loadPoDetail, ITEM_COLS, type PoDetailData } from '../components/purchaseorders/poDetailData';
-import type { PurchaseOrder, PurchaseOrderItem } from '../types/database';
+import { loadPoLines, loadPoActivity, ITEM_COLS } from '../components/purchaseorders/poDetailData';
+import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../types/database';
 import { useModalLock } from '../hooks/useModalLock';
 
-type Detail = { po: PurchaseOrder } & PoDetailData;
+// audit: null while the trail loads, 'error' when it failed (the card retries).
+type Detail = { po: PurchaseOrder; items: PurchaseOrderItem[]; receipts: PurchaseOrderReceipt[]; audit: AuditLog[] | null | 'error'; names: Record<string, string> };
 
 export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const { profile } = useAuth();
@@ -58,15 +59,25 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   useCrumb(detail ? `PO #${detail.po.po_number}` : null); // header: "Purchase Orders / PO #12"
   useBackClose(!!printData, () => setPrintData(null));
 
-  // Load lines + receipts + who did what for a PO, then open the detail panel.
+  // Who did what, after the sheet is up: the trail and the names behind the
+  // actor ids, patched into the open detail (and only while it is still the
+  // same PO). Not blocking — the card offers a retry.
+  const loadActivity = useCallback(async (po: PurchaseOrder, receipts: PurchaseOrderReceipt[]) => {
+    setDetail(d => d && d.po.id === po.id ? { ...d, audit: null } : d);
+    const a = await loadPoActivity(po, receipts);
+    if (a.error) addToast(friendlyError(a.error), 'error');
+    setDetail(d => d && d.po.id === po.id ? { ...d, audit: a.error ? 'error' : a.audit, names: a.error ? d.names : a.names } : d);
+  }, [addToast]);
+  // Load lines + receipts for a PO and open the detail panel at once.
   const openDetail = useCallback(async (poRow: PurchaseOrder) => {
-    const d = await loadPoDetail(poRow);
+    const d = await loadPoLines(poRow);
     // Never open a detail (or later print) on silently-missing data — a
     // transient failure here would render a PO with zero line items.
     if (d.error) { addToast(friendlyError(d.error), 'error'); return; }
-    if (d.activityError) addToast(friendlyError(d.activityError), 'error'); // the card offers a retry
-    setDetail({ po: poRow, ...d });
-  }, [addToast]);
+    // A refresh of the same PO keeps the names it already has, so the header does not blink.
+    setDetail(prev => ({ po: poRow, items: d.items, receipts: d.receipts, audit: null, names: prev && prev.po.id === poRow.id ? prev.names : {} }));
+    loadActivity(poRow, d.receipts);
+  }, [addToast, loadActivity]);
 
   const openPrint = useCallback(async (poRow: PurchaseOrder, preItems?: PurchaseOrderItem[]) => {
     let items = preItems;
@@ -143,6 +154,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
         dateFrom={dateFrom} onDateFromChange={setDateFrom} dateTo={dateTo} onDateToChange={setDateTo}
         pageSize={pageSize} onPageSizeChange={setPageSize}
         onClearFilters={clearFilters}
+        narrowed={!!(quick || vendorFilter || search || statusFilter || typeFilter || creatorFilter || dateFrom || dateTo)}
         onResetPage={() => setPage(0)}
         onOpenEmpty={() => { setEditing(null); setDuplicating(null); setShowForm(true); }} canCreate={canCreate}
         onOpenDetail={openDetail} onPrint={(po) => openPrint(po)}
@@ -155,7 +167,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
       {detail && <PODetail
         po={detail.po} items={detail.items} receipts={detail.receipts} audit={detail.audit} names={detail.names}
         statusColors={PO_STATUS_COLORS} canManage={canManage}
-        onClose={() => setDetail(null)} onChanged={refreshDetail}
+        onClose={() => setDetail(null)} onChanged={refreshDetail} onRetryActivity={() => loadActivity(detail.po, detail.receipts)}
         onEdit={() => { setEditing({ ...detail.po, items: detail.items }); setDuplicating(null); setDetail(null); setShowForm(true); }}
         onDuplicate={() => { setDuplicating({ ...detail.po, items: detail.items }); setEditing(null); setDetail(null); setShowForm(true); }}
         onReceive={() => { setReceiving({ po: detail.po, items: detail.items }); }}

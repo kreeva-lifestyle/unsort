@@ -7,9 +7,11 @@ import { T } from '../../lib/theme';
 import ActivityList, { type ActionMeta } from '../ui/ActivityList';
 import type { AuditLog } from '../../types/database';
 
+// Labels match the sentences the RPCs write ("PO #12 updated", "PO #12
+// marked sent"), so the list can drop a detail line that only repeats the pill.
 const ACTIONS: Record<string, ActionMeta> = {
-  CREATE: { label: 'Created', tone: 'ac' }, UPDATE: { label: 'Edited', tone: 'ac' },
-  APPROVED: { label: 'Approved', tone: 'ac' }, SENT: { label: 'Sent', tone: 'bl' },
+  CREATE: { label: 'Created', tone: 'ac' }, UPDATE: { label: 'Updated', tone: 'ac' },
+  APPROVED: { label: 'Approved', tone: 'ac' }, SENT: { label: 'Marked sent', tone: 'bl' },
   RECEIVE: { label: 'Received', tone: 'gr' }, RECEIPT_REMOVED: { label: 'Receipt removed', tone: 're' },
   CLOSED: { label: 'Closed', tone: 'yl' }, REOPENED: { label: 'Reopened', tone: 'neutral' }, CANCELLED: { label: 'Cancelled', tone: 're' },
 };

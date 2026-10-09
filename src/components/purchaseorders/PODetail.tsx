@@ -20,14 +20,15 @@ import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog }
 
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN');
 
-export default function PODetail({ po, items, receipts, audit, names, statusColors, canManage, onClose, onChanged, onEdit, onDuplicate, onReceive, onPrint, onPendency, addToast }: {
+export default function PODetail({ po, items, receipts, audit, names, statusColors, canManage, onClose, onChanged, onRetryActivity, onEdit, onDuplicate, onReceive, onPrint, onPendency, addToast }: {
   po: PurchaseOrder;
   items: PurchaseOrderItem[];
   receipts: PurchaseOrderReceipt[];
-  /** null while loading; 'error' when the trail could not be read (onChanged reloads it). */
+  /** null while loading; 'error' when the trail could not be read (onRetryActivity reloads it). */
   audit: AuditLog[] | null | 'error';
   /** Profile names by id, for every actor column and receipt. */
   names: Record<string, string>;
+  onRetryActivity: () => void;
   statusColors: Record<string, { bg: string; color: string }>;
   canManage: boolean;
   onClose: () => void;
@@ -159,7 +160,7 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
 
           <POReceipts receipts={receipts} items={items} names={names} canRemove={canRemoveReceipt} busy={busy} onRemove={removeReceipt} />
 
-          <POActivity audit={audit} poNumber={po.po_number} onRetry={onChanged} />
+          <POActivity audit={audit} poNumber={po.po_number} onRetry={onRetryActivity} />
         </div>
 
         {/* Actions */}

@@ -28,11 +28,11 @@ export default function POReceipts({ receipts, items, names, canRemove, busy, on
           <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '7px 10px', background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
             <div style={{ minWidth: 0 }}>
               <span style={{ color: T.tx }}>{item ? itemLabel(item) : 'Item'}</span> <span style={{ color: T.gr, fontFamily: T.mono }}>+{Number(r.received_qty)}</span>{r.remarks && <span style={{ color: T.tx3, marginLeft: 6 }}>· {r.remarks}</span>}
-              {/* The receipt's own date is on the right; this is who keyed it in, and the real moment. */}
-              {(who || r.created_at) && <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{who ? <>by <span style={{ color: T.tx2, fontWeight: 600 }}>{who}</span> · </> : ''}<span style={{ fontFamily: T.mono }}>{fmtWhen(r.created_at)}</span></div>}
+              {/* Two moments, both named: the delivery date (right) and when it was keyed in (here). */}
+              {(who || r.created_at) && <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{who ? <>by <span style={{ color: T.tx2, fontWeight: 600 }}>{who}</span> · </> : ''}entered <span style={{ fontFamily: T.mono }}>{fmtWhen(r.created_at)}</span></div>}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{fmtDate(r.receipt_date)}</span>
+              <span style={{ fontSize: 10, color: T.tx3 }}>received <span style={{ fontFamily: T.mono }}>{fmtDate(r.receipt_date)}</span></span>
               {canRemove && <button onClick={() => onRemove(r)} disabled={!!busy} title="Remove this receipt" style={{ border: 'none', background: 'none', color: T.re, cursor: busy ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: 600, padding: '0 8px', minHeight: 44, opacity: busy ? 0.5 : 0.85 }}>Undo</button>}
             </div>
           </div>

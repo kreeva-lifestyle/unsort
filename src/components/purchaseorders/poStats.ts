@@ -16,13 +16,14 @@ export interface OpenRow {
 export interface RecentRow { status: PurchaseOrderStatus; po_date: string | null; grand_total: number | null }
 
 export type OpenKey = 'approved' | 'sent' | 'partial';
-export const OPEN_LABELS: Record<OpenKey, string> = { approved: 'Approved', sent: 'Sent', partial: 'Partly received' };
+export const OPEN_LABELS: Record<OpenKey, string> = { approved: 'Approved', sent: 'Sent', partial: 'Partially received' };
 /** How long an open order has waited since its PO date — the list's own 7 / 14 day colour steps. */
 export type AgeKey = 'lt7' | 'd8_14' | 'd15_30' | 'gt30';
 export const AGE_LABELS: Record<AgeKey, string> = { lt7: 'Up to 7 d', d8_14: '8–14 d', d15_30: '15–30 d', gt30: 'Over 30 d' };
 
 export interface UnitPending { unit: string; ordered: number; received: number; pending: number; lines: number }
-export interface VendorOpen { vendor: string; orders: number; oldestDays: number; pending: number; unit: string }
+/** `pending` lists every unit still to come from this vendor, largest first. */
+export interface VendorOpen { vendor: string; orders: number; oldestDays: number; pending: { unit: string; qty: number }[] }
 export interface MonthBuying { orders: number; value: number; rated: number }
 export interface PoStatsData {
   open: number; drafts: number;
@@ -31,9 +32,9 @@ export interface PoStatsData {
   byUnit: UnitPending[]; lines: number; linesDone: number;
   waiting: { over7: number; over14: number; oldestDays: number; pastExpected: number };
   ages: Record<AgeKey, number>;
-  /** Most open orders first; past `TOP_VENDORS` folded into `OTHERS`. `pending` is in the vendor's main unit. */
+  /** Most open orders first; past `TOP_VENDORS` folded into `OTHERS` (which keeps their pending). */
   byVendor: VendorOpen[];
-  /** Orders dated this and last month (drafts and cancelled left out); `rated` = how many carry a total. */
+  /** Orders dated this month (up to today) and last month; drafts and cancelled left out; `rated` = how many carry a total. */
   month: MonthBuying; lastMonth: MonthBuying;
 }
 export const TOP_VENDORS = 6;
@@ -70,7 +71,8 @@ export function poStatsOf(open: OpenRow[], recent: RecentRow[], today = fileDate
   for (const r of recent) {
     if (r.status === 'draft') { s.drafts += 1; continue; }
     if (r.status === 'cancelled' || !r.po_date) continue;
-    const b = r.po_date >= mStart ? s.month : r.po_date >= lmStart ? s.lastMonth : null;
+    // Bounded on both sides: a PO typed with a future date is not "this month".
+    const b = r.po_date >= mStart ? (r.po_date <= today ? s.month : null) : r.po_date >= lmStart ? s.lastMonth : null;
     if (!b) continue;
     b.orders += 1;
     const v = n(r.grand_total); if (v > 0) { b.value += v; b.rated += 1; }
@@ -99,13 +101,14 @@ export function poStatsOf(open: OpenRow[], recent: RecentRow[], today = fileDate
     }
   }
   s.byUnit = [...units.values()].sort((a, b) => b.pending - a.pending || b.ordered - a.ordered);
-  const lead = (m: Map<string, number>): [string, number] => [...m.entries()].sort((a, b) => b[1] - a[1])[0] ?? ['', 0];
-  const sorted = [...vendors.values()]
-    .map(v => { const [unit, pending] = lead(v.pending); return { vendor: v.vendor, orders: v.orders, oldestDays: v.oldestDays, pending, unit }; })
-    .sort((a, b) => b.orders - a.orders || b.oldestDays - a.oldestDays || a.vendor.localeCompare(b.vendor));
-  if (sorted.length > TOP_VENDORS + 1) {
-    const rest = sorted.slice(TOP_VENDORS);
-    s.byVendor = [...sorted.slice(0, TOP_VENDORS), { vendor: OTHERS, orders: rest.reduce((t, v) => t + v.orders, 0), oldestDays: Math.max(...rest.map(v => v.oldestDays)), pending: 0, unit: '' }];
-  } else s.byVendor = sorted;
+  const asList = (m: Map<string, number>) => [...m.entries()].filter(([, qty]) => qty > 0).map(([unit, qty]) => ({ unit, qty })).sort((a, b) => b.qty - a.qty);
+  const sorted = [...vendors.values()].sort((a, b) => b.orders - a.orders || b.oldestDays - a.oldestDays || a.vendor.localeCompare(b.vendor));
+  const rows = sorted.map(v => ({ vendor: v.vendor, orders: v.orders, oldestDays: v.oldestDays, pending: asList(v.pending) }));
+  if (rows.length > TOP_VENDORS + 1) {
+    // The fold keeps what the folded vendors still owe, summed per unit.
+    const rest = sorted.slice(TOP_VENDORS), merged = new Map<string, number>();
+    for (const v of rest) for (const [u, q] of v.pending) merged.set(u, (merged.get(u) ?? 0) + q);
+    s.byVendor = [...rows.slice(0, TOP_VENDORS), { vendor: OTHERS, orders: rest.reduce((t, v) => t + v.orders, 0), oldestDays: Math.max(...rest.map(v => v.oldestDays)), pending: asList(merged) }];
+  } else s.byVendor = rows;
   return s;
 }

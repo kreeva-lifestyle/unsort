@@ -13,9 +13,11 @@ const Info = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div><div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.06em', color: T.tx3, marginBottom: 2 }}>{label}</div><div style={{ fontSize: 13, color: T.tx }}>{value}</div></div>
 );
 
-/** The person (by id), with the moment on its own line: "Manthan" / "09 Oct, 03:06 pm". */
+/** The person (by id), with the moment on its own line: "Manthan" / "09 Oct, 03:06 pm".
+ *  An id with no profile (a removed user) says so; no id at all (rows from
+ *  before actor stamping) shows a dash. */
 const Who = ({ names, id, at }: { names: Record<string, string>; id: string | null; at: string | null }) => (
-  <><div>{(id && names[id]) || 'User'}</div><div style={{ fontSize: 11, color: T.tx3, fontFamily: T.mono, marginTop: 1 }}>{fmtWhen(at)}</div></>
+  <><div>{id ? names[id] || 'Unknown user' : '—'}</div><div style={{ fontSize: 11, color: T.tx3, fontFamily: T.mono, marginTop: 1 }}>{fmtWhen(at)}</div></>
 );
 
 export default function POHeaderInfo({ po, costingSku, names }: {

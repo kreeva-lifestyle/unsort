@@ -50,21 +50,25 @@ export default function POStats({ version, quick, onQuick, onVendor, addToast }:
   const others = (s?.byUnit ?? []).slice(1).filter(u => u.pending > 0);
   const pct = lead && lead.ordered > 0 ? Math.round((lead.received / lead.ordered) * 100) : 0;
   const comeLine = !s ? '' : lead
-    ? `${fmtQty(lead.received)} of ${fmtQty(lead.ordered)} ${lead.unit} received (${pct}%) · ${s.linesDone} of ${plural(s.lines, 'line')} complete`
+    ? `${fmtQty(lead.received)} of ${fmtQty(lead.ordered)} ${lead.unit} received (${pct}%) · ${s.linesDone} of ${plural(s.lines, 'item')} received in full`
     : 'nothing on order right now';
   const waitLine = !s ? '' : s.open === 0 ? 'no open orders'
     : [`oldest ${s.waiting.oldestDays} d`, s.waiting.over14 ? `${s.waiting.over14} over two weeks` : '', s.waiting.pastExpected ? `${s.waiting.pastExpected} past expected date` : ''].filter(Boolean).join(' · ');
+  // Rupees only where rates were entered, and said so, for both months alike.
+  const rated = (m: { value: number; rated: number }) => `${inr(m.value)} across ${plural(m.rated, 'rated order')}`;
   const monthLine = !s ? '' : [
-    s.month.value > 0 ? `${inr(s.month.value)} on ${plural(s.month.rated, 'rated order')}` : s.month.orders ? 'no rates entered yet' : '',
-    `last month ${plural(s.lastMonth.orders, 'order')}${s.lastMonth.value > 0 ? ` · ${inr(s.lastMonth.value)}` : ''}`,
+    s.month.value > 0 ? rated(s.month) : s.month.orders ? 'no rates entered yet' : '',
+    `last month ${plural(s.lastMonth.orders, 'order')}${s.lastMonth.value > 0 ? `, ${rated(s.lastMonth)}` : ''}`,
   ].filter(Boolean).join(' · ');
+  const delta = s ? s.month.orders - s.lastMonth.orders : 0;
+  const monthTail = !s ? undefined : `${s.month.orders === 1 ? 'order' : 'orders'}${s.lastMonth.orders ? ` · ${delta === 0 ? 'same as' : `${delta > 0 ? '+' : '−'}${Math.abs(delta)} vs`} last month` : ''}`;
   const stateParts = (Object.keys(OPEN_LABELS) as OpenKey[]).map(k => ({ key: k, label: OPEN_LABELS[k], count: s?.states[k] ?? 0, color: OPEN_COLORS[k] }));
   const ageCols = s ? (Object.keys(AGE_LABELS) as AgeKey[]).map(k => ({ key: k, label: AGE_LABELS[k], value: s.ages[k], color: AGE_COLORS[k] })) : [];
-  // The bar is the number of open orders — one axis for every vendor; the
-  // pending quantity (in the vendor's main unit) is printed, not plotted.
+  // The bar is the number of open orders — one axis for every vendor; what
+  // is still to come is printed per unit, never plotted.
   const vendorRows = (s?.byVendor ?? []).map(v => ({
     key: v.vendor, label: v.vendor, value: v.orders, valueText: plural(v.orders, 'PO'),
-    sub: [v.pending ? `${fmtQty(v.pending)} ${v.unit} to come` : '', `waiting ${v.oldestDays} d`].filter(Boolean).join(' · '), pick: v.vendor !== OTHERS,
+    sub: [v.pending.length ? `${v.pending.map(p => `${fmtQty(p.qty)} ${p.unit}`).join(' + ')} to come` : '', `waiting ${v.oldestDays} d`].filter(Boolean).join(' · '), pick: v.vendor !== OTHERS,
   }));
   const pick = (q: PoQuick) => () => onQuick(quick === q ? '' : q);
   const loading = <div style={{ fontSize: 11, color: T.tx3 }}>Loading…</div>;
@@ -92,8 +96,8 @@ export default function POStats({ version, quick, onQuick, onVendor, addToast }:
       </StatTile>
       <StatTile>
         <TileLabel>Ordered this month</TileLabel>
-        <TileBig ready={ready} value={String(s?.month.orders ?? 0)} color={T.tx} tail={s ? (s.month.orders === 1 ? 'order' : 'orders') : undefined} />
-        <Meter value={s?.month.orders ?? 0} max={Math.max(s?.month.orders ?? 0, s?.lastMonth.orders ?? 0)} color={T.ac2} title={s ? `${s.month.orders} this month against ${s.lastMonth.orders} last month` : ''} />
+        {/* Two counts, not a share of a whole — so a signed delta, not a meter. */}
+        <TileBig ready={ready} value={String(s?.month.orders ?? 0)} color={T.tx} tail={monthTail} />
         <TileSub ready={ready} text={monthLine} />
       </StatTile>
     </div>
@@ -106,7 +110,7 @@ export default function POStats({ version, quick, onQuick, onVendor, addToast }:
           : <BarList rows={vendorRows} color={T.ac2} onPick={onVendor} />}
       </div>
       <div style={tileCard}>
-        <TileLabel>Waiting since</TileLabel>
+        <TileLabel>Waiting time</TileLabel>
         <TileHint gap={10}>Open orders by days since the PO date</TileHint>
         {!s ? loading : <Columns cols={ageCols} />}
       </div>
