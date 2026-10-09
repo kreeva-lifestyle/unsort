@@ -31,18 +31,20 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [sharing, setSharing] = useState(false);
-  // Bumped after every load so the summary tiles follow edits.
+  // Bumped after every write so the summary tiles follow; a search or a
+  // page flip changes nothing, so it leaves the summary alone.
   const [version, setVersion] = useState(0);
   useBackClose(!!openId, () => setOpenId(null));
 
   const load = useCallback(async () => {
     const r = await listJobs({ search, filter, page, perPage, vendor });
     if (r.error) { addToast(friendlyError(r.error), 'error'); setRows([]); return; }
-    setRows(r.rows); setCount(r.count); setVersion(v => v + 1);
+    setRows(r.rows); setCount(r.count);
   }, [search, filter, page, perPage, vendor, addToast]);
   useEffect(() => { const t = setTimeout(load, search ? 300 : 0); return () => clearTimeout(t); }, [load, search]);
+  const changed = useCallback(() => { load(); setVersion(v => v + 1); }, [load]);
 
-  if (openId) return <JobDetailView id={openId} onBack={() => setOpenId(null)} onChanged={load} addToast={addToast} />;
+  if (openId) return <JobDetailView id={openId} onBack={() => setOpenId(null)} onChanged={changed} addToast={addToast} />;
 
   const pages = Math.max(1, Math.ceil(count / perPage));
   const chip = (on: boolean): React.CSSProperties => ({ ...S.btnGhost, ...S.btnSm, minHeight: 32, borderRadius: 999, padding: '5px 14px', fontSize: 11, flexShrink: 0, ...(on ? { borderColor: T.ac, color: T.ac2, background: T.ac3 } : {}) });
@@ -101,7 +103,7 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
       )}
       <button type="button" className="fab" onClick={() => setCreating(true)} aria-label="New job">+</button>
       {sharing && <PendingShareModal boss={boss} onClose={() => setSharing(false)} addToast={addToast} />}
-      {creating && <JobForm edit={null} onClose={() => setCreating(false)} onSaved={id => { setCreating(false); load(); setOpenId(id); }} addToast={addToast} />}
+      {creating && <JobForm edit={null} onClose={() => setCreating(false)} onSaved={id => { setCreating(false); changed(); setOpenId(id); }} addToast={addToast} />}
     </div>
   );
 }

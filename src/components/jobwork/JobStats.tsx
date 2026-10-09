@@ -29,7 +29,8 @@ export default function JobStats({ boss, version, active, onPick, onVendor, addT
   const [s, setS] = useState<JobStatsData | null>(null);
   useEffect(() => {
     let live = true;
-    supabase.from('jobwork_order_summary').select(STAT_COLS).neq('status', 'cancelled').limit(5000)
+    // Newest first, so if the cap is ever hit it is the oldest (long settled) jobs that drop.
+    supabase.from('jobwork_order_summary').select(STAT_COLS).neq('status', 'cancelled').order('created_at', { ascending: false }).limit(5000)
       .then(({ data, error }) => {
         if (!live) return;
         if (error) { addToast(friendlyError(error), 'error'); return; }
@@ -60,8 +61,20 @@ export default function JobStats({ boss, version, active, onPick, onVendor, addT
     );
   };
 
+  // Pieces jobs that were handed over: what came back (OK or rejected) of what went.
   const back = s ? s.orderedPcs - s.pending : 0;
+  const rejHeld = s ? Math.max(0, back - s.okPcs) : 0;
   const pctBack = s && s.orderedPcs > 0 ? Math.round((back / s.orderedPcs) * 100) : 0;
+  const metersOnly = !!s && s.pending === 0 && s.pendingM > 0;
+  const backLine = !s ? '' : s.orderedPcs > 0
+    ? `${qty(back)} of ${qty(s.orderedPcs)} pcs back (${pctBack}%) · ${qty(s.okPcs)} OK${rejHeld ? `, ${qty(rejHeld)} rejected` : ''}`
+    : s.pendingM > 0 ? `${qu(s.pendingM, 'm')} out, all of it in meters` : 'nothing out right now';
+  // Of what is billed, how much is covered by payments; advances sit outside the bill.
+  const settled = s ? s.billed - s.due : 0;
+  const jobs = (k: number) => `${k} job${k === 1 ? '' : 's'}`;
+  const payLine = !s ? '' : s.billed > 0 || s.paid > 0
+    ? `${inr(s.paid)} paid against ${inr(s.billed)} billed · ${jobs(s.dueJobs)} with a balance${s.advance > 0 ? ` · ${inr(s.advance)} advance on ${jobs(s.advanceJobs)}` : ''}`
+    : 'nothing billed yet';
   const stateParts = STATE_ORDER.map(k => ({ key: k, label: STATE_LABELS[k], count: s?.states[k] ?? 0, color: STATE_COLORS[k] }));
   const dueCols = s ? [
     { key: 'overdue', label: 'Overdue', value: s.dueBack.overdue, color: T.re },
@@ -83,9 +96,11 @@ export default function JobStats({ boss, version, active, onPick, onVendor, addT
         <StackBar parts={stateParts} />
       </>)}
       {tile(null, <>
-        {label('Still with jobworkers')}{big(String(s?.pending ?? 0), (s?.pending || s?.pendingM) ? T.yl : T.tx3, s?.pendingM ? `pcs + ${qu(s.pendingM, 'm')}` : 'pcs')}
-        <Meter value={back} max={s?.orderedPcs ?? 0} color={T.gr} title={s ? `${qty(back)} of ${qty(s.orderedPcs)} pcs back` : ''} />
-        {sub(s && s.orderedPcs > 0 ? `${pctBack}% back — ${qty(back)} of ${qty(s.orderedPcs)} pcs handed over, ${qty(s.okPcs)} OK` : 'nothing handed over in pieces')}
+        {label('Still with jobworkers')}
+        {/* Pieces lead; a workload that is only meters leads with the meters instead of a "0". */}
+        {big(metersOnly ? qu(s!.pendingM, 'm') : String(s?.pending ?? 0), (s?.pending || s?.pendingM) ? T.yl : T.tx3, metersOnly ? undefined : s?.pendingM ? `pcs + ${qu(s.pendingM, 'm')}` : 'pcs')}
+        <Meter value={back} max={s?.orderedPcs ?? 0} color={T.gr} title={backLine} />
+        {sub(backLine)}
       </>)}
       {tile('overdue', <>
         {label('Overdue')}{big(String(s?.overdue ?? 0), (s?.overdue ?? 0) > 0 ? T.re : T.tx3)}
@@ -94,21 +109,21 @@ export default function JobStats({ boss, version, active, onPick, onVendor, addT
       </>)}
       {boss && tile('unpaid', <>
         {label('To pay')}{big(inr(s?.due ?? 0), (s?.due ?? 0) > 0 ? T.yl : T.tx3)}
-        <Meter value={s ? s.billed - s.due : 0} max={s?.billed ?? 0} color={T.ac2} title={s ? `${inr(s.billed - s.due)} paid against ${inr(s.billed)} billed` : ''} />
-        {sub(s && s.billed > 0 ? `${inr(s.billed - s.due)} paid against ${inr(s.billed)} billed · ${s.dueJobs} job${s.dueJobs === 1 ? '' : 's'} with a balance` : 'nothing billed yet')}
+        <Meter value={settled} max={s?.billed ?? 0} color={T.ac2} title={s ? `${inr(settled)} of ${inr(s.billed)} billed settled` : ''} />
+        {sub(payLine)}
       </>)}
     </div>
     <div className="jw-viz" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)', gap: 10, marginBottom: 14, alignItems: 'start' }}>
       <div style={card}>
         {label('Where the stock is')}
-        <div style={{ fontSize: 11, color: T.tx3, margin: '2px 0 6px' }}>Handed over and not yet back, by jobworker — tap a name to see those jobs</div>
+        <div style={{ fontSize: 11, color: T.tx3, margin: '2px 0 6px' }}>Handed over and not yet back, by jobworker. Bars show pieces; tap a name for that jobworker's open jobs</div>
         {!s ? <div style={{ fontSize: 11, color: T.tx3 }}>Loading…</div>
           : vendorRows.length === 0 ? <div style={{ fontSize: 11, color: T.tx3, padding: '8px 0' }}>Nothing is with a jobworker right now.</div>
           : <BarList rows={vendorRows} color={T.ac2} onPick={onVendor} />}
       </div>
       <div style={card}>
         {label('Due back')}
-        <div style={{ fontSize: 11, color: T.tx3, margin: '2px 0 10px' }}>Jobs with something still out, by due date</div>
+        <div style={{ fontSize: 11, color: T.tx3, margin: '2px 0 10px' }}>Open jobs with work pending, by due date</div>
         {!s ? <div style={{ fontSize: 11, color: T.tx3 }}>Loading…</div> : <Columns cols={dueCols} />}
       </div>
     </div>

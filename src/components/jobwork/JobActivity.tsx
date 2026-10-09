@@ -53,7 +53,7 @@ export default function JobActivity({ rows, jwNumber, onRetry }: {
         );
       })}
       {rows.length > SHOW && (
-        <button type="button" onClick={() => setAll(a => !a)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, marginTop: 8 }}>
+        <button type="button" onClick={() => setAll(a => !a)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 44, marginTop: 8 }}>
           {all ? 'Show fewer' : `Show all ${rows.length}`}
         </button>
       )}
