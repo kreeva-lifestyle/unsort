@@ -651,6 +651,9 @@ body.modal-open .fab { display: none !important; }
   .jw-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
 @media (max-width: 768px) {
+  .jw-viz { grid-template-columns: minmax(0, 1fr) !important; }
+}
+@media (max-width: 768px) {
   .jw-table { display: none !important; }
   .jw-cards { display: block; }
   .jw-toolbar > div:first-child { max-width: none !important; flex-basis: 100% !important; }

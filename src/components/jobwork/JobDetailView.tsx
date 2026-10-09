@@ -12,13 +12,14 @@ import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import JobHeader from './JobHeader';
 import JobBalance from './JobBalance';
 import JobTimeline from './JobTimeline';
+import JobActivity from './JobActivity';
 import EntryModal from './EntryModal';
 import PaymentModal from './PaymentModal';
 import CloseJobModal from './CloseJobModal';
 import JobForm from './JobForm';
-import { loadJob, costingImage, deleteEntry, deletePayment, setStatus } from './jobworkApi';
+import { loadJob, loadJobActivity, costingImage, deleteEntry, deletePayment, setStatus } from './jobworkApi';
 import { shareJob, shareVendor } from './jobworkShare';
-import { materialBalances, rejectedHeld, inr, per, type JobDetail, type TimelineRow } from './jobworkModel';
+import { materialBalances, rejectedHeld, inr, per, type JobDetail, type TimelineRow, type JobActivityRow } from './jobworkModel';
 
 type Sheet = null | 'out' | 'in' | 'pay' | 'close' | 'edit' | 'share' | 'more';
 
@@ -34,12 +35,21 @@ export default function JobDetailView({ id, onBack, onChanged, addToast }: {
   const [photo, setPhoto] = useState<string | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [busy, setBusy] = useState('');
+  const [activity, setActivity] = useState<JobActivityRow[] | null>(null);
+  const [names, setNames] = useState<Record<string, string>>({});
   const { ask, modalProps } = useConfirm();
 
   const reload = useCallback(async () => {
     const { detail, error } = await loadJob(id);
     if (error) { addToast(friendlyError(error), 'error'); return; }
     setD(detail);
+    // Who and when, after the job itself: the audit trail and the names
+    // behind the movements' created_by. Not blocking the page.
+    if (!detail) return;
+    const ids = [...detail.entries.map(e => e.created_by), ...detail.payments.map(p => p.created_by)].filter((x): x is string => !!x);
+    const act = await loadJobActivity(id, ids);
+    if (act.error) { addToast(friendlyError(act.error), 'error'); return; }
+    setActivity(act.audit); setNames(act.names);
   }, [id, addToast]);
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => {
@@ -106,8 +116,9 @@ export default function JobDetailView({ id, onBack, onChanged, addToast }: {
           {actions('jw-actions jw-actions-inline')}
           {job.close_reason && <div style={{ ...S.warningBox, marginTop: 12 }}>{job.status === 'cancelled' ? 'Cancelled' : 'Closed'}: {job.close_reason}</div>}
           <div style={card}>{title('Material')}<JobBalance rows={materialBalances(d, job.pcs_ok)} per={per(job.qty_unit)} /></div>
-          <div style={card}>{title('What moved, and when')}<JobTimeline detail={d} canFix={boss} onDelete={removeRow} /></div>
+          <div style={card}>{title('What moved, and when')}<JobTimeline detail={d} names={names} canFix={boss} onDelete={removeRow} /></div>
           {job.notes && <div style={card}>{title('Notes')}<div style={{ fontSize: 12, color: T.tx2, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{job.notes}</div></div>}
+          <div style={card}>{title('Who did what')}<JobActivity rows={activity} jwNumber={job.jw_number} /></div>
         </div>
         <div className="jw-side">{actions('jw-actions')}</div>
       </div>

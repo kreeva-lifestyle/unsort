@@ -55,7 +55,8 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
           <button type="button" className="desktop-only" onClick={() => setCreating(true)} style={S.btnPrimary}>+ New job</button>
         </div>
       </div>
-      <JobStats boss={boss} version={version} active={filter} onPick={f => { setFilter(f); setPage(0); }} addToast={addToast} />
+      <JobStats boss={boss} version={version} active={filter} onPick={f => { setFilter(f); setPage(0); }}
+        onSearch={v => { setSearch(v); setFilter('open'); setPage(0); }} addToast={addToast} />
       <div className="jw-toolbar" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
       <div style={{ position: 'relative', flex: '1 1 320px', maxWidth: 520 }}>
         <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>

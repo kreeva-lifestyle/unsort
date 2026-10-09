@@ -5,7 +5,7 @@
 import { supabase } from '../../lib/supabase';
 import type { JobworkSummary, JobworkMaterial, JobworkPayment, JobworkPaymentInsert, JobworkEntryKind, JobworkQtyUnit } from '../../types/database';
 import type { CostingComponent } from '../minis/costing/costingModel';
-import { today, type EntryWithLines, type JobDetail } from './jobworkModel';
+import { today, type EntryWithLines, type JobDetail, type JobActivityRow } from './jobworkModel';
 
 export const SUMMARY_COLS = 'id, jw_number, vendor_id, vendor_name, vendor_phone, job_type, sku, component, costing_product_id, pieces, qty_unit, rate, job_date, expected_date, status, notes, close_reason, created_at, updated_at, pcs_ok, pcs_rejected, pcs_rework, pcs_remaining, out_count, last_entry_date, bill, paid, due, last_pay_date';
 const MATERIAL_COLS = 'id, order_id, name, unit, per_piece, sort_order, removed, created_at, updated_at';
@@ -53,6 +53,19 @@ export async function loadJob(id: string): Promise<{ detail: JobDetail | null; e
     },
     error: null,
   };
+}
+
+/** Who did what on a job (audit_log, newest first) and the names behind the
+ *  movements' created_by ids — one small read each, after the job itself. */
+export async function loadJobActivity(id: string, userIds: string[]): Promise<{ audit: JobActivityRow[]; names: Record<string, string>; error: unknown }> {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  const [a, p] = await Promise.all([
+    supabase.from('audit_log').select('id, action, details, user_email, created_at').eq('module', 'jobwork').eq('record_id', id).order('created_at', { ascending: false }).limit(100),
+    ids.length ? supabase.from('profiles').select('id, full_name').in('id', ids) : Promise.resolve({ data: [] as { id: string; full_name: string | null }[], error: null }),
+  ]);
+  const names: Record<string, string> = {};
+  for (const r of (p.data ?? []) as { id: string; full_name: string | null }[]) names[r.id] = r.full_name?.trim() || 'User';
+  return { audit: (a.data ?? []) as JobActivityRow[], names, error: a.error || p.error };
 }
 
 /** Every open job of one jobworker, with movements — the jobworker statement. */

@@ -1,11 +1,15 @@
 // Everything that happened on a job, oldest first: send-outs, receipts and
-// payments, each dated. Admin/manager can delete a wrong entry (confirmed,
-// audited server-side); the job's own guard refuses it once closed.
+// payments, each dated, with who keyed it in and when (the date on the left
+// is the business date; a backdated receipt still shows the day it was
+// entered). Admin/manager can delete a wrong entry (confirmed, audited
+// server-side); the job's own guard refuses it once closed.
 import { T } from '../../lib/theme';
-import { timeline, linesText, shortDate, inr, qty, qu, PAY_MODE_LABELS, type JobDetail, type TimelineRow } from './jobworkModel';
+import { timeline, linesText, shortDate, fmtWhen, inr, qty, qu, PAY_MODE_LABELS, type JobDetail, type TimelineRow } from './jobworkModel';
 
-export default function JobTimeline({ detail, canFix, onDelete }: {
+export default function JobTimeline({ detail, names, canFix, onDelete }: {
   detail: JobDetail;
+  /** profile id → name, for the rows' created_by. */
+  names: Record<string, string>;
   canFix: boolean;
   onDelete: (row: TimelineRow) => void;
 }) {
@@ -31,6 +35,8 @@ export default function JobTimeline({ detail, canFix, onDelete }: {
             sub = [mats && (parts.length ? `returned ${mats}` : mats), e.note].filter(Boolean).join(' · ');
           }
         }
+        const by = r.kind === 'pay' ? r.pay.created_by : r.entry.created_by;
+        const who = by ? names[by] : '';
         return (
           <div key={(r.kind === 'pay' ? r.pay.id : r.entry.id)} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 0', borderTop: i ? `1px solid ${T.bd}` : 'none' }}>
             <div style={{ width: 52, flexShrink: 0, fontSize: 11, color: T.tx3, fontFamily: T.mono, paddingTop: 1 }}>{shortDate(r.date)}</div>
@@ -38,6 +44,9 @@ export default function JobTimeline({ detail, canFix, onDelete }: {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: T.tx }}>{title}</div>
               {sub && <div style={{ fontSize: 11, color: T.tx3, marginTop: 2, lineHeight: 1.5 }}>{sub}</div>}
+              <div style={{ fontSize: 10, color: T.tx3, marginTop: 3, opacity: 0.85 }}>
+                {who ? <>by <span style={{ color: T.tx2, fontWeight: 600 }}>{who}</span> · </> : ''}<span style={{ fontFamily: T.mono }}>{fmtWhen(r.at)}</span>
+              </div>
             </div>
             {canFix && (r.kind === 'pay' || detail.job.status === 'open') && (
               <button type="button" onClick={() => onDelete(r)} aria-label="Delete entry" title="Delete this entry"

@@ -43,12 +43,23 @@ export const fmtDate = (d: string | null | undefined): string =>
   d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 export const shortDate = (d: string | null | undefined): string =>
   d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—';
+/** A moment, in the phone's own clock: "09 Oct, 03:06 pm". */
+export const fmtWhen = (iso: string | null | undefined): string =>
+  iso ? new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+/** "Manav Bhalala" → "MB", "Manthan" → "M", an email → its first letter. */
+export const initials = (name: string): string =>
+  name.split('@')[0].trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
+
+/** One audit row on a job (audit_log, module 'jobwork'): the actor's name
+ *  and the real time are stamped by the database, never by the client. */
+export interface JobActivityRow { id: string; action: string; details: string | null; user_email: string | null; created_at: string | null }
 
 export const isOverdue = (j: Pick<JobworkSummary, 'status' | 'expected_date' | 'pcs_remaining'>): boolean =>
   j.status === 'open' && !!j.expected_date && j.expected_date < today() && j.pcs_remaining > 0;
 
 /** Where the work stands, in the words used on the floor. */
-export function workState(j: JobworkSummary): { label: string; tone: 'gr' | 'yl' | 're' | 'bl' | 'tx3' } {
+export type WorkStateInput = Pick<JobworkSummary, 'status' | 'expected_date' | 'pcs_remaining' | 'pcs_ok' | 'pcs_rejected' | 'out_count'>;
+export function workState(j: WorkStateInput): { label: string; tone: 'gr' | 'yl' | 're' | 'bl' | 'tx3' } {
   if (j.status === 'cancelled') return { label: 'Cancelled', tone: 'tx3' };
   if (j.status === 'closed') return { label: j.pcs_remaining > 0 ? 'Closed short' : 'Closed', tone: 'tx3' };
   if (isOverdue(j)) return { label: 'Overdue', tone: 're' };
