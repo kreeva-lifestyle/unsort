@@ -1,25 +1,32 @@
-// The PO detail's activity timeline — audit rows, newest first, each with
-// who did it (poAudit stores the profile's full name in `user_email`,
-// falling back to the sign-in email). Split out of PODetail so that file
-// stays under the 200-line limit.
+// Who did what on a purchase order — the audit trail the PO RPCs write
+// (created, edited, approved, sent, received, receipt removed, closed,
+// reopened, cancelled), drawn by the shared ActivityList with the order's
+// own action names. The actor's name and the real time are stamped by the
+// database.
 import { T } from '../../lib/theme';
+import ActivityList, { type ActionMeta } from '../ui/ActivityList';
 import type { AuditLog } from '../../types/database';
 
-export default function POActivity({ audit }: { audit: AuditLog[] | null }) {
-  if (!audit || audit.length === 0) return null;
+const ACTIONS: Record<string, ActionMeta> = {
+  CREATE: { label: 'Created', tone: 'ac' }, UPDATE: { label: 'Edited', tone: 'ac' },
+  APPROVED: { label: 'Approved', tone: 'ac' }, SENT: { label: 'Sent', tone: 'bl' },
+  RECEIVE: { label: 'Received', tone: 'gr' }, RECEIPT_REMOVED: { label: 'Receipt removed', tone: 're' },
+  CLOSED: { label: 'Closed', tone: 'yl' }, REOPENED: { label: 'Reopened', tone: 'neutral' }, CANCELLED: { label: 'Cancelled', tone: 're' },
+};
+
+export default function POActivity({ audit, poNumber, onRetry }: {
+  /** null while loading; 'error' when the read failed (the order itself is up). */
+  audit: AuditLog[] | null | 'error';
+  poNumber: number;
+  onRetry: () => void;
+}) {
+  // Rows say "PO #12 — received 10 across 1 item" or "PO #12 marked sent";
+  // on PO #12's own page the prefix is noise.
+  const strip = (d: string | null) => (d ?? '').replace(new RegExp(`^PO #${poNumber}(?: —)? ?`), '');
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: T.tx2, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Activity</div>
-      {audit.map(a => (
-        <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, padding: '5px 0', fontSize: 11 }}>
-          <div style={{ minWidth: 0 }}>
-            <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, background: T.ac3, color: T.ac2, fontWeight: 700, marginRight: 6 }}>{a.action}</span>
-            <span style={{ color: T.tx2 }}>{a.details}</span>
-            {a.user_email && <span style={{ fontSize: 9, color: T.tx3, marginLeft: 6, whiteSpace: 'nowrap' }}>by {a.user_email}</span>}
-          </div>
-          <span style={{ fontSize: 9, color: T.tx3, fontFamily: T.mono, flexShrink: 0, paddingTop: 2 }}>{a.created_at ? new Date(a.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
-        </div>
-      ))}
+      <div style={{ fontSize: 11, fontWeight: 700, color: T.tx2, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Who did what</div>
+      <ActivityList rows={audit} actions={ACTIONS} strip={strip} onRetry={onRetry} />
     </div>
   );
 }

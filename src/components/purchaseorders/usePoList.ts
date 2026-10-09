@@ -8,9 +8,16 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useActiveRefetch } from '../../hooks/useActiveRefetch';
 import { friendlyError } from '../../lib/friendlyError';
+import { fileDate } from '../../lib/exportName';
+import { PENDING_STATUSES } from './pendencyData';
+import { addDays } from './poStats';
 import type { PORow } from './POList';
 
 export const PO_COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, for_pieces, lump_sum, costing_product_id, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, closed_at, closed_by, close_reason, created_by, modified_by, created_at, updated_at';
+
+/** The summary tiles' one-tap slices: open orders, or open orders waiting over a week (the list's own yellow step). */
+export type PoQuick = '' | 'open' | 'late';
+export const QUICK_LABELS: Record<Exclude<PoQuick, ''>, string> = { open: 'Open orders', late: 'Waiting over a week' };
 
 export function usePoList(active: boolean | undefined, addToast: (m: string, t?: string) => void) {
   const [pos, setPos] = useState<PORow[]>([]);
@@ -29,6 +36,14 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [quick, setQuick] = useState<PoQuick>('');
+  // Exactly one vendor (a tap on the summary's bar) — not a text match.
+  const [vendorFilter, setVendorFilter] = useState('');
+  // Bumped when the data changed (a write, a realtime event, a foreground
+  // refetch) — never on a search or a page flip — so the summary follows
+  // edits without refetching on every keystroke.
+  const [dataVersion, setDataVersion] = useState(0);
+  const bumpData = useCallback(() => setDataVersion(v => v + 1), []);
   const [users, setUsers] = useState<{ id: string; full_name: string }[]>([]);
 
   // Active users for the "Created By" filter dropdown (pattern from CashBook).
@@ -70,6 +85,11 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
       }
       if (ors.length > 0) q = q.or(ors.join(','));
     }
+    if (quick) q = q.in('status', PENDING_STATUSES);
+    // "Waiting over a week" = more than 7 days since the PO date, the same
+    // step that turns the list's "pending N d" yellow.
+    if (quick === 'late') q = q.lt('po_date', addDays(fileDate(), -7));
+    if (vendorFilter) q = q.eq('vendor_name', vendorFilter);
     if (statusFilter) q = q.eq('status', statusFilter);
     if (typeFilter) q = q.eq('po_type', typeFilter);
     if (creatorFilter) q = q.eq('created_by', creatorFilter);
@@ -86,7 +106,8 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
     setPos((data as unknown as PORow[] | null) || []);
     setTotalCount(count || 0);
     setLoading(false);
-  }, [debouncedSearch, statusFilter, typeFilter, creatorFilter, dateFrom, dateTo, page, pageSize, addToast]);
+    if (silent) setDataVersion(v => v + 1); // silent = something changed, not a new slice
+  }, [debouncedSearch, quick, vendorFilter, statusFilter, typeFilter, creatorFilter, dateFrom, dateTo, page, pageSize, addToast]);
 
   useEffect(() => { fetchPos(); }, [fetchPos]);
 
@@ -106,11 +127,12 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
     return () => { supabase.removeChannel(ch); };
   }, [notifyPos]);
 
-  const clearFilters = () => { setStatusFilter(''); setTypeFilter(''); setCreatorFilter(''); setDateFrom(''); setDateTo(''); setPage(0); };
+  const clearFilters = () => { setStatusFilter(''); setTypeFilter(''); setCreatorFilter(''); setDateFrom(''); setDateTo(''); setQuick(''); setVendorFilter(''); setPage(0); };
 
   return {
     pos, loading, page, setPage, pageSize, setPageSize, totalCount, totalPages,
     search, updateSearch, statusFilter, setStatusFilter, typeFilter, setTypeFilter, creatorFilter, setCreatorFilter,
     dateFrom, setDateFrom, dateTo, setDateTo, showFilters, setShowFilters, users, fetchPos, clearFilters,
+    quick, setQuick, vendorFilter, setVendorFilter, dataVersion, bumpData,
   };
 }

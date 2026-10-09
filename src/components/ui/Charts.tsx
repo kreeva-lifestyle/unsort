@@ -1,9 +1,10 @@
-// The small charts the Jobwork summary is drawn with. Plain divs, theme
-// tokens only, thin marks on recessive tracks: a meter (one hue on its own
-// lighter step), a stacked bar with a labelled count per segment (so no
-// state rides on colour alone), a bar list in one hue, and a short column
-// strip with its values written above. Marks carry a title, so hovering
-// reads the exact figure; the figures are always printed too.
+// The small charts the module summaries (Jobwork, Purchase Orders) are
+// drawn with. Plain divs, theme tokens only, thin marks on recessive
+// tracks: a meter (one hue on its own lighter step), a stacked bar with a
+// labelled count per segment (so no state rides on colour alone), a bar
+// list in one hue, and a short column strip with its values written above.
+// Marks carry a title, so hovering reads the exact figure; the figures are
+// always printed too.
 import { T, alpha } from '../../lib/theme';
 
 const TRACK = 0.16;   // the unfilled part of a meter: same hue, lighter step

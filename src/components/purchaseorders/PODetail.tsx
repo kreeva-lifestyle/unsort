@@ -1,7 +1,8 @@
-// Read-only PO detail: header, line items with Ordered/Received/Remaining,
-// receipts log, activity timeline, and status/role-gated actions. Status
-// transitions (approve / mark sent / cancel) run here via set_po_status;
-// edit / duplicate / receive / print are emitted to the parent.
+// Read-only PO detail: header (with who raised / approved / closed it),
+// line items with Ordered/Received/Remaining, receipts log (who received),
+// who did what, and status/role-gated actions. Status transitions
+// (approve / mark sent / cancel) run here via set_po_status; edit /
+// duplicate / receive / print are emitted to the parent.
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
@@ -12,18 +13,21 @@ import { useModalLock } from '../../hooks/useModalLock';
 import POCloseModal, { pendingOf } from './POCloseModal';
 import POActivity from './POActivity';
 import POReceipts from './POReceipts';
+import POHeaderInfo from './POHeaderInfo';
 import { itemLabel } from './poItemLabel';
-import { PO_TYPE_LABELS, PO_STATUS_LABELS } from '../../types/database';
+import { PO_STATUS_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../../types/database';
 
-const fmtDate = (d: string | null | undefined) => d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN');
 
-export default function PODetail({ po, items, receipts, audit, statusColors, canManage, onClose, onChanged, onEdit, onDuplicate, onReceive, onPrint, onPendency, addToast }: {
+export default function PODetail({ po, items, receipts, audit, names, statusColors, canManage, onClose, onChanged, onEdit, onDuplicate, onReceive, onPrint, onPendency, addToast }: {
   po: PurchaseOrder;
   items: PurchaseOrderItem[];
   receipts: PurchaseOrderReceipt[];
-  audit: AuditLog[] | null;
+  /** null while loading; 'error' when the trail could not be read (onChanged reloads it). */
+  audit: AuditLog[] | null | 'error';
+  /** Profile names by id, for every actor column and receipt. */
+  names: Record<string, string>;
   statusColors: Record<string, { bg: string; color: string }>;
   canManage: boolean;
   onClose: () => void;
@@ -104,10 +108,6 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
   const canCancel = !['completed', 'cancelled'].includes(po.status) && canManage;
   const canEdit = po.status === 'draft';
 
-  const Info = ({ label, value }: { label: string; value: React.ReactNode }) => (
-    <div><div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.06em', color: T.tx3, marginBottom: 2 }}>{label}</div><div style={{ fontSize: 13, color: T.tx }}>{value}</div></div>
-  );
-
   return createPortal(
     <div style={S.modalOverlay} onClick={onClose}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 720, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
@@ -122,18 +122,7 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
         {/* One scrolling body inside a flex column (see POForm): the old
             calc(90vh - 190px) was taller than the mobile bottom sheet. */}
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
-          {/* Header info */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 16 }}>
-            <Info label="Vendor" value={<><div style={{ fontWeight: 600 }}>{po.vendor_name}</div>{po.vendor_phone && <div style={{ fontSize: 11, color: T.tx3, fontFamily: T.mono }}>{po.vendor_phone}</div>}</>} />
-            <Info label="Type" value={PO_TYPE_LABELS[po.po_type] || po.po_type} />
-            <Info label="PO Date" value={fmtDate(po.po_date)} />
-            <Info label="Expected" value={fmtDate(po.expected_date)} />
-            {po.payment_terms && <Info label="Payment terms" value={po.payment_terms} />}
-            {po.for_pieces != null && po.for_pieces > 0 && <Info label="For pieces" value={<span style={{ fontFamily: T.mono }}>{po.for_pieces} pcs</span>} />}
-            {po.lump_sum && <Info label="Pricing" value="Lump sum" />}
-            {costingSku && <Info label="From costing" value={<span style={{ fontFamily: T.mono }}>{costingSku}</span>} />}
-            {po.status === 'closed' && <Info label="Closed" value={<span style={{ fontSize: 12 }}>{fmtDate(po.closed_at)}{po.close_reason ? <span style={{ color: T.tx3 }}> · {po.close_reason}</span> : null}</span>} />}
-          </div>
+          <POHeaderInfo po={po} costingSku={costingSku} names={names} />
 
           {/* Items */}
           <div style={{ border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden', marginBottom: 14 }}>
@@ -168,9 +157,9 @@ export default function PODetail({ po, items, receipts, audit, statusColors, can
             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${T.bd}`, paddingTop: 6, marginTop: 2, fontSize: 15, fontWeight: 700, color: T.tx }}><span>Grand Total</span><span style={{ fontFamily: T.mono }}>₹{inr(po.grand_total)}</span></div>
           </div>
 
-          <POReceipts receipts={receipts} items={items} canRemove={canRemoveReceipt} busy={busy} onRemove={removeReceipt} />
+          <POReceipts receipts={receipts} items={items} names={names} canRemove={canRemoveReceipt} busy={busy} onRemove={removeReceipt} />
 
-          <POActivity audit={audit} />
+          <POActivity audit={audit} poNumber={po.po_number} onRetry={onChanged} />
         </div>
 
         {/* Actions */}
