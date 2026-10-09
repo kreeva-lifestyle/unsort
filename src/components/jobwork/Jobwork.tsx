@@ -24,23 +24,27 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   const [count, setCount] = useState(0);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<JobFilter>('open');
+  // One jobworker, from a tap on the summary's "Where the stock is" bar.
+  const [vendor, setVendor] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [perPage, setPerPage] = useState(25);
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [sharing, setSharing] = useState(false);
-  // Bumped after every load so the summary tiles follow edits.
+  // Bumped after every write so the summary tiles follow; a search or a
+  // page flip changes nothing, so it leaves the summary alone.
   const [version, setVersion] = useState(0);
   useBackClose(!!openId, () => setOpenId(null));
 
   const load = useCallback(async () => {
-    const r = await listJobs({ search, filter, page, perPage });
+    const r = await listJobs({ search, filter, page, perPage, vendor });
     if (r.error) { addToast(friendlyError(r.error), 'error'); setRows([]); return; }
-    setRows(r.rows); setCount(r.count); setVersion(v => v + 1);
-  }, [search, filter, page, perPage, addToast]);
+    setRows(r.rows); setCount(r.count);
+  }, [search, filter, page, perPage, vendor, addToast]);
   useEffect(() => { const t = setTimeout(load, search ? 300 : 0); return () => clearTimeout(t); }, [load, search]);
+  const changed = useCallback(() => { load(); setVersion(v => v + 1); }, [load]);
 
-  if (openId) return <JobDetailView id={openId} onBack={() => setOpenId(null)} onChanged={load} addToast={addToast} />;
+  if (openId) return <JobDetailView id={openId} onBack={() => setOpenId(null)} onChanged={changed} addToast={addToast} />;
 
   const pages = Math.max(1, Math.ceil(count / perPage));
   const chip = (on: boolean): React.CSSProperties => ({ ...S.btnGhost, ...S.btnSm, minHeight: 32, borderRadius: 999, padding: '5px 14px', fontSize: 11, flexShrink: 0, ...(on ? { borderColor: T.ac, color: T.ac2, background: T.ac3 } : {}) });
@@ -55,7 +59,8 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
           <button type="button" className="desktop-only" onClick={() => setCreating(true)} style={S.btnPrimary}>+ New job</button>
         </div>
       </div>
-      <JobStats boss={boss} version={version} active={filter} onPick={f => { setFilter(f); setPage(0); }} addToast={addToast} />
+      <JobStats boss={boss} version={version} active={filter} onPick={f => { setFilter(f); setPage(0); }}
+        onVendor={v => { setVendor(v); setSearch(''); setFilter('open'); setPage(0); }} addToast={addToast} />
       <div className="jw-toolbar" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
       <div style={{ position: 'relative', flex: '1 1 320px', maxWidth: 520 }}>
         <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
@@ -65,12 +70,18 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
         {FILTERS.filter(f => boss || f.id !== 'unpaid').map(f => (
           <button key={f.id} type="button" onClick={() => { setFilter(f.id); setPage(0); }} aria-pressed={filter === f.id} style={chip(filter === f.id)}>{f.label}</button>
         ))}
+        {vendor && (
+          <button type="button" onClick={() => { setVendor(null); setPage(0); }} aria-label={`Showing ${vendor} only — tap to show every jobworker`}
+            style={{ ...chip(true), display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 220 }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vendor}</span><span aria-hidden style={{ fontSize: 14, lineHeight: 1 }}>&#215;</span>
+          </button>
+        )}
       </div>
       </div>
 
       {rows === null ? <div style={{ padding: 40, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading jobs…</div>
         : rows.length === 0 ? (
-          search || filter !== 'open'
+          search || vendor || filter !== 'open'
             ? <Empty icon="search" title="No jobs match" message="Try another search or filter." />
             : <Empty icon="clipboard" title="No open jobs" message="Create a job when you give work to an outside jobworker — then record what you send and what comes back." cta="+ New job" onCta={() => setCreating(true)} />
         ) : (<>
@@ -92,7 +103,7 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
       )}
       <button type="button" className="fab" onClick={() => setCreating(true)} aria-label="New job">+</button>
       {sharing && <PendingShareModal boss={boss} onClose={() => setSharing(false)} addToast={addToast} />}
-      {creating && <JobForm edit={null} onClose={() => setCreating(false)} onSaved={id => { setCreating(false); load(); setOpenId(id); }} addToast={addToast} />}
+      {creating && <JobForm edit={null} onClose={() => setCreating(false)} onSaved={id => { setCreating(false); changed(); setOpenId(id); }} addToast={addToast} />}
     </div>
   );
 }
