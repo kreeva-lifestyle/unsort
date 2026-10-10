@@ -578,7 +578,7 @@ body.modal-open .fab { display: none !important; }
    Desktop: the sheet on the left, a sticky money rail (totals, price,
    pieces, Save) on the right. <main> is the scroller and the 56px header
    is its sibling, so top:14 sits 14px under the header. Geometry only. */
-.cost-editor { max-width: 1480px; margin: 0 auto; }   /* fills a wide desktop; centred beyond 1480 so nothing is left stranded on one side */
+.cost-editor { max-width: 1480px; }   /* fills a wide desktop; left-aligned so it stays flush with the back row above it */
 .cost-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
 @media (min-width: 1280px) { .cost-layout { grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; } }
 .cost-rail { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 14px; max-height: calc(100vh - 84px); overflow-y: auto; }
@@ -695,6 +695,8 @@ html.launching .brand-slot { opacity: 0; }
 .po-node .pulse { position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--nc, oklch(0.65 0.18 270)); opacity: 0; pointer-events: none; }
 .po-node span { position: absolute; top: 28px; font: 600 11px/1.3 Inter, system-ui, sans-serif; color: oklch(0.53 0.04 255); white-space: nowrap; text-align: center; transition: color var(--m-fast); }
 .po-node span small { display: block; font: 500 10px/1.3 'JetBrains Mono', ui-monospace, monospace; color: oklch(0.53 0.04 255); }
+/* The last stop's label grows leftward into the rail, never past the card's edge. */
+.po-node.end span { left: auto; right: 0; text-align: right; }
 .po-node.done .o { border-color: var(--nc); background: var(--nc); }
 .po-node.done .o::after { background: oklch(0.12 0.02 265); }
 .po-node.cur .o { border-color: var(--nc); background: var(--nc); box-shadow: 0 0 0 5px var(--nc-soft), 0 0 18px var(--nc-glow); }
@@ -730,6 +732,7 @@ html.launching .brand-slot { opacity: 0; }
 .po-card-cap { margin-top: 0; padding-top: 12px; border-top: 1px solid oklch(1 0 0 / .05); display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12px; color: oklch(0.62 0.04 255); min-width: 0; }
 .po-card-cap .who { color: oklch(0.53 0.04 255); font: 500 11px/1.3 'JetBrains Mono', ui-monospace, monospace; flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Rolling text (ui/Roll): the new line and the outgoing ghost share one cell. */
-.roll { display: inline-grid; vertical-align: top; min-width: 0; }
+.roll { display: inline-grid; position: relative; vertical-align: top; min-width: 0; }
 .roll > span { grid-area: 1 / 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 420px) { .po-card { padding: 14px 14px 12px; } .po-card .po-rail { margin: 24px 18px 48px; } }
+.roll > span + span { position: absolute; inset: 0; pointer-events: none; }   /* the outgoing ghost: out of flow, so the cell is already the new text's width */
+@media (max-width: 420px) { .po-card { padding: 14px 14px 12px; } .po-card .po-rail { margin: 24px 18px 48px; } .po-card-cap .roll > span { white-space: normal; overflow-wrap: anywhere; } }

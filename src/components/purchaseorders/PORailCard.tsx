@@ -9,18 +9,20 @@ import Roll from '../ui/Roll';
 import PORail, { railState } from './PORail';
 import { shortDate } from './POHeaderInfo';
 import { itemLabel } from './poItemLabel';
+import { fmtQty } from './poStats';
 import { PO_STATUS_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../../types/database';
 
 const n = (v: unknown) => Number(v || 0);
 
-/** "20 of 20" when every line shares a unit; otherwise the share, "64%". */
-export function receivedOf(items: Pick<PurchaseOrderItem, 'quantity' | 'received_qty' | 'unit'>[]): { got: number; ordered: number; text: string } {
+/** "20 of 20" when every line shares a unit (metres and pieces are never
+ *  added together); otherwise the share, "64%", and `mixed` is set. */
+export function receivedOf(items: Pick<PurchaseOrderItem, 'quantity' | 'received_qty' | 'unit'>[]): { got: number; ordered: number; text: string; mixed: boolean } {
   const ordered = items.reduce((t, it) => t + n(it.quantity), 0);
   const got = items.reduce((t, it) => t + Math.min(n(it.received_qty), n(it.quantity)), 0);
-  const units = new Set(items.map(it => (it.unit || '').trim().toLowerCase()));
-  const text = units.size <= 1 ? `${got} of ${ordered}` : `${ordered > 0 ? Math.round(got / ordered * 100) : 0}%`;
-  return { got, ordered, text };
+  const mixed = new Set(items.map(it => (it.unit || '').trim().toLowerCase())).size > 1;
+  const text = !mixed ? `${fmtQty(got)} of ${fmtQty(ordered)}` : `${ordered > 0 ? Math.round(got / ordered * 100) : 0}%`;
+  return { got, ordered, text, mixed };
 }
 
 /** The latest thing that happened to the order, and who did it. */
@@ -32,7 +34,7 @@ export function latestEvent(po: PurchaseOrder, items: PurchaseOrderItem[], recei
     case 'cancelled': return { text: `Cancelled · ${fmtWhen(po.cancelled_at)}`, who: name(po.cancelled_by) };
     case 'closed': return { text: `Closed${r.got > 0 ? ` at ${r.text}` : ''} · ${fmtWhen(po.closed_at)}`, who: name(po.closed_by) };
     case 'completed': return { text: `Received ${r.text} · ${fmtWhen(last?.created_at)}`, who: name(last?.received_by ?? null) };
-    case 'partially_received': return { text: `Received ${r.text} · ${r.ordered - r.got} still due`, who: name(last?.received_by ?? null) };
+    case 'partially_received': return { text: `Received ${r.text}${r.mixed ? '' : ` · ${fmtQty(r.ordered - r.got)} still due`}`, who: name(last?.received_by ?? null) };
     case 'sent': {
       const row = Array.isArray(audit) ? audit.find(a => a.action === 'SENT') : null;
       return { text: `Sent to ${po.vendor_name}${row ? ` · ${fmtWhen(row.created_at)}` : ''}`, who: row?.user_email || '' };
@@ -66,7 +68,8 @@ export default function PORailCard({ po, items, receipts, audit, names, statusCo
       <PORail state={state} dates={[shortDate(po.po_date ?? po.created_at), shortDate(po.approved_at), shortDate(sentAt), null]}
         qty={got.got > 0 || state.stage === 3 ? got.text.replace(' of ', ' / ') : null} />
       <div className="po-card-cap">
-        <Roll text={ev.text} />
+        {/* The trail landing only completes the caption (the Sent time): adopted silently, no roll. */}
+        <Roll text={ev.text} baseline={state.ready} />
         <span className="who" title={ev.who || undefined}>{ev.who || (names === null && po.created_by ? '…' : '')}</span>
       </div>
     </div>

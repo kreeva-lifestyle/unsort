@@ -92,7 +92,7 @@ export default function PORail({ state, dates, qty, mini }: { state: RailState; 
   };
   const pct = state.partial != null ? Math.round(state.partial * 100) : null;
   const under = (i: number) => mini ? null
-    : i === 3 && (qty || pct != null) ? `${qty ?? `${pct}%`}${state.stopped === 'closed' ? ' · closed' : ''}`
+    : i === 3 && (qty || pct != null) ? qty ?? `${pct}%`       // one short line: the pill and the caption already say "closed"
     : state.stopped === 'closed' && i === state.stage ? 'closed' : dates?.[i] ?? null;
   // Stops already passed stay in the rail's own indigo; only the stop the
   // order is at wears the stage colour, so the eye lands on where it is now.
@@ -103,7 +103,7 @@ export default function PORail({ state, dates, qty, mini }: { state: RailState; 
     <div ref={rail} className={`po-rail${mini ? ' po-rail-mini' : ''}${state.stopped ? ' cx' : ''}`} style={vars} role="img" aria-label={label}>
       <div className="base" /><div ref={fill} className="fill" />
       {LABELS.map((l, i) => (
-        <div key={l} ref={el => { nodes.current[i] = el; }} className={cls(i)} style={nodeVars(i)}>
+        <div key={l} ref={el => { nodes.current[i] = el; }} className={`${cls(i)}${i === 3 ? ' end' : ''}`} style={nodeVars(i)}>
           <div className="o" style={i === 3 && pct != null && state.stopped !== 'cancelled' ? { background: `conic-gradient(${T.yl} 0 ${pct}%, ${T.s} ${pct}% 100%)` } : undefined}><b className="pulse" /></div>
           {!mini && <span>{l}{under(i) && <small>{under(i)}</small>}</span>}
         </div>
