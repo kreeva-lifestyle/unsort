@@ -578,8 +578,9 @@ body.modal-open .fab { display: none !important; }
    Desktop: the sheet on the left, a sticky money rail (totals, price,
    pieces, Save) on the right. <main> is the scroller and the 56px header
    is its sibling, so top:14 sits 14px under the header. Geometry only. */
-.cost-editor { max-width: 1180px; }
+.cost-editor { max-width: 1480px; }   /* fills a wide desktop; left-aligned so it stays flush with the back row above it */
 .cost-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+@media (min-width: 1280px) { .cost-layout { grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; } }
 .cost-rail { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 14px; max-height: calc(100vh - 84px); overflow-y: auto; }
 .cost-extras { grid-column: 1; }
 .cost-rail-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.05); }
@@ -694,6 +695,8 @@ html.launching .brand-slot { opacity: 0; }
 .po-node .pulse { position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--nc, oklch(0.65 0.18 270)); opacity: 0; pointer-events: none; }
 .po-node span { position: absolute; top: 28px; font: 600 11px/1.3 Inter, system-ui, sans-serif; color: oklch(0.53 0.04 255); white-space: nowrap; text-align: center; transition: color var(--m-fast); }
 .po-node span small { display: block; font: 500 10px/1.3 'JetBrains Mono', ui-monospace, monospace; color: oklch(0.53 0.04 255); }
+/* The last stop's label grows leftward into the rail, never past the card's edge. */
+.po-node.end span { left: auto; right: 0; text-align: right; }
 .po-node.done .o { border-color: var(--nc); background: var(--nc); }
 .po-node.done .o::after { background: oklch(0.12 0.02 265); }
 .po-node.cur .o { border-color: var(--nc); background: var(--nc); box-shadow: 0 0 0 5px var(--nc-soft), 0 0 18px var(--nc-glow); }
@@ -717,3 +720,19 @@ html.launching .brand-slot { opacity: 0; }
 .po-rail-mini .cap { height: 8px; width: 3px; margin-left: -1.5px; }
 @media (max-width: 420px) { .po-rail { margin: 24px 18px 44px; } .po-node span { font-size: 10.5px; } }
 @media (prefers-reduced-motion: reduce) { .po-rail .light { display: none; } }
+/* The hero card around the rail: eyebrow, title, pill; a hairline; the latest event and who. */
+.po-card { border-radius: 16px; border: 1px solid oklch(1 0 0 / .08); background: linear-gradient(180deg, oklch(0.15 0.02 265), oklch(0.12 0.02 265)); padding: 18px 18px 14px; margin-bottom: 16px; box-shadow: 0 30px 60px -36px oklch(0 0 0 / .9); }
+.po-card-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.po-card-h > div > b { display: block; font: 700 16px/1.25 Sora, Inter, system-ui, sans-serif; color: oklch(0.93 0.01 250); margin-top: 3px; letter-spacing: -.01em; overflow-wrap: anywhere; }   /* wraps beside the pill rather than cutting the vendor short */
+.po-card-k { font: 600 10px/1.2 'JetBrains Mono', ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: oklch(0.53 0.04 255); }
+.po-card-sub { font-size: 12px; color: oklch(0.53 0.04 255); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.po-card-pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 6px; font: 600 11px/1 Inter, system-ui, sans-serif; white-space: nowrap; flex-shrink: 0; transition: background-color var(--m-fast), color var(--m-fast); }
+.po-card-pill i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.po-card .po-rail { margin: 26px 26px 50px; }
+.po-card-cap { margin-top: 0; padding-top: 12px; border-top: 1px solid oklch(1 0 0 / .05); display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12px; color: oklch(0.62 0.04 255); min-width: 0; }
+.po-card-cap .who { color: oklch(0.53 0.04 255); font: 500 11px/1.3 'JetBrains Mono', ui-monospace, monospace; flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Rolling text (ui/Roll): the new line and the outgoing ghost share one cell. */
+.roll { display: inline-grid; position: relative; vertical-align: top; min-width: 0; }
+.roll > span { grid-area: 1 / 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.roll > span + span { position: absolute; inset: 0; pointer-events: none; }   /* the outgoing ghost: out of flow, so the cell is already the new text's width */
+@media (max-width: 420px) { .po-card { padding: 14px 14px 12px; } .po-card .po-rail { margin: 24px 18px 48px; } .po-card-cap .roll > span { white-space: normal; overflow-wrap: anywhere; } }
