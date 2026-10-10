@@ -8,6 +8,8 @@ import { PO_TYPE_LABELS } from '../../types/database';
 import type { PurchaseOrder } from '../../types/database';
 
 export const fmtDate = (d: string | null | undefined) => d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+/** "19 Sep" — under a rail stop; null when there is no date. */
+export const shortDate = (d: string | null | undefined): string | null => d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : null;
 
 const Info = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div><div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.06em', color: T.tx3, marginBottom: 2 }}>{label}</div><div style={{ fontSize: 13, color: T.tx }}>{value}</div></div>

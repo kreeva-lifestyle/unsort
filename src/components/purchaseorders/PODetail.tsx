@@ -13,7 +13,8 @@ import { useModalLock } from '../../hooks/useModalLock';
 import POCloseModal, { pendingOf } from './POCloseModal';
 import POActivity from './POActivity';
 import POReceipts from './POReceipts';
-import POHeaderInfo from './POHeaderInfo';
+import POHeaderInfo, { shortDate } from './POHeaderInfo';
+import PORail, { railState } from './PORail';
 import { itemLabel } from './poItemLabel';
 import { PO_STATUS_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../../types/database';
@@ -124,6 +125,8 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
             calc(90vh - 190px) was taller than the mobile bottom sheet. */}
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           <POHeaderInfo po={po} costingSku={costingSku} names={names} />
+          {/* The pipeline rail: where the order stands, and the light travels when it moves on. */}
+          <PORail state={railState(po, items, audit)} dates={[shortDate(po.po_date ?? po.created_at), shortDate(po.approved_at), null, shortDate(receipts[0]?.receipt_date)]} />
 
           {/* Items */}
           <div style={{ border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden', marginBottom: 14 }}>

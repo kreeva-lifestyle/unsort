@@ -93,6 +93,8 @@ marked (G).
 | `lib/escape.ts` | 15 | `escHtml` (print templates) and `csvCell` (CSV, formula-prefix guard) | `escHtml, csvCell` | — |
 | `lib/exportName.ts` | 63 | `Arya-<Doc>-<what>-<date>.<ext>` naming, IST dates | `fileSafe, fileDate, fileRange, docTitle, exportName` | — |
 | `lib/humanize.ts` | 16 | `fmtWhen` ("09 Oct, 03:06 pm", phone clock), `initials` ("Manav Bhalala" → "MB") — shared by Jobwork and Purchase Orders | `fmtWhen, initials` | — |
+| `lib/motion.ts` | 34 | The motion vocabulary (Motion Lab 01): `M` durations (90/160/220/320/450), `E` curves, `reducedMotion()`, `animate(el, frames, opts)` — Web Animations that strip movement under Reduce Motion and never throw. `index.css` carries the same values as `--m-*` / `--e-*` | `M, E, animate, reducedMotion` | — |
+| `lib/launch.ts` | 58 | The branded launch (Motion Lab 09): takes over the splash `index.html` painted (crest + wordmark), plays one sheen, waits for the header's `#brand-slot` (or `[data-launch-end]` on the sign-in page, or 3 s), flies the crest into the slot while the splash fades, then removes both and clears `html.launching`. Public routes skip it; Reduce Motion = crossfade | `runLaunch` | called once from `main.tsx` |
 | `lib/downloadFile.ts` | 32 | Share-sheet on touch devices, `<a download>` elsewhere | `downloadFile` | — |
 | `lib/xlsxDownload.ts` | 20 | `XLSX.write` → `downloadFile` | `saveWorkbook` | — |
 | `lib/fetchPaged.ts` | 18 | Page a PostgREST query in 1000s (server cap) | `fetchPaged` | — |
@@ -224,6 +226,7 @@ marked (G).
 | `components/purchaseorders/poItemLabel.ts` | 9 | `itemLabel(it)` = `name · fabric_code` — the one way a PO line is printed (detail, receive, close, receipts, list, PDF, image, pendency, pricing evidence) | pure |
 | `components/purchaseorders/PODetail.tsx` | 189 | Detail + status actions; header via `POHeaderInfo`, receipts via `POReceipts`, trail via `POActivity` | RPCs `set_po_status` (`approved/sent/cancelled/reopen`), `delete_po_receipt` |
 | `components/purchaseorders/POHeaderInfo.tsx` | 46 | Header grid: vendor, type, dates, terms — and who did what, when: Raised by / Approved by / Closed by / Cancelled by with the moment, from the header's actor columns + names | pure |
+| `components/purchaseorders/PORail.tsx` | 97 | The pipeline rail (Motion Lab 06): Draft → Approved → Sent → Received as stops on one rail; on a status change the light travels (480 ms, `--e-emph`), the fill follows, the stop settles with one pulse; a skipped Sent is hollow (trail has CREATE but no SENT), a partial receipt fills the last stop as a pie, cancelled = red cap where it stopped + the rest dims; `mini` = the list's silent version. `railState(po, items, audit)` is pure | `lib/motion` |
 | `components/purchaseorders/POReceive.tsx` | 134 | Receive goods (stale-tally guard) | RPC `receive_po_items` |
 | `components/purchaseorders/POCloseModal.tsx` | 114 | Short-close with reason | RPC `close_po_short` |
 | `components/purchaseorders/VendorPicker.tsx` | 117 | Vendor autosuggest + quick add | `po_vendors` select/insert |
