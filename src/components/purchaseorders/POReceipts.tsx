@@ -11,8 +11,8 @@ const fmtDate = (d: string | null | undefined) => d ? new Date(d + (d.length <= 
 export default function POReceipts({ receipts, items, names, canRemove, busy, onRemove }: {
   receipts: PurchaseOrderReceipt[];
   items: PurchaseOrderItem[];
-  /** Profile names by id, for `received_by`. */
-  names: Record<string, string>;
+  /** Profile names by id, for `received_by`; null until they have loaded. */
+  names: Record<string, string> | null;
   canRemove: boolean;
   busy: string;
   onRemove: (r: PurchaseOrderReceipt) => void;
@@ -23,7 +23,8 @@ export default function POReceipts({ receipts, items, names, canRemove, busy, on
       <div style={{ fontSize: 11, fontWeight: 700, color: T.tx2, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Receipts</div>
       {receipts.map(r => {
         const item = items.find(it => it.id === r.po_item_id);
-        const who = r.received_by ? names[r.received_by] || 'User' : '';
+        // Same words as the header: nothing while the names load, "Unknown user" for an id with no profile.
+        const who = r.received_by && names ? names[r.received_by] || 'Unknown user' : '';
         return (
           <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '7px 10px', background: T.glass1, border: `1px solid ${T.bd}`, borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
             <div style={{ minWidth: 0 }}>

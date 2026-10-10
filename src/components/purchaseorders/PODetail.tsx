@@ -26,8 +26,8 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
   receipts: PurchaseOrderReceipt[];
   /** null while loading; 'error' when the trail could not be read (onRetryActivity reloads it). */
   audit: AuditLog[] | null | 'error';
-  /** Profile names by id, for every actor column and receipt. */
-  names: Record<string, string>;
+  /** Profile names by id, for every actor column and receipt; null until they have loaded. */
+  names: Record<string, string> | null;
   onRetryActivity: () => void;
   statusColors: Record<string, { bg: string; color: string }>;
   canManage: boolean;

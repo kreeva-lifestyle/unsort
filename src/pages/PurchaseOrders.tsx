@@ -3,7 +3,7 @@
 // the list and the modal orchestration (form / detail / receive / print /
 // pendency / contacts). Mirrors the Cash Challan module; PO ≈ challan,
 // receipts ≈ payments.
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
@@ -26,7 +26,8 @@ import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog }
 import { useModalLock } from '../hooks/useModalLock';
 
 // audit: null while the trail loads, 'error' when it failed (the card retries).
-type Detail = { po: PurchaseOrder; items: PurchaseOrderItem[]; receipts: PurchaseOrderReceipt[]; audit: AuditLog[] | null | 'error'; names: Record<string, string> };
+// names: null until the profiles read lands, so nobody is called "unknown" meanwhile.
+type Detail = { po: PurchaseOrder; items: PurchaseOrderItem[]; receipts: PurchaseOrderReceipt[]; audit: AuditLog[] | null | 'error'; names: Record<string, string> | null };
 
 export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const { profile } = useAuth();
@@ -37,7 +38,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
 
   const {
     pos, loading, page, setPage, pageSize, setPageSize, totalCount, totalPages,
-    search, updateSearch, statusFilter, setStatusFilter, typeFilter, setTypeFilter, creatorFilter, setCreatorFilter,
+    search, debouncedSearch, updateSearch, statusFilter, setStatusFilter, typeFilter, setTypeFilter, creatorFilter, setCreatorFilter,
     dateFrom, setDateFrom, dateTo, setDateTo, showFilters, setShowFilters, users, fetchPos, clearFilters,
     quick, setQuick, vendorFilter, setVendorFilter, dataVersion, bumpData,
   } = usePoList(active, addToast);
@@ -60,13 +61,19 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   useBackClose(!!printData, () => setPrintData(null));
 
   // Who did what, after the sheet is up: the trail and the names behind the
-  // actor ids, patched into the open detail (and only while it is still the
-  // same PO). Not blocking — the card offers a retry.
+  // actor ids, patched into the open detail — only while it is still the
+  // same PO, and only from the newest read (an older one landing late must
+  // not hide the action just taken). Not blocking — the card offers a retry;
+  // a good half (names) is kept even when the other half (trail) failed.
+  const actSeq = useRef(0);
   const loadActivity = useCallback(async (po: PurchaseOrder, receipts: PurchaseOrderReceipt[]) => {
+    const seq = ++actSeq.current;
     setDetail(d => d && d.po.id === po.id ? { ...d, audit: null } : d);
     const a = await loadPoActivity(po, receipts);
-    if (a.error) addToast(friendlyError(a.error), 'error');
-    setDetail(d => d && d.po.id === po.id ? { ...d, audit: a.error ? 'error' : a.audit, names: a.error ? d.names : a.names } : d);
+    if (seq !== actSeq.current) return;
+    const error = a.auditError || a.namesError;
+    if (error) addToast(friendlyError(error), 'error');
+    setDetail(d => d && d.po.id === po.id ? { ...d, audit: error ? 'error' : a.audit, names: a.namesError ? d.names : a.names } : d);
   }, [addToast]);
   // Load lines + receipts for a PO and open the detail panel at once.
   const openDetail = useCallback(async (poRow: PurchaseOrder) => {
@@ -75,7 +82,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     // transient failure here would render a PO with zero line items.
     if (d.error) { addToast(friendlyError(d.error), 'error'); return; }
     // A refresh of the same PO keeps the names it already has, so the header does not blink.
-    setDetail(prev => ({ po: poRow, items: d.items, receipts: d.receipts, audit: null, names: prev && prev.po.id === poRow.id ? prev.names : {} }));
+    setDetail(prev => ({ po: poRow, items: d.items, receipts: d.receipts, audit: null, names: prev && prev.po.id === poRow.id ? prev.names : null }));
     loadActivity(poRow, d.receipts);
   }, [addToast, loadActivity]);
 
@@ -154,7 +161,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
         dateFrom={dateFrom} onDateFromChange={setDateFrom} dateTo={dateTo} onDateToChange={setDateTo}
         pageSize={pageSize} onPageSizeChange={setPageSize}
         onClearFilters={clearFilters}
-        narrowed={!!(quick || vendorFilter || search || statusFilter || typeFilter || creatorFilter || dateFrom || dateTo)}
+        narrowed={!!(quick || vendorFilter || search || debouncedSearch || statusFilter || typeFilter || creatorFilter || dateFrom || dateTo)}
         onResetPage={() => setPage(0)}
         onOpenEmpty={() => { setEditing(null); setDuplicating(null); setShowForm(true); }} canCreate={canCreate}
         onOpenDetail={openDetail} onPrint={(po) => openPrint(po)}

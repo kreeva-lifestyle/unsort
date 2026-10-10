@@ -134,7 +134,8 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
 
   return {
     pos, loading, page, setPage, pageSize, setPageSize, totalCount, totalPages,
-    search, updateSearch, statusFilter, setStatusFilter, typeFilter, setTypeFilter, creatorFilter, setCreatorFilter,
+    // debouncedSearch is what the rows on screen were fetched with.
+    search, debouncedSearch, updateSearch, statusFilter, setStatusFilter, typeFilter, setTypeFilter, creatorFilter, setCreatorFilter,
     dateFrom, setDateFrom, dateTo, setDateTo, showFilters, setShowFilters, users, fetchPos, clearFilters,
     quick, setQuick, vendorFilter, setVendorFilter, dataVersion, bumpData,
   };

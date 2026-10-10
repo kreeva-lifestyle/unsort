@@ -56,11 +56,12 @@ export function BarList({ rows, color, onPick }: { rows: BarRow[]; color: string
       {rows.map(r => {
         const Tag: 'button' | 'div' = onPick && r.pick ? 'button' : 'div';
         return (
-          <Tag key={r.key} type={Tag === 'button' ? 'button' : undefined} onClick={Tag === 'button' ? () => onPick!(r.key) : undefined} title={`${r.label}: ${r.valueText}`}
+          <Tag key={r.key} type={Tag === 'button' ? 'button' : undefined} onClick={Tag === 'button' ? () => onPick!(r.key) : undefined} title={`${r.label}: ${r.valueText}${r.sub ? ` · ${r.sub}` : ''}`}
             style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', width: '100%', minHeight: 44, textAlign: 'left', background: 'none', border: 'none', padding: '4px 0', cursor: Tag === 'button' ? 'pointer' : 'default', fontFamily: T.sans, color: T.tx }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
-              {r.sub && <span style={{ fontSize: 10, color: T.tx3, whiteSpace: 'nowrap' }}>{r.sub}</span>}
+              <span style={{ flex: '1 1 40%', minWidth: 0, fontSize: 12, color: T.tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
+              {/* The sub line yields before the name does: it clips first, and the full text is in the title. */}
+              {r.sub && <span style={{ flex: '0 1 auto', minWidth: 0, fontSize: 10, color: T.tx3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.sub}</span>}
               <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 600, color: T.tx2, whiteSpace: 'nowrap' }}>{r.valueText}</span>
             </div>
             <div style={{ height: 6, borderRadius: 4, background: alpha(color, TRACK), marginTop: 4, overflow: 'hidden' }}>

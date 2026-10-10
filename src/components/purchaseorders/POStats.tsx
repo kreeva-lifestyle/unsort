@@ -65,10 +65,13 @@ export default function POStats({ version, quick, onQuick, onVendor, addToast }:
   const stateParts = (Object.keys(OPEN_LABELS) as OpenKey[]).map(k => ({ key: k, label: OPEN_LABELS[k], count: s?.states[k] ?? 0, color: OPEN_COLORS[k] }));
   const ageCols = s ? (Object.keys(AGE_LABELS) as AgeKey[]).map(k => ({ key: k, label: AGE_LABELS[k], value: s.ages[k], color: AGE_COLORS[k] })) : [];
   // The bar is the number of open orders — one axis for every vendor; what
-  // is still to come is printed per unit, never plotted.
+  // is still to come is printed per unit, never plotted — two units, then
+  // "+N more" so the vendor's name keeps its room on a phone.
+  const toCome = (p: { unit: string; qty: number }[]) => p.length
+    ? `${p.slice(0, 2).map(x => `${fmtQty(x.qty)} ${x.unit}`).join(' + ')}${p.length > 2 ? ` +${p.length - 2} more` : ''} to come` : '';
   const vendorRows = (s?.byVendor ?? []).map(v => ({
     key: v.vendor, label: v.vendor, value: v.orders, valueText: plural(v.orders, 'PO'),
-    sub: [v.pending.length ? `${v.pending.map(p => `${fmtQty(p.qty)} ${p.unit}`).join(' + ')} to come` : '', `waiting ${v.oldestDays} d`].filter(Boolean).join(' · '), pick: v.vendor !== OTHERS,
+    sub: [toCome(v.pending), `waiting ${v.oldestDays} d`].filter(Boolean).join(' · '), pick: v.vendor !== OTHERS,
   }));
   const pick = (q: PoQuick) => () => onQuick(quick === q ? '' : q);
   const loading = <div style={{ fontSize: 11, color: T.tx3 }}>Loading…</div>;

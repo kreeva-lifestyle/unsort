@@ -20,14 +20,16 @@ export async function loadPoLines(po: PurchaseOrder): Promise<{ items: PurchaseO
 }
 
 /** Who did what (audit_log, newest first) and the names behind the header's
- *  actor columns and the receipts' `received_by` — one parallel read. */
-export async function loadPoActivity(po: PurchaseOrder, receipts: PurchaseOrderReceipt[]): Promise<{ audit: AuditLog[]; names: Record<string, string>; error: unknown }> {
+ *  actor columns and the receipts' `received_by` — one parallel read, each
+ *  half reporting its own failure so a good half is never thrown away. */
+export async function loadPoActivity(po: PurchaseOrder, receipts: PurchaseOrderReceipt[]): Promise<{ audit: AuditLog[]; names: Record<string, string>; auditError: unknown; namesError: unknown }> {
   const ids = [...new Set([po.created_by, po.approved_by, po.closed_by, po.cancelled_by, ...receipts.map(x => x.received_by)].filter((x): x is string => !!x))];
   const [a, p] = await Promise.all([
     supabase.from('audit_log').select('id, action, module, record_id, details, user_id, user_email, created_at, changes').eq('module', 'purchase_order').eq('record_id', po.id).order('created_at', { ascending: false }).limit(100),
     ids.length ? supabase.from('profiles').select('id, full_name').in('id', ids) : Promise.resolve({ data: [] as { id: string; full_name: string | null }[], error: null }),
   ]);
   const names: Record<string, string> = {};
-  for (const u of (p.data as { id: string; full_name: string | null }[] | null) ?? []) names[u.id] = u.full_name?.trim() || 'Unknown user';
-  return { audit: (a.data as AuditLog[] | null) ?? [], names, error: a.error || p.error };
+  // A profile with no name is still a person ("User"); an id with no profile at all is left out.
+  for (const u of (p.data as { id: string; full_name: string | null }[] | null) ?? []) names[u.id] = u.full_name?.trim() || 'User';
+  return { audit: (a.data as AuditLog[] | null) ?? [], names, auditError: a.error, namesError: p.error };
 }

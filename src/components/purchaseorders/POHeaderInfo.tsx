@@ -14,18 +14,22 @@ const Info = ({ label, value }: { label: string; value: React.ReactNode }) => (
 );
 
 /** The person (by id), with the moment on its own line: "Manthan" / "09 Oct, 03:06 pm".
- *  An id with no profile (a removed user) says so; no id at all (rows from
+ *  While the names are still loading the name is a quiet "…"; an id missing
+ *  from a loaded map (a removed user) says so; no id at all (rows from
  *  before actor stamping) shows a dash. */
-const Who = ({ names, id, at }: { names: Record<string, string>; id: string | null; at: string | null }) => (
-  <><div>{id ? names[id] || 'Unknown user' : '—'}</div><div style={{ fontSize: 11, color: T.tx3, fontFamily: T.mono, marginTop: 1 }}>{fmtWhen(at)}</div></>
+const Who = ({ names, id, at }: { names: Record<string, string> | null; id: string | null; at: string | null }) => (
+  <>
+    <div style={names === null && id ? { color: T.tx3 } : undefined}>{!id ? '—' : names === null ? '…' : names[id] || 'Unknown user'}</div>
+    <div style={{ fontSize: 11, color: T.tx3, fontFamily: T.mono, marginTop: 1 }}>{fmtWhen(at)}</div>
+  </>
 );
 
 export default function POHeaderInfo({ po, costingSku, names }: {
   po: PurchaseOrder;
   /** Raised from a costing sheet: that costing's SKU. */
   costingSku: string | null;
-  /** Profile names by id, for the actor columns. */
-  names: Record<string, string>;
+  /** Profile names by id, for the actor columns; null until they have loaded. */
+  names: Record<string, string> | null;
 }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 16 }}>

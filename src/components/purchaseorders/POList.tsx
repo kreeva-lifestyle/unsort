@@ -64,7 +64,7 @@ export default function POList(p: Props) {
 
       {p.loading && <SkeletonRows rows={4} />}
       {!p.loading && p.pos.length === 0 && (p.narrowed
-        ? <Empty icon="search" title="No orders match" message="Clear the chips or filters above to see every order." />
+        ? <Empty icon="search" title="No orders match" message="Clear the search, chips or filters above to see every order." />
         : <Empty icon="clipboard" title="No purchase orders yet" message="Raise your first PO — pick a vendor, add the items you're buying, and track them from draft through to fully received." cta={p.canCreate ? '+ New Purchase Order' : undefined} onCta={p.canCreate ? p.onOpenEmpty : undefined} />)}
 
       {/* Desktop table */}
