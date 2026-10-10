@@ -43,12 +43,7 @@ export const fmtDate = (d: string | null | undefined): string =>
   d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 export const shortDate = (d: string | null | undefined): string =>
   d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—';
-/** A moment, in the phone's own clock: "09 Oct, 03:06 pm". */
-export const fmtWhen = (iso: string | null | undefined): string =>
-  iso ? new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
-/** "Manav Bhalala" → "MB", "Manthan" → "M", an email → its first letter. */
-export const initials = (name: string): string =>
-  name.split('@')[0].trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
+export { fmtWhen, initials } from '../../lib/humanize';
 
 /** One audit row on a job (audit_log, module 'jobwork'): the actor's name
  *  and the real time are stamped by the database, never by the client. */

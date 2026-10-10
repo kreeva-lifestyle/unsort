@@ -653,6 +653,16 @@ body.modal-open .fab { display: none !important; }
 @media (max-width: 768px) {
   .jw-viz { grid-template-columns: minmax(0, 1fr) !important; }
 }
+
+/* Purchase Orders summary: tiles 2-up below 1024px, the two panels stacked
+   on phones, and the quick-filter chips at tap height. */
+@media (max-width: 1023px) {
+  .po-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 768px) {
+  .po-viz { grid-template-columns: minmax(0, 1fr) !important; }
+  .po-chips > button { min-height: 44px !important; }
+}
 @media (max-width: 768px) {
   .jw-table { display: none !important; }
   .jw-cards { display: block; }

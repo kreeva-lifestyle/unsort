@@ -35,6 +35,8 @@ interface Props extends POFiltersProps {
   page: number;
   totalPages: number;
   onPageChange: (p: number | ((prev: number) => number)) => void;
+  /** Something is narrowing the list (search, filters, a summary slice): an empty result is "no match", not "no orders yet". */
+  narrowed: boolean;
 }
 
 export default function POList(p: Props) {
@@ -61,7 +63,9 @@ export default function POList(p: Props) {
       <div style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{p.totalCount} record{p.totalCount === 1 ? '' : 's'}</div>
 
       {p.loading && <SkeletonRows rows={4} />}
-      {!p.loading && p.pos.length === 0 && <Empty icon="clipboard" title="No purchase orders yet" message="Raise your first PO — pick a vendor, add the items you're buying, and track them from draft through to fully received." cta={p.canCreate ? '+ New Purchase Order' : undefined} onCta={p.canCreate ? p.onOpenEmpty : undefined} />}
+      {!p.loading && p.pos.length === 0 && (p.narrowed
+        ? <Empty icon="search" title="No orders match" message="Clear the search, chips or filters above to see every order." />
+        : <Empty icon="clipboard" title="No purchase orders yet" message="Raise your first PO — pick a vendor, add the items you're buying, and track them from draft through to fully received." cta={p.canCreate ? '+ New Purchase Order' : undefined} onCta={p.canCreate ? p.onOpenEmpty : undefined} />)}
 
       {/* Desktop table */}
       {!p.loading && p.pos.length > 0 && <div className="desktop-only" style={{ border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
