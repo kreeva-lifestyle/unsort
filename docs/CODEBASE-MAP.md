@@ -72,7 +72,7 @@ marked (G).
 | `vite.config.ts` | 27 | React plugin, SW stamp plugin, `__APP_BUILD__` define | writes `dist/sw.js` |
 | `tsconfig.json` / `tsconfig.node.json` | 22 | Strict TS, `bundler` resolution, `noEmit` | — |
 | `eslint.config.js` | 19 | Flat config, TS + react-hooks | — |
-| `index.html` | 41 | Shell, splash, fonts, PWA meta, CSP | — |
+| `index.html` | 75 | Inline branded splash (`#splash` + `#splash-crest`, `/crest.webp` preloaded) painted before any script; `html.no-launch` hides it at parse time for `#/s/`, `#/rc/` and password recovery; `src/lib/launch.ts` takes it over (one sheen, then the crest flies into the header's `#brand-slot`, or a crossfade; 3 s give-up); an inline safety net says "Still loading…" at 7 s and removes it at ~19 s if the bundle never runs | — |
 | `.github/workflows/deploy.yml` | 64 | Build + GitHub Pages deploy | — |
 | `.claude/settings.json` | 16 | SessionStart health-check hook | — |
 | `.claude/skills/supabase-migration/SKILL.md` | 77 | Migration workflow skill | — |
@@ -126,8 +126,8 @@ marked (G).
 | Path | Lines | Purpose | Touches |
 |---|---|---|---|
 | `App.tsx` | 339 | Error boundary (→ `logError`), chunk-reload guard, lazy pages via `retryImport`, hash routing (`#/<tab>`, public `#/s/<code>`, `#/share/program/<hex>`, `#/rc/<32hex>`, recovery hash), auth gate, keeps visited tabs mounted (`display:none`), mobile bottom nav (Home/Inventory/PackStation/Challan/More), per-tab scroll memory, global shortcuts (Esc, ⌘F, ⌘N), `InstallPrompt`, `initGlobalPrintMode` | localStorage `sidebarOpen`; sessionStorage `chunkReloadedAt`, `pwa-dismiss` |
-| `main.tsx` | 71 | Mount, global error handlers, SW registration + update overlay, iOS `:active` enabler, haptics | `navigator.serviceWorker` |
-| `index.css` | 578 | The only stylesheet: body/root frame (dvh + `translateZ(0)`), iOS input-zoom fix (16px), select chevron, date-input normalisation, animations, `--nav-h` bottom-nav geometry, `.page-pad`, `.modal-inner` bottom sheets, FAB, `.desktop-only/.mobile-only`, per-module mobile overrides (challan, attendance, inventory, minis, programs) | — |
+| `main.tsx` | 75 | Mount, global error handlers, SW registration + update overlay, iOS `:active` enabler, haptics | `navigator.serviceWorker` |
+| `index.css` | 719 | The only stylesheet: body/root frame (dvh + `translateZ(0)`), iOS input-zoom fix (16px), select chevron, date-input normalisation, animations, `--nav-h` bottom-nav geometry, `.page-pad`, `.modal-inner` bottom sheets, FAB, `.desktop-only/.mobile-only`, per-module mobile overrides (challan, attendance, inventory, minis, programs) | — |
 | `components/layout/Sidebar.tsx` | 79 | Desktop sidebar / mobile drawer; tab list filtered by `canAccessTab`, each a real `<a href="#/tab" aria-current>` (plain click → `setActiveTab`, modifier click opens a tab); sign-out (clears `ccDraft`, reloads) | localStorage `ccDraft` |
 | `components/layout/Header.tsx` | 111 | Brand slot `#brand-slot` (the 28 px crest the launch flies into; hidden under `html.launching`), then `<nav aria-label="Breadcrumb">`: page title (tap = `closeAllLayers`, back to the page root) / middle crumbs (tap = `closeTopLayer`) / current (`aria-current`); sets `document.title` innermost-first; sidebar toggle, notifications dropdown | — |
 | `components/layout/ToastContainer.tsx` | 18 | Portalled toast strip (z 20000) | — |
@@ -226,7 +226,7 @@ marked (G).
 | `components/purchaseorders/ItemNameChips.tsx` | 38 | Last-5 item-name chips under an empty item-name box, scoped to the PO type, deduped case-insensitively | RPC `po_recent_item_names` |
 | `components/purchaseorders/poItemLabel.ts` | 9 | `itemLabel(it)` = `name · fabric_code` — the one way a PO line is printed (detail, receive, close, receipts, list, PDF, image, pendency, pricing evidence) | pure |
 | `components/purchaseorders/PODetail.tsx` | 193 | Detail + status actions; header via `POHeaderInfo`, receipts via `POReceipts`, trail via `POActivity` | RPCs `set_po_status` (`approved/sent/cancelled/reopen`), `delete_po_receipt` |
-| `components/purchaseorders/POHeaderInfo.tsx` | 46 | Header grid: vendor, type, dates, terms — and who did what, when: Raised by / Approved by / Closed by / Cancelled by with the moment, from the header's actor columns + names | pure |
+| `components/purchaseorders/POHeaderInfo.tsx` | 52 | Header grid: vendor, type, dates, terms — and who did what, when: Raised by / Approved by / Closed by / Cancelled by with the moment, from the header's actor columns + names | pure |
 | `components/purchaseorders/PORail.tsx` | 112 | The pipeline rail (Motion Lab 06): Draft → Approved → Sent → Received as stops on one rail; on a status change the light travels (480 ms, `--e-emph`), the fill follows, the stop settles with one pulse; a skipped Sent is hollow (trail has CREATE but no SENT), a partial receipt fills the last stop as a pie, cancelled = red cap where it stopped + the rest dims; `mini` = the list's silent version. `railState(po, items, audit)` is pure | `lib/motion` |
 | `components/purchaseorders/POReceive.tsx` | 134 | Receive goods (stale-tally guard) | RPC `receive_po_items` |
 | `components/purchaseorders/POCloseModal.tsx` | 114 | Short-close with reason | RPC `close_po_short` |

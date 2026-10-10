@@ -69,7 +69,10 @@ export default function PORail({ state, dates, mini }: { state: RailState; /** O
       animate(n.querySelector('.pulse'), [{ opacity: .8, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(2.3)' }], { duration: 450, easing: E.out });
       animate(n.querySelector('.o'), [{ transform: 'scale(.8)' }, { transform: 'scale(1)' }], { duration: 320, easing: E.spring });
     };
-    if (state.stopped && !before.stopped && showCap) animate(cap.current, [{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }], { duration: 320, easing: E.spring });
+    // The cap grows in whenever it becomes visible — also when an already
+    // closed order is cancelled, or loses its last receipt.
+    const capBefore = before.stopped === 'cancelled' || (before.stopped === 'closed' && before.stage < 3);
+    if (showCap && !capBefore) animate(cap.current, [{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }], { duration: 320, easing: E.spring });
     if (!state.stopped && state.stage > before.stage) {           // moving on: the light travels
       const p0 = P[before.stage], W = r.clientWidth;
       const travel = animate(f, [{ transform: `scaleX(${p0})` }, { transform: `scaleX(${p1})` }], { duration: 480, easing: E.emph });

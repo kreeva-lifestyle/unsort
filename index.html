@@ -66,7 +66,10 @@
     <script>if(/^#\/(s|rc)\//.test(location.hash)||location.hash.indexOf('type=recovery')>-1)document.documentElement.classList.add('no-launch')</script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- Safety net only: if the bundle never runs, the splash still goes. -->
-    <script>setTimeout(function(){['splash','splash-crest'].forEach(function(id){var s=document.getElementById(id);if(s)s.remove()});document.documentElement.classList.remove('launching')},7000)</script>
+    <!-- Safety net only. Once the bundle runs, src/lib/launch.ts owns the
+         splash (html.launching) and its own give-up ends it. If the bundle has
+         not run by 7 s the splash says so and waits; if it never runs, the
+         splash goes at ~19 s so the page can never be stuck behind it. -->
+    <script>(function(){var n=0;function tick(){var s=document.getElementById('splash');if(!s||document.documentElement.classList.contains('launching'))return;if(++n<3){var t=s.querySelector('.splash-text:last-child');if(t)t.textContent='Still loading\u2026';setTimeout(tick,6000);return}['splash','splash-crest'].forEach(function(id){var e=document.getElementById(id);if(e)e.remove()})}setTimeout(tick,7000)})()</script>
   </body>
 </html>
