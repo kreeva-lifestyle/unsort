@@ -44,6 +44,7 @@ export function runLaunch(): void {
     if (slot && crest && !rm) {
       const c = crest.getBoundingClientRect(), t = slot.getBoundingClientRect();
       if (c.width > 0 && t.width > 0) {
+        crest.style.transformOrigin = '0 0';   // the entrance scaled about the centre; the fly is measured from the corner
         const fly = animate(crest, [{ transform: 'translate(0,0) scale(1)' }, { transform: `translate(${t.left - c.left}px,${t.top - c.top}px) scale(${t.width / c.width})` }], { duration: M.emph, easing: E.emph, fill: 'forwards' }, true);
         texts.forEach(el => animate(el, [{ opacity: 1 }, { opacity: 0 }], { duration: M.fast, fill: 'forwards' }));
         animate(splash, [{ opacity: 1 }, { opacity: 0 }], { duration: M.slow, delay: 80, easing: E.out, fill: 'forwards' });
@@ -51,7 +52,9 @@ export function runLaunch(): void {
         return;
       }
     }
-    // No slot (sign-in, a slow app, Reduce Motion): a plain crossfade.
+    // No fly (sign-in, a slow app, Reduce Motion): a plain crossfade — the
+    // header's own crest, if it is there, is revealed by the same fade.
+    if (slot) html.classList.remove('launching');
     animate(splash, [{ opacity: 1 }, { opacity: 0 }], { duration: M.base, fill: 'forwards' });
     animate(crest, [{ opacity: 1 }, { opacity: 0 }], { duration: M.base, fill: 'forwards' }).finished.then(remove);
   });

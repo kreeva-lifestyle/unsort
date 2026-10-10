@@ -57,11 +57,13 @@
       <div class="splash-text" style="position:absolute;left:0;right:0;top:calc(50% + 82px);text-align:center;font-family:'Sora',sans-serif;font-weight:600;font-size:13px;letter-spacing:.42em;text-indent:.42em;color:#d4b86a;animation:splashIn .22s cubic-bezier(.2,.9,.3,1) .12s both">ARYA DESIGNS</div>
       <div class="splash-text" style="position:absolute;left:0;right:0;top:calc(50% + 112px);text-align:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10.5px;letter-spacing:.18em;text-indent:.18em;text-transform:uppercase;color:#6b7890;animation:splashIn .22s cubic-bezier(.2,.9,.3,1) .2s both">DailyOffice</div>
     </div>
-    <div id="splash-crest" style="position:fixed;left:50%;top:50%;z-index:9999;width:128px;height:128px;margin:-82px 0 0 -64px;border-radius:50%;overflow:hidden;transform-origin:0 0;pointer-events:none;animation:splashIn .32s cubic-bezier(.2,.9,.3,1) both">
+    <div id="splash-crest" style="position:fixed;left:50%;top:50%;z-index:9999;width:128px;height:128px;margin:-82px 0 0 -64px;border-radius:50%;overflow:hidden;pointer-events:none;animation:splashIn .32s cubic-bezier(.2,.9,.3,1) both">
       <img src="/crest.webp" alt="" width="128" height="128" style="display:block;width:100%;height:100%;border-radius:50%">
       <div style="position:absolute;inset:0;-webkit-mask:url(/crest.webp) center/contain no-repeat;mask:url(/crest.webp) center/contain no-repeat"><i id="splash-sheen" style="position:absolute;top:-10%;bottom:-10%;left:-60%;width:60%;background:linear-gradient(100deg,transparent 20%,rgba(255,250,235,.85) 50%,transparent 80%);transform:translateX(-10%)"></i></div>
     </div>
-    <style>@keyframes splashIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}</style>
+    <style>@keyframes splashIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}@media(prefers-reduced-motion:reduce){#splash-crest,.splash-text{animation:none}}.no-launch #splash,.no-launch #splash-crest{display:none}</style>
+    <!-- Public pages (short links, the rate card, password recovery) never paint the launch: decided at parse time, before the bundle. -->
+    <script>if(/^#\/(s|rc)\//.test(location.hash)||location.hash.indexOf('type=recovery')>-1)document.documentElement.classList.add('no-launch')</script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <!-- Safety net only: if the bundle never runs, the splash still goes. -->

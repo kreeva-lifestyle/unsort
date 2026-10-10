@@ -702,7 +702,10 @@ html.launching .brand-slot { opacity: 0; }
 .po-node.part .o { border-color: oklch(0.78 0.18 75); box-shadow: 0 0 16px oklch(0.78 0.18 75 / .35); }
 .po-node.part span { color: oklch(0.93 0.01 250); }
 .po-node.x .o { border-color: oklch(0.63 0.22 25); background: oklch(0.63 0.22 25); box-shadow: 0 0 16px oklch(0.63 0.22 25 / .45); }
-.po-rail .cap { position: absolute; top: 0; width: 4px; height: 20px; margin-left: -2px; border-radius: 2px; background: oklch(0.63 0.22 25); transform-origin: 50% 50%; box-shadow: 0 0 10px oklch(0.63 0.22 25 / .6); }
+/* Closed short before anything arrived: a quiet grey stop where it ended. */
+.po-node.stop .o { border-color: oklch(0.53 0.04 255); background: oklch(0.53 0.04 255); box-shadow: none; }
+.po-node.x span, .po-node.stop span { color: oklch(0.93 0.01 250); }
+.po-rail .cap { position: absolute; top: 0; width: 4px; height: 20px; margin-left: -2px; border-radius: 2px; background: var(--cap, oklch(0.63 0.22 25)); transform-origin: 50% 50%; box-shadow: 0 0 10px var(--cap-glow, oklch(0.63 0.22 25 / .6)); }
 /* The list's silent version: stops and fill only. */
 .po-rail-mini { margin: 0; height: 8px; min-width: 56px; }
 .po-rail-mini .base, .po-rail-mini .fill { top: 3px; }
