@@ -13,7 +13,8 @@ import { useModalLock } from '../../hooks/useModalLock';
 import POCloseModal, { pendingOf } from './POCloseModal';
 import POActivity from './POActivity';
 import POReceipts from './POReceipts';
-import POHeaderInfo from './POHeaderInfo';
+import POHeaderInfo, { shortDate } from './POHeaderInfo';
+import PORail, { railState } from './PORail';
 import { itemLabel } from './poItemLabel';
 import { PO_STATUS_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../../types/database';
@@ -32,7 +33,8 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
   statusColors: Record<string, { bg: string; color: string }>;
   canManage: boolean;
   onClose: () => void;
-  onChanged: () => void;
+  /** Re-reads the order; awaited so a button stays "Approving…" until the new stage has landed. */
+  onChanged: () => void | Promise<void>;
   onEdit: () => void;
   onDuplicate: () => void;
   onReceive: () => void;
@@ -60,7 +62,7 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
       const { error } = await supabase.rpc('set_po_status', { p_po_id: po.id, p_status: status });
       if (error) throw error;
       addToast(`Purchase order ${label}`, 'success');
-      onChanged();
+      await onChanged();   // the label holds until the new stage is on screen — no second tap lands on a stale button
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setBusy('');
   };
@@ -76,7 +78,7 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
       const { error } = await supabase.rpc('delete_po_receipt', { p_receipt_id: r.id });
       if (error) throw error;
       addToast('Receipt removed', 'success');
-      onChanged();
+      await onChanged();
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setBusy('');
   };
@@ -92,7 +94,7 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
       const { error } = await supabase.rpc('set_po_status', { p_po_id: po.id, p_status: 'reopen' });
       if (error) throw error;
       addToast('Purchase order reopened', 'success');
-      onChanged();
+      await onChanged();
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setBusy('');
   };
@@ -124,6 +126,8 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
             calc(90vh - 190px) was taller than the mobile bottom sheet. */}
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
           <POHeaderInfo po={po} costingSku={costingSku} names={names} />
+          {/* The pipeline rail: where the order stands, and the light travels when it moves on. The Sent date comes from the trail. */}
+          <PORail state={railState(po, items, audit)} dates={[shortDate(po.po_date ?? po.created_at), shortDate(po.approved_at), shortDate(Array.isArray(audit) ? audit.find(a => a.action === 'SENT')?.created_at : null), shortDate(receipts[0]?.receipt_date)]} />
 
           {/* Items */}
           <div style={{ border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden', marginBottom: 14 }}>

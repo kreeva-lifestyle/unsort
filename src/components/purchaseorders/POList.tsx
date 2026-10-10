@@ -7,6 +7,7 @@ import { SkeletonRows } from '../ui/Skeleton';
 import { PO_TYPE_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem } from '../../types/database';
 import POFilters, { type POFiltersProps } from './POFilters';
+import PORail, { railState } from './PORail';
 import { StatusPill, itemsLabel, pendingDays, PendingSince, progress } from './poListParts';
 
 export type PORow = PurchaseOrder & {
@@ -92,12 +93,11 @@ export default function POList(p: Props) {
                     </>); })()}</td>
                     <td style={{ ...S.tdStyle, textAlign: 'right' }}><span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.mono, color: T.tx }}>₹{Number(po.grand_total || 0).toLocaleString('en-IN')}</span></td>
                     <td style={S.tdStyle}>
-                      {(po.status === 'partially_received' || po.status === 'completed') ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <div style={{ flex: 1, height: 5, borderRadius: 3, background: T.glass2, overflow: 'hidden', minWidth: 30 }}><div style={{ width: `${pr.pct}%`, height: '100%', background: pr.pct >= 100 ? T.gr : T.yl }} /></div>
-                          <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{pr.pct}%</span>
-                        </div>
-                      ) : <span style={{ fontSize: 11, color: T.tx3 }}>—</span>}
+                      {/* The pipeline rail, silent: where this order stands; the share received when goods have arrived. */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px' }}>
+                        <div style={{ flex: 1 }}><PORail mini state={railState(po, po.purchase_order_items ?? [], null)} /></div>
+                        {(po.status === 'partially_received' || po.status === 'completed') && <span style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>{pr.pct}%</span>}
+                      </div>
                     </td>
                     <td style={{ ...S.tdStyle, textAlign: 'center' }}><StatusPill status={po.status} sc={sc} /><PendingSince po={po} /></td>
                     <td style={{ ...S.tdStyle, padding: '11px 8px', textAlign: 'right' }}>
@@ -140,6 +140,7 @@ export default function POList(p: Props) {
                   {(po.status === 'partially_received' || po.status === 'completed') && <><span>·</span><span style={{ color: pr.pct >= 100 ? T.gr : T.yl }}>{pr.pct}% received</span></>}
                   {pendingDays(po) !== null && <><span>·</span><PendingSince po={po} inline /></>}
                 </div>
+                <div style={{ margin: '10px 4px 2px' }}><PORail mini state={railState(po, po.purchase_order_items ?? [], null)} /></div>
               </div>
             </SwipeRow>
           );

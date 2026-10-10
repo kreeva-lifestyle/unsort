@@ -14,7 +14,8 @@ import { useCrumb } from '../hooks/useBreadcrumb';
 import { friendlyError } from '../lib/friendlyError';
 import POList from '../components/purchaseorders/POList';
 import POStats from '../components/purchaseorders/POStats';
-import { usePoList, PO_COLS as COLS, QUICK_LABELS } from '../components/purchaseorders/usePoList';
+import POQuickChips from '../components/purchaseorders/POQuickChips';
+import { usePoList, PO_COLS as COLS } from '../components/purchaseorders/usePoList';
 import POForm, { type EditingPO } from '../components/purchaseorders/POForm';
 import PODetail from '../components/purchaseorders/PODetail';
 import POReceive from '../components/purchaseorders/POReceive';
@@ -68,7 +69,10 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
   const actSeq = useRef(0);
   const loadActivity = useCallback(async (po: PurchaseOrder, receipts: PurchaseOrderReceipt[]) => {
     const seq = ++actSeq.current;
-    setDetail(d => d && d.po.id === po.id ? { ...d, audit: null } : d);
+    // Rows already on screen stay while the fresh read is in flight (the
+    // rail and the card would otherwise flicker); only a missing or failed
+    // trail shows "Loading…".
+    setDetail(d => d && d.po.id === po.id && !Array.isArray(d.audit) ? { ...d, audit: null } : d);
     const a = await loadPoActivity(po, receipts);
     if (seq !== actSeq.current) return;
     const error = a.auditError || a.namesError;
@@ -81,8 +85,11 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     // Never open a detail (or later print) on silently-missing data — a
     // transient failure here would render a PO with zero line items.
     if (d.error) { addToast(friendlyError(d.error), 'error'); return; }
-    // A refresh of the same PO keeps the names it already has, so the header does not blink.
-    setDetail(prev => ({ po: poRow, items: d.items, receipts: d.receipts, audit: null, names: prev && prev.po.id === poRow.id ? prev.names : null }));
+    // A refresh of the same PO keeps the names and the trail it already has,
+    // so the header does not blink and the rail does not reposition.
+    setDetail(prev => prev && prev.po.id === poRow.id
+      ? { ...prev, po: poRow, items: d.items, receipts: d.receipts }
+      : { po: poRow, items: d.items, receipts: d.receipts, audit: null, names: null });
     loadActivity(poRow, d.receipts);
   }, [addToast, loadActivity]);
 
@@ -121,14 +128,6 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     fetchPos(true);
   };
 
-  // The summary's quick slices show up here as chips, each one a tap to clear.
-  const chip = (label: string, aria: string, clear: () => void) => (
-    <button key={label} type="button" onClick={clear} aria-label={aria}
-      style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, borderRadius: 999, padding: '5px 14px', fontSize: 11, borderColor: T.ac, color: T.ac2, background: T.ac3, display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 260 }}>
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span><span aria-hidden style={{ fontSize: 14, lineHeight: 1 }}>&#215;</span>
-    </button>
-  );
-
   if (showContacts) return <Contacts canEdit={canCreate} onBack={() => setShowContacts(false)} addToast={addToast} />;
 
   return (
@@ -143,13 +142,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
 
       <POStats version={dataVersion} quick={quick} onQuick={q => { setQuick(q); setPage(0); }}
         onVendor={v => { setVendorFilter(v); setQuick('open'); setPage(0); }} addToast={addToast} />
-      {(quick || vendorFilter) && (
-        <div className="po-chips" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
-          <span style={{ fontSize: 11, color: T.tx3 }}>Showing</span>
-          {quick && chip(QUICK_LABELS[quick], `Showing ${QUICK_LABELS[quick].toLowerCase()} — tap to show every order`, () => { setQuick(''); setPage(0); })}
-          {vendorFilter && chip(vendorFilter, `Showing ${vendorFilter} only — tap to show every vendor`, () => { setVendorFilter(''); setPage(0); })}
-        </div>
-      )}
+      <POQuickChips quick={quick} vendor={vendorFilter} onClearQuick={() => { setQuick(''); setPage(0); }} onClearVendor={() => { setVendorFilter(''); setPage(0); }} />
 
       <POList
         pos={pos} loading={loading} totalCount={totalCount} statusColors={PO_STATUS_COLORS}

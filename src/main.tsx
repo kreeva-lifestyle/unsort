@@ -3,8 +3,12 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 import App from './App'
 import { installGlobalErrorHandlers } from './lib/errorLogger'
+import { runLaunch } from './lib/launch'
 
 installGlobalErrorHandlers()
+// The splash index.html painted becomes the branded launch: one sheen on
+// the crest, then it flies into the header once the app is up.
+runLaunch()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
