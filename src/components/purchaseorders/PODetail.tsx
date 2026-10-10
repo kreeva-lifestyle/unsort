@@ -13,10 +13,9 @@ import { useModalLock } from '../../hooks/useModalLock';
 import POCloseModal, { pendingOf } from './POCloseModal';
 import POActivity from './POActivity';
 import POReceipts from './POReceipts';
-import POHeaderInfo, { shortDate } from './POHeaderInfo';
-import PORail, { railState } from './PORail';
+import POHeaderInfo from './POHeaderInfo';
+import PORailCard from './PORailCard';
 import { itemLabel } from './poItemLabel';
-import { PO_STATUS_LABELS } from '../../types/database';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../../types/database';
 
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN');
@@ -47,7 +46,6 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
   useModalLock();
   const [busy, setBusy] = useState('');
   const [closing, setClosing] = useState(false);
-  const sc = statusColors[po.status] || statusColors.draft;
   // Raised from a costing sheet: the list embed carries the costing's SKU.
   const costingSku = (po as PurchaseOrder & { costing_products?: { sku: string } | null }).costing_products?.sku ?? null;
 
@@ -115,19 +113,17 @@ export default function PODetail({ po, items, receipts, audit, names, statusColo
     <div style={S.modalOverlay} onClick={onClose}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 720, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={S.modalTitle}>PO #{po.po_number}</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: sc.color }} />{PO_STATUS_LABELS[po.status]}</span>
-          </div>
+          {/* The status lives on the hero card below (its pill rolls when the order moves on). */}
+          <span style={S.modalTitle}>PO #{po.po_number}</span>
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
 
         {/* One scrolling body inside a flex column (see POForm): the old
             calc(90vh - 190px) was taller than the mobile bottom sheet. */}
         <div style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0 }}>
+          {/* The hero: title, status pill, the pipeline rail (the light travels when the order moves on), the latest event and who. */}
+          <PORailCard po={po} items={items} receipts={receipts} audit={audit} names={names} statusColors={statusColors} />
           <POHeaderInfo po={po} costingSku={costingSku} names={names} />
-          {/* The pipeline rail: where the order stands, and the light travels when it moves on. The Sent date comes from the trail. */}
-          <PORail state={railState(po, items, audit)} dates={[shortDate(po.po_date ?? po.created_at), shortDate(po.approved_at), shortDate(Array.isArray(audit) ? audit.find(a => a.action === 'SENT')?.created_at : null), shortDate(receipts[0]?.receipt_date)]} />
 
           {/* Items */}
           <div style={{ border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden', marginBottom: 14 }}>

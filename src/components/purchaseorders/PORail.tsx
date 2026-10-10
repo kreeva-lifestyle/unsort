@@ -46,7 +46,7 @@ export function railState(po: Pick<PurchaseOrder, 'status' | 'approved_at'>, ite
   }
 }
 
-export default function PORail({ state, dates, mini }: { state: RailState; /** One short date per stop, where known. */ dates?: (string | null)[]; mini?: boolean }) {
+export default function PORail({ state, dates, qty, mini }: { state: RailState; /** One short date per stop, where known. */ dates?: (string | null)[]; /** Under the last stop: "12 / 20" (the card supplies it); the share otherwise. */ qty?: string | null; mini?: boolean }) {
   const rail = useRef<HTMLDivElement>(null), fill = useRef<HTMLDivElement>(null), light = useRef<HTMLDivElement>(null), cap = useRef<HTMLDivElement>(null);
   const nodes = useRef<(HTMLDivElement | null)[]>([]);
   const prev = useRef<RailState | null>(null);
@@ -92,7 +92,7 @@ export default function PORail({ state, dates, mini }: { state: RailState; /** O
   };
   const pct = state.partial != null ? Math.round(state.partial * 100) : null;
   const under = (i: number) => mini ? null
-    : i === 3 && pct != null ? `${pct}%${state.stopped === 'closed' ? ' · closed' : ''}`
+    : i === 3 && (qty || pct != null) ? `${qty ?? `${pct}%`}${state.stopped === 'closed' ? ' · closed' : ''}`
     : state.stopped === 'closed' && i === state.stage ? 'closed' : dates?.[i] ?? null;
   // Stops already passed stay in the rail's own indigo; only the stop the
   // order is at wears the stage colour, so the eye lands on where it is now.
