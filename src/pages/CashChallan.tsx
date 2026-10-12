@@ -18,7 +18,7 @@ import ChallanDetail from '../components/challan/ChallanDetail';
 import ChallanList from '../components/challan/ChallanList';
 import ChallanBulkActions from '../components/challan/ChallanBulkActions';
 import PendingOrders from '../components/challan/PendingOrders';
-import { markOrderConverted, toChallanItems } from '../components/challan/pendingOrdersModel';
+import { createChallanFromOrder, toChallanItems, fmtOrderNo, orderNoOf, challanIdsForOrderSearch, CHALLAN_ORDER_EMBED, type FromOrderResult } from '../components/challan/pendingOrdersModel';
 import { friendlyError } from '../lib/friendlyError';
 import { fetchCustomerOutstanding } from '../lib/customerOutstanding';
 import { useActiveRefetch } from '../hooks/useActiveRefetch';
@@ -156,7 +156,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [printHtml, setPrintHtml] = useState<string | null>(null);
   const printIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [viewingChallan, setViewingChallan] = useState<Challan | null>(null);
-  const [showOrders, setShowOrders] = useState(false); const [convertingOrder, setConvertingOrder] = useState<string | null>(null); // Pending Orders view + the order being made into a challan
+  const [showOrders, setShowOrders] = useState(false); const [convertingOrder, setConvertingOrder] = useState<{ id: string; number: number } | null>(null); // Orders view + the order a challan is being made from (kept on the draft)
   const [paymentQrUrl, setPaymentQrUrl] = useState<string | null>(null);
   const [paymentUpiId, setPaymentUpiId] = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -247,11 +247,15 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (!silent) setLoading(true);
     // Explicit columns (house rule — no select-* on growable tables): same
     // list the ledger fetch at ~:576 uses, so nothing the UI reads is missing.
-    let query = supabase.from('cash_challans').select('id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, handover_id, inventory_deducted, created_by, modified_by, voided_by, voided_at, created_at, updated_at, cash_challan_items(id, sku, quantity, price, discount_type, discount_value, discount_amount, total), handover:cash_handovers!handover_id(handover_number)', { count: 'estimated' });
+    let query = supabase.from('cash_challans').select(`id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, handover_id, inventory_deducted, created_by, modified_by, voided_by, voided_at, created_at, updated_at, cash_challan_items(id, sku, quantity, price, discount_type, discount_value, discount_amount, total), handover:cash_handovers!handover_id(handover_number), ${CHALLAN_ORDER_EMBED}`, { count: 'estimated' });
     if (debouncedSearch) {
       const s = debouncedSearch.replace(/[%_,().]/g, '');
       const num = parseInt(s);
-      if (!isNaN(num)) {
+      let orderIds: string[] | null = null;   // "ORD-0012": the challans made from that order
+      try { orderIds = await challanIdsForOrderSearch(s); } catch (e) { addToast(friendlyError(e), 'error'); if (!silent) setLoading(false); return; }
+      if (orderIds) {
+        query = orderIds.length ? query.in('id', orderIds) : query.eq('id', '00000000-0000-0000-0000-000000000000');
+      } else if (!isNaN(num)) {
         query = query.or(`challan_number.eq.${num},customer_name.ilike.%${s.trim()}%`);
       } else if (s.trim()) {
         const { data: skuIds } = await supabase.rpc('search_challan_ids', { q: s.trim() });
@@ -298,6 +302,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // Back closes the form but KEEPS the auto-saved draft: closeModal() calls
   // clearDraft(), which wiped a half-typed challan (and the 24h restore safety
   // net) on one reflex gesture. Discard stays explicit.
+  // The order stays with the in-memory form (and the draft) — the form shows "from ORD-0012" and can detach it.
   useBackClose(showModal, () => setShowModal(false));
   useBackClose(showBulkPay, () => setShowBulkPay(false));
   useBackClose(showBulkUnpay, () => setShowBulkUnpay(false));
@@ -353,11 +358,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           customerName, selectedCustomerId, customerPhone, items, shippingCharges, manualRoundOff,
           notes, tags, paymentMode, paymentDate, amountPaid, challanStatus, isReturn,
           returnSourceId: returnSource?.id || null, returnSourceNumber: returnSource?.challan_number || null,
+          fromOrder: convertingOrder,
         }));
       } catch {}
     }, 2000);
     return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
-  }, [showModal, customerName, selectedCustomerId, customerPhone, items, shippingCharges, manualRoundOff, notes, tags, paymentMode, paymentDate, amountPaid, challanStatus, isReturn, currentUserId, editing, returnSource]);
+  }, [showModal, customerName, selectedCustomerId, customerPhone, items, shippingCharges, manualRoundOff, notes, tags, paymentMode, paymentDate, amountPaid, challanStatus, isReturn, currentUserId, editing, returnSource, convertingOrder]);
 
   // Restore draft when modal opens for a NEW challan
   useEffect(() => {
@@ -386,6 +392,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       // Coerce stale pre-removal 'draft' autosaves — that status no longer exists.
       setChallanStatus(d.challanStatus && d.challanStatus !== 'draft' ? d.challanStatus : 'unpaid');
       setIsReturn(!!d.isReturn);
+      setConvertingOrder(d.fromOrder && typeof d.fromOrder.id === 'string' ? { id: d.fromOrder.id, number: Number(d.fromOrder.number) } : null);
       setDraftRestored(true);
       setDraftRestoredAt(d.savedAt);
     } catch { clearDraft(); }
@@ -502,7 +509,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   }, [fetchLedger]);
 
   const fetchLedgerDetailWithRange = useCallback(async (cust: { id: string | null; name: string }, from: string, to: string) => {
-    let q = supabase.from('cash_challans').select('id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, created_at, updated_at').neq('status', 'voided').order('created_at', { ascending: false });
+    let q = supabase.from('cash_challans').select(`id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, created_at, updated_at, ${CHALLAN_ORDER_EMBED}`).neq('status', 'voided').order('created_at', { ascending: false });
     q = cust.id ? q.eq('customer_id', cust.id) : q.ilike('customer_name', cust.name.replace(/[%_]/g, '\\$&'));
     // Local-midnight → ISO instant so the day boundary is IST, not UTC
     if (from) q = q.gte('created_at', new Date(from + 'T00:00:00').toISOString());
@@ -512,7 +519,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // already-loaded list (and silently no-op the PDF export).
     if (error) { addToast(friendlyError(error), 'error'); return; }
     if (((data as unknown[] | null) || []).length >= 500) addToast('Showing the most recent 500 challans — KPIs and PDF cover only these; narrow the date range for exact figures', 'error');
-    setLedgerChallans((data as Challan[] | null) || []);
+    setLedgerChallans((data as unknown as Challan[] | null) || []);
   }, [addToast]);
 
   const fetchLedgerDetail = useCallback(async (cust: { id: string | null; name: string }) => {
@@ -657,6 +664,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
     let createdNumber: string | null = null;
     let createdId: string | null = null;
+    let fromOrder: FromOrderResult | null = null;   // made from an order: what it delivered and what is still due
     try {
       if (editing) {
         const { data: current, error: curErr } = await supabase.from('cash_challans').select('updated_at').eq('id', editing.id).maybeSingle();
@@ -684,13 +692,16 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           p_items: items.map((it) => ({ sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: computeItemDiscount(it) })),
           p_payment: (!isReturn && amountPaid > 0) ? { amount: amountPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || localToday(), paid_by: user?.id } : null,
         };
-        const { data: newChallan, error: crErr } = await supabase.rpc('create_challan_with_items', rpcPayload);
+        // From an order: the challan and what it delivered land together (create_challan_from_order).
+        if (convertingOrder) fromOrder = await createChallanFromOrder(convertingOrder.id, rpcPayload);
+        const { data: newChallan, error: crErr } = fromOrder ? { data: fromOrder, error: null } : await supabase.rpc('create_challan_with_items', rpcPayload);
         if (crErr || !newChallan?.id || !newChallan?.challan_number) throw new Error(crErr?.message || 'Failed to create challan — missing response data');
         createdNumber = newChallan.challan_number;
         createdId = newChallan.id;
-        if (convertingOrder) await markOrderConverted(convertingOrder, newChallan.id as string).catch(e => addToast(`Challan #${createdNumber} saved, but the pending order could not be marked converted — ${friendlyError(e)}. Cancel it under Pending Orders.`, 'error'));
       }
     } catch (e: any) {
+      // The order was processed or cancelled meanwhile: let the next tap save a plain challan.
+      if (convertingOrder && /no longer pending/i.test(String(e?.message))) { setConvertingOrder(null); setFormError(`${fmtOrderNo(convertingOrder.number)} is no longer pending (processed or cancelled meanwhile). Tap Create again to save this as a plain challan, or close it.`); return; }
       setFormError(`Save failed — ${friendlyError(e)}`);
       return;
     }
@@ -718,7 +729,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       setWhatsAppShare({ phone: savedPhone, url: `https://wa.me/${waPhone(savedPhone)}?text=${msg}` });
     }
     if (wasNew) {
-      addToast('Challan created!', 'success');
+      if (fromOrder && fromOrder.order_over_due > 0) addToast(`${fromOrder.order_over_due} pcs on challan #${savedNumber} were not due on ${fmtOrderNo(fromOrder.order_number)} — already sent or extra. Check the challan.`, 'error');
+      addToast(!fromOrder ? 'Challan created!'
+        : fromOrder.order_delivered <= 0 ? `Challan created — nothing on it was still due on ${fmtOrderNo(fromOrder.order_number)}, so the order is unchanged`
+        : fromOrder.order_remaining > 0 ? `Challan created — ${fromOrder.order_remaining} pcs still pending on ${fmtOrderNo(convertingOrder?.number)}`
+        : `Challan created — ${fmtOrderNo(convertingOrder?.number)} processed`, 'success');
       if (savedPhone && !isReturn) {
         const { value: totalOutstanding, error: outErr } = await fetchCustomerOutstanding({ name: savedName, customerId: custId, excludeId: createdId });
         if (outErr) addToast('Could not fetch outstanding balance — figure omitted from message', 'error');
@@ -1249,8 +1264,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     )}
     <ChallanForm
       editing={editing}
+      fromOrderLabel={editing ? (orderNoOf(editing) != null ? fmtOrderNo(orderNoOf(editing)) : undefined) : convertingOrder ? fmtOrderNo(convertingOrder.number) : undefined}
+      onDetachOrder={convertingOrder && !editing ? () => { setConvertingOrder(null); addToast('Not linked to the order any more — this saves as a plain challan', 'success'); } : undefined}
       isReturn={isReturn}
-      setIsReturn={(v) => { setIsReturn(v); if (v) { setChallanStatus('paid'); setAmountPaid(0); setPaymentMode(''); setPaymentDate(''); } }}
+      setIsReturn={(v) => { if (v && convertingOrder) { addToast(`A challan made from ${fmtOrderNo(convertingOrder.number)} can't be a return — close it and start a new return`, 'error'); return; } setIsReturn(v); if (v) { setChallanStatus('paid'); setAmountPaid(0); setPaymentMode(''); setPaymentDate(''); } }}
       returnSource={returnSource}
       returnSearchQ={returnSearchQ}
       setReturnSearchQ={setReturnSearchQ}
@@ -1314,9 +1331,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     /></>
   );
 
-  // ── Pending Orders — components/challan/PendingOrders.tsx; "Make challan" pre-fills the form above (prices blank) and saveChallan marks the order converted ──
+  // ── Orders — components/challan/PendingOrders.tsx; "Make challan" pre-fills the form above with the picked lines (prices blank) and saveChallan records what the challan delivered ──
   if (showOrders) return (<>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => setShowOrders(false)} style={S.btnGhost}>← Back</button></div><PendingOrders canEdit={['admin', 'manager', 'operator'].includes(profile?.role || '')} addToast={addToast}
-    onConvert={(o) => { clearDraft(); setCustomerName(o.customer_name); setSelectedCustomerId(o.customer_id); setCustomerPhone(o.customer_phone || ''); setItems(toChallanItems(o)); setNotes(o.notes || ''); setConvertingOrder(o.id); setShowModal(true); }} /></>);
+    onConvert={(o, picks) => { clearDraft(); setCustomerName(o.customer_name); setSelectedCustomerId(o.customer_id); setCustomerPhone(o.customer_phone || ''); setItems(toChallanItems(o, picks)); setNotes(o.notes || ''); setConvertingOrder({ id: o.id, number: o.order_number }); setShowModal(true); }} /></>);
 
   // ── Ledger (list + detail) — extracted to components/challan/ChallanLedger.tsx ──
   if (showLedger) return (
@@ -1358,7 +1375,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             btnSm pills looked undersized next to the primary CTA). Order runs
             plain views → tinted sibling module → primary action. */}
         <div className="challan-nav-wrap"><div className="challan-nav-btns" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => setShowOrders(true)} style={S.btnGhost}>Pending Orders</button>
+          <button onClick={() => setShowOrders(true)} style={S.btnGhost}>Orders</button>
           <button onClick={() => setShowContacts(true)} style={S.btnGhost}>Contacts</button>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('analytics'); await fetchAnalytics(); setViewOpening(null); setShowAnalytics(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'analytics' ? 0.6 : 1 }}>{viewOpening === 'analytics' ? 'Opening…' : 'Analytics'}</button>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('ledger'); await fetchLedger(); setViewOpening(null); setShowLedger(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'ledger' ? 0.6 : 1 }}>{viewOpening === 'ledger' ? 'Opening…' : 'Ledger'}</button>

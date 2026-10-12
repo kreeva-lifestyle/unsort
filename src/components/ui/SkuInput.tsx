@@ -65,7 +65,7 @@ export default function SkuInput({
   const hit = resolveSku(index, value);
   const product = hit?.product ?? null;
   const chosenSize = hit?.size ?? null;
-  const showSizes = sizes && !!product && needsSize(product) && !chosenSize;
+  const showSizes = sizes && !disabled && !!product && needsSize(product) && !chosenSize;
 
   // Fire onPick once per resolved code, not on every keystroke that happens to
   // still resolve — otherwise a challan row would re-fill its price constantly.

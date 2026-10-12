@@ -60,7 +60,7 @@ export default function ContactModal({ contact, canEdit, onClose, onSaved, addTo
   // with the count, so a stale list can never delete a used contact.
   const remove = async () => {
     if (!contact || saving || deleting || !canEdit) return;
-    if (!await ask({ title: `Delete ${contact.name}?`, message: 'Allowed only when no challan, pending order or purchase order uses this contact.', confirmLabel: 'Delete', danger: true })) return;
+    if (!await ask({ title: `Delete ${contact.name}?`, message: 'Allowed only when no challan, order or purchase order uses this contact.', confirmLabel: 'Delete', danger: true })) return;
     setDeleting(true);
     try { await deleteContact(contact); addToast(`${contact.name} deleted`, 'success'); onSaved(); }
     catch (e) { setError(friendlyError(e)); setDeleting(false); }
