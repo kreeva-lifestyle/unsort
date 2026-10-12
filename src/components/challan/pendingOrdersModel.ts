@@ -16,9 +16,19 @@ export const fmtOrderNo = (n: number | null | undefined): string => (n == null ?
 /** The order a challan was made from, if any — read from the challan list's
  *  `order_links` embed (cash_challan_order_deliveries → cash_challan_orders). */
 export const orderNoOf = (c: unknown): number | null =>
-  (c as { order_links?: { cash_challan_orders: { order_number: number } | null }[] }).order_links?.find(l => l.cash_challan_orders)?.cash_challan_orders?.order_number ?? null;
-/** What the challan list adds to its select for that. */
-export const CHALLAN_ORDER_EMBED = 'order_links:cash_challan_order_deliveries(reversed_at, cash_challan_orders(order_number))';
+  (c as { order_links?: { reversed_at: string | null; lines: unknown[] | null; cash_challan_orders: { order_number: number } | null }[] }).order_links
+    // a link an edit emptied (no lines, not a void) no longer ties the challan to the order
+    ?.find(l => l.cash_challan_orders && !(l.reversed_at && !(l.lines ?? []).length))?.cash_challan_orders?.order_number ?? null;
+/** What a challan select adds for that. */
+export const CHALLAN_ORDER_EMBED = 'order_links:cash_challan_order_deliveries(reversed_at, lines, cash_challan_orders(order_number))';
+/** "ORD-0012" / "ord 12" typed in the challan search → that order's challans. null = not an order ID. */
+export async function challanIdsForOrderSearch(q: string): Promise<string[] | null> {
+  const m = q.trim().match(/^ord[-\s#]*0*(\d{1,9})$/i);
+  if (!m) return null;
+  const { data, error } = await supabase.from('cash_challan_order_deliveries').select('challan_id, cash_challan_orders!inner(order_number)').eq('cash_challan_orders.order_number', Number(m[1]));
+  if (error) throw error;
+  return [...new Set(((data || []) as { challan_id: string }[]).map(r => r.challan_id))];
+}
 
 type DeliveryRow = Pick<CashChallanOrderDelivery, 'id' | 'challan_id' | 'lines' | 'reversed_at' | 'created_at'> & { cash_challans: { challan_number: number; status: string } | null };
 /** A list row with the challans made from it, oldest first. */
@@ -99,7 +109,7 @@ export async function fetchOrders(status: CashChallanOrderStatus | '', search: s
     if (sErr) throw sErr;
     const list = ((ids || []) as (string | { search_order_ids: string })[]).map(x => (typeof x === 'string' ? x : x.search_order_ids));
     if (!list.length) return [];
-    q = q.in('id', list.slice(0, MAX_ROWS));
+    q = q.in('id', list.slice(0, 200));   // the ids travel in the URL
   }
   const { data, error } = await q;
   if (error) throw error;
@@ -119,7 +129,7 @@ export async function saveOrder(o: { id?: string; seenAt?: string; customer_id: 
     if (o.seenAt) q = q.eq('updated_at', o.seenAt);
     const { data, error } = await q.select('id');
     if (error) throw error;
-    if (!data?.length) throw new Error('This order changed since you opened it (a challan may have been made from it) — close and open it again');
+    if (!data?.length) throw new Error('Order changed since you opened it — close and reopen it');
     return;
   }
   const { data: { user } } = await supabase.auth.getUser();

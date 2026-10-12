@@ -8,7 +8,7 @@
 // opens the order's full record (OrderDetail: challans + history). The
 // summary and the waiting badge point at what is late. Processed = every
 // piece sent; cancelled ones can be reopened.
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
@@ -41,8 +41,11 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
   const [busyId, setBusyId] = useState('');
   const { ask, modalProps } = useConfirm();
 
+  // Only the newest read lands (a slow read from the previous tab or search must not overwrite this one).
+  const seq = useRef(0);
   const load = useCallback(() => {
-    fetchOrders(tab, search).then(setRows).catch(e => { addToast(friendlyError(e), 'error'); setRows([]); });
+    const my = ++seq.current;
+    fetchOrders(tab, search).then(r => { if (my === seq.current) setRows(r); }).catch(e => { if (my !== seq.current) return; addToast(friendlyError(e), 'error'); setRows([]); });
   }, [tab, search, addToast]);
   useEffect(() => { const t = setTimeout(load, search ? 250 : 0); return () => clearTimeout(t); }, [load, search]);
 

@@ -18,7 +18,7 @@ import ChallanDetail from '../components/challan/ChallanDetail';
 import ChallanList from '../components/challan/ChallanList';
 import ChallanBulkActions from '../components/challan/ChallanBulkActions';
 import PendingOrders from '../components/challan/PendingOrders';
-import { createChallanFromOrder, toChallanItems, fmtOrderNo, CHALLAN_ORDER_EMBED, type FromOrderResult } from '../components/challan/pendingOrdersModel';
+import { createChallanFromOrder, toChallanItems, fmtOrderNo, orderNoOf, challanIdsForOrderSearch, CHALLAN_ORDER_EMBED, type FromOrderResult } from '../components/challan/pendingOrdersModel';
 import { friendlyError } from '../lib/friendlyError';
 import { fetchCustomerOutstanding } from '../lib/customerOutstanding';
 import { useActiveRefetch } from '../hooks/useActiveRefetch';
@@ -251,7 +251,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (debouncedSearch) {
       const s = debouncedSearch.replace(/[%_,().]/g, '');
       const num = parseInt(s);
-      if (!isNaN(num)) {
+      let orderIds: string[] | null = null;   // "ORD-0012": the challans made from that order
+      try { orderIds = await challanIdsForOrderSearch(s); } catch (e) { addToast(friendlyError(e), 'error'); if (!silent) setLoading(false); return; }
+      if (orderIds) {
+        query = orderIds.length ? query.in('id', orderIds) : query.eq('id', '00000000-0000-0000-0000-000000000000');
+      } else if (!isNaN(num)) {
         query = query.or(`challan_number.eq.${num},customer_name.ilike.%${s.trim()}%`);
       } else if (s.trim()) {
         const { data: skuIds } = await supabase.rpc('search_challan_ids', { q: s.trim() });
@@ -298,8 +302,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // Back closes the form but KEEPS the auto-saved draft: closeModal() calls
   // clearDraft(), which wiped a half-typed challan (and the 24h restore safety
   // net) on one reflex gesture. Discard stays explicit.
-  // The order goes with the draft (restored with it), never onto the next blank form.
-  useBackClose(showModal, () => { setShowModal(false); setConvertingOrder(null); });
+  // The order stays with the in-memory form (and the draft) — the form shows "from ORD-0012" and can detach it.
+  useBackClose(showModal, () => setShowModal(false));
   useBackClose(showBulkPay, () => setShowBulkPay(false));
   useBackClose(showBulkUnpay, () => setShowBulkUnpay(false));
   useBackClose(!!confirmAction, () => setConfirmAction(null));
@@ -505,7 +509,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   }, [fetchLedger]);
 
   const fetchLedgerDetailWithRange = useCallback(async (cust: { id: string | null; name: string }, from: string, to: string) => {
-    let q = supabase.from('cash_challans').select('id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, created_at, updated_at').neq('status', 'voided').order('created_at', { ascending: false });
+    let q = supabase.from('cash_challans').select(`id, challan_number, customer_id, customer_name, customer_phone, status, subtotal, discount_type, discount_value, discount_amount, round_off, total, amount_paid, payment_mode, payment_date, notes, tags, shipping_charges, is_return, source_challan_id, created_at, updated_at, ${CHALLAN_ORDER_EMBED}`).neq('status', 'voided').order('created_at', { ascending: false });
     q = cust.id ? q.eq('customer_id', cust.id) : q.ilike('customer_name', cust.name.replace(/[%_]/g, '\\$&'));
     // Local-midnight → ISO instant so the day boundary is IST, not UTC
     if (from) q = q.gte('created_at', new Date(from + 'T00:00:00').toISOString());
@@ -515,7 +519,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // already-loaded list (and silently no-op the PDF export).
     if (error) { addToast(friendlyError(error), 'error'); return; }
     if (((data as unknown[] | null) || []).length >= 500) addToast('Showing the most recent 500 challans — KPIs and PDF cover only these; narrow the date range for exact figures', 'error');
-    setLedgerChallans((data as Challan[] | null) || []);
+    setLedgerChallans((data as unknown as Challan[] | null) || []);
   }, [addToast]);
 
   const fetchLedgerDetail = useCallback(async (cust: { id: string | null; name: string }) => {
@@ -1260,7 +1264,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     )}
     <ChallanForm
       editing={editing}
-      fromOrderLabel={convertingOrder ? fmtOrderNo(convertingOrder.number) : undefined}
+      fromOrderLabel={convertingOrder ? fmtOrderNo(convertingOrder.number) : editing && orderNoOf(editing) != null ? fmtOrderNo(orderNoOf(editing)) : undefined}
+      onDetachOrder={convertingOrder ? () => { setConvertingOrder(null); addToast('Not linked to the order any more — this saves as a plain challan', 'success'); } : undefined}
       isReturn={isReturn}
       setIsReturn={(v) => { if (v && convertingOrder) { addToast(`A challan made from ${fmtOrderNo(convertingOrder.number)} can't be a return — close it and start a new return`, 'error'); return; } setIsReturn(v); if (v) { setChallanStatus('paid'); setAmountPaid(0); setPaymentMode(''); setPaymentDate(''); } }}
       returnSource={returnSource}
