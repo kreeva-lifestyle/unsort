@@ -18,7 +18,7 @@ import ChallanDetail from '../components/challan/ChallanDetail';
 import ChallanList from '../components/challan/ChallanList';
 import ChallanBulkActions from '../components/challan/ChallanBulkActions';
 import PendingOrders from '../components/challan/PendingOrders';
-import { markOrderConverted, toChallanItems } from '../components/challan/pendingOrdersModel';
+import { createChallanFromOrder, toChallanItems, type FromOrderResult } from '../components/challan/pendingOrdersModel';
 import { friendlyError } from '../lib/friendlyError';
 import { fetchCustomerOutstanding } from '../lib/customerOutstanding';
 import { useActiveRefetch } from '../hooks/useActiveRefetch';
@@ -156,7 +156,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const [printHtml, setPrintHtml] = useState<string | null>(null);
   const printIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [viewingChallan, setViewingChallan] = useState<Challan | null>(null);
-  const [showOrders, setShowOrders] = useState(false); const [convertingOrder, setConvertingOrder] = useState<string | null>(null); // Pending Orders view + the order being made into a challan
+  const [showOrders, setShowOrders] = useState(false); const [convertingOrder, setConvertingOrder] = useState<string | null>(null); // Orders view + the order a challan is being made from
   const [paymentQrUrl, setPaymentQrUrl] = useState<string | null>(null);
   const [paymentUpiId, setPaymentUpiId] = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -657,6 +657,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
 
     let createdNumber: string | null = null;
     let createdId: string | null = null;
+    let fromOrder: FromOrderResult | null = null;   // made from an order: what it delivered and what is still due
     try {
       if (editing) {
         const { data: current, error: curErr } = await supabase.from('cash_challans').select('updated_at').eq('id', editing.id).maybeSingle();
@@ -684,11 +685,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
           p_items: items.map((it) => ({ sku: it.sku, description: it.description, quantity: it.quantity, price: it.price, total: computeItemTotal(it), discount_type: it.discount_type || null, discount_value: it.discount_value || 0, discount_amount: computeItemDiscount(it) })),
           p_payment: (!isReturn && amountPaid > 0) ? { amount: amountPaid, payment_mode: paymentMode || 'Cash', payment_date: paymentDate || localToday(), paid_by: user?.id } : null,
         };
-        const { data: newChallan, error: crErr } = await supabase.rpc('create_challan_with_items', rpcPayload);
+        // From an order: the challan and what it delivered land together (create_challan_from_order).
+        if (convertingOrder) fromOrder = await createChallanFromOrder(convertingOrder, rpcPayload);
+        const { data: newChallan, error: crErr } = fromOrder ? { data: fromOrder, error: null } : await supabase.rpc('create_challan_with_items', rpcPayload);
         if (crErr || !newChallan?.id || !newChallan?.challan_number) throw new Error(crErr?.message || 'Failed to create challan — missing response data');
         createdNumber = newChallan.challan_number;
         createdId = newChallan.id;
-        if (convertingOrder) await markOrderConverted(convertingOrder, newChallan.id as string).catch(e => addToast(`Challan #${createdNumber} saved, but the pending order could not be marked converted — ${friendlyError(e)}. Cancel it under Pending Orders.`, 'error'));
       }
     } catch (e: any) {
       setFormError(`Save failed — ${friendlyError(e)}`);
@@ -718,7 +720,10 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       setWhatsAppShare({ phone: savedPhone, url: `https://wa.me/${waPhone(savedPhone)}?text=${msg}` });
     }
     if (wasNew) {
-      addToast('Challan created!', 'success');
+      addToast(!fromOrder ? 'Challan created!'
+        : fromOrder.order_delivered <= 0 ? 'Challan created — nothing on it matched the order (by SKU), so the order is unchanged'
+        : fromOrder.order_remaining > 0 ? `Challan created — ${fromOrder.order_remaining} pcs still pending on the order`
+        : 'Challan created — order completed', 'success');
       if (savedPhone && !isReturn) {
         const { value: totalOutstanding, error: outErr } = await fetchCustomerOutstanding({ name: savedName, customerId: custId, excludeId: createdId });
         if (outErr) addToast('Could not fetch outstanding balance — figure omitted from message', 'error');
@@ -1314,9 +1319,9 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     /></>
   );
 
-  // ── Pending Orders — components/challan/PendingOrders.tsx; "Make challan" pre-fills the form above (prices blank) and saveChallan marks the order converted ──
+  // ── Orders — components/challan/PendingOrders.tsx; "Make challan" pre-fills the form above with the picked lines (prices blank) and saveChallan records what the challan delivered ──
   if (showOrders) return (<>{pdfModal}<div style={{ padding: '10px 16px 0' }}><button onClick={() => setShowOrders(false)} style={S.btnGhost}>← Back</button></div><PendingOrders canEdit={['admin', 'manager', 'operator'].includes(profile?.role || '')} addToast={addToast}
-    onConvert={(o) => { clearDraft(); setCustomerName(o.customer_name); setSelectedCustomerId(o.customer_id); setCustomerPhone(o.customer_phone || ''); setItems(toChallanItems(o)); setNotes(o.notes || ''); setConvertingOrder(o.id); setShowModal(true); }} /></>);
+    onConvert={(o, picks) => { clearDraft(); setCustomerName(o.customer_name); setSelectedCustomerId(o.customer_id); setCustomerPhone(o.customer_phone || ''); setItems(toChallanItems(o, picks)); setNotes(o.notes || ''); setConvertingOrder(o.id); setShowModal(true); }} /></>);
 
   // ── Ledger (list + detail) — extracted to components/challan/ChallanLedger.tsx ──
   if (showLedger) return (
@@ -1358,7 +1363,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
             btnSm pills looked undersized next to the primary CTA). Order runs
             plain views → tinted sibling module → primary action. */}
         <div className="challan-nav-wrap"><div className="challan-nav-btns" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => setShowOrders(true)} style={S.btnGhost}>Pending Orders</button>
+          <button onClick={() => setShowOrders(true)} style={S.btnGhost}>Orders</button>
           <button onClick={() => setShowContacts(true)} style={S.btnGhost}>Contacts</button>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('analytics'); await fetchAnalytics(); setViewOpening(null); setShowAnalytics(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'analytics' ? 0.6 : 1 }}>{viewOpening === 'analytics' ? 'Opening…' : 'Analytics'}</button>
           <button onClick={async () => { if (viewOpening) return; setViewOpening('ledger'); await fetchLedger(); setViewOpening(null); setShowLedger(true); }} style={{ ...S.btnGhost, opacity: viewOpening === 'ledger' ? 0.6 : 1 }}>{viewOpening === 'ledger' ? 'Opening…' : 'Ledger'}</button>

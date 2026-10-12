@@ -1,7 +1,9 @@
-// New / edit pending order: customer (the last five customers as one-tap
-// pills, then suggestions from the challan customers as you type), item
-// lines (SKU · qty — no price and no description, owner's call), notes.
-// A bottom sheet on mobile like every modal here.
+// New / edit order: customer (the last five customers as one-tap pills,
+// then suggestions from the challan customers as you type), item lines
+// (SKU · qty — no price and no description, owner's call), notes. A line
+// that has already gone out on a challan keeps what it delivered: it can't
+// be removed or lowered below that. A bottom sheet on mobile like every
+// modal here.
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
@@ -54,8 +56,8 @@ export default function PendingOrderForm({ editing, onClose, onSaved, addToast }
     if (problem) { setError(problem); return; }
     setError(''); setSaving(true);
     try {
-      await saveOrder({ id: editing?.id, customer_id: customerId, customer_name: customerName, customer_phone: customerPhone, items, notes });
-      addToast(editing ? 'Order updated' : 'Pending order saved', 'success');
+      await saveOrder({ id: editing?.id, seenAt: editing?.updated_at, customer_id: customerId, customer_name: customerName, customer_phone: customerPhone, items, notes });
+      addToast(editing ? 'Order updated' : 'Order saved', 'success');
       onSaved();
     } catch (e) { setError(friendlyError(e)); }
     setSaving(false);
@@ -65,7 +67,7 @@ export default function PendingOrderForm({ editing, onClose, onSaved, addToast }
     <div style={S.modalOverlay} onClick={onClose}>
       <div className="modal-inner" style={{ ...S.modalBox, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
-          <div style={S.modalTitle}>{editing ? 'Edit pending order' : 'New pending order'}</div>
+          <div style={S.modalTitle}>{editing ? 'Edit order' : 'New order'}</div>
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <form noValidate onSubmit={e => { e.preventDefault(); save(); }} style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -91,14 +93,23 @@ export default function PendingOrderForm({ editing, onClose, onSaved, addToast }
           <div>
             <label style={S.fLabel}>Items *</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {items.map((it, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 76px 44px', gap: 6, alignItems: 'center' }}>
-                  <SkuInput value={it.sku} onChange={v => patch(i, { sku: v })} placeholder="SKU" style={{ ...S.fInput, width: '100%', fontFamily: T.mono }} />
-                  <input value={it.quantity} onChange={e => patch(i, { quantity: Number(e.target.value) })} onKeyDown={e => numericKeyDown(e)} type="number" min="1" step="1" inputMode="numeric" placeholder="Qty" aria-label="Quantity" style={{ ...S.fInput, width: '100%', fontFamily: T.mono, textAlign: 'center' }} />
-                  <button type="button" onClick={() => setItems(list => list.length === 1 ? [blankItem()] : list.filter((_, j) => j !== i))} aria-label="Remove item"
-                    style={{ border: 'none', background: 'none', color: T.re, opacity: 0.7, fontSize: 20, cursor: 'pointer', width: 44, minHeight: 44 }}>&#215;</button>
-                </div>
-              ))}
+              {items.map((it, i) => {
+                const sent = Number(it.delivered) || 0;
+                return (
+                  <div key={i}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 76px 44px', gap: 6, alignItems: 'center' }}>
+                      {/* A line that went out keeps its SKU: the challans already made match on it. */}
+                      <SkuInput value={it.sku} onChange={v => patch(i, { sku: v })} disabled={sent > 0} placeholder="SKU" style={{ ...S.fInput, width: '100%', fontFamily: T.mono, ...(sent > 0 ? { opacity: 0.7 } : {}) }} />
+                      <input value={it.quantity} onChange={e => patch(i, { quantity: Number(e.target.value) })} onKeyDown={e => numericKeyDown(e)} type="number" min={Math.max(1, sent)} step="1" inputMode="numeric" placeholder="Qty" aria-label="Quantity" style={{ ...S.fInput, width: '100%', fontFamily: T.mono, textAlign: 'center' }} />
+                      {sent > 0
+                        ? <span title="Already on a challan" style={{ width: 44, textAlign: 'center', fontSize: 10, color: T.gr }}>sent</span>
+                        : <button type="button" onClick={() => setItems(list => list.length === 1 ? [blankItem()] : list.filter((_, j) => j !== i))} aria-label="Remove item"
+                            style={{ border: 'none', background: 'none', color: T.re, opacity: 0.7, fontSize: 20, cursor: 'pointer', width: 44, minHeight: 44 }}>&#215;</button>}
+                    </div>
+                    {sent > 0 && <div style={{ fontSize: 10, color: T.tx3, marginTop: 2 }}>{sent} already on a challan</div>}
+                  </div>
+                );
+              })}
             </div>
             <button type="button" onClick={() => setItems(list => [...list, blankItem()])} style={{ ...S.btnGhost, marginTop: 8, borderStyle: 'dashed', minHeight: 40 }}>+ Add item</button>
           </div>

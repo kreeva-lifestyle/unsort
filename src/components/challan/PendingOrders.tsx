@@ -1,7 +1,9 @@
-// Cash Challan → Pending Orders: orders taken before the goods are ready.
-// Pending ones offer "Make challan" (opens the challan form pre-filled, the
-// parent handles that and marks the order converted after the save);
-// converted ones show the challan they became; cancelled ones can be reopened.
+// Cash Challan → Orders: orders taken before the goods are ready. A pending
+// order offers "Make challan": pick what goes out now (OrderPickSheet), the
+// parent opens the challan form with those lines, and the save records
+// what the challan delivered. Anything not sent keeps the order pending,
+// line by line ("2 of 4 sent · 2 due"); the challans made from it are
+// listed. Completed = every piece sent; cancelled ones can be reopened.
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
@@ -9,22 +11,24 @@ import { friendlyError } from '../../lib/friendlyError';
 import Empty from '../ui/Empty';
 import ConfirmModal, { useConfirm } from '../ui/ConfirmModal';
 import PendingOrderForm from './PendingOrderForm';
+import OrderPickSheet from './OrderPickSheet';
 import type { CashChallanOrder, CashChallanOrderStatus } from '../../types/database';
-import { fetchOrders, cancelOrder, reopenOrder, pieceCount, type OrderRow } from './pendingOrdersModel';
+import { fetchOrders, cancelOrder, reopenOrder, pieceCount, lineLeft, deliveredCount, leftCount, challansOf, type OrderRow } from './pendingOrdersModel';
 
-const TABS: { key: CashChallanOrderStatus; label: string }[] = [{ key: 'pending', label: 'Pending' }, { key: 'converted', label: 'Converted' }, { key: 'cancelled', label: 'Cancelled' }];
+const TABS: { key: CashChallanOrderStatus; label: string }[] = [{ key: 'pending', label: 'Pending' }, { key: 'converted', label: 'Completed' }, { key: 'cancelled', label: 'Cancelled' }];
 const ago = (iso: string) => { const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`; };
 
 export default function PendingOrders({ canEdit, onConvert, addToast }: {
   canEdit: boolean;
-  /** Open the challan form pre-filled from this order. */
-  onConvert: (o: CashChallanOrder) => void;
+  /** Open the challan form with `picks[i]` pieces of each order line. */
+  onConvert: (o: CashChallanOrder, picks: number[]) => void;
   addToast: (m: string, t?: string) => void;
 }) {
   const [tab, setTab] = useState<CashChallanOrderStatus>('pending');
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState<OrderRow[] | null>(null);
   const [form, setForm] = useState<{ open: boolean; editing: CashChallanOrder | null }>({ open: false, editing: null });
+  const [picking, setPicking] = useState<OrderRow | null>(null);
   const [busyId, setBusyId] = useState('');
   const { ask, modalProps } = useConfirm();
 
@@ -34,7 +38,8 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
   useEffect(() => { const t = setTimeout(load, search ? 250 : 0); return () => clearTimeout(t); }, [load, search]);
 
   const cancel = async (o: OrderRow) => {
-    if (!await ask({ title: `Cancel ${o.customer_name}'s order?`, message: 'It moves to Cancelled and can be reopened later.', confirmLabel: 'Cancel order', danger: true })) return;
+    const sent = deliveredCount(o);
+    if (!await ask({ title: `Cancel ${o.customer_name}'s order?`, message: sent > 0 ? `The ${leftCount(o)} pcs still due are dropped (the ${sent} already sent stay on their challans). It moves to Cancelled and can be reopened later.` : 'It moves to Cancelled and can be reopened later.', confirmLabel: 'Cancel order', danger: true })) return;
     setBusyId(o.id);
     try { await cancelOrder(o.id); addToast('Order cancelled', 'success'); load(); } catch (e) { addToast(friendlyError(e), 'error'); }
     setBusyId('');
@@ -49,8 +54,8 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>Pending orders</div>
-          <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>Orders taken before the goods are ready · make a challan when they are</div>
+          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>Orders</div>
+          <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>Orders taken before the goods are ready · make a challan for all or part of one; the rest stays pending</div>
         </div>
         {canEdit && <button onClick={() => setForm({ open: true, editing: null })} style={S.btnPrimary} className="desktop-only">+ New order</button>}
       </div>
@@ -70,34 +75,42 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
       {rows === null && <div style={{ padding: 30, textAlign: 'center', color: T.tx3, fontSize: 12 }}>Loading…</div>}
       {rows && rows.length === 0 && (
         <div style={{ padding: 14, background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8 }}>
-          <Empty icon="receipt" title={search ? 'No orders match' : tab === 'pending' ? 'No pending orders' : `No ${tab} orders`}
-            message={tab === 'pending' && !search ? 'Record what a customer has ordered; when the goods are ready, make the challan from here.' : undefined}
+          <Empty icon="receipt" title={search ? 'No orders match' : tab === 'pending' ? 'No pending orders' : tab === 'converted' ? 'No completed orders' : 'No cancelled orders'}
+            message={tab === 'pending' && !search ? 'Record what a customer has ordered; when the goods are ready, make the challan from here — all of it or part.' : undefined}
             cta={canEdit && tab === 'pending' && !search ? '+ New order' : undefined} onCta={() => setForm({ open: true, editing: null })} />
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {rows?.map(o => {
           const busy = busyId === o.id;
+          const sent = deliveredCount(o), total = pieceCount(o), nums = challansOf(o);
+          const part = sent > 0 && sent < total;
           return (
             <div key={o.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 12, opacity: busy ? 0.6 : 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.customer_name}</div>
                   <div style={{ fontSize: 11, color: T.tx3, marginTop: 2 }}>
-                    {o.items.length} item{o.items.length === 1 ? '' : 's'} · {pieceCount(o)} pcs · {ago(o.created_at)}{o.customer_phone ? ` · ${o.customer_phone}` : ''}
+                    {o.items.length} item{o.items.length === 1 ? '' : 's'} · {total} pcs · {ago(o.created_at)}{o.customer_phone ? ` · ${o.customer_phone}` : ''}
                   </div>
                 </div>
-                {o.status === 'converted' && <span style={{ fontSize: 11, fontWeight: 600, color: T.gr, whiteSpace: 'nowrap' }}>Challan #{o.cash_challans?.challan_number ?? '—'}</span>}
+                {part && o.status === 'pending' && <span style={{ fontSize: 11, fontWeight: 600, color: T.yl, whiteSpace: 'nowrap' }}>{sent} of {total} sent</span>}
+                {o.status === 'converted' && <span style={{ fontSize: 11, fontWeight: 600, color: T.gr, whiteSpace: 'nowrap' }}>Completed</span>}
                 {o.status === 'cancelled' && <span style={{ fontSize: 11, fontWeight: 600, color: T.tx3 }}>Cancelled</span>}
               </div>
               <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {o.items.map((it, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 8, fontSize: 12, color: T.tx2 }}>
-                    <span style={{ fontFamily: T.mono, minWidth: 36, textAlign: 'right', color: T.tx }}>{it.quantity}×</span>
-                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.sku && <span style={{ fontFamily: T.mono, color: T.ac2 }}>{it.sku}</span>}{it.sku && it.description ? ' · ' : ''}{it.description}</span>
-                  </div>
-                ))}
+                {o.items.map((it, i) => {
+                  const done = Math.min(Number(it.delivered) || 0, Number(it.quantity) || 0), left = lineLeft(it);
+                  return (
+                    <div key={i} style={{ display: 'flex', gap: 8, fontSize: 12, color: T.tx2, alignItems: 'baseline' }}>
+                      <span style={{ fontFamily: T.mono, minWidth: 36, textAlign: 'right', color: left === 0 && done > 0 ? T.tx3 : T.tx }}>{it.quantity}×</span>
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...(left === 0 && done > 0 && o.status === 'pending' ? { color: T.tx3, textDecoration: 'line-through' } : {}) }}>{it.sku && <span style={{ fontFamily: T.mono, color: T.ac2 }}>{it.sku}</span>}{it.sku && it.description ? ' · ' : ''}{it.description}</span>
+                      {done > 0 && o.status !== 'converted' && <span style={{ fontSize: 11, whiteSpace: 'nowrap', color: left > 0 ? T.yl : T.gr }}>{left > 0 ? `${done} sent · ${left} due` : 'sent'}</span>}
+                    </div>
+                  );
+                })}
               </div>
+              {nums.length > 0 && <div style={{ marginTop: 6, fontSize: 11, color: T.tx3 }}>On challan{nums.length === 1 ? '' : 's'} <span style={{ color: T.gr, fontWeight: 600 }}>{nums.map(x => `#${x}`).join(' · ')}</span></div>}
               {o.notes && <div style={{ marginTop: 6, fontSize: 11, color: T.tx3, whiteSpace: 'pre-wrap' }}>{o.notes}</div>}
               {/* Desktop: natural-width buttons, right-aligned, primary last (house card
                   layout). Mobile (.order-actions in index.css): Make challan spans
@@ -107,7 +120,7 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
                   {o.status === 'pending' && <>
                     <button onClick={() => setForm({ open: true, editing: o })} disabled={busy} style={S.btnGhost}>Edit</button>
                     <button onClick={() => cancel(o)} disabled={busy} style={S.btnDanger}>{busy ? 'Working…' : 'Cancel'}</button>
-                    <button onClick={() => onConvert(o)} disabled={busy} className="order-primary" style={S.btnPrimary}>Make challan</button>
+                    <button onClick={() => setPicking(o)} disabled={busy} className="order-primary" style={S.btnPrimary}>{part ? `Make challan · ${total - sent} due` : 'Make challan'}</button>
                   </>}
                   {o.status === 'cancelled' && <button onClick={() => reopen(o)} disabled={busy} style={S.btnGhost}>{busy ? 'Working…' : 'Reopen'}</button>}
                 </div>
@@ -117,8 +130,9 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
         })}
       </div>
 
-      {canEdit && createPortal(<button className="fab" aria-label="New pending order" onClick={() => setForm({ open: true, editing: null })}>+</button>, document.body)}
+      {canEdit && createPortal(<button className="fab" aria-label="New order" onClick={() => setForm({ open: true, editing: null })}>+</button>, document.body)}
       {form.open && <PendingOrderForm editing={form.editing} onClose={() => setForm({ open: false, editing: null })} onSaved={() => { setForm({ open: false, editing: null }); load(); }} addToast={addToast} />}
+      {picking && <OrderPickSheet order={picking} onClose={() => setPicking(null)} onPick={picks => { const o = picking; setPicking(null); onConvert(o, picks); }} />}
       <ConfirmModal {...modalProps} />
     </div>
   );
