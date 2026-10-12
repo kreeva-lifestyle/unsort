@@ -15,7 +15,7 @@ import { useBackClose } from '../../hooks/useBackClose';
 import SkuInput from '../ui/SkuInput';
 import SuggestInput from '../ui/SuggestInput';
 import type { CashChallanOrder, CashChallanOrderItem } from '../../types/database';
-import { blankItem, orderProblem, saveOrder, searchOrderCustomers, recentCustomers, type RecentCustomer } from './pendingOrdersModel';
+import { blankItem, orderProblem, saveOrder, searchOrderCustomers, recentCustomers, fmtOrderNo, type RecentCustomer } from './pendingOrdersModel';
 
 export default function PendingOrderForm({ editing, onClose, onSaved, addToast }: {
   editing: CashChallanOrder | null;
@@ -67,7 +67,7 @@ export default function PendingOrderForm({ editing, onClose, onSaved, addToast }
     <div style={S.modalOverlay} onClick={onClose}>
       <div className="modal-inner" style={{ ...S.modalBox, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
-          <div style={S.modalTitle}>{editing ? 'Edit order' : 'New order'}</div>
+          <div style={S.modalTitle}>{editing ? `Edit ${fmtOrderNo(editing.order_number)}` : 'New order'}</div>
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <form noValidate onSubmit={e => { e.preventDefault(); save(); }} style={{ padding: '16px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>

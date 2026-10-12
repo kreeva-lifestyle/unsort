@@ -1,7 +1,7 @@
-// ─── cash_challan_orders (13 cols) — Cash Challan "Orders" ─────────────────
+// ─── cash_challan_orders (14 cols) — Cash Challan "Orders" ─────────────────
 // Split out of database.ts (grandfathered over the size limit).
 
-/** 'converted' = every piece has gone out on a challan (shown as Completed). */
+/** 'converted' = every piece has gone out on a challan (shown as Processed). */
 export type CashChallanOrderStatus = 'pending' | 'converted' | 'cancelled';
 
 /** One ordered line: no price — prices are typed when the challan is made.
@@ -23,6 +23,8 @@ export interface CashChallanOrderDelivery {
 
 export interface CashChallanOrder {
   id: string;
+  /** The human order ID, shown as ORD-0012 (sequence, unique). */
+  order_number: number;
   customer_id: string | null;
   customer_name: string;
   customer_phone: string | null;

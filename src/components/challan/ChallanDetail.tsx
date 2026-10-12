@@ -4,7 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useAuth } from '../../hooks/useAuth';
-import { T, S, Icon } from '../../lib/theme';
+import { T, S, Icon, alpha } from '../../lib/theme';
+import { fmtOrderNo, orderNoOf } from './pendingOrdersModel';
 import { SkeletonRows } from '../ui/Skeleton';
 import ApplyCreditModal from './ApplyCreditModal';
 import type { CashChallan, CashChallanItem } from '../../types/database';
@@ -218,6 +219,7 @@ export default function ChallanDetail({ challan: c, onClose, onEdit, onPrint, on
               <span style={{ fontSize: mobile ? 16 : 18, fontWeight: 700, fontFamily: T.sora, color: T.tx }}>#{c.challan_number}</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, padding: '3px 8px', borderRadius: 4, background: sc.bg, color: sc.color, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{isRet ? <><Icon name="return" size={9} /> Return</> : c.status}</span>
               {c.handover_id && <span title="This cash was included in a signed handover" style={{ fontSize: 9, padding: '3px 8px', borderRadius: 4, background: 'oklch(0.77 0.14 230 / .12)', color: T.bl, fontWeight: 700, letterSpacing: 0.3 }}>{hoNum ? `Handed over · HO-${String(hoNum).padStart(4, '0')}` : 'Handed over'}</span>}
+              {orderNoOf(c) != null && <span title="This challan was made from that order" style={{ fontSize: 9, padding: '3px 8px', borderRadius: 4, background: alpha(T.yl, .12), color: T.yl, fontWeight: 700, letterSpacing: 0.3, fontFamily: T.mono }}>From {fmtOrderNo(orderNoOf(c))}</span>}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: T.tx }}>{c.customer_name}</span>

@@ -23,6 +23,8 @@ interface ChallanItem { id?: string; sku: string; description: string; quantity:
 export type ChallanFormProps = {
   // Mode
   editing: Challan | null;
+  /** Made from an order: its ID ("ORD-0012"), shown beside the title. */
+  fromOrderLabel?: string;
   isReturn: boolean;
   setIsReturn: (v: boolean) => void;
   // Return-against flow
@@ -153,6 +155,7 @@ export default function ChallanForm(p: ChallanFormProps) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 14, fontWeight: 700, fontFamily: T.sora }}>{p.editing ? `Edit #${p.editing.challan_number}` : (p.isReturn ? 'New Return' : 'New Cash Challan')}</span>
+            {p.fromOrderLabel && <span title="The pieces on this challan are marked sent on that order" style={{ fontFamily: T.mono, fontSize: 11, fontWeight: 600, color: T.yl, padding: '2px 7px', background: alpha(T.yl, .1), border: `1px solid ${T.yl22}`, borderRadius: 6 }}>from {p.fromOrderLabel}</span>}
             {!p.editing && nextNum && <span title="Approximate — final number assigned on save" style={{ fontFamily: T.mono, fontSize: 11, color: T.tx3, fontWeight: 500, padding: '2px 7px', background: 'rgba(255,255,255,.03)', border: `1px solid ${T.bd}`, borderRadius: 6 }}>~#{nextNum}</span>}
             {p.editing && <button onClick={() => p.loadAuditTrail(p.editing!.challan_number)} style={{ ...S.btnGhost, ...S.btnSm }}>View History</button>}
           </div>

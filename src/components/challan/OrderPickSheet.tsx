@@ -9,7 +9,7 @@ import { numericKeyDown } from '../../lib/numericInput';
 import { useModalLock } from '../../hooks/useModalLock';
 import { useBackClose } from '../../hooks/useBackClose';
 import type { CashChallanOrder } from '../../types/database';
-import { lineLeft } from './pendingOrdersModel';
+import { lineLeft, fmtOrderNo } from './pendingOrdersModel';
 
 export default function OrderPickSheet({ order, onClose, onPick }: {
   order: CashChallanOrder;
@@ -31,14 +31,14 @@ export default function OrderPickSheet({ order, onClose, onPick }: {
         <div style={S.modalHead}>
           <div style={{ minWidth: 0 }}>
             <div style={S.modalTitle}>What goes on this challan?</div>
-            <div style={{ fontSize: 11, color: T.tx3, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.customer_name} · {due} pcs still due</div>
+            <div style={{ fontSize: 11, color: T.tx3, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fmtOrderNo(order.order_number)} · {order.customer_name} · {due} pcs still due</div>
           </div>
           <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <form noValidate onSubmit={e => { e.preventDefault(); if (total > 0) onPick(picks); }} style={{ padding: '14px 18px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-            <button type="button" onClick={() => setPicks(order.items.map(lineLeft))} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>All</button>
-            <button type="button" onClick={() => setPicks(order.items.map(() => 0))} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>None</button>
+            <button type="button" className="touch44" onClick={() => setPicks(order.items.map(lineLeft))} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>All</button>
+            <button type="button" className="touch44" onClick={() => setPicks(order.items.map(() => 0))} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32 }}>None</button>
           </div>
           {order.items.map((it, i) => {
             const left = lineLeft(it);

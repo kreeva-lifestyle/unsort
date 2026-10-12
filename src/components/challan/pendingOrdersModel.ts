@@ -6,12 +6,21 @@
 // by line. Whatever is left keeps the order pending; when nothing is left
 // it is Completed. Voiding such a challan hands its pieces back.
 import { supabase } from '../../lib/supabase';
-import type { CashChallanOrder, CashChallanOrderItem, CashChallanOrderStatus, CashChallanOrderDelivery } from '../../types/database';
+import type { CashChallanOrder, CashChallanOrderItem, CashChallanOrderStatus, CashChallanOrderDelivery, AuditLog } from '../../types/database';
 
-export const ORDER_COLS = 'id, customer_id, customer_name, customer_phone, items, notes, status, challan_id, created_by, created_at, updated_at, converted_at, converted_by, cash_challan_order_deliveries(id, challan_id, lines, reversed_at, created_at, cash_challans(challan_number))';
+export const ORDER_COLS = 'id, order_number, customer_id, customer_name, customer_phone, items, notes, status, challan_id, created_by, created_at, updated_at, converted_at, converted_by, cash_challan_order_deliveries(id, challan_id, lines, reversed_at, created_at, cash_challans(challan_number, status))';
 const MAX_ROWS = 500;
 
-type DeliveryRow = Pick<CashChallanOrderDelivery, 'id' | 'challan_id' | 'lines' | 'reversed_at' | 'created_at'> & { cash_challans: { challan_number: number } | null };
+/** The order ID everyone uses: "ORD-0012" (same shape as HO-0012). */
+export const fmtOrderNo = (n: number | null | undefined): string => (n == null ? 'ORD-—' : `ORD-${String(n).padStart(4, '0')}`);
+/** The order a challan was made from, if any — read from the challan list's
+ *  `order_links` embed (cash_challan_order_deliveries → cash_challan_orders). */
+export const orderNoOf = (c: unknown): number | null =>
+  (c as { order_links?: { cash_challan_orders: { order_number: number } | null }[] }).order_links?.find(l => l.cash_challan_orders)?.cash_challan_orders?.order_number ?? null;
+/** What the challan list adds to its select for that. */
+export const CHALLAN_ORDER_EMBED = 'order_links:cash_challan_order_deliveries(reversed_at, cash_challan_orders(order_number))';
+
+type DeliveryRow = Pick<CashChallanOrderDelivery, 'id' | 'challan_id' | 'lines' | 'reversed_at' | 'created_at'> & { cash_challans: { challan_number: number; status: string } | null };
 /** A list row with the challans made from it, oldest first. */
 export type OrderRow = CashChallanOrder & { cash_challan_order_deliveries: DeliveryRow[] };
 
@@ -79,11 +88,19 @@ export function orderProblem(customerName: string, items: CashChallanOrderItem[]
   return null;
 }
 
+/** Search matches the order ID ("ORD-12", "12"), the customer, the phone,
+ *  a SKU on any line, or the notes — server-side (search_order_ids). */
 export async function fetchOrders(status: CashChallanOrderStatus | '', search: string): Promise<OrderRow[]> {
   let q = supabase.from('cash_challan_orders').select(ORDER_COLS).order('created_at', { ascending: false }).limit(MAX_ROWS);
   if (status) q = q.eq('status', status);
   const s = search.trim();
-  if (s) q = q.ilike('customer_name', `%${s.replace(/[%_]/g, '\\$&')}%`);
+  if (s) {
+    const { data: ids, error: sErr } = await supabase.rpc('search_order_ids', { p_q: s });
+    if (sErr) throw sErr;
+    const list = ((ids || []) as (string | { search_order_ids: string })[]).map(x => (typeof x === 'string' ? x : x.search_order_ids));
+    if (!list.length) return [];
+    q = q.in('id', list.slice(0, MAX_ROWS));
+  }
   const { data, error } = await q;
   if (error) throw error;
   return ((data || []) as unknown as OrderRow[]).map(o => ({ ...o, items: Array.isArray(o.items) ? o.items : [], cash_challan_order_deliveries: o.cash_challan_order_deliveries || [] }));
@@ -120,7 +137,8 @@ export async function reopenOrder(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export type FromOrderResult = { id: string; challan_number: string; order_delivered: number; order_remaining: number; order_status: CashChallanOrderStatus };
+/** order_over_due: pieces of an ordered SKU on the challan beyond what was due (sent meanwhile by someone else, or added on purpose). */
+export type FromOrderResult = { id: string; challan_number: string; order_delivered: number; order_remaining: number; order_over_due: number; order_number: number; order_status: CashChallanOrderStatus };
 
 /** The challan page's save for a challan made from an order: the challan
  *  and what it delivered, in one transaction (create_challan_from_order
@@ -129,6 +147,25 @@ export async function createChallanFromOrder(orderId: string, payload: { p_chall
   const { data, error } = await supabase.rpc('create_challan_from_order', { p_order_id: orderId, ...payload });
   if (error) throw error;
   return data as FromOrderResult;
+}
+
+/** One order, fresh — the pick sheet starts from what is due now, not from a list read minutes ago. */
+export async function fetchOrder(id: string): Promise<OrderRow | null> {
+  const { data, error } = await supabase.from('cash_challan_orders').select(ORDER_COLS).eq('id', id).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const o = data as unknown as OrderRow;
+  return { ...o, items: Array.isArray(o.items) ? o.items : [], cash_challan_order_deliveries: o.cash_challan_order_deliveries || [] };
+}
+
+/** An order's track record (audit_log, module cash_challan_order), newest
+ *  first: created, edited, a challan made (and what it took), a challan
+ *  voided (pieces back), processed, cancelled, reopened. */
+export async function loadOrderHistory(orderId: string): Promise<AuditLog[]> {
+  const { data, error } = await supabase.from('audit_log').select('id, action, module, record_id, details, user_id, user_email, created_at, changes')
+    .eq('module', 'cash_challan_order').eq('record_id', orderId).order('created_at', { ascending: false }).limit(100);
+  if (error) throw error;
+  return (data || []) as AuditLog[];
 }
 
 /** Customer picker for the order form — same lookup the challan form uses. */

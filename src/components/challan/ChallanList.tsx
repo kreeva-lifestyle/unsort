@@ -1,6 +1,7 @@
 // Challan list — search/filter row + collapsible filter bar + per-row table.
 // Extracted from CashChallan.tsx; parent owns state & action callbacks.
-import { T, S, Icon } from '../../lib/theme';
+import { T, S, Icon, alpha } from '../../lib/theme';
+import { fmtOrderNo, orderNoOf } from './pendingOrdersModel';
 import Empty from '../ui/Empty';
 import SwipeRow from '../ui/SwipeRow';
 import DateInput from '../ui/DateInput';
@@ -189,6 +190,7 @@ export default function ChallanList(p: Props) {
                     {c.customer_phone && <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono }}>+91 {c.customer_phone.replace(/^91/, '').replace(/(\d{5})(\d{5})/, '$1 $2')}</div>}
                     <div style={{ display: 'flex', gap: 4, marginTop: 2, flexWrap: 'wrap', alignItems: 'center' }}>
                       {isRet && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 700, textTransform: 'uppercase' }}><Icon name="return" size={8} /> Return{srcNum(c) ? ` of #${srcNum(c)}` : ''}</span>}
+                      {orderNoOf(c) != null && <span title="Made from this order" style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: alpha(T.yl, .12), color: T.yl, fontWeight: 700, fontFamily: T.mono }}>{fmtOrderNo(orderNoOf(c))}</span>}
                       {(c.tags || []).map(t => <span key={t} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: T.ac3, color: T.ac2, fontWeight: 600 }}>{t}</span>)}
                       {c.notes && <span title={c.notes} style={{ display: 'inline-flex', alignItems: 'center', opacity: 0.4 }}><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.tx3, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg></span>}
                     </div>
@@ -287,6 +289,7 @@ export default function ChallanList(p: Props) {
                   {c.payment_mode && c.status !== 'voided' && <><span>·</span><span>{c.payment_mode}</span></>}
                   {c.status !== 'voided' && <><span>·</span><button className="inv-chip" onClick={e => { e.stopPropagation(); p.onToggleInventoryDeducted(c.id, !c.inventory_deducted); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, border: `1px solid ${c.inventory_deducted ? 'oklch(0.72 0.19 145 / .25)' : 'oklch(0.63 0.22 25 / .25)'}`, background: c.inventory_deducted ? 'oklch(0.72 0.19 145 / .08)' : 'oklch(0.63 0.22 25 / .06)', color: c.inventory_deducted ? T.gr : T.re, fontSize: 10, fontWeight: 600, cursor: 'pointer' }} aria-label={c.inventory_deducted ? (c.is_return ? 'Inventory added back' : 'Inventory deducted') : 'Inventory pending'}><span style={{ width: 5, height: 5, borderRadius: '50%', background: c.inventory_deducted ? T.gr : T.re }} />{c.inventory_deducted ? (c.is_return ? 'Added' : 'Deducted') : 'Pending'}</button></>}
                   {isRet && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'oklch(0.63 0.22 25 / .12)', color: T.re, fontWeight: 700, textTransform: 'uppercase', marginLeft: 2 }}>Return{srcNum(c) ? ` of #${srcNum(c)}` : ''}</span>}
+                  {orderNoOf(c) != null && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: alpha(T.yl, .12), color: T.yl, fontWeight: 700, fontFamily: T.mono, marginLeft: 2 }}>{fmtOrderNo(orderNoOf(c))}</span>}
                   {c.notes && <span style={{ display: 'inline-flex', alignItems: 'center', opacity: 0.4, marginLeft: 2 }} title={c.notes}><svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: T.tx3, strokeWidth: 2 }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg></span>}
                 </div>
                 {/* Balance due */}
