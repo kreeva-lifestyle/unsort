@@ -1264,8 +1264,8 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     )}
     <ChallanForm
       editing={editing}
-      fromOrderLabel={convertingOrder ? fmtOrderNo(convertingOrder.number) : editing && orderNoOf(editing) != null ? fmtOrderNo(orderNoOf(editing)) : undefined}
-      onDetachOrder={convertingOrder ? () => { setConvertingOrder(null); addToast('Not linked to the order any more — this saves as a plain challan', 'success'); } : undefined}
+      fromOrderLabel={editing ? (orderNoOf(editing) != null ? fmtOrderNo(orderNoOf(editing)) : undefined) : convertingOrder ? fmtOrderNo(convertingOrder.number) : undefined}
+      onDetachOrder={convertingOrder && !editing ? () => { setConvertingOrder(null); addToast('Not linked to the order any more — this saves as a plain challan', 'success'); } : undefined}
       isReturn={isReturn}
       setIsReturn={(v) => { if (v && convertingOrder) { addToast(`A challan made from ${fmtOrderNo(convertingOrder.number)} can't be a return — close it and start a new return`, 'error'); return; } setIsReturn(v); if (v) { setChallanStatus('paid'); setAmountPaid(0); setPaymentMode(''); setPaymentDate(''); } }}
       returnSource={returnSource}
