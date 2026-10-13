@@ -32,7 +32,7 @@ export interface PoStatsData {
   /** Open orders' lines by unit, most pending first; `lines` counts every line, `linesDone` the fully received ones. */
   byUnit: UnitPending[]; lines: number; linesDone: number;
   /** Open orders past their due date (expected date, or PO date + 3 d when none): how many, the worst, how many are due today, how many run on the assumed date. */
-  breach: { count: number; worstLate: number; dueToday: number; assumed: number; oldestDays: number };
+  breach: { count: number; worstLate: number; dueToday: number; assumed: number };
   due: Record<DueKey, number>;
   /** Most open orders first; past `TOP_VENDORS` folded into `OTHERS` (which keeps their pending). */
   byVendor: VendorOpen[];
@@ -62,7 +62,7 @@ export function poStatsOf(open: OpenRow[], recent: RecentRow[], today = fileDate
   const mStart = monthStart(today), lmStart = lastMonthStart(today);
   const s: PoStatsData = {
     open: 0, drafts: 0, states: { approved: 0, sent: 0, partial: 0 }, byUnit: [], lines: 0, linesDone: 0,
-    breach: { count: 0, worstLate: 0, dueToday: 0, assumed: 0, oldestDays: 0 }, due: { ok: 0, today: 0, d1_3: 0, d4_7: 0, gt7: 0 }, byVendor: [],
+    breach: { count: 0, worstLate: 0, dueToday: 0, assumed: 0 }, due: { ok: 0, today: 0, d1_3: 0, d4_7: 0, gt7: 0 }, byVendor: [],
     month: { orders: 0, value: 0, rated: 0 }, lastMonth: { orders: 0, value: 0, rated: 0 },
   };
   for (const r of recent) {
@@ -87,7 +87,6 @@ export function poStatsOf(open: OpenRow[], recent: RecentRow[], today = fileDate
     else if (d.left === 0) s.breach.dueToday += 1;
     if (d.assumed) s.breach.assumed += 1;
     s.breach.worstLate = Math.max(s.breach.worstLate, d.late);
-    s.breach.oldestDays = Math.max(s.breach.oldestDays, days);
     const v = vendors.get(r.vendor_name) ?? { vendor: r.vendor_name, orders: 0, oldestDays: 0, worstLate: 0, pending: new Map<string, number>() };
     v.orders += 1; v.oldestDays = Math.max(v.oldestDays, days); v.worstLate = Math.max(v.worstLate, d.late); vendors.set(r.vendor_name, v);
     for (const it of r.purchase_order_items ?? []) {

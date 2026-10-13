@@ -6,7 +6,7 @@ import { PO_STATUS_LABELS } from '../../types/database';
 import { itemLabel } from './poItemLabel';
 import { fileDate } from '../../lib/exportName';
 import { PENDING_STATUSES } from './pendencyData';
-import { dueOf, dueTone, type DueTone } from './poDue';
+import { dueOf, dueTone, ASSUMED_LEAD_DAYS, type DueTone } from './poDue';
 import type { PORow } from './POList';
 
 export const StatusPill = ({ status, sc }: { status: string; sc: { bg: string; color: string } }) => (
@@ -47,7 +47,7 @@ export const PendingSince = ({ po, inline }: { po: PORow; inline?: boolean }) =>
   if (d === null) return null;
   const due = dueOf(po, fileDate()), tone = dueTone(due);
   const text = `${d === 0 ? 'pending since today' : `pending ${d} d`}${tone === 'late' ? ` · ${due.late} d late` : tone === 'today' ? ' · due today' : ''}`;
-  const title = `Due ${new Date(due.due + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}${due.assumed ? ' — no expected date on the PO, so 3 days from the PO date' : ''}`;
+  const title = `Due ${new Date(due.due + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}${due.assumed ? ` — no expected date on the PO, so ${ASSUMED_LEAD_DAYS} days from the ${po.po_date ? 'PO date' : 'day it was raised'}` : ''}`;
   return inline ? <span title={title} style={{ color: TONE_COLOR[tone] }}>{text}</span> : <div title={title} style={{ fontSize: 9, color: TONE_COLOR[tone], marginTop: 3, fontFamily: T.mono, whiteSpace: 'nowrap' }}>{text}</div>;
 };
 
