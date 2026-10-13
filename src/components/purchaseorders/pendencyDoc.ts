@@ -5,7 +5,7 @@
 import { escHtml } from '../../lib/escape';
 import { docTitle } from '../../lib/exportName';
 import { PO_STATUS_LABELS } from '../../types/database';
-import type { PendencyReport } from './pendencyData';
+import type { PendencyReport, PendencyPo } from './pendencyData';
 import { itemLabel } from './poItemLabel';
 
 export interface PendencyDocOptions { rates?: boolean }
@@ -13,20 +13,25 @@ export interface PendencyDocOptions { rates?: boolean }
 const inr = (n: unknown) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const qty = (n: number) => Number.isInteger(n) ? String(n) : n.toFixed(2);
 export const fmtDate = (d: string | null | undefined) => d ? new Date(d + (d.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-/** Print colours for the wait: red past 14 days, amber past 7, else ink. */
-export const ageColor = (days: number) => (days > 14 ? '#B91C1C' : days > 7 ? '#B45309' : '#1F2937');
-export const ageBg = (days: number) => (days > 14 ? '#FEE2E2' : days > 7 ? '#FEF3C7' : '#F3F4F6');
+/** Print colours against the due date: red once breached, amber on the day it is due, else ink. */
+export const ageColor = (late: number, dueToday = false) => (late > 0 ? '#B91C1C' : dueToday ? '#B45309' : '#1F2937');
+export const ageBg = (late: number, dueToday = false) => (late > 0 ? '#FEE2E2' : dueToday ? '#FEF3C7' : '#F3F4F6');
 export const waitText = (days: number) => days === 0 ? 'since today' : days === 1 ? '1 day' : `${days} days`;
+/** "3 days late" / "due today" / "due 14 Oct" — "(assumed)" when the PO carried no expected date. */
+export const dueText = (p: Pick<PendencyPo, 'due' | 'late' | 'assumed'>, today: string) =>
+  `${p.late > 0 ? `${p.late} day${p.late === 1 ? '' : 's'} late` : p.due === today ? 'due today' : `due ${fmtDate(p.due)}`}${p.assumed ? ' (assumed)' : ''}`;
+export const dueToday = (p: Pick<PendencyPo, 'due' | 'late'>, today: string) => p.late === 0 && p.due === today;
 
 export function buildPendencyHtml(r: PendencyReport, opts: PendencyDocOptions = {}): string {
   const rates = opts.rates === true;
+  const today = r.generated.slice(0, 10);
   const hasSku = r.pos.some(p => p.items.some(it => it.sku));
   const blocks = r.pos.map(p => {
     const rows = p.items.map((it, i) => `<tr><td>${i + 1}</td>${hasSku ? `<td class="m">${escHtml(it.sku || '—')}</td>` : ''}<td>${escHtml(itemLabel(it))}</td><td class="r">${qty(it.quantity)}</td><td class="r">${qty(it.received)}</td><td class="r b">${qty(it.pending)}</td><td>${escHtml(it.unit || '—')}</td>${rates ? `<td class="r">${it.rate == null ? '—' : inr(it.rate)}</td><td class="r">${it.rate == null ? '—' : inr(it.pending * it.rate)}</td>` : ''}</tr>`).join('');
     return `<section class="po">
       <div class="pohead">
         <div><span class="num">PO #${escHtml(p.po_number)}</span> <span class="sub">dated ${fmtDate(p.po_date)} · ${escHtml(PO_STATUS_LABELS[p.status] || p.status)}${p.expected_date ? ` · expected ${fmtDate(p.expected_date)}` : ''}</span></div>
-        <div class="since" style="color:${ageColor(p.days)};background:${ageBg(p.days)}">Pending since ${fmtDate(p.since)} · ${waitText(p.days)}</div>
+        <div class="since" style="color:${ageColor(p.late, dueToday(p, today))};background:${ageBg(p.late, dueToday(p, today))}">Pending since ${fmtDate(p.since)} · ${waitText(p.days)} · ${dueText(p, today)}</div>
       </div>
       <table><thead><tr><th>#</th>${hasSku ? '<th>SKU</th>' : ''}<th>Item</th><th class="r">Ordered</th><th class="r">Received</th><th class="r">Pending</th><th>Unit</th>${rates ? '<th class="r">Rate</th><th class="r">Amount</th>' : ''}</tr></thead><tbody>${rows}</tbody></table>
       <div class="pofoot">${qty(p.pendingQty)} pending in ${p.items.length} line${p.items.length === 1 ? '' : 's'}${rates && p.pendingAmount != null ? ` · ₹${inr(p.pendingAmount)}` : ''}</div>
@@ -40,7 +45,7 @@ export function buildPendencyHtml(r: PendencyReport, opts: PendencyDocOptions = 
         <div class="cell"><div class="k">Open orders</div><div class="v">${t.orders}</div></div>
         <div class="cell"><div class="k">Pending qty</div><div class="v">${qty(t.pendingQty)}</div></div>
         ${rates && t.pendingAmount != null ? `<div class="cell"><div class="k">Pending value</div><div class="v">₹${inr(t.pendingAmount)}</div></div>` : ''}
-        <div class="cell hi" style="color:${ageColor(t.oldestDays)};background:${ageBg(t.oldestDays)}"><div class="k">Oldest pending since</div><div class="v">${fmtDate(t.oldestSince)}</div><div class="k2">${waitText(t.oldestDays)}</div></div>
+        <div class="cell hi" style="color:${ageColor(t.worstLate, t.dueToday > 0)};background:${ageBg(t.worstLate, t.dueToday > 0)}"><div class="k">Oldest pending since</div><div class="v">${fmtDate(t.oldestSince)}</div><div class="k2">${waitText(t.oldestDays)}${t.worstLate ? ` · worst ${t.worstLate} day${t.worstLate === 1 ? '' : 's'} late` : t.dueToday ? ` · ${t.dueToday} due today` : ''}</div></div>
       </div>`;
 
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -76,6 +81,6 @@ export function buildPendencyHtml(r: PendencyReport, opts: PendencyDocOptions = 
   </div>
   ${summary}
   ${blocks}
-  <div class="foot">Pending = ordered − received. Orders listed oldest first. This is a computer-generated statement and does not require a signature.</div>
+  <div class="foot">Pending = ordered − received. Orders listed oldest first. Due = the expected date on the PO, or 3 days from the PO date when none was given (assumed). This is a computer-generated statement and does not require a signature.</div>
 </body></html>`;
 }

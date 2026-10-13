@@ -3,7 +3,7 @@
 // image, so a vendor gets one picture on WhatsApp. Pending since is the
 // loud element of every order. Rates are OFF unless asked for.
 import type { PendencyReport, PendencyPo } from './pendencyData';
-import { ageColor, ageBg, fmtDate, waitText } from './pendencyDoc';
+import { ageColor, ageBg, fmtDate, waitText, dueText, dueToday } from './pendencyDoc';
 import type { PendencyDocOptions } from './pendencyDoc';
 import { itemLabel } from './poItemLabel';
 import { exportName } from '../../lib/exportName';
@@ -53,8 +53,9 @@ export function renderPendencyImage(r: PendencyReport, opts: PendencyDocOptions 
   ctx.strokeStyle = '#111827'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y); ctx.stroke();
   y += 14;
 
-  // Summary strip — the oldest wait is the highlighted cell.
+  // Summary strip — the oldest wait is the highlighted cell, coloured by the worst breach.
   const t = r.totals;
+  const today = r.generated.slice(0, 10);
   if (t.orders === 0) {
     ctx.textAlign = 'center'; ctx.fillStyle = '#6B7280'; ctx.font = `400 13px ${SANS}`;
     ctx.fillText('Nothing pending — every open order has been received.', W / 2, y + 40);
@@ -64,16 +65,16 @@ export function renderPendencyImage(r: PendencyReport, opts: PendencyDocOptions 
       { k: 'OPEN ORDERS', v: String(t.orders) },
       { k: 'PENDING QTY', v: qty(t.pendingQty) },
       ...(rates && t.pendingAmount != null ? [{ k: 'PENDING VALUE', v: '₹' + inr(t.pendingAmount) }] : []),
-      { k: 'OLDEST PENDING SINCE', v: fmtDate(t.oldestSince), k2: waitText(t.oldestDays), hi: true },
+      { k: 'OLDEST PENDING SINCE', v: fmtDate(t.oldestSince), k2: `${waitText(t.oldestDays)}${t.worstLate ? ` · worst ${t.worstLate} d late` : t.dueToday ? ` · ${t.dueToday} due today` : ''}`, hi: true },
     ];
     const units = cells.reduce((s, c) => s + (c.hi ? 1.6 : 1), 0);
     const unitW = (W - PAD * 2 - 10 * (cells.length - 1)) / units;
     let x = PAD;
     for (const cell of cells) {
       const w = unitW * (cell.hi ? 1.6 : 1);
-      if (cell.hi) { ctx.fillStyle = ageBg(t.oldestDays); roundRect(ctx, x, y, w, 66, 6); ctx.fill(); }
+      if (cell.hi) { ctx.fillStyle = ageBg(t.worstLate, t.dueToday > 0); roundRect(ctx, x, y, w, 66, 6); ctx.fill(); }
       else { ctx.strokeStyle = '#E5E7EB'; ctx.lineWidth = 1; roundRect(ctx, x, y, w, 66, 6); ctx.stroke(); }
-      const col = cell.hi ? ageColor(t.oldestDays) : '#111827';
+      const col = cell.hi ? ageColor(t.worstLate, t.dueToday > 0) : '#111827';
       ctx.textAlign = 'left'; ctx.fillStyle = cell.hi ? col : '#9CA3AF'; ctx.font = `600 9px ${SANS}`;
       ctx.fillText(cell.k, x + 12, y + 20);
       ctx.fillStyle = col; ctx.font = `700 18px ${SANS}`; ctx.fillText(cell.v, x + 12, y + 44);
@@ -94,11 +95,11 @@ export function renderPendencyImage(r: PendencyReport, opts: PendencyDocOptions 
     const numW = ctx.measureText(`PO #${p.po_number}`).width;
     ctx.fillStyle = '#6B7280'; ctx.font = `400 10px ${SANS}`;
     ctx.fillText(`dated ${fmtDate(p.po_date)} · ${PO_STATUS_LABELS[p.status] || p.status}${p.expected_date ? ` · expected ${fmtDate(p.expected_date)}` : ''}`, PAD + 10 + numW + 8, y + 22);
-    const since = `Pending since ${fmtDate(p.since)} · ${waitText(p.days)}`;
+    const since = `Pending since ${fmtDate(p.since)} · ${waitText(p.days)} · ${dueText(p, today)}`;
     ctx.font = `700 11px ${SANS}`;
     const sw = ctx.measureText(since).width + 18;
-    ctx.fillStyle = ageBg(p.days); roundRect(ctx, W - PAD - 8 - sw, y + 7, sw, 20, 4); ctx.fill();
-    ctx.fillStyle = ageColor(p.days); ctx.textAlign = 'right'; ctx.fillText(since, W - PAD - 17, y + 21);
+    ctx.fillStyle = ageBg(p.late, dueToday(p, today)); roundRect(ctx, W - PAD - 8 - sw, y + 7, sw, 20, 4); ctx.fill();
+    ctx.fillStyle = ageColor(p.late, dueToday(p, today)); ctx.textAlign = 'right'; ctx.fillText(since, W - PAD - 17, y + 21);
     let ry = y + POHEAD + 22;
     ctx.fillStyle = '#6B7280'; ctx.font = `600 9px ${SANS}`; ctx.textAlign = 'left';
     ctx.fillText('#', cols.num, ry); if (hasSku) ctx.fillText('SKU', cols.sku, ry); ctx.fillText('ITEM', cols.item, ry);

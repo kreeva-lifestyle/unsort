@@ -4,7 +4,9 @@
 // vendor has the order: approved, sent or partially received. Drafts have
 // not reached the vendor; completed and cancelled are over.
 import { supabase } from '../../lib/supabase';
+import { fileDate } from '../../lib/exportName';
 import type { PurchaseOrderStatus } from '../../types/database';
+import { dueOf } from './poDue';
 
 export const PENDING_STATUSES: PurchaseOrderStatus[] = ['approved', 'sent', 'partially_received'];
 
@@ -13,12 +15,14 @@ export interface PendencyPo {
   id: string; po_number: number; po_date: string | null; expected_date: string | null; status: PurchaseOrderStatus;
   /** ISO date the wait is counted from — the PO date, else the day it was created. */
   since: string; days: number;
+  /** ISO day the order was due (expected date, or PO date + 3 d when none), days past it, and whether the date was assumed. */
+  due: string; late: number; assumed: boolean;
   items: PendencyItem[]; pendingQty: number; pendingAmount: number | null;
 }
 export interface PendencyReport {
   vendor: string; phone: string | null; generated: string;
   pos: PendencyPo[];
-  totals: { orders: number; pendingQty: number; oldestSince: string | null; oldestDays: number; pendingAmount: number | null };
+  totals: { orders: number; pendingQty: number; oldestSince: string | null; oldestDays: number; worstLate: number; dueToday: number; pendingAmount: number | null };
 }
 export interface PendingVendor { name: string; phone: string | null; orders: number; oldestSince: string | null }
 
@@ -34,11 +38,13 @@ type Row = {
   purchase_order_items: { sku: string | null; item_name: string; fabric_code: string | null; unit: string | null; quantity: number; received_qty: number | null; rate: number | null; sort_order: number | null }[] | null;
 };
 
-/** Pure: shape raw rows into the report (harness-testable). `now` only feeds the generated stamp. */
+/** Pure: shape raw rows into the report (harness-testable). `now` feeds the generated stamp and the due-date arithmetic. */
 export function buildReport(vendor: string, rows: Row[], now = new Date()): PendencyReport {
   const pos: PendencyPo[] = [];
+  const today = fileDate(now);
   for (const r of rows) {
     const since = r.po_date ? dateOnly(r.po_date) : r.created_at ? dateOnly(r.created_at) : dateOnly(now.toISOString());
+    const d = dueOf({ po_date: since, created_at: null, expected_date: r.expected_date }, today);
     const items = (r.purchase_order_items || [])
       .slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map(it => {
@@ -50,7 +56,7 @@ export function buildReport(vendor: string, rows: Row[], now = new Date()): Pend
     const pendingQty = items.reduce((s, it) => s + it.pending, 0);
     const rated = items.filter(it => it.rate != null);
     const pendingAmount = rated.length ? rated.reduce((s, it) => s + it.pending * (it.rate as number), 0) : null;
-    pos.push({ id: r.id, po_number: r.po_number, po_date: r.po_date, expected_date: r.expected_date, status: r.status, since, days: daysSince(since), items, pendingQty, pendingAmount });
+    pos.push({ id: r.id, po_number: r.po_number, po_date: r.po_date, expected_date: r.expected_date, status: r.status, since, days: daysSince(since), due: d.due, late: d.late, assumed: d.assumed, items, pendingQty, pendingAmount });
   }
   pos.sort((a, b) => a.since.localeCompare(b.since) || a.po_number - b.po_number);
   const phone = rows.find(r => r.vendor_phone)?.vendor_phone ?? null;
@@ -62,6 +68,8 @@ export function buildReport(vendor: string, rows: Row[], now = new Date()): Pend
       pendingQty: pos.reduce((s, p) => s + p.pendingQty, 0),
       oldestSince: pos[0]?.since ?? null,
       oldestDays: pos[0]?.days ?? 0,
+      worstLate: Math.max(0, ...pos.map(p => p.late)),
+      dueToday: pos.filter(p => p.late === 0 && p.due === today).length,
       pendingAmount: amounts.length ? amounts.reduce((s, p) => s + (p.pendingAmount as number), 0) : null,
     },
   };
