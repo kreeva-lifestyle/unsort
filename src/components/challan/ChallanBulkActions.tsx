@@ -21,6 +21,8 @@ interface Props {
   outstanding: number;
   returnsTotal: number;
   netTotal: number;
+  /** Returns are selected alongside another customer's challans. */
+  mixedCustomers: boolean;
   bulkBusy: boolean;
   onSelectAll: () => void;
   onClearSelection: () => void;
@@ -62,6 +64,10 @@ export default function ChallanBulkActions(p: Props) {
   const recvStr = String(p.bulkReceivedAmount).trim();
   const shortBy = recvStr !== '' && p.netTotal > 0 ? Math.abs(p.netTotal) - (Number(recvStr) || 0) : 0;
   const isShort = shortBy > 0.009;
+  // Refund: what is typed is what gets booked as handed back; it can't be
+  // more than the credit, and anything less stays on the return as credit.
+  const refundOver = p.netTotal < 0 && recvStr !== '' && (Number(recvStr) || 0) > Math.abs(p.netTotal) + 0.009;
+  const blocked = p.mixedCustomers || refundOver;
 
   return (
     <>
@@ -95,8 +101,15 @@ export default function ChallanBulkActions(p: Props) {
             <div style={{ marginBottom: 10 }}>
               <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>{p.netTotal < 0 ? 'Amount Refunded to Customer' : 'Amount Received from Customer'}</label>
               <input type="number" min="0" value={p.bulkReceivedAmount} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setBulkReceivedAmount(e.target.value)} placeholder={String(Math.abs(p.netTotal))} style={{ ...S.fInput, width: '100%', fontFamily: T.mono, fontSize: 14 }} />
-              {(() => { const recv = Number(p.bulkReceivedAmount) || 0; const expected = Math.abs(p.netTotal); const diff = recv - expected; if (!p.bulkReceivedAmount || diff === 0) return null; return <div style={{ marginTop: 4, fontSize: 10, color: T.yl, fontWeight: 600 }}>₹{Math.abs(diff).toLocaleString('en-IN')} {diff > 0 ? 'more than expected' : 'less than expected'}</div>; })()}
+              {(() => { const recv = Number(p.bulkReceivedAmount) || 0; const expected = Math.abs(p.netTotal); const diff = recv - expected; if (!p.bulkReceivedAmount || diff === 0) return null;
+                if (p.netTotal < 0) return <div style={{ marginTop: 4, fontSize: 10, color: diff > 0 ? T.re : T.yl, fontWeight: 600 }}>{diff > 0 ? `Only ₹${expected.toLocaleString('en-IN')} of credit is left to refund` : `₹${Math.abs(diff).toLocaleString('en-IN')} stays as credit on the return`}</div>;
+                return <div style={{ marginTop: 4, fontSize: 10, color: T.yl, fontWeight: 600 }}>₹{Math.abs(diff).toLocaleString('en-IN')} {diff > 0 ? 'more than expected' : 'less than expected'}</div>; })()}
             </div>
+            {p.mixedCustomers && (
+              <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re, marginBottom: 10 }}>
+                Return credit can only settle the same customer's challans — select one customer at a time.
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
               <div style={{ flex: 1 }}>
                 <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>{p.netTotal < 0 ? 'Refund Mode' : 'Payment Mode'}</label>
@@ -117,7 +130,7 @@ export default function ChallanBulkActions(p: Props) {
             )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={p.onCloseBulkPay} style={{ ...S.btnGhost, flex: 1 }}>Cancel</button>
-              <button onClick={p.onConfirmBulkPay} disabled={!p.bulkPayMode || p.payable.length === 0 || p.bulkBusy || (isShort && !shortAck)} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: p.bulkPayMode ? `linear-gradient(135deg, ${p.netTotal < 0 ? T.re : T.gr}, ${p.netTotal < 0 ? T.reCC : T.grCC})` : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: p.bulkPayMode && !p.bulkBusy && !(isShort && !shortAck) ? 'pointer' : 'default', opacity: p.bulkPayMode && !p.bulkBusy && !(isShort && !shortAck) ? 1 : 0.4 }}>{p.bulkBusy ? 'Processing…' : p.netTotal < 0 ? 'Settle & Refund' : 'Confirm Pay'}</button>
+              <button onClick={p.onConfirmBulkPay} disabled={!p.bulkPayMode || p.payable.length === 0 || p.bulkBusy || (isShort && !shortAck) || blocked} style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: 'none', background: p.bulkPayMode ? `linear-gradient(135deg, ${p.netTotal < 0 ? T.re : T.gr}, ${p.netTotal < 0 ? T.reCC : T.grCC})` : 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: p.bulkPayMode && !p.bulkBusy && !(isShort && !shortAck) && !blocked ? 'pointer' : 'default', opacity: p.bulkPayMode && !p.bulkBusy && !(isShort && !shortAck) && !blocked ? 1 : 0.4 }}>{p.bulkBusy ? 'Processing…' : p.netTotal < 0 ? 'Settle & Refund' : 'Confirm Pay'}</button>
             </div>
           </div>
         </div>,

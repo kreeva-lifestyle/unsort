@@ -423,12 +423,13 @@ export default function ChallanForm(p: ChallanFormProps) {
               ask — bring ₹2,043 to ₹2,040/₹2,050). Manual values persist
               through edits; Auto returns to the computed figure. */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 11, color: T.tx3, marginBottom: 4 }}>
-            <span>Round Off{p.manualRoundOff !== null && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: T.yl, letterSpacing: '0.06em' }}>MANUAL</span>}</span>
+            <span>Round Off{p.manualRoundOff !== null && !p.isReturn && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: T.yl, letterSpacing: '0.06em' }}>MANUAL</span>}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              {p.manualRoundOff === null ? (
+              {/* A return only rounds down, never by hand — it is credit. */}
+              {p.manualRoundOff === null || p.isReturn ? (
                 <>
                   <span style={{ fontFamily: T.mono }}>{p.roundOff > 0 ? '+' : ''}₹{p.roundOff.toFixed(2)}</span>
-                  <button type="button" className="touch44" onClick={() => { setRoundOffText(p.roundOff.toFixed(2)); p.setManualRoundOff(p.roundOff); }} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 28 }} aria-label="Edit round off">Edit</button>
+                  {!p.isReturn && <button type="button" className="touch44" onClick={() => { setRoundOffText(p.roundOff.toFixed(2)); p.setManualRoundOff(p.roundOff); }} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 28 }} aria-label="Edit round off">Edit</button>}
                 </>
               ) : (
                 <>
