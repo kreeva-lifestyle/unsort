@@ -75,8 +75,8 @@ export default function PendencyReport({ vendor: initial, onClose, addToast }: {
           </select>
         </div>
         {report && report.totals.orders > 0 && (
-          <div style={{ fontSize: 11, color: report.totals.oldestDays > 14 ? T.re : report.totals.oldestDays > 7 ? T.yl : T.tx2, fontFamily: T.mono, paddingTop: 16 }}>
-            {report.totals.orders} open · oldest since {fmtDate(report.totals.oldestSince)} ({waitText(report.totals.oldestDays)})
+          <div style={{ fontSize: 11, color: report.totals.worstLate > 0 ? T.re : report.totals.dueToday > 0 ? T.yl : T.tx2, fontFamily: T.mono, paddingTop: 16 }}>
+            {report.totals.orders} open · oldest since {fmtDate(report.totals.oldestSince)} ({waitText(report.totals.oldestDays)}){report.totals.worstLate > 0 ? ` · worst ${report.totals.worstLate} d late` : report.totals.dueToday > 0 ? ` · ${report.totals.dueToday} due today` : ''}
           </div>
         )}
       </div>

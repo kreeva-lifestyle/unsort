@@ -10,14 +10,14 @@ import { useActiveRefetch } from '../../hooks/useActiveRefetch';
 import { friendlyError } from '../../lib/friendlyError';
 import { fileDate } from '../../lib/exportName';
 import { PENDING_STATUSES } from './pendencyData';
-import { addDays } from './poStats';
+import { addDays, ASSUMED_LEAD_DAYS } from './poDue';
 import type { PORow } from './POList';
 
 export const PO_COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, for_pieces, lump_sum, costing_product_id, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, closed_at, closed_by, close_reason, created_by, modified_by, created_at, updated_at';
 
-/** The summary tiles' one-tap slices: open orders, or open orders waiting over a week (the list's own yellow step). */
-export type PoQuick = '' | 'open' | 'late';
-export const QUICK_LABELS: Record<Exclude<PoQuick, ''>, string> = { open: 'Open orders', late: 'Waiting over a week' };
+/** The summary tiles' one-tap slices: open orders, or open orders past their due date. */
+export type PoQuick = '' | 'open' | 'breached';
+export const QUICK_LABELS: Record<Exclude<PoQuick, ''>, string> = { open: 'Open orders', breached: 'Breached orders' };
 
 export function usePoList(active: boolean | undefined, addToast: (m: string, t?: string) => void) {
   const [pos, setPos] = useState<PORow[]>([]);
@@ -89,9 +89,13 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
       if (ors.length > 0) q = q.or(ors.join(','));
     }
     if (quick) q = q.in('status', PENDING_STATUSES);
-    // "Waiting over a week" = more than 7 days since the PO date, the same
-    // step that turns the list's "pending N d" yellow.
-    if (quick === 'late') q = q.lt('po_date', addDays(fileDate(), -7));
+    // "Breached" = past the due date: the expected date, or (none given)
+    // the PO date plus ASSUMED_LEAD_DAYS — the same rule as poDue.dueOf,
+    // which turns the list's row red.
+    if (quick === 'breached') {
+      const today = fileDate(), cut = addDays(today, -ASSUMED_LEAD_DAYS);
+      q = q.or(`expected_date.lt.${today},and(expected_date.is.null,po_date.lt.${cut}),and(expected_date.is.null,po_date.is.null,created_at.lt.${cut})`);
+    }
     if (vendorFilter) q = q.eq('vendor_name', vendorFilter);
     if (statusFilter) q = q.eq('status', statusFilter);
     if (typeFilter) q = q.eq('po_type', typeFilter);

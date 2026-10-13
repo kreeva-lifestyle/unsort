@@ -1,4 +1,4 @@
-// The summary's quick slices (an open-orders / waiting tile, a vendor bar)
+// The summary's quick slices (an open-orders / breached tile, a vendor bar)
 // shown above the list as chips, each one a tap to clear. Split out of
 // pages/PurchaseOrders.tsx so the page stays under the 200-line limit.
 import { T, S } from '../../lib/theme';
