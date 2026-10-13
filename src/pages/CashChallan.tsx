@@ -1104,6 +1104,12 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   // a return = credit already handed back in cash via settle_return_refund).
   const bulkReturnsTotal = bulkReturns.reduce((s, c) => s + Math.max(0, Number(c.total) - Number(c.amount_paid || 0)), 0);
   const bulkNetTotal = bulkSalesOutstanding - bulkReturnsTotal;
+  // Return credit belongs to its customer: a batch that nets returns must be
+  // one customer's challans (pay_challan_batch refuses anything else). Only
+  // returns with credit left are sent, so only they count here.
+  const bulkCreditReturns = bulkReturns.filter(c => Number(c.total) - Number(c.amount_paid || 0) > 0.009);
+  const bulkMixedCustomers = bulkCreditReturns.length > 0
+    && new Set([...bulkPayable, ...bulkCreditReturns].map(c => c.customer_id || `name:${(c.customer_name || '').trim().toLowerCase()}`)).size > 1;
 
   const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const selectAll = () => setSelectedIds(new Set(challans.filter(c => c.status !== 'voided').map(c => c.id)));
@@ -1111,14 +1117,14 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const exitBulkMode = () => { setBulkMode(false); clearSelection(); };
 
   const executeBulkPay = async () => {
-    if (!bulkPayMode || bulkBusy) return;
+    if (!bulkPayMode || bulkBusy || bulkMixedCustomers) return;
     // Payment date is choosable (owner's ask) — defaults to today, never future.
     const today = localToday();
     const payDate = bulkPayDate || today;
     if (payDate > today) { addToast('Payment date cannot be in the future', 'error'); return; }
     setBulkBusy(true);
     const ids = bulkPayable.map(c => c.id);
-    const settleableReturns = bulkReturns.filter(c => Number(c.total) - Number(c.amount_paid || 0) > 0.009);
+    const settleableReturns = bulkCreditReturns;
     if (ids.length === 0 && settleableReturns.length === 0) { setShowBulkPay(false); setBulkBusy(false); return; }
     const batchId = `BP-${Date.now().toString(36).toUpperCase()}`;
     const isRefund = bulkNetTotal < 0;
@@ -1139,14 +1145,17 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const paidOk: Challan[] = [];
     const skipped: { challan_number?: number; reason: string }[] = [];
     // The selected returns are consumed INSIDE the same RPC/transaction as
-    // the sale payments (p_return_ids): the batch is counted net of their
-    // credit, so a return that cannot be settled rolls the whole batch back
-    // instead of leaving the sales "paid" with the credit still spendable.
-    // Their rows carry the batch id, so batch Undo hands the credits back.
+    // the sale payments (p_return_ids): their credit pays the sales as
+    // mirrored 'Return Credit' entries (so unpay / void / Undo hand it back
+    // to the right return), and any return or sale that cannot be settled
+    // rolls the whole batch back. A refund hands back all the credit left;
+    // a typed refund must match it (the server checks against live rows),
+    // an empty box lets the server refund whatever is actually left.
+    const typedRefund = isRefund && String(bulkReceivedAmount).trim() !== '';
     const { data: payRes, error: payErr } = await supabase.rpc('pay_challan_batch', {
       p_ids: ids, p_mode: bulkPayMode, p_date: payDate, p_batch_id: batchId, p_note: receiptNote, p_refund: isRefund,
       p_extra: isRefund ? { refunded: { from: 0, to: received } } : { received_amount: { from: Math.abs(bulkNetTotal), to: received } },
-      p_return_ids: settleableReturns.map(c => c.id), p_received: isRefund ? null : received,
+      p_return_ids: settleableReturns.map(c => c.id), p_received: isRefund && !typedRefund ? null : received,
     });
     if (payErr) { addToast(friendlyError(payErr), 'error'); setBulkBusy(false); return; }
     const rows = ((payRes as { challan_id: string; challan_number?: number; paid?: number; skipped?: string; is_return?: boolean; written_off?: number }[] | null) || []);
@@ -1198,11 +1207,16 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     const { data: { user } } = await supabase.auth.getUser();
     const { data: results, error: undoErr } = await supabase.rpc('undo_challan_batch', { p_batch_id: batchId, p_undo_batch_id: undoBatchId, p_user: user?.id });
     if (undoErr) { addToast(friendlyError(undoErr), 'error'); return; }
-    const rows = ((results as { challan_id: string; challan_number: number; prev_paid: number; remaining: number }[] | null) || []);
-    if (rows.length === 0) { addToast('Nothing to undo — the batch was not found or its challans changed since', 'error'); return; }
+    // A challan touched after the batch (unpaid / re-paid / voided) comes
+    // back as `skipped` and keeps its newer state.
+    const all = ((results as { challan_id: string; challan_number: number; is_return?: boolean; skipped?: string }[] | null) || []);
+    const rows = all.filter(r => !r.skipped && !r.is_return);
+    const skipped = all.filter(r => r.skipped);
+    if (rows.length === 0 && !all.some(r => r.is_return && !r.skipped)) { addToast('Nothing to undo — the batch was not found or its challans changed since', 'error'); return; }
     setLastBatch(null);
     fetchChallans();
     addToast(`Batch ${batchId} reversed — ${rows.length} challan${rows.length !== 1 ? 's' : ''} reverted`, 'success');
+    if (skipped.length > 0) addToast(`Left as is (changed since the batch): ${skipped.map(r => `#${r.challan_number}`).join(', ')}`, 'error');
   };
 
   // Atomic via RPC: the DB now only allows paid → unpaid inside an
@@ -1434,6 +1448,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
         outstanding={bulkSalesOutstanding}
         returnsTotal={bulkReturnsTotal}
         netTotal={bulkNetTotal}
+        mixedCustomers={bulkMixedCustomers}
         bulkBusy={bulkBusy}
         onSelectAll={selectAll}
         onClearSelection={clearSelection}

@@ -23,6 +23,9 @@ export type AnalyticsData = {
 // every slice has a ranked legend row with name and value.
 const PIE = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767', '#0d9ea8', '#a1662f'];
 
+// Ledger modes that settle a bill without any money changing hands.
+const NOT_MONEY = new Set(['Write-off', 'Return Credit']);
+
 /** One donut slice path (annulus segment), angles in degrees from 12 o'clock. */
 const slicePath = (cx: number, cy: number, r0: number, r1: number, a0: number, a1: number): string => {
   // A lone customer is a full ring - two half-arcs, since a 360° arc collapses.
@@ -99,16 +102,19 @@ export default function ChallanAnalytics({ analytics, from, to, onFromChange, on
           <span style={{ fontSize: 10, fontWeight: 600, color: T.tx3, textTransform: 'uppercase', letterSpacing: 1 }}>Payment Mode Breakup</span>
           <span style={{ fontSize: 9, color: T.tx3 }}>money collected in this range — unpaid billed amounts are not here</span>
         </div>
+        {/* Write-off (a short payment forgiven) and Return Credit (a return
+            set against a bill) settle bills but bring in no money, so they
+            are listed but kept out of "Total collected". */}
         {Object.entries(analytics.byMode).map(([mode, amount]) => (
           <div key={mode} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: `1px solid ${T.bd}` }}>
-            <span style={{ fontSize: 12, color: T.tx }}>{mode}</span>
-            <span style={{ fontSize: 12, fontFamily: T.mono, color: T.ac2, fontWeight: 600 }}>₹{Number(amount).toLocaleString('en-IN')}</span>
+            <span style={{ fontSize: 12, color: NOT_MONEY.has(mode) ? T.tx3 : T.tx }}>{mode}{NOT_MONEY.has(mode) ? ' · not money' : ''}</span>
+            <span style={{ fontSize: 12, fontFamily: T.mono, color: NOT_MONEY.has(mode) ? T.tx3 : T.ac2, fontWeight: 600 }}>₹{Number(amount).toLocaleString('en-IN')}</span>
           </div>
         ))}
         {Object.keys(analytics.byMode).length > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255,255,255,0.02)' }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: T.tx2 }}>Total collected</span>
-            <span style={{ fontSize: 12, fontFamily: T.mono, color: T.tx, fontWeight: 700 }}>₹{Object.values(analytics.byMode).reduce((s, a) => s + Number(a), 0).toLocaleString('en-IN')}</span>
+            <span style={{ fontSize: 12, fontFamily: T.mono, color: T.tx, fontWeight: 700 }}>₹{Object.entries(analytics.byMode).reduce((s, [m, a]) => s + (NOT_MONEY.has(m) ? 0 : Number(a)), 0).toLocaleString('en-IN')}</span>
           </div>
         )}
         {Object.keys(analytics.byMode).length === 0 && <div style={{ padding: 16, textAlign: 'center' as const, color: T.tx3, fontSize: 11 }}>No payments recorded in this date range</div>}

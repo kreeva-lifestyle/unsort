@@ -39,6 +39,11 @@ export function friendlyError(raw: unknown, fallback = 'Something went wrong. Pl
   if (l.includes('fabric item needs a fabric code')) return 'Every fabric item needs a fabric code.';
   if (l.includes('for how many pcs is required')) return 'For how many pcs is required — a whole number above 0, or tick Lump sum.';
   if (l.includes('at least one item') || l.includes('item_name')) return 'Add at least one item with a name and quantity.';
+  // Cash-challan guards raise human guidance (which bill, what to do first)
+  // under code 23514 — show it verbatim rather than the generic text below.
+  if (['sealed period', 'nothing was saved', 'same customer', 'void that return first', 'credit left', 'unpay it first', 'first, then void',
+    'were credited', 'can credit at most', 'round up by less', 'left to return', 'source challan charged', 'between sale and return',
+    'customer cannot be changed', 'not on the source invoice'].some(p => l.includes(p))) return msg;
   if (code === '23514' || l.includes('check constraint')) return 'One of the values is outside the allowed range.';
   if (code === '23502' || l.includes('not null')) return 'A required field is missing.';
 
