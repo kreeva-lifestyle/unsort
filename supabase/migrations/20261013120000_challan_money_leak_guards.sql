@@ -13,8 +13,9 @@
 --       Unpay of the sale hands the credit back to the return, and voiding
 --       the return withdraws it from the sale (the customer owes it again)
 --       — before, both silently lost the credit / the money owed.
---    c. A refund books what the operator says was handed back (never more
---       than the credit left); credit not refunded stays on the return.
+--    c. A refund hands back all the credit left; a typed amount that does
+--       not match it is refused (before, the typed figure was ignored and
+--       the full credit was booked as refunded whatever was handed over).
 --    d. With returns in the batch, any sale that cannot be paid aborts the
 --       whole batch (the net figure assumed every selected bill).
 -- 2. undo_challan_batch works per challan: a short-paid bill's money row and
@@ -25,14 +26,14 @@
 -- 3. void_challan refuses to void a sale while a live return was made from
 --    it ("void that return first") — before, the return's credit outlived
 --    the sale and the customer was relieved twice.
--- 4. update_challan_with_items: a challan cannot flip between sale and
---    return; a sale with live returns keeps at least the returned pieces at
---    no lower price; returns / applied credit pin the bill's customer.
+-- 4. (update_challan_with_items lives in 20261013121000 — applied
+--    separately because the SQL tool needs an owner confirmation for it.)
 -- 5. challan_check_money (returns): same customer as the source bill, unit
---    price never above what the source charged, round-off only down and by
---    less than one rupee (was ±999.99 — a typo could add up to ₹999 of
---    credit). create_challan_with_items locks the source bill so two returns
---    saved at once cannot both pass the returned-quantity cap.
+--    price never above what the source charged, round-off up by less than a
+--    rupee (was ±999.99 — a typo could add up to ₹999 of credit), and all
+--    live returns of a bill together never credit more than it charged for
+--    its goods (total less shipping). create_challan_with_items locks the
+--    source bill so two returns saved at once cannot both pass the caps.
 -- 6. protect_challan_immutability: status -> 'voided' only through
 --    void_challan (a bare update lost payments and credit from the books).
 -- 7. prevent_backdated_challan_payment: a new challan carrying money may not
@@ -64,7 +65,7 @@ DECLARE
   v_is_return boolean := COALESCE((p_challan->>'is_return')::boolean, false);
   v_source uuid := NULLIF(p_challan->>'source_challan_id', '')::uuid;
   v_sku text; v_src_qty numeric; v_prev_qty numeric; v_n int;
-  v_src record; v_unit numeric; v_src_unit numeric;
+  v_src record; v_unit numeric; v_src_unit numeric; v_used numeric;
 BEGIN
   IF COALESCE(btrim(p_challan->>'customer_name'), '') = '' THEN
     RAISE EXCEPTION 'Customer name is required' USING ERRCODE = '23514';
@@ -133,7 +134,7 @@ BEGIN
   -- Returns: only the source invoice's SKUs, never more than it still holds.
   IF v_is_return THEN
     IF v_source IS NULL THEN RAISE EXCEPTION 'A return must name its source invoice' USING ERRCODE = '23514'; END IF;
-    SELECT id, customer_id, customer_name INTO v_src FROM cash_challans WHERE id = v_source AND NOT is_return AND status <> 'voided';
+    SELECT id, challan_number, customer_id, customer_name, total, COALESCE(shipping_charges, 0) AS shipping INTO v_src FROM cash_challans WHERE id = v_source AND NOT is_return AND status <> 'voided';
     IF NOT FOUND THEN RAISE EXCEPTION 'The source invoice is not an open sale' USING ERRCODE = '23514'; END IF;
     -- The credit belongs to the customer who bought the goods.
     IF NOT (
@@ -143,10 +144,19 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'A return must be for the same customer as its source challan' USING ERRCODE = '23514';
     END IF;
-    -- A return's round-off may only take credit away (the nearest lower
-    -- rupee), never add it.
-    IF v_round > 0 OR v_round <= -1 THEN
-      RAISE EXCEPTION 'A return can only round down, by less than 1 rupee' USING ERRCODE = '23514';
+    -- Round-off on a return may go down freely but up by less than a rupee
+    -- (the automatic rounding); the cap below bounds the total anyway.
+    IF v_round >= 1 THEN
+      RAISE EXCEPTION 'A return can round up by less than 1 rupee' USING ERRCODE = '23514';
+    END IF;
+    -- All live returns of a bill together never credit more than the bill
+    -- charged for its goods (total less shipping, after its own discounts
+    -- and round-off). Shipping is not refunded.
+    SELECT COALESCE(SUM(total), 0) INTO v_used FROM cash_challans
+     WHERE source_challan_id = v_source AND is_return AND status <> 'voided' AND (p_self IS NULL OR id <> p_self);
+    IF v_total > v_src.total - v_src.shipping - v_used + 0.009 THEN
+      RAISE EXCEPTION 'This return can credit at most ₹% — what is left of challan #%''s charge. Round it down.',
+        inr_text(greatest(v_src.total - v_src.shipping - v_used, 0)), v_src.challan_number USING ERRCODE = '23514';
     END IF;
     FOR v_sku, v_qty IN
       SELECT COALESCE(NULLIF(btrim(value->>'sku'), ''), ''), SUM((value->>'quantity')::numeric)
@@ -368,7 +378,7 @@ begin
     v_key := coalesce(v_c.customer_id::text, 'name:' || btrim(lower(coalesce(v_c.customer_name, ''))));
     if v_cust is null then v_cust := v_key;
     elsif v_cust <> v_key then
-      raise exception 'Bulk Pay with returns works for one customer at a time — pick one customer''s challans' using errcode = '23514';
+      raise exception 'Returns can only settle the same customer''s challans' using errcode = '23514';
     end if;
     v_ret_ids := v_ret_ids || v_id; v_ret_nums := v_ret_nums || v_c.challan_number;
     v_ret_left := v_ret_left || v_remaining; v_ret_used := v_ret_used || 0::numeric;
@@ -415,7 +425,7 @@ begin
     if v_has_returns then
       v_key := coalesce(v_c.customer_id::text, 'name:' || btrim(lower(coalesce(v_c.customer_name, ''))));
       if v_key <> v_cust then
-        raise exception 'Bulk Pay with returns works for one customer at a time — pick one customer''s challans' using errcode = '23514';
+        raise exception 'Returns can only settle the same customer''s challans' using errcode = '23514';
       end if;
     end if;
 
@@ -470,15 +480,16 @@ begin
     end;
   end loop;
 
-  -- 3. Credit left after the sales: a refund batch hands out what the
-  --    operator says was actually refunded (never more than is left); any
-  --    credit not refunded stays on the return for later.
+  -- 3. Credit left after the sales: a refund batch hands ALL of it back.
+  --    An amount typed by the operator must match it — a part refund would
+  --    book money that was not handed over (or leave credit behind that a
+  --    later handover locks), so it is refused instead of guessed.
   v_left_total := 0;
   for v_k in 1 .. coalesce(array_length(v_ret_ids, 1), 0) loop v_left_total := v_left_total + v_ret_left[v_k]; end loop;
   if coalesce(p_refund, false) and v_has_returns then
-    v_refund := round(coalesce(p_received, v_left_total), 2);
-    if v_refund > v_left_total + 0.009 then
-      raise exception 'Refund ₹% is more than the credit left (₹%)', inr_text(v_refund), inr_text(v_left_total) using errcode = '23514';
+    v_refund := round(v_left_total, 2);
+    if p_received is not null and abs(round(p_received, 2) - v_refund) > 0.009 then
+      raise exception 'Refund ₹% does not match the ₹% credit left — refund it all, or apply part of the credit from the return', inr_text(p_received), inr_text(v_refund) using errcode = '23514';
     end if;
     for v_k in 1 .. coalesce(array_length(v_ret_ids, 1), 0) loop
       exit when v_refund <= 0.009;
@@ -790,168 +801,6 @@ begin
     'total', v_c.total, 'is_return', v_c.is_return, 'inventory_deducted', v_c.inventory_deducted,
     'prev_status', v_c.status, 'prev_paid', coalesce(v_c.amount_paid, 0),
     'credit_withdrawn', v_withdrawn, 'refund_reversed', v_refund, 'batch', v_batch);
-end;
-$function$;
-CREATE OR REPLACE FUNCTION public.update_challan_with_items(p_challan_id uuid, p_challan jsonb, p_items jsonb, p_payment jsonb DEFAULT NULL::jsonb)
- RETURNS jsonb
- LANGUAGE plpgsql
- SET search_path TO 'public'
-AS $function$
-declare
-  v_item jsonb;
-  v_i int := 0;
-  v_tags text[] := null;
-  v_old cash_challans%rowtype;
-  v_new_paid numeric;
-  v_pay_diff numeric;
-  v_is_return boolean := coalesce((p_challan->>'is_return')::boolean, false);
-  v_new_status text := p_challan->>'status';
-  v_new_total numeric := (p_challan->>'total')::numeric;
-  v_actor uuid := coalesce(auth.uid(), (p_challan->>'modified_by')::uuid);
-  v_changes jsonb := '{}'::jsonb;
-  v_k text; v_from text; v_to text;
-  v_has_returns boolean := false;
-  v_sku text; v_ret_qty numeric; v_ret_unit numeric; v_new_qty numeric; v_new_unit numeric;
-begin
-  perform set_config('app.challan_rpc', 'on', true);
-  perform challan_check_money(p_challan, p_items, p_challan_id);
-
-  if p_challan->'tags' is not null and jsonb_typeof(p_challan->'tags') = 'array' and jsonb_array_length(p_challan->'tags') > 0 then
-    v_tags := array(select jsonb_array_elements_text(p_challan->'tags'));
-  end if;
-
-  select * into v_old from cash_challans where id = p_challan_id for update;
-  if not found then
-    raise exception 'Challan not found';
-  end if;
-  if v_old.status = 'voided' then
-    raise exception 'Cannot edit a voided challan';
-  end if;
-  if v_is_return is distinct from coalesce(v_old.is_return, false) then
-    raise exception 'A challan cannot be switched between sale and return' using errcode = '23514';
-  end if;
-  if not v_is_return then
-    v_has_returns := exists (select 1 from cash_challans r where r.source_challan_id = p_challan_id and r.is_return and r.status <> 'voided');
-    -- Returns and applied return credit tie this bill to its customer.
-    if (case when v_old.customer_id is not null
-             then nullif(p_challan->>'customer_id', '')::uuid is distinct from v_old.customer_id
-             else btrim(lower(coalesce(p_challan->>'customer_name', ''))) <> btrim(lower(coalesce(v_old.customer_name, ''))) end)
-       and (v_has_returns or exists (
-         select 1 from cash_challan_payments where challan_id = p_challan_id and payment_mode = 'Return Credit'
-         group by challan_id having sum(case when is_reversal then -amount else amount end) > 0)) then
-      raise exception 'Return credit is tied to this customer — the customer cannot be changed' using errcode = '23514';
-    end if;
-    -- Goods returned from this bill must stay on it, at no lower price,
-    -- or the return's credit would outlive the sale.
-    if v_has_returns then
-      for v_sku, v_ret_qty, v_ret_unit in
-        select coalesce(nullif(btrim(i.sku), ''), ''), sum(i.quantity), max(round(i.total / nullif(i.quantity, 0), 2))
-          from cash_challan_items i join cash_challans r on r.id = i.challan_id
-         where r.source_challan_id = p_challan_id and r.is_return and r.status <> 'voided'
-         group by 1
-      loop
-        select coalesce(sum((value->>'quantity')::numeric), 0), min(round((value->>'total')::numeric / nullif((value->>'quantity')::numeric, 0), 2))
-          into v_new_qty, v_new_unit
-          from jsonb_array_elements(p_items) where coalesce(nullif(btrim(value->>'sku'), ''), '') = v_sku;
-        if v_new_qty < v_ret_qty then
-          raise exception 'SKU %: % pcs were returned from this challan — keep at least that many', v_sku, v_ret_qty::int using errcode = '23514';
-        end if;
-        if v_new_unit < v_ret_unit - 0.01 then
-          raise exception 'SKU %: price cannot go below what its return was credited', v_sku using errcode = '23514';
-        end if;
-      end loop;
-    end if;
-  end if;
-
-  v_new_paid := coalesce((p_challan->>'amount_paid')::numeric, 0);
-  v_pay_diff := v_new_paid - coalesce(v_old.amount_paid, 0);
-
-  if not v_is_return then
-    if v_new_status = 'paid' and v_new_paid is distinct from v_new_total then
-      raise exception 'Status "paid" requires amount_paid (%) to equal total (%)', v_new_paid, v_new_total using errcode = '23514';
-    elsif v_new_status = 'partial' and not (v_new_paid > 0 and v_new_paid < v_new_total) then
-      raise exception 'Status "partial" requires 0 < amount_paid (%) < total (%)', v_new_paid, v_new_total using errcode = '23514';
-    elsif v_new_status = 'unpaid' and v_new_paid <> 0 then
-      raise exception 'Status "unpaid" requires amount_paid 0, got %', v_new_paid using errcode = '23514';
-    end if;
-  end if;
-  if v_pay_diff <> 0 and p_payment is null then
-    raise exception 'amount_paid changed by % without a payment record', v_pay_diff using errcode = '23514';
-  end if;
-
-  if v_pay_diff > 0 and p_payment is not null then
-    insert into cash_challan_payments (
-      challan_id, amount, payment_mode, payment_date, paid_by, is_reversal
-    ) values (
-      p_challan_id,
-      v_pay_diff,
-      coalesce(p_payment->>'payment_mode', 'Cash'),
-      coalesce((p_payment->>'payment_date')::date, (now() at time zone 'Asia/Kolkata')::date),
-      v_actor,
-      false
-    );
-  elsif v_pay_diff < 0 and p_payment is not null then
-    perform challan_reverse_payments(p_challan_id, abs(v_pay_diff), 'Payment removed/reduced', null, v_actor);
-  end if;
-
-  delete from cash_challan_items where challan_id = p_challan_id;
-
-  for v_item in select jsonb_array_elements(p_items)
-  loop
-    insert into cash_challan_items (
-      challan_id, sku, description, quantity, price, total,
-      discount_type, discount_value, discount_amount, sort_order
-    ) values (
-      p_challan_id,
-      nullif(v_item->>'sku', ''),
-      v_item->>'description',
-      (v_item->>'quantity')::numeric,
-      (v_item->>'price')::numeric,
-      (v_item->>'total')::numeric,
-      nullif(v_item->>'discount_type', ''),
-      coalesce((v_item->>'discount_value')::numeric, 0),
-      coalesce((v_item->>'discount_amount')::numeric, 0),
-      v_i
-    );
-    v_i := v_i + 1;
-  end loop;
-
-  update cash_challans set
-    customer_id = (p_challan->>'customer_id')::uuid,
-    customer_name = p_challan->>'customer_name',
-    customer_phone = nullif(p_challan->>'customer_phone', ''),
-    status = p_challan->>'status',
-    subtotal = (p_challan->>'subtotal')::numeric,
-    discount_type = nullif(p_challan->>'discount_type', ''),
-    discount_value = coalesce((p_challan->>'discount_value')::numeric, 0),
-    discount_amount = coalesce((p_challan->>'discount_amount')::numeric, 0),
-    shipping_charges = coalesce((p_challan->>'shipping_charges')::numeric, 0),
-    round_off = coalesce((p_challan->>'round_off')::numeric, 0),
-    total = (p_challan->>'total')::numeric,
-    amount_paid = v_new_paid,
-    payment_mode = nullif(p_challan->>'payment_mode', ''),
-    payment_date = (nullif(p_challan->>'payment_date', ''))::date,
-    notes = nullif(p_challan->>'notes', ''),
-    tags = v_tags,
-    is_return = coalesce((p_challan->>'is_return')::boolean, false),
-    modified_by = v_actor,
-    updated_at = now()
-  where id = p_challan_id;
-
-  foreach v_k in array array['status','amount_paid','payment_mode','payment_date','total','round_off','customer_name','shipping_charges','notes'] loop
-    v_from := coalesce(to_jsonb(v_old) ->> v_k, '');
-    v_to := coalesce(p_challan ->> v_k, '');
-    if v_k in ('amount_paid','total','round_off','shipping_charges') then
-      if abs(coalesce(nullif(v_from,'')::numeric, 0) - coalesce(nullif(v_to,'')::numeric, 0)) > 0.001 then
-        v_changes := v_changes || jsonb_build_object(v_k, jsonb_build_object('from', to_jsonb(v_old) -> v_k, 'to', p_challan -> v_k));
-      end if;
-    elsif v_from <> v_to then
-      v_changes := v_changes || jsonb_build_object(v_k, jsonb_build_object('from', to_jsonb(v_old) -> v_k, 'to', p_challan -> v_k));
-    end if;
-  end loop;
-  perform audit_write('cash_challan', 'UPDATE', p_challan_id::text, 'Challan #' || v_old.challan_number || ' updated', nullif(v_changes, '{}'::jsonb));
-
-  return jsonb_build_object('id', p_challan_id, 'ok', true);
 end;
 $function$;
 CREATE OR REPLACE FUNCTION public.protect_challan_immutability()

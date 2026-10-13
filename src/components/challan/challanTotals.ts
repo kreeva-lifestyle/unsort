@@ -31,11 +31,7 @@ export function challanTotals(items: TotalsItem[], shippingCharges: number, isRe
   // hidden in return mode and any lingering value is ignored here.
   const clampedShipping = isReturn ? 0 : Math.max(0, shippingCharges);
   const afterAll = r2(subtotal - totalDiscount + clampedShipping);
-  // A return is customer credit: it only ever rounds DOWN to the rupee and
-  // takes no manual round-off, so it can never credit more than the goods
-  // were worth (the server refuses anything else).
-  const roundOff = isReturn ? r2(Math.floor(afterAll + 1e-9) - afterAll)
-    : manualRoundOff === null ? r2(Math.round(afterAll) - afterAll) : r2(manualRoundOff);
+  const roundOff = manualRoundOff === null ? r2(Math.round(afterAll) - afterAll) : r2(manualRoundOff);
   const grandTotal = r2(afterAll + roundOff);
   return { subtotal, totalDiscount, clampedShipping, afterAll, roundOff, grandTotal };
 }

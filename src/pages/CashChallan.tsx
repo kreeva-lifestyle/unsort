@@ -1105,9 +1105,11 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
   const bulkReturnsTotal = bulkReturns.reduce((s, c) => s + Math.max(0, Number(c.total) - Number(c.amount_paid || 0)), 0);
   const bulkNetTotal = bulkSalesOutstanding - bulkReturnsTotal;
   // Return credit belongs to its customer: a batch that nets returns must be
-  // one customer's challans (pay_challan_batch refuses anything else).
-  const bulkMixedCustomers = bulkReturns.length > 0
-    && new Set([...bulkPayable, ...bulkReturns].map(c => c.customer_id || `name:${(c.customer_name || '').trim().toLowerCase()}`)).size > 1;
+  // one customer's challans (pay_challan_batch refuses anything else). Only
+  // returns with credit left are sent, so only they count here.
+  const bulkCreditReturns = bulkReturns.filter(c => Number(c.total) - Number(c.amount_paid || 0) > 0.009);
+  const bulkMixedCustomers = bulkCreditReturns.length > 0
+    && new Set([...bulkPayable, ...bulkCreditReturns].map(c => c.customer_id || `name:${(c.customer_name || '').trim().toLowerCase()}`)).size > 1;
 
   const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const selectAll = () => setSelectedIds(new Set(challans.filter(c => c.status !== 'voided').map(c => c.id)));
@@ -1122,7 +1124,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     if (payDate > today) { addToast('Payment date cannot be in the future', 'error'); return; }
     setBulkBusy(true);
     const ids = bulkPayable.map(c => c.id);
-    const settleableReturns = bulkReturns.filter(c => Number(c.total) - Number(c.amount_paid || 0) > 0.009);
+    const settleableReturns = bulkCreditReturns;
     if (ids.length === 0 && settleableReturns.length === 0) { setShowBulkPay(false); setBulkBusy(false); return; }
     const batchId = `BP-${Date.now().toString(36).toUpperCase()}`;
     const isRefund = bulkNetTotal < 0;
@@ -1146,17 +1148,18 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
     // the sale payments (p_return_ids): their credit pays the sales as
     // mirrored 'Return Credit' entries (so unpay / void / Undo hand it back
     // to the right return), and any return or sale that cannot be settled
-    // rolls the whole batch back. On a refund, p_received is what was
-    // actually handed over — credit not refunded stays on the return.
+    // rolls the whole batch back. A refund hands back all the credit left;
+    // a typed refund must match it (the server checks against live rows),
+    // an empty box lets the server refund whatever is actually left.
+    const typedRefund = isRefund && String(bulkReceivedAmount).trim() !== '';
     const { data: payRes, error: payErr } = await supabase.rpc('pay_challan_batch', {
       p_ids: ids, p_mode: bulkPayMode, p_date: payDate, p_batch_id: batchId, p_note: receiptNote, p_refund: isRefund,
       p_extra: isRefund ? { refunded: { from: 0, to: received } } : { received_amount: { from: Math.abs(bulkNetTotal), to: received } },
-      p_return_ids: settleableReturns.map(c => c.id), p_received: received,
+      p_return_ids: settleableReturns.map(c => c.id), p_received: isRefund && !typedRefund ? null : received,
     });
     if (payErr) { addToast(friendlyError(payErr), 'error'); setBulkBusy(false); return; }
-    const rows = ((payRes as { challan_id: string; challan_number?: number; paid?: number; skipped?: string; is_return?: boolean; written_off?: number; credit_left?: number }[] | null) || []);
+    const rows = ((payRes as { challan_id: string; challan_number?: number; paid?: number; skipped?: string; is_return?: boolean; written_off?: number }[] | null) || []);
     const writtenOff = rows.reduce((s, r) => s + Number(r.written_off || 0), 0); const settleFail = 0; let settledCount = 0; // short payment → 'Write-off' rows on the last challans paid
-    const creditLeft = rows.reduce((s, r) => s + (r.is_return ? Number(r.credit_left || 0) : 0), 0);
     for (const r of rows) {
       if (r.written_off || r.is_return) { if (r.is_return) settledCount++; continue; }
       const c = bulkPayable.find(x => x.id === r.challan_id);
@@ -1172,7 +1175,7 @@ export default function CashChallan({ active }: { active?: boolean } = {}) {
       if (settleableReturns.length > 0) parts.push(`${settledCount} of ${settleableReturns.length} return credits settled${settleFail > 0 ? ` (${settleFail} failed)` : ''}`);
       addToast(`${parts.join(' · ')} (${batchId})`, 'error');
     }
-    else addToast(isRefund ? `Settled ${ids.length} challans, refunded ₹${received.toLocaleString('en-IN')}${creditLeft > 0.009 ? `, ₹${creditLeft.toLocaleString('en-IN')} credit kept on the return` : ''} (${batchId})` : `${ids.length > 0 ? `${ids.length} challans marked as paid` : `${settledCount} return credit${settledCount === 1 ? '' : 's'} settled`}${writtenOff > 0 ? `, ₹${writtenOff.toLocaleString('en-IN')} written off` : ''} (${batchId})`, 'success');
+    else addToast(isRefund ? `Settled ${ids.length} challans, refunded ₹${received.toLocaleString('en-IN')} (${batchId})` : `${ids.length > 0 ? `${ids.length} challans marked as paid` : `${settledCount} return credit${settledCount === 1 ? '' : 's'} settled`}${writtenOff > 0 ? `, ₹${writtenOff.toLocaleString('en-IN')} written off` : ''} (${batchId})`, 'success');
     // Offer a WhatsApp receipt when the whole batch belongs to one customer
     // (the common per-customer settlement case). Mixed selections: skip.
     if (paidOk.length > 0) {

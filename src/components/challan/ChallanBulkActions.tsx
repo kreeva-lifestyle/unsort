@@ -64,10 +64,10 @@ export default function ChallanBulkActions(p: Props) {
   const recvStr = String(p.bulkReceivedAmount).trim();
   const shortBy = recvStr !== '' && p.netTotal > 0 ? Math.abs(p.netTotal) - (Number(recvStr) || 0) : 0;
   const isShort = shortBy > 0.009;
-  // Refund: what is typed is what gets booked as handed back; it can't be
-  // more than the credit, and anything less stays on the return as credit.
-  const refundOver = p.netTotal < 0 && recvStr !== '' && (Number(recvStr) || 0) > Math.abs(p.netTotal) + 0.009;
-  const blocked = p.mixedCustomers || refundOver;
+  // Refund: all the credit left goes back. A typed amount must match it —
+  // a part refund would book money that was never handed over.
+  const refundMismatch = p.netTotal < 0 && recvStr !== '' && Math.abs((Number(recvStr) || 0) - Math.abs(p.netTotal)) > 0.009;
+  const blocked = p.mixedCustomers || refundMismatch;
 
   return (
     <>
@@ -102,7 +102,7 @@ export default function ChallanBulkActions(p: Props) {
               <label style={{ ...S.fLabel, display: 'block', marginBottom: 4 }}>{p.netTotal < 0 ? 'Amount Refunded to Customer' : 'Amount Received from Customer'}</label>
               <input type="number" min="0" value={p.bulkReceivedAmount} onKeyDown={e => numericKeyDown(e)} onChange={e => p.setBulkReceivedAmount(e.target.value)} placeholder={String(Math.abs(p.netTotal))} style={{ ...S.fInput, width: '100%', fontFamily: T.mono, fontSize: 14 }} />
               {(() => { const recv = Number(p.bulkReceivedAmount) || 0; const expected = Math.abs(p.netTotal); const diff = recv - expected; if (!p.bulkReceivedAmount || diff === 0) return null;
-                if (p.netTotal < 0) return <div style={{ marginTop: 4, fontSize: 10, color: diff > 0 ? T.re : T.yl, fontWeight: 600 }}>{diff > 0 ? `Only ₹${expected.toLocaleString('en-IN')} of credit is left to refund` : `₹${Math.abs(diff).toLocaleString('en-IN')} stays as credit on the return`}</div>;
+                if (p.netTotal < 0) return <div style={{ marginTop: 4, fontSize: 10, color: T.re, fontWeight: 600 }}>Refund the full ₹{expected.toLocaleString('en-IN')} — or apply part of the credit from the return instead</div>;
                 return <div style={{ marginTop: 4, fontSize: 10, color: T.yl, fontWeight: 600 }}>₹{Math.abs(diff).toLocaleString('en-IN')} {diff > 0 ? 'more than expected' : 'less than expected'}</div>; })()}
             </div>
             {p.mixedCustomers && (
