@@ -69,6 +69,19 @@ self.addEventListener('fetch', e => {
     return;
   }
 
+  // Hashed build output (/assets/<name>-<hash>.js|css): the URL changes
+  // whenever the content does, so a cached copy can never be stale. Serve
+  // it from the build-stamped cache and fetch only on a miss. index.html
+  // stays network-first above — that is what moves a device to new hashes
+  // (and the activate handler drops the old cache on each deploy).
+  if (url.pathname.startsWith('/assets/')) {
+    e.respondWith(caches.match(e.request).then(c => c || fetch(e.request).then(r => {
+      if (r.ok) { const clone = r.clone(); caches.open(CACHE).then(cache => cache.put(e.request, clone)); }
+      return r;
+    })));
+    return;
+  }
+
   // JS/CSS: network-first with cache fallback (prevents stale chunk errors)
   if (url.pathname.match(/\.(js|css)$/)) {
     e.respondWith(

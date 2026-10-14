@@ -5,18 +5,26 @@
 //                      detail), appended after the page's crumbs while the
 //                      label is non-null and gone the moment it closes.
 // Nested sub-views mount in order, so their crumbs read outer → inner.
+//
+// Two contexts on purpose: the actions never change, the trail changes on
+// every relabel (a costing sheet pushes its SKU as typed). Pages and hooks
+// read only the actions, so a keystroke in a sheet re-renders the Header,
+// not the page that hosts the sheet and every tool under it.
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 
 interface Layer { id: number; label: string }
-interface BreadcrumbCtx {
-  crumbs: string[];
+interface Actions {
   set: (c: string[] | null) => void;
   push: (id: number, label: string) => void;
   remove: (id: number) => void;
 }
-const Ctx = createContext<BreadcrumbCtx>({ crumbs: [], set: () => {}, push: () => {}, remove: () => {} });
+const ActionsCtx = createContext<Actions>({ set: () => {}, push: () => {}, remove: () => {} });
+const CrumbsCtx = createContext<string[]>([]);
 
-export const useBreadcrumb = () => useContext(Ctx);
+/** Pages: `set` (and useCrumb's push/remove). Stable — never re-renders a consumer. */
+export const useBreadcrumb = () => useContext(ActionsCtx);
+/** Header only: the trail to display. */
+export const useCrumbs = () => useContext(CrumbsCtx);
 
 let seq = 0;
 export function useCrumb(label: string | null) {
@@ -39,6 +47,11 @@ export const BreadcrumbProvider = ({ children }: { children: React.ReactNode }) 
   const push = useCallback((id: number, label: string) => setLayers(ls =>
     ls.some(l => l.id === id) ? ls.map(l => (l.id === id ? { id, label } : l)) : [...ls, { id, label }]), []);
   const remove = useCallback((id: number) => setLayers(ls => ls.filter(l => l.id !== id)), []);
-  const value = useMemo(() => ({ crumbs: [...base, ...layers.map(l => l.label)], set, push, remove }), [base, layers, set, push, remove]);
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  const actions = useMemo(() => ({ set, push, remove }), [set, push, remove]);
+  const crumbs = useMemo(() => [...base, ...layers.map(l => l.label)], [base, layers]);
+  return (
+    <ActionsCtx.Provider value={actions}>
+      <CrumbsCtx.Provider value={crumbs}>{children}</CrumbsCtx.Provider>
+    </ActionsCtx.Provider>
+  );
 };

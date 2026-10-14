@@ -66,9 +66,9 @@ export default function RateCardGenerator({ addToast, lockedMode, shareToken }: 
 
   const pickExcel = (f: File) => {
     const reader = new FileReader();
-    reader.onload = ev => {
+    reader.onload = async ev => {
       try {
-        const p = parseRateSheet(ev.target?.result as ArrayBuffer);
+        const p = await parseRateSheet(ev.target?.result as ArrayBuffer);
         setParsed(p); setExcelName(f.name); setResult(null);
         addToast(`${p.rows.length} design${p.rows.length === 1 ? '' : 's'} imported (${p.columns.join(', ')})`, 'success');
       } catch (e) { addToast(friendlyError(e), 'error'); }

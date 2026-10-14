@@ -31,7 +31,7 @@ Contents
 | Build gate | `npm run build` = `eslint src/ && tsc && vite build`. `tsconfig.json` is `strict` with `noUnusedLocals`/`noUnusedParameters`. ESLint: `typescript-eslint` recommended + `react-hooks` (`exhaustive-deps` = warn, `no-explicit-any` and `no-unused-vars` off). 28 warnings exist today, 0 errors. |
 | Deploy | `.github/workflows/deploy.yml`: on push to `main` (and manual dispatch) → `npm ci`, `npm run build`, upload `dist/`, `actions/deploy-pages@v4`. Concurrency group `pages` with `cancel-in-progress: false` (deploys queue). Live at `https://dailyoffice.aryadesigns.co.in`. |
 | Vite | `vite.config.ts`: `base: '/'`, `cssTarget: 'safari15'`, `define __APP_BUILD__` (build stamp shown by `?vpdebug`), plugin `swVersionStamp` rewrites `__BUILD_TS__` in `dist/sw.js` so every deploy installs a fresh service-worker cache. |
-| PWA | `public/sw.js` precaches `/index.html`, network-first for HTML/JS/CSS, cache-first for public Supabase Storage images (own `dailyoffice-images-v1` cache that survives deploys, CORS refetch on miss, capped at 200 oldest-first; uploads set `cacheControl: '31536000'` since every upload is a new url), posts `SW_UPDATED` to clients on activate; `main.tsx` shows a full-screen "Update Available" overlay only when a Supabase auth token exists in `localStorage` and the hash is not a `#/s/` short link. `public/manifest.json`, icons, `arya-designs-logo.png` (preloaded for short-link pages). |
+| PWA | `public/sw.js` precaches `/index.html`, network-first for HTML and non-hashed JS/CSS, cache-first for Vite's hashed `/assets/*` (the url changes with the content, so a warm device opens Minis with no network; `index.html` staying network-first is what moves it to new hashes), cache-first for public Supabase Storage images (own `dailyoffice-images-v1` cache that survives deploys, CORS refetch on miss, capped at 200 oldest-first; uploads set `cacheControl: '31536000'` since every upload is a new url), posts `SW_UPDATED` to clients on activate; `main.tsx` shows a full-screen "Update Available" overlay only when a Supabase auth token exists in `localStorage` and the hash is not a `#/s/` short link. `public/manifest.json`, icons, `arya-designs-logo.png` (preloaded for short-link pages). |
 | index.html | Minimal meta CSP (`object-src 'none'; base-uri 'self'`), `viewport-fit=cover`, iOS standalone meta tags, Google Fonts (Inter, Sora, JetBrains Mono), inline splash removed by a `MutationObserver` once `#root` has children. |
 | Claude Code | `.claude/settings.json`: one `SessionStart` hook running `tsc --noEmit` + `eslint src/` (120 s). `.claude/skills/supabase-migration/SKILL.md`: 8-step migration workflow + 10-point checklist. |
 | Tests | None. Verification is `npm run build` plus manual/headless-Chromium checks. |
@@ -82,7 +82,7 @@ marked (G).
 | Path | Lines | Purpose | Key exports | Touches |
 |---|---|---|---|---|
 | `lib/theme.tsx` | 409 | Design tokens `T` (OKLCH), style recipes `S`, `alpha()`, `oklchTint()`, `Pill`, `Icon` (22 stroke icons), `CHALLAN_STATUS_COLORS`, `PO_STATUS_COLORS` | `T, S, alpha, oklchTint, Pill, Icon, …` | none |
-| `lib/supabase.ts` | 7 | Supabase client; the only place the anon key lives | `supabase, SUPABASE_ANON_KEY` | — |
+| `lib/supabase.ts` | 13 | Supabase client; the only place the anon key lives; `currentUserId()` reads the stored session (no `/auth/v1/user` round trip) for `created_by` columns | `supabase, SUPABASE_ANON_KEY, currentUserId` | — |
 | `lib/tabs.ts` | 50 | Tab ids, module labels, role/`module_access` gating. The Home tab (`dashboard`) is always reachable; the admin's "Dashboard data" toggle gates the numbers via `canSeeDashboardData` (App mounts `Dashboard` or `HomeLite`) | `TAB_IDS, MODULE_LABELS, ALL_MODULE_KEYS, canAccessTab, canAccessModule, canSeeDashboardData, getFirstAllowedTab` | reads `profiles.role` / `module_access` passed in |
 | `lib/friendlyError.ts` | 64 | Maps Postgres/GoTrue/network errors to human copy; `console.error`s the raw message | `friendlyError` | — |
 | `lib/printQueue.ts` | 202 | Global print mode (`app_settings.print_mode` ↔ `localStorage.print_mode`), `printOrQueue` (cloud → `print_queue` insert + per-job watcher; default → iframe print), `browserPrint` | `getPrintMode, setPrintMode, initGlobalPrintMode, submitPrintJob, printOrQueue` | `app_settings` select/upsert (`print_mode`, `print_station_heartbeat`); `print_queue` insert/select; channels `app-settings-print-mode` (filter `key=eq.print_mode`) and `print-job-<id>` (filter `id=eq.<id>`) |
@@ -96,7 +96,8 @@ marked (G).
 | `lib/motion.ts` | 34 | The motion vocabulary (Motion Lab 01): `M` durations (90/160/220/320/450), `E` curves, `reducedMotion()`, `animate(el, frames, opts)` — Web Animations that strip movement under Reduce Motion and never throw. `index.css` carries the same values as `--m-*` / `--e-*` | `M, E, animate, reducedMotion` | — |
 | `lib/launch.ts` | 61 | The branded launch (Motion Lab 09): takes over the splash `index.html` painted (crest + wordmark), plays one sheen, waits for the header's `#brand-slot` (or `[data-launch-end]` on the sign-in page, or 3 s), flies the crest into the slot while the splash fades, then removes both and clears `html.launching`. Public routes skip it; Reduce Motion = crossfade | `runLaunch` | called once from `main.tsx` |
 | `lib/downloadFile.ts` | 32 | Share-sheet on touch devices, `<a download>` elsewhere | `downloadFile` | — |
-| `lib/xlsxDownload.ts` | 20 | `XLSX.write` → `downloadFile` | `saveWorkbook` | — |
+| `lib/xlsxDownload.ts` | 23 | `XLSX.write` → `downloadFile`; async, imports `xlsx` on first call so the 415 KB library never rides a page chunk | `saveWorkbook` | — |
+| `lib/retryImport.tsx` | 31 | `React.lazy` with a one-shot reload when a chunk 404s after a deploy (`ChunkErrorScreen` otherwise); used by `App.tsx` for pages and by `Minis.tsx` for every tool | `retryImport, ChunkErrorScreen` | sessionStorage `chunkReloadedAt` |
 | `lib/fetchPaged.ts` | 18 | Page a PostgREST query in 1000s (server cap) | `fetchPaged` | — |
 | `lib/customerOutstanding.ts` | 40 | Canonical "what this customer owes" (open sales − unsettled return credits) | `fetchCustomerOutstanding` | `cash_challans` select ×2 |
 | `lib/beforeSignOut.ts` | 18 | Registry of async flushes awaited before sign-out (PackTime sheet queue) | `registerBeforeSignOut, runBeforeSignOut` | — |
@@ -116,7 +117,7 @@ marked (G).
 | `hooks/useModalLock.ts` | 17 | `body.modal-open` toggle, released only when no `.modal-inner` remains | DOM |
 | `hooks/useActiveRefetch.ts` | 60 | Throttled refetch only while the tab is active/visible; marks stale otherwise | DOM events |
 | `hooks/useViewportRestore.ts` | 93 | iOS standalone keyboard-shrink fix (display:none round-trip on `#root`) | DOM |
-| `hooks/useBreadcrumb.tsx` | 45 | Header breadcrumb context: `set(crumbs)` for a page's own trail + `useCrumb(label)` for one open sub-view (appended outer → inner, gone on close) | — |
+| `hooks/useBreadcrumb.tsx` | 57 | Header breadcrumb: two contexts — stable actions (`useBreadcrumb` → `set(crumbs)` for a page's own trail, `useCrumb(label)` for one open sub-view, appended outer → inner, gone on close) and the trail itself (`useCrumbs`, Header only), so a relabel re-renders the Header, not the page | — |
 | `hooks/useDebouncedFetch.ts` | 29 | Debounced/flushable fetch wrapper | — |
 | `hooks/useUndoDelete.ts` | 60 | 5-s undoable delete (table per call); failure only `console.error` | dynamic `supabase.from(table).delete()` |
 | `hooks/useProductCatalog.ts` | 275 | Module-singleton SKU catalog (sorted index + Map), localStorage cache `unsort.product_catalog.v1` validated by fingerprint; `searchProducts/resolveSku/needsSize/variantSku` | `product_catalog` select (paged 1000, explicit cols; fingerprint `count:'exact'` + max `updated_at`) |
@@ -290,7 +291,7 @@ marked (G).
 
 | Path | Lines | Purpose | Touches |
 |---|---|---|---|
-| `pages/Minis.tsx` | 513 (G) | Tool hub (tile grid from `miniRegistry`), routes each `MiniView`, hosts the Utsav import + compare inline | `utsav_ignored_skus` select/insert/delete; edge `short-track` action `compare` (anon key); `saveWorkbook` |
+| `pages/Minis.tsx` | 487 (G) | Tool hub (tile grid from `miniRegistry`), routes each `MiniView`; every tool is a `retryImport` lazy chunk behind one `Suspense` inside the hub (the tab paints ~25 KB, a tool costs its own chunk on first tap); hosts the Utsav import + compare inline, `xlsx` imported on demand | `utsav_ignored_skus` select/insert/delete; edge `short-track` action `compare` (anon key); `saveWorkbook` |
 | `components/minis/miniRegistry.ts` | 32 | `MiniView` union, breadcrumb labels, tile list (17 tools) | — |
 | `components/minis/VirtualStock.tsx` | 170 | Manual stock overrides shared by Utsav/Cbazaar/Odette/Indya | `virtual_stock` select/insert/update/delete; CSV via hand-built string (no `csvCell`) |
 | `components/minis/AddressPrinter.tsx` | 221 | LabelMaker: saved addresses, copies, 4×6 in courier labels | `address_labels` CRUD; `printOrQueue('label_large', {4,6})`; SwipeRow `label-maker` |

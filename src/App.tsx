@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Component, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef, Component, Suspense } from 'react';
 import { friendlyError } from './lib/friendlyError';
 
 // Preload logo immediately for short-link pages — fires before React renders anything,
@@ -29,31 +29,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: un
   }
 }
 
-// Chunk-load failures: a fresh deploy renames hashed chunks, so a stale tab
-// 404s on navigation — one auto-reload fixes that. But offline (or with a
-// broken deploy) the reload fails the same way forever, looping the page with
-// no explanation. The 30s guard turns repeat failures into a real screen.
-const ChunkErrorScreen = () => (
-  <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-    <div style={{ textAlign: 'center', maxWidth: 360 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: T.tx, fontFamily: T.sora, marginBottom: 8 }}>Couldn't load this page</div>
-      <p style={{ color: T.tx3, fontSize: 11, marginBottom: 16, lineHeight: 1.5 }}>Check your internet connection, then reload. If it keeps happening, a new version may still be deploying — wait a minute and try again.</p>
-      <button onClick={() => window.location.reload()} style={{ ...S.btnPrimary, padding: '7px 18px', fontSize: 11 }}>Reload</button>
-    </div>
-  </div>
-);
-const retryImport = (fn: () => Promise<any>) => lazy(() =>
-  fn().catch(() => {
-    let last = 0;
-    try { last = Number(sessionStorage.getItem('chunkReloadedAt')) || 0; } catch {}
-    if (Date.now() - last > 30_000) {
-      try { sessionStorage.setItem('chunkReloadedAt', String(Date.now())); } catch {}
-      window.location.reload();
-      return new Promise<never>(() => {});
-    }
-    return { default: ChunkErrorScreen };
-  })
-);
+import { retryImport } from './lib/retryImport';
 
 const BrandTagPrinter = retryImport(() => import('./pages/BrandTags'));
 const PackTime = retryImport(() => import('./pages/PackTime'));

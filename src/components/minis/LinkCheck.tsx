@@ -4,11 +4,11 @@
 // writes nothing), then "Replace N links" applies only the confirmed matches.
 // The server refuses to touch a row when the right folder isn't found or is
 // ambiguous (catalog-aware matching). Creds live in the server vault.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import * as XLSX from 'xlsx';
 import { saveWorkbook } from '../../lib/xlsxDownload';
 import { T, S } from '../../lib/theme';
-import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase';
+import { supabase, SUPABASE_ANON_KEY, currentUserId } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { useAuth } from '../../hooks/useAuth';
 import ConnectDropboxCard from './ConnectDropboxCard';
@@ -31,7 +31,11 @@ const call = async (body: object) => {
   return { status: r.status, data: await r.json().catch(() => ({} as any)) };
 };
 
-export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, type?: string) => void }) {
+// Rendered rows are capped with Load More; scan, fix and export always work
+// on the full list.
+const PAGE = 50;
+
+function MasterLinkCheck({ addToast }: { addToast: (msg: string, type?: string) => void }) {
   const { profile } = useAuth();
   const role = profile?.role as string | undefined;
   const canConnect = role === 'admin';
@@ -42,12 +46,13 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
   const [fixing, setFixing] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [problems, setProblems] = useState<Problem[] | null>(null);
+  const [limit, setLimit] = useState(PAGE);
 
   useEffect(() => { call({ action: 'dropbox_status' }).then(({ data }) => { setConnected(!!data.connected); setAppKey(data.appKey || ''); }).catch(() => setConnected(false)); }, []);
 
   const scan = async () => {
     if (scanning || fixing) return;
-    setScanning(true); setProblems(null); setProgress({ done: 0, total: 0 });
+    setScanning(true); setProblems(null); setLimit(PAGE); setProgress({ done: 0, total: 0 });
     const acc: Problem[] = [];
     try {
       // Belt-and-braces: the server also suppresses approved (sku, url) pairs —
@@ -116,7 +121,7 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
     if (!p.url) return;
     const { error } = undo
       ? await supabase.from('link_check_approvals').delete().match({ sku: p.sku, url: p.url })
-      : await supabase.from('link_check_approvals').insert({ sku: p.sku, url: p.url, tab: p.tab, approved_by: (await supabase.auth.getUser()).data.user?.id });
+      : await supabase.from('link_check_approvals').insert({ sku: p.sku, url: p.url, tab: p.tab, approved_by: await currentUserId() });
     if (error) { addToast(friendlyError(error), 'error'); return; }
     setProblems(prev => prev ? prev.map(q => q.tab === p.tab && q.row === p.row ? { ...q, approved: !undo, problem: undo ? q.problem.replace(/^✓.*$/, 'WRONG LINK — re-check on next scan') : `✓ Marked correct — won't be flagged again` } : q) : prev);
     addToast(undo ? `${p.sku} will be checked again on the next scan` : `${p.sku} remembered as correct`, 'success');
@@ -176,7 +181,7 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
             <thead><tr>{['SKU', 'Tab', 'Sheet Row', 'Status', 'Link'].map(c => <th key={c} style={{ ...S.thStyle, whiteSpace: 'nowrap' as const }}>{c}</th>)}</tr></thead>
             <tbody>
-              {problems.map((p, i) => (
+              {problems.slice(0, limit).map((p, i) => (
                 <tr key={i} style={p.fixed ? { background: 'oklch(0.72 0.19 145 / .05)' } : undefined}>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, fontWeight: 600, whiteSpace: 'nowrap' as const }}>{p.sku}</td>
                   <td style={S.tdStyle}>{p.tab}</td>
@@ -195,8 +200,12 @@ export default function MasterLinkCheck({ addToast }: { addToast: (msg: string, 
               ))}
             </tbody>
           </table>
+          {problems.length > limit && <div style={{ padding: '8px 14px', fontSize: 10, color: T.tx3, borderTop: `1px solid ${T.bd}`, textAlign: 'center' }}>Showing {limit} of {problems.length} rows.</div>}
         </div>
       )}
+      {problems && problems.length > limit && <button onClick={() => setLimit(l => l + PAGE)} style={{ width: '100%', padding: '12px', marginTop: 8, border: 'none', background: T.ac3, color: T.ac2, fontSize: 11, fontWeight: 600, cursor: 'pointer', borderRadius: 8 }}>Load More ({problems.length - limit} remaining)</button>}
     </div>
   );
 }
+
+export default memo(MasterLinkCheck);

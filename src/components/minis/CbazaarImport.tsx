@@ -16,12 +16,15 @@ export default function CbazaarImport({ addToast }: { addToast: (msg: string, ty
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<CbRow[]>([]);
   const [fileName, setFileName] = useState('');
+  const [importing, setImporting] = useState(false);
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
+    setImporting(true);
     const reader = new FileReader();
+    reader.onerror = () => { addToast('Failed to read file', 'error'); setImporting(false); };
     reader.onload = (ev) => {
       try {
         const wb = XLSX.read(ev.target?.result, { type: 'array' });
@@ -58,6 +61,7 @@ export default function CbazaarImport({ addToast }: { addToast: (msg: string, ty
         addToast(`${parsed.length} rows imported`, 'success');
         if (unmappedSizes > 0) addToast(`${unmappedSizes} rows have non-standard sizes — used first word as fallback`, 'error');
       } catch { addToast('Failed to parse file — check format', 'error'); }
+      finally { setImporting(false); }
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
@@ -85,7 +89,7 @@ export default function CbazaarImport({ addToast }: { addToast: (msg: string, ty
   return (
     <div style={{ animation: 'fi .15s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
-        <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
+        <div onClick={() => !importing && fileRef.current?.click()} style={{ ...S.btnPrimary, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>{importing ? 'Reading…' : 'Import Excel'}</div>
         {rows.length > 0 && <div onClick={() => exportCsv(false)} style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export CSV</div>}
         {rows.length > 0 && <div onClick={() => exportCsv(true)} title="Each size also counts the next size up (L → M), one step only" style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export CSV · alterations</div>}
         {rows.length > 0 && <div onClick={() => { setRows([]); setFileName(''); }} style={{ ...S.btnGhost, color: T.re, border: '1px solid oklch(0.63 0.22 25 / .2)', background: 'oklch(0.63 0.22 25 / .06)' }}>Close</div>}

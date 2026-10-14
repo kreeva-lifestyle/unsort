@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { supabase } from '../../lib/supabase';
+import { supabase, currentUserId } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
 import { useBackClose } from '../../hooks/useBackClose';
@@ -65,13 +65,13 @@ export default function AddressPrinter({ addToast }: { addToast: (msg: string, t
     if (!form.name.trim() || !form.phone.trim() || !form.address.trim() || !form.city.trim() || !form.state.trim() || !form.pincode.trim()) { setFormError('All fields are required'); return; }
     setSaving(true);
     const upper = { name: form.name.trim().toUpperCase(), phone: form.phone.trim(), address: form.address.trim().toUpperCase(), city: form.city.trim().toUpperCase(), state: form.state.trim().toUpperCase(), pincode: form.pincode.trim() };
-    const { data: { user } } = await supabase.auth.getUser();
+    const uid = await currentUserId();
     if (editingId) {
       const { error } = await supabase.from('address_labels').update({ ...upper, updated_at: new Date().toISOString() }).eq('id', editingId);
       if (error) { addToast('Update failed — ' + friendlyError(error), 'error'); setSaving(false); return; }
       addToast('Address updated', 'success');
     } else {
-      const { error } = await supabase.from('address_labels').insert({ ...upper, created_by: user?.id });
+      const { error } = await supabase.from('address_labels').insert({ ...upper, created_by: uid });
       if (error) { addToast('Save failed — ' + friendlyError(error), 'error'); setSaving(false); return; }
       addToast('Address saved', 'success');
     }

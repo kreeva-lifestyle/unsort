@@ -4,7 +4,6 @@
 // SKU is the ONLY mandatory column; PRICE is optional (a sheet without one
 // makes a price-less card — see finalizeRateRows for the all-or-nothing
 // rule when a price column IS present).
-import * as XLSX from 'xlsx';
 import { finalizeRateRows, FinalizedSheet } from './finalizeRateRows';
 
 export type { RateRow } from './finalizeRateRows'; // renderRateCard imports it from here
@@ -38,7 +37,8 @@ const cellText = (v: unknown): string => {
   return String(v).trim();
 };
 
-export function parseRateSheet(data: ArrayBuffer): ParsedRateSheet {
+export async function parseRateSheet(data: ArrayBuffer): Promise<ParsedRateSheet> {
+  const XLSX = await import('xlsx');
   const wb = XLSX.read(data, { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   if (!ws) throw new Error('The file has no sheets');

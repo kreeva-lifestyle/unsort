@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, memo } from 'react';
 import * as XLSX from 'xlsx';
 import { saveWorkbook } from '../../lib/xlsxDownload';
 import { T, S } from '../../lib/theme';
@@ -33,11 +33,15 @@ function toResult(data: any): ReconcileResult {
 // sheet yet: every size of a sized design (DRS181-M…), and the bare code of a
 // Semi-Stitched / Unstitched design (DRS233). The edge function reads both
 // Google Sheets server-side and diffs; this component is just the button +
-// results. No file upload.
-export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: string, type?: string) => void }) {
+// results. No file upload. Rendered rows are capped with Load More (the
+// export always takes the full list).
+const PAGE = 50;
+
+function OdetteCoverageCheck({ addToast }: { addToast: (msg: string, type?: string) => void }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ReconcileResult | null>(null);
   const [search, setSearch] = useState('');
+  const [limit, setLimit] = useState(PAGE);
 
   const reconcile = async () => {
     setLoading(true);
@@ -55,6 +59,7 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
       if (!resp.ok || !data.ok) { addToast(friendlyError(data.details || data.error || 'Reconcile failed'), 'error'); setLoading(false); return; }
       setResult(toResult(data));
       setSearch('');
+      setLimit(PAGE);
       (data.warnings || []).forEach((w: string) => addToast(w, 'info'));
       addToast(`${data.counts.missing} SKU${data.counts.missing === 1 ? '' : 's'} not on Odette (of ${data.counts.active} active)`, 'success');
     } catch (e: any) { addToast(friendlyError(e), 'error'); }
@@ -69,8 +74,10 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
     saveWorkbook(wb, exportName('Odette-Missing-Sizes', [fileDate()], 'xls'));
   };
 
-  const q = search.toLowerCase();
-  const filtered = result ? result.missing.filter(r => !q || Object.values(r).some(v => String(v).toLowerCase().includes(q))) : [];
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return result ? result.missing.filter(r => !q || Object.values(r).some(v => String(v).toLowerCase().includes(q))) : [];
+  }, [result, search]);
 
   return (
     <div style={{ animation: 'fi .15s ease' }}>
@@ -101,13 +108,13 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
         ) : <>
           <div style={{ position: 'relative', marginBottom: 10, maxWidth: 280 }}>
             <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, strokeLinecap: 'round' as const, opacity: 0.5 }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" style={{ ...S.fSearch, width: '100%' }} />
+            <input value={search} onChange={e => { setSearch(e.target.value); setLimit(PAGE); }} placeholder="Search…" style={{ ...S.fSearch, width: '100%' }} />
           </div>
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 8, border: `1px solid ${T.bd}` }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 300 }}>
               <thead><tr>{result.columns.map(c => <th key={c} style={{ ...S.thStyle, whiteSpace: 'nowrap' as const }}>{c}</th>)}</tr></thead>
               <tbody>
-                {filtered.map((row, i) => (
+                {filtered.slice(0, limit).map((row, i) => (
                   <tr key={i}>
                     {result.columns.map(c => (
                       <td key={c} style={{ ...S.tdStyle, whiteSpace: 'nowrap' as const, ...(/sku/i.test(c) ? { fontFamily: T.mono, fontWeight: 600 } : {}) }}>{row[c] ?? ''}</td>
@@ -116,7 +123,9 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
                 ))}
               </tbody>
             </table>
+            {filtered.length > limit && <div style={{ padding: '8px 14px', fontSize: 10, color: T.tx3, borderTop: `1px solid ${T.bd}`, textAlign: 'center' }}>Showing {limit} of {filtered.length} rows.</div>}
           </div>
+          {filtered.length > limit && <button onClick={() => setLimit(l => l + PAGE)} style={{ width: '100%', padding: '12px', marginTop: 8, border: 'none', background: T.ac3, color: T.ac2, fontSize: 11, fontWeight: 600, cursor: 'pointer', borderRadius: 8 }}>Load More ({filtered.length - limit} remaining)</button>}
         </>}
       </>}
 
@@ -124,3 +133,5 @@ export default function OdetteCoverageCheck({ addToast }: { addToast: (msg: stri
     </div>
   );
 }
+
+export default memo(OdetteCoverageCheck);

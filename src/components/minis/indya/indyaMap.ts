@@ -4,7 +4,7 @@
 // stock lookup, the results. Codes only, never a size (owner's rule): one
 // entry fixes every size of that product. The pure parts (toCorrections,
 // mergeEntries, isCodeOnly) are harness-tested; the Supabase calls are thin.
-import { supabase } from '../../../lib/supabase';
+import { supabase, currentUserId } from '../../../lib/supabase';
 import { normKey, shapeKey, isCodeOnly } from './indyaSku';
 import type { Corrections } from './indyaFiles';
 import type { IndyaSkuMap } from '../../../types/database';
@@ -55,9 +55,9 @@ export async function upsertSkuMap(entries: MapEntry[]): Promise<{ written: numb
   let skipped = 0;
   for (const e of entries) { if (checkEntry(e.wrong, e.correct)) skipped++; else ok.push(e); }
   const rows = mergeEntries([], ok);
-  const { data: { user } } = await supabase.auth.getUser();
+  const uid = await currentUserId();
   for (let i = 0; i < rows.length; i += 500) {
-    const chunk = rows.slice(i, i + 500).map(r => ({ wrong: r.wrong, correct: r.correct, note: r.note ?? null, created_by: user?.id ?? null, updated_at: new Date().toISOString() }));
+    const chunk = rows.slice(i, i + 500).map(r => ({ wrong: r.wrong, correct: r.correct, note: r.note ?? null, created_by: uid ?? null, updated_at: new Date().toISOString() }));
     const { error } = await supabase.from('indya_sku_map').upsert(chunk, { onConflict: 'wrong_norm' });
     if (error) throw error;
   }
