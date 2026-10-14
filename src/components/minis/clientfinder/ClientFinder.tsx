@@ -14,8 +14,12 @@ import { call, explain, fileToB64, type Hit, type FolderCandidate } from './api'
 import { exportHitsXlsx } from './exportHits';
 import HitList from './HitList';
 import { optimizeImage } from '../costing/imageResize';
+import BuyerSpider from './buyers/BuyerSpider';
 
-type Mode = 'upload' | 'sku';
+// 'buyers' is the Buyer Spider (buyers/BuyerSpider.tsx): a different job
+// behind the same tile — finding NEW clients rather than who copied a photo.
+type Mode = 'upload' | 'sku' | 'buyers';
+const MODE_LABEL: Record<Mode, string> = { upload: 'By photo', sku: 'By SKU', buyers: 'Buyers' };
 
 // Camera photos are 3–8 MB; Vision matches on content, not bytes, and
 // downsamples internally, so a 1600 px JPEG finds the same pages at a
@@ -226,14 +230,14 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
   return (
     <div style={{ fontFamily: T.sans, color: T.tx }}>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
-        <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.6, marginBottom: 12 }}>
+        {mode !== 'buyers' && <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.6, marginBottom: 12 }}>
           Searches Google&rsquo;s image index for pages showing this product. It only finds
           what Google has indexed &mdash; private catalogues and wholesale portals stay invisible,
           so no result is never proof that nobody copied a design.
-        </div>
+        </div>}
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-          {(['upload', 'sku'] as Mode[]).map(m => (
+          {(['upload', 'sku', 'buyers'] as Mode[]).map(m => (
             <button
               key={m}
               onClick={() => { setMode(m); setHits(null); setError(''); setCandidates([]); setPhotos([]); }}
@@ -245,12 +249,12 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
               {/* Mode labels read as a CHOICE ("By photo"), not an action —
                   "Upload a photo" next to the real "Choose or take photos"
                   button looked like two upload buttons (owner's report). */}
-              {m === 'upload' ? 'By photo' : 'By SKU'}
+              {MODE_LABEL[m]}
             </button>
           ))}
         </div>
 
-        {mode === 'upload' ? (
+        {mode === 'buyers' ? <BuyerSpider addToast={addToast} /> : mode === 'upload' ? (
           <div>
             {/* A <label> wrapping the input, NOT a button calling .click():
                 the tap opens the picker natively, with no JavaScript in the
@@ -335,6 +339,7 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
           </div>
         )}
 
+        {mode !== 'buyers' && <>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
           <button
             // Wrapped, not passed directly: search() now takes an optional
@@ -397,6 +402,7 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
             ))}
           </div>
         )}
+        </>}
       </div>
 
       {hits && (
