@@ -2,7 +2,7 @@
 // edge function, validated with one real query before it is saved). Brave
 // Search needs one key; Google Programmable Search needs a key plus the
 // engine id (cx). The key never reaches the browser bundle.
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { T, S } from '../../../../lib/theme';
 import { friendlyError } from '../../../../lib/friendlyError';
 import { call, explain, type SearchProvider } from './buyerApi';
@@ -18,6 +18,9 @@ export default function BuyerKeyCard({ provider, isAdmin, onSaved, addToast }: {
   const [key, setKey] = useState('');
   const [cx, setCx] = useState('');
   const [saving, setSaving] = useState(false);
+  // The configured provider arrives after the status call; the picker
+  // follows it so "Replace key" tests the new key against the right API.
+  useEffect(() => { if (provider) setChoice(provider); }, [provider]);
 
   const save = async () => {
     if (saving) return;
@@ -41,7 +44,7 @@ export default function BuyerKeyCard({ provider, isAdmin, onSaved, addToast }: {
           {label ? `Search API: ${label} is set.` : isAdmin ? 'No search API key yet — add one to start finding buyers.' : 'No search API key yet — ask an admin to add one.'}
         </span>
         {isAdmin && !editing && (
-          <button onClick={() => setEditing(true)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 36 }}>{provider ? 'Replace key' : 'Add key'}</button>
+          <button onClick={() => setEditing(true)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 44 }}>{provider ? 'Replace key' : 'Add key'}</button>
         )}
       </div>
       {editing && (
@@ -60,8 +63,8 @@ export default function BuyerKeyCard({ provider, isAdmin, onSaved, addToast }: {
               <input value={cx} onChange={e => setCx(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') save(); }}
                 placeholder="Search engine id (cx)" autoComplete="off" style={{ ...S.fInput, flex: 1, minWidth: 160, fontFamily: T.mono }} />
             )}
-            <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, minHeight: 36, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Testing…' : 'Save'}</button>
-            <button onClick={() => { setEditing(false); setKey(''); setCx(''); }} style={{ ...S.btnGhost, minHeight: 36 }}>Cancel</button>
+            <button onClick={save} disabled={saving} style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>{saving ? 'Testing…' : 'Save'}</button>
+            <button onClick={() => { setEditing(false); setKey(''); setCx(''); }} style={{ ...S.btnGhost, minHeight: 44 }}>Cancel</button>
           </div>
         </div>
       )}

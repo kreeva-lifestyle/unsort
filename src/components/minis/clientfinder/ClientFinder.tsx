@@ -405,7 +405,9 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
         </>}
       </div>
 
-      {hits && (
+      {/* A photo search still running when the mode switches to Buyers would
+          otherwise drop its results under the buyer list. */}
+      {hits && mode !== 'buyers' && (
         <>
           {bestGuess && (
             <div style={{ fontSize: 11, color: T.tx3, marginBottom: 8 }}>

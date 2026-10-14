@@ -11,26 +11,33 @@ import { LEAD_COLS, STATUS_LABEL, KIND_LABEL, updateLead, type BuyerLead, type B
 import { exportLeadsXlsx } from './exportLeads';
 
 const PAGE = 50;
+const MAX_ROWS = 1000;   // the list is read in one go; past this the footer says so
 const STATUS_COLOR: Record<BuyerLeadStatus, string> = { new: T.ac2, contacted: T.yl, replied: T.bl, customer: T.gr, rejected: T.tx3 };
 const scoreColor = (s: number) => (s >= 80 ? T.gr : s >= 65 ? T.yl : T.tx3);
 
 export default function BuyerLeadList({ runId, refreshKey, addToast }: { runId: string | null; refreshKey: number; addToast: (m: string, t?: string) => void }) {
   const [leads, setLeads] = useState<BuyerLead[] | null>(null);
-  const [scope, setScope] = useState<'run' | 'all'>(runId ? 'run' : 'all');
+  const [scope, setScope] = useState<'run' | 'all'>('all');
   const [status, setStatus] = useState<'' | BuyerLeadStatus>('');
   const [search, setSearch] = useState('');
   const [limit, setLimit] = useState(PAGE);
   const [notesFor, setNotesFor] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
 
-  useEffect(() => { if (!runId) setScope('all'); }, [runId]);
+  // A new run shows its own buyers first; without a run the whole list.
+  useEffect(() => { setScope(runId ? 'run' : 'all'); setLimit(PAGE); }, [runId]);
+  // refreshKey bumps on every lead found, so responses can overlap: only the
+  // latest request may land, or a stale "this run" reply overwrites "all".
   useEffect(() => {
-    let q = supabase.from('buyer_leads').select(LEAD_COLS).order('score', { ascending: false }).order('created_at', { ascending: false }).limit(1000);
+    let cancelled = false;
+    let q = supabase.from('buyer_leads').select(LEAD_COLS).order('score', { ascending: false }).order('created_at', { ascending: false }).limit(MAX_ROWS);
     if (scope === 'run' && runId) q = q.eq('first_run_id', runId);
     q.then(({ data, error }) => {
+      if (cancelled) return;
       if (error) { addToast(friendlyError(error), 'error'); setLeads([]); return; }
       setLeads((data ?? []) as BuyerLead[]);
     });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, runId, refreshKey]);
 
@@ -59,14 +66,14 @@ export default function BuyerLeadList({ runId, refreshKey, addToast }: { runId: 
     <div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
         {runId && (['run', 'all'] as const).map(s => (
-          <button key={s} onClick={() => { setScope(s); setLimit(PAGE); }} style={{ ...(scope === s ? S.btnPrimary : S.btnGhost), minHeight: 36 }}>{s === 'run' ? 'This run' : 'All buyers'}</button>
+          <button key={s} onClick={() => { setScope(s); setLimit(PAGE); }} style={{ ...(scope === s ? S.btnPrimary : S.btnGhost), minHeight: 44 }}>{s === 'run' ? 'This run' : 'All buyers'}</button>
         ))}
         <select value={status} onChange={e => { setStatus(e.target.value as '' | BuyerLeadStatus); setLimit(PAGE); }} style={{ ...S.fInput, width: 'auto' }}>
           <option value="">All statuses</option>
           {(Object.keys(STATUS_LABEL) as BuyerLeadStatus[]).map(k => <option key={k} value={k}>{STATUS_LABEL[k]}</option>)}
         </select>
         <input value={search} onChange={e => { setSearch(e.target.value); setLimit(PAGE); }} placeholder="Search name, city, country…" style={{ ...S.fInput, flex: 1, minWidth: 160 }} />
-        {shown.length > 0 && <button onClick={() => exportLeadsXlsx(shown, scope === 'run' ? 'run' : 'all')} style={{ ...S.btnGhost, minHeight: 36 }}>Export {shown.length}</button>}
+        {shown.length > 0 && <button onClick={() => exportLeadsXlsx(shown, scope === 'run' ? 'run' : 'all')} style={{ ...S.btnGhost, minHeight: 44 }}>Export {shown.length}</button>}
       </div>
 
       {leads === null && <div style={{ padding: 30, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading…</div>}
@@ -97,19 +104,20 @@ export default function BuyerLeadList({ runId, refreshKey, addToast }: { runId: 
               <select value={l.status} onChange={e => setLeadStatus(l, e.target.value as BuyerLeadStatus)} style={{ ...S.fInput, width: 'auto', color: STATUS_COLOR[l.status], borderColor: alpha(STATUS_COLOR[l.status], 0.4) }}>
                 {(Object.keys(STATUS_LABEL) as BuyerLeadStatus[]).map(k => <option key={k} value={k}>{STATUS_LABEL[k]}</option>)}
               </select>
-              <button onClick={() => { setNotesFor(notesFor === l.id ? null : l.id); setDraft(l.notes || ''); }} style={{ ...S.btnGhost, minHeight: 36 }}>{l.notes ? 'Edit note' : 'Add note'}</button>
+              <button onClick={() => { setNotesFor(notesFor === l.id ? null : l.id); setDraft(l.notes || ''); }} style={{ ...S.btnGhost, minHeight: 44 }}>{l.notes ? 'Edit note' : 'Add note'}</button>
               {l.notes && notesFor !== l.id && <span style={{ fontSize: 10.5, color: T.tx2, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.notes}</span>}
             </div>
             {notesFor === l.id && (
               <div style={{ display: 'flex', gap: 6 }}>
                 <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveNotes(l); }} placeholder="Who you spoke to, what they said…" style={{ ...S.fInput, flex: 1 }} autoFocus />
-                <button onClick={() => saveNotes(l)} style={{ ...S.btnPrimary, minHeight: 36 }}>Save</button>
+                <button onClick={() => saveNotes(l)} style={{ ...S.btnPrimary, minHeight: 44 }}>Save</button>
               </div>
             )}
           </div>
         ))}
       </div>
       {shown.length > limit && <button onClick={() => setLimit(n => n + PAGE)} style={{ width: '100%', padding: '12px', marginTop: 8, border: 'none', background: T.ac3, color: T.ac2, fontSize: 11, fontWeight: 600, cursor: 'pointer', borderRadius: 8 }}>Load More ({shown.length - limit} remaining)</button>}
+      {leads !== null && leads.length >= MAX_ROWS && <div style={{ fontSize: 10.5, color: T.tx3, textAlign: 'center', marginTop: 8 }}>Showing the top {MAX_ROWS} by match score — narrow with a status or search, or export to Excel for everything in a filter.</div>}
     </div>
   );
 }

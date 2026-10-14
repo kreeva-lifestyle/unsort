@@ -10,7 +10,7 @@ export function exportLeadsXlsx(leads: BuyerLead[], subject: string): void {
   const rows = leads.map(l => [
     l.name || l.domain, l.url, KIND_LABEL[l.kind || ''] || l.kind || '', l.city || '', l.country || '', l.what_they_sell || '',
     l.email || '', l.phone || '', l.whatsapp || '', l.instagram ? `https://instagram.com/${l.instagram}` : '', l.facebook ? `https://facebook.com/${l.facebook}` : '',
-    l.score, l.reason || '', STATUS_LABEL[l.status], l.notes || '', l.parent_domain || '', l.hop, l.created_at.slice(0, 10),
+    l.score, l.reason || '', STATUS_LABEL[l.status], l.notes || '', l.parent_domain || '', l.hop, fileDate(l.created_at),
   ]);
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);

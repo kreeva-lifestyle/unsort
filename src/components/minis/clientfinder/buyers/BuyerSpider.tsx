@@ -23,6 +23,7 @@ export default function BuyerSpider({ addToast }: { addToast: (m: string, t?: st
   const [depth, setDepth] = useState(2);
   const [maxLeads, setMaxLeads] = useState(150);
   const [starting, setStarting] = useState(false);
+  const [controlling, setControlling] = useState(false);
   const [error, setError] = useState('');
 
   const loadStatus = useCallback(async () => {
@@ -32,14 +33,23 @@ export default function BuyerSpider({ addToast }: { addToast: (m: string, t?: st
       else setError(explain(data, st));
     } catch (e) { setError(friendlyError(e)); }
   }, []);
-  // The newest run comes back on every open, so a run paused from the phone
-  // can be resumed from the desk (the queue lives in the database).
+  // The newest of YOUR runs comes back on every open, so a run paused from
+  // the phone can be resumed from the desk (the queue lives in the database).
+  // A run left 'running' by a closed tab is shown paused and waits for an
+  // explicit Resume here: opening the panel must never start stepping, or two
+  // tabs (or two people) would step the same queue in parallel.
   useEffect(() => {
     loadStatus();
-    supabase.from('buyer_runs').select(RUN_COLS).order('created_at', { ascending: false }).limit(1).maybeSingle()
-      .then(({ data, error: e }) => { if (e) addToast(friendlyError(e), 'error'); else if (data) setRun(data as BuyerRun); });
+    if (!profile?.id) return;
+    supabase.from('buyer_runs').select(RUN_COLS).eq('created_by', profile.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      .then(({ data, error: e }) => {
+        if (e) { addToast(friendlyError(e), 'error'); return; }
+        if (!data) return;
+        const r = data as BuyerRun;
+        setRun(r.status === 'running' ? { ...r, status: 'paused', step_note: 'Paused — tap Resume to continue' } : r);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [profile?.id]);
 
   const onLoopError = useCallback((m: string) => { setError(m); addToast(m, 'error'); }, [addToast]);
   const { log, stepping, clearLog } = useSpiderLoop(run, setRun, onLoopError);
@@ -56,13 +66,20 @@ export default function BuyerSpider({ addToast }: { addToast: (m: string, t?: st
     } catch (e) { const m = friendlyError(e); setError(m); addToast(m, 'error'); }
     finally { setStarting(false); }
   };
-  const control = async (action: 'pause' | 'resume') => {
-    if (!run) return;
-    const { status: st, data } = await call({ action, run_id: run.id });
-    if (!data.ok) { addToast(explain(data, st), 'error'); return; }
-    setError('');
-    setRun({ ...run, status: action === 'pause' ? 'paused' : 'running', last_error: null, step_note: action === 'pause' ? 'Paused' : 'Resumed' });
+  const control = async (action: 'pause' | 'resume'): Promise<boolean> => {
+    if (!run || controlling) return false;
+    setControlling(true);
+    try {
+      const { status: st, data } = await call({ action, run_id: run.id });
+      if (!data.ok) { addToast(explain(data, st), 'error'); return false; }
+      setError('');
+      setRun(data.run ?? { ...run, status: action === 'pause' ? 'paused' : 'running', last_error: null, step_note: action === 'pause' ? 'Paused' : 'Resumed' });
+      addToast(action === 'pause' ? 'Paused' : 'Resumed', 'success');
+      return true;
+    } catch (e) { addToast(friendlyError(e), 'error'); return false; }
+    finally { setControlling(false); }
   };
+  const busyStyle = { pointerEvents: controlling ? 'none' as const : 'auto' as const, opacity: controlling ? 0.5 : 1 };
 
   const ready = !!status?.searchProvider && !!status?.hasAiKey;
   const live = run && (run.status === 'running' || run.status === 'paused');
@@ -106,9 +123,11 @@ export default function BuyerSpider({ addToast }: { addToast: (m: string, t?: st
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: run.status === 'running' ? T.gr : run.status === 'paused' ? T.yl : run.status === 'failed' ? T.re : T.tx3, flexShrink: 0 }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: T.tx, flex: 1, minWidth: 160 }}>{p?.business_name || run.seed_domain} <span style={{ fontSize: 10.5, color: T.tx3, fontWeight: 400 }}>· {run.status}{stepping ? '…' : ''}</span></span>
-            {run.status === 'running' && <button onClick={() => control('pause')} style={{ ...S.btnGhost, minHeight: 44 }}>Pause</button>}
-            {run.status === 'paused' && <button onClick={() => control('resume')} style={{ ...S.btnPrimary, minHeight: 44 }}>Resume</button>}
-            {live && <button onClick={async () => { if (run.status === 'running') await control('pause'); setRun(null); }} style={{ ...S.btnGhost, minHeight: 44 }}>New run</button>}
+            {run.status === 'running' && <button onClick={() => control('pause')} style={{ ...S.btnGhost, minHeight: 44, ...busyStyle }}>{controlling ? 'Pausing…' : 'Pause'}</button>}
+            {run.status === 'paused' && <button onClick={() => control('resume')} style={{ ...S.btnPrimary, minHeight: 44, ...busyStyle }}>{controlling ? 'Resuming…' : 'Resume'}</button>}
+            {/* Always pauses the server row: the card may read paused while the
+                database still says running (a run loaded from another tab). */}
+            {live && <button onClick={async () => { if (await control('pause')) setRun(null); }} style={{ ...S.btnGhost, minHeight: 44, ...busyStyle }}>New run</button>}
             {!live && <button onClick={() => setRun(null)} style={{ ...S.btnGhost, minHeight: 44 }}>Clear</button>}
           </div>
           {p && <div style={{ fontSize: 11, color: T.tx2, marginTop: 6, lineHeight: 1.5 }}>{p.what_they_sell}{p.customer ? ` — for ${p.customer}` : ''}{[p.city, p.country].filter(Boolean).length ? ` · ${[p.city, p.country].filter(Boolean).join(', ')}` : ''}{!p.is_buyer && <span style={{ color: T.yl }}> · reads as a manufacturer, not a buyer</span>}</div>}
