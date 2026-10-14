@@ -70,7 +70,13 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
         });
       });
   };
-  const closeSheet = (p: CostingProduct) => { setEditing(null); refreshRow(p.id); };
+  const closeSheet = (p: CostingProduct) => {
+    setEditing(null);
+    // Initial load still in flight: refreshRow would turn null into [] (a
+    // false "Nothing costed yet" flash) or a lone [row]; only a full load()
+    // is guaranteed to include a sheet saved after the first query ran.
+    if (list === null) load(); else refreshRow(p.id);
+  };
   // The open sheet owns one history entry, so the device Back returns to
   // this list (same as the sheet's Back button) instead of closing the tool.
   useBackClose(!!editing, () => { if (editing) closeSheet(editing); });

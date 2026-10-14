@@ -19,6 +19,11 @@ export const ChunkErrorScreen = () => (
 
 export const retryImport = (fn: () => Promise<any>) => lazy(() =>
   fn().catch(() => {
+    // Offline, a reload cannot fetch anything either — it would only wipe
+    // the in-memory state of every mounted tab (a half-filled form, an
+    // imported sheet). Show the screen instead; its Reload button is there
+    // for when the connection returns.
+    if (!navigator.onLine) return { default: ChunkErrorScreen };
     let last = 0;
     try { last = Number(sessionStorage.getItem('chunkReloadedAt')) || 0; } catch {}
     if (Date.now() - last > 30_000) {

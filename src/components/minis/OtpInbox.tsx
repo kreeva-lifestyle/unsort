@@ -48,10 +48,11 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
   useEffect(() => { loadRef.current = load; load(); }, [load]);
 
   useEffect(() => {
-    // Foreground/reconnect refreshes arrive in bursts — iOS fires
-    // visibilitychange AND focus, and the socket joins right after the mount
-    // load — one load per second is plenty. A real new OTP (INSERT below)
-    // always reloads at once.
+    // Foreground refreshes arrive in bursts — iOS fires visibilitychange AND
+    // focus together — one load per second is plenty there. A real new OTP
+    // (INSERT below) and every channel (re)join always reload at once: a
+    // load started before the join cannot see rows inserted between its
+    // snapshot and the join, and nothing replays those.
     const refresh = () => { if (Date.now() - lastLoadAt.current > 1000) loadRef.current(); };
     // New OTPs appear the moment the phone forwards them: refetch the page
     // (keeps the count and page contents exact, wherever the user is).
@@ -66,7 +67,7 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
       // Reload whenever the channel (re)connects: iOS suspends the socket
       // while the PWA is backgrounded, and anything that arrived meanwhile
       // would otherwise be missed until a manual refresh.
-      .subscribe(status => { if (status === 'SUBSCRIBED') refresh(); });
+      .subscribe(status => { if (status === 'SUBSCRIBED') loadRef.current(); });
     // Same story when the app returns to the foreground or regains focus —
     // no refresh button needed, the list refetches itself.
     const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
