@@ -1,34 +1,39 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import * as XLSX from 'xlsx';
+import { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { saveWorkbook } from '../lib/xlsxDownload';
+import { retryImport } from '../lib/retryImport';
 import { T, S, alpha } from '../lib/theme';
-import { SUPABASE_ANON_KEY, supabase } from '../lib/supabase';
+import { SUPABASE_ANON_KEY, supabase, currentUserId } from '../lib/supabase';
 import { useNotifications } from '../hooks/useNotifications';
 import { friendlyError } from '../lib/friendlyError';
 import { useBreadcrumb } from '../hooks/useBreadcrumb';
 import { useBackClose, closeTopLayer } from '../hooks/useBackClose';
-import AddressPrinter from '../components/minis/AddressPrinter';
-import CbazaarImport from '../components/minis/CbazaarImport';
-import OdetteImport from '../components/minis/OdetteImport';
-import OdetteCoverageCheck from '../components/minis/OdetteCoverageCheck';
-import IndyaImport from '../components/minis/indya/IndyaImport';
 import { MINI_LABELS, MINI_TILES, type MiniView } from '../components/minis/miniRegistry';
 import { takePendingMini } from '../lib/shortcuts';
-import MasterLinkCheck from '../components/minis/LinkCheck';
 import VirtualStock from '../components/minis/VirtualStock';
-import Trackly from '../components/minis/Trackly';
-import ReturnLabels from '../components/minis/ReturnLabels';
-import VendorStudio from '../components/minis/vendorstudio/VendorStudio';
-import MasterAssistant from '../components/listingai/assistant/MasterAssistant';
-import DropboxLinkGenerator from '../components/minis/dropboxlinks/DropboxLinkGenerator';
-import ForwardDropbox from '../components/minis/forward/ForwardDropbox';
-import ClientFinder from '../components/minis/clientfinder/ClientFinder';
-import DropboxUploader from '../components/minis/uploader/DropboxUploader';
-import ProductCosting from '../components/minis/costing/ProductCosting';
-import PriceProjector from '../components/minis/pricing/PriceProjector';
-import OtpInbox from '../components/minis/OtpInbox';
 import { exportName } from '../lib/exportName';
 import { exportUtsavXls, UTSAV_SIZE_MAP as SIZE_MAP, type UtsavRow } from '../components/minis/utsavExport';
+
+// Every tool is its own chunk, fetched the first time it is tapped. Opening
+// the tab used to download and parse all seventeen (plus the Excel library)
+// before the tile grid could paint — about 940 KB on the owner's phone.
+const AddressPrinter = retryImport(() => import('../components/minis/AddressPrinter'));
+const CbazaarImport = retryImport(() => import('../components/minis/CbazaarImport'));
+const OdetteImport = retryImport(() => import('../components/minis/OdetteImport'));
+const OdetteCoverageCheck = retryImport(() => import('../components/minis/OdetteCoverageCheck'));
+const IndyaImport = retryImport(() => import('../components/minis/indya/IndyaImport'));
+const MasterLinkCheck = retryImport(() => import('../components/minis/LinkCheck'));
+const Trackly = retryImport(() => import('../components/minis/Trackly'));
+const ReturnLabels = retryImport(() => import('../components/minis/ReturnLabels'));
+const VendorStudio = retryImport(() => import('../components/minis/vendorstudio/VendorStudio'));
+const MasterAssistant = retryImport(() => import('../components/listingai/assistant/MasterAssistant'));
+const DropboxLinkGenerator = retryImport(() => import('../components/minis/dropboxlinks/DropboxLinkGenerator'));
+const ForwardDropbox = retryImport(() => import('../components/minis/forward/ForwardDropbox'));
+const ClientFinder = retryImport(() => import('../components/minis/clientfinder/ClientFinder'));
+const DropboxUploader = retryImport(() => import('../components/minis/uploader/DropboxUploader'));
+const ProductCosting = retryImport(() => import('../components/minis/costing/ProductCosting'));
+const PriceProjector = retryImport(() => import('../components/minis/pricing/PriceProjector'));
+const OtpInbox = retryImport(() => import('../components/minis/OtpInbox'));
+const toolFallback = <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}><div className="spinner" /></div>;
 
 
 export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab: string) => void; active?: boolean }) {
@@ -39,6 +44,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
   const [fileName, setFileName] = useState('');
   const [virtualStock, setVirtualStock] = useState<Record<string, number>>({});
   const [comparing, setComparing] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   type CompareCategory = 'na' | 'stock_out' | 'not_uploaded' | 'zero_stock' | 'vs_missing' | 'duplicate';
   type CompareFilter = 'all' | CompareCategory | 'ignored';
@@ -67,7 +73,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
 
   const ignoreSku = async (row: CompareRow) => {
     const key = row._key;
-    const { error } = await supabase.from('utsav_ignored_skus').insert({ sku_key: key, display_sku: row.sku, category: row.category, created_by: (await supabase.auth.getUser()).data.user?.id });
+    const { error } = await supabase.from('utsav_ignored_skus').insert({ sku_key: key, display_sku: row.sku, category: row.category, created_by: await currentUserId() });
     if (error) { addToast(friendlyError(error), 'error'); return; }
     setIgnoredSkus(prev => new Map(prev).set(key, { displaySku: row.sku, category: row.category }));
     addToast(`Ignored ${row.sku}`, 'success');
@@ -80,6 +86,9 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
   };
 
   const setView = useCallback((v: MiniView) => setViewState(v), []);
+  // One stable "back to the grid" so memoised tools don't re-render on every
+  // hub render (a toast re-renders the hub three times).
+  const goHome = useCallback(() => setViewState('home'), []);
 
   const { set: setBreadcrumb } = useBreadcrumb();
   useEffect(() => {
@@ -100,8 +109,13 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
+    setImporting(true);
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onerror = () => { addToast('Failed to read file', 'error'); setImporting(false); };
+    reader.onload = async (ev) => {
+      // The Excel library is its own 415 KB chunk, fetched on first use.
+      let XLSX: typeof import('xlsx');
+      try { XLSX = await import('xlsx'); } catch (err) { addToast(friendlyError(err), 'error'); setImporting(false); return; }
       try {
         const wb = XLSX.read(ev.target?.result, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
@@ -128,6 +142,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
         addToast(`${parsed.length} rows imported`, 'success');
         if (unmappedSizes > 0) addToast(`${unmappedSizes} rows have unmapped sizes — used raw number in SKU`, 'error');
       } catch { addToast('Failed to parse file — check format', 'error'); }
+      finally { setImporting(false); }
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
@@ -238,10 +253,12 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     });
   }, [compareRows, compareFilter, compareSearch, ignoredSkus, ignoredKeySet]);
 
-  const exportCompareFilter = (cat: CompareFilter) => {
+  const exportCompareFilter = async (cat: CompareFilter) => {
     if (cat === 'ignored') return;
     const items = (cat === 'all' ? compareRows : compareRows.filter(r => r.category === cat)).filter(r => !ignoredKeySet.has(r._key));
     if (items.length === 0) { addToast('Nothing to export in this category', 'error'); return; }
+    let XLSX: typeof import('xlsx');
+    try { XLSX = await import('xlsx'); } catch (err) { addToast(friendlyError(err), 'error'); return; }
     const today = new Date().toISOString().slice(0, 10);
     const hasFullData = items.some(r => r.cells);
     if (hasFullData && compareHeaders.length > 0) {
@@ -287,14 +304,14 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
   // Tools that are just the back arrow + one component share one wrapper.
   const simple: Partial<Record<MiniView, React.ReactNode>> = {
     address: <AddressPrinter addToast={addToast} />, return_labels: <ReturnLabels addToast={addToast} />,
-    dropbox_links: <DropboxLinkGenerator addToast={addToast} />, forward_dropbox: <ForwardDropbox addToast={addToast} onBack={() => setView('home')} />,
+    dropbox_links: <DropboxLinkGenerator addToast={addToast} />, forward_dropbox: <ForwardDropbox addToast={addToast} onBack={goHome} />,
     otp: <OtpInbox addToast={addToast} />, costing: <ProductCosting addToast={addToast} />, dropbox_upload: <DropboxUploader addToast={addToast} />,
     client_finder: <ClientFinder addToast={addToast} />, ratecard: <VendorStudio addToast={addToast} />,
   };
   if (simple[view]) return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ marginBottom: 14 }}>{back}</div>
-      {simple[view]}
+      <Suspense fallback={toolFallback}>{simple[view]}</Suspense>
     </div>
   );
 
@@ -302,7 +319,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ marginBottom: 14 }}>{back}</div>
       <VirtualStock stock={virtualStock} setStock={setVirtualStock} addToast={addToast} />
-      <CbazaarImport addToast={addToast} />
+      <Suspense fallback={toolFallback}><CbazaarImport addToast={addToast} /></Suspense>
     </div>
   );
 
@@ -310,29 +327,33 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       <div style={{ marginBottom: 14 }}>{back}</div>
       <VirtualStock stock={virtualStock} setStock={setVirtualStock} addToast={addToast} />
-      <OdetteImport addToast={addToast} virtualStock={virtualStock} />
-      <div style={{ margin: '20px 0 12px', paddingTop: 16, borderTop: `1px solid ${T.bd}` }}>
-        <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 2 }}>Coverage Check</div>
-        <div style={{ fontSize: 11, color: T.tx3 }}>Active size variants (SKU × size) not yet on the Odette sheet — one row per missing size</div>
-      </div>
-      <OdetteCoverageCheck addToast={addToast} />
+      <Suspense fallback={toolFallback}>
+        <OdetteImport addToast={addToast} virtualStock={virtualStock} />
+        <div style={{ margin: '20px 0 12px', paddingTop: 16, borderTop: `1px solid ${T.bd}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 2 }}>Coverage Check</div>
+          <div style={{ fontSize: 11, color: T.tx3 }}>Active size variants (SKU × size) not yet on the Odette sheet — one row per missing size</div>
+        </div>
+        <OdetteCoverageCheck addToast={addToast} />
+      </Suspense>
     </div>
   );
 
   if (view === 'indya') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <IndyaImport addToast={addToast} virtualStock={virtualStock} setVirtualStock={setVirtualStock} onBack={() => setView('home')} />
+      <Suspense fallback={toolFallback}><IndyaImport addToast={addToast} virtualStock={virtualStock} setVirtualStock={setVirtualStock} onBack={goHome} /></Suspense>
     </div>
   );
 
   if (view === 'trackly') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <Trackly addToast={addToast} onBack={() => setView('home')} />
-      <div style={{ margin: '20px 0 12px', paddingTop: 16, borderTop: `1px solid ${T.bd}` }}>
-        <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 2 }}>Image Link Check</div>
-        <div style={{ fontSize: 11, color: T.tx3 }}>Find broken, deleted or empty Dropbox image links on the master sheet (active products) — with the exact sheet row to fix</div>
-      </div>
-      <MasterLinkCheck addToast={addToast} />
+      <Suspense fallback={toolFallback}>
+        <Trackly addToast={addToast} onBack={goHome} />
+        <div style={{ margin: '20px 0 12px', paddingTop: 16, borderTop: `1px solid ${T.bd}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, fontFamily: T.sora, color: T.tx, marginBottom: 2 }}>Image Link Check</div>
+          <div style={{ fontSize: 11, color: T.tx3 }}>Find broken, deleted or empty Dropbox image links on the master sheet (active products) — with the exact sheet row to fix</div>
+        </div>
+        <MasterLinkCheck addToast={addToast} />
+      </Suspense>
     </div>
   );
 
@@ -340,14 +361,14 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
       {/* No {back} here: the projector renders ONE arrow that leaves a sheet
           first and Minis second, so a sheet never shows two back buttons. */}
-      <PriceProjector addToast={addToast} navigateTo={navigateTo} onHome={() => setView('home')} />
+      <Suspense fallback={toolFallback}><PriceProjector addToast={addToast} navigateTo={navigateTo} onHome={goHome} /></Suspense>
     </div>
   );
 
   // MasterAssistant renders its own back button, so no wrapper `back` here.
   if (view === 'master_assistant') return (
     <div className="page-pad" style={{ padding: '14px 16px', animation: 'fi .15s ease' }}>
-      <MasterAssistant addToast={addToast} onBack={() => setView('home')} openListingAI={navigateTo ? () => navigateTo('listingai') : undefined} />
+      <Suspense fallback={toolFallback}><MasterAssistant addToast={addToast} onBack={goHome} openListingAI={navigateTo ? () => navigateTo('listingai') : undefined} /></Suspense>
     </div>
   );
 
@@ -356,7 +377,7 @@ export default function Minis({ navigateTo, active = true }: { navigateTo?: (tab
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         {back}
         <div style={{ display: 'flex', gap: 6 }}>
-          <div onClick={() => fileRef.current?.click()} style={S.btnPrimary}>Import Excel</div>
+          <div onClick={() => !importing && fileRef.current?.click()} style={{ ...S.btnPrimary, opacity: importing ? 0.5 : 1, pointerEvents: importing ? 'none' : 'auto' }}>{importing ? 'Reading…' : 'Import Excel'}</div>
           {rows.length > 0 && <div onClick={() => exportXls(false)} style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export XLS</div>}
           {rows.length > 0 && <div onClick={() => exportXls(true)} title="Each size also counts the next size up (L → M), one step only" style={{ ...S.btnGhost, color: T.gr, border: '1px solid oklch(0.72 0.19 145 / .2)', background: 'oklch(0.72 0.19 145 / .06)' }}>Export XLS · alterations</div>}
           {rows.length > 0 && <div onClick={!comparing ? compareNonUploaded : undefined} style={{ ...S.btnGhost, color: T.yl, border: '1px solid oklch(0.78 0.18 75 / .2)', background: 'oklch(0.78 0.18 75 / .06)', opacity: comparing ? 0.5 : 1, pointerEvents: comparing ? 'none' : 'auto' }}>{comparing ? 'Comparing…' : 'Compare Non-Uploaded'}</div>}

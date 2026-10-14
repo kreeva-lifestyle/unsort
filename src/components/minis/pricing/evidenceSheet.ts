@@ -48,10 +48,12 @@ export function sheetEvidence(inp: EvidenceInput, lines: SheetLine[]): Item[] {
   const label = sameCat.length >= 2 ? `${cat} sheets` : 'all costing sheets';
   if (group.length >= 2) {
     const shares = (b: ReturnType<typeof costBreakdown>) => b.costPerPc > 0 ? { Fabric: b.fabric / b.costPerPc * 100, Material: b.material / b.costPerPc * 100, Stitching: b.stitchingTotal / b.costPerPc * 100, Maintenance: b.maintenance / b.costPerPc * 100 } : null;
-    const peerShares = group.map(x => shares(costBreakdown(x, config))).filter((s): s is NonNullable<typeof s> => !!s);
+    // Break every peer down once; shares and the cost median read the same list.
+    const peerBd = group.map(x => costBreakdown(x, config));
+    const peerShares = peerBd.map(shares).filter((s): s is NonNullable<typeof s> => !!s);
     const mine = shares(pr.breakdown);
     if (mine && peerShares.length >= 2) {
-      const peerCost = median(group.map(x => costBreakdown(x, config).costPerPc));
+      const peerCost = median(peerBd.map(b => b.costPerPc));
       let flagged = 0;
       for (const k of Object.keys(mine) as (keyof typeof mine)[]) {
         const med = median(peerShares.map(s => s[k]));

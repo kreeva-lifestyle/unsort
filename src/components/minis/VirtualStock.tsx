@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, currentUserId } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
 import { numericKeyDown } from '../../lib/numericInput';
@@ -50,8 +50,8 @@ export default function VirtualStock({ setStock, addToast }: { stock: Record<str
       if (error) { addToast('Update failed — ' + friendlyError(error), 'error'); setSaving(false); return; }
       addToast(`Added ${q} to ${s} (now ${existing.quantity + q})`, 'success');
     } else {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from('virtual_stock').insert({ sku: s, quantity: q, created_by: user?.id });
+      const uid = await currentUserId();
+      const { error } = await supabase.from('virtual_stock').insert({ sku: s, quantity: q, created_by: uid });
       if (error) { addToast('Save failed — ' + friendlyError(error), 'error'); setSaving(false); return; }
       addToast(`${s}: +${q} added`, 'success');
     }

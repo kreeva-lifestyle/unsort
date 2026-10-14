@@ -6,7 +6,9 @@ import DateInput from '../ui/DateInput';
 import { copyToClipboard } from '../../lib/clipboard';
 import type { ShortLink, LinkClick } from '../../types/database';
 
-const CLICK_COLS = 'id, link_id, clicked_at, user_agent, device_type, browser, os, referrer, country, city, visitor_hash';
+// Only what the charts and table read — user_agent/referrer are never shown
+// and link_id is the filter, so 2,000 rows travel ~40% lighter without them.
+const CLICK_COLS = 'id, clicked_at, device_type, browser, os, country, city, visitor_hash';
 const CLICK_LIMIT = 2000;
 const APP_ORIGIN = typeof window !== 'undefined' ? window.location.origin : 'https://dailyoffice.aryadesigns.co.in';
 
@@ -61,7 +63,8 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
       if (reqIdRef.current !== myReq) return; // stale; newer fetch in flight
       if (error) addToast(friendlyError(error), 'error');
       else if (countErr) addToast(friendlyError(countErr), 'error');
-      setClicks(data || []);
+      // Narrow column list (CLICK_COLS): the dropped fields are never read here.
+      setClicks((data || []) as LinkClick[]);
       setTotalCount(count ?? (data?.length || 0));
       setPage(0);
     } finally {
@@ -69,7 +72,16 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
     }
   }, [link.id, from, to, addToast]);
 
-  useEffect(() => { fetchClicks(); }, [fetchClicks]);
+  // Mount (and link change) fetches at once; a date edit waits 400 ms so a
+  // wheel scroll or typed date produces one request instead of one per tick.
+  // Apply fetches immediately and discards any pending debounced fetch.
+  const firstRunRef = useRef(true);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    if (firstRunRef.current) { firstRunRef.current = false; fetchClicks(); return; }
+    debounceRef.current = setTimeout(fetchClicks, 400);
+    return () => clearTimeout(debounceRef.current);
+  }, [fetchClicks]);
 
   const copyLink = async () => {
     const ok = await copyToClipboard(`${APP_ORIGIN}/#/s/${link.short_code}`);
@@ -113,7 +125,7 @@ export default function TracklyAnalytics({ link, onBack, addToast }: Props) {
         <DateInput value={from} onChange={e => setFrom(e.target.value)} />
         <span style={{ fontSize: 10, color: T.tx3 }}>to</span>
         <DateInput value={to} onChange={e => setTo(e.target.value)} />
-        <button onClick={fetchClicks} style={S.btnPrimary}>Apply</button>
+        <button onClick={() => { clearTimeout(debounceRef.current); fetchClicks(); }} style={S.btnPrimary}>Apply</button>
       </div>
 
       {loading ? <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>Loading analytics...</div> : <>

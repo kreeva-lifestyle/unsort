@@ -28,7 +28,9 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
   const [perPage, setPerPage] = useState(25);
   const [count, setCount] = useState(0);
 
+  const lastLoadAt = useRef(0);
   const load = useCallback(() => {
+    lastLoadAt.current = Date.now();
     supabase.from('otp_inbox').select('id, message, code, device, received_at, sheet_status, sheet_file', { count: 'exact' })
       .order('received_at', { ascending: false }).range(page * perPage, page * perPage + perPage - 1)
       .then(({ data, error, count: total }) => {
@@ -46,6 +48,11 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
   useEffect(() => { loadRef.current = load; load(); }, [load]);
 
   useEffect(() => {
+    // Foreground/reconnect refreshes arrive in bursts — iOS fires
+    // visibilitychange AND focus, and the socket joins right after the mount
+    // load — one load per second is plenty. A real new OTP (INSERT below)
+    // always reloads at once.
+    const refresh = () => { if (Date.now() - lastLoadAt.current > 1000) loadRef.current(); };
     // New OTPs appear the moment the phone forwards them: refetch the page
     // (keeps the count and page contents exact, wherever the user is).
     const ch = supabase.channel('otp-inbox')
@@ -59,10 +66,10 @@ export default function OtpInbox({ addToast }: { addToast: (m: string, t?: strin
       // Reload whenever the channel (re)connects: iOS suspends the socket
       // while the PWA is backgrounded, and anything that arrived meanwhile
       // would otherwise be missed until a manual refresh.
-      .subscribe(status => { if (status === 'SUBSCRIBED') loadRef.current(); });
+      .subscribe(status => { if (status === 'SUBSCRIBED') refresh(); });
     // Same story when the app returns to the foreground or regains focus —
     // no refresh button needed, the list refetches itself.
-    const onVisible = () => { if (document.visibilityState === 'visible') loadRef.current(); };
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
     // Re-render every 30s so the age labels and the fresh highlight track.

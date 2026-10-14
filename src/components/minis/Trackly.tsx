@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { supabase } from '../../lib/supabase';
+import { supabase, currentUserId } from '../../lib/supabase';
 import { friendlyError } from '../../lib/friendlyError';
 import { T, S } from '../../lib/theme';
 import { copyToClipboard } from '../../lib/clipboard';
@@ -75,8 +75,8 @@ export default function Trackly({ addToast, onBack }: { addToast: (msg: string, 
     if (code.length < 3) { setFormError('Short code must be at least 3 characters'); return; }
     if (!/^[a-zA-Z0-9_-]+$/.test(code)) { setFormError('Short code: letters, numbers, hyphens, underscores only'); return; }
     setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from('short_links').insert({ long_url: v.href, title: form.title.trim() || null, short_code: code, created_by: user?.id });
+    const uid = await currentUserId();
+    const { error } = await supabase.from('short_links').insert({ long_url: v.href, title: form.title.trim() || null, short_code: code, created_by: uid });
     if (error) { addToast(friendlyError(error), 'error'); setSaving(false); return; }
     addToast('Short link created', 'success');
     setSaving(false); closeModal(); fetchLinks();

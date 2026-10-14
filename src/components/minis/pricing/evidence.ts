@@ -28,7 +28,10 @@ export const sheetLines = (p: PricedProduct): SheetLine[] => p.components.flatMa
 }));
 
 export const r2 = (x: number) => Math.round(x * 100) / 100;
-export const fmtDate = (d: string | null) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : 'undated');
+// Cached formatter: toLocaleDateString rebuilds one per call, and the
+// evidence engine formats every PO line on each keystroke of the sheet.
+const DATE_IN = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
+export const fmtDate = (d: string | null) => (d ? DATE_IN.format(new Date(d + 'T00:00:00')) : 'undated');
 const uniq = <T,>(xs: T[]) => [...new Set(xs)];
 const isMeters = (u: string | null) => ['meter', 'metre', 'mtr', 'm'].includes((u || '').trim().toLowerCase());
 

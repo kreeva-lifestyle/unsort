@@ -48,6 +48,13 @@ export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
   const setTranslate = useCallback((x: number, animate = false, closing = false) => {
     const el = contentRef.current;
     if (!el) return;
+    // Promote to a compositor layer only while the row is moving. At rest a
+    // promoted row still holds its own GPU backing (~1 MB per row at 3x), and
+    // a 25-100 row list of them is what makes long lists stutter on phones.
+    // A no-op "animate to 0 while already at 0" fires no transitionend, so
+    // release the hint right away in that case instead of waiting for one.
+    const restToRest = x === 0 && currentX.current === 0;
+    el.style.willChange = animate && restToRest ? '' : 'transform';
     el.style.transition = animate ? (closing ? `transform .35s ${EASE_OUT}` : `transform .3s ${SPRING}`) : 'none';
     el.style.transform = `translateX(${x}px)`;
     currentX.current = x;
@@ -156,15 +163,21 @@ export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
       }
     };
 
+    // Once a snap/close animation lands at rest the row is ordinary content
+    // again — drop the layer hint so only the row being dragged keeps one.
+    const onSettled = () => { if (currentX.current === 0) el.style.willChange = ''; };
+
     // touchmove must be non-passive so we can preventDefault during horizontal swipe
     el.addEventListener('touchstart', onStart, { passive: true });
     el.addEventListener('touchmove', onMove, { passive: false });
     el.addEventListener('touchend', onEnd);
+    el.addEventListener('transitionend', onSettled);
 
     return () => {
       el.removeEventListener('touchstart', onStart);
       el.removeEventListener('touchmove', onMove);
       el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('transitionend', onSettled);
       openRows.delete(closeThis);
     };
   }, [maxReveal, setTranslate, snap, closeThis]);
@@ -215,7 +228,7 @@ export default function SwipeRow({ children, actions, hint, hintKey }: Props) {
     // scrolling on any list of SwipeRows. pan-y hands vertical panning to the
     // compositor; horizontal moves still arrive cancellable.
     <div ref={rowRef} style={{ position: 'relative', overflow: 'hidden', touchAction: 'pan-y' }}>
-      <div ref={contentRef} style={{ position: 'relative', zIndex: 1, background: isOpen ? '#0d1220' : '#060810', willChange: 'transform' }}>
+      <div ref={contentRef} style={{ position: 'relative', zIndex: 1, background: isOpen ? '#0d1220' : '#060810' }}>
         {children}
       </div>
       <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center', gap: 10, paddingRight: 12, paddingLeft: 8 }}>

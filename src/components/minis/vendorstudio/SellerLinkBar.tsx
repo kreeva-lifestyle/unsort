@@ -2,7 +2,7 @@
 // link sellers use to build their own cards. One click — the link and its
 // short URL create themselves on first view, so Copy is the only action.
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../../lib/supabase';
+import { supabase, currentUserId } from '../../../lib/supabase';
 import { friendlyError } from '../../../lib/friendlyError';
 import { T, S } from '../../../lib/theme';
 
@@ -24,7 +24,7 @@ export default function SellerLinkBar({ addToast }: { addToast: (m: string, t?: 
       if (!data) {
         // No link yet: mint one. A partial unique index allows a single active
         // row, so if another admin raced us we just re-read theirs.
-        const uid = (await supabase.auth.getUser()).data.user?.id;
+        const uid = await currentUserId();
         const { error } = await supabase.from('ratecard_share').insert({ token: newToken(), created_by: uid });
         ({ data } = await read());
         if (!data) { addToast(friendlyError(error || 'Could not create the seller link'), 'error'); return; }
@@ -35,7 +35,7 @@ export default function SellerLinkBar({ addToast }: { addToast: (m: string, t?: 
       // Give it a friendly Trackly code so the owner shares /#/s/ratecard
       // rather than the 32-hex token. Best effort: if the code is taken, try a
       // suffixed one; if that fails too, the long link still works.
-      const uid = (await supabase.auth.getUser()).data.user?.id;
+      const uid = await currentUserId();
       for (const code of [PREFERRED_CODE, `${PREFERRED_CODE}-${Math.random().toString(36).slice(2, 5)}`]) {
         const { error } = await supabase.from('short_links')
           .insert({ short_code: code, long_url: longFor(data.token), title: 'Seller rate card', created_by: uid });

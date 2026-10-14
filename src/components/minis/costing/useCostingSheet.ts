@@ -7,7 +7,7 @@
 // component that holds a problem (errVersion) so a tapped error always
 // finds its row.
 import { useState, useEffect } from 'react';
-import { supabase } from '../../../lib/supabase';
+import { supabase, currentUserId } from '../../../lib/supabase';
 import { friendlyError } from '../../../lib/friendlyError';
 import { useCrumb } from '../../../hooks/useBreadcrumb';
 import { useProductCatalog, resolveSku } from '../../../hooks/useProductCatalog';
@@ -77,11 +77,11 @@ export function useCostingSheet({ product, saved, library, onSaved, addToast, as
     if (!comps) return;
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const uid = await currentUserId();
       const row = {
         id: p.id, sku: p.sku.trim().toUpperCase(), image_url: p.image_url,
         maintenance_pct: num(p.maintenance_pct), components: comps,
-        notes: p.notes, created_by: user?.id, updated_at: new Date().toISOString(),
+        notes: p.notes, created_by: uid, updated_at: new Date().toISOString(),
         category: (p.category || '').trim(), attachments: p.attachments ?? [],
         selling_price: String(p.selling_price ?? '').trim() ? num(p.selling_price ?? '') : null,
       };

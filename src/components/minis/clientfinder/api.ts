@@ -92,7 +92,7 @@ export const explain = (data: SearchResult, status: number): string =>
 // Read a picked File as base64 for the edge function. FileReader (not
 // arrayBuffer + btoa) because a spread over a photo-sized byte array
 // overflows the call stack on larger phone photos.
-export const fileToB64 = (file: File): Promise<string> =>
+export const fileToB64 = (file: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
     const fr = new FileReader();
     fr.onerror = () => reject(new Error('Could not read that file'));

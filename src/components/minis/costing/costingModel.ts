@@ -30,8 +30,11 @@ export const num = (v: number | string | null | undefined): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export const money = (n: number): string =>
-  `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// One formatter for the whole app: toLocaleString builds a new
+// Intl.NumberFormat per call (~40 µs), and money() runs hundreds of times
+// per list render. Output is identical, including 0, -0, NaN and Infinity.
+const INR = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const money = (n: number): string => `₹${INR.format(n)}`;
 
 /** The supplier whose rate prices this sub-component. Falls back to the
  *  first entry so a sheet can never silently cost a sub at 0 just because

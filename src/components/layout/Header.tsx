@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { T } from '../../lib/theme';
-import { useBreadcrumb } from '../../hooks/useBreadcrumb';
+import { useCrumbs } from '../../hooks/useBreadcrumb';
 import { closeAllLayers, closeTopLayer, layerCount } from '../../hooks/useBackClose';
 
 // A crumb that can be tapped looks like text but is a real button: keyboard
@@ -17,7 +17,7 @@ export default function Header({ title, onNotifClick, notifications, markAsRead,
   onToggleSidebar?: () => void;
 }) {
   const [show, setShow] = useState(false);
-  const { crumbs } = useBreadcrumb();
+  const crumbs = useCrumbs();
   const unread = notifications.filter((n: any) => !n.is_read).length;
 
   // The browser tab, history menu and share sheet name the VIEW, innermost

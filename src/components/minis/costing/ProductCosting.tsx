@@ -2,7 +2,7 @@
 // full-sheet editor behind each one. Cost of a garment = Σ over main
 // components of Σ over sub-components (qty × selected supplier's rate),
 // plus the maintenance %.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
@@ -14,6 +14,8 @@ import AskBox from './AskBox';
 import CostingThumb from './CostingThumb';
 import { useBackClose } from '../../../hooks/useBackClose';
 import { PRICING_KEYS, normalizeCosting } from '../pricing/pricingConfig';
+
+const COLS = 'id, sku, image_url, maintenance_pct, components, notes, selling_price, category, attachments, updated_at';
 
 export default function ProductCosting({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const [list, setList] = useState<CostingProduct[] | null>(null);
@@ -32,7 +34,7 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
 
   const load = () => {
     supabase.from('costing_products')
-      .select('id, sku, image_url, maintenance_pct, components, notes, selling_price, category, attachments, updated_at')
+      .select(COLS)
       // Newest sheet first by CREATION, so editing a sheet never moves it in
       // the grid (ordering by updated_at did — owner's complaint).
       .order('created_at', { ascending: false }).order('id').limit(500)
@@ -52,9 +54,26 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
       });
   };
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // After a sheet closes, re-read ONLY that sheet instead of all 500 rows
+  // with their components JSON. A row that no longer exists (deleted) is
+  // dropped; a new one is prepended (the grid is newest-created first); an
+  // existing one is replaced in place so it never moves.
+  const refreshRow = (id: string) => {
+    supabase.from('costing_products').select(COLS).eq('id', id).maybeSingle()
+      .then(({ data, error }) => {
+        if (error) { addToast(friendlyError(error), 'error'); return; }
+        setList(l => {
+          const cur = l ?? [];
+          if (!data) return cur.filter(p => p.id !== id);
+          const row = data as CostingProduct;
+          return cur.some(p => p.id === id) ? cur.map(p => (p.id === id ? row : p)) : [row, ...cur];
+        });
+      });
+  };
+  const closeSheet = (p: CostingProduct) => { setEditing(null); refreshRow(p.id); };
   // The open sheet owns one history entry, so the device Back returns to
   // this list (same as the sheet's Back button) instead of closing the tool.
-  useBackClose(!!editing, () => { setEditing(null); load(); });
+  useBackClose(!!editing, () => { if (editing) closeSheet(editing); });
   // The header crumb ("Minis / Product Costing / FD-1") is set by the editor
   // itself, from the SKU as typed — so a new sheet reads its code as soon as
   // it is entered, not only after the first save.
@@ -63,7 +82,10 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
   // unit and suppliers with rates (owner's call — chips auto-fill the
   // price; qty is left to type). The material code is NOT carried: it is
   // per design, so it stays blank for the user (owner's rule).
-  const presets: SubPreset[] = topSubs.map(n => {
+  // Both are walks over every line of every sheet — once per list change,
+  // not once per render (the sheet's SKU crumb used to re-render this per
+  // keystroke).
+  const presets: SubPreset[] = useMemo(() => topSubs.map(n => {
     for (const p of list ?? []) for (const c of p.components) for (const s of c.subs) {
       if (s.name.trim().toUpperCase() === n.toUpperCase()) {
         return { name: s.name.trim(), unit: s.unit,
@@ -72,7 +94,10 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
       }
     }
     return { name: n, unit: '', suppliers: [] };
-  });
+  }), [topSubs, list]);
+  // Everything typed on ANY sheet, offered back as dropdown suggestions —
+  // one spelling per supplier keeps the purchase plan grouped correctly.
+  const library = useMemo(() => withCommonTemplates(withTemplates(buildLibrary(list ?? []), list ?? []), commonSubs), [list, commonSubs]);
 
   const newSheet = () => {
     setEditingSaved(false);
@@ -83,13 +108,10 @@ export default function ProductCosting({ addToast }: { addToast: (m: string, t?:
   };
 
   if (editing) {
-    // Everything typed on ANY sheet, offered back as dropdown suggestions —
-    // one spelling per supplier keeps the purchase plan grouped correctly.
-    const library = withCommonTemplates(withTemplates(buildLibrary(list ?? []), list ?? []), commonSubs);
     return (
       <CostingEditor product={editing} saved={editingSaved} library={library} topSubs={presets} addToast={addToast}
-        onBack={() => { setEditing(null); load(); }}
-        onSaved={() => { setEditing(null); load(); }} />
+        onBack={() => closeSheet(editing)}
+        onSaved={() => closeSheet(editing)} />
     );
   }
 

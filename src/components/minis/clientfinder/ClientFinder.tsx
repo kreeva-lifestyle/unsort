@@ -13,8 +13,20 @@ import PhotoPicker from './PhotoPicker';
 import { call, explain, fileToB64, type Hit, type FolderCandidate } from './api';
 import { exportHitsXlsx } from './exportHits';
 import HitList from './HitList';
+import { optimizeImage } from '../costing/imageResize';
 
 type Mode = 'upload' | 'sku';
+
+// Camera photos are 3–8 MB; Vision matches on content, not bytes, and
+// downsamples internally, so a 1600 px JPEG finds the same pages at a
+// fraction of the upload. Small files go as-is. Any decode/encode failure
+// falls back to the original file so nothing that worked before stops
+// working (optimizeImage itself throws on undecodable files over 4 MB —
+// that path must not surface here).
+const shrinkForSearch = async (file: File): Promise<Blob> => {
+  if (file.size <= 1_000_000) return file;
+  try { return (await optimizeImage(file, 1600, 0.85)).blob; } catch { return file; }
+};
 
 /** A picked photo plus the blob URL showing it. Kept as one object so the two
  *  can never drift apart, and so the URL can be revoked when the photo goes. */
@@ -135,7 +147,7 @@ export default function ClientFinder({ addToast }: { addToast: (m: string, t?: s
         const target = targets[ti];
         const payload = mode === 'sku'
           ? { action: 'search', source: 'sku', sku: sku.trim().toUpperCase(), folder: folder || undefined, image_url: (target as string) || undefined }
-          : { action: 'search', source: 'upload', image_b64: await fileToB64(target as File) };
+          : { action: 'search', source: 'upload', image_b64: await fileToB64(await shrinkForSearch(target as File)) };
         const { status, data } = await call(payload);
 
         // A folder choice is a question, not a failure — offer the options

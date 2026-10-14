@@ -2,7 +2,6 @@
 // an .xls for Utsav's upload. Two flavours (owner's ask): the stock as
 // entered, and "with alterations" — every size also counting the next size
 // up (see lib/sizeAlteration.ts). Split out of Minis.tsx.
-import * as XLSX from 'xlsx';
 import { saveWorkbook } from '../../lib/xlsxDownload';
 import { exportName, fileDate } from '../../lib/exportName';
 import { withAlterations } from '../../lib/sizeAlteration';
@@ -19,7 +18,8 @@ export function utsavStocks(rows: UtsavRow[], alterations: boolean): number[] {
   return withAlterations(rows, r => (r.designno && UTSAV_SIZE_MAP[r.size] ? { product: r.designno.toUpperCase(), size: UTSAV_SIZE_MAP[r.size] } : null), r => r.stock, 'sum');
 }
 
-export function exportUtsavXls(rows: UtsavRow[], alterations: boolean): Promise<boolean> {
+export async function exportUtsavXls(rows: UtsavRow[], alterations: boolean): Promise<boolean> {
+  const XLSX = await import('xlsx');
   const stocks = utsavStocks(rows, alterations);
   const data = rows.map((r, i) => ({ relid: r.relid, vendorno: r.vendorno, stock: stocks[i], leadtime: r.leadtime, block: r.block, 'ARYA SKU': r.aryaSku }));
   const ws = XLSX.utils.json_to_sheet(data);
