@@ -476,6 +476,16 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
       await setItem('accepted', 'seed');
       return reply(await bump(runId, { note: `Searched ${skip + used} queries — ${added} sites to check` }), { result: 'searched', added });
     }
+    // A lead whose hop searches were interrupted (search outage) comes back
+    // as pending with its remaining queries in the note: no re-read, no
+    // second model call, just the searches that never ran.
+    const resumeLead = (() => { try { const n = JSON.parse(String(item.note || '')); return n && n.lead ? n : null; } catch { return null; } })();
+    if (resumeLead) {
+      const r = await expand(run0, cfg, resumeLead.queries || [], item.hop + 1, item.domain, resumeLead.searched || 0);
+      if (r.error) { await rest(`buyer_queue?id=eq.${item.id}`, { method: 'PATCH', body: JSON.stringify({ claimed_at: null, note: JSON.stringify({ ...resumeLead, searched: (resumeLead.searched || 0) + r.used }) }) }); return pause(r.error, r.used); }
+      await setItem('accepted', `${resumeLead.score} — ${resumeLead.reason}`);
+      return reply(await bump(runId, { note: `${item.domain}: searches finished — ${r.added} more to check` }), { result: 'lead', score: resumeLead.score, added: r.added });
+    }
     const target = publicHttpUrl(item.url);
     const page0 = target ? await readPage(target) : null;
     if (!page0) {
@@ -518,7 +528,11 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
       const qs = (Array.isArray(v.queries) ? v.queries : []).map((q: unknown) => str(q, 120)).filter(Boolean).slice(0, HOP_QUERIES);
       const r = await expand(run, cfg, qs, item.hop + 1, page.domain);
       added = r.added;
-      if (r.error) return pause(r.error, r.used);
+      if (r.error) {
+        // Back to pending with the leftover queries, so Resume finishes them.
+        await rest(`buyer_queue?id=eq.${item.id}`, { method: 'PATCH', body: JSON.stringify({ state: 'pending', claimed_at: null, note: JSON.stringify({ lead: true, score, reason: lead.reason.slice(0, 120), searched: r.used, queries: qs }) }) });
+        return pause(r.error, r.used);
+      }
     }
     run = await bump(runId, { note: `${lead.name || page.domain}: buyer (${score})${added ? ` — ${added} more to check` : ''}` });
     return reply(run, { result: 'lead', score, added }, usage);
