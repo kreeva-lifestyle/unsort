@@ -9,6 +9,7 @@ import { call, explain } from './buyerApi';
 export default function BuyerKeyCard({ hasKey, isAdmin, onSaved, addToast }: {
   hasKey: boolean;
   isAdmin: boolean;
+  /** Called after any save attempt (the test search counts even when the key is refused). */
   onSaved: () => void;
   addToast: (m: string, t?: string) => void;
 }) {
@@ -22,8 +23,9 @@ export default function BuyerKeyCard({ hasKey, isAdmin, onSaved, addToast }: {
     setSaving(true);
     try {
       const { status, data } = await call({ action: 'set_search_key', key: key.trim() });
-      if (data?.ok) { addToast('Brave key saved — a test search worked', 'success'); setEditing(false); setKey(''); onSaved(); }
+      if (data?.ok) { addToast('Brave key saved — a test search worked', 'success'); setEditing(false); setKey(''); }
       else addToast(explain(data, status), 'error');
+      onSaved();
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setSaving(false);
   };

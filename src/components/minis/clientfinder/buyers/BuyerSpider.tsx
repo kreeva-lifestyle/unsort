@@ -73,9 +73,9 @@ export default function BuyerSpider({ addToast }: { addToast: (m: string, t?: st
     setStarting(true); setError(''); clearLog();
     try {
       const { status: st, data } = await call({ action: 'start', seed_url: seed.trim(), max_depth: depth, max_leads: maxLeads });
+      if (data.search_usage) setUsage(data.search_usage);
       if (!data.ok || !data.run) { setError(explain(data, st)); addToast(explain(data, st), 'error'); return; }
       setRun(data.run); setSeed('');
-      if (data.search_usage) setUsage(data.search_usage);
       addToast(`Profiled ${data.run.profile.business_name || data.run.seed_domain} — searching`, 'success');
     } catch (e) { const m = friendlyError(e); setError(m); addToast(m, 'error'); }
     finally { setStarting(false); }
@@ -85,6 +85,7 @@ export default function BuyerSpider({ addToast }: { addToast: (m: string, t?: st
     setControlling(true);
     try {
       const { status: st, data } = await call({ action, run_id: run.id });
+      if (data.search_usage) setUsage(data.search_usage);
       if (!data.ok) { addToast(explain(data, st), 'error'); return false; }
       setError('');
       setRun(data.run ?? { ...run, status: action === 'pause' ? 'paused' : 'running', last_error: null, step_note: action === 'pause' ? 'Paused' : 'Resumed' });

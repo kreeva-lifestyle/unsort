@@ -51,7 +51,7 @@ function corsHeaders(req: Request) {
 }
 const json = (body: unknown, req: Request, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders(req), 'content-type': 'application/json' } });
-const fail = (status: number, error: string, req: Request, details?: string) => json({ ok: false, error, details }, req, status);
+const fail = (status: number, error: string, req: Request, details?: string, extra: Record<string, unknown> = {}) => json({ ok: false, error, details, ...extra }, req, status);
 
 // ── Caps (server-side, the client cannot raise them) ────────────────────────
 const RUNS_PER_USER_PER_DAY = 5;
@@ -126,8 +126,12 @@ async function monthUsage(): Promise<number> {
   const r = await rest(`buyer_search_usage?month=eq.${monthKey()}&select=used`);
   return Number(r?.[0]?.used) || 0;
 }
+// A database failure here is a "search…" error: the run pauses with its
+// resume note intact (like a Brave outage), never a failed site.
 async function reserveSearch(): Promise<number | null> {
-  const r = await rest('rpc/buyer_search_reserve', { method: 'POST', body: JSON.stringify({ p_month: monthKey(), p_cap: MONTHLY_SEARCH_CAP }) });
+  let r: unknown;
+  try { r = await rest('rpc/buyer_search_reserve', { method: 'POST', body: JSON.stringify({ p_month: monthKey(), p_cap: MONTHLY_SEARCH_CAP }) }); }
+  catch (e) { throw new Error(`search_reserve_failed: ${String((e as Error)?.message || e).slice(0, 120)}`); }
   const n = Array.isArray(r) ? r[0] : r;
   return n === null || n === undefined ? null : Number(n);
 }
@@ -266,7 +270,7 @@ async function withContactPage(p: Page): Promise<Page> {
   return { ...p, text: `${p.text}\n\n[CONTACT PAGE]\n${c.text.slice(0, 3000)}`, contacts: { emails: merge(p.contacts.emails, c.contacts.emails), phones: merge(p.contacts.phones, c.contacts.phones), whatsapp: merge(p.contacts.whatsapp, c.contacts.whatsapp), instagram: merge(p.contacts.instagram, c.contacts.instagram), facebook: merge(p.contacts.facebook, c.contacts.facebook) } };
 }
 
-// ── Search providers ────────────────────────────────────────────────────────
+// ── Brave Search ────────────────────────────────────────────────────────────
 interface Hit { url: string; title: string; snippet: string }
 interface SearchCfg { key: string }
 
@@ -292,6 +296,7 @@ const searchErrorText = (e: unknown) => {
   if (m === 'search_key_rejected') return 'The Brave Search API key was rejected — an admin can replace it in Client Finder → Buyers';
   if (m === 'search_rate_limited') return 'The Brave Search rate limit was hit — wait a minute and resume';
   if (m === 'search_monthly_cap') return `Monthly search limit reached — all ${MONTHLY_SEARCH_CAP} free Brave searches for this month are used. Runs continue next month.`;
+  if (m.startsWith('search_reserve_failed')) return 'The search counter could not be updated — wait a minute and resume';
   return `Search failed: ${m.slice(0, 120)} — wait a minute and resume`;
 };
 
@@ -407,7 +412,8 @@ async function expand(run: any, cfg: SearchCfg, queries: string[], hop: number, 
   let monthUsed = await monthUsage();
   for (let i = skip; i < queries.length; i++) {
     if (queriesUsed >= MAX_QUERIES_PER_RUN) break;
-    const taken = await reserveSearch();
+    let taken: number | null;
+    try { taken = await reserveSearch(); } catch (e) { return { added, used, monthUsed, error: e }; }
     if (taken === null) return { added, used, monthUsed: MONTHLY_SEARCH_CAP, error: new Error('search_monthly_cap') };
     monthUsed = taken;
     if (used > 0) await new Promise(res => setTimeout(res, 1100)); // Brave free plan: 1 request a second
@@ -441,7 +447,7 @@ async function start(who: { id: string; role: string }, body: any, req: Request)
   const cfg = await loadSearchCfg();
   if (!cfg) return fail(400, 'No Brave Search API key yet — an admin adds one below', req);
   const monthUsed = await monthUsage();
-  if (monthUsed >= MONTHLY_SEARCH_CAP) return fail(429, searchErrorText(new Error('search_monthly_cap')), req);
+  if (monthUsed >= MONTHLY_SEARCH_CAP) return fail(429, searchErrorText(new Error('search_monthly_cap')), req, undefined, { search_usage: usageInfo(monthUsed) });
   const since = new Date(Date.now() - 86_400_000).toISOString();
   const recent = await rest(`buyer_runs?select=id&created_by=eq.${who.id}&created_at=gte.${since}`);
   if (recent.length >= RUNS_PER_USER_PER_DAY) return fail(429, `Daily limit reached — ${RUNS_PER_USER_PER_DAY} runs per person per day`, req);
@@ -567,6 +573,7 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
     return reply(run, { result: 'lead', score, added }, modelUsage);
   } catch (e) {
     const m = String((e as Error)?.message || e);
+    try { monthUsed = await monthUsage(); } catch { /* the reply keeps the last known count */ }
     // A key, quota or provider outage pauses the run (searches throw "search…",
     // model problems "Anthropic…"); a single bad site is marked failed and the
     // loop moves on — unless it was already accepted, which stands.
@@ -595,8 +602,8 @@ Deno.serve(async (req) => {
       // One real query before storing: a bad key is refused here, not mid-run.
       // It is reserved against the month like any other search.
       const taken = await reserveSearch();
-      if (taken === null) return fail(429, searchErrorText(new Error('search_monthly_cap')), req);
-      try { await webSearch({ key }, 'indian clothing boutique'); } catch (e) { return fail(400, searchErrorText(e), req); }
+      if (taken === null) return fail(429, searchErrorText(new Error('search_monthly_cap')), req, undefined, { search_usage: usageInfo(MONTHLY_SEARCH_CAP) });
+      try { await webSearch({ key }, 'indian clothing boutique'); } catch (e) { return fail(400, searchErrorText(e), req, undefined, { search_usage: usageInfo(taken) }); }
       await setSecret('search_api_key', key);
       return json({ ok: true, hasSearchKey: true, search_usage: usageInfo(taken) }, req);
     }
@@ -610,7 +617,7 @@ Deno.serve(async (req) => {
       if (!run) return fail(404, 'Run not found', req);
       if (run.status === 'done' || run.status === 'failed') return fail(400, 'That run has finished', req);
       const updated = await bump(runId, { status: action === 'pause' ? 'paused' : 'running', note: action === 'pause' ? 'Paused' : 'Resumed', error: null });
-      return json({ ok: true, run: updated }, req);
+      return json({ ok: true, run: updated, search_usage: usageInfo(await monthUsage()) }, req);
     }
     return fail(400, 'Unknown action', req);
   } catch (e) {
