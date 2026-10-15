@@ -929,6 +929,9 @@ export interface BuyerLead {
   updated_at: string;
 }
 
+// Buyer Spider: Brave searches used per UTC month (free plan cap 1,000).
+export interface BuyerSearchUsage { month: string; used: number; updated_at: string }
+
 // ─── Purchase Orders ────────────────────────────────────────────────────
 // Split into ./purchaseOrders.ts (audit L4/L6); re-exported so every
 // existing `from '../types/database'` import keeps working.

@@ -3,13 +3,13 @@
 // between any two taps and the run resumes later exactly where it stopped —
 // the queue lives in the database, not here.
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { call, explain, type StepItem } from './buyerApi';
+import { call, explain, type SearchUsage, type StepItem } from './buyerApi';
 import type { BuyerRun } from '../../../../types/database';
 
 const BREATHER_MS = 250;   // between steps, so the UI paints each result
 const LOG_LINES = 8;
 
-export function useSpiderLoop(run: BuyerRun | null, setRun: Dispatch<SetStateAction<BuyerRun | null>>, onError: (m: string) => void) {
+export function useSpiderLoop(run: BuyerRun | null, setRun: Dispatch<SetStateAction<BuyerRun | null>>, onError: (m: string) => void, onUsage: (u: SearchUsage) => void) {
   const [log, setLog] = useState<StepItem[]>([]);
   const [stepping, setStepping] = useState(false);
   const stop = useRef(false);
@@ -35,6 +35,7 @@ export function useSpiderLoop(run: BuyerRun | null, setRun: Dispatch<SetStateAct
         try { ({ status, data } = await call({ action: 'step', run_id: runId })); }
         catch { halt('Network error — the run is still saved; tap Resume to continue'); break; }
         if (!alive) break;
+        if (data.search_usage) onUsage(data.search_usage);
         if (!data.ok) { halt(explain(data, status), data.run); break; }
         if (data.run) setRun(data.run);
         if (data.item) setLog(l => [data.item!, ...l].slice(0, LOG_LINES));
@@ -44,8 +45,8 @@ export function useSpiderLoop(run: BuyerRun | null, setRun: Dispatch<SetStateAct
       if (alive) setStepping(false);
     })();
     return () => { alive = false; stop.current = true; setStepping(false); };
-    // onError/setRun are stable callbacks from the panel; the loop restarts
-    // only when the run or its running state changes.
+    // onError/onUsage/setRun are stable callbacks from the panel; the loop
+    // restarts only when the run or its running state changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId, active]);
 
