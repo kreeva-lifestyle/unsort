@@ -17,17 +17,21 @@
 // the service role; the client only reads the tables (and updates outreach).
 //
 // Secrets: the Anthropic key and the owner-picked model come from app_secrets
-// (Settings → Listing AI, same as pricing-ai). The search API key is stored by
-// an admin through `set_search_key` — Brave Search or Google Programmable
-// Search — never in the browser.
+// (Settings → Listing AI, same as pricing-ai). The Brave Search API key is
+// stored by an admin through `set_search_key` — never in the browser. Brave's
+// free plan allows MONTHLY_SEARCH_CAP searches a month: every search is first
+// reserved in buyer_search_usage (one row per UTC month, one atomic RPC per
+// search — refused once the month is spent), a run pauses at the cap and the
+// UI warns from MONTHLY_SEARCH_WARN. (Google Programmable Search was dropped: Google no
+// longer lets new engines search the whole web.)
 //
 // Honest limits: it only finds sites a search engine indexes and that publish
 // contacts on their own pages. It reads at human-ish volume (one page per
 // candidate, one contact page at most) and never logs into anything.
 //
 // Actions (POST JSON { action, ... }):
-//   status          (signed-in)               -> { ok, searchProvider, hasAiKey, model, role }
-//   set_search_key  (admin)                   -> store/validate the search API key
+//   status          (signed-in)               -> { ok, hasSearchKey, hasAiKey, model, role, search_usage }
+//   set_search_key  (admin)                   -> store/validate the Brave Search API key
 //   start           (admin/manager/operator)  -> profile the seed, create a run
 //   step            (admin/manager/operator)  -> process one queue item
 //   pause           (admin/manager/operator)  -> status := paused
@@ -60,6 +64,8 @@ const MIN_ACCEPT_SCORE = 55;          // the "worth contacting" band edge in JUD
 const PAGE_BYTES = 350_000;
 const FETCH_MS = 10_000;
 const CLAIM_STALE_MS = 3 * 60_000;    // a claimed item nobody finished (edge timeout) is retried after this
+const MONTHLY_SEARCH_CAP = 1000;      // Brave free plan: never exceeded, per UTC month
+const MONTHLY_SEARCH_WARN = 900;      // the UI warns from here
 
 // Same whitelist + prices as listing-ai / pricing-ai (USD per MTok).
 const MODELS: Record<string, { in: number; out: number }> = { 'claude-haiku-4-5': { in: 1, out: 5 }, 'claude-sonnet-5': { in: 3, out: 15 }, 'claude-opus-4-8': { in: 5, out: 25 } };
@@ -104,10 +110,28 @@ async function rest(path: string, init: RequestInit & { prefer?: string } = {}):
 }
 // Counters are ADDED in SQL (buyer_run_bump): two devices stepping the same
 // run can never overwrite each other's increments with a stale snapshot.
+// p_month is unused by the function (see migration 20261015100000): it is sent
+// so PostgREST resolves the 8-parameter overload unambiguously.
 async function bump(runId: string, d: { pages?: number; queries?: number; leads?: number; note?: string; error?: string | null; status?: string | null }): Promise<any> {
-  const row = await rest('rpc/buyer_run_bump', { method: 'POST', body: JSON.stringify({ p_run: runId, p_pages: d.pages ?? 0, p_queries: d.queries ?? 0, p_leads: d.leads ?? 0, p_note: d.note ?? null, p_error: d.error ?? null, p_status: d.status ?? null }) });
+  const row = await rest('rpc/buyer_run_bump', { method: 'POST', body: JSON.stringify({ p_run: runId, p_pages: d.pages ?? 0, p_queries: d.queries ?? 0, p_leads: d.leads ?? 0, p_note: d.note ?? null, p_error: d.error ?? null, p_status: d.status ?? null, p_month: null }) });
   return Array.isArray(row) ? row[0] : row;
 }
+// Brave's free plan: MONTHLY_SEARCH_CAP searches per month, never more. One
+// row per UTC month in buyer_search_usage; reserveSearch() takes one search
+// atomically BEFORE the request is made (the row lock serialises two devices
+// or two users), and returns null once the month is spent. A search that
+// fails after it was reserved still counts: Brave saw the request.
+const monthKey = () => new Date().toISOString().slice(0, 7);
+async function monthUsage(): Promise<number> {
+  const r = await rest(`buyer_search_usage?month=eq.${monthKey()}&select=used`);
+  return Number(r?.[0]?.used) || 0;
+}
+async function reserveSearch(): Promise<number | null> {
+  const r = await rest('rpc/buyer_search_reserve', { method: 'POST', body: JSON.stringify({ p_month: monthKey(), p_cap: MONTHLY_SEARCH_CAP }) });
+  const n = Array.isArray(r) ? r[0] : r;
+  return n === null || n === undefined ? null : Number(n);
+}
+const usageInfo = (used: number) => ({ used, cap: MONTHLY_SEARCH_CAP, warn_at: MONTHLY_SEARCH_WARN, month: monthKey() });
 
 // ── URL safety ──────────────────────────────────────────────────────────────
 // Every page fetch is a server-side request to a URL that came from the user
@@ -244,40 +268,30 @@ async function withContactPage(p: Page): Promise<Page> {
 
 // ── Search providers ────────────────────────────────────────────────────────
 interface Hit { url: string; title: string; snippet: string }
-interface SearchCfg { provider: 'brave' | 'google'; key: string; cx: string }
+interface SearchCfg { key: string }
 
 async function loadSearchCfg(): Promise<SearchCfg | null> {
-  const provider = (await getSecret('search_api_provider')) as SearchCfg['provider'] | null;
   const key = await getSecret('search_api_key');
-  if (!provider || !key || !['brave', 'google'].includes(provider)) return null;
-  return { provider, key, cx: (await getSecret('search_api_cx')) || '' };
+  return key ? { key } : null;
 }
 
 // Every failure here throws a message starting with "search" — the step
 // handler pauses the run on those rather than blaming the current site.
 async function webSearch(cfg: SearchCfg, q: string): Promise<Hit[]> {
-  if (cfg.provider === 'brave') {
-    const r = await fetch(`https://api.search.brave.com/res/v1/web/search?${new URLSearchParams({ q, count: String(RESULTS_PER_QUERY * 2), search_lang: 'en', safesearch: 'off', text_decorations: 'false' })}`, {
-      headers: { accept: 'application/json', 'x-subscription-token': cfg.key }, signal: AbortSignal.timeout(FETCH_MS),
-    });
-    if (r.status === 401 || r.status === 403) throw new Error('search_key_rejected');
-    if (r.status === 429) throw new Error('search_rate_limited');
-    if (!r.ok) throw new Error(`search ${r.status}`);
-    const d = await r.json();
-    return (d?.web?.results || []).map((x: any) => ({ url: String(x.url || ''), title: String(x.title || ''), snippet: String(x.description || '') }));
-  }
-  const r = await fetch(`https://www.googleapis.com/customsearch/v1?${new URLSearchParams({ key: cfg.key, cx: cfg.cx, q, num: String(RESULTS_PER_QUERY) })}`, { signal: AbortSignal.timeout(FETCH_MS) });
-  const d = await r.json().catch(() => ({}));
-  if (r.status === 400 || r.status === 403) throw new Error('search_key_rejected');
-  if (r.status === 429) throw new Error('search_daily_quota');
-  if (!r.ok) throw new Error(`search ${r.status} ${String(d?.error?.message || '').slice(0, 80)}`);
-  return (d?.items || []).map((x: any) => ({ url: String(x.link || ''), title: String(x.title || ''), snippet: String(x.snippet || '') }));
+  const r = await fetch(`https://api.search.brave.com/res/v1/web/search?${new URLSearchParams({ q, count: String(RESULTS_PER_QUERY * 2), search_lang: 'en', safesearch: 'off', text_decorations: 'false' })}`, {
+    headers: { accept: 'application/json', 'x-subscription-token': cfg.key }, signal: AbortSignal.timeout(FETCH_MS),
+  });
+  if (r.status === 401 || r.status === 403) throw new Error('search_key_rejected');
+  if (r.status === 429) throw new Error('search_rate_limited');
+  if (!r.ok) throw new Error(`search ${r.status}`);
+  const d = await r.json();
+  return (d?.web?.results || []).map((x: any) => ({ url: String(x.url || ''), title: String(x.title || ''), snippet: String(x.description || '') }));
 }
 const searchErrorText = (e: unknown) => {
   const m = String((e as Error)?.message || e);
-  if (m === 'search_key_rejected') return 'The search API key was rejected — an admin can replace it in Client Finder → Buyers';
-  if (m === 'search_rate_limited') return 'The search API rate limit was hit — wait a minute and resume';
-  if (m === 'search_daily_quota') return 'The Google search daily quota (100 free searches) is used up — resume tomorrow, or switch to Brave';
+  if (m === 'search_key_rejected') return 'The Brave Search API key was rejected — an admin can replace it in Client Finder → Buyers';
+  if (m === 'search_rate_limited') return 'The Brave Search rate limit was hit — wait a minute and resume';
+  if (m === 'search_monthly_cap') return `Monthly search limit reached — all ${MONTHLY_SEARCH_CAP} free Brave searches for this month are used. Runs continue next month.`;
   return `Search failed: ${m.slice(0, 120)} — wait a minute and resume`;
 };
 
@@ -385,18 +399,25 @@ async function enqueue(runId: string, hits: Hit[], hop: number, parent: string, 
 // Runs the queries for one node (skipping the first `skip`, already run on a
 // previous attempt). Every search is counted on the run the moment it ran, so
 // a failure mid-way loses nothing; the caller gets how many ran before it.
-async function expand(run: any, cfg: SearchCfg, queries: string[], hop: number, parent: string, skip = 0): Promise<{ added: number; used: number; error: unknown }> {
+// EVERY search is reserved against the month first (reserveSearch), so the
+// 1,000th search is the last one this month whatever the run caps say — even
+// with two runs stepping at once.
+async function expand(run: any, cfg: SearchCfg, queries: string[], hop: number, parent: string, skip = 0): Promise<{ added: number; used: number; monthUsed: number; error: unknown }> {
   let added = 0, used = 0, queriesUsed = Number(run.queries_used) || 0;
+  let monthUsed = await monthUsage();
   for (let i = skip; i < queries.length; i++) {
     if (queriesUsed >= MAX_QUERIES_PER_RUN) break;
-    if (used > 0 && cfg.provider === 'brave') await new Promise(res => setTimeout(res, 1100));
+    const taken = await reserveSearch();
+    if (taken === null) return { added, used, monthUsed: MONTHLY_SEARCH_CAP, error: new Error('search_monthly_cap') };
+    monthUsed = taken;
+    if (used > 0) await new Promise(res => setTimeout(res, 1100)); // Brave free plan: 1 request a second
     let hits: Hit[];
-    try { hits = await webSearch(cfg, queries[i]); } catch (e) { return { added, used, error: e }; }
+    try { hits = await webSearch(cfg, queries[i]); } catch (e) { return { added, used, monthUsed, error: e }; }
     used += 1;
     queriesUsed = Number((await bump(run.id, { queries: 1 }))?.queries_used) || queriesUsed + 1;
     added += await enqueue(run.id, hits, hop, parent, queries[i], run.seed_domain);
   }
-  return { added, used, error: null };
+  return { added, used, monthUsed, error: null };
 }
 
 // Atomic claim: the PATCH's own filter re-checks "pending and unclaimed (or
@@ -418,7 +439,9 @@ async function start(who: { id: string; role: string }, body: any, req: Request)
   const maxDepth = Math.min(3, Math.max(1, Number(body.max_depth) || 2));
   const maxLeads = Math.min(500, Math.max(10, Number(body.max_leads) || 150));
   const cfg = await loadSearchCfg();
-  if (!cfg) return fail(400, 'No search API key yet — an admin adds one below (Brave Search or Google Programmable Search)', req);
+  if (!cfg) return fail(400, 'No Brave Search API key yet — an admin adds one below', req);
+  const monthUsed = await monthUsage();
+  if (monthUsed >= MONTHLY_SEARCH_CAP) return fail(429, searchErrorText(new Error('search_monthly_cap')), req);
   const since = new Date(Date.now() - 86_400_000).toISOString();
   const recent = await rest(`buyer_runs?select=id&created_by=eq.${who.id}&created_at=gte.${since}`);
   if (recent.length >= RUNS_PER_USER_PER_DAY) return fail(429, `Daily limit reached — ${RUNS_PER_USER_PER_DAY} runs per person per day`, req);
@@ -433,7 +456,7 @@ async function start(who: { id: string; role: string }, body: any, req: Request)
   const [run] = await rest('buyer_runs', { method: 'POST', prefer: 'return=representation', body: JSON.stringify({ created_by: who.id, seed_url: page.url, seed_domain: seedDomain, profile, max_depth: maxDepth, max_leads: maxLeads, pages_fetched: 1, step_note: profile.is_buyer ? 'Profiled the seed — searching next' : 'Note: the seed does not read as a buyer itself; searching anyway' }) });
   // The seed's queries run on the first step, so Start returns fast.
   await rest('buyer_queue', { method: 'POST', body: JSON.stringify({ run_id: run.id, domain: seedDomain, url: page.url, hop: 0, state: 'pending', note: 'seed' }) });
-  return json({ ok: true, run }, req);
+  return json({ ok: true, run, search_usage: usageInfo(monthUsed) }, req);
 }
 
 async function step(who: { id: string }, body: any, req: Request): Promise<Response> {
@@ -441,29 +464,33 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
   if (!/^[0-9a-f-]{36}$/.test(runId)) return fail(400, 'Missing run', req);
   const run0 = (await rest(`buyer_runs?id=eq.${runId}&select=*`))?.[0];
   if (!run0) return fail(404, 'Run not found', req);
-  if (run0.status !== 'running') return json({ ok: true, run: run0, done: run0.status !== 'paused' }, req);
-  const finish = async (status: string, note: string) => json({ ok: true, run: await bump(runId, { status, note }), done: true }, req);
+  let monthUsed = await monthUsage();
+  const usage = () => usageInfo(monthUsed);
+  if (run0.status !== 'running') return json({ ok: true, run: run0, done: run0.status !== 'paused', search_usage: usage() }, req);
+  const finish = async (status: string, note: string) => json({ ok: true, run: await bump(runId, { status, note }), done: true, search_usage: usage() }, req);
   if (run0.leads_found >= run0.max_leads) return finish('done', `Reached ${run0.max_leads} leads`);
   if (run0.pages_fetched >= MAX_PAGES_PER_RUN) return finish('done', `Read ${MAX_PAGES_PER_RUN} sites — the cap for one run`);
   const item = await claimNext(runId);
   if (!item) {
     const busy = (await rest(`buyer_queue?run_id=eq.${runId}&state=eq.pending&select=id&limit=1`))?.length > 0;
     // Another device holds the last items: nothing to do this tick, not done.
-    if (busy) return json({ ok: true, run: run0, done: false }, req);
+    if (busy) return json({ ok: true, run: run0, done: false, search_usage: usage() }, req);
     return finish('done', run0.queries_used >= MAX_QUERIES_PER_RUN ? `Used the ${MAX_QUERIES_PER_RUN}-search cap for one run` : 'Nothing left to check');
   }
   const cfg = await loadSearchCfg();
-  if (!cfg) return fail(400, 'The search API key is gone — an admin can add it again', req);
+  if (!cfg) return fail(400, 'The Brave Search API key is gone — an admin can add it again', req);
   const setItem = (state: string, note: string) => rest(`buyer_queue?id=eq.${item.id}`, { method: 'PATCH', body: JSON.stringify({ state, note: clip(note, 200) }) });
-  const reply = (run: any, it: Record<string, unknown>, usage?: unknown) => json({ ok: true, run, done: false, item: { domain: item.domain, hop: item.hop, ...it }, usage }, req);
+  const reply = (run: any, it: Record<string, unknown>, modelUsage?: unknown) => json({ ok: true, run, done: false, item: { domain: item.domain, hop: item.hop, ...it }, usage: modelUsage, search_usage: usage() }, req);
   // Pauses the run with the reason; the client shows Resume. Searches already
   // run were counted as they ran; `usedNow` is only for the note.
   const pause = async (e: unknown, usedNow = 0) => {
     const m = String((e as Error)?.message || e);
     const friendly = /^search/.test(m) ? searchErrorText(e) : m.slice(0, 300);
     const run = await bump(runId, { status: 'paused', error: friendly, note: `${friendly}${usedNow ? ` (${usedNow} searches done)` : ''}` });
-    return json({ ok: false, error: friendly, run }, req, 502);
+    return json({ ok: false, error: friendly, run, search_usage: usage() }, req, 502);
   };
+  // The month is already spent: pause before claiming anything.
+  if (monthUsed >= MONTHLY_SEARCH_CAP) { await rest(`buyer_queue?id=eq.${item.id}`, { method: 'PATCH', body: JSON.stringify({ claimed_at: null }) }); return pause(new Error('search_monthly_cap')); }
   let itemState: string | null = null;
 
   try {
@@ -471,7 +498,8 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
     // after a search failure skips the queries that already ran.
     if (item.hop === 0) {
       const skip = Number((String(item.note || '').match(/searched:(\d+)/) || [])[1]) || 0;
-      const { added, used, error } = await expand(run0, cfg, run0.profile?.queries || [], 1, run0.seed_domain, skip);
+      const { added, used, error, monthUsed: mu } = await expand(run0, cfg, run0.profile?.queries || [], 1, run0.seed_domain, skip);
+      monthUsed = mu;
       if (error) { await rest(`buyer_queue?id=eq.${item.id}`, { method: 'PATCH', body: JSON.stringify({ claimed_at: null, note: `seed searched:${skip + used}` }) }); return pause(error, skip + used); }
       await setItem('accepted', 'seed');
       return reply(await bump(runId, { note: `Searched ${skip + used} queries — ${added} sites to check` }), { result: 'searched', added });
@@ -482,6 +510,7 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
     const resumeLead = (() => { try { const n = JSON.parse(String(item.note || '')); return n && n.lead ? n : null; } catch { return null; } })();
     if (resumeLead) {
       const r = await expand(run0, cfg, resumeLead.queries || [], item.hop + 1, item.domain, resumeLead.searched || 0);
+      monthUsed = r.monthUsed;
       if (r.error) { await rest(`buyer_queue?id=eq.${item.id}`, { method: 'PATCH', body: JSON.stringify({ claimed_at: null, note: JSON.stringify({ ...resumeLead, searched: (resumeLead.searched || 0) + r.used }) }) }); return pause(r.error, r.used); }
       await setItem('accepted', `${resumeLead.score} — ${resumeLead.reason}`);
       return reply(await bump(runId, { note: `${item.domain}: searches finished — ${r.added} more to check` }), { result: 'lead', score: resumeLead.score, added: r.added });
@@ -501,12 +530,12 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
     const page = await withContactPage(page0);
     const seedP = run0.profile || {};
     const user = `SEED BUYER (what we are looking for more of)\nname: ${seedP.business_name}\nsells: ${seedP.what_they_sell}\nsegment: ${seedP.segment}\ncustomer: ${seedP.customer}\nplace: ${[seedP.city, seedP.country].filter(Boolean).join(', ')}\n\nCANDIDATE SITE\n${pageBlock(page)}\n\n${contactsBlock(page.contacts)}\n\nJudge the candidate as JSON.`;
-    const { data: v, usage } = await askModel(JUDGE_SYSTEM, user, JUDGE_SCHEMA, 900);
+    const { data: v, usage: modelUsage } = await askModel(JUDGE_SYSTEM, user, JUDGE_SCHEMA, 900);
     const score = Math.max(0, Math.min(100, Math.round(Number(v.score) || 0)));
     const accepted = !!v.is_buyer && score >= MIN_ACCEPT_SCORE;
     if (!accepted) {
       await setItem('rejected', `${score} — ${str(v.reason, 160)}`);
-      return reply(await bump(runId, { pages: 1, note: `${page.domain}: not a buyer (${score})` }), { result: 'rejected', score }, usage);
+      return reply(await bump(runId, { pages: 1, note: `${page.domain}: not a buyer (${score})` }), { result: 'rejected', score }, modelUsage);
     }
     const lead = {
       domain: page.domain, url: page.url, name: str(v.name, 120) || page.title.slice(0, 120), kind: str(v.kind, 30) || 'other', what_they_sell: str(v.what_they_sell, 300),
@@ -527,7 +556,7 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
     if (item.hop < run0.max_depth) {
       const qs = (Array.isArray(v.queries) ? v.queries : []).map((q: unknown) => str(q, 120)).filter(Boolean).slice(0, HOP_QUERIES);
       const r = await expand(run, cfg, qs, item.hop + 1, page.domain);
-      added = r.added;
+      added = r.added; monthUsed = r.monthUsed;
       if (r.error) {
         // Back to pending with the leftover queries, so Resume finishes them.
         await rest(`buyer_queue?id=eq.${item.id}`, { method: 'PATCH', body: JSON.stringify({ state: 'pending', claimed_at: null, note: JSON.stringify({ lead: true, score, reason: lead.reason.slice(0, 120), searched: r.used, queries: qs }) }) });
@@ -535,7 +564,7 @@ async function step(who: { id: string }, body: any, req: Request): Promise<Respo
       }
     }
     run = await bump(runId, { note: `${lead.name || page.domain}: buyer (${score})${added ? ` — ${added} more to check` : ''}` });
-    return reply(run, { result: 'lead', score, added }, usage);
+    return reply(run, { result: 'lead', score, added }, modelUsage);
   } catch (e) {
     const m = String((e as Error)?.message || e);
     // A key, quota or provider outage pauses the run (searches throw "search…",
@@ -557,19 +586,19 @@ Deno.serve(async (req) => {
   try {
     if (action === 'status') {
       const cfg = await loadSearchCfg();
-      return json({ ok: true, searchProvider: cfg?.provider || null, hasAiKey: !!(await getSecret('anthropic_api_key')), model: await getModel(), role: who.role, caps: { runsPerDay: RUNS_PER_USER_PER_DAY, queriesPerRun: MAX_QUERIES_PER_RUN, pagesPerRun: MAX_PAGES_PER_RUN } }, req);
+      return json({ ok: true, hasSearchKey: !!cfg, hasAiKey: !!(await getSecret('anthropic_api_key')), model: await getModel(), role: who.role, search_usage: usageInfo(await monthUsage()), caps: { runsPerDay: RUNS_PER_USER_PER_DAY, queriesPerRun: MAX_QUERIES_PER_RUN, pagesPerRun: MAX_PAGES_PER_RUN } }, req);
     }
     if (action === 'set_search_key') {
       if (who.role !== 'admin') return fail(403, 'Only an admin can set the search API key', req);
-      const provider = str(body.provider, 10) as SearchCfg['provider'];
-      const key = str(body.key, 200); const cx = str(body.cx, 100);
-      if (!['brave', 'google'].includes(provider)) return fail(400, 'Pick Brave or Google', req);
+      const key = str(body.key, 200);
       if (!key) return fail(400, 'Paste the API key first', req);
-      if (provider === 'google' && !cx) return fail(400, 'Google also needs the Programmable Search Engine id (cx)', req);
       // One real query before storing: a bad key is refused here, not mid-run.
-      try { await webSearch({ provider, key, cx }, 'indian clothing boutique'); } catch (e) { return fail(400, searchErrorText(e), req); }
-      await setSecret('search_api_provider', provider); await setSecret('search_api_key', key); await setSecret('search_api_cx', cx);
-      return json({ ok: true, searchProvider: provider }, req);
+      // It is reserved against the month like any other search.
+      const taken = await reserveSearch();
+      if (taken === null) return fail(429, searchErrorText(new Error('search_monthly_cap')), req);
+      try { await webSearch({ key }, 'indian clothing boutique'); } catch (e) { return fail(400, searchErrorText(e), req); }
+      await setSecret('search_api_key', key);
+      return json({ ok: true, hasSearchKey: true, search_usage: usageInfo(taken) }, req);
     }
     if (!CAN_RUN.includes(who.role)) return fail(403, 'Sign in as admin, manager or operator to find buyers', req);
     if (action === 'start') return await start(who, body, req);

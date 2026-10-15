@@ -1,15 +1,18 @@
 // Edge-function caller for the Buyer Spider (Client Finder → Buyers). Sends
 // the session token: the server checks the role, enforces the per-person run
-// cap and holds every key (search API, Anthropic) — nothing reaches the browser.
+// cap and the monthly Brave search cap, and holds every key (Brave,
+// Anthropic) — nothing reaches the browser.
 import { supabase, SUPABASE_ANON_KEY } from '../../../../lib/supabase';
 import type { BuyerRun, BuyerLead, BuyerLeadStatus } from '../../../../types/database';
 
 export const FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/buyer-spider';
 
-export type SearchProvider = 'brave' | 'google';
+/** Brave free-plan searches used this UTC month; `warn_at` is where the UI
+ *  turns amber, `cap` is where the server refuses to search any further. */
+export interface SearchUsage { used: number; cap: number; warn_at: number; month: string }
 
 export interface SpiderStatus {
-  searchProvider: SearchProvider | null;
+  hasSearchKey: boolean;
   hasAiKey: boolean;
   model: string;
   role: string;
@@ -26,7 +29,8 @@ export interface SpiderResponse {
   run?: BuyerRun;
   done?: boolean;
   item?: StepItem;
-  searchProvider?: SearchProvider | null;
+  search_usage?: SearchUsage;
+  hasSearchKey?: boolean;
   hasAiKey?: boolean;
   model?: string;
   role?: string;

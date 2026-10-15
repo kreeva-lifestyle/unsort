@@ -2,12 +2,12 @@
 // buyers anywhere, then lookalikes of those (up to 3 hops). The edge function
 // `buyer-spider` does the reading and the judging; this panel starts, steps,
 // pauses and resumes a run, and shows the buyers as they land.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../../../lib/supabase';
 import { T, S } from '../../../../lib/theme';
 import { friendlyError } from '../../../../lib/friendlyError';
 import { useAuth } from '../../../../hooks/useAuth';
-import { call, explain, RUN_COLS, type BuyerRun, type SpiderStatus } from './buyerApi';
+import { call, explain, RUN_COLS, type BuyerRun, type SearchUsage, type SpiderStatus } from './buyerApi';
 import { useSpiderLoop } from './useSpiderLoop';
 import BuyerKeyCard from './BuyerKeyCard';
 import BuyerLeadList from './BuyerLeadList';
@@ -18,6 +18,7 @@ export default function BuyerSpider({ addToast }: { addToast: (m: string, t?: st
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const [status, setStatus] = useState<SpiderStatus | null>(null);
+  const [usage, setUsage] = useState<SearchUsage | null>(null);
   const [run, setRun] = useState<BuyerRun | null>(null);
   const [seed, setSeed] = useState('');
   const [depth, setDepth] = useState(2);
@@ -29,8 +30,10 @@ export default function BuyerSpider({ addToast }: { addToast: (m: string, t?: st
   const loadStatus = useCallback(async () => {
     try {
       const { status: st, data } = await call({ action: 'status' });
-      if (data.ok) setStatus({ searchProvider: data.searchProvider ?? null, hasAiKey: !!data.hasAiKey, model: String(data.model || ''), role: String(data.role || ''), caps: data.caps! });
-      else setError(explain(data, st));
+      if (data.ok) {
+        setStatus({ hasSearchKey: !!data.hasSearchKey, hasAiKey: !!data.hasAiKey, model: String(data.model || ''), role: String(data.role || ''), caps: data.caps! });
+        if (data.search_usage) setUsage(data.search_usage);
+      } else setError(explain(data, st));
     } catch (e) { setError(friendlyError(e)); }
   }, []);
   // The newest of YOUR runs comes back on every open, so a run paused from
@@ -52,7 +55,17 @@ export default function BuyerSpider({ addToast }: { addToast: (m: string, t?: st
   }, [profile?.id]);
 
   const onLoopError = useCallback((m: string) => { setError(m); addToast(m, 'error'); }, [addToast]);
-  const { log, stepping, clearLog } = useSpiderLoop(run, setRun, onLoopError);
+  // Brave's free plan is 1,000 searches a month: the server stops at the cap;
+  // this warns once per open when usage crosses the warning line (900).
+  const warned = useRef(false);
+  const onUsage = useCallback((u: SearchUsage) => {
+    setUsage(u);
+    if (u.used >= u.warn_at && u.used < u.cap && !warned.current) {
+      warned.current = true;
+      addToast(`${u.used} of ${u.cap} free Brave searches used this month — ${u.cap - u.used} left`, 'error');
+    }
+  }, [addToast]);
+  const { log, stepping, clearLog } = useSpiderLoop(run, setRun, onLoopError, onUsage);
 
   const start = async () => {
     if (starting) return;
@@ -62,6 +75,7 @@ export default function BuyerSpider({ addToast }: { addToast: (m: string, t?: st
       const { status: st, data } = await call({ action: 'start', seed_url: seed.trim(), max_depth: depth, max_leads: maxLeads });
       if (!data.ok || !data.run) { setError(explain(data, st)); addToast(explain(data, st), 'error'); return; }
       setRun(data.run); setSeed('');
+      if (data.search_usage) setUsage(data.search_usage);
       addToast(`Profiled ${data.run.profile.business_name || data.run.seed_domain} — searching`, 'success');
     } catch (e) { const m = friendlyError(e); setError(m); addToast(m, 'error'); }
     finally { setStarting(false); }
@@ -81,7 +95,9 @@ export default function BuyerSpider({ addToast }: { addToast: (m: string, t?: st
   };
   const busyStyle = { pointerEvents: controlling ? 'none' as const : 'auto' as const, opacity: controlling ? 0.5 : 1 };
 
-  const ready = !!status?.searchProvider && !!status?.hasAiKey;
+  const capReached = !!usage && usage.used >= usage.cap;
+  const nearCap = !!usage && !capReached && usage.used >= usage.warn_at;
+  const ready = !!status?.hasSearchKey && !!status?.hasAiKey && !capReached;
   const live = run && (run.status === 'running' || run.status === 'paused');
   const p = run?.profile;
   const pct = run ? Math.min(100, Math.round((run.leads_found / run.max_leads) * 100)) : 0;
@@ -89,9 +105,14 @@ export default function BuyerSpider({ addToast }: { addToast: (m: string, t?: st
   return (
     <div>
       <div style={{ fontSize: 11, color: T.tx3, lineHeight: 1.6, marginBottom: 12 }}>
-        Paste the website of a buyer you already have (a boutique, a reseller, an online store). The spider reads it, searches the web for shops like it anywhere in the world, reads each one, keeps the real buyers with their contact details, and lets every buyer it finds lead to more. It never logs in anywhere and reads one page per site.
+        Paste the website of a buyer you already have (a boutique, a reseller, an online store). The spider reads it, searches the web for shops like it anywhere in the world, reads each one, keeps the real buyers with their contact details, and lets every buyer it finds lead to more. It never logs in anywhere, reads one page per site, and never makes more than 1,000 Brave searches in a month.
       </div>
-      <BuyerKeyCard provider={status?.searchProvider ?? null} isAdmin={isAdmin} onSaved={loadStatus} addToast={addToast} />
+      <BuyerKeyCard hasKey={!!status?.hasSearchKey} isAdmin={isAdmin} onSaved={loadStatus} addToast={addToast} />
+      {usage && (
+        <div style={{ fontSize: 11, color: capReached ? T.re : nearCap ? T.yl : T.tx3, marginBottom: 10, lineHeight: 1.5 }}>
+          {usage.used} of {usage.cap} free Brave searches used this month{capReached ? ' — the limit is reached; runs continue next month.' : nearCap ? ` — only ${usage.cap - usage.used} left; a full run uses up to ${status?.caps.queriesPerRun ?? 120}.` : '.'}
+        </div>
+      )}
       {status && !status.hasAiKey && <div style={{ fontSize: 11, color: T.yl, marginBottom: 10 }}>No Anthropic API key — an admin can add one in Settings → Listing AI. The spider needs it to judge sites.</div>}
 
       {!live && (
