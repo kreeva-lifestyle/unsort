@@ -12,26 +12,54 @@ const MATERIAL_COLS = 'id, order_id, name, unit, per_piece, sort_order, removed,
 const ENTRY_COLS = 'id, order_id, kind, entry_date, pcs_ok, pcs_rejected, pcs_rework, note, created_by, created_at, jobwork_entry_lines(material_id, qty)';
 const PAY_COLS = 'id, order_id, pay_date, amount, mode, reference, note, created_by, created_at';
 
-export type JobFilter = 'open' | 'overdue' | 'unpaid' | 'closed' | 'all';
+/** Two tabs. Open = still running, or closed but money still owed (a job
+ *  closed short, or a payment removed after it auto-closed) — it leaves Open
+ *  only when nothing is owed. Completed = closed with nothing owed, or
+ *  cancelled. A job closes itself once all received and paid (or nothing to
+ *  bill): migration 20261016090000_jobwork_auto_close. */
+export type JobTab = 'open' | 'completed';
+const TAB_OR: Record<JobTab, string> = {
+  open: 'status.eq.open,and(status.eq.closed,due.gt.0)',
+  completed: 'status.eq.cancelled,and(status.eq.closed,due.lte.0)',
+};
+/** 'completed' is the Completed tab; the rest are slices of the Open tab. */
+export type JobFilter = 'open' | 'overdue' | 'unpaid' | 'completed';
+export const tabOf = (f: JobFilter): JobTab => (f === 'completed' ? 'completed' : 'open');
 export const FILTERS: { id: JobFilter; label: string }[] = [
-  { id: 'open', label: 'Open' }, { id: 'overdue', label: 'Overdue' }, { id: 'unpaid', label: 'To pay' },
-  { id: 'closed', label: 'Closed' }, { id: 'all', label: 'All' },
+  { id: 'open', label: 'All open' }, { id: 'overdue', label: 'Overdue' }, { id: 'unpaid', label: 'To pay' },
 ];
 
-export async function listJobs(opts: { search: string; filter: JobFilter; page: number; perPage: number; vendor?: string | null }) {
-  let q = supabase.from('jobwork_order_summary').select(SUMMARY_COLS, { count: 'exact' });
+type Narrow = { search: string; vendor?: string | null };
+// One builder type for the list and the head-only tab counts, so both share
+// the search + one-jobworker filter below.
+const summaryQuery = (columns: string, head = false) =>
+  supabase.from('jobwork_order_summary').select(columns, { count: 'exact', head });
+type SummaryQuery = ReturnType<typeof summaryQuery>;
+function narrow(q: SummaryQuery, o: Narrow): SummaryQuery {
   // Exactly one jobworker (a tap on the summary's bar) — not a text match.
-  if (opts.vendor) q = q.eq('vendor_name', opts.vendor);
-  if (opts.filter === 'open') q = q.eq('status', 'open');
-  if (opts.filter === 'overdue') q = q.eq('status', 'open').lt('expected_date', today()).gt('pcs_remaining', 0);
-  if (opts.filter === 'unpaid') q = q.neq('status', 'cancelled').gt('due', 0);
-  if (opts.filter === 'closed') q = q.in('status', ['closed', 'cancelled']);
-  const s = opts.search.trim().replace(/[%_,()]/g, ' ').trim();
+  if (o.vendor) q = q.eq('vendor_name', o.vendor);
+  const s = o.search.trim().replace(/[%_,()]/g, ' ').trim();
   if (s) {
     const like = `%${s}%`;
     const num = /^#?\d+$/.test(s) ? `,jw_number.eq.${s.replace('#', '')}` : '';
     q = q.or(`sku.ilike.${like},vendor_name.ilike.${like},job_type.ilike.${like}${num}`);
   }
+  return q;
+}
+
+/** How many jobs each tab holds under the current search / jobworker. */
+export async function tabCounts(o: Narrow): Promise<{ counts: Record<JobTab, number> | null; error: unknown }> {
+  const head = (t: JobTab) => narrow(summaryQuery('id', true), o).or(TAB_OR[t]);
+  const [a, b] = await Promise.all([head('open'), head('completed')]);
+  const error = a.error || b.error;
+  return { counts: error ? null : { open: a.count ?? 0, completed: b.count ?? 0 }, error };
+}
+
+export async function listJobs(opts: Narrow & { filter: JobFilter; page: number; perPage: number }) {
+  let q = narrow(summaryQuery(SUMMARY_COLS), opts);
+  q = q.or(TAB_OR[tabOf(opts.filter)]);
+  if (opts.filter === 'overdue') q = q.eq('status', 'open').lt('expected_date', today()).gt('pcs_remaining', 0);
+  if (opts.filter === 'unpaid') q = q.gt('due', 0);
   const from = opts.page * opts.perPage;
   const { data, error, count } = await q.order('created_at', { ascending: false }).order('id').range(from, from + opts.perPage - 1);
   return { rows: (data ?? []) as unknown as JobworkSummary[], count: count ?? 0, error };

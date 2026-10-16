@@ -56,7 +56,7 @@ export const isOverdue = (j: Pick<JobworkSummary, 'status' | 'expected_date' | '
 export type WorkStateInput = Pick<JobworkSummary, 'status' | 'expected_date' | 'pcs_remaining' | 'pcs_ok' | 'pcs_rejected' | 'out_count'>;
 export function workState(j: WorkStateInput): { label: string; tone: 'gr' | 'yl' | 're' | 'bl' | 'tx3' } {
   if (j.status === 'cancelled') return { label: 'Cancelled', tone: 'tx3' };
-  if (j.status === 'closed') return { label: j.pcs_remaining > 0 ? 'Closed short' : 'Closed', tone: 'tx3' };
+  if (j.status === 'closed') return { label: j.pcs_remaining > 0 ? 'Closed short' : 'Completed', tone: 'tx3' };
   if (isOverdue(j)) return { label: 'Overdue', tone: 're' };
   if (j.pcs_remaining === 0) return { label: 'All received', tone: 'gr' };
   if (j.pcs_ok + j.pcs_rejected > 0) return { label: 'Part received', tone: 'yl' };
