@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { warmPage } from '../../lib/pageWarm';
 import { T, Icon } from '../../lib/theme';
 import { canAccessTab } from '../../lib/tabs';
 import { useAuth } from '../../hooks/useAuth';
@@ -54,8 +55,9 @@ export default function Sidebar({ activeTab, setActiveTab, profile, collapsed }:
           // setActiveTab (closes open layers, pushes one history entry).
           <a key={t.id} href={`#/${t.id}`} aria-current={activeTab === t.id ? 'page' : undefined}
             onClick={e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); setActiveTab(t.id); }}
+            onPointerDown={() => warmPage(t.id)} onFocus={() => warmPage(t.id)}
             style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', margin: '1px 0', cursor: 'pointer', textDecoration: 'none', background: activeTab === t.id ? T.ac3 : 'transparent', color: activeTab === t.id ? T.ac2 : T.tx3, fontSize: 13, fontWeight: activeTab === t.id ? 600 : 400, fontFamily: T.sans, borderRadius: 8, transition: 'all .18s ease', position: 'relative' }}
-            onMouseEnter={e => { if (activeTab !== t.id) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = T.tx2; } }}
+            onMouseEnter={e => { warmPage(t.id); if (activeTab !== t.id) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = T.tx2; } }}
             onMouseLeave={e => { if (activeTab !== t.id) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.tx3; } }}>
             <Icon name={t.icon} size={18} />
             {t.label}

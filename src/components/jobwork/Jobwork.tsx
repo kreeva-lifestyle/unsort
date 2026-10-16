@@ -2,25 +2,26 @@
 // jobwork_order_summary view (totals in SQL, paginated); a job opens as its
 // own page (device Back returns here). New jobs from the header button on
 // desktop and the FAB on the phone.
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
 import { useAuth } from '../../hooks/useAuth';
+import { useIsPhone } from '../../hooks/useIsPhone';
+import { useProgressive } from '../../hooks/useProgressive';
 import { useBackClose } from '../../hooks/useBackClose';
 import Empty from '../ui/Empty';
 import type { JobworkSummary } from '../../types/database';
 import JobCard from './JobCard';
 import JobTable from './JobTable';
 import JobStats from './JobStats';
-import JobForm from './JobForm';
-import JobDetailView from './JobDetailView';
-import PendingShareModal from './PendingShareModal';
-import ReceivedByDate from './ReceivedByDate';
+import { JobForm, JobDetailView, PendingShareModal, ReceivedByDate, prefetchJobworkParts } from './jobworkLazy';
+import { whenIdle } from '../../lib/idle';
 import { listJobs, tabCounts, tabOf, FILTERS, type JobFilter, type JobTab } from './jobworkApi';
 
 export default function Jobwork({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const { profile } = useAuth();
   const boss = profile?.role === 'admin' || profile?.role === 'manager';
+  const phone = useIsPhone();
   const [rows, setRows] = useState<JobworkSummary[] | null>(null);
   const [count, setCount] = useState(0);
   const [search, setSearch] = useState('');
@@ -51,9 +52,14 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   }, [search, filter, page, perPage, vendor, addToast]);
   useEffect(() => { const t = setTimeout(load, search ? 300 : 0); return () => clearTimeout(t); }, [load, search]);
   const changed = useCallback(() => { load(); setVersion(v => v + 1); }, [load]);
+  // The list first; the job page's and forms' code once it is on screen and the phone is idle.
+  const listShown = rows !== null;
+  const shownRows = useProgressive(rows ?? [], !listShown);
+  useEffect(() => (listShown ? whenIdle(prefetchJobworkParts) : undefined), [listShown]);
+  const wait = <div style={{ padding: 40, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading…</div>;
 
-  if (openId) return <JobDetailView id={openId} onBack={() => setOpenId(null)} onChanged={changed} addToast={addToast} />;
-  if (byDate) return <ReceivedByDate onBack={() => setByDate(false)} onOpen={setOpenId} addToast={addToast} />;
+  if (openId) return <Suspense fallback={wait}><JobDetailView id={openId} onBack={() => setOpenId(null)} onChanged={changed} addToast={addToast} /></Suspense>;
+  if (byDate) return <Suspense fallback={wait}><ReceivedByDate onBack={() => setByDate(false)} onOpen={setOpenId} addToast={addToast} /></Suspense>;
 
   const pages = Math.max(1, Math.ceil(count / perPage));
   const chip = (on: boolean): React.CSSProperties => ({ ...S.btnGhost, ...S.btnSm, minHeight: 32, borderRadius: 999, padding: '5px 14px', fontSize: 11, flexShrink: 0, ...(on ? { borderColor: T.ac, color: T.ac2, background: T.ac3 } : {}) });
@@ -110,8 +116,9 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
             ? <Empty icon="clipboard" title="No completed jobs yet" message="A job moves here once everything is received and nothing is owed — paid in full or nothing to bill — or when it is cancelled." />
             : <Empty icon="clipboard" title="No open jobs" message="Create a job when you give work to an outside jobworker — then record what you send and what comes back." cta="+ New job" onCta={() => setCreating(true)} />
         ) : (<>
-          <JobTable rows={rows} showMoney={boss} onOpen={setOpenId} />
-          <div className="jw-cards">{rows.map(j => <JobCard key={j.id} job={j} showMoney={boss} onOpen={() => setOpenId(j.id)} />)}</div>
+          {/* Only the layout on screen is built (the classes stay as the CSS fallback). */}
+          {!phone && <JobTable rows={shownRows} showMoney={boss} onOpen={setOpenId} />}
+          {phone && <div className="jw-cards">{shownRows.map(j => <JobCard key={j.id} job={j} showMoney={boss} onOpen={() => setOpenId(j.id)} />)}</div>}
         </>)}
 
       {count > 0 && (
@@ -127,8 +134,10 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
         </div>
       )}
       <button type="button" className="fab" onClick={() => setCreating(true)} aria-label="New job">+</button>
+      <Suspense fallback={null}>
       {sharing && <PendingShareModal boss={boss} onClose={() => setSharing(false)} addToast={addToast} />}
       {creating && <JobForm edit={null} onClose={() => setCreating(false)} onSaved={id => { setCreating(false); changed(); setOpenId(id); }} addToast={addToast} />}
+      </Suspense>
     </div>
   );
 }

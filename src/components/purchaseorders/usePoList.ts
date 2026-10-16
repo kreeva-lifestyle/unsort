@@ -63,14 +63,18 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
   const bumpData = useCallback(() => setDataVersion(v => v + 1), []);
   const [users, setUsers] = useState<{ id: string; full_name: string }[]>([]);
 
-  // Active users for the "Created By" filter dropdown (pattern from CashBook).
+  // Active users for the "Created By" filter dropdown (pattern from CashBook) —
+  // read the first time Filters is opened, not on every page open.
+  const usersAsked = useRef(false);
   useEffect(() => {
+    if (!showFilters || usersAsked.current) return;
+    usersAsked.current = true;
     supabase.from('profiles').select('id, full_name').eq('is_active', true).order('full_name').limit(200)
       .then(({ data, error }) => {
         if (error) { addToast(friendlyError(error), 'error'); return; }
         setUsers((data as { id: string; full_name: string }[] | null) || []);
       });
-  }, [addToast]);
+  }, [showFilters, addToast]);
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
@@ -130,11 +134,12 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
       .order('po_number', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
     // A slice that lives on Open only has nothing on Completed: no query.
     const otherQ = quick ? null : narrow(poQuery('id', { count: 'exact', head: true }).in('status', TAB_STATUSES[other]));
-    const [{ data, count, error }, otherRes] = await Promise.all([listQ, otherQ ?? Promise.resolve({ count: 0, error: null })]);
+    const { data, count, error } = await listQ;
     if (seq !== fetchSeq.current) return; // a newer fetch superseded this one
-    // The count is a hint on the tab: a failure leaves it blank (the list
-    // itself still reports errors below).
-    setOtherCount(!otherQ || otherRes.error ? null : (otherRes.count ?? 0));
+    // The other tab's count is a hint, read only once the list is on screen:
+    // the rows someone came for never wait behind it. A failure leaves it blank.
+    if (otherQ) otherQ.then(o => { if (seq === fetchSeq.current) setOtherCount(o.error ? null : (o.count ?? 0)); });
+    else setOtherCount(null);
     // We ARE the latest fetch, so ALWAYS clear loading — even on the silent
     // path. A silent refetch (channel connect / foreground) can supersede the
     // mount fetch, and the superseded one returns above without clearing;
