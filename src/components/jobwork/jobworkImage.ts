@@ -8,12 +8,12 @@ import type { JobDetail } from './jobworkModel';
 import { materialBalances, timeline, linesText, fmtDate, today, shortDate, qty, qu, per, mixedQty, unitShort, inr, n, PAY_MODE_LABELS, workState } from './jobworkModel';
 
 const SANS = "-apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
-const W = 760, PAD = 36, SS = 2;
-const C = { ink: '#111827', mid: '#4B5563', soft: '#9CA3AF', line: '#E5E7EB', band: '#F3F4F6', green: '#047857', red: '#B91C1C', amber: '#B45309' };
+export const W = 760, PAD = 36, SS = 2;
+export const C = { ink: '#111827', mid: '#4B5563', soft: '#9CA3AF', line: '#E5E7EB', band: '#F3F4F6', green: '#047857', red: '#B91C1C', amber: '#B45309' };
 type Op = (ctx: CanvasRenderingContext2D) => void;
 
 /** Lays text out top-down; ops are replayed on a canvas of the final height. */
-class Doc {
+export class Doc {
   y = PAD; ops: Op[] = [];
   text(s: string, x: number, size: number, weight = 400, color = C.ink, align: CanvasTextAlign = 'left', maxW = W - 2 * PAD) {
     const y = this.y;
@@ -44,7 +44,7 @@ class Doc {
   }
 }
 
-function head(doc: Doc, title: string, right: string, sub: string) {
+export function head(doc: Doc, title: string, right: string, sub: string) {
   doc.y += 22; doc.text('Arya Designs', PAD, 24, 700); doc.text(right, W - PAD, 16, 700, C.ink, 'right');
   doc.y += 18; doc.text(title, PAD, 12, 400, C.mid); doc.text(sub, W - PAD, 12, 400, C.mid, 'right');
   doc.y += 16; doc.rule(C.ink); doc.y += 8;
