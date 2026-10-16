@@ -12,12 +12,26 @@ import { fileDate } from '../../lib/exportName';
 import { PENDING_STATUSES } from './pendencyData';
 import { addDays, ASSUMED_LEAD_DAYS } from './poDue';
 import type { PORow } from './POList';
+import type { PurchaseOrderStatus } from '../../types/database';
 
 export const PO_COLS = 'id, po_number, vendor_id, vendor_name, vendor_phone, po_type, status, po_date, expected_date, payment_terms, notes, for_pieces, lump_sum, costing_product_id, subtotal, discount_type, discount_value, discount_amount, tax_percent, tax_amount, other_charges, round_off, grand_total, approved_by, approved_at, cancelled_by, cancelled_at, closed_at, closed_by, close_reason, created_by, modified_by, created_at, updated_at';
 
 /** The summary tiles' one-tap slices: open orders, or open orders past their due date. */
 export type PoQuick = '' | 'open' | 'breached';
 export const QUICK_LABELS: Record<Exclude<PoQuick, ''>, string> = { open: 'Open orders', breached: 'Breached orders' };
+
+/** The list's two tabs. A partly received order is still open. */
+export type PoTab = 'open' | 'completed';
+export const TAB_STATUSES: Record<PoTab, PurchaseOrderStatus[]> = {
+  open: ['draft', 'approved', 'sent', 'partially_received'],
+  completed: ['completed', 'closed', 'cancelled'],
+};
+
+// One builder type for both the list query and the head-only count, so the
+// two share a single filter chain (narrow, in fetchPos).
+const poQuery = (columns: string, opts: { count: 'estimated' | 'exact'; head?: boolean }) =>
+  supabase.from('purchase_orders').select(columns, opts);
+type PoQuery = ReturnType<typeof poQuery>;
 
 export function usePoList(active: boolean | undefined, addToast: (m: string, t?: string) => void) {
   const [pos, setPos] = useState<PORow[]>([]);
@@ -37,6 +51,9 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
   const [dateTo, setDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [quick, setQuick] = useState<PoQuick>('');
+  const [tab, setTabState] = useState<PoTab>('open');
+  // The other tab's count under the same search and filters (null = unknown).
+  const [otherCount, setOtherCount] = useState<number | null>(null);
   // Exactly one vendor (a tap on the summary's bar) — not a text match.
   const [vendorFilter, setVendorFilter] = useState('');
   // Bumped when the data changed (a write, a realtime event, a foreground
@@ -63,7 +80,10 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
   const fetchPos = useCallback(async (silent = false) => {
     const seq = ++fetchSeq.current;
     if (!silent) setLoading(true);
-    let q = supabase.from('purchase_orders').select(`${PO_COLS}, costing_products(sku), purchase_order_items(sku, item_name, fabric_code, quantity, received_qty)`, { count: 'estimated' });
+    // The open-orders slices (summary tiles, vendor bar) only ever live on Open.
+    const shown: PoTab = quick ? 'open' : tab;
+    const other: PoTab = shown === 'open' ? 'completed' : 'open';
+    const ors: string[] = [];
     if (debouncedSearch) {
       // Vendor name always matches; a pure number also matches the PO #; and
       // ANY term (numeric SKUs like "15003" included) also matches line-item
@@ -72,7 +92,6 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
       // the or-filter string needs the PostgREST-syntax characters removed.
       const raw = debouncedSearch.trim();
       const s = raw.replace(/[%_,().]/g, '').trim();
-      const ors: string[] = [];
       if (s) {
         ors.push(`vendor_name.ilike.%${s}%`);
         // <=9 digits only: a 13-digit barcode overflows int4 and 400s the query.
@@ -86,25 +105,36 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
         const ids = (idRows as string[] | null) || [];
         if (ids.length > 0) ors.push(`id.in.(${ids.slice(0, 200).join(',')})`);
       }
+    }
+    // Search + filters, applied the same way to the list and to the other
+    // tab's count.
+    const narrow = (q: PoQuery): PoQuery => {
       if (ors.length > 0) q = q.or(ors.join(','));
-    }
-    if (quick) q = q.in('status', PENDING_STATUSES);
-    // "Breached" = past the due date: the expected date, or (none given)
-    // the PO date plus ASSUMED_LEAD_DAYS — the same rule as poDue.dueOf,
-    // which turns the list's row red.
-    if (quick === 'breached') {
-      const today = fileDate(), cut = addDays(today, -ASSUMED_LEAD_DAYS);
-      q = q.or(`expected_date.lt.${today},and(expected_date.is.null,po_date.lt.${cut}),and(expected_date.is.null,po_date.is.null,created_at.lt.${cut})`);
-    }
-    if (vendorFilter) q = q.eq('vendor_name', vendorFilter);
-    if (statusFilter) q = q.eq('status', statusFilter);
-    if (typeFilter) q = q.eq('po_type', typeFilter);
-    if (creatorFilter) q = q.eq('created_by', creatorFilter);
-    if (dateFrom) q = q.gte('po_date', dateFrom);
-    if (dateTo) q = q.lte('po_date', dateTo);
-    q = q.order('po_number', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
-    const { data, count, error } = await q;
+      if (quick) q = q.in('status', PENDING_STATUSES);
+      // "Breached" = past the due date: the expected date, or (none given)
+      // the PO date plus ASSUMED_LEAD_DAYS — the same rule as poDue.dueOf,
+      // which turns the list's row red.
+      if (quick === 'breached') {
+        const today = fileDate(), cut = addDays(today, -ASSUMED_LEAD_DAYS);
+        q = q.or(`expected_date.lt.${today},and(expected_date.is.null,po_date.lt.${cut}),and(expected_date.is.null,po_date.is.null,created_at.lt.${cut})`);
+      }
+      if (vendorFilter) q = q.eq('vendor_name', vendorFilter);
+      if (statusFilter) q = q.eq('status', statusFilter);
+      if (typeFilter) q = q.eq('po_type', typeFilter);
+      if (creatorFilter) q = q.eq('created_by', creatorFilter);
+      if (dateFrom) q = q.gte('po_date', dateFrom);
+      if (dateTo) q = q.lte('po_date', dateTo);
+      return q;
+    };
+    const listQ = narrow(poQuery(`${PO_COLS}, costing_products(sku), purchase_order_items(sku, item_name, fabric_code, quantity, received_qty)`, { count: 'estimated' }).in('status', TAB_STATUSES[shown]))
+      .order('po_number', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1);
+    // A slice that lives on Open only has nothing on Completed: no query.
+    const otherQ = quick ? null : narrow(poQuery('id', { count: 'exact', head: true }).in('status', TAB_STATUSES[other]));
+    const [{ data, count, error }, otherRes] = await Promise.all([listQ, otherQ ?? Promise.resolve({ count: 0, error: null })]);
     if (seq !== fetchSeq.current) return; // a newer fetch superseded this one
+    // The count is a hint on the tab: a failure leaves it blank (the list
+    // itself still reports errors below).
+    setOtherCount(!otherQ || otherRes.error ? null : (otherRes.count ?? 0));
     // We ARE the latest fetch, so ALWAYS clear loading — even on the silent
     // path. A silent refetch (channel connect / foreground) can supersede the
     // mount fetch, and the superseded one returns above without clearing;
@@ -114,7 +144,7 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
     setTotalCount(count || 0);
     setLoading(false);
     if (silent) setDataVersion(v => v + 1); // silent = something changed, not a new slice
-  }, [debouncedSearch, quick, vendorFilter, statusFilter, typeFilter, creatorFilter, dateFrom, dateTo, page, pageSize, addToast]);
+  }, [debouncedSearch, quick, tab, vendorFilter, statusFilter, typeFilter, creatorFilter, dateFrom, dateTo, page, pageSize, addToast]);
 
   useEffect(() => { fetchPos(); }, [fetchPos]);
 
@@ -134,6 +164,15 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
     return () => { supabase.removeChannel(ch); };
   }, [notifyPos]);
 
+  // Switching tab starts at page 1, drops a status filter that belongs to the
+  // other tab, and leaves an open-orders slice (it lives on Open only).
+  const setTab = (t: PoTab) => {
+    setTabState(t); setPage(0); setOtherCount(null);
+    if (statusFilter && !TAB_STATUSES[t].includes(statusFilter as PurchaseOrderStatus)) setStatusFilter('');
+    if (t === 'completed') { setQuick(''); setVendorFilter(''); }
+  };
+  const tabShown: PoTab = quick ? 'open' : tab;
+
   const clearFilters = () => { setStatusFilter(''); setTypeFilter(''); setCreatorFilter(''); setDateFrom(''); setDateTo(''); setQuick(''); setVendorFilter(''); setPage(0); };
 
   return {
@@ -142,5 +181,6 @@ export function usePoList(active: boolean | undefined, addToast: (m: string, t?:
     search, debouncedSearch, updateSearch, statusFilter, setStatusFilter, typeFilter, setTypeFilter, creatorFilter, setCreatorFilter,
     dateFrom, setDateFrom, dateTo, setDateTo, showFilters, setShowFilters, users, fetchPos, clearFilters,
     quick, setQuick, vendorFilter, setVendorFilter, dataVersion, bumpData,
+    tab: tabShown, setTab, otherCount,
   };
 }

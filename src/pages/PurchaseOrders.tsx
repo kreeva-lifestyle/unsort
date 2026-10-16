@@ -15,7 +15,8 @@ import { friendlyError } from '../lib/friendlyError';
 import POList from '../components/purchaseorders/POList';
 import POStats from '../components/purchaseorders/POStats';
 import POQuickChips from '../components/purchaseorders/POQuickChips';
-import { usePoList, PO_COLS as COLS } from '../components/purchaseorders/usePoList';
+import POTabs from '../components/purchaseorders/POTabs';
+import { usePoList, PO_COLS as COLS, TAB_STATUSES } from '../components/purchaseorders/usePoList';
 import POForm, { type EditingPO } from '../components/purchaseorders/POForm';
 import PODetail from '../components/purchaseorders/PODetail';
 import POReceive from '../components/purchaseorders/POReceive';
@@ -41,8 +42,9 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     pos, loading, page, setPage, pageSize, setPageSize, totalCount, totalPages,
     search, debouncedSearch, updateSearch, statusFilter, setStatusFilter, typeFilter, setTypeFilter, creatorFilter, setCreatorFilter,
     dateFrom, setDateFrom, dateTo, setDateTo, showFilters, setShowFilters, users, fetchPos, clearFilters,
-    quick, setQuick, vendorFilter, setVendorFilter, dataVersion, bumpData,
+    quick, setQuick, vendorFilter, setVendorFilter, dataVersion, bumpData, tab, setTab, otherCount,
   } = usePoList(active, addToast);
+  const otherTab = tab === 'open' ? 'completed' : 'open';
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<EditingPO | null>(null);
@@ -140,9 +142,10 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
         </div>
       </div>
 
-      <POStats version={dataVersion} quick={quick} onQuick={q => { setQuick(q); setPage(0); }}
-        onVendor={v => { setVendorFilter(v); setQuick('open'); setPage(0); }} addToast={addToast} />
+      <POStats version={dataVersion} quick={quick} onQuick={q => { if (q) setTab('open'); setQuick(q); setPage(0); }}
+        onVendor={v => { setTab('open'); setVendorFilter(v); setQuick('open'); setPage(0); }} addToast={addToast} />
       <POQuickChips quick={quick} vendor={vendorFilter} onClearQuick={() => { setQuick(''); setPage(0); }} onClearVendor={() => { setVendorFilter(''); setPage(0); }} />
+      <POTabs tab={tab} onTab={setTab} counts={{ [tab]: loading ? null : totalCount, [otherTab]: otherCount } as Record<typeof tab, number | null>} />
 
       <POList
         pos={pos} loading={loading} totalCount={totalCount} statusColors={PO_STATUS_COLORS}
@@ -153,7 +156,8 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
         creatorFilter={creatorFilter} onCreatorFilterChange={setCreatorFilter} users={users}
         dateFrom={dateFrom} onDateFromChange={setDateFrom} dateTo={dateTo} onDateToChange={setDateTo}
         pageSize={pageSize} onPageSizeChange={setPageSize}
-        onClearFilters={clearFilters}
+        onClearFilters={clearFilters} tabStatuses={TAB_STATUSES[tab]}
+        otherTab={{ label: otherTab === 'open' ? 'Open' : 'Completed', count: otherCount }}
         narrowed={!!(quick || vendorFilter || search || debouncedSearch || statusFilter || typeFilter || creatorFilter || dateFrom || dateTo)}
         onResetPage={() => setPage(0)}
         onOpenEmpty={() => { setEditing(null); setDuplicating(null); setShowForm(true); }} canCreate={canCreate}

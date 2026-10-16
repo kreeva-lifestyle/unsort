@@ -38,6 +38,8 @@ interface Props extends POFiltersProps {
   onPageChange: (p: number | ((prev: number) => number)) => void;
   /** Something is narrowing the list (search, filters, a summary slice): an empty result is "no match", not "no orders yet". */
   narrowed: boolean;
+  /** The other tab's name and how many orders it holds under the same search and filters. */
+  otherTab: { label: string; count: number | null };
 }
 
 export default function POList(p: Props) {
@@ -64,7 +66,9 @@ export default function POList(p: Props) {
       <div style={{ fontSize: 9, color: T.tx3, marginBottom: 6 }}>{p.totalCount} record{p.totalCount === 1 ? '' : 's'}</div>
 
       {p.loading && <SkeletonRows rows={4} />}
-      {!p.loading && p.pos.length === 0 && (p.narrowed
+      {!p.loading && p.pos.length === 0 && (p.otherTab.count
+        ? <Empty icon="search" title={`Nothing here — ${p.otherTab.count} on ${p.otherTab.label}`} message={`The ${p.otherTab.label} tab above has ${p.otherTab.count} order${p.otherTab.count === 1 ? '' : 's'} that match.`} />
+        : p.narrowed
         ? <Empty icon="search" title="No orders match" message="Clear the search, chips or filters above to see every order." />
         : <Empty icon="clipboard" title="No purchase orders yet" message="Raise your first PO — pick a vendor, add the items you're buying, and track them from draft through to fully received." cta={p.canCreate ? '+ New Purchase Order' : undefined} onCta={p.canCreate ? p.onOpenEmpty : undefined} />)}
 
