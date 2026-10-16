@@ -15,7 +15,8 @@ import JobStats from './JobStats';
 import JobForm from './JobForm';
 import JobDetailView from './JobDetailView';
 import PendingShareModal from './PendingShareModal';
-import { listJobs, FILTERS, type JobFilter } from './jobworkApi';
+import ReceivedByDate from './ReceivedByDate';
+import { listJobs, tabCounts, tabOf, FILTERS, type JobFilter, type JobTab } from './jobworkApi';
 
 export default function Jobwork({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const { profile } = useAuth();
@@ -29,22 +30,30 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   const [page, setPage] = useState(0);
   const [perPage, setPerPage] = useState(25);
   const [openId, setOpenId] = useState<string | null>(null);
+  // "Received on" (what came back on one date) — its own page, like a job.
+  const [byDate, setByDate] = useState(false);
+  const [counts, setCounts] = useState<Record<JobTab, number> | null>(null);
   const [creating, setCreating] = useState(false);
   const [sharing, setSharing] = useState(false);
   // Bumped after every write so the summary tiles follow; a search or a
   // page flip changes nothing, so it leaves the summary alone.
   const [version, setVersion] = useState(0);
   useBackClose(!!openId, () => setOpenId(null));
+  useBackClose(byDate && !openId, () => setByDate(false));
 
   const load = useCallback(async () => {
     const r = await listJobs({ search, filter, page, perPage, vendor });
     if (r.error) { addToast(friendlyError(r.error), 'error'); setRows([]); return; }
     setRows(r.rows); setCount(r.count);
+    // Tab counts are a hint: a failure leaves them blank (the list already toasts its own errors).
+    const c = await tabCounts({ search, vendor });
+    setCounts(c.counts);
   }, [search, filter, page, perPage, vendor, addToast]);
   useEffect(() => { const t = setTimeout(load, search ? 300 : 0); return () => clearTimeout(t); }, [load, search]);
   const changed = useCallback(() => { load(); setVersion(v => v + 1); }, [load]);
 
   if (openId) return <JobDetailView id={openId} onBack={() => setOpenId(null)} onChanged={changed} addToast={addToast} />;
+  if (byDate) return <ReceivedByDate onBack={() => setByDate(false)} onOpen={setOpenId} addToast={addToast} />;
 
   const pages = Math.max(1, Math.ceil(count / perPage));
   const chip = (on: boolean): React.CSSProperties => ({ ...S.btnGhost, ...S.btnSm, minHeight: 32, borderRadius: 999, padding: '5px 14px', fontSize: 11, flexShrink: 0, ...(on ? { borderColor: T.ac, color: T.ac2, background: T.ac3 } : {}) });
@@ -55,19 +64,33 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12 }}>
         <div style={{ fontSize: 12, color: T.tx3, minWidth: 0 }}>Work given outside · what went out, came back, is pending and paid</div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button type="button" className="jw-share-btn" onClick={() => setByDate(true)} style={S.btnGhost}>Received on…</button>
           <button type="button" className="jw-share-btn" onClick={() => setSharing(true)} style={S.btnGhost}>Share pending</button>
           <button type="button" className="desktop-only" onClick={() => setCreating(true)} style={S.btnPrimary}>+ New job</button>
         </div>
       </div>
       <JobStats boss={boss} version={version} active={filter} onPick={f => { setFilter(f); setPage(0); }}
         onVendor={v => { setVendor(v); setSearch(''); setFilter('open'); setPage(0); }} addToast={addToast} />
+      {/* Open = running, or closed with money still owed; Completed = settled or cancelled. */}
+      <div role="tablist" aria-label="Jobs" style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        {(['open', 'completed'] as JobTab[]).map(t => {
+          const on = tabOf(filter) === t;
+          return (
+            <button key={t} type="button" role="tab" aria-selected={on} onClick={() => { if (!on) { setFilter(t); setPage(0); } }}
+              style={{ ...(on ? S.btnPrimary : S.btnGhost), flex: 1, maxWidth: 220, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              {t === 'open' ? 'Open' : 'Completed'}
+              {counts && <span style={{ fontFamily: T.mono, fontSize: 11, padding: '1px 7px', borderRadius: 999, background: on ? 'rgba(255,255,255,.18)' : T.glass2, color: on ? T.tx : T.tx3 }}>{counts[t]}</span>}
+            </button>
+          );
+        })}
+      </div>
       <div className="jw-toolbar" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
       <div style={{ position: 'relative', flex: '1 1 320px', maxWidth: 520 }}>
         <svg viewBox="0 0 24 24" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, fill: 'none', stroke: T.tx3, strokeWidth: 1.8, opacity: 0.5 }}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
         <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search SKU, jobworker, job type or JW #" aria-label="Search jobs" style={{ ...S.fSearch, width: '100%' }} />
       </div>
       <div className="jw-filters" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
-        {FILTERS.filter(f => boss || f.id !== 'unpaid').map(f => (
+        {tabOf(filter) === 'open' && FILTERS.filter(f => boss || f.id !== 'unpaid').map(f => (
           <button key={f.id} type="button" onClick={() => { setFilter(f.id); setPage(0); }} aria-pressed={filter === f.id} style={chip(filter === f.id)}>{f.label}</button>
         ))}
         {vendor && (
@@ -81,8 +104,10 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
 
       {rows === null ? <div style={{ padding: 40, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading jobs…</div>
         : rows.length === 0 ? (
-          search || vendor || filter !== 'open'
+          search || vendor || filter === 'overdue' || filter === 'unpaid'
             ? <Empty icon="search" title="No jobs match" message="Try another search or filter." />
+            : filter === 'completed'
+            ? <Empty icon="clipboard" title="No completed jobs yet" message="A job moves here once everything is received and nothing is owed — paid in full or nothing to bill — or when it is cancelled." />
             : <Empty icon="clipboard" title="No open jobs" message="Create a job when you give work to an outside jobworker — then record what you send and what comes back." cta="+ New job" onCta={() => setCreating(true)} />
         ) : (<>
           <JobTable rows={rows} showMoney={boss} onOpen={setOpenId} />
