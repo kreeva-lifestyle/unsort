@@ -1,7 +1,8 @@
 // Print / save-as-PDF preview for Received on (same frame as the Purchase
 // Order and Salary previews): the A4 document in an iframe, photos fetched
 // first so they are in the PDF, a rate & amount switch for admin/manager
-// (off by default), and Print / Save PDF through the print queue.
+// (off by default), Print / Save PDF through the print queue, and Share as
+// an image (jobworkShare.shareReceived).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
@@ -12,6 +13,7 @@ import { useBackClose } from '../../hooks/useBackClose';
 import Toggle from '../ui/Toggle';
 import { buildReceivedPdf, type ReceivedDoc } from './receivedPdf';
 import { fmtDate } from './jobworkModel';
+import { shareReceived } from './jobworkShare';
 
 export default function ReceivedPdfOverlay({ doc, boss, onClose, addToast }: {
   doc: Omit<ReceivedDoc, 'photos' | 'money'>; boss: boolean; onClose: () => void; addToast: (m: string, t?: string) => void;
@@ -20,6 +22,7 @@ export default function ReceivedPdfOverlay({ doc, boss, onClose, addToast }: {
   useBackClose(true, onClose);
   const [photos, setPhotos] = useState<Record<string, string | null> | null>(null);
   const [money, setMoney] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   useEffect(() => {
     let live = true;
@@ -48,9 +51,12 @@ export default function ReceivedPdfOverlay({ doc, boss, onClose, addToast }: {
         ? <iframe ref={frameRef} srcDoc={html} style={{ flex: 1, border: 'none', width: '100%', background: '#fff' }} title="Received on — preview" />
         : <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: T.tx3 }}>Loading photos…</div>}
       <div style={bar({ paddingBottom: 'max(10px, env(safe-area-inset-bottom))', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 8, justifyContent: 'center' })}>
-        <button type="button" onClick={onClose} style={{ ...S.btnGhost, flex: 1, maxWidth: 200, minHeight: 44 }}>Close</button>
+        <button type="button" onClick={onClose} style={{ ...S.btnGhost, flex: 1, maxWidth: 160, minHeight: 44 }}>Close</button>
         <button type="button" disabled={!html} onClick={() => printOrQueue('document', html, 'A4', title, undefined, addToast, frameRef.current)}
-          style={{ ...S.btnPrimary, flex: 1, maxWidth: 200, minHeight: 44, opacity: html ? 1 : 0.5, pointerEvents: html ? 'auto' : 'none' }}>Print / Save PDF</button>
+          style={{ ...S.btnGhost, flex: 1, maxWidth: 180, minHeight: 44, border: `1px solid ${T.ac3}`, background: T.ac3, color: T.ac2, fontWeight: 600, opacity: html ? 1 : 0.5, pointerEvents: html ? 'auto' : 'none' }}>Print / Save PDF</button>
+        {/* An image through the phone's share sheet (WhatsApp…); a download on desktop. */}
+        <button type="button" disabled={sharing} onClick={() => { setSharing(true); shareReceived({ ...doc, money: boss && money }, addToast).finally(() => setSharing(false)); }}
+          style={{ ...S.btnPrimary, flex: 1, maxWidth: 160, minHeight: 44, opacity: sharing ? 0.5 : 1, pointerEvents: sharing ? 'none' : 'auto' }}>{sharing ? 'Sharing…' : 'Share'}</button>
       </div>
     </div>, document.body);
 }

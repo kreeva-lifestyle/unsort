@@ -6,6 +6,8 @@ import { exportName } from '../../lib/exportName';
 import { loadForCanvas } from '../minis/costing/costingShare';
 import { skuThumbUrl } from '../../lib/skuThumbs';
 import { renderJobStatement, renderVendorStatement } from './jobworkImage';
+import { renderReceivedOn } from './receivedImage';
+import type { ReceivedDoc } from './receivedPdf';
 import { loadVendorOpen } from './jobworkApi';
 import type { JobDetail } from './jobworkModel';
 
@@ -51,4 +53,15 @@ export async function shareVendor(vendor: string, money: boolean, addToast: Toas
   }
   catch (e) { addToast(friendlyError(e, 'Could not build the statement image'), 'error'); return; }
   await send(blob, exportName('Jobwork', [vendor, 'open'], 'jpg'), `Jobwork pending — ${vendor}`, addToast);
+}
+
+/** Received on <date> (one jobworker or all) as an image, with SKU photos. */
+export async function shareReceived(d: Omit<ReceivedDoc, 'photos'>, addToast: Toast) {
+  let blob: Blob;
+  try {
+    const skus = [...new Set(d.rows.map(r => r.job?.sku).filter((x): x is string => !!x))];
+    const imgs = await Promise.all(skus.map(async s => { const u = await skuThumbUrl(s); return [s, u ? await loadForCanvas(u) : null] as const; }));
+    blob = await toBlob(renderReceivedOn({ ...d, photos: Object.fromEntries(imgs) }));
+  } catch (e) { addToast(friendlyError(e, 'Could not build the image'), 'error'); return; }
+  await send(blob, exportName('Jobwork-Received', [d.date, d.vendor ?? 'All'], 'jpg'), `Jobwork received ${d.date}${d.vendor ? ` — ${d.vendor}` : ''}`, addToast);
 }
