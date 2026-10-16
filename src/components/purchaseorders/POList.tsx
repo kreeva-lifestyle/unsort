@@ -1,6 +1,8 @@
 // PO list — search + collapsible filters, desktop table, mobile cards, pager.
 // Parent owns all state & data; this is a pure presentational component.
 import { T, S } from '../../lib/theme';
+import { useIsPhone } from '../../hooks/useIsPhone';
+import { useProgressive } from '../../hooks/useProgressive';
 import Empty from '../ui/Empty';
 import SwipeRow from '../ui/SwipeRow';
 import { SkeletonRows } from '../ui/Skeleton';
@@ -44,6 +46,11 @@ interface Props extends POFiltersProps {
 
 export default function POList(p: Props) {
   const filterActive = p.statusFilter || p.typeFilter || p.creatorFilter || p.dateFrom || p.dateTo;
+  // Only the layout on screen is built: the table on a desktop, the cards on
+  // a phone. Building both and hiding one with CSS doubled the work of every
+  // page of orders (the classes stay as the CSS fallback).
+  const phone = useIsPhone();
+  const shown = useProgressive(p.pos, p.loading);
   return (
     <>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '10px 14px', marginBottom: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -73,7 +80,7 @@ export default function POList(p: Props) {
         : <Empty icon="clipboard" title="No purchase orders yet" message="Raise your first PO — pick a vendor, add the items you're buying, and track them from draft through to fully received." cta={p.canCreate ? '+ New Purchase Order' : undefined} onCta={p.canCreate ? p.onOpenEmpty : undefined} />)}
 
       {/* Desktop table */}
-      {!p.loading && p.pos.length > 0 && <div className="desktop-only" style={{ border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
+      {!phone && !p.loading && p.pos.length > 0 && <div className="desktop-only" style={{ border: `1px solid ${T.bd}`, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860, tableLayout: 'fixed' }}>
             <colgroup><col style={{ width: '9%' }} /><col style={{ width: '18%' }} /><col style={{ width: '10%' }} /><col style={{ width: '17%' }} /><col style={{ width: '11%' }} /><col style={{ width: '12%' }} /><col style={{ width: '13%' }} /><col style={{ width: 44 }} /></colgroup>
@@ -81,7 +88,7 @@ export default function POList(p: Props) {
               <th style={S.thStyle}>PO #</th><th style={S.thStyle}>Vendor</th><th style={S.thStyle}>Type</th><th style={S.thStyle}>Items</th><th style={{ ...S.thStyle, textAlign: 'right' }}>Total</th><th style={S.thStyle}>Received</th><th style={{ ...S.thStyle, textAlign: 'center' }}>Status</th><th style={S.thStyle} />
             </tr></thead>
             <tbody>
-              {p.pos.map(po => {
+              {shown.map(po => {
                 const sc = p.statusColors[po.status] || p.statusColors.draft;
                 const pr = progress(po);
                 return (
@@ -118,8 +125,8 @@ export default function POList(p: Props) {
       </div>}
 
       {/* Mobile cards */}
-      {!p.loading && p.pos.length > 0 && <div className="mobile-only" style={{ flexDirection: 'column', gap: 6, width: '100%' }}>
-        {p.pos.map((po, i) => {
+      {phone && !p.loading && p.pos.length > 0 && <div className="mobile-only" style={{ flexDirection: 'column', gap: 6, width: '100%' }}>
+        {shown.map((po, i) => {
           const sc = p.statusColors[po.status] || p.statusColors.draft;
           const pr = progress(po);
           return (

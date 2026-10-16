@@ -3,7 +3,7 @@
 // the list and the modal orchestration (form / detail / receive / print /
 // pendency / contacts). Mirrors the Cash Challan module; PO ≈ challan,
 // receipts ≈ payments.
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
@@ -17,12 +17,9 @@ import POStats from '../components/purchaseorders/POStats';
 import POQuickChips from '../components/purchaseorders/POQuickChips';
 import POTabs from '../components/purchaseorders/POTabs';
 import { usePoList, PO_COLS as COLS, TAB_STATUSES } from '../components/purchaseorders/usePoList';
-import POForm, { type EditingPO } from '../components/purchaseorders/POForm';
-import PODetail from '../components/purchaseorders/PODetail';
-import POReceive from '../components/purchaseorders/POReceive';
-import POPrintOverlay from '../components/purchaseorders/POPrintOverlay';
-import PendencyReport from '../components/purchaseorders/PendencyReport';
-import Contacts from '../components/contacts/Contacts';
+import type { EditingPO } from '../components/purchaseorders/POForm';
+import { POForm, PODetail, POReceive, POPrintOverlay, PendencyReport, Contacts, prefetchPoParts } from '../components/purchaseorders/poLazy';
+import { whenIdle } from '../lib/idle';
 import { loadPoLines, loadPoActivity, ITEM_COLS } from '../components/purchaseorders/poDetailData';
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseOrderReceipt, AuditLog } from '../types/database';
 import { useModalLock } from '../hooks/useModalLock';
@@ -45,6 +42,8 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     quick, setQuick, vendorFilter, setVendorFilter, dataVersion, bumpData, tab, setTab, otherCount,
   } = usePoList(active, addToast);
   const otherTab = tab === 'open' ? 'completed' : 'open';
+  // The list first; the sheets' code once it is on screen and the phone is idle.
+  useEffect(() => (loading ? undefined : whenIdle(prefetchPoParts)), [loading]);
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<EditingPO | null>(null);
@@ -130,7 +129,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
     fetchPos(true);
   };
 
-  if (showContacts) return <Contacts canEdit={canCreate} onBack={() => setShowContacts(false)} addToast={addToast} />;
+  if (showContacts) return <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading…</div>}><Contacts canEdit={canCreate} onBack={() => setShowContacts(false)} addToast={addToast} /></Suspense>;
 
   return (
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
@@ -166,6 +165,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
         page={page} totalPages={totalPages} onPageChange={setPage}
       />
 
+      <Suspense fallback={null}>
       {showForm && <POForm editing={editing} duplicateFrom={duplicating} onClose={closeForm} onSaved={onSaved} addToast={addToast} />}
 
       {detail && <PODetail
@@ -186,6 +186,7 @@ export default function PurchaseOrders({ active }: { active?: boolean } = {}) {
         onReceived={() => { setReceiving(null); refreshDetail(); }} addToast={addToast} />}
 
       {printData && <POPrintOverlay po={printData.po} items={printData.items} onClose={() => setPrintData(null)} addToast={addToast} />}
+      </Suspense>
 
       {active !== false && !detail && !showForm && !receiving && !printData && !pendency && canCreate && createPortal(
         <button className="fab" aria-label="New purchase order" onClick={() => { setEditing(null); setDuplicating(null); setShowForm(true); }}>+</button>,
