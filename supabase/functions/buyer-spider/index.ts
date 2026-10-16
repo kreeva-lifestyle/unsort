@@ -297,6 +297,7 @@ const searchErrorText = (e: unknown) => {
   if (m === 'search_rate_limited') return 'The Brave Search rate limit was hit — wait a minute and resume';
   if (m === 'search_monthly_cap') return `Monthly search limit reached — all ${MONTHLY_SEARCH_CAP} free Brave searches for this month are used. Runs continue next month.`;
   if (m.startsWith('search_reserve_failed')) return 'The search counter could not be updated — wait a minute and resume';
+  if (m.startsWith('search_store_failed')) return `Search results could not be saved (${m.slice(21, 120)}) — tap Resume to try again`;
   return `Search failed: ${m.slice(0, 120)} — wait a minute and resume`;
 };
 
@@ -385,7 +386,9 @@ async function enqueue(runId: string, hits: Hit[], hop: number, parent: string, 
     const d = domainOf(u);
     if (seen.has(d) || d === seedDomain || isBlocked(d)) continue;
     seen.add(d);
-    rows.push({ run_id: runId, domain: d, url: `${u.protocol}//${u.host}/`, hop, parent_domain: parent, via_query: clip(query, 120), state: 'pending' });
+    // Every row carries the SAME keys (note included): PostgREST refuses a bulk
+    // insert whose objects differ (400 PGRST102), which a known lead's note caused.
+    rows.push({ run_id: runId, domain: d, url: `${u.protocol}//${u.host}/`, hop, parent_domain: parent, via_query: clip(query, 120), state: 'pending', note: null });
   }
   if (!rows.length) return 0;
   // Known leads from earlier runs are not re-read: they go straight to 'skipped'.
@@ -396,8 +399,8 @@ async function enqueue(runId: string, hits: Hit[], hop: number, parent: string, 
   // on_conflict=run_id,domain + ignore-duplicates: a domain surfaced by two
   // queries stays at the hop it was first seen.
   const ins = await fetch(`${SB_URL}/rest/v1/buyer_queue?on_conflict=run_id,domain`, { method: 'POST', headers: { ...svcHeaders, prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(rows) });
-  const inserted = ins.ok ? await ins.json().catch(() => []) : [];
-  if (!ins.ok) throw new Error(`db ${ins.status} buyer_queue`);
+  if (!ins.ok) throw new Error(`db ${ins.status} buyer_queue: ${(await ins.text().catch(() => '')).slice(0, 160)}`);
+  const inserted = await ins.json().catch(() => []);
   return (inserted as any[]).filter(r => r.state === 'pending').length;
 }
 
@@ -420,8 +423,12 @@ async function expand(run: any, cfg: SearchCfg, queries: string[], hop: number, 
     let hits: Hit[];
     try { hits = await webSearch(cfg, queries[i]); } catch (e) { return { added, used, monthUsed, error: e }; }
     used += 1;
-    queriesUsed = Number((await bump(run.id, { queries: 1 }))?.queries_used) || queriesUsed + 1;
-    added += await enqueue(run.id, hits, hop, parent, queries[i], run.seed_domain);
+    // A database failure here pauses the run like a search outage (the caller
+    // keeps its resume note) instead of failing the seed and ending the run.
+    try {
+      queriesUsed = Number((await bump(run.id, { queries: 1 }))?.queries_used) || queriesUsed + 1;
+      added += await enqueue(run.id, hits, hop, parent, queries[i], run.seed_domain);
+    } catch (e) { return { added, used, monthUsed, error: new Error(`search_store_failed: ${String((e as Error)?.message || e).slice(0, 160)}`) }; }
   }
   return { added, used, monthUsed, error: null };
 }
