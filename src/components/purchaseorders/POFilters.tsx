@@ -2,7 +2,7 @@
 // range, clear). Presentational — the parent owns every value.
 import { S, T } from '../../lib/theme';
 import DateInput from '../ui/DateInput';
-import { PO_TYPE_LABELS, PO_STATUS_LABELS, PO_STATUSES } from '../../types/database';
+import { PO_TYPE_LABELS, PO_STATUS_LABELS, type PurchaseOrderStatus } from '../../types/database';
 
 export interface POFiltersProps {
   statusFilter: string;
@@ -18,6 +18,8 @@ export interface POFiltersProps {
   onDateToChange: (v: string) => void;
   onClearFilters: () => void;
   onResetPage: () => void;
+  /** The statuses of the tab on screen: the Status filter offers only these. */
+  tabStatuses: PurchaseOrderStatus[];
 }
 
 export default function POFilters(p: POFiltersProps & { filterActive: boolean }) {
@@ -27,7 +29,7 @@ export default function POFilters(p: POFiltersProps & { filterActive: boolean })
         <div>
           <label style={S.fLabel}>Status</label>
           <select value={p.statusFilter} onChange={e => { p.onStatusFilterChange(e.target.value); p.onResetPage(); }} style={S.fInput}>
-            <option value="">All</option>{PO_STATUSES.map(s => <option key={s} value={s}>{PO_STATUS_LABELS[s]}</option>)}
+            <option value="">All</option>{p.tabStatuses.map(s => <option key={s} value={s}>{PO_STATUS_LABELS[s]}</option>)}
           </select>
         </div>
         <div>
