@@ -79,7 +79,7 @@ export default function CamerasPanel({ agent, addToast }: { agent: PackcamAgentS
   if (!data.cameras.length) return <Empty icon="box" title="No cameras yet" message="Add the camera numbers your packers pick in Settings → PackStation, then give each one its IP address here." />;
   return (
     <div>
-      <div style={{ fontSize: 12, color: T.tx3, marginBottom: 10, lineHeight: 1.5 }}>Hikvision main stream: port 554, path /Streaming/Channels/101 (the full-quality stream). Use the camera's own login. Each packer's scans are recorded on the camera number they pick in PackStation.</div>
+      <div style={{ fontSize: 12, color: T.tx3, marginBottom: 10, lineHeight: 1.5 }}>Hikvision main stream: port 554, path /Streaming/Channels/101 (the full-quality stream); other brands often use /stream1. H.265 cameras work: their videos are converted to H.264 on the PC. Use the camera's own login. Each packer's scans are recorded on the camera number they pick in PackStation.</div>
       {data.cameras.map(c => <CameraCard key={c.id} cam={c} hasPassword={data.hasPassword.has(c.id)} live={live.get(String(c.number))} onSaved={load} addToast={addToast} />)}
     </div>
   );
