@@ -33,22 +33,26 @@ PackStation scan ──▶ packcam function ──▶ agent ──▶ clip cut f
 
 ## Setup on the office PC (Windows)
 
-1. **Install Node.js** (LTS, version 20 or newer) from nodejs.org.
-2. **Install ffmpeg**: open PowerShell and run `winget install Gyan.FFmpeg`
-   (or download it from gyan.dev and note the path to `ffmpeg.exe`).
-3. Put this folder on the PC, e.g. `C:\PackCam\agent`.
-4. Copy `config.example.json` to `config.json`.
-5. In DailyOffice → Settings → Pack Cam press **Create agent key** and paste
-   it into `"agent_key"` in `config.json`. If ffmpeg is not on PATH, set
-   `"ffmpeg"` to the full path, e.g. `C:/ffmpeg/bin/ffmpeg.exe`.
-6. In Settings → Pack Cam → Cameras enter each camera's IP address, user name and
-   password (Hikvision main stream: port 554, path `/Streaming/Channels/101`).
-7. Double-click `start.bat`. Open <http://localhost:8765> on the PC: each
-   camera should say **Recording**.
-8. Run `install-startup.bat` once so Pack Cam starts when Windows signs in.
-   Set the PC to sign in automatically and never sleep.
-9. Allow Node.js through Windows Firewall on **Private** networks (Windows
-   asks the first time) so PC-stored clips play on office phones and laptops.
+The owner's step-by-step guide with pictures is the "Pack Cam setup guide" PDF.
+In short:
+
+1. In PowerShell: `winget install OpenJS.NodeJS.LTS` and `winget install Gyan.FFmpeg`,
+   then restart the PC once.
+2. Unzip `PackCam-PC-Setup.zip` (this folder plus a ready `config.json`) into
+   `C:\PackCam`, giving `C:\PackCam\agent`. (From the code: copy this folder and
+   copy `config.example.json` to `config.json`.)
+3. In DailyOffice → Settings → Pack Cam press **Create agent key** and paste it
+   into `"agent_key"` in `config.json`. If ffmpeg is not on PATH, set `"ffmpeg"`
+   to the full path, e.g. `C:/ffmpeg/bin/ffmpeg.exe`.
+4. Double-click `start.bat` and allow Node.js on **Private** networks when Windows
+   asks (so PC-stored clips play on office phones). Open <http://localhost:8765>
+   on the PC.
+5. Right-click `install-startup.bat` → **Run as administrator**, once, so Pack Cam
+   starts when Windows signs in. Set the PC to sign in automatically and never sleep.
+6. In Settings → Pack Cam → Cameras enter each camera's IP address and password
+   (Hikvision main stream: port 554, path `/Streaming/Channels/101`; behind an
+   NVR use the NVR's IP and `/Streaming/Channels/<channel>01`). Then in Storage
+   choose PC / Dropbox / Drive and their folders and turn recording on.
 
 ### Google Drive (optional)
 
