@@ -33,12 +33,14 @@ PackStation scan ──▶ packcam function ──▶ agent ──▶ clip cut f
 
 ## Setup on the office PC (Windows)
 
-The owner's step-by-step guide with pictures is the "Pack Cam setup guide" PDF.
+The step-by-step guide with pictures ("Setup guide (PDF)") and the ready-to-unzip
+program ("PC program (zip)") are in DailyOffice → Settings → Pack Cam → Status & setup.
 In short:
 
 1. In PowerShell: `winget install OpenJS.NodeJS.LTS` and `winget install Gyan.FFmpeg`,
    then restart the PC once.
-2. Unzip `PackCam-PC-Setup.zip` (this folder plus a ready `config.json`) into
+2. Download "PC program (zip)" (`PackCam-PC-Setup.zip`: this folder plus a ready
+   `config.json`, built from this folder on every deploy) and unzip it into
    `C:\PackCam`, giving `C:\PackCam\agent`. (From the code: copy this folder and
    copy `config.example.json` to `config.json`.)
 3. In DailyOffice → Settings → Pack Cam press **Create agent key** and paste it
