@@ -65,6 +65,8 @@ export default function PendingOrders({ canEdit, onConvert, addToast }: {
       const fresh = await fetchOrder(o.id);
       setViewing(null);
       if (!fresh || fresh.status !== 'pending' || leftCount(fresh) <= 0) { addToast(`${fmtOrderNo(o.order_number)} is no longer pending — refreshed`, 'error'); load(); }
+      // One piece left: nothing to choose, straight to the challan form.
+      else if (leftCount(fresh) === 1) onConvert(fresh, fresh.items.map(lineLeft));
       else setPicking(fresh);
     } catch (e) { addToast(friendlyError(e), 'error'); }
     setBusyId('');
