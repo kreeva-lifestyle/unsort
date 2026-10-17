@@ -71,6 +71,24 @@ for (const [enc, tag] of [['libx264', 'H.264'], ['libx265', 'H.265']]) {
     check(codec === 'h264', `${tag}: saved as H.264, plays everywhere (${codec})`);
     check(fs.readdirSync(path.join(gd, 'out')).length === 1, `${tag}: no work files left beside the clip`);
   }
+  // Keyframes are at 0, 1.2, 2.4 s. `frames` counts a clip's pictures (25 per second).
+  const frames = f => Number(execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0', f]).toString().trim());
+  const cut = (id, w) => cutClip({ data_dir: gd, ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' }, { id, camera: '9' }, w, path.join(gd, 'out', `${id}.mp4`));
+  // A keyframe inside the pre-roll (1.0-1.5 s): start there, nothing added, the end kept.
+  const inPre = await cut('k1', { start: t0 + 1000, end: t0 + 3000, scan: t0 + 1500, limit: 2000 });
+  if (inPre.file) {
+    check(Math.abs(lumAt(inPre.file, 0) - 60) <= 4 && Math.abs(frames(inPre.file) - 45) <= 2, `${tag}: keyframe in the pre-roll: starts there and keeps its end (1.8 s = ~45 frames, got ${frames(inPre.file)})`);
+  } else check(false, `${tag}: keyframe in the pre-roll: no clip`);
+  // No keyframe in the pre-roll and the window is the whole limit: start on the
+  // earlier keyframe (1.2 s) and take the extra off the end, never over the limit.
+  const atLimit = await cut('k2', { start: t0 + 2000, end: t0 + 3500, scan: t0 + 2000, limit: 1500 });
+  if (atLimit.file) check(Math.abs(frames(atLimit.file) - 38) <= 2 && Math.abs(lumAt(atLimit.file, 0) - 60) <= 4, `${tag}: at the limit the picture never runs over it (1.5 s = ~38 frames, got ${frames(atLimit.file)})`);
+  else check(false, `${tag}: at the limit: no clip`);
+  // Under the limit: the earlier start is kept and the end is not cut (the
+  // moment after the next scan stays in the video).
+  const under = await cut('k3', { start: t0 + 2000, end: t0 + 3500, scan: t0 + 2000, limit: 60_000 });
+  if (under.file) { const n = frames(under.file); check(Math.abs(n - 58) <= 2 && Math.abs(lumAt(under.file, n - 1) - 172) <= 6, `${tag}: under the limit the end is kept (2.3 s = ~58 frames to brightness ~172, got ${n}, ${lumAt(under.file, n - 1)})`); }
+  else check(false, `${tag}: under the limit: no clip`);
 }
 
 // ---- the stand-in server ----
@@ -134,7 +152,7 @@ try {
   const A = scan('AWB-A'); await sleep(6000);
   const B = scan('AWB-A'); await sleep(5000);                 // the same tracking ID again (another sheet / rescan)
   settings.targets = { pc: false, dropbox: true, gdrive: false };   // C is cut after this: cloud only
-  const C = scan('AWB-C');                                    // no next scan: capped at 12 s
+  const C = scan('AWB-C');                                    // no next scan: the whole video stops at 12 s
   await until(() => [A, B, C].every(s => ['done', 'failed', 'missing'].includes(clips.get(s.id)?.status)), 60_000, 'three clips finished');
 
   const a = clips.get(A.id); const b = clips.get(B.id); const c = clips.get(C.id);
@@ -148,7 +166,7 @@ try {
   check(c?.status === 'done' && !c.pc_path && c.dropbox_path && !c.gdrive_file_id, `C saved to Dropbox only (${c?.status} ${c?.error || ''})`);
   // A runs from 1 s before A to 1 s after B: about 8 s.
   check(a && Math.abs(a.duration_s - 8) <= 1.5, `A is ~8 s long (${a?.duration_s})`);
-  check(c && Math.abs(c.duration_s - 14) <= 1.5, `C stops at the 12 s cap + rolls (~14 s, got ${c?.duration_s})`);
+  check(c && Math.abs(c.duration_s - 12) <= 1, `C stops at the 12 s limit for the whole video (~12 s, got ${c?.duration_s})`);
   check(a && Math.abs(Date.parse(a.clip_start) - (Date.parse(A.scanned_at) - 1000)) <= 1500, `A starts at its scan in server time (${a?.clip_start} vs ${A.scanned_at})`);
   if (a?.pc_path) {
     const p = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name,width,height', '-of', 'json', a.pc_path]));

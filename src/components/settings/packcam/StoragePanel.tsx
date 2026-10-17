@@ -21,7 +21,7 @@ const TARGETS: { k: keyof PackcamSettings['targets']; label: string; hint: strin
 // A Windows folder (D:\x, \\server\share\x) or an absolute path; no characters Windows refuses.
 const PC_FOLDER = /^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+|\/)[^:*?"<>|]*$/;
 const NUMS: { k: 'max_clip_seconds' | 'pre_roll_seconds' | 'post_roll_seconds' | 'buffer_hours'; label: string; min: number; max: number; unit: string }[] = [
-  { k: 'max_clip_seconds', label: 'Longest clip', min: 30, max: 3600, unit: 'seconds' },
+  { k: 'max_clip_seconds', label: 'Longest video (whole video)', min: 30, max: 3600, unit: 'seconds' },
   { k: 'pre_roll_seconds', label: 'Start before scan', min: 0, max: 60, unit: 'seconds' },
   { k: 'post_roll_seconds', label: 'Keep after next scan', min: 0, max: 60, unit: 'seconds' },
   { k: 'buffer_hours', label: 'Raw recording kept on PC', min: 1, max: 72, unit: 'hours' },
@@ -50,6 +50,7 @@ export default function StoragePanel({ settings, onSaved, addToast }: { settings
       const v = f[n.k];
       if (!Number.isInteger(v) || v < n.min || v > n.max) { setErr(`${n.label}: enter a whole number from ${n.min} to ${n.max}`); return; }
     }
+    if (f.max_clip_seconds < f.pre_roll_seconds + 10) { setErr('Longest video must be at least 10 seconds more than "Start before scan"'); return; }
     const pcFolder = (f.pc_folder || '').trim().replace(/[\\/]+$/, (m, i) => (i <= 2 ? m : ''));
     if (pcFolder && !PC_FOLDER.test(pcFolder)) { setErr('PC folder: a full folder path like D:\\Packing Videos, or leave it blank'); return; }
     if (!/^\/[^\\:*?"<>|]*$/.test(f.dropbox_folder.trim())) { setErr('Dropbox folder must start with /, e.g. /PackCam'); return; }
