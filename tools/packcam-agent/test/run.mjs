@@ -26,7 +26,9 @@ const video = path.join(tmp, 'camera.mkv');
 execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=25', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=8000',
   '-t', '40', '-c:v', 'libx264', '-preset', 'ultrafast', '-g', '25', '-c:a', 'pcm_mulaw', video]);
 
-// ---- a gap in the recording does not shift the footage ----
+// ---- clips hold the right footage, and a recording gap does not shift it ----
+// Each test frame's brightness is its frame number × 2, so the frame that
+// starts a clip tells exactly which moment of the recording it came from.
 {
   process.env.PACKCAM_SEGMENT_SECONDS = '4';
   const { cutClip } = await import('../lib/clipper.mjs');
@@ -35,16 +37,27 @@ execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=siz
   const dir = cameraDir(gd, '9');
   const t0 = new Date(2026, 0, 5, 10, 0, 0).getTime();
   const name = ms => { const d = new Date(ms); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.ts`; };
-  // Two 4 s pieces with a 6 s hole between them (camera dropped out).
-  for (const [i, start] of [[0, t0], [1, t0 + 10_000]]) {
+  const piece = (start, base) => {
     const f = path.join(dir, name(start));
-    execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', `testsrc2=size=320x240:rate=25`, '-f', 'lavfi', '-i', 'sine', '-t', '4', '-c:v', 'libx264', '-preset', 'ultrafast', '-g', '25', '-c:a', 'aac', '-f', 'mpegts', f]);
+    // Same muxer as the recorder: the segment muxer writing MPEG-TS (pieces start at ~1.4 s).
+    execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', `color=c=black:s=64x64:r=25,format=gray,geq=lum='${base}+N*2'`, '-f', 'lavfi', '-i', 'sine',
+      '-t', '4', '-c:v', 'libx264', '-preset', 'ultrafast', '-g', '25', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-f', 'segment', '-segment_time', '60', '-segment_format', 'mpegts', '-reset_timestamps', '1', path.join(gd, 'piece%d.ts')]);
+    fs.renameSync(path.join(gd, 'piece0.ts'), f);
     fs.utimesSync(f, new Date(start + 4000), new Date(start + 4000));
-    if (i === 1) fs.writeFileSync(path.join(dir, name(t0 + 30_000)), '');   // a later piece: the window is closed
-  }
+  };
+  piece(t0, 0);                 // frames 0..99 → brightness 0..198
+  piece(t0 + 10_000, 40);       // after a 6 s hole (camera dropped out): brightness 40..238
+  fs.writeFileSync(path.join(dir, name(t0 + 30_000)), '');   // a later piece: the window is closed
+  const lumAt = (file, frame) => execFileSync('ffmpeg', ['-loglevel', 'error', '-i', file, '-vf', `select=eq(n\\,${frame}),scale=1:1`, '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'])[0];
   const r = await cutClip({ data_dir: gd, ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' }, { id: 'g1', awb: 'GAP', camera: '9', scanned_at: new Date(t0 + 2000).toISOString() }, { start: t0 + 2000, end: t0 + 12_000 });
-  // 2 s from the first piece + 2 s from the second; the 6 s hole is skipped, not filled.
-  check(r.file && Math.abs(r.duration - 4) <= 1.2, `gap skipped: clip is ~4 s (${r.duration}), starts ${r.start === new Date(t0 + 2000).toISOString() ? 'at the scan' : r.start}`);
+  // 2 s from the first piece (from its 2 s mark) + 2 s from the second (its start); the hole is skipped.
+  check(r.file && Math.abs(r.duration - 4) <= 0.5, `gap skipped: clip is ~4 s (${r.duration})`);
+  if (r.file) {
+    const first = lumAt(r.file, 0); const last1 = lumAt(r.file, 49); const second = lumAt(r.file, 50);
+    check(Math.abs(first - 100) <= 4, `clip starts at the scan's moment (frame 50 → brightness ~100, got ${first})`);
+    check(Math.abs(last1 - 198) <= 4, `first piece kept to its end (brightness ~198, got ${last1})`);
+    check(Math.abs(second - 40) <= 4, `then the second piece from its start (brightness ~40, got ${second})`);
+  }
 }
 
 // ---- the stand-in server ----

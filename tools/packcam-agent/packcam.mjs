@@ -29,7 +29,7 @@ const drive = makeDrive(cfg);
 const lanUrl = cfg.lan_url || `http://${lanAddress()}:${cfg.port}`;
 
 let settings = null; let dropbox = null; let playSecret = null; let offset = 0;
-let serverOk = false; let lastError = ''; let bufferBytes = 0;
+let serverOk = false; let lastError = ''; let bufferBytes = 0; let wasRecording = false;
 const recorders = new Map();          // camera number → Recorder
 
 const ctx = { cfg, state, drive, settings: () => settings, dropbox: () => dropbox, offset: () => offset };
@@ -64,9 +64,16 @@ async function checkIn() {
   settings = d.settings; dropbox = d.dropbox; playSecret = d.play_secret;
   const recording = settings.enabled && (d.cameras || []).length > 0;
   syncRecorders(recording ? d.cameras : []);
-  // While nothing records, scans pass by unrecorded: keep the cursor at "now"
-  // so switching recording back on does not list them all as missing clips.
-  if (!recording) { if (state.st.cursor !== d.now) { state.st.cursor = d.now; state.touch(); } return; }
+  if (!recording) {
+    // Scans made just before recording was switched off still have footage:
+    // take them on this first poll, then keep the cursor at "now" so turning
+    // recording back on does not list the unrecorded scans as missing clips.
+    if (wasRecording) state.ingest(d.scans || []);
+    wasRecording = false;
+    if (state.st.cursor !== d.now) { state.st.cursor = d.now; state.touch(); }
+    return;
+  }
+  wasRecording = true;
   const added = state.ingest(d.scans || []);
   if (added) log(`${added} new scan(s)`);
 }
@@ -80,11 +87,13 @@ async function report() {
 
 let lastForget = 0;
 function housekeeping(now) {
-  // Keep `buffer_hours` of recording, but never a piece a waiting clip still needs.
+  // Keep `buffer_hours` of recording, but never a piece a waiting clip still
+  // needs — unless the disk is nearly full.
   const s = settings || {};
   const low = (diskInfo(cfg.data_dir).free_gb ?? 99) < 3;
   let before = now - (low ? 1 : Math.max(1, Number(s.buffer_hours) || 6)) * 3600_000;
-  for (const j of state.pending()) if (j.status === 'queued') before = Math.min(before, Date.parse(j.scanned_at) - offset - (Number(s.pre_roll_seconds) || 0) * 1000 - 120_000);
+  // A nearly full disk wins: recording must not stop for a clip still waiting.
+  if (!low) for (const j of state.pending()) if (j.status === 'queued') before = Math.min(before, Date.parse(j.scanned_at) - offset - (Number(s.pre_roll_seconds) || 0) * 1000 - 120_000);
   let total = 0;
   const segRoot = path.join(cfg.data_dir, 'segments');
   for (const d of fs.readdirSync(segRoot)) {
@@ -122,7 +131,10 @@ async function workLoop() {
   for (;;) {
     let busy = false;
     try {
-      for (const job of state.pending()) {
+      // Cutting comes first: a pile of upload retries must never hold up new
+      // scans (their footage is only kept for the recording buffer).
+      const jobs = state.pending();
+      for (const job of [...jobs.filter(j => j.status === 'queued'), ...jobs.filter(j => j.status !== 'queued')]) {
         if (await step(ctx, job, Date.now())) { busy = true; break; }
       }
     } catch (e) { log(`worker: ${e.message}`); }

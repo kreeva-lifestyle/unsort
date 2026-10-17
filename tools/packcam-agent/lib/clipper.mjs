@@ -40,6 +40,14 @@ const run = (bin, args, timeout) => new Promise((resolve, reject) => {
   });
 });
 
+/** A piece's first timestamp in seconds (MPEG-TS pieces start near 1.4 s, not 0). */
+async function startOf(cfg, file) {
+  try {
+    const out = await run(cfg.ffprobe, ['-v', 'error', '-show_entries', 'format=start_time', '-of', 'json', file], 30_000);
+    return Number(JSON.parse(out).format?.start_time) || 0;
+  } catch { return 0; }
+}
+
 export async function probe(cfg, file) {
   const out = await run(cfg.ffprobe, ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type,codec_name', '-of', 'json', file], 30_000);
   const d = JSON.parse(out);
@@ -55,11 +63,19 @@ export async function cutClip(cfg, scan, win) {
   const segs = covering(listSegments(cameraDir(cfg.data_dir, scan.camera)), win.start, win.end);
   if (!segs.length) return { missing: 'No recording for this time — the camera was not recording, or the clip is older than the recording buffer' };
   // Each piece is trimmed on its own timeline (inpoint/outpoint), so a gap in
-  // the recording drops out of the clip instead of shifting the footage.
+  // the recording drops out of the clip instead of shifting the footage. The
+  // concat demuxer reads inpoint/outpoint as timestamps inside the piece, and
+  // MPEG-TS pieces do not start at 0 (the muxer adds ~1.4 s), so each piece's
+  // own start time is added. The first and last pieces are only trimmed where
+  // the window cuts them; whole pieces in between are taken as they are.
   const parts = [];
   for (const sg of segs) {
     const a = Math.max(win.start, sg.start); const b = Math.min(win.end, sg.end);
-    if (b - a >= 200) parts.push({ file: sg.file, a, b, inpoint: (a - sg.start) / 1000, outpoint: (b - sg.start) / 1000 });
+    if (b - a < 200) continue;
+    const t0 = await startOf(cfg, sg.file);
+    parts.push({ file: sg.file, a, b,
+      inpoint: a > sg.start ? t0 + (a - sg.start) / 1000 : null,
+      outpoint: b < sg.end ? t0 + (b - sg.start) / 1000 : null });
   }
   if (!parts.length) return { missing: 'Less than a second of recording covers this scan' };
   const realStart = parts[0].a;
@@ -71,7 +87,8 @@ export async function cutClip(cfg, scan, win) {
   const name = `${safeName(scan.awb)}_cam${safeName(scan.camera)}_${localTime(at)}.mp4`;
   const out = path.join(dir, name);
   const list = path.join(cfg.data_dir, 'tmp', `${scan.id}.txt`);
-  fs.writeFileSync(list, parts.map(p => `file '${p.file.replace(/\\/g, '/').replace(/'/g, "'\\''")}'\ninpoint ${p.inpoint.toFixed(3)}\noutpoint ${p.outpoint.toFixed(3)}`).join('\n'));
+  fs.writeFileSync(list, parts.map(p => [`file '${p.file.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`,
+    p.inpoint != null ? `inpoint ${p.inpoint.toFixed(3)}` : '', p.outpoint != null ? `outpoint ${p.outpoint.toFixed(3)}` : ''].filter(Boolean).join('\n')).join('\n'));
   const info = await probe(cfg, parts[0].file).catch(() => ({ vcodec: null }));
   const tmpOut = out + '.part.mp4';
   try {

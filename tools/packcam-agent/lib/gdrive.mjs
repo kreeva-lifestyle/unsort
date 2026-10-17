@@ -114,7 +114,12 @@ export function makeDrive(cfg) {
           continue;
         }
         const d = await r.json().catch(() => ({}));
-        if (!r.ok || !d.id) throw new Error(`Google Drive upload ${r.status}: ${d.error?.message || 'failed'}`);
+        if (!r.ok || !d.id) {
+          const e = new Error(`Google Drive upload ${r.status}: ${d.error?.message || 'failed'}`);
+          // Drive full: a retry cannot fix it, the clip is marked failed.
+          e.permanent = r.status === 403 && /storageQuotaExceeded|quota/i.test(JSON.stringify(d.error || ''));
+          throw e;
+        }
         return linkOf(d);
       }
     } finally { fs.closeSync(fd); }

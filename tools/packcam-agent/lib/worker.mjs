@@ -18,14 +18,15 @@ function failed(ctx, job, e, now) {
   job.attempts = (job.attempts || 0) + 1;
   job.error = error;
   const cut = job.file && fs.existsSync(job.file);
-  if (job.status === 'uploading' && cut) {
-    // An upload never gives up while the cut clip is on this PC (Dropbox not
+  if (job.status === 'uploading' && cut && !e?.permanent) {
+    // An upload does not give up while the cut clip is on this PC (Dropbox not
     // connected yet, internet down…): it retries every 30 minutes at most.
     // After a few failures the PC copy is offered so the clip can be watched.
+    // Errors a retry cannot fix (Dropbox/Drive full) fail at once instead.
     job.next_try = now + Math.min(60_000 * 2 ** (job.attempts - 1), 30 * 60_000);
     if (job.attempts >= 3 && !job.pc_path) { job.pc_path = job.file; ctx.state.st.files[job.id] = job.file; ctx.state.mark(job); }
     else if (changed) ctx.state.mark(job);
-  } else if (job.attempts >= MAX_ATTEMPTS) {
+  } else if (e?.permanent || job.attempts >= MAX_ATTEMPTS) {
     job.status = 'failed';
     if (cut) { job.pc_path = job.file; ctx.state.st.files[job.id] = job.file; }
     ctx.state.mark(job);

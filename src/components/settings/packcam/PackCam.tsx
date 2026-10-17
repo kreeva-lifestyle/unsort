@@ -1,6 +1,6 @@
 // Settings → Pack Cam: packing videos for PackStation scans. Owns the shared
 // state (settings + the office PC's heartbeat) and the four sub-tabs.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { T } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { SkeletonRows } from '../../ui/Skeleton';
@@ -21,14 +21,19 @@ export default function PackCam({ addToast, isAdmin }: { addToast: (m: string, t
   const [cameraNumbers, setCameraNumbers] = useState<string[]>([]);
 
   const [loadErr, setLoadErr] = useState('');
+  const seq = useRef(0);
+  const loaded = useRef(false);
   // The 30 s refresh is for the PC status: keep the same settings object when
   // the saved settings did not change, so the Storage form is left alone.
-  // A failed load never falls back to defaults (saving those would overwrite
-  // the real settings) — the page says it could not load instead.
+  // Only the newest load counts (a save bumps the counter, so a refresh that
+  // started before it cannot bring the old values back). A failed load never
+  // falls back to defaults — saving those would overwrite the real settings —
+  // and once the page has loaded, a failed background refresh stays quiet.
   const load = useCallback(() => {
+    const my = ++seq.current;
     loadSettings()
-      .then(n => { setLoadErr(''); setState(p => (p && JSON.stringify(p.settings) === JSON.stringify(n.settings) ? { ...n, settings: p.settings } : n)); })
-      .catch(e => { addToast(friendlyError(e), 'error'); setLoadErr(friendlyError(e)); });
+      .then(n => { if (my !== seq.current) return; loaded.current = true; setLoadErr(''); setState(p => (p && JSON.stringify(p.settings) === JSON.stringify(n.settings) ? { ...n, settings: p.settings } : n)); })
+      .catch(e => { if (my !== seq.current || loaded.current) return; addToast(friendlyError(e), 'error'); setLoadErr(friendlyError(e)); });
   }, [addToast]);
   useEffect(() => { load(); }, [load]);
   // The PC checks in every few seconds; refresh its status while this page is
@@ -52,7 +57,7 @@ export default function PackCam({ addToast, isAdmin }: { addToast: (m: string, t
       </div>
       {sub === 'status' && <AgentPanel agent={state.agent} isAdmin={isAdmin} addToast={addToast} />}
       {sub === 'cameras' && <CamerasPanel agent={state.agent} addToast={addToast} />}
-      {sub === 'storage' && <StoragePanel settings={state.settings} onSaved={s => setState(p => (p ? { ...p, settings: s } : p))} addToast={addToast} />}
+      {sub === 'storage' && <StoragePanel settings={state.settings} onSaved={s => { seq.current++; setState(p => (p ? { ...p, settings: s } : p)); }} addToast={addToast} />}
       {sub === 'videos' && <ClipsPanel cameras={cameraNumbers} addToast={addToast} />}
     </div>
   );

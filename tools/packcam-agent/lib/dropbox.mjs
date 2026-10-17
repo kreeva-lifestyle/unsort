@@ -10,6 +10,15 @@ const CHUNK = 32 * 1024 * 1024;
 // The Dropbox-API-Arg header must be plain ASCII.
 const arg = o => JSON.stringify(o).replace(/[\u007f-￿]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
 
+// Errors a retry cannot fix (account full, bad folder name, no permission):
+// the clip is marked failed instead of being re-sent every 30 minutes.
+const PERMANENT = /insufficient_space|malformed_path|disallowed_name|no_write_permission|too_long/;
+function fail(r) {
+  const e = new Error(`Dropbox upload ${r.status}: ${r.d.error_summary || 'failed'}`);
+  e.permanent = r.status === 409 && PERMANENT.test(String(r.d.error_summary || ''));
+  return e;
+}
+
 async function dbx(url, token, headers, body) {
   const r = await fetch(url, { method: 'POST', headers: { authorization: `Bearer ${token}`, ...headers }, body, signal: AbortSignal.timeout(5 * 60_000), duplex: 'half' });
   const t = await r.text();
@@ -22,7 +31,7 @@ export async function dropboxUpload(token, file, dest) {
   const size = fs.statSync(file).size;
   if (size <= CHUNK) {
     const r = await dbx(`${CONTENT}/files/upload`, token, { 'content-type': 'application/octet-stream', 'Dropbox-API-Arg': arg({ path: dest, mode: 'overwrite', mute: true }) }, fs.readFileSync(file));
-    if (r.status !== 200) throw new Error(`Dropbox upload ${r.status}: ${r.d.error_summary || 'failed'}`);
+    if (r.status !== 200) throw fail(r);
     return r.d.path_display || dest;
   }
   // Larger: an upload session — start with the first piece, append the
@@ -34,7 +43,7 @@ export async function dropboxUpload(token, file, dest) {
     const read = () => buf.subarray(0, fs.readSync(fd, buf, 0, Math.min(CHUNK, size - off), off));
     const send = async (step, a, piece) => {
       const r = await dbx(`${CONTENT}/files/upload_session/${step}`, token, { 'content-type': 'application/octet-stream', 'Dropbox-API-Arg': arg(a) }, piece);
-      if (r.status !== 200) throw new Error(`Dropbox upload ${r.status}: ${r.d.error_summary || 'failed'}`);
+      if (r.status !== 200) throw fail(r);
       return r.d;
     };
     let piece = read();
