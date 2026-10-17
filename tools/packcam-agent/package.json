@@ -1,0 +1,9 @@
+{
+  "name": "packcam-agent",
+  "version": "1.0.0",
+  "description": "Pack Cam agent for DailyOffice: records the packing-table IP cameras on the office PC and cuts one full-quality clip per PackStation scan.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node packcam.mjs", "test": "node test/run.mjs" }
+}

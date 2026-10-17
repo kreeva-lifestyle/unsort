@@ -611,88 +611,6 @@ export type BrandInsert = {
   created_at?: string | null;
 };
 
-// ─── packtime_cameras (4 cols) ───────────────────────────────────────────
-
-export interface PackTimeCamera {
-  id: string;
-  number: string;
-  is_active: boolean | null;
-  created_at: string | null;
-}
-
-export type PackTimeCameraInsert = {
-  id?: string;
-  number: string;
-  is_active?: boolean | null;
-  created_at?: string | null;
-};
-
-// ─── packtime_couriers (6 cols) ──────────────────────────────────────────
-
-export interface PackTimeCourier {
-  id: string;
-  name: string;
-  sheet_name: string;
-  is_active: boolean | null;
-  created_at: string | null;
-  brand: string | null;
-}
-
-export type PackTimeCourierInsert = {
-  id?: string;
-  name: string;
-  sheet_name: string;
-  is_active?: boolean | null;
-  created_at?: string | null;
-  brand?: string | null;
-};
-
-// ─── packtime_scans (9 cols) ─────────────────────────────────────────────
-
-export interface PackTimeScan {
-  id: string;
-  session_id: string;
-  awb: string;
-  courier: string;
-  camera: string;
-  sheet_name: string;
-  scanned_at: string | null;
-  user_id: string | null;
-  brand: string | null;
-}
-
-export type PackTimeScanInsert = {
-  id?: string;
-  session_id: string;
-  awb: string;
-  courier: string;
-  camera: string;
-  sheet_name: string;
-  scanned_at?: string | null;
-  user_id?: string | null;
-  brand?: string | null;
-};
-
-// ─── packtime_shortcuts (6 cols) ────────────────────────────────────────
-
-export interface PackTimeShortcut {
-  id: string;
-  user_id: string;
-  courier: string;
-  camera: string;
-  brand: string;
-  used_at: string;
-}
-
-export type PackTimeShortcutInsert = {
-  id?: string;
-  user_id: string;
-  courier: string;
-  camera: string;
-  brand: string;
-  used_at?: string;
-};
-
 // ─── Status enum helpers ─────────────────────────────────────────────────
 
 export type InventoryStatus = NonNullable<InventoryItem['status']>;
@@ -937,6 +855,7 @@ export interface BuyerSearchUsage { month: string; used: number; updated_at: str
 // existing `from '../types/database'` import keeps working.
 export * from './purchaseOrders';
 export * from './challanOrders'; export * from './jobwork'; export * from './skuThumbs'; // jobwork: Minis → Jobwork; sku_thumbs: Dropbox thumbnails
+export * from './packtime'; export * from './packcam'; // PackStation + Pack Cam (packing videos)
 
 // ─── indya_sku_map (8 cols) ─────────────────────────────────────────────
 // Indya Import's saved SKU fixes: the code as Indya sent it → the correct
