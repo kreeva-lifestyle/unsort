@@ -82,7 +82,7 @@ export default function StoragePanel({ settings, onSaved, addToast }: { settings
             </div>
           </div>
         ))}
-        <div style={{ ...note, marginTop: 10 }}>Each video is named by the tracking ID scanned, e.g. SF4156451997AJI.mp4, in one folder per day (2026-10-17). The same tracking ID twice on one day gets the scan time added (SF4156451997AJI_143005.mp4). Videos are copied exactly as the camera records them — no quality is lost.</div>
+        <div style={{ ...note, marginTop: 10 }}>Each video is named by the tracking ID scanned, e.g. SF4156451997AJI.mp4, in one folder per day (2026-10-17). The same tracking ID twice on one day gets the scan time added (SF4156451997AJI_143005.mp4). Videos from an H.264 camera are copied exactly as recorded; an H.265 camera's videos are converted to H.264 on the PC so every phone and browser can play them.</div>
       </div>
 
       <div style={card}>

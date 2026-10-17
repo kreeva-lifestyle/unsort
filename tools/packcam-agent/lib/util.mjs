@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-export const VERSION = '1.0.0';
+// One version for the agent and the app's "update the PC" notice: package.json.
+export const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 export const SEGMENT_SECONDS = Number(process.env.PACKCAM_SEGMENT_SECONDS) || 60;   // env: tests only
 
 export function loadConfig(file) {

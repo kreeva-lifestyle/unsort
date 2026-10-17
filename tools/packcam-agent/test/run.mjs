@@ -29,11 +29,14 @@ execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=siz
 // ---- clips hold the right footage, and a recording gap does not shift it ----
 // Each test frame's brightness is its frame number × 2, so the frame that
 // starts a clip tells exactly which moment of the recording it came from.
-{
+// Run for an H.264 camera (copied) and an H.265 camera (converted to H.264).
+// Keyframes every 30 frames (1.2 s) and a scan between two of them: the
+// clip must start on the keyframe before the scan, picture and sound together.
+for (const [enc, tag] of [['libx264', 'H.264'], ['libx265', 'H.265']]) {
   process.env.PACKCAM_SEGMENT_SECONDS = '4';
   const { cutClip } = await import('../lib/clipper.mjs');
   const { cameraDir } = await import('../lib/segments.mjs');
-  const gd = path.join(tmp, 'gap'); fs.mkdirSync(path.join(gd, 'tmp'), { recursive: true });
+  const gd = path.join(tmp, 'gap-' + enc); fs.mkdirSync(path.join(gd, 'tmp'), { recursive: true });
   const dir = cameraDir(gd, '9');
   const t0 = new Date(2026, 0, 5, 10, 0, 0).getTime();
   const name = ms => { const d = new Date(ms); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.ts`; };
@@ -41,7 +44,7 @@ execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=siz
     const f = path.join(dir, name(start));
     // Same muxer as the recorder: the segment muxer writing MPEG-TS (pieces start at ~1.4 s).
     execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', `color=c=black:s=64x64:r=25,format=gray,geq=lum='${base}+N*2'`, '-f', 'lavfi', '-i', 'sine',
-      '-t', '4', '-c:v', 'libx264', '-preset', 'ultrafast', '-g', '25', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-f', 'segment', '-segment_time', '60', '-segment_format', 'mpegts', '-reset_timestamps', '1', path.join(gd, 'piece%d.ts')]);
+      '-t', '4', '-c:v', enc, '-preset', 'ultrafast', '-g', '30', '-keyint_min', '30', '-sc_threshold', '0', ...(enc === 'libx265' ? ['-x265-params', 'log-level=error:bframes=0:scenecut=0:min-keyint=30'] : []), '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-f', 'segment', '-segment_time', '60', '-segment_format', 'mpegts', '-reset_timestamps', '1', path.join(gd, 'piece%d.ts')]);
     fs.renameSync(path.join(gd, 'piece0.ts'), f);
     fs.utimesSync(f, new Date(start + 4000), new Date(start + 4000));
   };
@@ -50,13 +53,23 @@ execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=siz
   fs.writeFileSync(path.join(dir, name(t0 + 30_000)), '');   // a later piece: the window is closed
   const lumAt = (file, frame) => execFileSync('ffmpeg', ['-loglevel', 'error', '-i', file, '-vf', `select=eq(n\\,${frame}),scale=1:1`, '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'])[0];
   const r = await cutClip({ data_dir: gd, ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' }, { id: 'g1', camera: '9' }, { start: t0 + 2000, end: t0 + 12_000 }, path.join(gd, 'out', 'GAP.mp4'));
-  // 2 s from the first piece (from its 2 s mark) + 2 s from the second (its start); the hole is skipped.
-  check(r.file && Math.abs(r.duration - 4) <= 0.5, `gap skipped: clip is ~4 s (${r.duration})`);
+  // The scan is at 2 s (frame 50); the keyframe before it is frame 30 (1.2 s).
+  // 2.8 s from the first piece + 2 s from the second (its start); the hole is skipped.
+  check(r.file && Math.abs(r.duration - 4.8) <= 0.5, `${tag}: gap skipped, clip is ~4.8 s (${r.duration})`);
+  check(Math.abs(Date.parse(r.start) - (t0 + 1200)) <= 60, `${tag}: reported start is the keyframe before the scan (${r.start})`);
   if (r.file) {
-    const first = lumAt(r.file, 0); const last1 = lumAt(r.file, 49); const second = lumAt(r.file, 50);
-    check(Math.abs(first - 100) <= 4, `clip starts at the scan's moment (frame 50 → brightness ~100, got ${first})`);
-    check(Math.abs(last1 - 198) <= 4, `first piece kept to its end (brightness ~198, got ${last1})`);
-    check(Math.abs(second - 40) <= 4, `then the second piece from its start (brightness ~40, got ${second})`);
+    const first = lumAt(r.file, 0); const last1 = lumAt(r.file, 69); const second = lumAt(r.file, 70);
+    check(Math.abs(first - 60) <= 4, `${tag}: clip starts on the keyframe before the scan (frame 30 → brightness ~60, got ${first})`);
+    check(Math.abs(last1 - 198) <= 4, `${tag}: first piece kept to its end (brightness ~198, got ${last1})`);
+    check(Math.abs(second - 40) <= 4, `${tag}: then the second piece from its start (brightness ~40, got ${second})`);
+    const starts = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,start_time', '-of', 'csv=p=0', r.file]).toString().trim().split('\n').map(l => l.split(','));
+    const vs = Number(starts.find(x => x[0] === 'video')?.[1]); const as = Number(starts.find(x => x[0] === 'audio')?.[1]);
+    // A stream copy keeps a few sound packets from just before the keyframe; a
+    // whole keyframe gap of sound with no picture (the old failure) is ~1.2 s here.
+    check(Math.abs(vs - as) < 0.5, `${tag}: picture starts with the sound (video ${vs}, audio ${as})`);
+    const codec = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', r.file]).toString().trim();
+    check(codec === 'h264', `${tag}: saved as H.264, plays everywhere (${codec})`);
+    check(fs.readdirSync(path.join(gd, 'out')).length === 1, `${tag}: no work files left beside the clip`);
   }
 }
 

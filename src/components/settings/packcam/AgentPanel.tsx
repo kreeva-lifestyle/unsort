@@ -9,6 +9,11 @@ import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 import type { PackcamAgentStatus } from '../../../types/packcam';
 import { agentOnline, newAgentKey, scansWithoutAddress } from './packcamApi';
 
+declare const __PACKCAM_AGENT_VERSION__: string; // tools/packcam-agent/package.json, via vite define
+/** "1.0.0" < "1.1.0", number by number. */
+const older = (a: string, b: string) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); return false; };
+const UPDATE_URL = '/packcam/PackCam-PC-Update.zip';
+
 const card: React.CSSProperties = { background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16, marginBottom: 12 };
 const head: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora, marginBottom: 10 };
 const Dot = ({ ok, warn }: { ok: boolean; warn?: boolean }) => <span style={{ width: 8, height: 8, borderRadius: '50%', background: ok ? T.gr : warn ? T.yl : T.re, display: 'inline-block', flexShrink: 0 }} />;
@@ -63,6 +68,12 @@ export default function AgentPanel({ agent, recording, isAdmin, addToast }: { ag
       <div style={card}>
         <div style={{ ...head, display: 'flex', alignItems: 'center', gap: 8 }}><Dot ok={online} warn={!!seen} />Office PC {online ? 'online' : seen ? 'offline' : 'not connected yet'}</div>
         {!seen && <div style={{ fontSize: 12, color: T.tx3 }}>Follow the setup steps below. This turns green once the PC checks in.</div>}
+        {agent.version && older(agent.version, __PACKCAM_AGENT_VERSION__) && (
+          <div style={{ margin: '8px 0', background: T.ac3, border: `1px solid ${T.ac44}`, borderRadius: 6, padding: '8px 10px', fontSize: 12, color: T.tx2, lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 600, color: T.ac2, marginBottom: 4 }}>Update the PC program: this PC runs {agent.version}, version {__PACKCAM_AGENT_VERSION__} is ready</div>
+            On the office PC press <a href={UPDATE_URL} download="PackCam-PC-Update.zip" className="touch44" style={{ color: T.ac2, fontWeight: 600 }}>PC update (zip)</a>, right-click the downloaded file → Extract All → type C:\PackCam → Extract → "Replace the files in the destination". Then close the black Pack Cam window and double-click start.bat in C:\PackCam\agent (or restart the PC). The agent key and settings stay as they are; videos already saved are not changed.
+          </div>
+        )}
         {unwatched.map(u => (
           <div key={u.number} style={{ margin: '8px 0', background: T.yl22, border: `1px solid ${T.yl88}`, borderRadius: 6, padding: '8px 10px', fontSize: 12, color: T.yl, lineHeight: 1.5 }}>
             Camera {u.number}: {u.count} scan{u.count === 1 ? '' : 's'} in the last 24 hours but no camera address, so no video was saved. If packers pick Camera {u.number} in PackStation, enter that camera's address under Camera {u.number} in the Cameras tab.
@@ -101,11 +112,12 @@ export default function AgentPanel({ agent, recording, isAdmin, addToast }: { ag
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
           <a href="/packcam/Pack-Cam-Setup-Guide.pdf" target="_blank" rel="noopener" style={{ ...S.btnPrimary, minHeight: 44, textDecoration: 'none' }}>Setup guide (PDF)</a>
           <a href="/packcam/PackCam-PC-Setup.zip" download="PackCam-PC-Setup.zip" style={{ ...S.btnGhost, minHeight: 44, textDecoration: 'none' }}>PC program (zip)</a>
+          <a href={UPDATE_URL} download="PackCam-PC-Update.zip" title="For a PC that already has Pack Cam: keeps its key and settings" style={{ ...S.btnGhost, minHeight: 44, textDecoration: 'none' }}>PC update (zip)</a>
         </div>
         <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {STEPS.map((s, i) => <li key={i} style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5 }}>{s}</li>)}
         </ol>
-        <div style={{ fontSize: 11, color: T.tx3, marginTop: 10, lineHeight: 1.5 }}>Each scan's video runs from that scan to the next scan on the same camera, copied exactly as the camera records it (no quality loss). Keep the PC on and set to never sleep.</div>
+        <div style={{ fontSize: 11, color: T.tx3, marginTop: 10, lineHeight: 1.5 }}>Each scan's video runs from that scan to the next scan on the same camera, copied as the camera records it; an H.265 camera's videos are converted to H.264 on the PC so they play on every phone and browser. Keep the PC on and set to never sleep.</div>
       </div>
       <ConfirmModal {...modalProps} />
     </div>
