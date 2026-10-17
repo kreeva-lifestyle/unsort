@@ -21,7 +21,7 @@ const TARGETS: { k: keyof PackcamSettings['targets']; label: string; hint: strin
 // A Windows folder (D:\x, \\server\share\x) or an absolute path; no characters Windows refuses.
 const PC_FOLDER = /^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+|\/)[^:*?"<>|]*$/;
 const NUMS: { k: 'max_clip_seconds' | 'pre_roll_seconds' | 'post_roll_seconds' | 'buffer_hours'; label: string; min: number; max: number; unit: string }[] = [
-  { k: 'max_clip_seconds', label: 'Longest clip', min: 30, max: 3600, unit: 'seconds' },
+  { k: 'max_clip_seconds', label: 'Longest video (whole video)', min: 30, max: 3600, unit: 'seconds' },
   { k: 'pre_roll_seconds', label: 'Start before scan', min: 0, max: 60, unit: 'seconds' },
   { k: 'post_roll_seconds', label: 'Keep after next scan', min: 0, max: 60, unit: 'seconds' },
   { k: 'buffer_hours', label: 'Raw recording kept on PC', min: 1, max: 72, unit: 'hours' },

@@ -579,7 +579,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
     setLastScanned(trimmed);
     setSessionCount(p => p + 1);
     setSheetTotal(p => p + 1);
-    setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true }, ...p].slice(0, 30));
+    setRecentScans(p => [{ awb: trimmed, time: now.toLocaleTimeString('en-IN'), success: true, pending: true, at: now.getTime() }, ...p].slice(0, 30));
 
     // Save to Supabase DB first, then Sheet
     const scanRow: PackTimeScanInsert = { session_id: sessionIdRef.current, awb: trimmed, courier, camera, brand: courierBrand, sheet_name: courierSheet, user_id: userIdRef.current };
@@ -1170,7 +1170,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             </div>
           </div>
         </div>
-        <CamStatusLine live={camLive} />
+        <CamStatusLine live={camLive} last={successScans[0]} />
       </div>
 
       {/* AWB Search */}

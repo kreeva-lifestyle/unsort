@@ -71,6 +71,12 @@ for (const [enc, tag] of [['libx264', 'H.264'], ['libx265', 'H.265']]) {
     check(codec === 'h264', `${tag}: saved as H.264, plays everywhere (${codec})`);
     check(fs.readdirSync(path.join(gd, 'out')).length === 1, `${tag}: no work files left beside the clip`);
   }
+  // The limit covers the whole video: a 1.5 s window whose start moves back to
+  // the keyframe (0.8 s earlier) still gives 1.5 s, the extra taken off the end.
+  const short = await cutClip({ data_dir: gd, ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' }, { id: 'g2', camera: '9' }, { start: t0 + 2000, end: t0 + 3500 }, path.join(gd, 'out', 'SHORT.mp4'));
+  const frames = short.file ? Number(execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0', short.file]).toString().trim()) : 0;
+  check(Math.abs(frames - 38) <= 2, `${tag}: picture never longer than its window (1.5 s = ~38 frames, got ${frames})`);
+  if (short.file) check(Math.abs(lumAt(short.file, 0) - 60) <= 4, `${tag}: and still starts on the keyframe before the scan`);
 }
 
 // ---- the stand-in server ----
@@ -134,7 +140,7 @@ try {
   const A = scan('AWB-A'); await sleep(6000);
   const B = scan('AWB-A'); await sleep(5000);                 // the same tracking ID again (another sheet / rescan)
   settings.targets = { pc: false, dropbox: true, gdrive: false };   // C is cut after this: cloud only
-  const C = scan('AWB-C');                                    // no next scan: capped at 12 s
+  const C = scan('AWB-C');                                    // no next scan: the whole video stops at 12 s
   await until(() => [A, B, C].every(s => ['done', 'failed', 'missing'].includes(clips.get(s.id)?.status)), 60_000, 'three clips finished');
 
   const a = clips.get(A.id); const b = clips.get(B.id); const c = clips.get(C.id);
@@ -148,7 +154,7 @@ try {
   check(c?.status === 'done' && !c.pc_path && c.dropbox_path && !c.gdrive_file_id, `C saved to Dropbox only (${c?.status} ${c?.error || ''})`);
   // A runs from 1 s before A to 1 s after B: about 8 s.
   check(a && Math.abs(a.duration_s - 8) <= 1.5, `A is ~8 s long (${a?.duration_s})`);
-  check(c && Math.abs(c.duration_s - 14) <= 1.5, `C stops at the 12 s cap + rolls (~14 s, got ${c?.duration_s})`);
+  check(c && Math.abs(c.duration_s - 12) <= 1, `C stops at the 12 s limit for the whole video (~12 s, got ${c?.duration_s})`);
   check(a && Math.abs(Date.parse(a.clip_start) - (Date.parse(A.scanned_at) - 1000)) <= 1500, `A starts at its scan in server time (${a?.clip_start} vs ${A.scanned_at})`);
   if (a?.pc_path) {
     const p = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name,width,height', '-of', 'json', a.pc_path]));

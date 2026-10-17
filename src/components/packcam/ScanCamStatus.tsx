@@ -9,9 +9,11 @@ import { logSwallowed } from '../../lib/errorLogger';
 import { supabase } from '../../lib/supabase';
 import { agentOnline, loadSettings, playable } from '../settings/packcam/packcamApi';
 import type { PackcamClip } from '../../types/packcam';
+import PackCountdown from './PackCountdown';
 
 export type ClipMark = 'saved' | 'waiting' | 'none';
-export interface CamLive { tone: 'ok' | 'warn' | 'bad'; text: string }
+// packSeconds: from a scan until that parcel's video stops (limit minus pre-roll).
+export interface CamLive { tone: 'ok' | 'warn' | 'bad'; text: string; packSeconds?: number }
 type ClipRow = Pick<PackcamClip, 'awb' | 'status' | 'pc_path' | 'dropbox_path' | 'gdrive_link'>;
 
 const POLL_MS = 15_000;
@@ -41,7 +43,7 @@ export function usePackcamLive(active: boolean, camera: string, awbs: string[]) 
           : !agentOnline(agent) ? { tone: 'bad', text: `Video PC offline since ${timeOf(agent.last_seen)} — packing videos are not being saved` }
           : !cam ? { tone: 'warn', text: `Camera ${camera} is not set up in Pack Cam — no videos for these scans` }
           : !cam.ok ? { tone: 'bad', text: `Camera ${camera} not recording${cam.error ? `: ${cam.error}` : ''} — videos are not being saved` }
-          : { tone: 'ok', text: `Camera ${camera} recording · packing videos are being saved` });
+          : { tone: 'ok', text: `Camera ${camera} recording · packing videos are being saved`, packSeconds: Math.max(1, (Number(settings.max_clip_seconds) || 600) - (Number(settings.pre_roll_seconds) || 0)) });
         const list = awbRef.current;
         if (!list.length) { setMarks({}); return; }
         // Last 24 h rather than "since the session started": scanned_at is
@@ -69,15 +71,17 @@ export function usePackcamLive(active: boolean, camera: string, awbs: string[]) 
 
 const TONE = { ok: T.gr, warn: T.yl, bad: T.re } as const;
 
-export function CamStatusLine({ live }: { live: CamLive | null }) {
+/** The status line, and while the camera records, the countdown for the last parcel scanned. */
+export function CamStatusLine({ live, last }: { live: CamLive | null; last?: { awb: string; at?: number } }) {
   if (!live) return null;
   const c = TONE[live.tone];
-  return (
+  return (<>
     <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, padding: '8px 12px', borderRadius: 10, border: `1px solid ${live.tone === 'ok' ? T.bd : c}`, background: live.tone === 'ok' ? 'rgba(255,255,255,0.02)' : live.tone === 'warn' ? T.yl22 : alpha(T.re, 0.08), fontSize: 11, color: live.tone === 'ok' ? T.tx2 : c, fontWeight: live.tone === 'ok' ? 500 : 600, lineHeight: 1.4 }}>
       <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0, animation: live.tone === 'ok' ? 'subtlePulse 2s ease-in-out infinite' : undefined }} />
       <span>{live.text}</span>
     </div>
-  );
+    {live.tone === 'ok' && live.packSeconds && last?.at ? <PackCountdown awb={last.awb} at={last.at} seconds={live.packSeconds} /> : null}
+  </>);
 }
 
 export function ClipMarkTag({ mark }: { mark?: ClipMark }) {

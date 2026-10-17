@@ -14,13 +14,19 @@ import os from 'node:os';
 import path from 'node:path';
 import { covering, listSegments, cameraDir } from './segments.mjs';
 
-/** The clip window for a scan, given the next scan on its camera (or null). */
+/**
+ * The clip window for a scan, given the next scan on its camera (or null).
+ * max_clip_seconds is the length of the whole video, pre- and post-roll
+ * included: it runs from pre-roll before the scan to post-roll after the next
+ * scan, or stops at the limit, whichever comes first.
+ */
 export function windowFor(scanMs, nextMs, s) {
   const cap = Math.max(10, Number(s.max_clip_seconds) || 600) * 1000;
   const pre = Math.max(0, Number(s.pre_roll_seconds) || 0) * 1000;
   const post = Math.max(0, Number(s.post_roll_seconds) || 0) * 1000;
-  const until = nextMs != null && nextMs > scanMs ? Math.min(nextMs, scanMs + cap) : scanMs + cap;
-  return { start: scanMs - pre, end: until + post, capped: nextMs == null || nextMs - scanMs > cap };
+  const start = scanMs - pre;
+  const end = nextMs != null && nextMs > scanMs ? Math.min(nextMs + post, start + cap) : start + cap;
+  return { start, end, capped: end === start + cap };
 }
 
 /**
@@ -102,9 +108,18 @@ export async function cutClip(cfg, scan, win, out) {
       const k = await keyframeAtOrBefore(cfg, sg.file, inpoint);
       if (k != null) { a = Math.max(sg.start, sg.start + (k - t0) * 1000); inpoint = k > t0 + 0.0005 ? k : null; }
     }
-    parts.push({ file: sg.file, a, b, inpoint,
-      outpoint: b < sg.end ? t0 + (b - sg.start) / 1000 : null });
+    parts.push({ file: sg.file, a, b, inpoint, t0, segStart: sg.start, segEnd: sg.end });
   }
+  // Starting on the earlier keyframe must not make the video longer than the
+  // window (the limit is a promise): take the extra off the end instead.
+  let over = parts.reduce((n, p) => n + (p.b - p.a), 0) - (win.end - win.start);
+  while (over > 0 && parts.length) {
+    const last = parts[parts.length - 1];
+    const cut = Math.min(over, last.b - last.a);
+    last.b -= cut; over -= cut;
+    if (last.b - last.a < 200) parts.pop();
+  }
+  for (const p of parts) p.outpoint = p.b < p.segEnd ? p.t0 + (p.b - p.segStart) / 1000 : null;
   if (!parts.length) return { missing: 'Less than a second of recording covers this scan' };
   const realStart = parts[0].a;
   const realEnd = parts[parts.length - 1].b;

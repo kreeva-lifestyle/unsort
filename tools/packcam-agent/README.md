@@ -2,7 +2,8 @@
 
 Records the packing-table IP cameras on the office PC and saves one video
 per PackStation scan: **from the scan to the next scan on the same camera**
-(plus a few seconds either side, never longer than the max clip length).
+(plus a few seconds either side). The whole video is never longer than the
+"Longest video" setting: with no next scan it stops there.
 H.264 video is copied exactly as the camera sends it. H.265 (HEVC), which most
 browsers and phones cannot play, is converted to H.264 once per clip on the PC
 (x264 `veryfast`, CRF 23, at below-normal priority so recording is never slowed).

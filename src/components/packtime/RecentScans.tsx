@@ -5,7 +5,7 @@ import { T, S } from '../../lib/theme';
 import { ClipMarkTag, type ClipMark } from '../packcam/ScanCamStatus';
 
 // In-memory view model for the recent-scans strip. Not a DB row.
-export interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; }
+export interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; at?: number; }
 
 interface Props {
   scans: ScanEntry[]; successCount: number; open: boolean; markOf: (awb: string) => ClipMark | undefined;
