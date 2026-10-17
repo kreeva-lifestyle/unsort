@@ -5,7 +5,7 @@
 // crash or power cut mid-file. ffmpeg is restarted when it exits (camera
 // rebooted, network blip) with a growing pause, and when the camera's
 // settings change.
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { cameraDir, listSegments } from './segments.mjs';
@@ -18,6 +18,31 @@ export function rtspUrl(c) {
 }
 /** The camera URL with the password hidden, for logs and the status page. */
 export const maskedUrl = c => rtspUrl({ ...c, password: c.password ? '***' : '' });
+
+/**
+ * Stop recorders left behind by an earlier copy of the agent: on Windows,
+ * ffmpeg outlives a node that crashed or was killed, and the next start would
+ * then record every camera twice into the same folder. Finds ffmpeg processes
+ * writing into this data folder's segments. Call only once this is the only
+ * agent on the PC (after the web port is ours). Resolves to the count.
+ */
+export function stopOrphanRecorders(cfg) {
+  if (process.platform !== 'win32') return Promise.resolve(0);
+  // The folder goes in through the environment and is escaped by PowerShell
+  // itself: no quoting of the path into the script.
+  const script = "$m = [WildcardPattern]::Escape($env:PACKCAM_SEGMENTS); $n = 0; Get-CimInstance Win32_Process -Filter \"Name='ffmpeg.exe'\" | Where-Object { [string]$_.CommandLine -like \"*$m*\" } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; $n++ } catch { Write-Output ('not stopped: ' + $_.Exception.Message) } }; $n";
+  return new Promise(resolve => {
+    execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', script],
+      { windowsHide: true, timeout: 60_000, env: { ...process.env, PACKCAM_SEGMENTS: path.join(cfg.data_dir, 'segments') } }, (e, out) => {
+        const lines = String(out || '').trim().split(/\r?\n/);
+        const n = Number(lines[lines.length - 1]) || 0;
+        for (const l of lines) if (l.startsWith('not stopped')) log(`old recorder ${l}`);
+        if (e) log(`old recorders check: ${e.message.split('\n')[0]}`);
+        else if (n) log(`stopped ${n} recorder(s) left from an earlier run`);
+        resolve(n);
+      });
+  });
+}
 
 export class Recorder {
   constructor(cfg, cam) {

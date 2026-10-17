@@ -15,7 +15,7 @@ import { VERSION, diskInfo, initLog, lanAddress, loadConfig, log, sleep } from '
 import { makeApi } from './lib/api.mjs';
 import { makeState } from './lib/state.mjs';
 import { makeDrive } from './lib/gdrive.mjs';
-import { Recorder } from './lib/recorder.mjs';
+import { Recorder, stopOrphanRecorders } from './lib/recorder.mjs';
 import { dirBytes, prune } from './lib/segments.mjs';
 import { step } from './lib/worker.mjs';
 import { startServer } from './lib/server.mjs';
@@ -174,5 +174,6 @@ await new Promise(resolve => {
     process.exit(3);
   });
 });
+await stopOrphanRecorders(cfg);
 checkInLoop();
 workLoop();

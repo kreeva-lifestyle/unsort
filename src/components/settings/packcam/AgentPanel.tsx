@@ -24,7 +24,7 @@ const STEPS = [
   'On the office PC press "PC program (zip)" above, then right-click the downloaded file → Extract All → type C:\\PackCam → Extract. You get C:\\PackCam\\agent.',
   'Press "Create agent key" above and paste it into config.json in that folder, between the quotes after "agent_key".',
   'In the Cameras tab, enter each camera\'s IP address and password, and Save.',
-  'Double-click start.bat and allow it through the firewall. Open http://localhost:8765 on the PC: each camera should say "Recording". Then right-click install-startup.bat → Run as administrator, once.',
+  'Double-click start.bat and allow it through the firewall. Open http://localhost:8765 on the PC: each camera should say "Recording". Then right-click install-startup.bat → Run as administrator, once: it closes that window, and Pack Cam now runs in the background with no window and starts by itself when the PC signs in (stop.bat stops it).',
   'In the Storage tab choose where videos go (PC / Dropbox / Google Drive and their folders) and turn recording on.',
 ];
 
@@ -105,7 +105,7 @@ export default function AgentPanel({ agent, recording, isAdmin, addToast }: { ag
         <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {STEPS.map((s, i) => <li key={i} style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5 }}>{s}</li>)}
         </ol>
-        <div style={{ fontSize: 11, color: T.tx3, marginTop: 10, lineHeight: 1.5 }}>Each scan's video runs from that scan to the next scan on the same camera, copied as the camera records it; an H.265 camera's videos are converted to H.264 on the PC so they play on every phone and browser. Keep the PC on and set to never sleep.</div>
+        <div style={{ fontSize: 11, color: T.tx3, marginTop: 10, lineHeight: 1.5 }}>Each scan's video runs from that scan to the next scan on the same camera, copied as the camera records it; an H.265 camera's videos are converted to H.264 on the PC so they play on every phone and browser. Keep the PC on and set to never sleep; Pack Cam runs in the background, nothing needs to stay open.</div>
       </div>
       <ConfirmModal {...modalProps} />
     </div>
