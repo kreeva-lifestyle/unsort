@@ -1,0 +1,9 @@
+{
+  "server": "https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packcam",
+  "agent_key": "paste the key from Settings → Pack Cam here",
+  "data_dir": "C:/PackCam",
+  "port": 8765,
+  "ffmpeg": "ffmpeg",
+  "gdrive_client_id": "",
+  "gdrive_client_secret": ""
+}

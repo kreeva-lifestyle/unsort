@@ -13,6 +13,8 @@ import { T, S } from '../lib/theme';
 import DateInput from '../components/ui/DateInput';
 import { SkeletonRows } from '../components/ui/Skeleton';
 import SwipeRow from '../components/ui/SwipeRow';
+import HistoryStats from '../components/packtime/HistoryStats';
+import { useScanClips, ScanVideoButton } from '../components/packcam/ScanVideo';
 import type {
   Brand,
   PackTimeCourier,
@@ -236,7 +238,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const [droppedCount, setDroppedCount] = useState(0);
   // Config from Supabase
   const [couriers, setCouriers] = useState<PackTimeCourier[]>([]);
-  const [cameras, setCameras] = useState<PackTimeCamera[]>([]);
+  const [cameras, setCameras] = useState<Pick<PackTimeCamera, 'id' | 'number' | 'is_active' | 'created_at'>[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
   const [loadingConfig, setLoadingConfig] = useState(true);
 
@@ -788,6 +790,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
   const totalPages = Math.ceil(historyTotal / historyPageSize);
+  const scanClips = useScanClips(showHistory ? historyData.map(r => r.id) : []);
 
   // ── History Screen ─────────────────────────────────────────────────────────
   if (showHistory) return (
@@ -824,23 +827,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       </div>
 
       {/* Stat strip */}
-      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 12 }}>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.ac87}, ${T.ac22})` }} />
-          <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Total Scans</div>
-          <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.ac2 }}>{historyTotal}</div>
-        </div>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.grCC}, ${T.gr22})` }} />
-          <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Today</div>
-          <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.gr }}>{historyData.filter(r => r.scanned_at && new Date(r.scanned_at).toDateString() === new Date().toDateString()).length}</div>
-        </div>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${T.ylCC}, ${T.yl22})` }} />
-          <div style={{ fontSize: 9, color: T.tx3, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600, marginBottom: 3 }}>Couriers</div>
-          <div style={{ fontFamily: T.sora, fontSize: 18, fontWeight: 700, color: T.yl }}>{new Set(historyData.map(r => r.courier)).size}</div>
-        </div>
-      </div>
+      <HistoryStats total={historyTotal} rows={historyData} />
 
       {/* Filter bar */}
       <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: '14px 16px', marginTop: 20, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -885,7 +872,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx3 }}>{r.camera}</td>
                   <td style={{ ...S.tdStyle, color: T.gr, fontWeight: 600 }}>{r.brand || '—'}</td>
                   <td style={{ ...S.tdStyle, fontFamily: T.mono, color: T.tx3, fontSize: 11 }}>{r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                  <td style={{ ...S.tdStyle, width: 40 }}>
+                  <td style={{ ...S.tdStyle, width: 40, whiteSpace: 'nowrap' }}>
+                    <ScanVideoButton clip={scanClips[r.id]} />
                     <button type="button" onClick={() => setConfirmDeleteId(r.id)} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', opacity: 0.4, transition: 'opacity .15s' }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')} aria-label="Delete">
                       <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 1.8 }}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
                     </button>
@@ -915,6 +903,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: T.gr }}>{r.brand || '—'}</div>
                   <div style={{ fontSize: 10, color: T.tx3, fontFamily: T.mono, marginTop: 2 }}>{r.scanned_at ? new Date(r.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</div>
+                  {scanClips[r.id] && <div style={{ marginTop: 6 }}><ScanVideoButton clip={scanClips[r.id]} /></div>}
                 </div>
               </div>
             </div>
