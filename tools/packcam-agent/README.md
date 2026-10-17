@@ -93,12 +93,10 @@ nothing to set up on the PC.
 
 ## Updating
 
-DailyOffice → Settings → Pack Cam → Status & setup says when the PC runs an older
-version than the one in the app. Download **PC update (zip)** (everything except
-`config.json`), Extract All into `C:\PackCam`, choose *Replace the files in the
-destination*, then close the Pack Cam window and run `start.bat` again (or restart
-the PC). The key and settings in `config.json` stay as they are. Clips cut before
-the update are not changed (an H.265 clip from 1.0.0 stays H.265; VLC plays it).
+Download **PC program (zip)** again (always the latest), close the Pack Cam
+window, replace the files in `C:\PackCam\agent` with the new ones but keep your
+own `config.json` (it holds the agent key and settings), then run `start.bat`
+again (or restart the PC). Clips cut before the update are not changed.
 
 Only one Pack Cam runs per PC: a second `start.bat` (for example while the one
 started at sign-in is running) says so and stops. `start.bat` never needs
