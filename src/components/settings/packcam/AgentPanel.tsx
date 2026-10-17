@@ -24,7 +24,7 @@ const STEPS = [
   'On the office PC press "PC program (zip)" above, then right-click the downloaded file → Extract All → type C:\\PackCam → Extract. You get C:\\PackCam\\agent.',
   'Press "Create agent key" above and paste it into config.json in that folder, between the quotes after "agent_key".',
   'In the Cameras tab, enter each camera\'s IP address and password, and Save.',
-  'Double-click start.bat and allow it through the firewall. Open http://localhost:8765 on the PC: each camera should say "Recording". Close that window, then right-click install-startup.bat → Run as administrator, once: Pack Cam now runs in the background with no window and starts by itself when the PC signs in (stop.bat stops it).',
+  'Double-click start.bat and allow it through the firewall. Open http://localhost:8765 on the PC: each camera should say "Recording". Then right-click install-startup.bat → Run as administrator, once: it closes that window, and Pack Cam now runs in the background with no window and starts by itself when the PC signs in (stop.bat stops it).',
   'In the Storage tab choose where videos go (PC / Dropbox / Google Drive and their folders) and turn recording on.',
 ];
 

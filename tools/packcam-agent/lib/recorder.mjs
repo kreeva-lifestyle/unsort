@@ -28,15 +28,19 @@ export const maskedUrl = c => rtspUrl({ ...c, password: c.password ? '***' : '' 
  */
 export function stopOrphanRecorders(cfg) {
   if (process.platform !== 'win32') return Promise.resolve(0);
-  const mark = path.join(cfg.data_dir, 'segments').replace(/'/g, "''").replace(/\[/g, '[[]');
-  const script = `$n = 0; Get-CimInstance Win32_Process -Filter "Name='ffmpeg.exe'" | Where-Object { $_.CommandLine -like '*${mark}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; $n++ }; $n`;
+  // The folder goes in through the environment and is escaped by PowerShell
+  // itself: no quoting of the path into the script.
+  const script = "$m = [WildcardPattern]::Escape($env:PACKCAM_SEGMENTS); $n = 0; Get-CimInstance Win32_Process -Filter \"Name='ffmpeg.exe'\" | Where-Object { [string]$_.CommandLine -like \"*$m*\" } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; $n++ } catch { Write-Output ('not stopped: ' + $_.Exception.Message) } }; $n";
   return new Promise(resolve => {
-    execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true, timeout: 60_000 }, (e, out) => {
-      const n = Number(String(out).trim()) || 0;
-      if (e) log(`old recorders check: ${e.message.split('\n')[0]}`);
-      else if (n) log(`stopped ${n} recorder(s) left from an earlier run`);
-      resolve(n);
-    });
+    execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', script],
+      { windowsHide: true, timeout: 60_000, env: { ...process.env, PACKCAM_SEGMENTS: path.join(cfg.data_dir, 'segments') } }, (e, out) => {
+        const lines = String(out || '').trim().split(/\r?\n/);
+        const n = Number(lines[lines.length - 1]) || 0;
+        for (const l of lines) if (l.startsWith('not stopped')) log(`old recorder ${l}`);
+        if (e) log(`old recorders check: ${e.message.split('\n')[0]}`);
+        else if (n) log(`stopped ${n} recorder(s) left from an earlier run`);
+        resolve(n);
+      });
   });
 }
 

@@ -51,11 +51,11 @@ In short:
    to the full path, e.g. `C:/ffmpeg/bin/ffmpeg.exe`.
 4. Double-click `start.bat` and allow Node.js on **Private** networks when Windows
    asks (so PC-stored clips play on office phones). Open <http://localhost:8765>
-   on the PC and check each camera says Recording. Then close that window.
-5. Right-click `install-startup.bat` → **Run as administrator**, once. From then
-   on Pack Cam runs in the background with no window, starting by itself when
-   Windows signs in (it starts right away too). Set the PC to sign in
-   automatically and never sleep.
+   on the PC and check each camera says Recording.
+5. Right-click `install-startup.bat` → **Run as administrator**, once. It closes
+   that window and from then on Pack Cam runs in the background with no window,
+   starting by itself when Windows signs in (and right away). Set the PC to sign
+   in automatically and never sleep.
 6. In Settings → Pack Cam → Cameras enter each camera's IP address and password
    (Hikvision main stream: port 554, path `/Streaming/Channels/101`; behind an
    NVR use the NVR's IP and `/Streaming/Channels/<channel>01`). Then in Storage
@@ -98,22 +98,26 @@ nothing to set up on the PC.
 
 Download **PC program (zip)** again (always the latest), double-click `stop.bat`,
 replace the files in `C:\PackCam\agent` with the new ones but keep your own
-`config.json` (it holds the agent key and settings), then double-click
-`start-hidden.vbs` (or restart the PC). Clips cut before the update are not changed.
+`config.json` (it holds the agent key and settings), then right-click
+`install-startup.bat` → **Run as administrator** (it also moves a PC set up
+before 1.3.0 from the start.bat window to the background). Clips cut before the update are not changed.
 
 ## Running in the background
 
 `start-hidden.vbs` runs Pack Cam with no window; the "Pack Cam" sign-in task
-made by `install-startup.bat` runs it, and double-clicking it starts Pack Cam
-by hand. `stop.bat` stops it (and any `start.bat` window) together with the
-camera recorders. `start.bat` is the same thing with a window, for watching
-what it does. Only one Pack Cam runs per PC: a second copy sees the web port
-taken and stops. On every start the agent also stops ffmpeg recorders a
-crashed earlier copy may have left writing into its segments folder, so a
-camera is never recorded twice. A start that fails at once (no key in
-`config.json`, Node.js not found) is written to `startup-errors.log` next to
-the program and retried every minute. `start.bat` and `start-hidden.vbs` never
-need administrator; only `install-startup.bat` does, once.
+made by `install-startup.bat` (`install-startup.ps1`) runs it, without admin
+rights and with no time limit, and double-clicking it starts Pack Cam by hand.
+`stop.bat` (`stop.ps1`) stops it, any `start.bat` window and the camera
+recorders: only processes of this folder (and ffmpeg writing into its data
+folder), and it says so if something could not be stopped. `start.bat` is the
+same thing with a window, for watching what it does. Only one Pack Cam runs per
+PC: a second copy sees the web port taken and stops (`start-hidden.vbs` then
+waits and takes over when the other one stops). On every start the agent also
+stops ffmpeg recorders a crashed earlier copy may have left writing into its
+segments folder, so a camera is never recorded twice. A start that fails at
+once (no key in `config.json`, Node.js not found) is written to
+`startup-errors.log` next to the program and retried every minute. Only
+`install-startup.bat` needs administrator.
 
 ## Files
 
