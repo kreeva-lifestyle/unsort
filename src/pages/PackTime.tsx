@@ -794,9 +794,9 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
 
   // ── History Screen ─────────────────────────────────────────────────────────
   if (showHistory) return (
-    <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx }}>
+    <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
       {/* Header — Back + subtitle */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 14, gap: 12, flexWrap: 'wrap', minHeight: 44 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12, flexWrap: 'wrap', minHeight: 44 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 11, color: T.tx3 }}>{historyDateFrom && historyDateTo ? `${historyTotal} records · ${historyDateFrom} to ${historyDateTo}` : 'Pick a date range to view scans'}</div>
         </div>
@@ -1116,10 +1116,10 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
         </div>
       )}
 
-      {/* Duplicate — non-blocking banner (audit P0: let operator keep scanning) */}
+      {/* Duplicate — non-blocking banner (audit P0: let operator keep scanning); below the header, which grows by the notch height in the installed app */}
       {duplicateAwb && (
-        <div style={{ position: 'fixed', top: 56, left: '50%', transform: 'translateX(-50%)', zIndex: 400, pointerEvents: 'none', animation: 'slideDown .15s ease' }}>
-          <div style={{ background: 'rgba(60,15,15,.95)', border: '1px solid oklch(0.63 0.22 25 / .45)', borderRadius: 10, padding: '8px 14px', boxShadow: '0 8px 24px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 10, color: '#fff' }}>
+        <div style={{ position: 'fixed', top: 'calc(64px + env(safe-area-inset-top, 0px))', left: 16, right: 16, display: 'flex', justifyContent: 'center', zIndex: 400, pointerEvents: 'none', animation: 'slideDown .15s ease' }}>
+          <div style={{ maxWidth: '100%', background: 'rgba(60,15,15,.95)', border: '1px solid oklch(0.63 0.22 25 / .45)', borderRadius: 10, padding: '8px 14px', boxShadow: '0 8px 24px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', gap: 10, color: '#fff' }}>
             <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: '#F59E0B', strokeWidth: 2, strokeLinejoin: 'round', flexShrink: 0 }}><path d="M12 2L2 22h20L12 2z" /><path d="M12 9v5" strokeLinecap="round" /><circle cx="12" cy="17" r=".5" fill="#F59E0B" /></svg>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: T.re, textTransform: 'uppercase', letterSpacing: 1 }}>Duplicate — not saved</div>
