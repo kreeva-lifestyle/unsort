@@ -791,7 +791,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const totalPages = Math.ceil(historyTotal / historyPageSize);
   const scanClips = useScanClips(showHistory ? historyData.map(r => r.id) : []);
 
-  const { live: camLive, marks: clipMarks } = usePackcamLive(started && !showHistory, camera, successScans.map(s => s.awb), sessionStartRef.current);
+  const { live: camLive, markOf: clipMarkOf } = usePackcamLive(!!active && started && !showHistory, camera, successScans.map(s => s.awb));
 
   // ── History Screen ─────────────────────────────────────────────────────────
   if (showHistory) return (
@@ -1290,7 +1290,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       </div>
 
       {/* Recent Scans — collapsible, with CSV export (audit P1: session summary without leaving screen) */}
-      <RecentScans scans={recentScans} successCount={successScans.length} open={sessionListOpen} marks={clipMarks} onToggle={() => setSessionListOpen(o => !o)} onExport={exportSession} onUndo={undoLast} />
+      <RecentScans scans={recentScans} successCount={successScans.length} open={sessionListOpen} markOf={clipMarkOf} onToggle={() => setSessionListOpen(o => !o)} onExport={exportSession} onUndo={undoLast} />
 
       {/* Complete Session */}
       {sessionCount > 0 && (

@@ -8,11 +8,11 @@ import { ClipMarkTag, type ClipMark } from '../packcam/ScanCamStatus';
 export interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; }
 
 interface Props {
-  scans: ScanEntry[]; successCount: number; open: boolean; marks: Record<string, ClipMark>;
+  scans: ScanEntry[]; successCount: number; open: boolean; markOf: (awb: string) => ClipMark | undefined;
   onToggle: () => void; onExport: () => void; onUndo: () => void;
 }
 
-export default function RecentScans({ scans, successCount, open, marks, onToggle, onExport, onUndo }: Props) {
+export default function RecentScans({ scans, successCount, open, markOf, onToggle, onExport, onUndo }: Props) {
   return (
     <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
       <div style={{ padding: '10px 12px', borderBottom: open ? `1px solid ${T.bd}` : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={onToggle}>
@@ -36,7 +36,7 @@ export default function RecentScans({ scans, successCount, open, marks, onToggle
                 {s.time}
                 {!s.success && <span style={{ color: T.re, fontWeight: 700, marginLeft: 6 }}>· DUPLICATE</span>}
                 {s.success && s.pending && <span style={{ color: T.yl, fontWeight: 600, marginLeft: 6 }}>· syncing</span>}
-                {s.success && <ClipMarkTag mark={marks[s.awb]} />}
+                {s.success && <ClipMarkTag mark={markOf(s.awb)} />}
               </div>
             </div>
             {s.success && !s.pending && i === 0 && <button type="button" className="touch44" onClick={(e) => { e.stopPropagation(); onUndo(); }} style={{ ...S.btnGhost, ...S.btnSm, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>↩ Undo</button>}
