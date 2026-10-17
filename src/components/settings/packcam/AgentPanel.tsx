@@ -1,12 +1,13 @@
 // Pack Cam → Status & setup: is the office PC recording, the agent key, and
 // the setup steps for the PC.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { copyToClipboard } from '../../../lib/clipboard';
+import { logSwallowed } from '../../../lib/errorLogger';
 import ConfirmModal, { useConfirm } from '../../ui/ConfirmModal';
 import type { PackcamAgentStatus } from '../../../types/packcam';
-import { agentOnline, newAgentKey } from './packcamApi';
+import { agentOnline, newAgentKey, scansWithoutAddress } from './packcamApi';
 
 const card: React.CSSProperties = { background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 10, padding: 16, marginBottom: 12 };
 const head: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora, marginBottom: 10 };
@@ -27,12 +28,22 @@ const STEPS = [
   'In the Storage tab choose where videos go (PC / Dropbox / Google Drive and their folders) and turn recording on.',
 ];
 
-export default function AgentPanel({ agent, isAdmin, addToast }: { agent: PackcamAgentStatus; isAdmin: boolean; addToast: (m: string, t?: string) => void }) {
+export default function AgentPanel({ agent, recording, isAdmin, addToast }: { agent: PackcamAgentStatus; recording: boolean; isAdmin: boolean; addToast: (m: string, t?: string) => void }) {
   const [key, setKey] = useState('');
+  const [unwatched, setUnwatched] = useState<{ number: string; count: number }[]>([]);
   const [busy, setBusy] = useState(false);
   const { ask, modalProps } = useConfirm();
   const online = agentOnline(agent);
   const seen = agent.last_seen ? new Date(agent.last_seen).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
+
+  // Scans on a camera number with no address are skipped by the PC. A hint
+  // only: a failed check just leaves the warning out.
+  useEffect(() => {
+    if (!recording) { setUnwatched([]); return; }
+    let live = true;
+    scansWithoutAddress().then(r => { if (live) setUnwatched(r); }).catch(e => logSwallowed('packcam unwatched cameras', e));
+    return () => { live = false; };
+  }, [recording]);
 
   const create = async () => {
     if (busy) return;
@@ -52,6 +63,11 @@ export default function AgentPanel({ agent, isAdmin, addToast }: { agent: Packca
       <div style={card}>
         <div style={{ ...head, display: 'flex', alignItems: 'center', gap: 8 }}><Dot ok={online} warn={!!seen} />Office PC {online ? 'online' : seen ? 'offline' : 'not connected yet'}</div>
         {!seen && <div style={{ fontSize: 12, color: T.tx3 }}>Follow the setup steps below. This turns green once the PC checks in.</div>}
+        {unwatched.map(u => (
+          <div key={u.number} style={{ margin: '8px 0', background: T.yl22, border: `1px solid ${T.yl88}`, borderRadius: 6, padding: '8px 10px', fontSize: 12, color: T.yl, lineHeight: 1.5 }}>
+            Camera {u.number}: {u.count} scan{u.count === 1 ? '' : 's'} in the last 24 hours but no camera address, so no video was saved. If packers pick Camera {u.number} in PackStation, enter that camera's address under Camera {u.number} in the Cameras tab.
+          </div>
+        ))}
         {seen && <>
           <Row label="Last check-in">{seen}</Row>
           {agent.host && <Row label="PC">{agent.host} · agent {agent.version}</Row>}

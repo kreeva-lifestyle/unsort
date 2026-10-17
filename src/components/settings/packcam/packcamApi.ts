@@ -82,3 +82,15 @@ export async function saveCamera(c: CameraConn, password: string | null) {
   const { error } = await supabase.rpc('packcam_save_camera', { p_camera: c.id, p_ip: c.ip || '', p_port: c.rtsp_port, p_path: c.rtsp_path, p_username: c.username, p_password: password });
   if (error) throw error;
 }
+
+/** Active cameras with no address that still had scans in the last 24 h: those scans get no video. */
+export async function scansWithoutAddress(): Promise<{ number: string; count: number }[]> {
+  const { data, error } = await supabase.from('packtime_cameras').select('number, is_active, ip').order('number');
+  if (error) throw error;
+  const since = new Date(Date.now() - 86_400_000).toISOString();
+  const missing = ((data || []) as Pick<CameraConn, 'number' | 'is_active' | 'ip'>[]).filter(c => c.is_active !== false && !c.ip);
+  const counts = await Promise.all(missing.map(c => supabase.from('packtime_scans').select('id', { count: 'exact', head: true }).eq('camera', c.number).gte('scanned_at', since)));
+  const failed = counts.find(r => r.error);
+  if (failed?.error) throw failed.error;
+  return missing.map((c, i) => ({ number: String(c.number), count: counts[i].count || 0 })).filter(r => r.count > 0);
+}

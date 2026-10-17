@@ -55,7 +55,7 @@ export default function PackCam({ addToast, isAdmin }: { addToast: (m: string, t
           </button>
         ))}
       </div>
-      {sub === 'status' && <AgentPanel agent={state.agent} isAdmin={isAdmin} addToast={addToast} />}
+      {sub === 'status' && <AgentPanel agent={state.agent} recording={state.settings.enabled} isAdmin={isAdmin} addToast={addToast} />}
       {sub === 'cameras' && <CamerasPanel agent={state.agent} addToast={addToast} />}
       {sub === 'storage' && <StoragePanel settings={state.settings} onSaved={s => { seq.current++; setState(p => (p ? { ...p, settings: s } : p)); }} addToast={addToast} />}
       {sub === 'videos' && <ClipsPanel cameras={cameraNumbers} addToast={addToast} />}
