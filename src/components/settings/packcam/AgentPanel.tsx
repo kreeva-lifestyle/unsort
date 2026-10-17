@@ -17,13 +17,14 @@ const Row = ({ label, children }: { label: string; children: React.ReactNode }) 
   </div>
 );
 
+// Short version of the "Pack Cam setup guide" PDF (with pictures) given to the owner.
 const STEPS = [
-  'On the office PC install Node.js (LTS) from nodejs.org, and ffmpeg (PowerShell: winget install Gyan.FFmpeg).',
-  'Copy the folder tools/packcam-agent from the DailyOffice code to the PC, e.g. C:\\PackCam\\agent. Rename config.example.json to config.json.',
-  'Press "Create agent key" below and paste the key into "agent_key" in config.json.',
-  'In the Cameras tab, enter each camera\'s IP address, user name and password.',
-  'Double-click start.bat. Open http://localhost:8765 on the PC: each camera should say "Recording". Run install-startup.bat once so it starts with Windows.',
-  'In the Storage tab choose PC / Dropbox / Google Drive and turn recording on. Every scan from then on gets its video.',
+  'On the office PC install Node.js and ffmpeg (PowerShell: winget install OpenJS.NodeJS.LTS, then winget install Gyan.FFmpeg).',
+  'Unzip the Pack Cam folder (PackCam-PC-Setup.zip) into C:\\PackCam — you get C:\\PackCam\\agent.',
+  'Press "Create agent key" below and paste it into config.json in that folder, between the quotes after "agent_key".',
+  'In the Cameras tab, enter each camera\'s IP address and password, and Save.',
+  'Double-click start.bat and allow it through the firewall. Open http://localhost:8765 on the PC: each camera should say "Recording". Then right-click install-startup.bat → Run as administrator, once.',
+  'In the Storage tab choose where videos go (PC / Dropbox / Google Drive and their folders) and turn recording on.',
 ];
 
 export default function AgentPanel({ agent, isAdmin, addToast }: { agent: PackcamAgentStatus; isAdmin: boolean; addToast: (m: string, t?: string) => void }) {

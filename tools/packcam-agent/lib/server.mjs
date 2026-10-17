@@ -45,7 +45,7 @@ function sendFile(req, res, file) {
 
 function statusPage(st, drive) {
   const d = drive.status();
-  const cams = (st.cameras || []).map(c => `<tr><td>Camera ${esc(c.number)}</td><td style="color:${c.ok ? '#16a34a' : '#dc2626'}">${c.ok ? 'Recording' : esc(c.error)}</td><td>${esc(c.last_segment_at || '—')}</td></tr>`).join('') || '<tr><td colspan="3">No cameras yet — add the camera IP addresses in DailyOffice → Settings → Pack Cam.</td></tr>';
+  const cams = (st.cameras || []).map(c => `<tr><td>Camera ${esc(c.number)}</td><td style="color:${c.ok ? '#16a34a' : '#dc2626'}">${c.ok ? 'Recording' : esc(c.error)}</td><td>${esc(c.last_segment_at ? new Date(c.last_segment_at).toLocaleString('en-IN') : '—')}</td></tr>`).join('') || '<tr><td colspan="3">No cameras yet — add the camera IP addresses in DailyOffice → Settings → Pack Cam.</td></tr>';
   const gd = !d.configured ? 'Not set up (add the Google client id/secret to config.json to use Drive)'
     : d.connected ? `Connected ${esc(d.connected_at)} · <a href="/gdrive/connect">Connect again</a>` : '<a href="/gdrive/connect"><b>Connect Google Drive</b></a>';
   return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pack Cam</title>
