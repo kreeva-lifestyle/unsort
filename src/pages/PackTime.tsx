@@ -15,6 +15,8 @@ import { SkeletonRows } from '../components/ui/Skeleton';
 import SwipeRow from '../components/ui/SwipeRow';
 import HistoryStats from '../components/packtime/HistoryStats';
 import { useScanClips, ScanVideoButton } from '../components/packcam/ScanVideo';
+import { usePackcamLive, CamStatusLine } from '../components/packcam/ScanCamStatus';
+import RecentScans, { type ScanEntry } from '../components/packtime/RecentScans';
 import type {
   Brand,
   PackTimeCourier,
@@ -28,9 +30,6 @@ import { downloadFile } from '../lib/downloadFile';
 import { registerBeforeSignOut } from '../lib/beforeSignOut';
 import { logSwallowed } from '../lib/errorLogger';
 import { useModalLock } from '../hooks/useModalLock';
-
-// In-memory view model for the recent-scans strip. Not a DB row.
-interface ScanEntry { awb: string; time: string; success: boolean; pending?: boolean; }
 
 // ── Beep ────────────────────────────────────────────────────────────────────────
 let audioCtx: AudioContext | null = null;
@@ -792,6 +791,8 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
   const totalPages = Math.ceil(historyTotal / historyPageSize);
   const scanClips = useScanClips(showHistory ? historyData.map(r => r.id) : []);
 
+  const { live: camLive, marks: clipMarks } = usePackcamLive(started && !showHistory, camera, successScans.map(s => s.awb), sessionStartRef.current);
+
   // ── History Screen ─────────────────────────────────────────────────────────
   if (showHistory) return (
     <div className="page-pad" style={{ fontFamily: T.sans, color: T.tx, padding: '14px 16px' }}>
@@ -1169,6 +1170,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
             </div>
           </div>
         </div>
+        <CamStatusLine live={camLive} />
       </div>
 
       {/* AWB Search */}
@@ -1288,35 +1290,7 @@ export default function PackTime({ active }: { active?: boolean } = {}) {
       </div>
 
       {/* Recent Scans — collapsible, with CSV export (audit P1: session summary without leaving screen) */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${T.bd}`, borderRadius: 8, overflow: 'hidden' }}>
-        <div style={{ padding: '10px 12px', borderBottom: sessionListOpen ? `1px solid ${T.bd}` : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setSessionListOpen(o => !o)}>
-          <span style={{ fontSize: 9, fontWeight: 600, color: T.tx3, letterSpacing: 1.5, textTransform: 'uppercase' }}>Recent Scans</span>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 9, color: T.tx3 }}>{recentScans.length} this session</span>
-            {successScans.length > 0 && <button type="button" className="touch44" onClick={e => { e.stopPropagation(); exportSession(); }} style={{ padding: '4px 10px', borderRadius: 4, border: `1px solid ${T.bd2}`, background: 'rgba(255,255,255,0.03)', color: T.tx3, fontSize: 10, fontWeight: 500, cursor: 'pointer' }}>Export</button>}
-          </div>
-        </div>
-        {sessionListOpen && <div style={{ maxHeight: 280, overflowY: 'auto' }}>
-          {recentScans.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: T.tx3, fontSize: 11 }}>No scans yet. Start scanning AWB barcodes.</div>}
-          {recentScans.map((s, i) => (
-            <div key={`${s.awb}-${s.time}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: `1px solid ${T.bd}`, animation: i === 0 ? 'fi .15s ease' : undefined, background: !s.success ? 'oklch(0.63 0.22 25 / .04)' : 'transparent' }}>
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: s.success ? 'oklch(0.72 0.19 145 / .12)' : 'oklch(0.63 0.22 25 / .12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {s.success ? <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.gr, strokeWidth: 2.5 }}><path d="M20 6L9 17l-5-5" /></svg>
-                : <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: T.re, strokeWidth: 2.5 }}><path d="M18 6L6 18M6 6l12 12" /></svg>}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontFamily: T.mono, color: T.tx, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.awb}</div>
-                <div style={{ fontSize: 9, color: T.tx3, marginTop: 1 }}>
-                  {s.time}
-                  {!s.success && <span style={{ color: T.re, fontWeight: 700, marginLeft: 6 }}>· DUPLICATE</span>}
-                  {s.success && s.pending && <span style={{ color: T.yl, fontWeight: 600, marginLeft: 6 }}>· syncing</span>}
-                </div>
-              </div>
-              {s.success && !s.pending && i === 0 && <button type="button" className="touch44" onClick={(e) => { e.stopPropagation(); undoLast(); }} style={{ ...S.btnGhost, ...S.btnSm, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>↩ Undo</button>}
-            </div>
-          ))}
-        </div>}
-      </div>
+      <RecentScans scans={recentScans} successCount={successScans.length} open={sessionListOpen} marks={clipMarks} onToggle={() => setSessionListOpen(o => !o)} onExport={exportSession} onUndo={undoLast} />
 
       {/* Complete Session */}
       {sessionCount > 0 && (
