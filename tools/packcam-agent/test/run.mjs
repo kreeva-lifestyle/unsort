@@ -26,9 +26,30 @@ const video = path.join(tmp, 'camera.mkv');
 execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=25', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=8000',
   '-t', '40', '-c:v', 'libx264', '-preset', 'ultrafast', '-g', '25', '-c:a', 'pcm_mulaw', video]);
 
+// ---- a gap in the recording does not shift the footage ----
+{
+  process.env.PACKCAM_SEGMENT_SECONDS = '4';
+  const { cutClip } = await import('../lib/clipper.mjs');
+  const { cameraDir } = await import('../lib/segments.mjs');
+  const gd = path.join(tmp, 'gap'); fs.mkdirSync(path.join(gd, 'tmp'), { recursive: true });
+  const dir = cameraDir(gd, '9');
+  const t0 = new Date(2026, 0, 5, 10, 0, 0).getTime();
+  const name = ms => { const d = new Date(ms); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.ts`; };
+  // Two 4 s pieces with a 6 s hole between them (camera dropped out).
+  for (const [i, start] of [[0, t0], [1, t0 + 10_000]]) {
+    const f = path.join(dir, name(start));
+    execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', `testsrc2=size=320x240:rate=25`, '-f', 'lavfi', '-i', 'sine', '-t', '4', '-c:v', 'libx264', '-preset', 'ultrafast', '-g', '25', '-c:a', 'aac', '-f', 'mpegts', f]);
+    fs.utimesSync(f, new Date(start + 4000), new Date(start + 4000));
+    if (i === 1) fs.writeFileSync(path.join(dir, name(t0 + 30_000)), '');   // a later piece: the window is closed
+  }
+  const r = await cutClip({ data_dir: gd, ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' }, { id: 'g1', awb: 'GAP', camera: '9', scanned_at: new Date(t0 + 2000).toISOString() }, { start: t0 + 2000, end: t0 + 12_000 });
+  // 2 s from the first piece + 2 s from the second; the 6 s hole is skipped, not filled.
+  check(r.file && Math.abs(r.duration - 4) <= 1.2, `gap skipped: clip is ~4 s (${r.duration}), starts ${r.start === new Date(t0 + 2000).toISOString() ? 'at the scan' : r.start}`);
+}
+
 // ---- the stand-in server ----
-const settings = { enabled: true, targets: { pc: true, dropbox: true, gdrive: true }, dropbox_folder: '/PackCam', gdrive_folder_name: 'PackCam', max_clip_seconds: 12, pre_roll_seconds: 1, post_roll_seconds: 1, buffer_hours: 6, auto_delete_days: 0 };
-const scans = []; const clips = new Map(); const deleteQueue = []; const deletedIds = [];
+const settings = { enabled: true, targets: { pc: true, dropbox: true, gdrive: true }, dropbox_folder: '/PackCam', gdrive_folder_name: 'PackCam', max_clip_seconds: 12, pre_roll_seconds: 1, post_roll_seconds: 1, buffer_hours: 6 };
+const scans = []; const clips = new Map();
 const dbx = new Map(); const drive = new Map(); let lastStatus = null;
 const body = req => new Promise(r => { const b = []; req.on('data', c => b.push(c)); req.on('end', () => r(Buffer.concat(b))); });
 const send = (res, code, obj, headers = {}) => { res.writeHead(code, { 'content-type': 'application/json', ...headers }); res.end(obj == null ? '' : JSON.stringify(obj)); };
@@ -42,12 +63,11 @@ const server = http.createServer(async (req, res) => {
       const since = d.cursor ? Date.parse(d.cursor) : 0;
       return send(res, 200, { ok: true, now: iso(sNow()), settings, play_secret: SECRET,
         cameras: [{ id: 'c1', number: '1', ip: '127.0.0.1', rtsp_port: 554, rtsp_path: '/x', username: 'admin', password: 'p@ss' }],
-        scans: scans.filter(s => Date.parse(s.scanned_at) >= since), deletes: deleteQueue.splice(0),
+        scans: scans.filter(s => Date.parse(s.scanned_at) >= since),
         dropbox: { access_token: 'dbx-token', expires_in: 14000 } });
     }
     if (d.action === 'agent_report') {
       for (const c of d.clips) clips.set(c.scan_id, c);
-      deletedIds.push(...d.deleted);
       return send(res, 200, { ok: true });
     }
   }
@@ -56,13 +76,11 @@ const server = http.createServer(async (req, res) => {
     dbx.set(a.path, b.length);
     return send(res, 200, { path_display: a.path });
   }
-  if (u.pathname === '/dbx-api/files/delete_v2') { const p = JSON.parse(b).path; return dbx.delete(p) ? send(res, 200, {}) : send(res, 409, { error_summary: 'path_lookup/not_found/' }); }
   if (u.pathname === '/g-token') return send(res, 200, { access_token: 'g-token', expires_in: 3600 });
   if (u.pathname === '/g-api/files' && req.method === 'GET') return send(res, 200, { files: [] });
   if (u.pathname === '/g-api/files' && req.method === 'POST') return send(res, 200, { id: 'folder-' + crypto.randomUUID().slice(0, 6) });
   if (u.pathname === '/g-upload/files') return send(res, 200, null, { location: `http://127.0.0.1:${server.address().port}/g-upload/session/${crypto.randomUUID()}` });
   if (u.pathname.startsWith('/g-upload/session/')) { const id = 'gf-' + crypto.randomUUID().slice(0, 8); drive.set(id, b.length); return send(res, 200, { id, webViewLink: `https://drive.example/${id}` }); }
-  if (u.pathname.startsWith('/g-api/files/') && req.method === 'DELETE') { drive.delete(u.pathname.split('/').pop()); return send(res, 204, null); }
   send(res, 404, { error: 'unknown ' + u.pathname });
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
@@ -76,7 +94,7 @@ const cfgFile = path.join(tmp, 'config.json');
 fs.writeFileSync(cfgFile, JSON.stringify({ server: `http://127.0.0.1:${P}/fn`, agent_key: KEY, data_dir: dataDir, port: AGENT_PORT, ffmpeg: 'ffmpeg', gdrive_client_id: 'id', gdrive_client_secret: 's', poll_ms: 1000, lan_url: `http://127.0.0.1:${AGENT_PORT}` }));
 const agent = spawn(process.execPath, [path.join(here, '..', 'packcam.mjs'), cfgFile], {
   env: { ...process.env, PACKCAM_TEST_INPUT_1: video, PACKCAM_SEGMENT_SECONDS: '4',
-    PACKCAM_DROPBOX_CONTENT: `http://127.0.0.1:${P}/dbx-content`, PACKCAM_DROPBOX_API: `http://127.0.0.1:${P}/dbx-api`,
+    PACKCAM_DROPBOX_CONTENT: `http://127.0.0.1:${P}/dbx-content`,
     PACKCAM_GOOGLE_TOKEN: `http://127.0.0.1:${P}/g-token`, PACKCAM_GDRIVE_API: `http://127.0.0.1:${P}/g-api`, PACKCAM_GDRIVE_UPLOAD: `http://127.0.0.1:${P}/g-upload` },
   stdio: ['ignore', 'pipe', 'pipe'] });
 let agentLog = '';
@@ -120,16 +138,11 @@ try {
   check(r3.status === 403, `expired link refused (${r3.status})`);
   check(lastStatus?.cameras?.[0]?.ok === true && !JSON.stringify(lastStatus).includes('p@ss'), 'heartbeat: camera recording, password never sent back');
 
-  // Bulk delete: A (all three copies) and C (Dropbox only).
-  const idA = crypto.randomUUID(); const idC = crypto.randomUUID();
-  deleteQueue.push({ id: idA, scan_id: A.id, pc_path: a?.pc_path, dropbox_path: a?.dropbox_path, gdrive_file_id: a?.gdrive_file_id },
-    { id: idC, scan_id: C.id, pc_path: null, dropbox_path: c?.dropbox_path, gdrive_file_id: null });
-  await until(() => deletedIds.includes(idA) && deletedIds.includes(idC), 15_000, 'deletes reported');
-  check(a?.pc_path && !fs.existsSync(a.pc_path), 'A removed from the PC');
-  check(!dbx.has(a?.dropbox_path) && !dbx.has(c?.dropbox_path), 'A and C removed from Dropbox');
-  check(!drive.has(a?.gdrive_file_id), 'A removed from Drive');
+  // Clips are cleared by hand: once A's file is removed from the PC, Play says so.
+  if (a?.pc_path) fs.unlinkSync(a.pc_path);
   const r4 = await fetch(`http://127.0.0.1:${AGENT_PORT}/clip/${A.id}?exp=${exp}&sig=${sig}`);
-  check(r4.status === 404, `deleted clip no longer plays (${r4.status})`);
+  check(r4.status === 404, `clip removed from the PC answers 404 (${r4.status})`);
+  check(drive.size === 1, `Drive holds one copy of A, not two (${drive.size})`);
   check(!/p@ss/.test(agentLog), 'camera password never written to the log');
 } finally {
   agent.kill('SIGINT');

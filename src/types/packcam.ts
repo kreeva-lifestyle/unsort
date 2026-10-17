@@ -1,9 +1,11 @@
 // Pack Cam: one packing video per PackStation scan, recorded by the agent on
 // the office PC (tools/packcam-agent). Re-exported from database.ts.
 
-export type PackcamClipStatus = 'queued' | 'cutting' | 'uploading' | 'done' | 'failed' | 'missing' | 'deleted';
+export type PackcamClipStatus = 'queued' | 'cutting' | 'uploading' | 'done' | 'failed' | 'missing';
 
-// ─── packcam_clips (22 cols) — written only by the packcam edge function ──
+// ─── packcam_clips (18 cols) — written only by the packcam edge function ──
+// Pack Cam never deletes clips; the team clears old ones from the PC folder,
+// Dropbox or Drive themselves (the row then simply stops playing).
 export interface PackcamClip {
   id: string;
   scan_id: string | null;
@@ -21,9 +23,6 @@ export interface PackcamClip {
   gdrive_file_id: string | null;
   gdrive_link: string | null;
   error: string | null;
-  delete_requested_at: string | null;
-  delete_requested_by: string | null;
-  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,7 +37,6 @@ export interface PackcamSettings {
   pre_roll_seconds: number;
   post_roll_seconds: number;
   buffer_hours: number;
-  auto_delete_days: number;
 }
 
 export const PACKCAM_DEFAULTS: PackcamSettings = {
@@ -50,7 +48,6 @@ export const PACKCAM_DEFAULTS: PackcamSettings = {
   pre_roll_seconds: 5,
   post_roll_seconds: 3,
   buffer_hours: 6,
-  auto_delete_days: 0,
 };
 
 /** app_settings.packcam_agent — the PC's heartbeat (written by the edge function). */

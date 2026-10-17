@@ -6,22 +6,23 @@ import { logSwallowed } from '../../lib/errorLogger';
 import { supabase } from '../../lib/supabase';
 import type { PackcamClip } from '../../types/packcam';
 import ClipPlayer from './ClipPlayer';
+import { playable } from '../settings/packcam/packcamApi';
 
-type ScanClip = Pick<PackcamClip, 'id' | 'scan_id' | 'awb' | 'camera' | 'scanned_at' | 'duration_s' | 'size_bytes' | 'status'>;
+type ScanClip = Pick<PackcamClip, 'id' | 'scan_id' | 'awb' | 'camera' | 'scanned_at' | 'duration_s' | 'size_bytes' | 'status' | 'pc_path' | 'dropbox_path' | 'gdrive_link'>;
 
-/** scan id → its clip, for the scans on screen (deleted / unfinished clips left out). */
+/** scan id → its clip, for the scans on screen (only clips with a copy to play). */
 export function useScanClips(scanIds: string[]) {
   const [clips, setClips] = useState<Record<string, ScanClip>>({});
   const key = scanIds.join(',');
   useEffect(() => {
     if (!key) { setClips({}); return; }
     let live = true;
-    supabase.from('packcam_clips').select('id, scan_id, awb, camera, scanned_at, duration_s, size_bytes, status')
-      .in('scan_id', key.split(',')).eq('status', 'done').is('delete_requested_at', null)
+    supabase.from('packcam_clips').select('id, scan_id, awb, camera, scanned_at, duration_s, size_bytes, status, pc_path, dropbox_path, gdrive_link')
+      .in('scan_id', key.split(',')).in('status', ['done', 'uploading', 'failed'])
       .then(({ data, error }) => {
         // Videos are an extra on this page: a failed lookup only hides the Play buttons.
         if (error) { logSwallowed('packcam scan clips', error); return; }
-        if (live) setClips(Object.fromEntries(((data || []) as ScanClip[]).map(c => [c.scan_id, c])));
+        if (live) setClips(Object.fromEntries(((data || []) as ScanClip[]).filter(playable).map(c => [c.scan_id, c])));
       });
     return () => { live = false; };
   }, [key]);

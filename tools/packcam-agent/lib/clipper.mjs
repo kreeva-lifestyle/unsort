@@ -54,10 +54,16 @@ export async function probe(cfg, file) {
 export async function cutClip(cfg, scan, win) {
   const segs = covering(listSegments(cameraDir(cfg.data_dir, scan.camera)), win.start, win.end);
   if (!segs.length) return { missing: 'No recording for this time — the camera was not recording, or the clip is older than the recording buffer' };
-  const first = segs[0];
-  const realStart = Math.max(win.start, first.start);
-  const realEnd = Math.min(win.end, segs[segs.length - 1].end);
-  if (realEnd - realStart < 1000) return { missing: 'Less than a second of recording covers this scan' };
+  // Each piece is trimmed on its own timeline (inpoint/outpoint), so a gap in
+  // the recording drops out of the clip instead of shifting the footage.
+  const parts = [];
+  for (const sg of segs) {
+    const a = Math.max(win.start, sg.start); const b = Math.min(win.end, sg.end);
+    if (b - a >= 200) parts.push({ file: sg.file, a, b, inpoint: (a - sg.start) / 1000, outpoint: (b - sg.start) / 1000 });
+  }
+  if (!parts.length) return { missing: 'Less than a second of recording covers this scan' };
+  const realStart = parts[0].a;
+  const realEnd = parts[parts.length - 1].b;
 
   const at = new Date(Date.parse(scan.scanned_at));
   const dir = path.join(cfg.data_dir, 'clips', localDate(at));
@@ -65,13 +71,12 @@ export async function cutClip(cfg, scan, win) {
   const name = `${safeName(scan.awb)}_cam${safeName(scan.camera)}_${localTime(at)}.mp4`;
   const out = path.join(dir, name);
   const list = path.join(cfg.data_dir, 'tmp', `${scan.id}.txt`);
-  fs.writeFileSync(list, segs.map(s => `file '${s.file.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`).join('\n'));
-  const info = await probe(cfg, segs[0].file).catch(() => ({ vcodec: null, hasAudio: true }));
+  fs.writeFileSync(list, parts.map(p => `file '${p.file.replace(/\\/g, '/').replace(/'/g, "'\\''")}'\ninpoint ${p.inpoint.toFixed(3)}\noutpoint ${p.outpoint.toFixed(3)}`).join('\n'));
+  const info = await probe(cfg, parts[0].file).catch(() => ({ vcodec: null }));
   const tmpOut = out + '.part.mp4';
   try {
     await run(cfg.ffmpeg, ['-nostdin', '-hide_banner', '-loglevel', 'error', '-y',
-      '-f', 'concat', '-safe', '0', '-ss', ((realStart - first.start) / 1000).toFixed(2), '-i', list,
-      '-t', ((realEnd - realStart) / 1000).toFixed(2),
+      '-f', 'concat', '-safe', '0', '-i', list,
       '-map', '0:v:0', '-map', '0:a?', '-c:v', 'copy', ...(info.vcodec === 'hevc' ? ['-tag:v', 'hvc1'] : []),
       '-c:a', 'copy', '-movflags', '+faststart', tmpOut], 15 * 60_000);
     fs.renameSync(tmpOut, out);

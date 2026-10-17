@@ -73,5 +73,3 @@ export function diskInfo(dir) {
 }
 
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
-/** True when `p` is inside `dir` (never delete outside the agent's own folders). */
-export const inside = (dir, p) => { const r = path.relative(dir, path.resolve(p)); return !!r && !r.startsWith('..') && !path.isAbsolute(r); };

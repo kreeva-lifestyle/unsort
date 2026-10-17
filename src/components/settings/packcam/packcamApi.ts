@@ -1,12 +1,12 @@
 // Pack Cam data access: settings + heartbeat (app_settings), clips
-// (packcam_clips, read-only), delete RPCs, and the packcam edge function
+// (packcam_clips, read-only), cameras, and the packcam edge function
 // (agent key, play links).
 import { supabase, SUPABASE_ANON_KEY } from '../../../lib/supabase';
 import { PACKCAM_DEFAULTS, type PackcamAgentStatus, type PackcamClip, type PackcamPlay, type PackcamSettings } from '../../../types/packcam';
 
 const FN = 'https://ulphprdnswznfztawbvg.supabase.co/functions/v1/packcam';
 
-export const CLIP_COLS = 'id, scan_id, awb, courier, camera, scanned_at, clip_start, clip_end, duration_s, size_bytes, status, pc_path, dropbox_path, gdrive_file_id, gdrive_link, error, delete_requested_at, delete_requested_by, deleted_at, created_at, updated_at';
+export const CLIP_COLS = 'id, scan_id, awb, courier, camera, scanned_at, clip_start, clip_end, duration_s, size_bytes, status, pc_path, dropbox_path, gdrive_file_id, gdrive_link, error, created_at, updated_at';
 
 /** Call the packcam function as the signed-in user. Throws with the server's message. */
 async function call<R>(body: object): Promise<R> {
@@ -45,36 +45,22 @@ export const agentOnline = (a: PackcamAgentStatus) => !!a.last_seen && Date.now(
 
 export interface ClipFilter { from: string; to: string; camera: string; status: string; awb: string }
 
-/** One page of clips (IST dates), newest first, with the exact count. Deleted clips are hidden unless asked for. */
+/** One page of clips (IST dates), newest first, with the exact count. */
 export async function fetchClips(f: ClipFilter, page: number, size: number) {
   let q = supabase.from('packcam_clips').select(CLIP_COLS, { count: 'exact' });
   if (f.from) q = q.gte('scanned_at', new Date(`${f.from}T00:00:00+05:30`).toISOString());
   if (f.to) q = q.lt('scanned_at', new Date(new Date(`${f.to}T00:00:00+05:30`).getTime() + 86_400_000).toISOString());
   if (f.camera) q = q.eq('camera', f.camera);
-  if (f.status === 'pending_delete') q = q.not('delete_requested_at', 'is', null).is('deleted_at', null);
-  else if (f.status) q = q.eq('status', f.status);
-  else q = q.neq('status', 'deleted');
+  if (f.status) q = q.eq('status', f.status);
   if (f.awb.trim()) q = q.ilike('awb', `%${f.awb.trim().replace(/[%_]/g, '\\$&')}%`);
   const { data, error, count } = await q.order('scanned_at', { ascending: false }).range(page * size, page * size + size - 1);
   if (error) throw error;
   return { rows: (data || []) as PackcamClip[], total: count || 0 };
 }
 
-export async function requestDelete(ids: string[]) {
-  const { data, error } = await supabase.rpc('packcam_request_delete', { p_ids: ids });
-  if (error) throw error;
-  return Number(data) || 0;
-}
-export async function requestDeleteRange(from: string, to: string, camera: string | null) {
-  const { data, error } = await supabase.rpc('packcam_request_delete_range', { p_from: from, p_to: to, p_camera: camera });
-  if (error) throw error;
-  return Number(data) || 0;
-}
-export async function cancelDelete(ids: string[]) {
-  const { data, error } = await supabase.rpc('packcam_cancel_delete', { p_ids: ids });
-  if (error) throw error;
-  return Number(data) || 0;
-}
+/** Has a copy that can be played (a clip still uploading may already be on the PC). */
+export const playable = (r: Pick<PackcamClip, 'status' | 'pc_path' | 'dropbox_path' | 'gdrive_link'>) =>
+  r.status === 'done' || ((r.status === 'uploading' || r.status === 'failed') && !!(r.pc_path || r.dropbox_path || r.gdrive_link));
 
 export const fmtSize = (b: number | null) => (b == null ? '—' : b >= 1e9 ? `${(b / 1e9).toFixed(2)} GB` : `${(b / 1e6).toFixed(1)} MB`);
 export const fmtDur = (s: number | null) => { if (s == null) return '—'; const t = Math.round(s); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };

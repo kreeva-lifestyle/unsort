@@ -11,6 +11,7 @@ const TOKEN = process.env.PACKCAM_GOOGLE_TOKEN || 'https://oauth2.googleapis.com
 const API = process.env.PACKCAM_GDRIVE_API || 'https://www.googleapis.com/drive/v3';
 const UPLOAD = process.env.PACKCAM_GDRIVE_UPLOAD || 'https://www.googleapis.com/upload/drive/v3';
 const FOLDER = 'application/vnd.google-apps.folder';
+const CHUNK = 32 * 1024 * 1024;   // a multiple of 256 KB, as Drive requires
 
 export function makeDrive(cfg) {
   const file = path.join(cfg.data_dir, 'gdrive.json');
@@ -50,7 +51,7 @@ export function makeDrive(cfg) {
   }
 
   async function api(url, init = {}) {
-    const r = await fetch(url, { ...init, headers: { authorization: `Bearer ${await token()}`, ...(init.headers || {}) }, signal: AbortSignal.timeout(10 * 60_000), duplex: 'half' });
+    const r = await fetch(url, { ...init, headers: { authorization: `Bearer ${await token()}`, ...(init.headers || {}) }, signal: AbortSignal.timeout(5 * 60_000), duplex: 'half' });
     return r;
   }
 
@@ -72,30 +73,51 @@ export function makeDrive(cfg) {
     return id;
   }
 
-  /** Upload a clip; returns { id, link }. Resumable upload, one request for the body. */
+  const esc = v => v.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const linkOf = d => ({ id: d.id, link: d.webViewLink || `https://drive.google.com/file/d/${d.id}/view` });
+
+  /**
+   * Upload a clip; returns { id, link }. A file of the same name and size
+   * already in the day folder (an earlier try whose answer was lost) is
+   * reused, not uploaded twice. The body goes in 32 MB pieces, each with its
+   * own timeout, so a big clip on a slow line still gets through.
+   */
   async function upload(localFile, folderName, dateName) {
     const parent = await folder(dateName, await folder(folderName || 'PackCam', 'root'));
     const size = fs.statSync(localFile).size;
+    const name = path.basename(localFile);
+    const q = `name='${esc(name)}' and '${parent}' in parents and trashed=false`;
+    const found = await api(`${API}/files?${new URLSearchParams({ q, fields: 'files(id,webViewLink,size)', pageSize: '5' })}`);
+    const fd0 = await found.json().catch(() => ({}));
+    const same = found.ok && (fd0.files || []).find(f => Number(f.size) === size);
+    if (same) return linkOf(same);
+
     const init = await api(`${UPLOAD}/files?uploadType=resumable&fields=id,webViewLink`, {
       method: 'POST',
       headers: { 'content-type': 'application/json; charset=UTF-8', 'x-upload-content-type': 'video/mp4', 'x-upload-content-length': String(size) },
-      body: JSON.stringify({ name: path.basename(localFile), parents: [parent] }),
+      body: JSON.stringify({ name, parents: [parent] }),
     });
     const where = init.headers.get('location');
     if (!init.ok || !where) throw new Error(`Google Drive upload ${init.status}: could not start`);
-    // A Blob backed by the file: sent with its length, never held in memory.
-    const r = await api(where, { method: 'PUT', headers: { 'content-type': 'video/mp4' }, body: await fs.openAsBlob(localFile) });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.id) throw new Error(`Google Drive upload ${r.status}: ${d.error?.message || 'failed'}`);
-    return { id: d.id, link: d.webViewLink || `https://drive.google.com/file/d/${d.id}/view` };
-  }
-
-  /** Delete a Drive file; a file that is already gone counts as deleted. */
-  async function remove(id) {
-    const r = await api(`${API}/files/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    if (r.ok || r.status === 404) return;
-    const d = await r.json().catch(() => ({}));
-    throw new Error(`Google Drive delete ${r.status}: ${d.error?.message || 'failed'}`);
+    const fd = fs.openSync(localFile, 'r');
+    try {
+      const buf = Buffer.alloc(CHUNK);
+      let off = 0;
+      for (;;) {
+        const n = fs.readSync(fd, buf, 0, Math.min(CHUNK, size - off), off);
+        const r = await api(where, { method: 'PUT', headers: { 'content-range': `bytes ${off}-${off + n - 1}/${size}` }, body: buf.subarray(0, n) });
+        if (r.status === 308) {
+          // Continue from what Google says it has ("bytes=0-1234").
+          const got = /bytes=0-(\d+)/.exec(r.headers.get('range') || '');
+          off = got ? Number(got[1]) + 1 : off;
+          if (off >= size) throw new Error('Google Drive upload: the upload did not finish');
+          continue;
+        }
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || !d.id) throw new Error(`Google Drive upload ${r.status}: ${d.error?.message || 'failed'}`);
+        return linkOf(d);
+      }
+    } finally { fs.closeSync(fd); }
   }
 
   function status() {
@@ -103,5 +125,5 @@ export function makeDrive(cfg) {
     return { configured: configured(), connected: !!s?.refresh_token, connected_at: s?.connected_at || null };
   }
 
-  return { configured, authUrl, finishConnect, upload, remove, status };
+  return { configured, authUrl, finishConnect, upload, status };
 }

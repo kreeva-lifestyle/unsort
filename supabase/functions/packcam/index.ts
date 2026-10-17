@@ -6,11 +6,11 @@
 //     Settings → Pack Cam and only its sha-256 is stored
 //     (app_secrets.packcam_agent_token_hash).
 //       agent_poll   { cursor, status }  -> settings, cameras (with passwords),
-//                    new scans since cursor, clips to delete, a short-lived
-//                    Dropbox access token (when Dropbox is on), play secret.
-//                    Also stores the agent's heartbeat (app_settings.packcam_agent)
-//                    and applies the auto-delete age.
-//       agent_report { clips, deleted, delete_failed } -> upserts clip rows.
+//                    new scans since cursor, a short-lived Dropbox access
+//                    token (when Dropbox is on), play secret. Also stores the
+//                    agent's heartbeat (app_settings.packcam_agent).
+//       agent_report { clips } -> upserts clip rows.
+//   Pack Cam never deletes clips: the team clears old ones themselves.
 //   * signed-in staff (Authorization: Bearer <user JWT>):
 //       new_agent_key (admin) -> a fresh agent key, shown once.
 //       play { clip_id }      -> a URL to watch the clip: a Dropbox temporary
@@ -46,7 +46,6 @@ export const DEFAULT_SETTINGS = {
   pre_roll_seconds: 5,
   post_roll_seconds: 3,
   buffer_hours: 6,
-  auto_delete_days: 0,
 };
 
 async function rest(path: string, init: RequestInit & { prefer?: string } = {}): Promise<any> {
@@ -95,7 +94,14 @@ async function playSecret(): Promise<string> {
   return s;
 }
 
+// The Dropbox access token is cached (app_secrets.packcam_dropbox_access) and
+// reused until 30 minutes before it expires, instead of a refresh on every
+// 5-second poll against the Dropbox app other features share.
 async function dropboxToken(): Promise<{ access_token: string; expires_in: number } | { error: string }> {
+  try {
+    const c = JSON.parse((await secret('packcam_dropbox_access')) || 'null');
+    if (c?.token && c.exp - Date.now() > 30 * 60_000) return { access_token: c.token, expires_in: Math.floor((c.exp - Date.now()) / 1000) };
+  } catch { /* refresh below */ }
   const [rt, ck, cs] = await Promise.all([secret('dropbox_refresh_token'), secret('dropbox_app_key'), secret('dropbox_app_secret')]);
   if (!rt || !ck || !cs) return { error: 'Dropbox is not connected — connect it in Minis → Dropbox' };
   const r = await fetch('https://api.dropbox.com/oauth2/token', {
@@ -104,7 +110,9 @@ async function dropboxToken(): Promise<{ access_token: string; expires_in: numbe
   });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) return { error: `Dropbox token ${r.status}: ${d.error_description || d.error || 'unknown'}` };
-  return { access_token: d.access_token, expires_in: d.expires_in || 14000 };
+  const expiresIn = Number(d.expires_in) || 14000;
+  await setSecret('packcam_dropbox_access', JSON.stringify({ token: d.access_token, exp: Date.now() + expiresIn * 1000 }));
+  return { access_token: d.access_token, expires_in: expiresIn };
 }
 
 const CLIP_COLS = ['scan_id', 'awb', 'courier', 'camera', 'scanned_at', 'clip_start', 'clip_end', 'duration_s', 'size_bytes', 'status', 'pc_path', 'dropbox_path', 'gdrive_file_id', 'gdrive_link', 'error'];
@@ -131,31 +139,20 @@ async function agentPoll(body: any, req: Request): Promise<Response> {
   // New scans on the configured cameras since the agent's cursor (first run:
   // the last 10 minutes only — no backlog from before Pack Cam existed).
   const since = typeof body?.cursor === 'string' && !isNaN(Date.parse(body.cursor)) ? body.cursor : new Date(Date.now() - 10 * 60_000).toISOString();
-  const numbers = cameras.map((c: any) => `"${c.number.replace(/"/g, '')}"`).join(',');
+  // Camera numbers are free text: quote and escape each for PostgREST, then
+  // URL-encode the list so characters like & or # cannot break the query.
+  const numbers = cameras.map((c: any) => `"${c.number.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',');
   const scans = settings.enabled && cameras.length
-    ? await rest(`packtime_scans?select=id,awb,courier,camera,scanned_at&scanned_at=gte.${encodeURIComponent(since)}&camera=in.(${numbers})&order=scanned_at.asc&limit=500`)
+    ? await rest(`packtime_scans?select=id,awb,courier,camera,scanned_at&scanned_at=gte.${encodeURIComponent(since)}&camera=in.(${encodeURIComponent(numbers)})&order=scanned_at.asc&limit=500`)
     : [];
 
-  // Auto-delete age: mark old clips; the agent deletes them like any other.
-  const days = Number(settings.auto_delete_days) || 0;
-  if (days > 0) {
-    const cut = new Date(Date.now() - days * 86_400_000).toISOString();
-    await rest(`packcam_clips?deleted_at=is.null&delete_requested_at=is.null&scanned_at=lt.${encodeURIComponent(cut)}`, { method: 'PATCH', body: JSON.stringify({ delete_requested_at: now, updated_at: now }) });
-  }
-  const deletes = await rest('packcam_clips?select=id,scan_id,pc_path,dropbox_path,gdrive_file_id&delete_requested_at=not.is.null&deleted_at=is.null&order=delete_requested_at.asc&limit=200');
-
-  const dropbox = settings.targets.dropbox || deletes.some((d: any) => d.dropbox_path) ? await dropboxToken() : null;
-  return json({ ok: true, now, settings, cameras, scans, deletes, dropbox, play_secret: await playSecret() }, req);
+  const dropbox = settings.targets.dropbox ? await dropboxToken() : null;
+  return json({ ok: true, now, settings, cameras, scans, dropbox, play_secret: await playSecret() }, req);
 }
 
 async function agentReport(body: any, req: Request): Promise<Response> {
   const now = new Date().toISOString();
-  let clips = (Array.isArray(body?.clips) ? body.clips : []).slice(0, 200).filter((c: any) => c && /^[0-9a-f-]{36}$/.test(String(c.scan_id)) && c.awb && c.camera && c.scanned_at && STATUSES.has(c.status));
-  if (clips.length) {
-    // A clip already deleted stays deleted: a late report must not bring it back.
-    const gone = new Set((await rest(`packcam_clips?select=scan_id&deleted_at=not.is.null&scan_id=in.(${clips.map((c: any) => c.scan_id).join(',')})`)).map((r: any) => r.scan_id));
-    clips = clips.filter((c: any) => !gone.has(c.scan_id));
-  }
+  const clips = (Array.isArray(body?.clips) ? body.clips : []).slice(0, 200).filter((c: any) => c && /^[0-9a-f-]{36}$/.test(String(c.scan_id)) && c.awb && c.camera && c.scanned_at && STATUSES.has(c.status));
   if (clips.length) {
     const rows = clips.map((c: any) => {
       const r: any = { updated_at: now };
@@ -167,24 +164,18 @@ async function agentReport(body: any, req: Request): Promise<Response> {
     const uniform = rows.map((r: any) => Object.fromEntries(keys.map(k => [k, k in r ? r[k] : null])));
     await rest('packcam_clips?on_conflict=scan_id', { method: 'POST', prefer: 'resolution=merge-duplicates', body: JSON.stringify(uniform) });
   }
-  const deleted = (Array.isArray(body?.deleted) ? body.deleted : []).filter((x: unknown) => typeof x === 'string' && /^[0-9a-f-]{36}$/.test(x)).slice(0, 500);
-  if (deleted.length) {
-    await rest(`packcam_clips?id=in.(${deleted.join(',')})`, { method: 'PATCH', body: JSON.stringify({ status: 'deleted', deleted_at: now, pc_path: null, dropbox_path: null, gdrive_file_id: null, gdrive_link: null, error: null, updated_at: now }) });
-  }
-  for (const f of (Array.isArray(body?.delete_failed) ? body.delete_failed : []).slice(0, 100)) {
-    if (typeof f?.id === 'string' && /^[0-9a-f-]{36}$/.test(f.id)) await rest(`packcam_clips?id=eq.${f.id}`, { method: 'PATCH', body: JSON.stringify({ error: s(`Delete failed: ${f.error}`, 500), updated_at: now }) });
-  }
-  return json({ ok: true, saved: clips.length, deleted: deleted.length }, req);
+  return json({ ok: true, saved: clips.length }, req);
 }
 
 async function play(body: any, req: Request): Promise<Response> {
   const id = String(body?.clip_id || '');
   if (!/^[0-9a-f-]{36}$/.test(id)) return fail(400, 'Missing clip', req);
-  const c = (await rest(`packcam_clips?id=eq.${id}&select=id,scan_id,status,pc_path,dropbox_path,gdrive_link,deleted_at`))?.[0];
+  const c = (await rest(`packcam_clips?id=eq.${id}&select=id,scan_id,status,pc_path,dropbox_path,gdrive_link`))?.[0];
   if (!c) return fail(404, 'Clip not found', req);
-  if (c.deleted_at || c.status === 'deleted') return fail(410, 'This packing video was deleted', req);
-  // A failed upload can still have a copy (usually the PC's) worth watching.
-  if (c.status !== 'done' && c.status !== 'failed') return fail(409, 'The packing video is not ready yet', req);
+  // A clip still uploading (or whose upload failed) can already have a copy
+  // worth watching — usually the PC's.
+  const watchable = c.status === 'done' || ((c.status === 'uploading' || c.status === 'failed') && (c.pc_path || c.dropbox_path || c.gdrive_link));
+  if (!watchable) return fail(409, 'The packing video is not ready yet', req);
   if (c.dropbox_path) {
     const t = await dropboxToken();
     if ('access_token' in t) {
@@ -202,7 +193,7 @@ async function play(body: any, req: Request): Promise<Response> {
     const sig = await hmac(await playSecret(), `${c.scan_id}.${exp}`);
     return json({ ok: true, url: `${agent.lan_url.replace(/\/+$/, '')}/clip/${c.scan_id}?exp=${exp}&sig=${sig}`, source: 'pc', lan_only: true }, req);
   }
-  return fail(404, 'No copy of this video is stored anywhere', req);
+  return fail(404, 'This video is no longer stored anywhere', req);
 }
 
 Deno.serve(async (req) => {

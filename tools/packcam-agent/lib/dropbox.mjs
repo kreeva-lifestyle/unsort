@@ -1,30 +1,32 @@
-// Dropbox uploads and deletes with the short-lived access token the server
-// hands out on each poll (the long-lived Dropbox login stays on the server).
+// Dropbox uploads with the short-lived access token the server hands out on
+// each poll (the long-lived Dropbox login stays on the server). Clips up to
+// 32 MB go in one request, larger ones in 32 MB pieces, each piece with its
+// own timeout. Mode "overwrite": a retry after a lost response replaces the
+// same file instead of leaving a second copy (names are unique per scan).
 import fs from 'node:fs';
 
 const CONTENT = process.env.PACKCAM_DROPBOX_CONTENT || 'https://content.dropboxapi.com/2';
-const API = process.env.PACKCAM_DROPBOX_API || 'https://api.dropboxapi.com/2';
 const CHUNK = 32 * 1024 * 1024;
 // The Dropbox-API-Arg header must be plain ASCII.
 const arg = o => JSON.stringify(o).replace(/[\u007f-￿]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
 
 async function dbx(url, token, headers, body) {
-  const r = await fetch(url, { method: 'POST', headers: { authorization: `Bearer ${token}`, ...headers }, body, signal: AbortSignal.timeout(10 * 60_000), duplex: 'half' });
+  const r = await fetch(url, { method: 'POST', headers: { authorization: `Bearer ${token}`, ...headers }, body, signal: AbortSignal.timeout(5 * 60_000), duplex: 'half' });
   const t = await r.text();
   let d = {}; try { d = t ? JSON.parse(t) : {}; } catch { d = { error_summary: t.slice(0, 200) }; }
   return { status: r.status, d };
 }
 
-/** Upload `file` to Dropbox `path` (pieces of 32 MB above 140 MB). Returns the stored path. */
+/** Upload `file` to Dropbox `dest`. Returns the stored path. */
 export async function dropboxUpload(token, file, dest) {
   const size = fs.statSync(file).size;
-  if (size <= 140 * 1024 * 1024) {
-    const r = await dbx(`${CONTENT}/files/upload`, token, { 'content-type': 'application/octet-stream', 'Dropbox-API-Arg': arg({ path: dest, mode: 'add', autorename: true, mute: true }) }, fs.readFileSync(file));
+  if (size <= CHUNK) {
+    const r = await dbx(`${CONTENT}/files/upload`, token, { 'content-type': 'application/octet-stream', 'Dropbox-API-Arg': arg({ path: dest, mode: 'overwrite', mute: true }) }, fs.readFileSync(file));
     if (r.status !== 200) throw new Error(`Dropbox upload ${r.status}: ${r.d.error_summary || 'failed'}`);
     return r.d.path_display || dest;
   }
-  // Above 140 MB: an upload session — start with the first 32 MB, append the
-  // middle pieces, finish with the last one.
+  // Larger: an upload session — start with the first piece, append the
+  // middle ones, finish with the last.
   const fd = fs.openSync(file, 'r');
   try {
     const buf = Buffer.alloc(CHUNK);
@@ -44,15 +46,7 @@ export async function dropboxUpload(token, file, dest) {
       off += piece.length;
     }
     piece = read();
-    const done = await send('finish', { cursor: { session_id: session, offset: off }, commit: { path: dest, mode: 'add', autorename: true, mute: true } }, piece);
+    const done = await send('finish', { cursor: { session_id: session, offset: off }, commit: { path: dest, mode: 'overwrite', mute: true } }, piece);
     return done.path_display || dest;
   } finally { fs.closeSync(fd); }
-}
-
-/** Delete a Dropbox file; a file that is already gone counts as deleted. */
-export async function dropboxDelete(token, p) {
-  const r = await dbx(`${API}/files/delete_v2`, token, { 'content-type': 'application/json' }, JSON.stringify({ path: p }));
-  if (r.status === 200) return;
-  if (r.status === 409 && /not_found/.test(JSON.stringify(r.d))) return;
-  throw new Error(`Dropbox delete ${r.status}: ${r.d.error_summary || 'failed'}`);
 }

@@ -1,6 +1,6 @@
 // Pack Cam → Storage: recording on/off, where clips are saved (PC / Dropbox /
 // Google Drive — any combination), clip length and housekeeping.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { T, S } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { numericKeyDown } from '../../../lib/numericInput';
@@ -17,20 +17,27 @@ const TARGETS: { k: keyof PackcamSettings['targets']; label: string; hint: strin
   { k: 'dropbox', label: 'Dropbox', hint: 'Uses the Dropbox account connected in Minis → Dropbox. Plays anywhere.' },
   { k: 'gdrive', label: 'Google Drive', hint: 'Needs a one-time Google sign-in on the PC (see the agent README).' },
 ];
-const NUMS: { k: 'max_clip_seconds' | 'pre_roll_seconds' | 'post_roll_seconds' | 'buffer_hours' | 'auto_delete_days'; label: string; min: number; max: number; unit: string }[] = [
+const NUMS: { k: 'max_clip_seconds' | 'pre_roll_seconds' | 'post_roll_seconds' | 'buffer_hours'; label: string; min: number; max: number; unit: string }[] = [
   { k: 'max_clip_seconds', label: 'Longest clip', min: 30, max: 3600, unit: 'seconds' },
   { k: 'pre_roll_seconds', label: 'Start before scan', min: 0, max: 60, unit: 'seconds' },
   { k: 'post_roll_seconds', label: 'Keep after next scan', min: 0, max: 60, unit: 'seconds' },
   { k: 'buffer_hours', label: 'Raw recording kept on PC', min: 1, max: 72, unit: 'hours' },
-  { k: 'auto_delete_days', label: 'Auto-delete clips after', min: 0, max: 3650, unit: 'days (0 = never)' },
 ];
 
 export default function StoragePanel({ settings, onSaved, addToast }: { settings: PackcamSettings; onSaved: (s: PackcamSettings) => void; addToast: (m: string, t?: string) => void }) {
   const [f, setF] = useState(settings);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
-  useEffect(() => { setF(settings); }, [settings]);
-  const dirty = JSON.stringify(f) !== JSON.stringify(settings);
+  // Follow the saved settings only when they really change (the page refreshes
+  // every 30 s for the PC status) and never over edits not yet saved.
+  const synced = useRef(JSON.stringify(settings));
+  const dirty = JSON.stringify(f) !== synced.current;
+  useEffect(() => {
+    const next = JSON.stringify(settings);
+    if (next === synced.current) return;
+    if (!dirty) setF(settings);
+    synced.current = next;
+  }, [settings]); // eslint-disable-line react-hooks/exhaustive-deps -- `dirty` is read at the moment the saved values change
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +51,7 @@ export default function StoragePanel({ settings, onSaved, addToast }: { settings
     if (f.targets.gdrive && !f.gdrive_folder_name.trim()) { setErr('Enter a Google Drive folder name'); return; }
     const clean = { ...f, dropbox_folder: f.dropbox_folder.trim().replace(/\/+$/, '') || '/PackCam', gdrive_folder_name: f.gdrive_folder_name.trim() };
     setSaving(true); setErr('');
-    try { await saveSettings(clean); onSaved(clean); addToast('Pack Cam settings saved', 'success'); }
+    try { await saveSettings(clean); setF(clean); synced.current = JSON.stringify(clean); onSaved(clean); addToast('Pack Cam settings saved', 'success'); }
     catch (e2) { setErr(friendlyError(e2)); addToast(friendlyError(e2), 'error'); }
     finally { setSaving(false); }
   };
@@ -70,7 +77,7 @@ export default function StoragePanel({ settings, onSaved, addToast }: { settings
       </div>
 
       <div style={card}>
-        <div style={{ ...head, marginBottom: 10 }}>Clip length & clean-up</div>
+        <div style={{ ...head, marginBottom: 10 }}>Clip length</div>
         <div className="pc-num-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 10 }}>
           {NUMS.map(n => (
             <div key={n.k}>
@@ -80,12 +87,12 @@ export default function StoragePanel({ settings, onSaved, addToast }: { settings
             </div>
           ))}
         </div>
-        <div style={{ ...note, marginTop: 10 }}>A clip runs from the scan to the next scan on the same camera, never longer than the longest-clip limit.</div>
+        <div style={{ ...note, marginTop: 10 }}>A clip runs from the scan to the next scan on the same camera, never longer than the longest-clip limit. Pack Cam never deletes clips — clear old ones from the PC folder, Dropbox or Drive yourself.</div>
       </div>
 
       {err && <div style={{ marginBottom: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{err}</div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        {dirty && <button type="button" onClick={() => { setF(settings); setErr(''); }} style={{ ...S.btnGhost, minHeight: 44 }}>Undo changes</button>}
+        {dirty && <button type="button" onClick={() => { setF(JSON.parse(synced.current)); setErr(''); }} style={{ ...S.btnGhost, minHeight: 44 }}>Undo changes</button>}
         <button type="submit" style={{ ...S.btnPrimary, minHeight: 44, pointerEvents: saving || !dirty ? 'none' : 'auto', opacity: saving || !dirty ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save settings'}</button>
       </div>
     </form>

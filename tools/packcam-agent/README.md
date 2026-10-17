@@ -5,9 +5,10 @@ per PackStation scan: **from the scan to the next scan on the same camera**
 (plus a few seconds either side, never longer than the max clip length).
 The video is copied exactly as the camera sends it; nothing is re-encoded and
 quality is not lowered. Clips go to the PC, Dropbox and/or Google Drive, whichever
-are switched on in DailyOffice → Settings → Pack Cam. Deleting clips (one, a
-selection, or a date range) is done from the same page; this agent carries
-the deletes out on every copy.
+are switched on in DailyOffice → Settings → Pack Cam. Pack Cam never deletes
+a clip: clear old ones yourself from `clips\` on the PC, the Dropbox folder or the
+Drive folder (one folder per day makes that easy). A removed clip simply stops
+playing in DailyOffice.
 
 ## How it works
 

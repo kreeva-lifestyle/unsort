@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { T } from '../../../lib/theme';
 import { friendlyError } from '../../../lib/friendlyError';
 import { SkeletonRows } from '../../ui/Skeleton';
-import { PACKCAM_DEFAULTS, type PackcamAgentStatus, type PackcamSettings } from '../../../types/packcam';
+import Empty from '../../ui/Empty';
+import type { PackcamAgentStatus, PackcamSettings } from '../../../types/packcam';
 import { agentOnline, loadCameras, loadSettings } from './packcamApi';
 import AgentPanel from './AgentPanel';
 import CamerasPanel from './CamerasPanel';
@@ -19,8 +20,15 @@ export default function PackCam({ addToast, isAdmin }: { addToast: (m: string, t
   const [state, setState] = useState<{ settings: PackcamSettings; agent: PackcamAgentStatus } | null>(null);
   const [cameraNumbers, setCameraNumbers] = useState<string[]>([]);
 
+  const [loadErr, setLoadErr] = useState('');
+  // The 30 s refresh is for the PC status: keep the same settings object when
+  // the saved settings did not change, so the Storage form is left alone.
+  // A failed load never falls back to defaults (saving those would overwrite
+  // the real settings) — the page says it could not load instead.
   const load = useCallback(() => {
-    loadSettings().then(setState).catch(e => { addToast(friendlyError(e), 'error'); setState(s => s || { settings: PACKCAM_DEFAULTS, agent: {} }); });
+    loadSettings()
+      .then(n => { setLoadErr(''); setState(p => (p && JSON.stringify(p.settings) === JSON.stringify(n.settings) ? { ...n, settings: p.settings } : n)); })
+      .catch(e => { addToast(friendlyError(e), 'error'); setLoadErr(friendlyError(e)); });
   }, [addToast]);
   useEffect(() => { load(); }, [load]);
   // The PC checks in every few seconds; refresh its status while this page is
@@ -30,7 +38,7 @@ export default function PackCam({ addToast, isAdmin }: { addToast: (m: string, t
     loadCameras().then(d => setCameraNumbers(d.cameras.map(c => String(c.number)))).catch(e => addToast(friendlyError(e), 'error'));
   }, [addToast]);
 
-  if (!state) return <SkeletonRows rows={4} />;
+  if (!state) return loadErr ? <Empty icon="warning" title="Could not load Pack Cam" message={loadErr} cta="Try again" onCta={load} /> : <SkeletonRows rows={4} />;
   const online = agentOnline(state.agent);
   return (
     <div>
@@ -45,7 +53,7 @@ export default function PackCam({ addToast, isAdmin }: { addToast: (m: string, t
       {sub === 'status' && <AgentPanel agent={state.agent} isAdmin={isAdmin} addToast={addToast} />}
       {sub === 'cameras' && <CamerasPanel agent={state.agent} addToast={addToast} />}
       {sub === 'storage' && <StoragePanel settings={state.settings} onSaved={s => setState(p => (p ? { ...p, settings: s } : p))} addToast={addToast} />}
-      {sub === 'videos' && <ClipsPanel cameras={cameraNumbers} canDelete addToast={addToast} />}
+      {sub === 'videos' && <ClipsPanel cameras={cameraNumbers} addToast={addToast} />}
     </div>
   );
 }

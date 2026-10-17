@@ -1,7 +1,6 @@
 // The rolling recording on disk: segments/<camera>/<YYYYMMDD-HHMMSS>.ts, one
 // file a minute per camera, named by the PC's local clock when ffmpeg opened
-// it. A segment runs from its name time to the next segment's name time
-// (the newest one: to its last write).
+// it. A segment runs from its name time to its last write.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -25,9 +24,13 @@ export function listSegments(dir) {
     segs.push({ file: path.join(dir, n), start, end: 0 });
   }
   segs.sort((a, b) => a.start - b.start);
+  // A piece ends at its last write (its mtime). A piece cut short by a
+  // camera drop or restart therefore ends early, and the time until the next
+  // piece is a gap with no video, not part of the earlier piece.
   for (let i = 0; i < segs.length; i++) {
-    if (i + 1 < segs.length) segs[i].end = segs[i + 1].start;
-    else { try { segs[i].end = fs.statSync(segs[i].file).mtimeMs; } catch { segs[i].end = segs[i].start; } }
+    let mt = segs[i].start;
+    try { mt = Math.max(segs[i].start, fs.statSync(segs[i].file).mtimeMs); } catch { /* gone */ }
+    segs[i].end = i + 1 < segs.length ? Math.min(segs[i + 1].start, mt) : mt;
   }
   return segs;
 }

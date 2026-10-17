@@ -1,28 +1,39 @@
-// One step of work at a time: cut a clip, upload it, or carry out a delete.
-// Each scan's job goes queued → uploading → done (or missing / failed);
-// every change is reported to the server on the next round.
+// One step of work at a time: cut a clip or upload it. Each scan's job goes
+// queued → uploading → done (or missing / failed); every change is reported
+// to the server on the next round. Clips are never deleted by Pack Cam —
+// the team removes them from the PC folder, Dropbox or Drive themselves.
 import fs from 'node:fs';
 import path from 'node:path';
 import { cutClip, readyToCut, windowFor } from './clipper.mjs';
 import { cameraDir, listSegments } from './segments.mjs';
-import { dropboxDelete, dropboxUpload } from './dropbox.mjs';
-import { inside, localDate, log } from './util.mjs';
+import { dropboxUpload } from './dropbox.mjs';
+import { localDate, log } from './util.mjs';
 
 const MAX_ATTEMPTS = 8;
 const clean = folder => '/' + String(folder || '/PackCam').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
 
 function failed(ctx, job, e, now) {
+  const error = String(e?.message || e).slice(0, 400);
+  const changed = error !== job.error;
   job.attempts = (job.attempts || 0) + 1;
-  job.error = String(e?.message || e).slice(0, 400);
-  if (job.attempts >= MAX_ATTEMPTS) {
+  job.error = error;
+  const cut = job.file && fs.existsSync(job.file);
+  if (job.status === 'uploading' && cut) {
+    // An upload never gives up while the cut clip is on this PC (Dropbox not
+    // connected yet, internet down…): it retries every 30 minutes at most.
+    // After a few failures the PC copy is offered so the clip can be watched.
+    job.next_try = now + Math.min(60_000 * 2 ** (job.attempts - 1), 30 * 60_000);
+    if (job.attempts >= 3 && !job.pc_path) { job.pc_path = job.file; ctx.state.st.files[job.id] = job.file; ctx.state.mark(job); }
+    else if (changed) ctx.state.mark(job);
+  } else if (job.attempts >= MAX_ATTEMPTS) {
     job.status = 'failed';
-    // Keep whatever was cut on this PC so it can still be found and deleted.
-    if (job.file && fs.existsSync(job.file)) { job.pc_path = job.file; ctx.state.st.files[job.id] = job.file; }
+    if (cut) { job.pc_path = job.file; ctx.state.st.files[job.id] = job.file; }
+    ctx.state.mark(job);
   } else {
     job.next_try = now + Math.min(60_000 * 2 ** (job.attempts - 1), 30 * 60_000);
+    if (changed) ctx.state.mark(job);
   }
-  ctx.state.mark(job);
-  log(`clip ${job.awb}: ${job.error} (try ${job.attempts}/${MAX_ATTEMPTS})`);
+  log(`clip ${job.awb}: ${error} (try ${job.attempts})`);
 }
 
 /** Do the next step for `job` if it is due. Returns true when it did something. */
@@ -89,26 +100,4 @@ export async function step(ctx, job, now) {
     return true;
   }
   return false;
-}
-
-/** Delete every copy of one clip. Throws with a readable reason on failure. */
-export async function removeClip(ctx, d) {
-  const { cfg, state } = ctx;
-  const job = d.scan_id ? state.st.jobs[d.scan_id] : null;
-  const pc = d.pc_path || job?.file || (d.scan_id && state.st.files[d.scan_id]) || null;
-  const dbx = d.dropbox_path || job?.dropbox_path || null;
-  const gd = d.gdrive_file_id || job?.gdrive_file_id || null;
-  if (pc) {
-    if (!inside(path.join(cfg.data_dir, 'clips'), pc)) throw new Error(`Not deleting ${pc}: it is outside the Pack Cam clips folder`);
-    try { fs.unlinkSync(pc); } catch (e) { if (e.code !== 'ENOENT') throw new Error(`PC file: ${e.message}`); }
-  }
-  if (dbx) {
-    const tok = ctx.dropbox();
-    if (!tok?.access_token) throw new Error(tok?.error || 'Waiting for the Dropbox login from the server');
-    await dropboxDelete(tok.access_token, dbx);
-  }
-  if (gd) await ctx.drive.remove(gd);
-  if (d.scan_id) delete state.st.files[d.scan_id];
-  if (job) { Object.assign(job, { status: 'deleted', file: null, pc_path: null, dropbox_path: null, gdrive_file_id: null, gdrive_link: null }); state.mark(job); }
-  state.touch();
 }

@@ -13,6 +13,6 @@ export function makeApi(cfg) {
   }
   return {
     poll: (cursor, status) => call('agent_poll', { cursor, status }),
-    report: (clips, deleted, delete_failed) => call('agent_report', { clips, deleted, delete_failed }),
+    report: clips => call('agent_report', { clips }),
   };
 }

@@ -18,7 +18,10 @@ function CameraCard({ cam, hasPassword, live, onSaved, addToast }: { cam: Camera
   const [clearPw, setClearPw] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
-  useEffect(() => { setF(cam); setPw(''); setClearPw(false); setErr(''); }, [cam]);
+  // Reset this card only when its own saved values change — saving another
+  // camera reloads the list and must not wipe what is typed here.
+  const sig = [cam.id, cam.ip, cam.rtsp_port, cam.rtsp_path, cam.username, cam.is_active].join('|');
+  useEffect(() => { setF(cam); setErr(''); }, [sig]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on the saved values
   const set = (k: keyof CameraConn, v: string | number) => { setF(p => ({ ...p, [k]: v })); setErr(''); };
 
   const save = async (e: React.FormEvent) => {
@@ -32,6 +35,7 @@ function CameraCard({ cam, hasPassword, live, onSaved, addToast }: { cam: Camera
     try {
       await saveCamera({ ...f, ip }, clearPw ? '' : pw ? pw : null);
       addToast(`Camera ${cam.number} saved`, 'success');
+      setPw(''); setClearPw(false);
       onSaved();
     } catch (e2) { setErr(friendlyError(e2)); addToast(friendlyError(e2), 'error'); }
     finally { setSaving(false); }

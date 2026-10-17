@@ -7,6 +7,7 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { pipeline } from 'node:stream';
 import { log } from './util.mjs';
 
 const LOCAL = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
@@ -20,6 +21,10 @@ export function validSig(secret, id, exp, sig) {
   return crypto.timingSafeEqual(want, Buffer.from(sig, 'hex'));
 }
 
+// pipeline() closes the file when the viewer stops or skips (no leaked
+// handles) and keeps a read error from crashing the agent.
+const streamed = e => { if (e && e.code !== 'ERR_STREAM_PREMATURE_CLOSE') log(`clip stream: ${e.message}`); };
+
 function sendFile(req, res, file) {
   let size;
   try { size = fs.statSync(file).size; } catch { res.writeHead(404); return res.end('This video is no longer on the PC'); }
@@ -31,11 +36,11 @@ function sendFile(req, res, file) {
     if (start >= size || start > end) { res.writeHead(416, { 'content-range': `bytes */${size}` }); return res.end(); }
     res.writeHead(206, { ...head, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': end - start + 1 });
     if (req.method === 'HEAD') return res.end();
-    return fs.createReadStream(file, { start, end }).pipe(res);
+    return pipeline(fs.createReadStream(file, { start, end }), res, streamed);
   }
   res.writeHead(200, { ...head, 'content-length': size });
   if (req.method === 'HEAD') return res.end();
-  fs.createReadStream(file).pipe(res);
+  pipeline(fs.createReadStream(file), res, streamed);
 }
 
 function statusPage(st, drive) {
