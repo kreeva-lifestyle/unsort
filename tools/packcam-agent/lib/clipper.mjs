@@ -10,7 +10,6 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { covering, listSegments, cameraDir } from './segments.mjs';
-import { localDate, localTime, safeName } from './util.mjs';
 
 /** The clip window for a scan, given the next scan on its camera (or null). */
 export function windowFor(scanMs, nextMs, s) {
@@ -56,10 +55,10 @@ export async function probe(cfg, file) {
 }
 
 /**
- * Cut the clip for `scan` ({ id, awb, camera, scanned_at }) covering `win`.
+ * Cut the clip for `scan` ({ id, camera }) covering `win` into the file `out`.
  * Returns { file, start, end, duration, size } or { missing: reason }.
  */
-export async function cutClip(cfg, scan, win) {
+export async function cutClip(cfg, scan, win, out) {
   const segs = covering(listSegments(cameraDir(cfg.data_dir, scan.camera)), win.start, win.end);
   if (!segs.length) return { missing: 'No recording for this time — the camera was not recording, or the clip is older than the recording buffer' };
   // Each piece is trimmed on its own timeline (inpoint/outpoint), so a gap in
@@ -81,11 +80,7 @@ export async function cutClip(cfg, scan, win) {
   const realStart = parts[0].a;
   const realEnd = parts[parts.length - 1].b;
 
-  const at = new Date(Date.parse(scan.scanned_at));
-  const dir = path.join(cfg.data_dir, 'clips', localDate(at));
-  fs.mkdirSync(dir, { recursive: true });
-  const name = `${safeName(scan.awb)}_cam${safeName(scan.camera)}_${localTime(at)}.mp4`;
-  const out = path.join(dir, name);
+  fs.mkdirSync(path.dirname(out), { recursive: true });
   const list = path.join(cfg.data_dir, 'tmp', `${scan.id}.txt`);
   fs.writeFileSync(list, parts.map(p => [`file '${p.file.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`,
     p.inpoint != null ? `inpoint ${p.inpoint.toFixed(3)}` : '', p.outpoint != null ? `outpoint ${p.outpoint.toFixed(3)}` : ''].filter(Boolean).join('\n')).join('\n'));

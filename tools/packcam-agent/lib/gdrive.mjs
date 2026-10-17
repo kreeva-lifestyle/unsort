@@ -83,7 +83,10 @@ export function makeDrive(cfg) {
    * own timeout, so a big clip on a slow line still gets through.
    */
   async function upload(localFile, folderName, dateName) {
-    const parent = await folder(dateName, await folder(folderName || 'PackCam', 'root'));
+    // The folder may be a path ("Packing/Videos"); each part is found or made.
+    let base = 'root';
+    for (const part of String(folderName || 'PackCam').split('/').map(x => x.trim()).filter(Boolean)) base = await folder(part, base);
+    const parent = await folder(dateName, base);
     const size = fs.statSync(localFile).size;
     const name = path.basename(localFile);
     const q = `name='${esc(name)}' and '${parent}' in parents and trashed=false`;

@@ -62,6 +62,7 @@ export default function AgentPanel({ agent, isAdmin, addToast }: { agent: Packca
           ))}
           {agent.dropbox && <Row label="Dropbox">{agent.dropbox.ok ? 'Ready' : agent.dropbox.error || 'Waiting'}</Row>}
           {agent.gdrive && <Row label="Google Drive">{agent.gdrive.connected ? 'Connected' : agent.gdrive.configured ? 'Not signed in — open http://localhost:8765 on the PC' : 'Not set up on the PC (see README)'}</Row>}
+          {agent.pc_folder && <Row label="Clips folder on PC">{agent.pc_folder}</Row>}
           {agent.lan_url && <Row label="Office address">{agent.lan_url}</Row>}
           {agent.last_error && <div style={{ marginTop: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: T.re }}>{agent.last_error}</div>}
         </>}

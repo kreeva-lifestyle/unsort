@@ -20,6 +20,7 @@ export const fail = (status: number, error: string, req: Request) => json({ ok: 
 export const DEFAULT_SETTINGS = {
   enabled: false,
   targets: { pc: true, dropbox: false, gdrive: false },
+  pc_folder: '',
   dropbox_folder: '/PackCam',
   gdrive_folder_name: 'PackCam',
   max_clip_seconds: 600,
