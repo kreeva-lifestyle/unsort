@@ -83,8 +83,13 @@ nothing to set up on the PC.
   corrects the PC clock against the server, but a camera's on-screen time
   should match too.
 * H.264 on the camera is best: clips are a plain copy and cost the PC nothing.
-  H.265 works too, but every clip is converted to H.264 on the PC (CPU time,
-  roughly a few seconds per minute of video).
+  H.265 works too, but every clip is converted to H.264 on the PC. That costs
+  CPU: on a 4-core PC about half a minute per minute of 4 MP video (1080p about
+  half that). With several 4 MP H.265 cameras scanning all day an ordinary office
+  PC can fall behind, so switch the cameras' main stream to H.264 if you can.
+* A clip starts on the camera's keyframe just before the scan (a stream copy
+  cannot start between keyframes), so the pre-roll can be up to one keyframe
+  interval longer than set. Keep the camera's I-frame interval at 1–2 s.
 
 ## Updating
 
@@ -92,7 +97,12 @@ DailyOffice → Settings → Pack Cam → Status & setup says when the PC runs a
 version than the one in the app. Download **PC update (zip)** (everything except
 `config.json`), Extract All into `C:\PackCam`, choose *Replace the files in the
 destination*, then close the Pack Cam window and run `start.bat` again (or restart
-the PC). The key and settings in `config.json` stay as they are.
+the PC). The key and settings in `config.json` stay as they are. Clips cut before
+the update are not changed (an H.265 clip from 1.0.0 stays H.265; VLC plays it).
+
+Only one Pack Cam runs per PC: a second `start.bat` (for example while the one
+started at sign-in is running) says so and stops. `start.bat` never needs
+administrator; only `install-startup.bat` does, once.
 
 ## Files
 

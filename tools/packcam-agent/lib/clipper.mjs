@@ -52,6 +52,24 @@ async function startOf(cfg, file) {
   } catch { return 0; }
 }
 
+/**
+ * The last keyframe at or before `t` (a timestamp inside the piece), or null.
+ * A stream copy can only start on a keyframe: starting between two would drop
+ * the picture until the next one while the sound plays on.
+ */
+async function keyframeAtOrBefore(cfg, file, t) {
+  try {
+    const out = await run(cfg.ffprobe, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'packet=pts_time,flags', '-of', 'csv=p=0', file], 60_000);
+    let best = null;
+    for (const line of out.split('\n')) {
+      const [pts, flags] = line.trim().split(',');
+      const v = Number(pts);
+      if (flags?.includes('K') && Number.isFinite(v) && v <= t + 0.0005 && (best == null || v > best)) best = v;
+    }
+    return best;
+  } catch { return null; }
+}
+
 export async function probe(cfg, file) {
   const out = await run(cfg.ffprobe, ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type,codec_name', '-of', 'json', file], 30_000);
   const d = JSON.parse(out);
@@ -71,14 +89,20 @@ export async function cutClip(cfg, scan, win, out) {
   // concat demuxer reads inpoint/outpoint as timestamps inside the piece, and
   // MPEG-TS pieces do not start at 0 (the muxer adds ~1.4 s), so each piece's
   // own start time is added. The first and last pieces are only trimmed where
-  // the window cuts them; whole pieces in between are taken as they are.
+  // the window cuts them; whole pieces in between are taken as they are. The
+  // start moves back to the keyframe before it (at most one keyframe gap of
+  // extra pre-roll), so picture and sound start together.
   const parts = [];
   for (const sg of segs) {
-    const a = Math.max(win.start, sg.start); const b = Math.min(win.end, sg.end);
+    let a = Math.max(win.start, sg.start); const b = Math.min(win.end, sg.end);
     if (b - a < 200) continue;
     const t0 = await startOf(cfg, sg.file);
-    parts.push({ file: sg.file, a, b,
-      inpoint: a > sg.start ? t0 + (a - sg.start) / 1000 : null,
+    let inpoint = a > sg.start ? t0 + (a - sg.start) / 1000 : null;
+    if (inpoint != null) {
+      const k = await keyframeAtOrBefore(cfg, sg.file, inpoint);
+      if (k != null) { a = Math.max(sg.start, sg.start + (k - t0) * 1000); inpoint = k > t0 + 0.0005 ? k : null; }
+    }
+    parts.push({ file: sg.file, a, b, inpoint,
       outpoint: b < sg.end ? t0 + (b - sg.start) / 1000 : null });
   }
   if (!parts.length) return { missing: 'Less than a second of recording covers this scan' };
@@ -88,29 +112,30 @@ export async function cutClip(cfg, scan, win, out) {
   fs.mkdirSync(path.dirname(out), { recursive: true });
   const list = path.join(cfg.data_dir, 'tmp', `${scan.id}.txt`);
   fs.writeFileSync(list, parts.map(p => [`file '${p.file.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`,
-    p.inpoint != null ? `inpoint ${p.inpoint.toFixed(3)}` : '', p.outpoint != null ? `outpoint ${p.outpoint.toFixed(3)}` : ''].filter(Boolean).join('\n')).join('\n'));
-  const info = await probe(cfg, parts[0].file).catch(() => ({ vcodec: null }));
-  const convert = !!info.vcodec && info.vcodec !== 'h264';
+    // Rounded down so the keyframe the inpoint sits on is never skipped.
+    p.inpoint != null ? `inpoint ${(Math.floor(p.inpoint * 1000) / 1000).toFixed(3)}` : '', p.outpoint != null ? `outpoint ${p.outpoint.toFixed(3)}` : ''].filter(Boolean).join('\n')).join('\n'));
   const tmpOut = out + '.part.mp4';
   const tmpCopy = out + '.copy.mp4';
   try {
     await run(cfg.ffmpeg, ['-nostdin', '-hide_banner', '-loglevel', 'error', '-y',
       '-f', 'concat', '-safe', '0', '-i', list,
-      '-map', '0:v:0', '-map', '0:a?', '-c:v', 'copy', ...(info.vcodec === 'hevc' ? ['-tag:v', 'hvc1'] : []),
-      '-c:a', 'copy', '-movflags', '+faststart', convert ? tmpCopy : tmpOut], 15 * 60_000);
-    // Converted from the finished cut, not from the pieces: the cut's edit
-    // list already hides the frames before the scan, and decoding honours it,
-    // so the converted clip starts on the same frame.
-    if (convert) {
+      '-map', '0:v:0', '-map', '0:a?', '-c:v', 'copy', '-c:a', 'copy', '-movflags', '+faststart', tmpCopy], 15 * 60_000);
+    // The codec is read from the cut itself; if that fails the cut fails and
+    // is retried, rather than an H.265 clip being saved unplayable.
+    const cut = await probe(cfg, tmpCopy);
+    if (cut.vcodec === 'h264') fs.renameSync(tmpCopy, out);
+    else {
+      // Frame timing passed through as cut; given 6× the clip's length (a
+      // slow PC) and at least 10 minutes before it counts as stuck.
       await run(cfg.ffmpeg, ['-nostdin', '-hide_banner', '-loglevel', 'error', '-y', '-i', tmpCopy,
         '-map', '0:v:0', '-map', '0:a?', '-fps_mode', 'passthrough', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
-        '-c:a', 'copy', '-movflags', '+faststart', tmpOut], 60 * 60_000, true);
+        '-c:a', 'copy', '-movflags', '+faststart', tmpOut], Math.max(10 * 60_000, cut.duration * 6000), true);
+      fs.renameSync(tmpOut, out);
     }
-    fs.renameSync(tmpOut, out);
   } finally {
     try { fs.unlinkSync(list); } catch { /* gone */ }
     try { fs.unlinkSync(tmpOut); } catch { /* renamed or never made */ }
-    try { fs.unlinkSync(tmpCopy); } catch { /* not converted */ }
+    try { fs.unlinkSync(tmpCopy); } catch { /* renamed or converted */ }
   }
   const meta = await probe(cfg, out).catch(() => ({ duration: (realEnd - realStart) / 1000 }));
   return { file: out, start: new Date(realStart).toISOString(), end: new Date(realEnd).toISOString(), duration: Math.round((meta.duration || 0) * 10) / 10, size: fs.statSync(out).size };

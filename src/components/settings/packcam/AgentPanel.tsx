@@ -71,7 +71,7 @@ export default function AgentPanel({ agent, recording, isAdmin, addToast }: { ag
         {agent.version && older(agent.version, __PACKCAM_AGENT_VERSION__) && (
           <div style={{ margin: '8px 0', background: T.ac3, border: `1px solid ${T.ac44}`, borderRadius: 6, padding: '8px 10px', fontSize: 12, color: T.tx2, lineHeight: 1.5 }}>
             <div style={{ fontWeight: 600, color: T.ac2, marginBottom: 4 }}>Update the PC program: this PC runs {agent.version}, version {__PACKCAM_AGENT_VERSION__} is ready</div>
-            On the office PC press <a href={UPDATE_URL} download="PackCam-PC-Update.zip" style={{ color: T.ac2, fontWeight: 600 }}>PC update (zip)</a>, right-click the downloaded file → Extract All → type C:\PackCam → Extract → "Replace the files in the destination". Then close the black Pack Cam window and double-click start.bat in C:\PackCam\agent (or restart the PC). The agent key and settings stay as they are.
+            On the office PC press <a href={UPDATE_URL} download="PackCam-PC-Update.zip" className="touch44" style={{ color: T.ac2, fontWeight: 600 }}>PC update (zip)</a>, right-click the downloaded file → Extract All → type C:\PackCam → Extract → "Replace the files in the destination". Then close the black Pack Cam window and double-click start.bat in C:\PackCam\agent (or restart the PC). The agent key and settings stay as they are; videos already saved are not changed.
           </div>
         )}
         {unwatched.map(u => (

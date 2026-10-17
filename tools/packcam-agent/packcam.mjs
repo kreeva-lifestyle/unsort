@@ -156,11 +156,23 @@ process.on('unhandledRejection', e => log(`unexpected: ${e?.message || e}`));
 process.on('SIGTERM', shutdown);
 
 log(`Pack Cam agent ${VERSION} · data ${cfg.data_dir} · ${lanUrl}`);
-startServer(cfg, {
+const web = startServer(cfg, {
   secret: () => playSecret,
   clipFile: id => state.st.files[id] || null,
   status: () => ({ ...status(), server_ok: serverOk }),
   drive,
+});
+// One Pack Cam per PC: a second copy (start.bat opened while it already runs
+// at sign-in) would record every camera twice into the same folders and cut
+// the same clips. Its port is taken, so it stops before recording anything;
+// exit code 3 tells start.bat not to restart it.
+await new Promise(resolve => {
+  web.once('listening', resolve);
+  web.once('error', e => {
+    if (e.code !== 'EADDRINUSE') return resolve();
+    log(`Pack Cam is already running on this PC (port ${cfg.port} is in use) — this copy is stopping.`);
+    process.exit(3);
+  });
 });
 checkInLoop();
 workLoop();

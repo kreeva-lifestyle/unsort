@@ -1,5 +1,5 @@
 // One ffmpeg per camera: RTSP over TCP → one-minute MPEG-TS pieces. The
-// video is a stream copy (the camera's own quality, never re-encoded); only
+// video is a stream copy (the recording is never re-encoded; clips from an H.265 camera are converted when cut, see clipper.mjs); only
 // the audio becomes AAC, because the cameras' G.711 audio cannot go into
 // MPEG-TS or MP4 (cheap — a few % of one CPU core). MPEG-TS survives a
 // crash or power cut mid-file. ffmpeg is restarted when it exits (camera
