@@ -29,10 +29,10 @@ const drive = makeDrive(cfg);
 const lanUrl = cfg.lan_url || `http://${lanAddress()}:${cfg.port}`;
 
 let settings = null; let dropbox = null; let playSecret = null; let offset = 0;
-let serverOk = false; let lastError = ''; let bufferBytes = 0; let wasRecording = false;
+let serverOk = false; let lastError = ''; let bufferBytes = 0; let wasRecording = false; let folderWarning = '';
 const recorders = new Map();          // camera number → Recorder
 
-const ctx = { cfg, state, drive, settings: () => settings, dropbox: () => dropbox, offset: () => offset };
+const ctx = { cfg, state, drive, settings: () => settings, dropbox: () => dropbox, offset: () => offset, setFolderWarning: w => { folderWarning = w; } };
 
 function syncRecorders(cameras) {
   const want = new Map(cameras.map(c => [c.number, c]));
@@ -51,7 +51,9 @@ function status() {
     queue: { waiting: jobs.filter(j => j.status === 'queued' || j.status === 'uploading').length, failed: jobs.filter(j => j.status === 'failed').length },
     dropbox: settings?.targets?.dropbox ? (dropbox?.error ? { ok: false, error: dropbox.error } : { ok: !!dropbox?.access_token }) : null,
     gdrive: settings?.targets?.gdrive ? drive.status() : null,
-    last_error: lastError || null,
+    // Where clips really go: the fallback while the chosen folder cannot be used.
+    pc_folder: (!folderWarning && (settings?.pc_folder || '').trim()) || path.join(cfg.data_dir, 'clips'),
+    last_error: [lastError, folderWarning].filter(Boolean).join(' · ') || null,
   };
 }
 

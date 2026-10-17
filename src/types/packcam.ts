@@ -31,6 +31,8 @@ export interface PackcamClip {
 export interface PackcamSettings {
   enabled: boolean;
   targets: { pc: boolean; dropbox: boolean; gdrive: boolean };
+  /** Folder on the office PC ('' = the agent's own clips folder). */
+  pc_folder: string;
   dropbox_folder: string;
   gdrive_folder_name: string;
   max_clip_seconds: number;
@@ -42,6 +44,7 @@ export interface PackcamSettings {
 export const PACKCAM_DEFAULTS: PackcamSettings = {
   enabled: false,
   targets: { pc: true, dropbox: false, gdrive: false },
+  pc_folder: '',
   dropbox_folder: '/PackCam',
   gdrive_folder_name: 'PackCam',
   max_clip_seconds: 600,
@@ -57,6 +60,8 @@ export interface PackcamAgentStatus {
   host?: string;
   os?: string;
   lan_url?: string;
+  /** The PC folder clips are actually saved in right now. */
+  pc_folder?: string;
   enabled?: boolean;
   disk?: { free_gb: number | null; total_gb: number | null };
   buffer_gb?: number;

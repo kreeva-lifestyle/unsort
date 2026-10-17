@@ -7,7 +7,7 @@ import path from 'node:path';
 import { cutClip, readyToCut, windowFor } from './clipper.mjs';
 import { cameraDir, listSegments } from './segments.mjs';
 import { dropboxUpload } from './dropbox.mjs';
-import { localDate, log } from './util.mjs';
+import { localDate, localTime, log, safeName } from './util.mjs';
 
 const MAX_ATTEMPTS = 8;
 const clean = folder => '/' + String(folder || '/PackCam').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
@@ -37,6 +37,37 @@ function failed(ctx, job, e, now) {
   log(`clip ${job.awb}: ${error} (try ${job.attempts})`);
 }
 
+/**
+ * The PC folder for clips: the one set in Settings → Pack Cam, or the agent's
+ * own clips folder. A folder that cannot be used (drive missing, no write
+ * access) falls back to the agent's own and says so on the status page.
+ */
+function clipsRoot(ctx, s) {
+  const fallback = path.join(ctx.cfg.data_dir, 'clips');
+  const want = String(s.pc_folder || '').trim();
+  ctx.setFolderWarning('');
+  if (!want) return fallback;
+  try { fs.mkdirSync(want, { recursive: true }); fs.accessSync(want, fs.constants.W_OK); return path.resolve(want); }
+  catch (e) { ctx.setFolderWarning(`PC folder "${want}" cannot be used (${e.code || e.message}) — saving to ${fallback}`); return fallback; }
+}
+
+/**
+ * <PC folder>/<date>/<tracking ID>.mp4. The same tracking ID twice on one day
+ * (scanned on two courier sheets, or rescanned after an undo) gets the scan
+ * time added — a clip never replaces another.
+ */
+function clipFile(ctx, s, job) {
+  const at = new Date(Date.parse(job.scanned_at));
+  const day = localDate(at);
+  const base = safeName(job.awb);
+  const dir = path.join(clipsRoot(ctx, s), day);
+  const taken = fs.existsSync(path.join(dir, `${base}.mp4`))
+    || Object.values(ctx.state.st.jobs).some(j => j.id !== job.id && j.name === `${base}.mp4` && j.day === day);
+  job.day = day;
+  job.name = taken ? `${base}_${localTime(at)}.mp4` : `${base}.mp4`;
+  return path.join(dir, job.name);
+}
+
 /** Do the next step for `job` if it is due. Returns true when it did something. */
 export async function step(ctx, job, now) {
   if (job.next_try > now) return false;
@@ -51,7 +82,8 @@ export async function step(ctx, job, now) {
       const nextMs = next == null ? null : next - ctx.offset();
       const win = windowFor(scanMs, nextMs, s);
       if (!readyToCut(win, nextMs != null, listSegments(cameraDir(cfg.data_dir, job.camera)), now)) return false;
-      const r = await cutClip(cfg, { id: job.id, awb: job.awb, camera: job.camera, scanned_at: job.scanned_at }, win);
+      const out = clipFile(ctx, s, job);
+      const r = await cutClip(cfg, { id: job.id, camera: job.camera }, win, out);
       if (r.missing) {
         Object.assign(job, { status: 'missing', error: r.missing });
         state.mark(job);

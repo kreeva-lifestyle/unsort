@@ -12,11 +12,14 @@ const card: React.CSSProperties = { background: 'rgba(255,255,255,0.02)', border
 const head: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: T.tx, fontFamily: T.sora, marginBottom: 4 };
 const note: React.CSSProperties = { fontSize: 11, color: T.tx3, lineHeight: 1.5 };
 
-const TARGETS: { k: keyof PackcamSettings['targets']; label: string; hint: string }[] = [
-  { k: 'pc', label: 'Office PC', hint: 'Kept on the PC disk. Plays on the office Wi-Fi.' },
-  { k: 'dropbox', label: 'Dropbox', hint: 'Uses the Dropbox account connected in Minis → Dropbox. Plays anywhere.' },
-  { k: 'gdrive', label: 'Google Drive', hint: 'Needs a one-time Google sign-in on the PC (see the agent README).' },
+type FolderKey = 'pc_folder' | 'dropbox_folder' | 'gdrive_folder_name';
+const TARGETS: { k: keyof PackcamSettings['targets']; label: string; hint: string; folder: FolderKey; folderLabel: string; placeholder: string }[] = [
+  { k: 'pc', label: 'Office PC', hint: 'Kept on the PC disk. Plays on the office Wi-Fi.', folder: 'pc_folder', folderLabel: 'Folder on the PC', placeholder: 'D:\\Packing Videos  (blank = C:\\PackCam\\clips)' },
+  { k: 'dropbox', label: 'Dropbox', hint: 'Uses the Dropbox account connected in Minis → Dropbox. Plays anywhere.', folder: 'dropbox_folder', folderLabel: 'Dropbox folder', placeholder: '/PackCam' },
+  { k: 'gdrive', label: 'Google Drive', hint: 'Needs a one-time Google sign-in on the PC (see the agent README).', folder: 'gdrive_folder_name', folderLabel: 'Google Drive folder', placeholder: 'PackCam  (or Packing/Videos)' },
 ];
+// A Windows folder (D:\x, \\server\share\x) or an absolute path; no characters Windows refuses.
+const PC_FOLDER = /^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+|\/)[^:*?"<>|]*$/;
 const NUMS: { k: 'max_clip_seconds' | 'pre_roll_seconds' | 'post_roll_seconds' | 'buffer_hours'; label: string; min: number; max: number; unit: string }[] = [
   { k: 'max_clip_seconds', label: 'Longest clip', min: 30, max: 3600, unit: 'seconds' },
   { k: 'pre_roll_seconds', label: 'Start before scan', min: 0, max: 60, unit: 'seconds' },
@@ -47,9 +50,11 @@ export default function StoragePanel({ settings, onSaved, addToast }: { settings
       const v = f[n.k];
       if (!Number.isInteger(v) || v < n.min || v > n.max) { setErr(`${n.label}: enter a whole number from ${n.min} to ${n.max}`); return; }
     }
-    if (f.targets.dropbox && !/^\/[^\\:*?"<>|]*$/.test(f.dropbox_folder.trim())) { setErr('Dropbox folder must start with /, e.g. /PackCam'); return; }
-    if (f.targets.gdrive && !f.gdrive_folder_name.trim()) { setErr('Enter a Google Drive folder name'); return; }
-    const clean = { ...f, dropbox_folder: f.dropbox_folder.trim().replace(/\/+$/, '') || '/PackCam', gdrive_folder_name: f.gdrive_folder_name.trim() };
+    const pcFolder = (f.pc_folder || '').trim().replace(/[\\/]+$/, (m, i) => (i <= 2 ? m : ''));
+    if (pcFolder && !PC_FOLDER.test(pcFolder)) { setErr('PC folder: a full folder path like D:\\Packing Videos, or leave it blank'); return; }
+    if (!/^\/[^\\:*?"<>|]*$/.test(f.dropbox_folder.trim())) { setErr('Dropbox folder must start with /, e.g. /PackCam'); return; }
+    if (!f.gdrive_folder_name.trim() || /[\\]/.test(f.gdrive_folder_name)) { setErr('Google Drive folder: a name like PackCam, or Packing/Videos for a folder inside another'); return; }
+    const clean = { ...f, pc_folder: pcFolder, dropbox_folder: f.dropbox_folder.trim().replace(/\/+$/, '') || '/PackCam', gdrive_folder_name: f.gdrive_folder_name.trim().replace(/^\/+|\/+$/g, '') };
     setSaving(true); setErr('');
     try { await saveSettings(clean); setF(clean); synced.current = JSON.stringify(clean); onSaved(clean); addToast('Pack Cam settings saved', 'success'); }
     catch (e2) { setErr(friendlyError(e2)); addToast(friendlyError(e2), 'error'); }
@@ -66,14 +71,18 @@ export default function StoragePanel({ settings, onSaved, addToast }: { settings
       <div style={card}>
         <div style={{ ...head, marginBottom: 10 }}>Save videos to</div>
         {TARGETS.map(t => (
-          <label key={t.k} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 0', minHeight: 44, cursor: 'pointer', borderBottom: `1px solid ${T.bd}` }}>
-            <input type="checkbox" checked={f.targets[t.k]} onChange={() => { setF(p => ({ ...p, targets: { ...p.targets, [t.k]: !p.targets[t.k] } })); setErr(''); }} style={{ width: 18, height: 18, marginTop: 1, accentColor: T.ac }} />
-            <span><span style={{ fontSize: 13, color: T.tx, fontWeight: 500 }}>{t.label}</span><span style={{ display: 'block', ...note }}>{t.hint}</span></span>
-          </label>
+          <div key={t.k} style={{ padding: '8px 0 12px', borderBottom: `1px solid ${T.bd}` }}>
+            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', minHeight: 44, cursor: 'pointer' }}>
+              <input type="checkbox" checked={f.targets[t.k]} onChange={() => { setF(p => ({ ...p, targets: { ...p.targets, [t.k]: !p.targets[t.k] } })); setErr(''); }} style={{ width: 18, height: 18, marginTop: 1, accentColor: T.ac }} />
+              <span><span style={{ fontSize: 13, color: T.tx, fontWeight: 500 }}>{t.label}</span><span style={{ display: 'block', ...note }}>{t.hint}</span></span>
+            </label>
+            <div style={{ paddingLeft: 28, opacity: f.targets[t.k] ? 1 : 0.55 }}>
+              <label style={S.fLabel}>{t.folderLabel}</label>
+              <input value={f[t.folder] || ''} onChange={e => { const v = e.target.value; setF(p => ({ ...p, [t.folder]: v })); setErr(''); }} placeholder={t.placeholder} spellCheck={false} style={{ ...S.fInput, fontFamily: T.mono }} aria-label={t.folderLabel} />
+            </div>
+          </div>
         ))}
-        {f.targets.dropbox && <div style={{ marginTop: 10 }}><label style={S.fLabel}>Dropbox folder</label><input value={f.dropbox_folder} onChange={e => setF(p => ({ ...p, dropbox_folder: e.target.value }))} style={{ ...S.fInput, fontFamily: T.mono }} /></div>}
-        {f.targets.gdrive && <div style={{ marginTop: 10 }}><label style={S.fLabel}>Google Drive folder</label><input value={f.gdrive_folder_name} onChange={e => setF(p => ({ ...p, gdrive_folder_name: e.target.value }))} style={S.fInput} /></div>}
-        <div style={{ ...note, marginTop: 10 }}>Videos are copied exactly as the camera records them — no quality is lost. Clips go into one folder per day.</div>
+        <div style={{ ...note, marginTop: 10 }}>Each video is named by the tracking ID scanned, e.g. SF4156451997AJI.mp4, in one folder per day (2026-10-17). The same tracking ID twice on one day gets the scan time added (SF4156451997AJI_143005.mp4). Videos are copied exactly as the camera records them — no quality is lost.</div>
       </div>
 
       <div style={card}>

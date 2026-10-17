@@ -6,7 +6,7 @@ per PackStation scan: **from the scan to the next scan on the same camera**
 The video is copied exactly as the camera sends it; nothing is re-encoded and
 quality is not lowered. Clips go to the PC, Dropbox and/or Google Drive, whichever
 are switched on in DailyOffice → Settings → Pack Cam. Pack Cam never deletes
-a clip: clear old ones yourself from `clips\` on the PC, the Dropbox folder or the
+a clip: clear old ones yourself from the PC folder, the Dropbox folder or the
 Drive folder (one folder per day makes that easy). A removed clip simply stops
 playing in DailyOffice.
 
@@ -20,7 +20,12 @@ PackStation scan ──▶ packcam function ──▶ agent ──▶ clip cut f
 * Each camera records continuously into one-minute pieces; pieces older
   than the buffer (default 6 hours) are removed.
 * For each scan the agent waits for the next scan on that camera (or the
-  max length), then copies that stretch into `clips/<date>/<AWB>_cam<N>_<time>.mp4`.
+  max length), then copies that stretch into `<folder>/<date>/<tracking ID>.mp4`,
+  e.g. `D:\Packing Videos\2026-10-17\SF4156451997AJI.mp4`. The same tracking ID
+  twice on one day gets the scan time added (`SF4156451997AJI_143005.mp4`).
+* The three folders (PC, Dropbox, Google Drive) are set in Settings → Pack Cam →
+  Storage. A blank PC folder means `clips\` inside `data_dir`; a PC folder that
+  cannot be used (drive missing) falls back to that and says so on the Status tab.
 * Clip status, size and storage places are reported back to DailyOffice.
 * **Play** in DailyOffice opens the Dropbox copy, the Drive copy, or (for
   PC-only clips) a signed one-hour link to this PC that works on the office
@@ -77,7 +82,7 @@ nothing to set up on the PC.
 | Path (under `data_dir`) | What |
 |---|---|
 | `segments/cam<N>/` | rolling recording, pruned automatically |
-| `clips/<date>/` | clips kept on the PC |
+| `clips/<date>/` | clips kept on the PC when no PC folder is set in Settings |
 | `state.json` | progress of every clip (safe to keep across restarts) |
 | `gdrive.json` | the Google Drive sign-in for this PC |
 | `logs/packcam.log` | log, rolls over at 5 MB |

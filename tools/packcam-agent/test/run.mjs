@@ -49,7 +49,7 @@ execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=siz
   piece(t0 + 10_000, 40);       // after a 6 s hole (camera dropped out): brightness 40..238
   fs.writeFileSync(path.join(dir, name(t0 + 30_000)), '');   // a later piece: the window is closed
   const lumAt = (file, frame) => execFileSync('ffmpeg', ['-loglevel', 'error', '-i', file, '-vf', `select=eq(n\\,${frame}),scale=1:1`, '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'])[0];
-  const r = await cutClip({ data_dir: gd, ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' }, { id: 'g1', awb: 'GAP', camera: '9', scanned_at: new Date(t0 + 2000).toISOString() }, { start: t0 + 2000, end: t0 + 12_000 });
+  const r = await cutClip({ data_dir: gd, ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' }, { id: 'g1', camera: '9' }, { start: t0 + 2000, end: t0 + 12_000 }, path.join(gd, 'out', 'GAP.mp4'));
   // 2 s from the first piece (from its 2 s mark) + 2 s from the second (its start); the hole is skipped.
   check(r.file && Math.abs(r.duration - 4) <= 0.5, `gap skipped: clip is ~4 s (${r.duration})`);
   if (r.file) {
@@ -61,9 +61,10 @@ execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=siz
 }
 
 // ---- the stand-in server ----
-const settings = { enabled: true, targets: { pc: true, dropbox: true, gdrive: true }, dropbox_folder: '/PackCam', gdrive_folder_name: 'PackCam', max_clip_seconds: 12, pre_roll_seconds: 1, post_roll_seconds: 1, buffer_hours: 6 };
+const pcFolder = path.join(tmp, 'Packing Videos');   // the PC folder set in Settings → Pack Cam
+const settings = { enabled: true, targets: { pc: true, dropbox: true, gdrive: true }, pc_folder: pcFolder, dropbox_folder: '/Packing/Cam', gdrive_folder_name: 'Packing/Cam', max_clip_seconds: 12, pre_roll_seconds: 1, post_roll_seconds: 1, buffer_hours: 6 };
 const scans = []; const clips = new Map();
-const dbx = new Map(); const drive = new Map(); let lastStatus = null;
+const dbx = new Map(); const drive = new Map(); const driveFolders = []; let lastStatus = null;
 const body = req => new Promise(r => { const b = []; req.on('data', c => b.push(c)); req.on('end', () => r(Buffer.concat(b))); });
 const send = (res, code, obj, headers = {}) => { res.writeHead(code, { 'content-type': 'application/json', ...headers }); res.end(obj == null ? '' : JSON.stringify(obj)); };
 const server = http.createServer(async (req, res) => {
@@ -91,7 +92,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (u.pathname === '/g-token') return send(res, 200, { access_token: 'g-token', expires_in: 3600 });
   if (u.pathname === '/g-api/files' && req.method === 'GET') return send(res, 200, { files: [] });
-  if (u.pathname === '/g-api/files' && req.method === 'POST') return send(res, 200, { id: 'folder-' + crypto.randomUUID().slice(0, 6) });
+  if (u.pathname === '/g-api/files' && req.method === 'POST') { driveFolders.push(JSON.parse(b).name); return send(res, 200, { id: 'folder-' + crypto.randomUUID().slice(0, 6) }); }
   if (u.pathname === '/g-upload/files') return send(res, 200, null, { location: `http://127.0.0.1:${server.address().port}/g-upload/session/${crypto.randomUUID()}` });
   if (u.pathname.startsWith('/g-upload/session/')) { const id = 'gf-' + crypto.randomUUID().slice(0, 8); drive.set(id, b.length); return send(res, 200, { id, webViewLink: `https://drive.example/${id}` }); }
   send(res, 404, { error: 'unknown ' + u.pathname });
@@ -118,7 +119,7 @@ try {
   await sleep(7000);                                          // some recording first
   const scan = (awb) => { const s = { id: crypto.randomUUID(), awb, courier: 'Delhivery', camera: '1', scanned_at: iso(sNow()) }; scans.push(s); return s; };
   const A = scan('AWB-A'); await sleep(6000);
-  const B = scan('AWB-B'); await sleep(5000);
+  const B = scan('AWB-A'); await sleep(5000);                 // the same tracking ID again (another sheet / rescan)
   settings.targets = { pc: false, dropbox: true, gdrive: false };   // C is cut after this: cloud only
   const C = scan('AWB-C');                                    // no next scan: capped at 12 s
   await until(() => [A, B, C].every(s => ['done', 'failed', 'missing'].includes(clips.get(s.id)?.status)), 60_000, 'three clips finished');
@@ -126,6 +127,11 @@ try {
   const a = clips.get(A.id); const b = clips.get(B.id); const c = clips.get(C.id);
   check(a?.status === 'done' && a.pc_path && a.dropbox_path && a.gdrive_file_id, `A saved to PC, Dropbox and Drive (${a?.status} ${a?.error || ''})`);
   check(b?.status === 'done', `B done (${b?.status} ${b?.error || ''})`);
+  const day = new Date(Date.parse(A.scanned_at)); const ymd = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+  check(a?.pc_path === path.join(pcFolder, ymd, 'AWB-A.mp4'), `A named by its tracking ID in the PC folder (${a?.pc_path})`);
+  check(a?.dropbox_path === `/Packing/Cam/${ymd}/AWB-A.mp4`, `A in the Dropbox folder (${a?.dropbox_path})`);
+  check(driveFolders.slice(0, 3).join('/') === `Packing/Cam/${ymd}`, `Drive folders Packing → Cam → date (${driveFolders.join(', ')})`);
+  check(/\/AWB-A_\d{6}\.mp4$/.test(b?.dropbox_path || ''), `same tracking ID again gets the scan time, never overwrites (${b?.dropbox_path})`);
   check(c?.status === 'done' && !c.pc_path && c.dropbox_path && !c.gdrive_file_id, `C saved to Dropbox only (${c?.status} ${c?.error || ''})`);
   // A runs from 1 s before A to 1 s after B: about 8 s.
   check(a && Math.abs(a.duration_s - 8) <= 1.5, `A is ~8 s long (${a?.duration_s})`);
@@ -138,7 +144,7 @@ try {
     check(au?.codec_name === 'aac', `sound converted to AAC (${au?.codec_name})`);
     check(dbx.get(a.dropbox_path) === fs.statSync(a.pc_path).size, 'Dropbox got the whole file');
   }
-  check(fs.readdirSync(path.join(dataDir, 'clips'), { recursive: true }).filter(f => /AWB-C/.test(f)).length === 0, 'C left no copy on the PC');
+  check(fs.readdirSync(pcFolder, { recursive: true }).filter(f => /AWB-C/.test(f)).length === 0, 'C left no copy on the PC');
 
   // Play over the office network: a signed link streams with Range.
   const exp = Math.floor(Date.now() / 1000) + 600;
@@ -156,6 +162,16 @@ try {
   const r4 = await fetch(`http://127.0.0.1:${AGENT_PORT}/clip/${A.id}?exp=${exp}&sig=${sig}`);
   check(r4.status === 404, `clip removed from the PC answers 404 (${r4.status})`);
   check(drive.size === 1, `Drive holds one copy of A, not two (${drive.size})`);
+  // A PC folder that cannot be used (here: a file, not a folder) must not lose clips.
+  const notAFolder = path.join(tmp, 'not-a-folder'); fs.writeFileSync(notAFolder, 'x');
+  Object.assign(settings, { pc_folder: notAFolder, targets: { pc: true, dropbox: false, gdrive: false } });
+  await sleep(1500);
+  const D = scan('AWB-D'); await sleep(3000); scan('AWB-E');
+  await until(() => clips.get(D.id)?.status === 'done', 40_000, 'D finished');
+  const dd = clips.get(D.id);
+  check(dd?.pc_path?.startsWith(path.join(dataDir, 'clips')) && fs.existsSync(dd.pc_path), `unusable PC folder: clip saved to the agent's own folder (${dd?.pc_path})`);
+  await until(() => /cannot be used/.test(lastStatus?.last_error || ''), 10_000, 'folder warning in status');
+  check(/cannot be used/.test(lastStatus?.last_error || '') && lastStatus?.pc_folder === path.join(dataDir, 'clips'), `status says so and shows the folder really used (${lastStatus?.pc_folder})`);
   check(!/p@ss/.test(agentLog), 'camera password never written to the log');
 } finally {
   agent.kill('SIGINT');
