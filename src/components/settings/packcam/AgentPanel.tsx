@@ -20,8 +20,8 @@ const Row = ({ label, children }: { label: string; children: React.ReactNode }) 
 // Short version of the "Pack Cam setup guide" PDF (with pictures) given to the owner.
 const STEPS = [
   'On the office PC install Node.js and ffmpeg (PowerShell: winget install OpenJS.NodeJS.LTS, then winget install Gyan.FFmpeg).',
-  'Unzip the Pack Cam folder (PackCam-PC-Setup.zip) into C:\\PackCam — you get C:\\PackCam\\agent.',
-  'Press "Create agent key" below and paste it into config.json in that folder, between the quotes after "agent_key".',
+  'On the office PC press "PC program (zip)" above, then right-click the downloaded file → Extract All → type C:\\PackCam → Extract. You get C:\\PackCam\\agent.',
+  'Press "Create agent key" above and paste it into config.json in that folder, between the quotes after "agent_key".',
   'In the Cameras tab, enter each camera\'s IP address and password, and Save.',
   'Double-click start.bat and allow it through the firewall. Open http://localhost:8765 on the PC: each camera should say "Recording". Then right-click install-startup.bat → Run as administrator, once.',
   'In the Storage tab choose where videos go (PC / Dropbox / Google Drive and their folders) and turn recording on.',
@@ -81,6 +81,11 @@ export default function AgentPanel({ agent, isAdmin, addToast }: { agent: Packca
 
       <div style={card}>
         <div style={head}>Set up the office PC</div>
+        <div style={{ fontSize: 12, color: T.tx3, marginBottom: 10, lineHeight: 1.5 }}>The setup guide walks through every step with pictures. Download the PC program on the office PC itself.</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+          <a href="/packcam/Pack-Cam-Setup-Guide.pdf" target="_blank" rel="noopener" style={{ ...S.btnPrimary, minHeight: 44, textDecoration: 'none' }}>Setup guide (PDF)</a>
+          <a href="/packcam/PackCam-PC-Setup.zip" download="PackCam-PC-Setup.zip" style={{ ...S.btnGhost, minHeight: 44, textDecoration: 'none' }}>PC program (zip)</a>
+        </div>
         <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {STEPS.map((s, i) => <li key={i} style={{ fontSize: 12, color: T.tx2, lineHeight: 1.5 }}>{s}</li>)}
         </ol>
