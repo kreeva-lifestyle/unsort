@@ -71,12 +71,24 @@ for (const [enc, tag] of [['libx264', 'H.264'], ['libx265', 'H.265']]) {
     check(codec === 'h264', `${tag}: saved as H.264, plays everywhere (${codec})`);
     check(fs.readdirSync(path.join(gd, 'out')).length === 1, `${tag}: no work files left beside the clip`);
   }
-  // The limit covers the whole video: a 1.5 s window whose start moves back to
-  // the keyframe (0.8 s earlier) still gives 1.5 s, the extra taken off the end.
-  const short = await cutClip({ data_dir: gd, ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' }, { id: 'g2', camera: '9' }, { start: t0 + 2000, end: t0 + 3500 }, path.join(gd, 'out', 'SHORT.mp4'));
-  const frames = short.file ? Number(execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0', short.file]).toString().trim()) : 0;
-  check(Math.abs(frames - 38) <= 2, `${tag}: picture never longer than its window (1.5 s = ~38 frames, got ${frames})`);
-  if (short.file) check(Math.abs(lumAt(short.file, 0) - 60) <= 4, `${tag}: and still starts on the keyframe before the scan`);
+  // Keyframes are at 0, 1.2, 2.4 s. `frames` counts a clip's pictures (25 per second).
+  const frames = f => Number(execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0', f]).toString().trim());
+  const cut = (id, w) => cutClip({ data_dir: gd, ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' }, { id, camera: '9' }, w, path.join(gd, 'out', `${id}.mp4`));
+  // A keyframe inside the pre-roll (1.0-1.5 s): start there, nothing added, the end kept.
+  const inPre = await cut('k1', { start: t0 + 1000, end: t0 + 3000, scan: t0 + 1500, limit: 2000 });
+  if (inPre.file) {
+    check(Math.abs(lumAt(inPre.file, 0) - 60) <= 4 && Math.abs(frames(inPre.file) - 45) <= 2, `${tag}: keyframe in the pre-roll: starts there and keeps its end (1.8 s = ~45 frames, got ${frames(inPre.file)})`);
+  } else check(false, `${tag}: keyframe in the pre-roll: no clip`);
+  // No keyframe in the pre-roll and the window is the whole limit: start on the
+  // earlier keyframe (1.2 s) and take the extra off the end, never over the limit.
+  const atLimit = await cut('k2', { start: t0 + 2000, end: t0 + 3500, scan: t0 + 2000, limit: 1500 });
+  if (atLimit.file) check(Math.abs(frames(atLimit.file) - 38) <= 2 && Math.abs(lumAt(atLimit.file, 0) - 60) <= 4, `${tag}: at the limit the picture never runs over it (1.5 s = ~38 frames, got ${frames(atLimit.file)})`);
+  else check(false, `${tag}: at the limit: no clip`);
+  // Under the limit: the earlier start is kept and the end is not cut (the
+  // moment after the next scan stays in the video).
+  const under = await cut('k3', { start: t0 + 2000, end: t0 + 3500, scan: t0 + 2000, limit: 60_000 });
+  if (under.file) { const n = frames(under.file); check(Math.abs(n - 58) <= 2 && Math.abs(lumAt(under.file, n - 1) - 172) <= 6, `${tag}: under the limit the end is kept (2.3 s = ~58 frames to brightness ~172, got ${n}, ${lumAt(under.file, n - 1)})`); }
+  else check(false, `${tag}: under the limit: no clip`);
 }
 
 // ---- the stand-in server ----

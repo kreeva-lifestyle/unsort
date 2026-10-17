@@ -21,12 +21,13 @@ import { covering, listSegments, cameraDir } from './segments.mjs';
  * scan, or stops at the limit, whichever comes first.
  */
 export function windowFor(scanMs, nextMs, s) {
-  const cap = Math.max(10, Number(s.max_clip_seconds) || 600) * 1000;
   const pre = Math.max(0, Number(s.pre_roll_seconds) || 0) * 1000;
   const post = Math.max(0, Number(s.post_roll_seconds) || 0) * 1000;
+  // Never so short that the video could end before (or just after) the scan.
+  const cap = Math.max(10_000 + pre, (Number(s.max_clip_seconds) || 600) * 1000);
   const start = scanMs - pre;
   const end = nextMs != null && nextMs > scanMs ? Math.min(nextMs + post, start + cap) : start + cap;
-  return { start, end, capped: end === start + cap };
+  return { start, end, scan: scanMs, limit: cap, capped: end === start + cap };
 }
 
 /**
@@ -59,20 +60,24 @@ async function startOf(cfg, file) {
 }
 
 /**
- * The last keyframe at or before `t` (a timestamp inside the piece), or null.
- * A stream copy can only start on a keyframe: starting between two would drop
- * the picture until the next one while the sound plays on.
+ * Where a stream copy starting near `t` (a timestamp inside the piece) can
+ * start: it must be a keyframe, or the picture is missing until the next one
+ * while the sound plays on. The first keyframe from `t` up to `latest` (still
+ * inside the pre-roll, so the scan is in the video and nothing is added), else
+ * the last one before `t`. Null if the piece cannot be read.
  */
-async function keyframeAtOrBefore(cfg, file, t) {
+async function keyframeNear(cfg, file, t, latest) {
   try {
     const out = await run(cfg.ffprobe, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'packet=pts_time,flags', '-of', 'csv=p=0', file], 60_000);
-    let best = null;
+    let before = null, after = null;
     for (const line of out.split('\n')) {
       const [pts, flags] = line.trim().split(',');
       const v = Number(pts);
-      if (flags?.includes('K') && Number.isFinite(v) && v <= t + 0.0005 && (best == null || v > best)) best = v;
+      if (!flags?.includes('K') || !Number.isFinite(v)) continue;
+      if (v <= t + 0.0005) { if (before == null || v > before) before = v; }
+      else if (v <= latest && (after == null || v < after)) after = v;
     }
-    return best;
+    return after ?? before;
   } catch { return null; }
 }
 
@@ -96,8 +101,8 @@ export async function cutClip(cfg, scan, win, out) {
   // MPEG-TS pieces do not start at 0 (the muxer adds ~1.4 s), so each piece's
   // own start time is added. The first and last pieces are only trimmed where
   // the window cuts them; whole pieces in between are taken as they are. The
-  // start moves back to the keyframe before it (at most one keyframe gap of
-  // extra pre-roll), so picture and sound start together.
+  // start moves to a keyframe (see keyframeNear), so picture and sound start
+  // together.
   const parts = [];
   for (const sg of segs) {
     let a = Math.max(win.start, sg.start); const b = Math.min(win.end, sg.end);
@@ -105,14 +110,16 @@ export async function cutClip(cfg, scan, win, out) {
     const t0 = await startOf(cfg, sg.file);
     let inpoint = a > sg.start ? t0 + (a - sg.start) / 1000 : null;
     if (inpoint != null) {
-      const k = await keyframeAtOrBefore(cfg, sg.file, inpoint);
+      const latest = t0 + (Math.min(win.scan ?? a, b) - sg.start) / 1000;
+      const k = await keyframeNear(cfg, sg.file, inpoint, latest);
       if (k != null) { a = Math.max(sg.start, sg.start + (k - t0) * 1000); inpoint = k > t0 + 0.0005 ? k : null; }
     }
     parts.push({ file: sg.file, a, b, inpoint, t0, segStart: sg.start, segEnd: sg.end });
   }
-  // Starting on the earlier keyframe must not make the video longer than the
-  // window (the limit is a promise): take the extra off the end instead.
-  let over = parts.reduce((n, p) => n + (p.b - p.a), 0) - (win.end - win.start);
+  // Only when there was no keyframe in the pre-roll and the start moved back
+  // can a video run past the limit: take that extra off the end. A video
+  // under the limit keeps its whole end (the moment after the next scan).
+  let over = win.limit ? parts.reduce((n, p) => n + (p.b - p.a), 0) - win.limit : 0;
   while (over > 0 && parts.length) {
     const last = parts[parts.length - 1];
     const cut = Math.min(over, last.b - last.a);

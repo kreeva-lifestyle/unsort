@@ -50,6 +50,7 @@ export default function StoragePanel({ settings, onSaved, addToast }: { settings
       const v = f[n.k];
       if (!Number.isInteger(v) || v < n.min || v > n.max) { setErr(`${n.label}: enter a whole number from ${n.min} to ${n.max}`); return; }
     }
+    if (f.max_clip_seconds < f.pre_roll_seconds + 10) { setErr('Longest video must be at least 10 seconds more than "Start before scan"'); return; }
     const pcFolder = (f.pc_folder || '').trim().replace(/[\\/]+$/, (m, i) => (i <= 2 ? m : ''));
     if (pcFolder && !PC_FOLDER.test(pcFolder)) { setErr('PC folder: a full folder path like D:\\Packing Videos, or leave it blank'); return; }
     if (!/^\/[^\\:*?"<>|]*$/.test(f.dropbox_folder.trim())) { setErr('Dropbox folder must start with /, e.g. /PackCam'); return; }
