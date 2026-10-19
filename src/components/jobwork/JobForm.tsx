@@ -2,6 +2,7 @@
 // (quick-add included); picking the SKU looks up its costing sheet, whose
 // components become chips — choosing one offers its outside-work rate
 // (JOBWORK ₹523…) and fills the fabric lines with their usage per piece.
+// A new job can be saved as a draft and finished later (jobworkDrafts.ts).
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { T, S } from '../../lib/theme';
@@ -18,39 +19,48 @@ import MaterialRows from './MaterialRows';
 import { JOB_TYPES, QTY_UNITS, today, inr, unitLabel, validQty, type JobDetail } from './jobworkModel';
 import { saveJob, costingFor, type JobDraft, type MaterialDraft, type CostingRef } from './jobworkApi';
 import { componentNames, rateHints, materialHints } from './jobworkCosting';
+import { createFromDraft, startForm, toDraftForm } from './jobworkDrafts';
+import JobFormActions, { useLeaveGuard, type Busy } from './JobFormActions';
+import ConfirmModal from '../ui/ConfirmModal';
+import type { JobworkDraft } from '../../types/database';
 
-const blank = (): JobDraft => ({ vendor_id: null, vendor_name: '', vendor_phone: '', job_type: '', sku: '', component: '', costing_product_id: null, pieces: '', qty_unit: 'pcs', rate: '', job_date: today(), expected_date: '', notes: '' });
-
-export default function JobForm({ edit, onClose, onSaved, addToast }: {
+export default function JobForm({ edit, draft = null, onClose, onSaved, onDrafts, addToast }: {
   edit: JobDetail | null;
+  /** A saved draft to finish (new jobs only). */
+  draft?: JobworkDraft | null;
   onClose: () => void;
   onSaved: (id: string) => void;
+  /** A draft was saved, discarded or turned into a job. */
+  onDrafts?: () => void;
   addToast: (m: string, t?: string) => void;
 }) {
   useModalLock();
-  useBackClose(true, onClose);
   const j = edit?.job;
-  const [d, setD] = useState<JobDraft>(() => j ? {
-    vendor_id: j.vendor_id, vendor_name: j.vendor_name, vendor_phone: j.vendor_phone ?? '', job_type: j.job_type, sku: j.sku,
-    component: j.component ?? '', costing_product_id: j.costing_product_id, pieces: String(j.pieces), qty_unit: j.qty_unit, rate: String(j.rate),
-    job_date: j.job_date, expected_date: j.expected_date ?? '', notes: j.notes ?? '',
-  } : blank());
-  const [mats, setMats] = useState<MaterialDraft[]>(() => (edit?.materials ?? []).filter(m => !m.removed)
-    .map(m => ({ id: m.id, name: m.name, unit: m.unit, per_piece: m.per_piece == null ? '' : String(m.per_piece) })));
+  const [start] = useState(() => startForm(edit, edit ? null : draft));
+  const [d, setD] = useState<JobDraft>(start.d);
+  const [mats, setMats] = useState<MaterialDraft[]>(start.mats);
+  // A draft keeps the job date only once someone picked it (else: the day it is finished).
+  const [dateSet, setDateSet] = useState(!!draft?.form.job_date);
+  const draftForm = () => toDraftForm(dateSet ? d : { ...d, job_date: '' }, mats);
+  const [startKey] = useState(() => JSON.stringify(toDraftForm(start.d, start.mats)));
+  const guard = useLeaveGuard({ dirty: () => JSON.stringify(toDraftForm(d, mats)) !== startKey, keepable: !j, draftId: edit ? null : draft?.id ?? null,
+    form: draftForm, onClose, onDrafts: () => onDrafts?.(), addToast });
+  useBackClose(true, guard.back);
   const locked = useMemo(() => new Set(edit?.entries.flatMap(e => e.jobwork_entry_lines.map(l => l.material_id)) ?? []), [edit]);
   const [costing, setCosting] = useState<CostingRef | null>(null);
   // The photo is asked for only once the SKU is real (picked from the
   // suggestions, or an existing job / costing sheet) — never per keystroke.
-  const [picked, setPicked] = useState(!!edit);
+  const [picked, setPicked] = useState(!!edit || !!draft?.form.sku);
   // …and only after the code has settled: typing DRS177 passes through the
   // real designs DRS1 and DRS17, which must not each cost a Dropbox lookup.
-  const [thumbSku, setThumbSku] = useState(edit ? edit.job.sku : '');
+  const [thumbSku, setThumbSku] = useState(edit ? edit.job.sku : draft?.form.sku ?? '');
   useEffect(() => {
     if (!(picked || costing) || !d.sku.trim()) { setThumbSku(''); return; }
     const t = setTimeout(() => setThumbSku(d.sku.trim()), 800);
     return () => clearTimeout(t);
   }, [picked, costing, d.sku]);
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState<Busy>('');
+  const draftId = edit ? null : draft?.id ?? null;
   const [error, setError] = useState('');
   const patch = (p: Partial<JobDraft>) => { setD(x => ({ ...x, ...p })); setError(''); };
 
@@ -82,7 +92,7 @@ export default function JobForm({ edit, onClose, onSaved, addToast }: {
   };
 
   const submit = async () => {
-    if (saving) return;
+    if (busy) return;
     if (!d.vendor_name.trim()) return setError('Pick the jobworker');
     if (!d.sku.trim()) return setError('Enter the SKU');
     if (!d.job_type.trim()) return setError('Pick the type of job');
@@ -90,9 +100,10 @@ export default function JobForm({ edit, onClose, onSaved, addToast }: {
       return setError(d.qty_unit === 'm' ? 'Meters must be above 0, up to 2 decimals (e.g. 8.80)' : 'Pieces must be a whole number above 0');
     if (d.expected_date && d.expected_date < d.job_date) return setError('Expected back cannot be before the job date');
     const rows = mats.filter(m => m.name.trim());
-    setSaving(true);
-    const { id, error: err } = await saveJob(j?.id ?? null, d, rows);
-    setSaving(false);
+    setBusy('job');
+    const { id, error: err } = draftId ? await createFromDraft(draftId, d, rows, draftForm()) : await saveJob(j?.id ?? null, d, rows);
+    setBusy('');
+    if (draftId) onDrafts?.();
     if (err || !id) { setError(friendlyError(err)); return; }
     addToast(j ? `JW #${j.jw_number} updated` : 'Job created', 'success');
     onSaved(id);
@@ -103,11 +114,11 @@ export default function JobForm({ edit, onClose, onSaved, addToast }: {
     <div style={{ minWidth: 0 }}><label style={S.fLabel}>{label} {req && <span style={{ color: T.re }}>*</span>}</label>{node}</div>
   );
   return createPortal(
-    <div style={S.modalOverlay} onClick={onClose}>
+    <div style={S.modalOverlay} onClick={() => { if (!guard.blockOutside()) onClose(); }}>
       <div className="modal-inner" style={{ ...S.modalBox, width: 560 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHead}>
-          <span style={S.modalTitle}>{j ? `Edit JW #${j.jw_number}` : 'New job'}</span>
-          <button type="button" onClick={onClose} style={S.modalClose} aria-label="Close">&#215;</button>
+          <span style={S.modalTitle}>{j ? `Edit JW #${j.jw_number}` : draftId ? 'Draft job' : 'New job'}</span>
+          <button type="button" onClick={guard.request} style={S.modalClose} aria-label="Close">&#215;</button>
         </div>
         <div style={{ padding: '14px 18px 18px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}
           // Enter saves from the number fields only — in the suggestion boxes
@@ -154,7 +165,7 @@ export default function JobForm({ edit, onClose, onSaved, addToast }: {
             </div>
           )}
           <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {field('Job date', true, <DateInput value={d.job_date} max={today()} onChange={e => patch({ job_date: e.target.value })} style={{ width: '100%' }} />)}
+            {field('Job date', true, <DateInput value={d.job_date} max={today()} onChange={e => { setDateSet(true); patch({ job_date: e.target.value }); }} style={{ width: '100%' }} />)}
             {field('Expected back', false, <DateInput value={d.expected_date} min={d.job_date} onChange={e => patch({ expected_date: e.target.value })} style={{ width: '100%' }} />)}
           </div>
           <div>
@@ -168,12 +179,9 @@ export default function JobForm({ edit, onClose, onSaved, addToast }: {
           {field('Notes', false, <textarea value={d.notes} onChange={e => patch({ notes: e.target.value })} rows={2} placeholder="Design, colour, special instructions…"
             style={{ ...S.fInput, width: '100%', height: 'auto', minHeight: 60, resize: 'vertical', lineHeight: 1.5 }} />)}
           {error && <div style={S.errorBox}>{error}</div>}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button type="button" onClick={onClose} style={{ ...S.btnGhost, minHeight: 44 }}>Cancel</button>
-            <button type="button" onClick={submit} style={{ ...S.btnPrimary, flex: 1, minHeight: 44, pointerEvents: saving ? 'none' : 'auto', opacity: saving ? 0.5 : 1 }}>
-              {saving ? 'Saving…' : j ? 'Save changes' : 'Create job'}
-            </button>
-          </div>
+          <JobFormActions mode={j ? 'edit' : draftId ? 'draft' : 'new'} draftId={draftId} form={draftForm} busy={busy} setBusy={setBusy}
+            setError={setError} onCancel={guard.request} onDrafts={() => { onDrafts?.(); onClose(); }} onSubmit={submit} addToast={addToast} />
+          <ConfirmModal {...guard.modalProps} />
         </div>
       </div>
     </div>,
