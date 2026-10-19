@@ -118,3 +118,21 @@ export type JobworkPaymentInsert = {
   reference?: string | null;
   note?: string | null;
 };
+
+// --- jobwork_drafts (6 cols): a New job form saved half-filled ---
+// Its own table so a draft never counts as a job anywhere; quantities are
+// kept as typed (text). Migration 20261019101535_jobwork_drafts.
+export interface JobworkDraftForm {
+  vendor_id: string | null; vendor_name: string; vendor_phone: string;
+  job_type: string; sku: string; component: string; costing_product_id: string | null;
+  pieces: string; qty_unit: JobworkQtyUnit; rate: string; job_date: string; expected_date: string; notes: string;
+  materials: { name: string; unit: string; per_piece: string }[];
+}
+export interface JobworkDraft {
+  id: string;
+  form: JobworkDraftForm;
+  created_by: string | null;
+  created_at: string;
+  updated_by: string | null;
+  updated_at: string;
+}

@@ -1,7 +1,8 @@
 // Jobwork (sidebar, below Purchase Orders): work sourced outside the company. The list reads the
 // jobwork_order_summary view (totals in SQL, paginated); a job opens as its
 // own page (device Back returns here). New jobs from the header button on
-// desktop and the FAB on the phone.
+// desktop and the FAB on the phone. Drafts (New job forms saved half-filled)
+// have their own tab, shown while there are any.
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { T, S } from '../../lib/theme';
 import { friendlyError } from '../../lib/friendlyError';
@@ -17,6 +18,9 @@ import JobStats from './JobStats';
 import { JobForm, JobDetailView, PendingShareModal, ReceivedByDate, prefetchJobworkParts } from './jobworkLazy';
 import { whenIdle } from '../../lib/idle';
 import { listJobs, tabCounts, tabOf, FILTERS, type JobFilter, type JobTab } from './jobworkApi';
+import JobDrafts from './JobDrafts';
+import { draftCount } from './jobworkDrafts';
+import type { JobworkDraft } from '../../types/database';
 
 export default function Jobwork({ addToast }: { addToast: (m: string, t?: string) => void }) {
   const { profile } = useAuth();
@@ -35,6 +39,13 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   const [byDate, setByDate] = useState(false);
   const [counts, setCounts] = useState<Record<JobTab, number> | null>(null);
   const [creating, setCreating] = useState(false);
+  // Drafts tab, the draft being finished, and a counter bumped after any draft change.
+  const [onDrafts, setOnDrafts] = useState(false);
+  const [draft, setDraft] = useState<JobworkDraft | null>(null);
+  const [draftN, setDraftN] = useState<number | null>(null);
+  const [draftVer, setDraftVer] = useState(0);
+  const draftsChanged = useCallback(() => setDraftVer(v => v + 1), []);
+  useEffect(() => { draftCount().then(setDraftN); }, [draftVer]);
   const [sharing, setSharing] = useState(false);
   // Bumped after every write so the summary tiles follow; a search or a
   // page flip changes nothing, so it leaves the summary alone.
@@ -79,13 +90,14 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
         onVendor={v => { setVendor(v); setSearch(''); setFilter('open'); setPage(0); }} addToast={addToast} />
       {/* Open = running, or closed with money still owed; Completed = settled or cancelled. */}
       <div role="tablist" aria-label="Jobs" style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-        {(['open', 'completed'] as JobTab[]).map(t => {
-          const on = tabOf(filter) === t;
+        {(['open', 'completed', ...(draftN || onDrafts ? ['drafts'] : [])] as (JobTab | 'drafts')[]).map(t => {
+          const on = t === 'drafts' ? onDrafts : !onDrafts && tabOf(filter) === t;
+          const n = t === 'drafts' ? draftN : counts?.[t];
           return (
-            <button key={t} type="button" role="tab" aria-selected={on} onClick={() => { if (!on) { setFilter(t); setPage(0); } }}
+            <button key={t} type="button" role="tab" aria-selected={on} onClick={() => { if (on) return; if (t === 'drafts') { setOnDrafts(true); return; } setOnDrafts(false); setFilter(t); setPage(0); }}
               style={{ ...(on ? S.btnPrimary : S.btnGhost), flex: 1, maxWidth: 220, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              {t === 'open' ? 'Open' : 'Completed'}
-              {counts && <span style={{ fontFamily: T.mono, fontSize: 11, padding: '1px 7px', borderRadius: 999, background: on ? 'rgba(255,255,255,.18)' : T.glass2, color: on ? T.tx : T.tx3 }}>{counts[t]}</span>}
+              {t === 'open' ? 'Open' : t === 'completed' ? 'Completed' : 'Drafts'}
+              {n != null && <span style={{ fontFamily: T.mono, fontSize: 11, padding: '1px 7px', borderRadius: 999, background: on ? 'rgba(255,255,255,.18)' : T.glass2, color: on ? T.tx : T.tx3 }}>{n}</span>}
             </button>
           );
         })}
@@ -96,7 +108,7 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
         <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search SKU, jobworker, job type or JW #" aria-label="Search jobs" style={{ ...S.fSearch, width: '100%' }} />
       </div>
       <div className="jw-filters" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
-        {tabOf(filter) === 'open' && FILTERS.filter(f => boss || f.id !== 'unpaid').map(f => (
+        {!onDrafts && tabOf(filter) === 'open' && FILTERS.filter(f => boss || f.id !== 'unpaid').map(f => (
           <button key={f.id} type="button" onClick={() => { setFilter(f.id); setPage(0); }} aria-pressed={filter === f.id} style={chip(filter === f.id)}>{f.label}</button>
         ))}
         {vendor && (
@@ -108,7 +120,8 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
       </div>
       </div>
 
-      {rows === null ? <div style={{ padding: 40, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading jobs…</div>
+      {onDrafts ? <JobDrafts search={search} version={draftVer} onOpen={setDraft} addToast={addToast} />
+        : rows === null ? <div style={{ padding: 40, textAlign: 'center', fontSize: 12, color: T.tx3 }}>Loading jobs…</div>
         : rows.length === 0 ? (
           search || vendor || filter === 'overdue' || filter === 'unpaid'
             ? <Empty icon="search" title="No jobs match" message="Try another search or filter." />
@@ -121,7 +134,7 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
           {phone && <div className="jw-cards">{shownRows.map(j => <JobCard key={j.id} job={j} showMoney={boss} onOpen={() => setOpenId(j.id)} />)}</div>}
         </>)}
 
-      {count > 0 && (
+      {!onDrafts && count > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
           <button type="button" disabled={page === 0} onClick={() => setPage(p => p - 1)} style={{ ...S.btnGhost, ...S.btnSm, minHeight: 32, opacity: page === 0 ? 0.3 : 1 }}>Prev</button>
           <span style={{ fontSize: 10, color: T.tx3 }}>{page + 1} / {pages}</span>
@@ -136,7 +149,8 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
       <button type="button" className="fab" onClick={() => setCreating(true)} aria-label="New job">+</button>
       <Suspense fallback={null}>
       {sharing && <PendingShareModal boss={boss} onClose={() => setSharing(false)} addToast={addToast} />}
-      {creating && <JobForm edit={null} onClose={() => setCreating(false)} onSaved={id => { setCreating(false); changed(); setOpenId(id); }} addToast={addToast} />}
+      {creating && <JobForm edit={null} onClose={() => setCreating(false)} onSaved={id => { setCreating(false); changed(); setOpenId(id); }} onDrafts={draftsChanged} addToast={addToast} />}
+      {draft && <JobForm key={draft.id} edit={null} draft={draft} onClose={() => setDraft(null)} onSaved={id => { setDraft(null); changed(); setOpenId(id); }} onDrafts={draftsChanged} addToast={addToast} />}
       </Suspense>
     </div>
   );
