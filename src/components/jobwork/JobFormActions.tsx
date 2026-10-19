@@ -9,6 +9,32 @@ import { saveDraft, deleteDraft, hasContent } from './jobworkDrafts';
 
 export type Busy = '' | 'job' | 'draft' | 'discard';
 
+/**
+ * Leaving the form with unsaved typing. × and Cancel ask first; a tap
+ * outside the form is ignored; device Back / Escape (which cannot wait for an
+ * answer) keeps a new job's or a draft's typing as a draft instead.
+ */
+export function useLeaveGuard({ dirty, keepable, draftId, form, onClose, onDrafts, addToast }: {
+  dirty: () => boolean; keepable: boolean; draftId: string | null; form: () => JobworkDraftForm;
+  onClose: () => void; onDrafts: () => void; addToast: (m: string, t?: string) => void;
+}) {
+  const { ask, modalProps } = useConfirm();
+  const request = async () => {
+    if (!dirty() || await ask({ title: 'Leave without saving?', message: keepable ? 'What you typed will be lost. Press "Save as draft" to keep it.' : 'Your changes to this job will be lost.', confirmLabel: 'Leave', cancelLabel: 'Keep editing', danger: true })) onClose();
+  };
+  const back = () => {
+    const f = form();
+    if (keepable && dirty() && hasContent(f)) {
+      saveDraft(draftId, f).then(({ error }) => {
+        if (error) addToast(friendlyError(error), 'error');
+        else { addToast('Your typing was kept as a draft', 'success'); onDrafts(); }
+      });
+    }
+    onClose();
+  };
+  return { request, back, blockOutside: dirty, modalProps };
+}
+
 export default function JobFormActions({ mode, draftId, form, busy, setBusy, setError, onCancel, onDrafts, onSubmit, addToast }: {
   mode: 'new' | 'draft' | 'edit';
   draftId: string | null;
@@ -25,11 +51,14 @@ export default function JobFormActions({ mode, draftId, form, busy, setBusy, set
   const keep = async () => {
     if (busy) return;
     const f = form();
-    if (!hasContent(f)) { setError('Fill in at least the jobworker or the SKU to save a draft'); return; }
+    if (!hasContent(f)) { setError("Type something first — a blank form can't be saved as a draft"); return; }
     setBusy('draft');
-    const { error } = await saveDraft(draftId, f);
+    const { error, recreated } = await saveDraft(draftId, f);
     if (error) return fail(error);
-    setBusy(''); addToast('Draft saved — finish it from the Drafts tab', 'success'); onDrafts();
+    setBusy('');
+    // Someone finished or discarded the draft meanwhile: kept as a new one — say so.
+    addToast(recreated ? 'This draft was finished or discarded by someone else — your typing is saved as a new draft. Check the Open tab before creating it again.' : 'Draft saved — finish it from the Drafts tab', recreated ? 'info' : 'success');
+    onDrafts();
   };
   const discard = async () => {
     if (busy || !draftId) return;

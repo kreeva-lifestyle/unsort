@@ -5,7 +5,7 @@
 import { supabase } from '../../lib/supabase';
 import type { JobworkDraft, JobworkDraftForm } from '../../types/database';
 import { today, type JobDetail } from './jobworkModel';
-import type { JobDraft, MaterialDraft } from './jobworkApi';
+import { saveJob, type JobDraft, type MaterialDraft } from './jobworkApi';
 
 const COLS = 'id, form, created_by, created_at, updated_by, updated_at';
 
@@ -22,26 +22,43 @@ export async function listDrafts(): Promise<{ rows: JobworkDraft[]; names: Recor
   return { rows, names, error };
 }
 
-export async function draftCount(): Promise<number | null> {
+export async function draftCount(): Promise<{ count: number | null; error: unknown }> {
   const { count, error } = await supabase.from('jobwork_drafts').select('id', { count: 'exact', head: true });
-  return error ? null : count ?? 0;
+  return { count: error ? null : count ?? 0, error };
 }
 
 /** Save over the draft `id`, or as a new draft. If someone already finished
  *  or discarded that draft, it is saved as a new one — typing is never lost. */
-export async function saveDraft(id: string | null, form: JobworkDraftForm): Promise<{ id: string | null; error: unknown }> {
+export async function saveDraft(id: string | null, form: JobworkDraftForm): Promise<{ id: string | null; error: unknown; recreated?: boolean }> {
   if (id) {
     const { data, error } = await supabase.from('jobwork_drafts').update({ form }).eq('id', id).select('id').maybeSingle();
     if (error) return { id: null, error };
     if (data) return { id: (data as { id: string }).id, error: null };
   }
   const { data, error } = await supabase.from('jobwork_drafts').insert({ form }).select('id').single();
-  return { id: (data as { id: string } | null)?.id ?? null, error };
+  return { id: (data as { id: string } | null)?.id ?? null, error, recreated: !!id };
 }
 
 export const deleteDraft = (id: string) => supabase.from('jobwork_drafts').delete().eq('id', id);
 
-/** Anything worth keeping typed in? (A blank form is not a draft.) */
+/**
+ * Create the job from draft `id`. The draft is taken first (deleted, and the
+ * delete must find it), so two people finishing the same draft cannot make
+ * two jobs; if the job then cannot be saved, the draft is put back.
+ */
+export async function createFromDraft(id: string, d: JobDraft, rows: MaterialDraft[], form: JobworkDraftForm): Promise<{ id: string | null; error: unknown }> {
+  const taken = await supabase.from('jobwork_drafts').delete().eq('id', id).select('id');
+  if (taken.error) return { id: null, error: taken.error };
+  if (!taken.data?.length) return { id: null, error: new Error('This draft was already finished or discarded by someone else.') };
+  const r = await saveJob(null, d, rows);
+  if (r.error || !r.id) {
+    const back = await supabase.from('jobwork_drafts').insert({ id, form });
+    if (back.error) return { id: null, error: new Error('Job not saved and the draft not put back — press Save as draft.') };
+  }
+  return r;
+}
+
+/** Anything worth keeping typed in? (A blank form — today's date aside — is not a draft.) */
 export const hasContent = (f: JobworkDraftForm) =>
   !!(f.vendor_name.trim() || f.sku.trim() || f.job_type.trim() || f.component.trim() || f.pieces.trim() || f.rate.trim() || f.notes.trim() || f.materials.some(m => m.name.trim()));
 
@@ -57,8 +74,9 @@ export function startForm(edit: JobDetail | null, draft: JobworkDraft | null): {
   const blank: JobDraft = { vendor_id: null, vendor_name: '', vendor_phone: '', job_type: '', sku: '', component: '', costing_product_id: null, pieces: '', qty_unit: 'pcs', rate: '', job_date: today(), expected_date: '', notes: '' };
   if (!draft) return { d: blank, mats: [] };
   const { materials, ...f } = draft.form;
-  // Filled over the blank form, so a draft saved by an older version still opens.
-  return { d: { ...blank, ...f }, mats: (materials ?? []).map(m => ({ name: m.name, unit: m.unit, per_piece: m.per_piece })) };
+  // Filled over the blank form, so a draft saved by an older version still
+  // opens. A job date never picked is saved blank and becomes today again.
+  return { d: { ...blank, ...f, job_date: f.job_date || blank.job_date }, mats: (materials ?? []).map(m => ({ name: m.name, unit: m.unit, per_piece: m.per_piece })) };
 }
 
 /** What a draft keeps: the form as typed, materials without their ids. */

@@ -17,6 +17,7 @@ import JobTable from './JobTable';
 import JobStats from './JobStats';
 import { JobForm, JobDetailView, PendingShareModal, ReceivedByDate, prefetchJobworkParts } from './jobworkLazy';
 import { whenIdle } from '../../lib/idle';
+import { logSwallowed } from '../../lib/errorLogger';
 import { listJobs, tabCounts, tabOf, FILTERS, type JobFilter, type JobTab } from './jobworkApi';
 import JobDrafts from './JobDrafts';
 import { draftCount } from './jobworkDrafts';
@@ -42,10 +43,14 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
   // Drafts tab, the draft being finished, and a counter bumped after any draft change.
   const [onDrafts, setOnDrafts] = useState(false);
   const [draft, setDraft] = useState<JobworkDraft | null>(null);
-  const [draftN, setDraftN] = useState<number | null>(null);
+  // undefined = not counted yet, null = the count failed (tab shown without a number).
+  const [draftN, setDraftN] = useState<number | null | undefined>(undefined);
   const [draftVer, setDraftVer] = useState(0);
   const draftsChanged = useCallback(() => setDraftVer(v => v + 1), []);
-  useEffect(() => { draftCount().then(setDraftN); }, [draftVer]);
+  // Also refreshed with the list, so a teammate's new draft shows up; a failed
+  // count keeps the tab (without a number) so drafts stay reachable.
+  const countDrafts = useCallback(() => draftCount().then(r => { if (r.error) logSwallowed('jobwork draft count', r.error); setDraftN(r.count); }), []);
+  useEffect(() => { countDrafts(); }, [draftVer, countDrafts]);
   const [sharing, setSharing] = useState(false);
   // Bumped after every write so the summary tiles follow; a search or a
   // page flip changes nothing, so it leaves the summary alone.
@@ -60,7 +65,8 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
     // Tab counts are a hint: a failure leaves them blank (the list already toasts its own errors).
     const c = await tabCounts({ search, vendor });
     setCounts(c.counts);
-  }, [search, filter, page, perPage, vendor, addToast]);
+    countDrafts();
+  }, [search, filter, page, perPage, vendor, addToast, countDrafts]);
   useEffect(() => { const t = setTimeout(load, search ? 300 : 0); return () => clearTimeout(t); }, [load, search]);
   const changed = useCallback(() => { load(); setVersion(v => v + 1); }, [load]);
   // The list first; the job page's and forms' code once it is on screen and the phone is idle.
@@ -86,13 +92,13 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
           <button type="button" className="desktop-only" onClick={() => setCreating(true)} style={S.btnPrimary}>+ New job</button>
         </div>
       </div>
-      <JobStats boss={boss} version={version} active={filter} onPick={f => { setFilter(f); setPage(0); }}
-        onVendor={v => { setVendor(v); setSearch(''); setFilter('open'); setPage(0); }} addToast={addToast} />
+      <JobStats boss={boss} version={version} active={filter} onPick={f => { setOnDrafts(false); setFilter(f); setPage(0); }}
+        onVendor={v => { setOnDrafts(false); setVendor(v); setSearch(''); setFilter('open'); setPage(0); }} addToast={addToast} />
       {/* Open = running, or closed with money still owed; Completed = settled or cancelled. */}
       <div role="tablist" aria-label="Jobs" style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-        {(['open', 'completed', ...(draftN || onDrafts ? ['drafts'] : [])] as (JobTab | 'drafts')[]).map(t => {
+        {(['open', 'completed', ...(draftN === null || (draftN ?? 0) > 0 || onDrafts ? ['drafts'] : [])] as (JobTab | 'drafts')[]).map(t => {
           const on = t === 'drafts' ? onDrafts : !onDrafts && tabOf(filter) === t;
-          const n = t === 'drafts' ? draftN : counts?.[t];
+          const n = t === 'drafts' ? draftN ?? null : counts?.[t];
           return (
             <button key={t} type="button" role="tab" aria-selected={on} onClick={() => { if (on) return; if (t === 'drafts') { setOnDrafts(true); return; } setOnDrafts(false); setFilter(t); setPage(0); }}
               style={{ ...(on ? S.btnPrimary : S.btnGhost), flex: 1, maxWidth: 220, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
@@ -111,7 +117,7 @@ export default function Jobwork({ addToast }: { addToast: (m: string, t?: string
         {!onDrafts && tabOf(filter) === 'open' && FILTERS.filter(f => boss || f.id !== 'unpaid').map(f => (
           <button key={f.id} type="button" onClick={() => { setFilter(f.id); setPage(0); }} aria-pressed={filter === f.id} style={chip(filter === f.id)}>{f.label}</button>
         ))}
-        {vendor && (
+        {vendor && !onDrafts && (
           <button type="button" onClick={() => { setVendor(null); setPage(0); }} aria-label={`Showing ${vendor} only — tap to show every jobworker`}
             style={{ ...chip(true), display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 220 }}>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vendor}</span><span aria-hidden style={{ fontSize: 14, lineHeight: 1 }}>&#215;</span>

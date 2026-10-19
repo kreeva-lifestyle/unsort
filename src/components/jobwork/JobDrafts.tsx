@@ -39,7 +39,7 @@ export default function JobDrafts({ search, version, onOpen, addToast }: {
         const f = r.form;
         const what = [f.job_type, f.component && f.component.toUpperCase()].filter(Boolean).join(' · ');
         return (
-          <div key={r.id} role="button" tabIndex={0} onClick={() => onOpen(r)} onKeyDown={e => { if (e.key === 'Enter') onOpen(r); }} className="jw-card"
+          <div key={r.id} role="button" tabIndex={0} onClick={() => onOpen(r)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(r); } }} className="jw-card"
             style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: 'rgba(255,255,255,0.02)', border: `1px dashed ${T.bd2}`, borderRadius: T.rLg, padding: '12px 14px', cursor: 'pointer', minHeight: 44 }}>
             {f.sku ? <SkuThumb sku={f.sku} size={48} /> : <div style={{ width: 48, height: 48, borderRadius: 8, background: T.glass2, flexShrink: 0 }} />}
             <div style={{ flex: 1, minWidth: 0 }}>
