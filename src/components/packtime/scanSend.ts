@@ -23,9 +23,10 @@ export async function sendScan(row: PackTimeScanInsert, at?: number): Promise<{ 
     const { error } = await supabase.from('packtime_scans')
       .insert(at ? { ...row, queued_ms: Math.max(0, Math.min(MAX_QUEUED_MS, Date.now() - at)) } : row)
       .abortSignal(timeoutSignal(SEND_TIMEOUT_MS));
-    // Undone while it was on its way: take it back out.
+    // Undone while it was on its way: take it back out — also after a
+    // timeout, since the server may still have saved it.
     if (row.id && cancelled.has(row.id)) {
-      if (!error) supabase.from('packtime_scans').delete().eq('id', row.id).then(({ error: e }) => { if (e) logSwallowed('packtime undo after send', e); });
+      supabase.from('packtime_scans').delete().eq('id', row.id).then(({ error: e }) => { if (e) logSwallowed('packtime undo after send', e); });
       return { error: null, cancelled: true };
     }
     return { error };
